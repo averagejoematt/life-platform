@@ -430,19 +430,26 @@ class TestExtractPlateSummary:
         html = f'<div>The Wildcard</div><div style="x">{long_wc}</div>'
         assert len(wp.extract_plate_summary(html, [], END)["wildcard"]) <= 80
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): extract_plate_summary's recipe regex scans the WHOLE "
-            "email, not the 'Try This' section its docstring names. Bolded Greatest Hits food "
-            "names (which are by construction his most-frequent real foods) are stored as "
-            "'recipes' and fed back to the next edition inside a 'DO NOT REPEAT THESE' block, "
-            "steering the AI away from his own staples."
-        ),
-    )
     def test_a_greatest_hits_food_name_is_not_stored_as_a_recipe_to_avoid(self):
+        """FIXED (#2221): the recipe regex scanned the WHOLE email, so bolded Greatest
+        Hits food names — by construction his most-frequent REAL foods — were stored as
+        'recipes' and replayed into the next edition inside the DO-NOT-REPEAT block,
+        steering the writer away from his own staples. The scan is now section-scoped."""
         s = wp.extract_plate_summary(AI_HTML, ["ground turkey 93/7"], END)
         assert "Ground Turkey 93/7" not in s["recipes"]
+        assert s["recipes"] == ["Smoky Turkey Kofte Bowls", "Charred Cabbage Tacos"]
+
+    def test_a_greatest_hits_name_stays_out_even_when_it_is_not_a_listed_top_food(self):
+        """The section fence does the work — not a name-matching filter against the
+        top-foods list, which is only the second line of defence."""
+        assert "Ground Turkey 93/7" not in wp.extract_plate_summary(AI_HTML, [], END)["recipes"]
+
+    def test_the_two_sections_the_extractor_fences_on_are_sections_the_prompt_demands(self):
+        """Guard the SET: if SYSTEM_PROMPT renames either section, the fence would
+        silently fall back to scanning the whole email again."""
+        titles = wp.plate_section_titles()
+        assert "Try This" in titles
+        assert "Your Greatest Hits" in titles
 
 
 class TestStorePlateSummary:
@@ -1181,21 +1188,39 @@ class TestHandlerAiDegradation:
         html = wired["ses"].sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
         assert "Smoky Turkey Kofte Bowls" in html
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): the guard `'unavailable' not in ai_content[:50]` can "
-            "never fire on this module's OWN failure stub. The stub opens with a 78-char inline-"
-            "styled <div>, so the word 'unavailable' sits at index ~89 — outside the 50-char probe. "
-            "Consequence: on every AI failure the stub is filed via insight_writer.write_insight as "
-            "a genuine `coaching` insight (confidence=medium, actionable=True, pillars=[nutrition]) "
-            "and is then replayed into later meal-planning prompts by build_insights_context. The "
-            "same broken probe also runs the AI-3 validator over the stub, which it was written to "
-            "skip. Same shape as the tranche-1 'Commentary unavailable' finding."
-        ),
-    )
     def test_a_failed_ai_call_is_not_filed_as_a_genuine_coaching_insight(self, wired, monkeypatch):
+        """FIXED (#2221): the guard `'unavailable' not in ai_content[:50]` could never fire
+        on this module's OWN failure stub — the stub opens with a 78-char inline-styled
+        <div>, so the word sits at index ~89, outside the 50-char probe. Every AI failure
+        therefore filed the stub as a genuine `coaching` insight (confidence=medium,
+        actionable=True, pillars=[nutrition]), which build_insights_context replayed into
+        later meal-planning prompts. Replaced by an `ai_written` flag set at the failure."""
         monkeypatch.setattr(wp, "call_anthropic", lambda s, u: (_ for _ in ()).throw(RuntimeError("bedrock 500")))
+        wp.lambda_handler({}, None)
+        assert wired["writer"].written == []
+
+    def test_the_failure_stub_is_not_run_through_the_ai_output_validator(self, wired, monkeypatch):
+        """The same broken probe was also what skipped AI-3 for the stub — the stub is
+        this module's own text, not model output, so validating it is meaningless work."""
+        seen = []
+        monkeypatch.setattr(wp, "call_anthropic", lambda s, u: (_ for _ in ()).throw(RuntimeError("bedrock 500")))
+        monkeypatch.setattr(wp, "validate_ai_output", lambda text, kind: seen.append(text))
+        monkeypatch.setattr(wp, "_HAS_AI_VALIDATOR", True)
+        wp.lambda_handler({}, None)
+        assert seen == []
+
+    def test_a_validator_blocked_edition_is_not_filed_as_a_genuine_coaching_insight(self, wired, monkeypatch):
+        """Same class as the stub: the fallback notice is a degradation message, not
+        coaching, and must not be replayed into next week's prompt as one."""
+
+        class Blocked:
+            blocked = True
+            block_reason = "Dangerously low calorie recommendation"
+            safe_fallback = "Nutrition data received. Aim for your protein target."
+            warnings = []
+
+        monkeypatch.setattr(wp, "validate_ai_output", lambda text, kind: Blocked())
+        monkeypatch.setattr(wp, "_HAS_AI_VALIDATOR", True)
         wp.lambda_handler({}, None)
         assert wired["writer"].written == []
 

@@ -1186,16 +1186,11 @@ class TestHandlerRouting:
         hae.lambda_handler(_event(payload), _Ctx())
         assert any("blood_pressure" in p["Key"] for p in s3.puts)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): combined-format BP with no diastolic value "
-            "writes a FABRICATED blood_pressure_diastolic of 0 — sum()/max(1, 0) — which "
-            "is an ADR-104 absence-as-zero violation and reaches /api/vitals. Asserting "
-            "the correct contract here rather than ratifying the zero."
-        ),
-    )
     def test_blood_pressure_with_no_diastolic_must_not_fabricate_a_zero(self, handler_env):
+        """FIXED (#2221, ADR-104): `sum(...) / max(1, 0)` used to write a fabricated
+        0 mmHg diastolic for a cuff reading that carried systolic only. The zero is
+        a clinical number: `daily_brief_lambda` renders it as "120/0" and runs the
+        AHA classification on it. Absence is now an absent key, not a zero."""
         _, table = handler_env
         payload = {
             "data": {
@@ -1210,10 +1205,38 @@ class TestHandlerRouting:
             }
         }
         hae.lambda_handler(_event(payload), _Ctx())
-        for update in table.updates:
-            w = written_fields(update)
-            assert w.get("bp_diastolic") != 0
-            assert w.get("blood_pressure_diastolic") != 0
+        bp = [written_fields(u) for u in table.updates if "blood_pressure_readings_count" in written_fields(u)]
+        assert bp, "expected the systolic-only reading to still be merged"
+        assert "bp_diastolic" not in bp[0]
+        assert "blood_pressure_diastolic" not in bp[0]
+        assert bp[0]["bp_systolic"] == 120  # the measured half is NOT dropped
+
+    def test_a_measured_diastolic_is_averaged_even_alongside_a_reading_that_lacks_one(self, handler_env):
+        """The other direction of the same ADR-104 rule: a genuinely measured value
+        must not be discarded. The filter is `is not None`, not truthiness."""
+        _, table = handler_env
+        payload = {
+            "data": {
+                "metrics": [
+                    {
+                        "name": "blood_pressure",
+                        "units": "mmHg",
+                        "data": [
+                            {"date": "2026-05-02 08:00:00 +0000", "systolic": 120, "diastolic": 80},
+                            {"date": "2026-05-02 20:00:00 +0000", "systolic": 130},
+                        ],
+                    }
+                ],
+                "workouts": [],
+            }
+        }
+        hae.lambda_handler(_event(payload), _Ctx())
+        bp = [written_fields(u) for u in table.updates if "blood_pressure_readings_count" in written_fields(u)]
+        assert bp, "expected a blood-pressure merge"
+        # 80 is the mean of the diastolic readings that exist — not (80 + 0) / 2.
+        assert bp[0]["bp_diastolic"] == 80
+        assert bp[0]["blood_pressure_diastolic"] == 80
+        assert bp[0]["bp_systolic"] == 125
 
     def test_the_response_echoes_the_metric_names_it_received(self, handler_env):
         payload = {

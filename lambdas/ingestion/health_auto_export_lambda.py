@@ -1645,19 +1645,17 @@ def lambda_handler(event, context):
                 n = save_bp_readings_to_s3(date_str, readings)
                 bp_readings_new += n
                 avg_sys = round(sum(r["systolic"] for r in readings) / len(readings))
-                avg_dia = round(
-                    sum(r["diastolic"] for r in readings if r["diastolic"]) / max(1, len([r for r in readings if r["diastolic"]]))
-                )
-                merge_day_to_dynamo(
-                    date_str,
-                    {
-                        "bp_systolic": avg_sys,
-                        "bp_diastolic": avg_dia,
-                        "blood_pressure_systolic": avg_sys,
-                        "blood_pressure_diastolic": avg_dia,
-                        "blood_pressure_readings_count": len(readings),
-                    },
-                )
+                # ADR-104 (#2221): no diastolic reading -> no diastolic average. This was
+                # `sum(...) / max(1, 0)` -> a fabricated 0 mmHg that daily_brief_lambda renders
+                # as "120/0" and AHA-classifies. Filter on `is not None` (not truthiness) so a
+                # measured value is never dropped either; omit the field when none was measured.
+                dia = [r["diastolic"] for r in readings if r["diastolic"] is not None]
+                bp_fields = {"bp_systolic": avg_sys, "blood_pressure_systolic": avg_sys, "blood_pressure_readings_count": len(readings)}
+                if dia:
+                    bp_fields["bp_diastolic"] = bp_fields["blood_pressure_diastolic"] = round(sum(dia) / len(dia))
+                else:
+                    logger.warning(f"Blood Pressure {date_str}: {len(readings)} reading(s) carried no diastolic — systolic only")
+                merge_day_to_dynamo(date_str, bp_fields)
             if bp_readings_new:
                 logger.info(f"Blood Pressure: {bp_readings_new} new readings saved (combined format)")
             break

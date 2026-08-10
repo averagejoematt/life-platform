@@ -581,8 +581,8 @@ class TestEwmaTrend:
         assert ev._get_ewma_trend("vibes", {}, TODAY) == (None, None)
 
     def test_eight_observations_do_not_yield_a_trend(self, table):
-        """Characterisation of the real floor: the prior EWMA is computed over
-        `values[:len-7]`, which needs >= 2 entries, so 9 points are required."""
+        """One below the floor: the prior EWMA is computed over `values[:len-7]`, which
+        must smooth at least EWMA_MIN_PRIOR_POINTS entries."""
         daily_series("hrv", [50.0, 51, 52, 53, 54, 55, 56, 57], table=table)
         assert ev._get_ewma_trend("hrv", {}, TODAY) == (None, None)
 
@@ -590,19 +590,26 @@ class TestEwmaTrend:
         daily_series("hrv", [50.0, 51, 52, 53, 54, 55, 56, 57, 58], table=table)
         assert ev._get_ewma_trend("hrv", {}, TODAY)[0] == "up"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): _get_ewma_trend documents and guards a five-observation "
-            "floor (`if len(values) < 5: return None, None`) but the prior-EWMA branch below it needs "
-            "`len(values) - 7 >= 2`, so 5-8 observations always return (None, None). Any directional "
-            "forecast on a sparse metric (withings weigh-ins, dexa) is graded 'insufficient data' "
-            "while the code claims five points are enough."
-        ),
-    )
-    def test_the_documented_five_observation_floor_is_the_real_floor(self, table):
-        daily_series("hrv", [50.0, 52, 54, 56, 58], table=table)
-        assert ev._get_ewma_trend("hrv", {}, TODAY)[0] is not None
+    def test_the_declared_observation_floor_is_the_floor_the_code_actually_enforces(self, table):
+        """FIXED (#2221): the guard read `if len(values) < 5` while the prior-EWMA branch
+        below it needed `len(values) - 7 >= 2` — so 5-8 observations always returned
+        (None, None) and the module's stated contract was a lie.
+
+        The repair is the guard, not the branch: a 5-point series would take its "prior"
+        EWMA over a SINGLE raw reading, and grading a coach's directional call off a
+        smoothed-level-vs-one-point comparison manufactures confidence (ADR-105). The
+        floor is now derived from the two constants that produce it, and this test pins
+        the declared number against the empirically observed one — a lie here is a FAIL,
+        whichever of the two moves."""
+        first_n_with_a_trend = None
+        for n in range(1, 13):
+            table.items.clear()
+            daily_series("hrv", [50.0 + i for i in range(n)], table=table)
+            if ev._get_ewma_trend("hrv", {}, TODAY)[0] is not None:
+                first_n_with_a_trend = n
+                break
+        assert first_n_with_a_trend == ev.EWMA_MIN_OBSERVATIONS
+        assert ev.EWMA_MIN_OBSERVATIONS == ev.EWMA_PRIOR_LAG + ev.EWMA_MIN_PRIOR_POINTS
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -735,20 +742,27 @@ class TestConditionalPredictions:
         assert (evaluations, stats["pending"]) == ([], 1)
         assert table.updates == []
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): _evaluate_all applies _check_expiry only to the "
-            "'inconclusive' branch, so a conditional whose precondition never materialises stays "
-            "'pending' forever — past 1x window, past the 2x EXPIRY_MULTIPLIER, indefinitely. It is "
-            "re-fetched and re-evaluated every day, never decided and never retired, so it inflates "
-            "GradableCount forever while ADR-105's 'every forecast graded' is silently unmet."
-        ),
-    )
     def test_a_conditional_whose_precondition_never_arrives_is_eventually_retired(self, table):
+        """FIXED (#2221): _evaluate_all applied _check_expiry to the 'inconclusive' branch
+        only, so a conditional whose precondition never materialised stayed 'pending'
+        forever — past 1x window, past 2x EXPIRY_MULTIPLIER, indefinitely — re-fetched and
+        re-evaluated every day, never decided and never retired. It inflated GradableCount
+        while ADR-105's "every forecast is graded" went silently unmet."""
         pred = prediction(evaluation=SPEC_CONDITIONAL, subdomain="training", created_date=days_before(200))
-        evaluations, _ = ev._evaluate_all([pred], TODAY)
+        evaluations, stats = ev._evaluate_all([pred], TODAY)
         assert [e["status"] for e in evaluations] == ["expired"]
+        # Retirement is not a verdict: a call the world never tested moves no confidence.
+        assert evaluations[0]["bayesian_update"] is None
+        assert confidence_rows(table) == []
+        assert stats["pending"] == 0
+
+    def test_a_conditional_still_inside_its_grace_period_keeps_waiting(self, table):
+        """The other side of the retirement rule — expiry must not swallow a conditional
+        whose precondition could still arrive."""
+        pred = prediction(evaluation=SPEC_CONDITIONAL, subdomain="training", created_date=days_before(30))
+        evaluations, stats = ev._evaluate_all([pred], TODAY)
+        assert (evaluations, stats["pending"]) == ([], 1)
+        assert table.updates == []
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1423,29 +1437,62 @@ class TestHandler:
 
 
 class TestSecondLook:
-    def test_an_undecidable_grade_is_written_back_as_a_terminal_outcome(self, table):
-        """Characterisation: the first undecidable pass terminalises the record —
-        it is stamped with algo_version, which is exactly what the #813 reclaim
-        discriminator uses to refuse a second pass."""
+    def test_an_undecidable_grade_is_still_written_back_with_the_algo_stamp(self, table):
+        """The undecidable pass is recorded, not swallowed — the record carries its
+        reason and this evaluator's algo_version. What changed with #2221 is that the
+        write is PROVISIONAL while the 2x grace period is open, not terminal."""
         ev._evaluate_all([prediction(created_date=days_before(20))], TODAY)
         stored = table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]
         assert stored["status"] == "inconclusive"
-        assert json.loads(stored["outcome_notes"])["algo_version"] == ev.ALGO_VERSION
+        notes = json.loads(stored["outcome_notes"])
+        assert notes["algo_version"] == ev.ALGO_VERSION
+        assert notes["grading_open"] is True
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery): a forecast graded 'inconclusive' purely because the "
-            "metric had no reading on the day its window closed is terminal. _evaluate_all writes "
-            "the outcome with algo_version, so _fetch_predictions' EVALUABLE_STATUSES filter and "
-            "the #813 reclaim discriminator both refuse it forever — even though data arriving one "
-            "day later would have decided it, and even though _check_expiry/EXPIRY_MULTIPLIER "
-            "clearly intend a 2x-window grace period. As a result EXPIRY_MULTIPLIER is unreachable "
-            "for any prediction the daily run sees on schedule."
-        ),
-    )
     def test_a_forecast_undecidable_for_lack_of_data_gets_a_second_look_before_expiry(self, table):
+        """FIXED (#2221): the first undecidable pass used to terminalise the record —
+        _update_prediction_status stamps algo_version, so EVALUABLE_STATUSES and the #813
+        reclaim discriminator both refused it forever, even though a reading arriving one
+        day later would have decided it and _check_expiry/EXPIRY_MULTIPLIER plainly intend
+        a 2x-window grace period. EXPIRY_MULTIPLIER was unreachable for any prediction the
+        daily run saw on schedule."""
         seed(table, prediction(created_date=days_before(20)))
         ev._evaluate_all(ev._fetch_predictions(), TODAY)  # day 20: no readings yet
         daily_series("hrv", [60.0], table=table)  # the reading lands the next day
         assert len(ev._fetch_predictions()) == 1
+
+    def test_the_second_look_actually_decides_the_call_once_the_reading_lands(self, table):
+        """A re-fetch that could never decide anything would be theatre."""
+        seed(table, prediction(created_date=days_before(20)))
+        ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        daily_series("hrv", [60.0], table=table)
+        evaluations, _ = ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        assert [e["status"] for e in evaluations] == ["confirmed"]
+        assert table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]["status"] == "confirmed"
+
+    def test_a_decided_call_is_never_reopened_by_the_second_look(self, table):
+        """The provisional flag is one-way: once an outcome is terminal it stays terminal
+        (idempotency — a second run must not double-count a coach's hit)."""
+        seed(table, prediction(created_date=days_before(20)))
+        daily_series("hrv", [60.0], table=table)
+        ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        assert "grading_open" not in json.loads(table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]["outcome_notes"])
+        assert ev._fetch_predictions() == []
+
+    def test_a_call_past_its_grace_period_is_retired_rather_than_re_looked_forever(self, table):
+        """The bound on the second look: expiry terminalises, clearing the flag."""
+        seed(table, prediction(created_date=days_before(200)))
+        evaluations, _ = ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        assert [e["status"] for e in evaluations] == ["expired"]
+        assert "grading_open" not in json.loads(table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]["outcome_notes"])
+        assert ev._fetch_predictions() == []
+
+    def test_a_provisional_grade_writes_no_learning_row_until_it_decides(self, table):
+        """One undecided call must not write one LEARNING# row per day — that would
+        crowd real confirmed/refuted rows out of the window the public profile reads."""
+        seed(table, prediction(created_date=days_before(20)))
+        for _ in range(3):
+            ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        assert [p for p in table.puts if str(p.get("sk", "")).startswith("LEARNING#")] == []
+        daily_series("hrv", [60.0], table=table)
+        ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        assert len([p for p in table.puts if str(p.get("sk", "")).startswith("LEARNING#")]) == 1
