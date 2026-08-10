@@ -179,10 +179,18 @@ class TestWritePathWiring:
 
         captured.clear()
         monkeypatch.setattr(csu, "guard_derived_summary", lambda s, *a, **kw: s)
+        # #2418 put a SECOND, independent guard on this same write path — the ADR-104
+        # grounding gate over the whole derived-prose set — and it catches this live
+        # example too (the summary's "55" / "42" are in the narrative, but its
+        # unlabeled figures trip the #1968 night class the gate now arms). Reproducing
+        # the original defect therefore means bypassing both; that is the layering
+        # working, and pinning it here is what stops a future edit deleting one guard
+        # and reading the other's green as proof the first was never needed.
+        monkeypatch.setattr(csu, "_gate_derived_prose", lambda coach_id, date, text, extraction: (extraction, []))
         csu._write_output_record(
             "nutrition_coach", "2026-08-08", "daily_brief_nutrition", LIVE_NARRATIVE, {"observatory_summary": LIVE_SUMMARY}
         )
-        assert captured["observatory_summary"] == LIVE_SUMMARY, "guard bypassed ⇒ the live defect is reproduced"
+        assert captured["observatory_summary"] == LIVE_SUMMARY, "both guards bypassed ⇒ the live defect is reproduced"
 
     def test_a_clean_summary_still_reaches_the_record(self, monkeypatch):
         from coach import coach_state_updater as csu

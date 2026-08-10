@@ -212,10 +212,12 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
 # exemptions: each says what a reader sees and where the fix is tracked. An entry
 # leaves this table by landing a SURFACES registration, never by being re-described.
 UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
-    "lambdas/coach/coach_state_updater.py": {
-        "issue": 2418,
-        "note": "observatory_summary — the primary text /api/coach_analysis serves — carries guard_derived_summary only, unregistered.",
-    },
+    # coach_state_updater.py left this table 2026-08-10 the designed way (#2418): its
+    # DERIVED READER PROSE — observatory_summary AND the key_recommendation that
+    # outranks it on three of the six serving paths, AND elena_quote — now crosses one
+    # registered chokepoint in this module, with no exemption
+    # (grounding_wiring: "lambdas/coach/coach_state_updater.py::_gate_derived_prose",
+    # numbers/dates/night/freshness, regenerate-once-then-HOLD to the gated `content`).
     # coach_ensemble_digest.py left this table 2026-08-09 the designed way (#2419):
     # its digest writer landed a SURFACES registration
     # (grounding_wiring: "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate").

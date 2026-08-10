@@ -210,6 +210,32 @@ SURFACES = {
     # an internal input laundered into a reader surface. Same arms as the stance
     # surface below; regenerate-once-then-HOLD (the prior COMPRESSED#latest is kept —
     # write skipped — or the deterministic structural fallback stands in).
+    # #2418: the DERIVED READER PROSE of an OUTPUT# record — observatory_summary,
+    # key_recommendation, elena_quote. Six serving paths publish these in preference to
+    # the coach's own gated `content` (site_api_coach_narrative, site_api_coach_profile,
+    # site_api_lambda's coaching-dashboard, coach_observatory_renderer, the Panel
+    # podcast, the daily reflection), and until this entry they were the census's
+    # tracked defect (UNGATED_READER_KNOWN): two deterministic guards, no registered
+    # surface, so the numeric/date/night/freshness class never looked at the text a
+    # reader actually gets. Allow-list = the source narrative itself. Regenerate once,
+    # then HOLD the whole derived set (nulled) so every read site falls back to
+    # `content` — the artifact that passed its own gate at generation time.
+    "lambdas/coach/coach_state_updater.py::_gate_derived_prose": _entry(
+        ("numbers", "dates", "freshness", "night"),
+        {
+            "behavioral": (
+                "the source narrative ALREADY passed the #1699 gate with a real availability map "
+                "(ai_calls arms it on both the legacy and coach-v2 paths), and this surface grades a "
+                "CONDENSATION of that narrative against the narrative itself — a behavioral claim in "
+                "the summary is either one the source gate already graded or a fabrication the "
+                "numbers/dates classes catch as text the source never contained. Arming it here "
+                "would need a map this layer does not hold: the state updater is invoked with "
+                "`{coach_id, output_text, output_type, generation_date}` and reads no log partition "
+                "at all, so a map would be new I/O bought to re-grade a class one gate up. Revisit "
+                "if the extraction ever writes prose that is not a condensation of gated text."
+            )
+        },
+    ),
     "lambdas/coach/coach_history_summarizer.py::_apply_compression_gate": _entry(
         ("numbers", "dates", "freshness", "behavioral"),
         {"night": _NO_NIGHT_MAP},

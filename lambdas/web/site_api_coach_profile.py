@@ -22,6 +22,7 @@ the split, and it is why nothing here imports the facade — no import cycle.
 from boto3.dynamodb.conditions import Key
 from coach import (
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
+    coach_derived_prose,  # #2418: the derived-prose read seam — a held condensation falls back to gated `content`
     coach_dossier,  # #1387: the verbatim, privacy-filtered dossier projection (bundled module)
     coach_traits,  # #1113: authored trait scores for the immersive bios (bundled module)
 )
@@ -374,7 +375,7 @@ def _recent_outputs(coach_id, limit=25, *, _g):  # CC-07: depth for the daily-jo
             out.append(
                 {
                     "date": it.get("sk", "").replace("OUTPUT#", "").split("#")[0],
-                    "summary": it.get("key_recommendation") or it.get("observatory_summary") or "",
+                    "summary": coach_derived_prose.served_summary(it),
                     "themes": it.get("themes", []),
                 }
             )

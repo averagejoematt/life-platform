@@ -192,7 +192,14 @@ BASELINE = {
     # the ratchet's first real bump, and the shape it is meant to allow.
     "lambdas/compute/daily_metrics_compute_lambda.py": 1370,
     "lambdas/coach/coach_narrative_orchestrator.py": 1315,
-    "lambdas/coach/coach_state_updater.py": 1268,
+    # 1268 -> 1233 (#2418): the ADR-104 grounding gate on the derived reader prose is
+    # ~85 lines of new substance, and this file was AT its recorded number. Paid for the
+    # #2221 way rather than by raising it — the 143-line extraction-prompt literal moved
+    # to coach/coach_extraction_prompt.py (re-exported; nothing monkeypatches it) and the
+    # gate’s blob/regen/hold/read helpers live in coach/coach_derived_prose.py, which the
+    # three serving paths import anyway. Tightened to the measured count so the 35 lines
+    # handed back are not left as unpoliced headroom.
+    "lambdas/coach/coach_state_updater.py": 1233,
     "mcp/tools_hevy_routine.py": 1218,
 }
 
