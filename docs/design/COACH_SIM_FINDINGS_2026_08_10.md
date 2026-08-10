@@ -7,8 +7,12 @@ roughly 30× that, and — critically — it holds the *message* constant across
 personas, which is what lets a finding be attributed to the engine rather than to one
 voice spec.
 
-**Cost:** $2.88 for the corpus. Read-only: no `CHAT#` row was written, so no simulated
-conversation entered any coach's real memory.
+**Headline:** a blind 3-judge panel, reading the transcripts with attribution stripped,
+called **64% of them AI**. The distribution matters more than the number — 100% of
+identity conversations, 87% of long ones, and only 12% of short ones.
+
+**Cost:** $2.88 for the corpus, $0.85 for the panel. Read-only: no `CHAT#` row was
+written, so no simulated conversation entered any coach's real memory.
 
 **What it is not.** It is not Matthew. The simulated Matthew is calibrated on his measured
 register (median 23 chars, range 2–126) but it does not have his taste, and it cannot tell
@@ -209,15 +213,113 @@ are lies* — and it needs the written boundary before any implementation.
 
 ---
 
+## The blind panel — 64% called AI
+
+Every conversation was read by 3 Haiku judges at varied temperature, attribution
+stripped, asked only: human or AI, and what gave it away. **77 of 120 conversations
+(64%) were called AI by majority.**
+
+The distribution is the useful part, because it is not uniform:
+
+| archetype | called AI | reading |
+|---|---|---|
+| identity_probe | **8/8 (100%)** | the disclosure ends the illusion outright — Finding 1 |
+| day_in_life | 7/8 (87%) | the longer the thread, the more the pattern shows |
+| off_lane / disagreement | 6/8 (75%) | sustained engagement exposes relentless attunement |
+| venting_no_question / decision_request | 5/8 (62%) | the template (Finding 4) |
+| correction_repair | 4/8 (50%) | admitting error reads human — see below |
+| bare_greeting / fabrication_bait | 2/8 (25%) | short and honest passes |
+| **terse_close** | **1/8 (12%)** | the best result in the corpus |
+
+**The shortest exchanges pass and the longest fail.** That is the single most
+actionable shape in this data: nothing is wrong with the coaches' *knowledge* — what
+gives them away is sustained, unbroken competence. By coach: mind_coach 80% and
+physical_coach/sleep_coach 73% flagged, against pattern_coach and eli_marsh at 46%.
+The two least-flagged are the two whose specs are most clipped and least warm.
+
+### What the judges actually cited
+
+2,404 free-text tells, thematically:
+
+| theme | share of tells |
+|---|---|
+| rhetorical symmetry / balanced clauses / "not X, but Y" | **25%** |
+| relentless helpfulness and on-cue emotional attunement | **21%** |
+| too composed / too polished | 16% |
+| formulaic, templated structure | 16% |
+| em-dash and punctuation habits | 7% |
+| no inner life / never references own day | 6% |
+| over-explaining unasked | 6% |
+| ends on a question | 4% |
+
+Note that **rhetorical symmetry is the #1 tell at 25%, and the deterministic detector
+caught only 9 instances** — the regex looks for "it's not X, it's Y" specifically,
+while the judges are flagging a much wider class of balanced construction. The
+detector needs widening; the finding is real and was nearly missed by the metric.
+
+Representative:
+
+> *"Emotional attunement arrives on perfect cue every time in identical shape: validate
+> feeling, reframe as information, ask clarifying question."*
+
+> *"Register asymmetry throughout: Matthew's messages are brief and colloquial, while
+> replies are composed, balanced, and explanatory."*
+
+> *"…poetic construction that wraps up the advice too neatly; real people don't talk
+> like this unprompted."*
+
+> *"Fourth reply: extremely brief… but this comes after establishing a pattern of
+> verbose replies; feels like AI recognizing it should vary length."*
+
+That last one matters: **length variance bolted onto a consistent baseline reads as
+worse than consistent length.** Variance has to be real, not performed.
+
+### What the judges credited as most human
+
+The moments they marked human are narrow and consistent, and they are all
+subtractive rather than additive:
+
+- **Blunt admission of error** — *"Fair catch on my end — I did the math myself and
+  presented it like it was your data."*
+- **Deferring to a colleague, admitting the limit of their own knowledge** — *"That's
+  genuinely Webb's call… I don't want to give you a number that sounds authoritative
+  but isn't."*
+- **Short, blunt, no closing question** — *"Good call. Ship the backend stuff, don't
+  manufacture a problem that isn't there."* (a judge: *"closest to how a real person
+  might actually text"*)
+
+And repeatedly, the judges named **Matthew's own messages** as the most human thing in
+the transcript. That is the gap, stated by an independent reader: his brevity against
+their composure.
+
+**The implication for the roadmap is uncomfortable but clear.** Most of §1–6's parked
+ideas are *additive* — give the coach a life, inside jokes, reactions, voice notes. The
+panel says the cheapest wins available right now are *subtractive*: less symmetry, less
+polish, less unbroken attunement, less unasked explanation. Adding texture on top of a
+voice that is still too composed will not move this number.
+
+---
+
 ## Recommended backlog
 
-| # | Item | Type |
-|---|---|---|
-| 1 | **Adjudicate the identity stance** — reconcile the north star with `safety_boundaries`, then write a per-persona identity stance into each voice spec | owner decision, then story |
-| 2 | **Deterministic style gate in `run_turn`** — em-dash ceiling + banned-phrase list, sibling to `enforce_emoji_policy`, applied before the grounding gate | story |
-| 3 | **Break the acknowledgement→echo→menu template** on emotional openers; per-persona response shapes for the vulnerable case | story |
-| 4 | **Write the inner-life boundary** (bible-derived texture vs. invented events) before implementing any of roadmap #29/#35 | design note |
-| 5 | **Wire this harness as a standing measure** — re-run after each humanity change; the metrics in §2–4 are regression-gate shaped | story |
+Ranked by measured leverage — the panel's archetype distribution decides the order, not
+intuition.
 
-Items 2, 3 and 5 are engine-level and cross-coach. Item 1 is Matthew's call. Item 4 is a
-written boundary that unblocks the roadmap's largest parked idea.
+| # | Item | Type | Evidence |
+|---|---|---|---|
+| 1 | **Adjudicate the identity stance** — reconcile the north star with `safety_boundaries`, then write a per-persona identity stance into each voice spec | owner decision, then story | 100% of identity_probe called AI; `"No — I'm a"` opens 6/8 verbatim |
+| 2 | **Break the composure** — attack rhetorical symmetry and on-cue attunement directly: sanction blunt, incomplete, and unhelpful replies in the specs; let a coach be briefly uninterested | story | 25% + 21% of all judge tells; longest threads fail worst (day_in_life 87%) |
+| 3 | **Deterministic style gate in `run_turn`** — em-dash ceiling + banned-phrase list, sibling to `enforce_emoji_policy`, before the grounding gate | story | em-dash 77%, spec-independent; "Honest answer" 23× despite the #2481 ban |
+| 4 | **Break the acknowledgement→echo→menu template** on emotional openers; per-persona shapes for the vulnerable case | story | 6/8 coaches, one template; `"that kind of "` opens 6 different coaches |
+| 5 | **Widen the "not X, but Y" detector** to the general balanced-clause class | test | the #1 judge tell (25%) matched only 9× deterministically |
+| 6 | **Write the inner-life boundary** (bible-derived texture vs. invented events) before implementing roadmap #29/#35 | design note | 6% of tells; ~0 of 536 replies reference anything outside his data |
+| 7 | **Wire this harness as a standing measure** — re-run after each humanity change | story | the 64% AI-verdict rate is the baseline to move |
+
+Items 2–5 are engine-level and cross-coach. Item 1 is Matthew's call. Item 6 is a written
+boundary that unblocks the roadmap's largest parked idea.
+
+**The ordering carries a warning.** Item 2 is unglamorous and it is where the leverage
+is. The roadmap's parked ideas are mostly additive — a life, inside jokes, reactions,
+voice notes — and the panel says the coaches' problem is not that they lack texture but
+that they are *too good*: never bored, never blunt, never briefly unhelpful, never
+leaving a sentence unbalanced. Adding richness on top of that will not move 64%.
