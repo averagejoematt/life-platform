@@ -79,18 +79,12 @@ BUDGET_FEATURE = "state_of_matthew"
 MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 MAX_TOKENS = 420
 
-# Same 8-coach roster used by the coach-intelligence tools + the calibration
-# scoreboard (mcp/tools_coach_intelligence.py, lambdas/web/site_api_coach.py).
-COACH_NAMES = {
-    "sleep": "Dr. Lisa Park",
-    "nutrition": "Dr. Marcus Webb",
-    "training": "Dr. Sarah Chen",
-    "mind": "Dr. Nathan Reeves",
-    "physical": "Dr. Victor Reyes",
-    "glucose": "Dr. Amara Patel",
-    "labs": "Dr. James Okafor",
-    "explorer": "Dr. Henning Brandt",
-}
+# The operational roster, registry-derived (coaching-team v2) — the same map
+# the coach-intelligence tools + calibration scoreboard resolve, so a rename or
+# retirement propagates from config/personas.json instead of drifting here.
+from coach.persona_registry import short_id_names as _short_id_names
+
+COACH_NAMES = _short_id_names()
 COACH_IDS = tuple(COACH_NAMES)
 
 RESOLVED_WINDOW_DAYS = 7  # "this week's" hypothesis resolutions considered for the highlight

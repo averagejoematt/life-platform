@@ -73,13 +73,26 @@ TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 # config/personas.json) — but the contact you open is the room, which is what you
 # actually want to reach when the question spans domains.
 BOTS = [
+    ("headcoach", "ajm_headcoach_bot", "Dr. Eli Marsh"),
     ("nutrition", "ajm_nutrition_bot", "Dr. Marcus Webb"),
-    ("training", "ajm_training_bot", "Dr. Sarah Chen"),
     ("sleep", "ajm_sleep_bot", "Dr. Lisa Park"),
     ("mind", "ajm_mind_bot", "Dr. Nathan Reeves"),
-    ("physical", "ajm_longevity_bot", "Dr. Victor Reyes"),
+    # Coaching-team v2 (2026-08-10): the merged Performance seat. The @username
+    # survives the Victor→Max rename (usernames are sticky); /setname updates the
+    # display side whenever the owner runs this script.
+    ("physical", "ajm_longevity_bot", "Dr. Max Reyes"),
     ("explorer", "ajm_research_bot", "Dr. Henning Brandt"),
+    ("pattern", "ajm_pattern_bot", "Dr. Nora Vale"),
+    ("career", "ajm_career_bot", "Steve Brooks"),
     ("board", "ajm_board_bot", "Grand Rounds"),
+]
+
+# Retired seats keep their historical entry VISIBLE but are never configured:
+# the training route retired with Dr. Sarah Chen (2026-08-10, ADR-153). If the
+# owner previously created @ajm_training_bot, delete its webhook + revoke the
+# token via BotFather — an orphaned live webhook is attack surface.
+RETIRED_BOTS = [
+    ("training", "ajm_training_bot", "Dr. Sarah Chen (retired)"),
 ]
 
 # Coaches who keep running on the platform — daily cards, narratives, the board —

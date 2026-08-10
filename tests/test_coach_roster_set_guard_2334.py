@@ -44,6 +44,13 @@ from coach import persona_registry  # noqa: E402
 FULL_IDS = set(persona_registry.OPERATIONAL_COACH_IDS)
 SHORT_IDS = set(persona_registry.OPERATIONAL_SHORT_IDS)
 
+# The SCANNER's vocabulary additionally knows the retired ids: after the
+# 2026-08-10 retirement a stale hand-typed 8-coach copy still carries
+# training_coach, and a guard that no longer recognizes it would go quieter at
+# the exact moment the drift class it hunts became live.
+SCAN_FULL_IDS = FULL_IDS | set(persona_registry.RETIRED_COACH_IDS)
+SCAN_SHORT_IDS = SHORT_IDS | {c.replace("_coach", "") for c in persona_registry.RETIRED_COACH_IDS}
+
 # A literal is "a roster copy" when it shares at least this many ids with either
 # vocabulary. 5 of 8 catches a DRIFTED copy (an old cast shares most ids with the
 # live one — the drifted copy is the whole point) while staying clear of small
@@ -76,7 +83,7 @@ def roster_literals(root: Path):
             if not isinstance(node, (ast.List, ast.Tuple, ast.Set)):
                 continue
             elems = {e.value for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)}
-            if len(elems & FULL_IDS) < OVERLAP_THRESHOLD and len(elems & SHORT_IDS) < OVERLAP_THRESHOLD:
+            if len(elems & SCAN_FULL_IDS) < OVERLAP_THRESHOLD and len(elems & SCAN_SHORT_IDS) < OVERLAP_THRESHOLD:
                 continue
             window = lines[max(0, node.lineno - 1 - _WAIVER_LOOKBACK) : node.lineno]
             waived = any(WAIVER_MARKER in line for line in window)

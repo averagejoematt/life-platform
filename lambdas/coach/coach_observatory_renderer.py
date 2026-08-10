@@ -61,7 +61,8 @@ table = dynamodb.Table(TABLE_NAME)
 DOMAIN_COACH_MAP = {
     "sleep": "sleep_coach",
     "nutrition": "nutrition_coach",
-    "training": "training_coach",
+    # Coaching-team v2 (2026-08-10): the merged Performance seat serves training.
+    "training": "physical_coach",
     "mind": "mind_coach",
     "physical": "physical_coach",
     "glucose": "glucose_coach",
@@ -69,56 +70,21 @@ DOMAIN_COACH_MAP = {
     "explorer": "explorer_coach",
 }
 
-COACH_DISPLAY = {
-    "sleep_coach": {
-        "name": "Dr. Lisa Park",
-        "initials": "LP",
-        "title": "Sleep & Circadian Rhythm Specialist",
-        "color": "#818cf8",
-    },
-    "nutrition_coach": {
-        "name": "Dr. Marcus Webb",
-        "initials": "MW",
-        "title": "Evidence-Based Nutrition",
-        "color": "#10b981",
-    },
-    "training_coach": {
-        "name": "Dr. Sarah Chen",
-        "initials": "SC",
-        "title": "Exercise Physiology & Strength",
-        "color": "#3db88a",
-    },
-    "mind_coach": {
-        "name": "Dr. Nathan Reeves",
-        "initials": "NR",
-        "title": "Psychiatrist — Behavioral Patterns",
-        "color": "#a78bfa",
-    },
-    "physical_coach": {
-        "name": "Dr. Victor Reyes",
-        "initials": "VR",
-        "title": "Longevity & Body Composition",
-        "color": "#f59e0b",
-    },
-    "glucose_coach": {
-        "name": "Dr. Amara Patel",
-        "initials": "AP",
-        "title": "Metabolic Health & CGM",
-        "color": "#2dd4bf",
-    },
-    "labs_coach": {
-        "name": "Dr. James Okafor",
-        "initials": "JO",
-        "title": "Clinical Pathology & Preventive Labs",
-        "color": "#5ba4cf",
-    },
-    "explorer_coach": {
-        "name": "Dr. Henning Brandt",
-        "initials": "HB",
-        "title": "Biostatistics & N=1 Research",
-        "color": "#e879f9",
-    },
+# Registry-derived names/initials (coaching-team v2) + this surface's styling.
+from coach.persona_registry import display_map as _registry_display_map
+
+_OBS_STYLE = {
+    "sleep_coach": {"title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
+    "nutrition_coach": {"title": "Evidence-Based Nutrition", "color": "#10b981"},
+    "training_coach": {"title": "Exercise Physiology & Strength (retired seat)", "color": "#3db88a"},
+    "mind_coach": {"title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa"},
+    "physical_coach": {"title": "Performance — Training, Cardio & Mobility", "color": "#f59e0b"},
+    "glucose_coach": {"title": "Metabolic Health & CGM", "color": "#2dd4bf"},
+    "labs_coach": {"title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
+    "explorer_coach": {"title": "Research & Longevity — Evidence Appraisal", "color": "#e879f9"},
 }
+_reg = _registry_display_map(include=("operational", "retired"))
+COACH_DISPLAY = {cid: {**(_reg.get(cid) or {}), **style} for cid, style in _OBS_STYLE.items() if _reg.get(cid)}
 
 # Domain → source mapping for statistical guardrails lookup
 DOMAIN_SOURCE_MAP = {

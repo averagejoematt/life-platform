@@ -781,71 +781,30 @@ def lambda_handler(event, context):
         return handle_coach(event)
     if path == "/api/coaching-dashboard":
         try:
+            # Registry-derived (coaching-team v2) + this dashboard's links/styling. The
+            # retired training seat stays renderable for history; live iteration below
+            # keys off whatever this dict carries, so the registry decides the roster.
+            from coach.persona_registry import display_map as _registry_display_map
+
+            _cd_style = {
+                "sleep": {"title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8", "observatory_link": "/sleep/"},
+                "nutrition": {"title": "Evidence-Based Nutrition", "color": "#10b981", "observatory_link": "/nutrition/"},
+                "mind": {"title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa", "observatory_link": "/mind/"},
+                "physical": {"title": "Performance — Training, Cardio & Mobility", "color": "#f59e0b", "observatory_link": "/physical/"},
+                "glucose": {"title": "Metabolic Health & CGM", "color": "#2dd4bf", "observatory_link": "/glucose/"},
+                "labs": {"title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf", "observatory_link": "/labs/"},
+                "explorer": {"title": "Research & Longevity — Evidence Appraisal", "color": "#e879f9", "observatory_link": "/explorer/"},
+            }
+            _cd_names = _registry_display_map(include=("operational",))
             _cd_coach_display = {
-                "sleep": {
-                    "coach_id": "sleep",
-                    "name": "Dr. Lisa Park",
-                    "initials": "LP",
-                    "title": "Sleep & Circadian Rhythm Specialist",
-                    "color": "#818cf8",
-                    "observatory_link": "/sleep/",
-                },
-                "nutrition": {
-                    "coach_id": "nutrition",
-                    "name": "Dr. Marcus Webb",
-                    "initials": "MW",
-                    "title": "Evidence-Based Nutrition",
-                    "color": "#10b981",
-                    "observatory_link": "/nutrition/",
-                },
-                "training": {
-                    "coach_id": "training",
-                    "name": "Dr. Sarah Chen",
-                    "initials": "SC",
-                    "title": "Exercise Physiology & Strength",
-                    "color": "#3db88a",
-                    "observatory_link": "/training/",
-                },
-                "mind": {
-                    "coach_id": "mind",
-                    "name": "Dr. Nathan Reeves",
-                    "initials": "NR",
-                    "title": "Psychiatrist — Behavioral Patterns",
-                    "color": "#a78bfa",
-                    "observatory_link": "/mind/",
-                },
-                "physical": {
-                    "coach_id": "physical",
-                    "name": "Dr. Victor Reyes",
-                    "initials": "VR",
-                    "title": "Longevity & Body Composition",
-                    "color": "#f59e0b",
-                    "observatory_link": "/physical/",
-                },
-                "glucose": {
-                    "coach_id": "glucose",
-                    "name": "Dr. Amara Patel",
-                    "initials": "AP",
-                    "title": "Metabolic Health & CGM",
-                    "color": "#2dd4bf",
-                    "observatory_link": "/glucose/",
-                },
-                "labs": {
-                    "coach_id": "labs",
-                    "name": "Dr. James Okafor",
-                    "initials": "JO",
-                    "title": "Clinical Pathology & Preventive Labs",
-                    "color": "#5ba4cf",
-                    "observatory_link": "/labs/",
-                },
-                "explorer": {
-                    "coach_id": "explorer",
-                    "name": "Dr. Henning Brandt",
-                    "initials": "HB",
-                    "title": "Biostatistics & N=1 Research",
-                    "color": "#e879f9",
-                    "observatory_link": "/explorer/",
-                },
+                short: {
+                    "coach_id": short,
+                    "name": _cd_names[f"{short}_coach"]["name"],
+                    "initials": _cd_names[f"{short}_coach"]["initials"],
+                    **style,
+                }
+                for short, style in _cd_style.items()
+                if f"{short}_coach" in _cd_names
             }
             _cd_coach_id_map = {
                 "sleep": "sleep_coach",

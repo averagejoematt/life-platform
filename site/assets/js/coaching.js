@@ -998,17 +998,19 @@ function groundingFooterHTML(grounding) {
 // #373: ONE cast — the same eight coaches the rest of the site displays, so the
 // sigils and names on the convene cards match the roster (the phantom second
 // cast answered ungrounded and is retired; the API maps old cached ids).
+// Coaching-team v2 (2026-08-10): the training seat retired — the merged Performance
+// seat (Dr. Max Reyes) carries training. Keep this map equal to /api/coaches'
+// operational roster (tests/test_board_ask_roster.py + cast-consistency guard).
 const BOARD_PERSONAS = {
-  training_coach: { name: "Dr. Sarah Chen", title: "Training & Movement" },
   nutrition_coach: { name: "Dr. Marcus Webb", title: "Evidence-Based Nutrition" },
   sleep_coach: { name: "Dr. Lisa Park", title: "Sleep & Recovery" },
-  physical_coach: { name: "Dr. Victor Reyes", title: "Physical & Metabolic Health" },
+  physical_coach: { name: "Dr. Max Reyes", title: "Performance & Training" },
   glucose_coach: { name: "Dr. Amara Patel", title: "Glucose & Metabolic Response" },
   mind_coach: { name: "Dr. Nathan Reeves", title: "Mind & Behaviour" },
   labs_coach: { name: "Dr. James Okafor", title: "Labs & Biomarkers" },
   explorer_coach: { name: "Dr. Henning Brandt", title: "Cross-Domain Patterns" },
 };
-const BOARD_TRIO = ["training_coach", "nutrition_coach", "sleep_coach"];
+const BOARD_TRIO = ["physical_coach", "nutrition_coach", "sleep_coach"];
 
 // #546: a per-card follow-up thread with ONE coach. The server holds the
 // transcript (opaque session token, IP-bound, TTL ≤ 1h, ≤3 follow-ups), so the
@@ -1075,7 +1077,7 @@ function renderAskBoard(read) {
     `<form class="askboard-form" novalidate>` +
     `<textarea class="askboard-in" name="q" rows="3" maxlength="500" placeholder="e.g. Is the glucose spike the supplement, or just a bad night's sleep?" aria-label="Your question for the board"></textarea>` +
     `<div class="askboard-row">` +
-    `<label class="cv-all label"><input type="checkbox" name="allsix"> convene the full board (8)</label>` +
+    `<label class="cv-all label"><input type="checkbox" name="allsix"> convene the full board (7)</label>` +
     `<button class="askboard-btn" type="submit">Convene the board</button>` +
     `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>` +
     `<div class="cv-panel" data-cv-panel aria-live="polite"></div>` +

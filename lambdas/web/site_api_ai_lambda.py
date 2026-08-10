@@ -766,39 +766,18 @@ SAFETY (WR-40):
 # real-expert-adjacent wire IDs. board_ask now convenes the SAME eight coaches
 # the coaching pages display (config/coaches/*.json display names), each
 # grounded on the canonical facts block + their own STANCE#latest.
+# Registry-derived (coaching-team v2): name/title/lens live in config/personas.json,
+# so the board_ask roster IS the operational roster — a retired coach stops taking
+# new questions the moment the registry says so.
+from coach.persona_registry import display_map as _registry_display_map
+
 COACH_ROSTER = {
-    "sleep_coach": {"name": "Dr. Lisa Park", "title": "Sleep & Recovery", "lens": "sleep architecture, recovery, HRV, circadian rhythm"},
-    "training_coach": {
-        "name": "Dr. Sarah Chen",
-        "title": "Training & Movement",
-        "lens": "strength, cardio load, progressive overload, movement quality",
-    },
-    "nutrition_coach": {
-        "name": "Dr. Marcus Webb",
-        "title": "Evidence-Based Nutrition",
-        "lens": "energy balance, protein, adherence, a sustainable deficit",
-    },
-    "mind_coach": {"name": "Dr. Nathan Reeves", "title": "Mind & Behaviour", "lens": "habits, stress, motivation, behavioural patterns"},
-    "physical_coach": {
-        "name": "Dr. Victor Reyes",
-        "title": "Physical & Metabolic Health",
-        "lens": "body composition, weight trajectory, metabolic adaptation",
-    },
-    "glucose_coach": {
-        "name": "Dr. Amara Patel",
-        "title": "Glucose & Metabolic Response",
-        "lens": "glucose response, meal timing, metabolic flexibility",
-    },
-    "labs_coach": {"name": "Dr. James Okafor", "title": "Labs & Biomarkers", "lens": "bloodwork, biomarkers, long-run risk factors"},
-    "explorer_coach": {
-        "name": "Dr. Henning Brandt",
-        "title": "Cross-Domain Patterns",
-        "lens": "correlations across domains, N=1 methodology, statistical honesty",
-    },
+    pid: {"name": d["name"], "title": d["title"], "lens": d["lens"]} for pid, d in _registry_display_map(include=("operational",)).items()
 }
 # Tolerant transition for cached OLD persona ids (the retired cast) — mapped to
 # the nearest real coach, deduped downstream. Unknown ids (not old, not real) 400.
 LEGACY_PERSONA_MAP = {
+    "training_coach": "physical_coach",  # retired 2026-08-10 — the Performance seat absorbs training
     "vasquez": "physical_coach",
     "okafor": "labs_coach",
     "patel": "glucose_coach",

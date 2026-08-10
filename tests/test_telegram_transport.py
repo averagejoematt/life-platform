@@ -94,10 +94,11 @@ def test_the_board_group_routes_with_its_negative_chat_id(_wire):
 
 
 def test_chat_ids_authorize_across_bots_so_a_new_bots_first_message_routes(_wire):
-    """The union decision: training has no discovered chat id yet, but the id is
-    known from the nutrition bot — Matthew's first message to the new contact must
-    not read as a stranger."""
-    hook.lambda_handler(tg_event(path="/telegram/training"), None)
+    """The union decision: the pattern bot has no discovered chat id yet, but the
+    id is known from the nutrition bot — Matthew's first message to the new
+    contact must not read as a stranger. (Was the training route pre-retirement;
+    any not-yet-messaged live route exercises the same union.)"""
+    hook.lambda_handler(tg_event(path="/telegram/pattern"), None)
     assert len(_wire.lam.invocations) == 1
 
 

@@ -567,7 +567,7 @@ RULES FOR ALL ADVISORS:
 
 Write exactly these six sections with these exact headers:
 
-🏋️ DR. SARAH CHEN — MONTHLY TRAINING REVIEW
+🏋️ DR. MAX REYES — MONTHLY PERFORMANCE REVIEW
 Domain: training volume arc, Zone 2 base-building, CTL trajectory, periodisation, fatigue accumulation across the month.
 Key question: Did Matthew build fitness this month, or just accumulate fatigue? Is Zone 2 base growing, holding, or eroding? What does the Banister CTL say about fitness direction? Recommend ONE structural change to training for next month.
 

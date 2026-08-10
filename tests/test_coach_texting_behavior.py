@@ -490,3 +490,47 @@ def test_pack_failure_is_soft():
             raise RuntimeError("ddb down")
 
     assert cdf.domain_facts_block("nutrition", _Boom(), today="2026-08-09") == ""
+
+
+# ── B9: chat-tier routing (v2 roster) ────────────────────────────────────────
+
+
+def test_headcoach_route_resolves_eli_not_string_surgery():
+    from coach.persona_registry import persona_for_telegram_route
+
+    pid, p = persona_for_telegram_route("headcoach")
+    assert pid == "eli_marsh" and p["name"] == "Dr. Eli Marsh"
+    # the retired seat's route is gone — an unknown route fails closed upstream
+    assert persona_for_telegram_route("training") == (None, None)
+
+
+def test_worker_partitions_chat_tier_by_persona(monkeypatch):
+    """The head-coach chat must land in ONE partition derived from the persona,
+    not the route string — and the persona/voice must be Eli's."""
+    from coach import telegram_worker_lambda as worker
+
+    calls, stored = [], []
+    monkeypatch.setattr(worker, "_tg", lambda token, method, payload: calls.append((method, payload.get("text"))))
+    monkeypatch.setattr(worker, "_bot_token", lambda cid: "tok")
+    monkeypatch.setattr(worker, "_seen_update", lambda cid, uid: False)
+    monkeypatch.setattr(worker, "_thread_today", lambda cid: stored.append(("thread", cid)) or [])
+    monkeypatch.setattr(worker, "_facts", lambda: {})
+    monkeypatch.setattr(worker, "_memory_block", lambda cid: stored.append(("memory", cid)) or "")
+    monkeypatch.setattr(worker, "_current_tier", lambda: 3)  # budget-paused: no bedrock call needed
+    monkeypatch.setattr(worker, "_s3_client", lambda: None)
+    monkeypatch.setattr(worker.telegram_gateway, "is_stale", lambda ts, now: False)
+    monkeypatch.setattr(worker.coach_chat, "turn_records", lambda *a, **kw: [])
+
+    out = worker.lambda_handler({"coach_id": "headcoach", "chat_id": 1, "text": "hey"}, None)
+    assert out["ok"] is True
+    assert ("thread", "eli_marsh") in stored and ("memory", "eli_marsh") in stored
+
+
+def test_eli_voice_spec_loads_offline():
+    from coach import persona_core
+
+    spec = persona_core.load_voice_spec("eli_marsh", force_refresh=True)
+    assert spec and spec["display_name"] == "Dr. Eli Marsh"
+    assert persona_core.texting_block(spec).startswith("HOW YOU TEXT")
+    block = persona_core.persona_block("eli_marsh")
+    assert "YOUR SHARED STANDARD" in block and "one decision" in block.lower()

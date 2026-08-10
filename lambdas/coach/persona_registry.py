@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 # id list without an S3 round-trip at module load.
 OPERATIONAL_COACH_IDS = [
     "sleep_coach",
-    "training_coach",
     "nutrition_coach",
     "mind_coach",
     "physical_coach",
@@ -34,6 +33,19 @@ OPERATIONAL_COACH_IDS = [
     "explorer_coach",
 ]
 OPERATIONAL_SHORT_IDS = [c.replace("_coach", "") for c in OPERATIONAL_COACH_IDS]
+
+# Coaching-team v2 (2026-08-10): the roster grew TIERS. training_coach retired at
+# the cycle-13 genesis (Dr. Sarah Chen — the Performance seat absorbs training);
+# chat-tier coaches carry a voice spec + a Telegram bot but no daily engine
+# outputs; consulting specialists keep pipelines + site but no bots. MUST stay
+# equal to the corresponding flags in config/personas.json
+# (tests/test_persona_registry.py).
+CHAT_COACH_IDS = ["pattern_coach", "career_coach", "eli_marsh"]
+CONSULTING_COACH_IDS = ["glucose_coach", "labs_coach"]
+RETIRED_COACH_IDS = ["training_coach"]
+
+# Every coach with a voice spec a texting surface may load (worker persona path).
+TEXTING_PERSONA_IDS = [c for c in OPERATIONAL_COACH_IDS if c not in CONSULTING_COACH_IDS] + CHAT_COACH_IDS
 
 # The head coach (Principal Investigator) — the lead tier ABOVE the 8 operational
 # coaches (#1112). Non-operational (writes no domain OUTPUT#/STANCE#) but a
@@ -170,6 +182,60 @@ def display_name(persona_id, s3_client=None, bucket=None):
     """Human-facing name for a persona_id; falls back to the id itself."""
     p = resolve(persona_id, s3_client, bucket)
     return p.get("name") if p else persona_id
+
+
+def _initials(name: str) -> str:
+    parts = [w for w in str(name or "").replace("Dr.", "").split() if w and w[0].isalpha()]
+    return "".join(w[0].upper() for w in parts[:2])
+
+
+def short_id_names(s3_client=None, bucket=None, include_retired=False) -> dict:
+    """{short_id: display name} for the operational roster — the map a dozen
+    surfaces used to hand-copy (and let drift, which is how a renamed or retired
+    coach kept ghost-writing). Retired personas are included only on request,
+    for surfaces that render historical records under their real byline."""
+    out = {}
+    for pid, p in personas(s3_client, bucket).items():
+        if not p.get("short_id") or not p.get("name"):
+            continue
+        if p.get("operational") or (include_retired and p.get("retired")):
+            out[p["short_id"]] = p["name"]
+    return out
+
+
+def display_map(s3_client=None, bucket=None, include=("operational",)) -> dict:
+    """{persona_id: {name, initials, title, color, emoji, lens}} for chip/roster
+    surfaces. ``include`` selects tiers: "operational", "chat", "consulting",
+    "retired". Fields fall back sensibly so a sparse persona never renders
+    empty."""
+    out = {}
+    for pid, p in personas(s3_client, bucket).items():
+        tier_ok = (
+            ("operational" in include and p.get("operational"))
+            or ("chat" in include and p.get("chat"))
+            or ("consulting" in include and p.get("consulting"))
+            or ("retired" in include and p.get("retired"))
+        )
+        if not tier_ok or not p.get("name"):
+            continue
+        out[pid] = {
+            "name": p["name"],
+            "initials": _initials(p["name"]),
+            "title": p.get("title") or p.get("board_role") or "",
+            "color": p.get("color") or "#94a3b8",
+            "emoji": p.get("emoji") or "",
+            "lens": p.get("lens") or p.get("short_bio") or "",
+        }
+    return out
+
+
+def persona_for_telegram_route(route, s3_client=None, bucket=None):
+    """(persona_id, persona) for a Telegram route key, or (None, None).
+
+    Chat-tier coaches broke the old ``f"{route}_coach"`` derivation (eli_marsh
+    has no ``_coach`` suffix), so the route → persona mapping is registry data
+    (``telegram_route``), never string surgery."""
+    return _find("telegram_route", route, s3_client, bucket)
 
 
 def tts_voice(persona_id, s3_client=None, bucket=None):

@@ -32,14 +32,15 @@ def _body(resp):
 # ── roster (/api/coaches) ────────────────────────────────────────────────────
 
 
-def test_roster_returns_lead_plus_eight_staff():
-    # #1112: the head coach leads the roster (lead tier), then the 8 operational
-    # coaches in registry order.
+def test_roster_returns_lead_plus_staff():
+    # #1112: the head coach leads the roster (lead tier), then the operational
+    # coaches in registry order (7 since the 2026-08-10 retirement).
     data = _body(api.handle_coaches({}))
-    assert data["count"] == 9
+    staff_n = len(api.persona_registry.OPERATIONAL_COACH_IDS)
+    assert data["count"] == 1 + staff_n
     ids = [c["persona_id"] for c in data["coaches"]]
     assert ids == [api.persona_registry.LEAD_PERSONA_ID] + api.persona_registry.OPERATIONAL_COACH_IDS
-    assert [c["tier"] for c in data["coaches"]] == ["lead"] + ["staff"] * 8
+    assert [c["tier"] for c in data["coaches"]] == ["lead"] + ["staff"] * staff_n
     for c in data["coaches"]:
         for f in ("name", "domain", "short_bio", "emoji", "board_role", "headline_stat"):
             assert c.get(f), f"{c['persona_id']} missing {f}"
@@ -107,8 +108,8 @@ def test_coach_page_character_carries_data_sources(monkeypatch):
 
 
 def test_coach_page_id_via_query_param():
-    data = _body(api.handle_coach({"queryStringParameters": {"id": "training_coach"}}))
-    assert data["persona_id"] == "training_coach"
+    data = _body(api.handle_coach({"queryStringParameters": {"id": "physical_coach"}}))
+    assert data["persona_id"] == "physical_coach"
     assert data["stance"]["rung"]["stage_id"] == "foundation"
 
 
@@ -169,7 +170,7 @@ def test_lead_leads_the_roster_before_staff():
 
 def test_team_view_shape():
     data = _body(api.handle_coach_team({}))
-    assert len(data["huddle"]) == 8
+    assert len(data["huddle"]) == len(api.persona_registry.OPERATIONAL_COACH_IDS)
     for c in data["huddle"]:
         assert c.get("name") and c.get("headline") and c.get("stage_id")
         assert "watch" in c
@@ -183,7 +184,7 @@ def test_team_stage_mix_is_honest():
     stages = {c["persona_id"]: c["stage_id"] for c in data["huddle"]}
     # weight-banded coaches sit at 'foundation' from the baseline; nutrition
     # (logging consistency) sits at 'visibility' — so not all on one stage label.
-    assert stages["training_coach"] == "foundation"
+    assert stages["physical_coach"] == "foundation"
     assert stages["nutrition_coach"] == "visibility"
     assert data["all_same_stage"] is False
 

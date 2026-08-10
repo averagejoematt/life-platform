@@ -303,11 +303,11 @@ def test_curate_with_question_writes_checkin_under_mind(fake_table, monkeypatch)
 
 def test_curate_handoff_writes_checkin_under_target(fake_table, monkeypatch):
     monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
-    out = tr.tool_curate_horizon(_commit_args(follow_up_question="Worth a training angle?", handoff_to_coach="training"))
+    out = tr.tool_curate_horizon(_commit_args(follow_up_question="Worth a performance angle?", handoff_to_coach="physical"))
     assert out["status"] == "committed" and out["follow_up_surfaced"] is True
-    assert out["pick"]["follow_up"]["type"] == "handoff" and out["pick"]["follow_up"]["to_coach"] == "training"
-    assert _checkins(fake_table, "training") and not _checkins(fake_table, "mind")
-    assert _checkins(fake_table, "training")[0]["handoff_from"] == "mind"
+    assert out["pick"]["follow_up"]["type"] == "handoff" and out["pick"]["follow_up"]["to_coach"] == "physical"
+    assert _checkins(fake_table, "physical") and not _checkins(fake_table, "mind")
+    assert _checkins(fake_table, "physical")[0]["handoff_from"] == "mind"
 
 
 def test_curate_handoff_to_unknown_coach_is_rejected(fake_table, monkeypatch):

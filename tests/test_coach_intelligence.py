@@ -45,12 +45,15 @@ class TestDataMaturity:
         maturity = build_data_maturity(inventory)
         assert maturity["sleep"]["phase"] == "established"
 
-    def test_training_orientation_zero_workouts(self):
+    def test_retired_training_domain_has_no_maturity_ladder(self):
+        # v2 roster (ADR-153): the training domain retired with its seat — the
+        # merged Performance coach (physical) carries movement; a separate
+        # training maturity ladder would grade a coach that no longer exists.
         from intelligence.intelligence_common import build_data_maturity
 
         inventory = {"strava": {"exists": False, "records": 0, "days_of_data": 0}}
         maturity = build_data_maturity(inventory)
-        assert maturity["training"]["phase"] == "orientation"
+        assert "training" not in maturity
 
     def test_labs_uses_correct_source(self):
         from intelligence.intelligence_common import build_data_maturity

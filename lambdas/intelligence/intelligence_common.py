@@ -206,11 +206,11 @@ def build_data_inventory() -> dict:
 # DATA MATURITY
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Phase thresholds per coach domain
+# Phase thresholds per coach domain. v2 roster (2026-08-10): the training domain
+# retired with its seat — physical carries movement; its maturity stays composite.
 _MATURITY_THRESHOLDS = {
     "sleep": {"orientation": 7, "established": 30, "source": "whoop", "unit": "nights"},
     "nutrition": {"orientation": 7, "established": 30, "source": "macrofactor", "unit": "days logged"},
-    "training": {"orientation": 1, "established": 14, "source": "strava", "unit": "workouts"},
     "glucose": {"orientation": 7, "established": 30, "source": "cgm", "unit": "CGM days"},
     "physical": {
         "orientation": 7,

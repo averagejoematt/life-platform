@@ -150,9 +150,12 @@ def state_of_matthew(*, _g) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # Derived from the canonical persona registry, never re-typed (#2334; guard:
 # tests/test_coach_roster_set_guard_2334.py).
-from coach.persona_registry import OPERATIONAL_SHORT_IDS
+from coach.persona_registry import OPERATIONAL_SHORT_IDS, RETIRED_COACH_IDS
 
-_WRONG_COACHES = tuple(OPERATIONAL_SHORT_IDS)
+# Retired seats STAY in the sweep: The Wrong Feed is the losses-never-buried
+# surface, and a retirement (ADR-153) must not quietly bury a coach's graded
+# failures with it.
+_WRONG_COACHES = tuple(OPERATIONAL_SHORT_IDS) + tuple(c.replace("_coach", "") for c in RETIRED_COACH_IDS)
 
 # #1377 (The Wrong Feed): plain-English phrasing for a graded verdict's comparison
 # operator. Templated only — the obituary NEVER lets an LLM assert wrongness; every

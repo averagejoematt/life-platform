@@ -29,9 +29,10 @@ AI_SRC = open(os.path.join(ROOT, "lambdas/web/site_api_ai_lambda.py")).read()
 EXPERT_SRC = open(os.path.join(ROOT, "lambdas/intelligence/ai_expert_analyzer_lambda.py")).read()
 SUMMARIZER_SRC = open(os.path.join(ROOT, "lambdas/coach/coach_history_summarizer.py")).read()
 
+# 7 since the 2026-08-10 retirement (coaching-team v2) — training_coach's spec
+# stays on disk for history but leaves every operational sweep.
 OPERATIONAL = [
     "sleep_coach",
-    "training_coach",
     "nutrition_coach",
     "mind_coach",
     "physical_coach",

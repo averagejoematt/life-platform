@@ -28,7 +28,10 @@ sys.path.insert(0, _LAMBDAS)
 
 from coach import persona_registry  # noqa: E402  (lightweight — no boto3 at import)
 
-VALID_TYPES = {"board", "coach", "both", "narrator", "meta"}
+# Coaching-team v2 (2026-08-10) added two tier types: "chat" (voice spec + a
+# Telegram bot, no daily engine outputs — pattern_coach, career_coach) and
+# "retired" (published history keeps the byline; nothing writes as them again).
+VALID_TYPES = {"board", "coach", "both", "narrator", "meta", "chat", "retired"}
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -99,8 +102,18 @@ def test_operational_names_are_distinct():
 
 
 def test_config_coaches_match_operational_personas():
+    """*_coach.json voice specs == operational + chat + retired registry keys.
+
+    Chat-tier coaches text through the same persona_core path, so they carry a
+    voice spec; a retired coach's spec stays on disk because published history
+    still renders under their byline. (eli_marsh's spec has no _coach suffix, so
+    it lives outside this glob by construction.)"""
     config_keys = set(_coach_config_keys())
-    registry_keys = {p["coach_config_key"] for p in _operational().values()}
+    registry_keys = {
+        p["coach_config_key"]
+        for p in _personas().values()
+        if p.get("coach_config_key", "").endswith("_coach") and (p.get("operational") or p.get("chat") or p.get("retired"))
+    }
     assert config_keys == registry_keys, (
         f"config/coaches vs registry mismatch: "
         f"only in config={config_keys - registry_keys}, only in registry={registry_keys - config_keys}"
@@ -171,8 +184,16 @@ def test_accessors_resolve_known_coach():
     pid3, _ = persona_registry.by_engine_id("explorer_coach")
     assert pid3 == "explorer_coach"
     assert persona_registry.display_name("glucose_coach") == "Dr. Amara Patel"
-    assert len(persona_registry.operational_personas()) == 8
+    assert len(persona_registry.operational_personas()) == 7  # 8 → 7: training_coach retired 2026-08-10
     assert "the_chair" in persona_registry.board_personas()
+    # The tier constants mirror the registry flags (coaching-team v2).
+    assert persona_registry.CHAT_COACH_IDS == [k for k, v in _personas().items() if v.get("chat")]
+    assert persona_registry.CONSULTING_COACH_IDS == [k for k, v in _personas().items() if v.get("consulting")]
+    assert persona_registry.RETIRED_COACH_IDS == [k for k, v in _personas().items() if v.get("retired")]
+    # Route → persona resolution is registry data, never string surgery.
+    assert persona_registry.persona_for_telegram_route("headcoach")[0] == "eli_marsh"
+    assert persona_registry.persona_for_telegram_route("pattern")[0] == "pattern_coach"
+    assert persona_registry.persona_for_telegram_route("training") == (None, None)  # retired: no live route
 
 
 def test_lead_persona_nonoperational_with_distinct_voice():
@@ -185,7 +206,7 @@ def test_lead_persona_nonoperational_with_distinct_voice():
     assert lead.get("operational") is False, "lead must be non-operational"
     assert lead.get("lead") is True
     assert lead.get("type") in VALID_TYPES
-    assert len(_operational()) == 8, "adding the lead must not change the operational count"
+    assert len(_operational()) == 7, "adding the lead must not change the operational count (7 since the 2026-08-10 retirement)"
     v = lead.get("tts_voice")
     assert v and v.startswith("en-US-Chirp3-HD-"), f"lead voice unexpected: {v!r}"
     taken = {persona_registry.tts_voice(s) for s in list(persona_registry.OPERATIONAL_COACH_IDS) + ["elena_voss"]}
@@ -201,8 +222,8 @@ def test_lead_constant_matches_the_single_lead_persona():
 
 
 def test_podcast_voice_map_complete_and_unique():
-    """Every operational coach + Elena has a distinct persistent TTS voice (podcasts)."""
-    speakers = list(persona_registry.OPERATIONAL_COACH_IDS) + ["elena_voss"]
+    """Every operational + chat coach + Elena has a distinct persistent TTS voice."""
+    speakers = list(persona_registry.OPERATIONAL_COACH_IDS) + list(persona_registry.CHAT_COACH_IDS) + ["elena_voss"]
     voices = {s: persona_registry.tts_voice(s) for s in speakers}
     for s, v in voices.items():
         assert v, f"{s} missing tts_voice"

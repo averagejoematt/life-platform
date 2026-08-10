@@ -1424,10 +1424,10 @@ def _run_ai_coach_pipeline(
     # keeps the legacy fallback: no gate made a judgment there.
     _held_domains = set()
 
+    # v2 roster: training seat retired — its _v2_text stays "" so renderers never show it.
     for _cid, _call_fn, _label in [
         ("sleep", ai_calls.call_sleep_coach_v2, "Sleep"),
         ("nutrition", ai_calls.call_nutrition_coach_v2, "Nutrition"),
-        ("training", ai_calls.call_training_coach_v2, "Training"),
         ("mind", ai_calls.call_mind_coach_v2, "Mind"),
         ("physical", ai_calls.call_physical_coach_v2, "Physical"),
         ("glucose", ai_calls.call_glucose_coach_v2, "Glucose"),

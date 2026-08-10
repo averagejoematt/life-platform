@@ -32,10 +32,16 @@ if [ "$SKIP_CONFIGS" = false ]; then
   aws s3 cp "$ROOT_DIR/config/narrative/arc_definitions.json" \
     s3://matthew-life-platform/config/narrative/arc_definitions.json
 
-  # Upload coach voice specs
-  for f in "$ROOT_DIR"/config/coaches/*_coach.json; do
+  # Upload coach voice specs — every non-stance JSON, matching build_bundle's
+  # glob exactly (v2 roster added _shared_standard.json + eli_marsh.json, which
+  # the old *_coach.json glob silently skipped — S3-first reads would then serve
+  # a stale substrate forever). Stance files stay S3-only, engine-written.
+  for f in "$ROOT_DIR"/config/coaches/*.json; do
+    case "$(basename "$f")" in *_stance.json) continue ;; esac
     [ -f "$f" ] && aws s3 cp "$f" "s3://matthew-life-platform/config/coaches/$(basename "$f")"
   done
+  # The persona registry itself (the known ADD_A_COACH.md §10 gap, now closed).
+  aws s3 cp "$ROOT_DIR/config/personas.json" s3://matthew-life-platform/config/personas.json
   echo "✅ Config files uploaded"
   echo
 else

@@ -19,16 +19,12 @@ AI_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 SITE_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas/web/site_api_lambda.py")).read()
 COACHING_JS = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "site/assets/js/coaching.js")).read()
 
-REAL_ROSTER = {
-    "sleep_coach",
-    "training_coach",
-    "nutrition_coach",
-    "mind_coach",
-    "physical_coach",
-    "glucose_coach",
-    "labs_coach",
-    "explorer_coach",
-}
+# Derived, not pinned (coaching-team v2): the board_ask cast IS the operational
+# registry — the 2026-08-10 retirement shrank it to 7 and this test must shrink
+# with it, not hold the cast at a dead size.
+from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+REAL_ROSTER = set(OPERATIONAL_COACH_IDS)
 RETIRED_WIRE_IDS = ["vasquez", "okafor_persona", "driggs", "goggins", "patrick_persona"]
 
 

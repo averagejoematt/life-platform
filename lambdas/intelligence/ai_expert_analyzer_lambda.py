@@ -585,7 +585,7 @@ has already read your last analysis and will notice repetition immediately.
     # activity, instruct the coach to withhold the under-training verdict (the deterministic
     # guard at write-time is the backstop; this keeps the narrative itself honest).
     movement_context = ""
-    if expert_key == "training" and _HAS_INTELLIGENCE_COMMON:
+    if expert_key == "physical" and _HAS_INTELLIGENCE_COMMON:  # v2 roster: physical carries the training mandate
         try:
             _assess = movement_assessability(data.get("movement_source_state"), data.get("movement_ingest_health"))
             if not _assess["assessable"]:

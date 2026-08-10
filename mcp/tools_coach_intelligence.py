@@ -18,19 +18,12 @@ logger = logging.getLogger(__name__)
 # Derived from the canonical persona registry, never re-typed (#2334; guard:
 # tests/test_coach_roster_set_guard_2334.py). The coach package is on the MCP
 # bundle's path already (tools_coach_checkin imports persona_registry the same way).
-from coach.persona_registry import OPERATIONAL_SHORT_IDS
+from coach.persona_registry import OPERATIONAL_SHORT_IDS, short_id_names as _short_id_names
 
 COACH_IDS = list(OPERATIONAL_SHORT_IDS)
-COACH_NAMES = {
-    "sleep": "Dr. Lisa Park",
-    "nutrition": "Dr. Marcus Webb",
-    "training": "Dr. Sarah Chen",
-    "mind": "Dr. Nathan Reeves",
-    "physical": "Dr. Victor Reyes",
-    "glucose": "Dr. Amara Patel",
-    "labs": "Dr. James Okafor",
-    "explorer": "Dr. Henning Brandt",
-}
+# Registry-derived (coaching-team v2); retired coaches stay resolvable so their
+# historical records keep their real byline.
+COACH_NAMES = _short_id_names(include_retired=True)
 
 
 def tool_get_coach_thread(args):

@@ -50,7 +50,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Loaded carries improve bone density, metabolic conditioning, and grip strength",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "Rucking is Zone 2 with a strength stimulus. Two adaptations for the price of one.",
       "protocol": "3 walks per week with 20-40lb ruck. Minimum 30 minutes each.",
       "status": "backlog"
@@ -80,7 +80,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Morning sunlight resets circadian rhythm, improves cortisol awakening response",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "Morning sunlight within 30 minutes of waking is the single highest-ROI protocol.",
       "protocol": "Walk outdoors within 30 min of waking. Minimum 10 min. No sunglasses.",
       "status": "backlog"
@@ -95,7 +95,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "VO2max is the strongest predictor of all-cause mortality",
-      "board_recommender": "Dr. Victor Reyes",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "Building cardiovascular capacity is non-negotiable for the centenarian decathlon.",
       "protocol": "Complete a 5K (3.1 miles) running continuously.",
       "status": "backlog",
@@ -111,7 +111,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Grip strength is one of the strongest predictors of all-cause mortality",
-      "board_recommender": "Dr. Victor Reyes",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "Centenarian decathlon benchmark.",
       "protocol": "Hang from a pull-up bar with both hands for 60 continuous seconds.",
       "status": "backlog",
@@ -142,7 +142,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Pushup capacity inversely associated with cardiovascular events",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "Simple, measurable, functional strength benchmark.",
       "protocol": "20 full pushups, chest to ground, no pausing.",
       "status": "backlog",
@@ -641,7 +641,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Laukkanen et al.: 4-7 sauna sessions/week associated with 40% reduction in all-cause mortality",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "The Finnish data is staggering. Regular sauna use is one of the strongest longevity signals we have.",
       "protocol": "3 sessions/week, 170-190°F, 15-20 min. Cool down 5 min between rounds if doing multiple. Hydrate aggressively. Log sessions.",
       "status": "backlog"
@@ -656,7 +656,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Cold exposure increases norepinephrine 200-300%, improves mood, reduces inflammation markers",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "The discomfort IS the mechanism. Deliberate cold trains your stress response system.",
       "protocol": "End every shower with 2+ minutes of cold (as cold as it goes), OR cold plunge 50-59°F for 2 min. Morning preferred. Log daily.",
       "status": "backlog"
@@ -671,7 +671,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Progressive running programs build aerobic base safely; VO2max improvement 15-20%",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "The evidence for running and all-cause mortality is bulletproof. Getting to a 5K is the single highest ROI fitness goal.",
       "protocol": "Follow structured C25K plan (3 runs/week, walk-run intervals progressing to continuous). Track with Strava. Target: run 5K without stopping.",
       "status": "backlog"
@@ -686,7 +686,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "WHO + Attia: 150 min/week moderate cardio is the longevity minimum. Zone 2 specifically improves mitochondrial function.",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "Zone 2 is boring. It's also the single most important exercise modality for longevity.",
       "protocol": "150+ minutes per week in HR Zone 2 (roughly 60-70% max HR). Can be walking, cycling, rowing, swimming. Track via Whoop/Strava.",
       "status": "backlog"
@@ -701,7 +701,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Daily mobility work reduces injury risk, improves recovery, maintains joint range of motion",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "Flexibility is the pillar people skip. It catches up with you after 40.",
       "protocol": "15 minutes daily: hip openers, thoracic spine, hamstrings, shoulders. Can be yoga, foam rolling, or structured routine. Track compliance.",
       "status": "backlog"
@@ -716,7 +716,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Post-meal walking reduces glucose spike by 30-50% (CGM data); improves insulin sensitivity",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "The cheapest glucose drug in the world is a 10-minute walk after dinner.",
       "protocol": "Walk 10+ minutes within 30 min of each main meal. All 3 meals ideal, minimum 1/day (dinner). Track with steps + CGM correlation.",
       "status": "backlog"
@@ -731,7 +731,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Grip strength is the single strongest predictor of all-cause mortality in exercise science",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "If you can only measure one physical attribute for longevity prediction, measure grip strength.",
       "protocol": "3x/week: 3 sets max dead hang + 2 sets farmer carry (heavy, 30 sec). Track hang time progression.",
       "status": "backlog"
@@ -1177,7 +1177,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "CTL 4.45 means no accumulated fitness base. ACWR 0.26 means any intensity spike represents a 4x load jump. Zone 2 builds aerobic base safely and adds ~5 CTL over 3 weeks.",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "You can't buy fitness in a week of intensity. Zone 2 is the foundation everything else sits on.",
       "protocol": "4 Zone 2 sessions/week, 30–45 min each, HR 120–140 BPM. Walk, bike, elliptical — your call. If you can't hold a conversation, you're going too hard. Log every session.",
       "status": "available"
@@ -1193,7 +1193,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Walk 5k was missed 14 of 20 tracked days — the single most missed Tier 0 habit. When the walk goes, everything cascades. This is the canary. Fix the foundation.",
-      "board_recommender": "Dr. Sarah Chen",
+      "board_recommender": "Dr. Max Reyes",
       "board_quote": "The walk is the canary. When it goes, everything goes. You've proven that now.",
       "protocol": "5,000+ steps every single day for 10 consecutive days. No exceptions. Track in Apple Health or Garmin.",
       "status": "available"
