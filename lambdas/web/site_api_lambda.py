@@ -675,8 +675,6 @@ def lambda_handler(event, context):
     if SITE_API_ORIGIN_SECRET:
         req_headers = event.get("headers") or {}
         incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
-        import hmac as _hmac
-
         if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
             return _error(403, "Forbidden")
 
