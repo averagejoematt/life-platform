@@ -174,6 +174,8 @@ from ingestion import source_registry  # #2003: the canonical freshness set + th
 from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its own date
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
+from emails.brief_data_status import build_data_status_banner_html, scan_quiet_behavioral_sources  # #2326 quiet notice
+
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
 ai_calls.init(
     s3_client=s3,
@@ -2245,30 +2247,18 @@ def lambda_handler(event, context):
     # freshness-checker Lambda + get_freshness_status MCP tool use — direct DDB
     # query, no CloudWatch dependency (works even if metrics emission silently
     # fails like it did for 30 days).
+    # #2326: alongside the amber staleness banner, a calm "Quiet inputs" notice
+    # for load-bearing behavioral sources that have been silent far longer than
+    # their canonical threshold (MacroFactor's 45-day dark stretch was on no
+    # surface an operator reads). Non-paging by construction — it is a line in
+    # this email and nothing else. Quiet sources are re-homed out of the amber
+    # list so a logging lapse is never dressed up as breakage (ADR-104).
     try:
-        _stale = scan_stale_sources(datetime.now(timezone.utc).date())
-        if _stale:
-            _row_parts = []
-            for _s in _stale:
-                _src_name = _s["source"]
-                _age = _s.get("age_days")
-                if _age is None:
-                    _detail = "no data"
-                else:
-                    _last = _s.get("last_date", "?")
-                    _detail = f"last update {_last} ({_age}d ago)"
-                _row_parts.append(f'<li style="margin:2px 0">{_src_name} — {_detail}</li>')
-            _banner_rows = "".join(_row_parts)
-            _banner = (
-                '<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:14px 18px;'
-                'margin:0 0 16px;font-family:-apple-system,sans-serif;font-size:13px;color:#78350f">'
-                f'<strong style="color:#92400e">⚠️ Data Status — {len(_stale)} source{"s" if len(_stale)>1 else ""} stale</strong>'
-                f'<ul style="margin:6px 0 0;padding-left:18px;color:#78350f">{_banner_rows}</ul>'
-                '<div style="margin-top:8px;font-size:11px;color:#92400e">'
-                "The intelligence below is based on the data we have. "
-                "Stale sources can pull the day grade down without reflecting your actual behavior."
-                "</div></div>"
-            )
+        _scan_today = datetime.now(timezone.utc).date()
+        _stale = scan_stale_sources(_scan_today)
+        _quiet = scan_quiet_behavioral_sources(table, _scan_today)
+        _banner = build_data_status_banner_html(_stale, _quiet)
+        if _banner:
             # Inject banner immediately after <body...> tag
             import re as _re
 
@@ -2279,7 +2269,7 @@ def lambda_handler(event, context):
                 count=1,
                 flags=_re.IGNORECASE,
             )
-            logger.info(f"WR-48 banner prepended: {len(_stale)} stale sources")
+            logger.info(f"WR-48 banner prepended: {len(_stale)} stale, {len(_quiet)} quiet-behavioral sources")
     except Exception as _be:
         logger.warning(f"WR-48 banner failed (non-fatal): {_be}")
 

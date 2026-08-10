@@ -438,6 +438,10 @@ def test_the_scan_is_still_wired_into_the_brief():
     """The extraction must not have orphaned the banner: lambda_handler still calls
     it, and nothing rebuilt an inline copy alongside."""
     src = (REPO_ROOT / "lambdas" / "emails" / "daily_brief_lambda.py").read_text()
-    assert "scan_stale_sources(datetime.now(timezone.utc).date())" in src
+    # #2326 moved the call onto a shared pinned date so the quiet-behavioral scan
+    # reads the same "today" as the staleness scan.
+    assert "_scan_today = datetime.now(timezone.utc).date()" in src
+    assert "scan_stale_sources(_scan_today)" in src
+    assert "scan_quiet_behavioral_sources(table, _scan_today)" in src
     assert src.count("def scan_stale_sources") == 1
     assert "_STALE_OVERRIDE" not in src, "the inline staleness block came back"

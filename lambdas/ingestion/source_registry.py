@@ -791,6 +791,54 @@ def behavioral_source_keys() -> set:
     return {k for k, v in _active_monitored().items() if v["behavioral"]}
 
 
+# ── #2326: the quiet notice for load-bearing behavioral sources ────────────────
+# DECISION (2026-08-09, #2326): YES — a source classified `behavioral: True` AND
+# `posture: load-bearing` gets a NON-PAGING quiet notice once it has been silent
+# far longer than its stale_hours. MacroFactor went 45 days dark (cycle 12 had
+# zero nutrition data) while the Dropbox poller ran healthy — "behavioral means
+# never page" had in practice also become "never mention": nothing an operator
+# reads said so. The notice lives in the daily brief (a calm "quiet inputs"
+# block, rendered by daily_brief_lambda next to the WR-48 Data Status banner).
+#
+# Explicitly NOT a reclassification to infrastructure: that would route these
+# sources into StaleSourceCount and page the slo-source-freshness alarm on a
+# correct rest state (a skipped weigh-in, a rest week) — the exact
+# mis-classification the header of this file warns about, and the drift #392
+# cured. `behavioral` stays True; the notice NEVER feeds a paging path.
+#
+# Distinct-signal contract: the `stale_hours` facets above are canonical and
+# encode each WRITER's cadence (nutrition ~24h-lagged by design, weigh-ins
+# ~weekly). The quiet threshold does not re-state or re-tune them — it derives:
+# quiet_after_days = max(QUIET_NOTICE_MIN_DAYS, stale_hours × QUIET_NOTICE_FACTOR),
+# i.e. "quiet for several multiples of a normal lapse", strictly beyond the
+# staleness threshold, so a normal rest stretch never surfaces.
+QUIET_NOTICE_FACTOR = 3
+QUIET_NOTICE_MIN_DAYS = 14
+
+
+def quiet_watch_sources() -> dict:
+    """{key: {label, checker_label, quiet_after_days}} for every source whose
+    facets are `behavioral: True` AND `posture: load-bearing` (#2326) — derived,
+    never hand-typed. Only facet-level exclusions apply: `partition: False`
+    (nothing to query) and `paused` (intentionally off). Note this deliberately
+    ignores the `freshness`/`monitored` surface facets: supplements is
+    freshness-surface-exempt (#498) yet medication-safety load-bearing (ADR-077
+    dec A), and the quiet notice is precisely the surface of last resort."""
+    out = {}
+    for k, v in SOURCE_REGISTRY.items():
+        if not v["behavioral"] or v.get("posture") != "load-bearing":
+            continue
+        if v.get("partition") is False or v.get("paused"):
+            continue
+        sh = v["stale_hours"] if v["stale_hours"] is not None else DEFAULT_STALE_HOURS
+        out[k] = {
+            "label": v["label"],
+            "checker_label": v["checker_label"],
+            "quiet_after_days": max(QUIET_NOTICE_MIN_DAYS, int(sh * QUIET_NOTICE_FACTOR / 24)),
+        }
+    return out
+
+
 def public_board_sources() -> dict:
     """Active registry for /api/source_freshness (label/desc/category/behavioral)."""
     return {
