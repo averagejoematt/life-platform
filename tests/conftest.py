@@ -199,6 +199,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # ── registries a new module must join (none discoverable from the module) ──
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
+        "test_observatory_summary_grounding_2418.py",  # same registry, derived-prose surface (#2418)
         "test_api_schema_completeness.py",
         "test_og_card_coverage.py",
         "test_hae_datatype_liveness_468.py",
