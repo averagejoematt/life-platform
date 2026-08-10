@@ -24,28 +24,19 @@ Schedule:
   9:42 AM PT  daily-insight-compute  ← this Lambda
   10:00 AM PT daily-brief            (reads computed_insights via data["computed_insights"])
 
-v1.5.0 — 2026-07-05 (IC-31 / #542: changepoint detection)
-  - _compute_changepoints(): stats_core.detect_changepoints (CUSUM-style scan +
-    binary segmentation, stdlib) over HRV / Resting HR / Weight — surfaces abrupt
-    LEVEL shifts ("stepped down around Jun 14") that fixed-window drift misses,
-    with magnitude + confidence + approximate date; honest on thin data (ADR-105).
-  - Stored as `changepoints` on computed_insights; injected into the AI context
-    block at priority 3 (adverse) / 4 (favorable).
-v1.4.0 — 2026-03-13 (TB7-22: equalize slow drift windows)
-  - _compute_slow_drift(): windows changed from 7d recent/8-28d baseline
-    to 14d recent/15-28d baseline (equal 14d windows, same SE of mean)
-v1.3.0 — 2026-03-11 (IC-19: Slow Drift + Experiment Context)
-  - _compute_slow_drift(): non-overlapping 7d vs 8-28d windows, min N=14 (Henning)
-  - Weight plateau: regression slope on >=8 measurements, not endpoint (Attia)
-  - Weight plateau: MacroFactor TDEE preferred over Apple Watch (Webb/Norton)
-  - Recomposition caveat + >=11 complete log day gate (Okafor/Henning)
-  - Circadian consistency note when HRV/recovery drift fires (Huberman)
-  - slow_drift_metrics stored on computed_insights with baseline_n (Omar)
-  - _build_experiment_context(): descriptive active experiment injection (Anika/Raj)
-  - _build_prioritized_context_block(): priority queue + 700-token budget (Priya)
-  - Social quality flag when multiple drift + sparse journal (Murthy)
-v1.2.0 — 2026-03-09 (IC-5: Early Warning Detection — multi-marker proactive alert)
-v1.1.0 — 2026-03-08 (IC-8: Intent vs Execution Gap)
+Design notes (current truth; the per-version changelog is in git — it had gone stale here,
+restating _compute_slow_drift's pre-TB7-22 windows two lines under its own fix):
+  - _compute_slow_drift: EQUAL 14d recent vs 15-28d baseline windows (TB7-22 — same SE of the
+    mean), min N=14 (Henning), baseline_n on every signal (Omar); weight plateau from a
+    regression slope over >=8 measurements, not endpoints (Attia), MacroFactor TDEE over
+    Apple Watch (Webb/Norton), recomposition caveat, >=11 complete-log-day gate
+    (Okafor/Henning), circadian note (Huberman).
+  - _compute_changepoints (IC-31/#542): stats_core.detect_changepoints (CUSUM scan + binary
+    segmentation, stdlib) over HRV / Resting HR / Weight — abrupt LEVEL shifts a fixed-window
+    drift test misses, with magnitude/confidence/date, honest on thin data (ADR-105); stored
+    as `changepoints`, injected at priority 3 adverse / 4 favorable.
+  - IC-5 early warning, IC-8 intent-vs-execution gap, IC-19 experiment context (Anika/Raj),
+    the 700-token priority queue (Priya), Murthy social flag.
 """
 
 import json
@@ -116,6 +107,24 @@ DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_
 
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+
+
+def _are_consecutive_days(date_strs):
+    """Strictly adjacent ascending calendar days? Unparsable/absent → unverifiable → False (#2221)."""
+    try:
+        days = [datetime.strptime(d, "%Y-%m-%d").date() for d in date_strs]
+    except (TypeError, ValueError):
+        return False
+    return all((days[i] - days[i - 1]).days == 1 for i in range(1, len(days)))
+
+
+def _t0_rate(rec):
+    """Tier-0 habit completion (0..1) off a `habit_scores` row (#2221). `tier0_pct` is what
+    BOTH writers of that partition write (daily_brief_lambda's store_habit_scores +
+    daily_metrics_compute); `t0_completion_rate` is a legacy alias nothing has ever written.
+    None-aware: `a or b` read a MEASURED 0.0 day as absence, dropping it from averages (ADR-104)."""
+    val = safe_float(rec, "tier0_pct")
+    return val if val is not None else safe_float(rec, "t0_completion_rate")
 
 
 def fetch_date(source, date_str):
@@ -253,14 +262,11 @@ def detect_metric_trends(computed_records_7d):
     for rec in sorted(computed_records_7d, key=lambda x: x.get("date", "")):
         date_str = rec.get("date") or rec.get("sk", "").replace("DATE#", "")
         comp_scores = rec.get("component_scores", {})
-        for m in TOP_METRICS:
-            val = safe_float(rec, m)
-            if val is not None:
-                series[m].append((date_str, val))
-        for m in COMP_METRICS:
-            val = safe_float(comp_scores, m)
-            if val is not None:
-                series[m].append((date_str, val))
+        for src, names in ((rec, TOP_METRICS), (comp_scores, COMP_METRICS)):
+            for m in names:
+                val = safe_float(src, m)
+                if val is not None:
+                    series[m].append((date_str, val))
 
     declining, improving = [], []
     for metric, pts in series.items():
@@ -269,29 +275,26 @@ def detect_metric_trends(computed_records_7d):
         recent = pts[-3:]
         baseline_7d = round(sum(v for _, v in pts) / len(pts), 1)
 
-        if all(recent[i][1] < recent[i - 1][1] for i in range(1, len(recent))):
-            delta_pct = round((recent[-1][1] - recent[0][1]) / max(recent[0][1], 1) * 100, 1)
-            declining.append(
-                {
-                    "metric": metric,
-                    "consecutive_days": 3,
-                    "current": round(recent[-1][1]),
-                    "baseline_7d_avg": baseline_7d,
-                    "delta_pct": delta_pct,
-                }
-            )
+        # #2221: `consecutive_days` is a CALENDAR claim (rendered "declining 3 days"; IC-5 says
+        # "3 consecutive days"). 05-01/05-05/05-09 is three readings, not three days — the days
+        # between were never scored, and an unscored day is absence, not data (ADR-104).
+        if not _are_consecutive_days(d for d, _ in recent):
+            continue
 
-        elif all(recent[i][1] > recent[i - 1][1] for i in range(1, len(recent))):
-            delta_pct = round((recent[-1][1] - recent[0][1]) / max(recent[0][1], 1) * 100, 1)
-            improving.append(
-                {
-                    "metric": metric,
-                    "consecutive_days": 3,
-                    "current": round(recent[-1][1]),
-                    "baseline_7d_avg": baseline_7d,
-                    "delta_pct": delta_pct,
-                }
-            )
+        steps = [recent[i][1] - recent[i - 1][1] for i in range(1, len(recent))]
+        bucket = declining if all(s < 0 for s in steps) else improving if all(s > 0 for s in steps) else None
+        if bucket is None:
+            continue
+
+        bucket.append(
+            {
+                "metric": metric,
+                "consecutive_days": len(recent),
+                "current": round(recent[-1][1]),
+                "baseline_7d_avg": baseline_7d,
+                "delta_pct": round((recent[-1][1] - recent[0][1]) / max(recent[0][1], 1) * 100, 1),
+            }
+        )
 
     return declining, improving
 
@@ -628,6 +631,7 @@ def _compute_intention_patterns(history_records):
     Returns dict:
       gap_types_ranked:       [{type, stated, missed, miss_rate}] by miss_rate desc
       follow_through_rate_7d: float 0-1 or None
+      follow_through_days_n:  how many days that rate actually spans (ADR-105)
     """
     if not history_records:
         return {}
@@ -635,6 +639,11 @@ def _compute_intention_patterns(history_records):
     type_stated = {}
     type_missed = {}
     day_rates = []
+
+    # #2221: the loader queries ScanIndexForward=False, so records arrive NEWEST-first and
+    # `day_rates[-7:]` took the seven OLDEST — the "7-day" rate described days 8-14. Ordering
+    # here, off each record's own date, holds whichever way a caller hands them over.
+    history_records = sorted(history_records, key=lambda r: r.get("date") or str(r.get("sk", "")).rsplit("#", 1)[-1])
 
     for rec in history_records:
         evals = rec.get("evaluations", [])
@@ -674,6 +683,7 @@ def _compute_intention_patterns(history_records):
     return {
         "gap_types_ranked": gap_types[:4],
         "follow_through_rate_7d": overall,
+        "follow_through_days_n": len(recent),  # ADR-105: two logged days is a two-day rate
     }
 
 
@@ -775,7 +785,8 @@ def analyze_intention_execution_gap(yesterday_str, profile):
 
     overall = patterns.get("follow_through_rate_7d")
     if overall is not None:
-        lines.append(f"  7-day follow-through rate: {int(overall * 100)}%")
+        n_days = patterns.get("follow_through_days_n") or 0
+        lines.append(f"  Follow-through rate, last {n_days} day{'' if n_days == 1 else 's'} with intentions: {int(overall * 100)}%")
 
     lines.append(
         "INSTRUCTION: If recurring gaps exist, name the pattern directly and probe the friction. "
@@ -813,25 +824,11 @@ def detect_early_warning(computed_records_7d, habit_7d, declining):
     sorted_recs = sorted(computed_records_7d, key=lambda x: x.get("date", ""))
     recent_3 = sorted_recs[-3:] if len(sorted_recs) >= 3 else sorted_recs
 
-    # Marker 1: journal sparse
-    journal_low = 0
-    for rec in recent_3:
-        comp = rec.get("component_scores", {})
-        score = safe_float(comp, "journal")
-        if score is not None and score < 50:
-            journal_low += 1
-    if journal_low >= 2:
-        markers.append("journal_sparse")
-
-    # Marker 2: nutrition gap
-    nutrition_low = 0
-    for rec in recent_3:
-        comp = rec.get("component_scores", {})
-        score = safe_float(comp, "nutrition")
-        if score is not None and score < 40:
-            nutrition_low += 1
-    if nutrition_low >= 2:
-        markers.append("nutrition_gap")
+    # Markers 1-2: one rule, one table — component under its floor on 2+ of the last 3 days.
+    for marker, field, floor in (("journal_sparse", "journal", 50), ("nutrition_gap", "nutrition", 40)):
+        scores = [safe_float(r.get("component_scores", {}), field) for r in recent_3]
+        if sum(1 for s in scores if s is not None and s < floor) >= 2:
+            markers.append(marker)
 
     # Marker 3: habit completion dropping
     sorted_habits = sorted(habit_7d, key=lambda x: x.get("date", ""))
@@ -840,8 +837,7 @@ def detect_early_warning(computed_records_7d, habit_7d, declining):
         prior_h = sorted_habits[-7:-3] if len(sorted_habits) >= 7 else sorted_habits[:-3]
 
         def avg_completion(records):
-            vals = [safe_float(r, "t0_completion_rate") for r in records]
-            vals = [v for v in vals if v is not None]
+            vals = [v for v in (_t0_rate(r) for r in records) if v is not None]
             return sum(vals) / len(vals) if vals else None
 
         recent_comp = avg_completion(recent_h)
@@ -1588,8 +1584,7 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
         if not habit_7d:
             return False, ""
 
-        t0_rates = [safe_float(r, "tier0_pct") or safe_float(r, "t0_completion_rate") for r in habit_7d]
-        t0_rates = [v for v in t0_rates if v is not None]
+        t0_rates = [v for v in (_t0_rate(r) for r in habit_7d) if v is not None]
         t0_avg_7d = sum(t0_rates) / len(t0_rates) if t0_rates else None
 
         if t0_avg_7d is None:
@@ -2088,9 +2083,14 @@ def lambda_handler(event, context):
     profile = fetch_profile()
 
     # ── 1. Load pre-computed records ──
-    computed_7d = fetch_range("computed_metrics", (today - timedelta(days=7)).isoformat(), yesterday_str)
-    habit_7d = fetch_range("habit_scores", (today - timedelta(days=7)).isoformat(), yesterday_str)
-    grade_14d = fetch_range("day_grade", (today - timedelta(days=14)).isoformat(), yesterday_str)
+    # #2221: anchor on the TARGET date, not the wall clock — `today - 7` .. `yesterday_str`
+    # INVERTS on any backfill older than a week, so momentum/trends/habits read zero records
+    # and store half-computed, silently. Offsets are 6/13 not 7/14 (yesterday-6 == today-7):
+    # spans and compute_momentum's two balanced 7-day halves are unchanged on the daily run.
+    anchor = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+    computed_7d = fetch_range("computed_metrics", (anchor - timedelta(days=6)).isoformat(), yesterday_str)
+    habit_7d = fetch_range("habit_scores", (anchor - timedelta(days=6)).isoformat(), yesterday_str)
+    grade_14d = fetch_range("day_grade", (anchor - timedelta(days=13)).isoformat(), yesterday_str)
 
     logger.info(f"Loaded: {len(computed_7d)} computed_metrics, {len(habit_7d)} habit_scores, {len(grade_14d)} day_grade records")
 
