@@ -779,7 +779,18 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         # All five gate classes armed; the memory block and thread text widen the
         # NUMBER vocabulary (quoting memory is not fabrication) while the night map
         # stays facts-only — #2343's class is checked even on remembered figures.
-        grounder=_grounder_for(a),
+        #
+        # `text` — the message Matthew JUST sent — is an evidence source for the
+        # same reason memory is: repeating back what he told you is not
+        # fabrication. `a` is assembled BEFORE this turn, so `a["thread"]` holds
+        # only PRIOR turns; without `text` here, every number he states in the
+        # current message reads as invented. Measured live 2026-08-10: "I woke up
+        # late so ended up just doing a 2.5 mile walk outside instead" held twice
+        # on `fabricated_number` and fell back to the deferral string — the coach
+        # was structurally unable to acknowledge a number he had just supplied.
+        # The referral path (`_grounder_for(a, tail)`) already passed its tail,
+        # which is why only the primary inbound path carried the defect.
+        grounder=_grounder_for(a, text),
         tier=_current_tier(),
         turns_today=_turns_today(thread),
         last_reply_had_emoji=_last_reply_had_emoji(thread),

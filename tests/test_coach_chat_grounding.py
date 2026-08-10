@@ -185,3 +185,40 @@ def test_the_grounder_is_reusable_across_turns_without_rebuilding():
     first = gr("You averaged 165 g.")
     second = gr("You averaged 165 g.")
     assert first and second and len(first) == len(second)
+
+
+# ── What Matthew just said is evidence (live regression, 2026-08-10) ──────────
+#
+# Measured on the real thread: he texted "I woke up late so ended up just doing a
+# 2.5 mile walk outside instead", the reply held TWICE on `fabricated_number`, and
+# the coach fell back to the deferral string — "Let me check that before I answer
+# ... Ask me again in a minute." The walk was not in the platform yet (nothing had
+# ingested it), so the only place "2.5" existed was HIS OWN MESSAGE.
+#
+# The gate was right that 2.5 was unsupported by the facts. The wiring was wrong:
+# the inbound message was never offered as a source, so the coach was structurally
+# unable to acknowledge any number he had just supplied. Repeating back what he
+# told you is not fabrication — the same principle the memory block already rides
+# on. The night class stays facts-only, so #2343 is unaffected.
+
+
+def test_a_number_matthew_supplies_in_his_own_message_is_not_a_fabrication():
+    """The live 2026-08-10 failure, as a property."""
+    inbound = "I woke up late so ended up just doing a 2.5 mile walk outside instead"
+    gr = grounder(extra_sources=(inbound,))
+    assert gr("Nice — 2.5 miles outside still counts.") == [], "a number he just stated must be repeatable back to him"
+
+
+def test_the_same_number_is_still_a_fabrication_when_he_did_not_supply_it():
+    """The complement — this is what stops the fix from being a hole. Without the
+    inbound carrying it, 2.5 is unsupported and must still be caught."""
+    assert grounder()("Nice — 2.5 miles outside still counts."), "an unsourced number must still fail"
+
+
+def test_widening_on_the_inbound_does_not_disarm_the_night_class():
+    """#2343's class is the one an existence-only check misses. Matthew naming a
+    number must not let a REAL reading be attached to the WRONG night."""
+    inbound = "felt rough, recovery was 31 percent"
+    gr = grounder(extra_sources=(inbound,))
+    findings = gr("Your recovery on 2026-08-07 was 31%.")
+    assert findings, "31 is sayable because he said it — but not as 2026-08-07's stored 55%"
