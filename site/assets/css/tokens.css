@@ -924,8 +924,11 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .wu-dot.lit { background: var(--ember); border-color: var(--ember); }
 .wu-label { color: var(--ink-muted); }
 /* Compound selector: .rd-badge's border shorthand (evidence.css, loads later)
-   would re-solidify a bare .wu-carried — 0,2,0 wins regardless of order. */
-.wu-carried, .rd-badge.wu-carried { border-style: dashed; opacity: 0.85; }
+   would re-solidify a bare .wu-carried — 0,2,0 wins regardless of order.
+   No opacity: it sank the badge text below the AA contrast floor the moment the
+   cycle-13 carried baseline first rendered the badge live (axe color-contrast,
+   site-deploy 2026-08-10) — the dashed border alone says "carried". */
+.wu-carried, .rd-badge.wu-carried { border-style: dashed; }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
