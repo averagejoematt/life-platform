@@ -31,6 +31,8 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
+    aws_events as events,
+    aws_events_targets as targets,
     aws_lambda as _lambda,
     aws_s3 as s3,
     aws_sns as sns,
@@ -340,6 +342,31 @@ class ServeStack(Stack):
         )
         _telegram_worker_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # Act 1b: the worker gained a SCHEDULED path (the morning check-in), and a
+        # scheduled path has no human on the other end to notice it broke — the
+        # inbound half at least has Matthew wondering why nobody answered. The
+        # function was created with alerts_topic=None, so until now it had no error
+        # alarm at all. Threshold 3/hour rather than 1: the outbound gates are
+        # deliberately fail-soft and a single transient DDB/Bedrock blip is already
+        # absorbed, so one error is noise and a repeated one is a broken deploy.
+        _telegram_worker_errors = cloudwatch.Alarm(
+            self,
+            "TelegramWorkerErrors",
+            alarm_name="telegram-worker-errors",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": "telegram-coach-worker"},
+                period=Duration.hours(1),
+                statistic="Sum",
+            ),
+            threshold=3,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _telegram_worker_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         _telegram_webhook_throttles = cloudwatch.Alarm(
             self,
             "TelegramWebhookThrottles",
@@ -392,6 +419,34 @@ class ServeStack(Stack):
         # A chatty evening must not starve the site: the worker gets a small reserved
         # slice, sized like site-api-ai's (sequential model calls, one user).
         telegram_worker_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
+
+        # Eli's weekday morning check-in (Act 1b) — the ONE scheduled outbound the
+        # coaching team has. cron(15 17 ? * MON-FRI *) UTC = 10:15 AM PDT / 09:15 PST,
+        # UTC-fixed per the no-DST-drift convention; the handler re-checks the
+        # Pacific weekday itself, because the cron's weekday is a UTC weekday.
+        #
+        # The rule is defined here rather than via create_platform_lambda's
+        # `schedule=` because the worker needs a CONSTANT INPUT to tell a scheduled
+        # check-in apart from a webhook work order — the helper wires a bare
+        # LambdaFunction target with no event override.
+        #
+        # This rule firing is NOT the same thing as a text being sent: the handler
+        # is independently dark until Eli's bot exists in the telegram secret with a
+        # chat id on it. Both halves have to be true, which is the property that
+        # lets this ship before the owner's BotFather run.
+        morning_checkin_rule = events.Rule(
+            self,
+            "TelegramMorningCheckin",
+            rule_name="telegram-coach-morning-checkin",
+            description="Weekday morning check-in from the program lead (dark until his Telegram bot is registered)",
+            schedule=events.Schedule.expression("cron(15 17 ? * MON-FRI *)"),
+        )
+        morning_checkin_rule.add_target(
+            targets.LambdaFunction(
+                telegram_worker_fn,
+                event=events.RuleTargetInput.from_object({"kind": "morning_checkin"}),
+            )
+        )
 
         telegram_webhook_fn = create_platform_lambda(
             self,

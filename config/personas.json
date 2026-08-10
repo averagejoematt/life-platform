@@ -112,6 +112,7 @@
       "title": "Performance & Training",
       "lens": "training load, strength + cardio programming, movement capability, body composition",
       "telegram_route": "physical",
+      "telegram_route_aliases": ["training"],
       "pronouns": "he/him"
     },
     "glucose_coach": {

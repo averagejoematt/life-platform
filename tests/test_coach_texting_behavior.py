@@ -509,8 +509,11 @@ def test_headcoach_route_resolves_eli_not_string_surgery():
 
     pid, p = persona_for_telegram_route("headcoach")
     assert pid == "eli_marsh" and p["name"] == "Dr. Eli Marsh"
-    # the retired seat's route is gone — an unknown route fails closed upstream
-    assert persona_for_telegram_route("training") == (None, None)
+    # The retired seat's route is a SUCCESSION alias, not a dead key: the chat
+    # Matthew already has open continues with the coach who absorbed the lane.
+    assert persona_for_telegram_route("training")[0] == "physical_coach"
+    # A route nobody claims still fails closed.
+    assert persona_for_telegram_route("astrology") == (None, None)
 
 
 def test_worker_partitions_chat_tier_by_persona(monkeypatch):

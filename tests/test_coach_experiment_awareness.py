@@ -299,8 +299,16 @@ def test_storage_failure_costs_the_ddb_sections_not_the_frame():
 def test_the_worker_feeds_the_pacific_date_to_both_the_pack_and_the_gate():
     """#2392's class. The worker computes the Pacific day once and hands it to
     domain_facts_block AND build_grounder; a UTC default would put the coach a day
-    ahead of its own frame after 5pm PT."""
+    ahead of its own frame after 5pm PT.
+
+    The clock is read through the worker's ``_pacific_now()`` seam (Act 1b — the
+    outbound gates inject it), which still resolves to ``pacific_time.pacific_now``
+    and nothing else. Both facts are asserted so the seam cannot become a second,
+    divergent notion of "now".
+    """
     src = open(os.path.join(os.path.dirname(__file__), "..", "lambdas", "coach", "telegram_worker_lambda.py")).read()
-    assert 'today_pt = pacific_now().strftime("%Y-%m-%d")' in src
+    assert 'today_pt = _pacific_now().strftime("%Y-%m-%d")' in src
+    assert "def _pacific_now():" in src
+    assert "from common.pacific_time import pacific_now" in src
     assert "domain_facts_block(persona_id, _table(), today_pt)" in src
-    assert "generation_date_iso=today_pt" in src
+    assert 'generation_date_iso=a["today_pt"]' in src

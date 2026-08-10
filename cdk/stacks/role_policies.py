@@ -3236,9 +3236,9 @@ def telegram_worker() -> list[iam.PolicyStatement]:
     """Telegram coach worker (#2364): the chat brain's runtime grants.
 
     DDB read-wide (persona/memory/facts span COACH#, computed_metrics, engagement)
-    but WRITE-SCOPED to COACH#* via LeadingKeys — the chat stores CHAT# turns and
-    must never touch a DATE# timeseries row. Bedrock via the ADR-062 statement;
-    the telegram store; read-only SSM for budget tier + cycle.
+    but WRITE-SCOPED to COACH#* via LeadingKeys — CHAT# turns + the outbound daily
+    ledger (UpdateItem on COACH#outbound_ledger), never a DATE# timeseries row.
+    Bedrock via ADR-062; the telegram store; read-only SSM for budget tier + cycle.
     """
     return [
         iam.PolicyStatement(
@@ -3250,7 +3250,7 @@ def telegram_worker() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
         iam.PolicyStatement(
             sid="DynamoDBCoachChatWrite",
-            actions=["dynamodb:PutItem"],
+            actions=["dynamodb:PutItem", "dynamodb:UpdateItem"],
             resources=[TABLE_ARN],
             conditions={
                 "ForAllValues:StringLike": {
