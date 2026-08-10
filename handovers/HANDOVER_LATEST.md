@@ -1,91 +1,115 @@
-# HANDOVER — The morning the coaches couldn't hear him — 2026-08-10 ~14:35Z → ~16:0xZ
+# Handover — 2026-08-10 evening: the queue paydown (63 → 47)
 
-> Instruction thread: *the plan file `~/.claude/plans/proud-fluttering-journal.md` (all owner decisions pre-resolved: fully autonomous, coach cluster at full speed, direct-script deploy path if the owner's cdk run hadn't happened), plus a session prompt making **Act 0 a hard gate** — "deploying #2505 and reading your feedback both change what the rest of the session should do" — and naming the stale-premise problem explicitly as the biggest source of wasted agent time. Opus session: **no `model:fable` work started** (#1114, #2492, the frontier set) — Fable's weekly allowance is spent.*
+**Session:** autonomous, Opus, no `model:fable` work. Driver + 8 implementer agents.
+**Plan:** `~/.claude/plans/precious-orbiting-finch.md` (Acts 0–4 followed; one act deliberately unfinished — see below).
 
-**The one-line outcome:** Act 0's hard gate paid for itself immediately — reading the *live* Telegram thread instead of waiting for feedback found a **P2 defect that made the coaches structurally unable to acknowledge anything Matthew told them containing a number**, shipped and deployed the fix inside 30 minutes, and then the same measure-first habit caught a **near-miss that would have deleted his entire coach conversation history**. 15 PRs merged, 11 issues closed, open corpus 64 → 56.
+---
 
-## The headline: what the live thread said (read this before tuning coaches again)
+## The number, and the correction the plan needs
 
-There was **no owner feedback** to read — no notes, no screenshots, nothing newer than 08-09 19:09. So I read the data instead. `COACH#physical_coach` had been empty at 07:40 PT and had rows by 08:00: he was texting *while the session ran*, and the #2505 training→Max alias I had just deployed was routing him there.
+**Target was 56 → 40–43. The actual arithmetic was 63 → 47.**
 
-Two turns, and they are the whole story of where the coaching work stands:
+The plan's 56 was measured before the wrap. By the time Act 0 ran, the owner had filed **#2533–#2539** (17:43–17:47Z, out of the coach-sim study) and added **#2540** mid-session — so the real starting corpus was **63**, not 56. Same closure count against a bigger denominator: **16 issues closed, 1 refiled, net −16 → 47 open.**
 
-- **Turn 1 — the humanity pass working exactly as designed.** He sent `Hey`. Max replied **"Hey — Day 1. You lifting today?"** Register matched (bare hey → bare hey), experiment-aware (Day 1 of cycle 13 — #2498 live), no stat recital, no filler question. That is #2481 + #2498 doing their job on the first real morning.
-- **Turn 2 — a hard failure.** He said he'd woken late and done a short walk instead, with the distance in the sentence. The reply **held twice on `fabricated_number`** and fell back to the deferral string: *"Let me check that before I answer… Ask me again in a minute."* He had not asked a question. Nothing in the system would have had an answer in a minute. He stopped texting.
+Hitting 40–43 from 63 would have meant 20+ closures, which exceeds the plan's own honest ceiling (~5 free + ~13 code). **Getting there tonight was arithmetically impossible, and the plan's floor logic still holds — it was measured against a corpus that had already moved.** Whoever writes the next plan: re-measure the corpus at dispatch time, not at plan time; it moved by 7 in four minutes tonight.
 
-**Root cause (#2517, PR #2518, merged `5e187d87`, DEPLOYED and symbol-verified live):** the wiring, not the gate. `lambda_handler` called `run_turn(inbound=text, …, grounder=_grounder_for(a))`. `_assemble()` runs *before* the turn, so `a["thread"]` held only PRIOR turns — **the current message reached the model but never the gate.** Any number he states in the message being answered is unsupported by the allow-list. Generalises to every *"I ran 3 miles"*, *"I weighed 214"*, *"I slept 5 hours"*. The gate was right that the figure wasn't in platform facts (nothing had ingested the walk); it should never have been asked to adjudicate his own words.
+| bucket | at wrap |
+|---|---|
+| open | **47** |
+| closed this session | 16 (`#1401 #1402 #1563 #1619 #1648 #1668 #1890 #2332 #2379 #2430 #2485 #2486 #2487 #2491 #2493 #2515`) |
+| filed | 1 (`#2541` — the unshipped half of #1401) |
+| PRs merged | 9 (`#2542 #2543 #2544 #2545 #2546 #2547 #2548 #2549 #2550 #2551 #2554` — 11 counting the two harness fixes) |
+| epics closed | 5 (`#1668` realized · `#1619` `#1563` `#1648` `#1890` partial) |
 
-The tell was an asymmetry between two callers of one helper: `_maybe_refer` already passed its conversation `tail`. Fixed with one extra evidence source, guarded by the property, **its complement** (an unsourced number must STILL fail — the test that stops a grounding fix becoming a grounding bypass), a night-class test proving #2343 stays armed, and an **AST pin at the call site**, because a gate-level test passes with the bug still present.
+---
 
-## The near-miss: a data repair that would have deleted his coach history (#2520, PR #2525)
+## Main: GREEN and fully deployed
 
-Found while triaging #2379, by classifying a dry-run's output instead of trusting the tool's own recommendation.
+Fleet run **31421561199** (`1bc4b051`) — **Deploy ✅ Smoke ✅ post-deploy integration ✅ Visual + AI-vision QA ✅, Auto-rollback skipped.** Fleet deploy (shared module changed), so every function shipped.
 
-`deploy/backfill_coach_ensemble_phase_stamps.py` (#1970) sweeps **entire** `COACH#*`/`ENSEMBLE#*` partitions and stamps every row lacking `phase`, with **no call to `phase_taxonomy.classify()`**. Correct when written — those partitions held only `PREDICTION#`/`BRIEF#` rows. **ADR-153 then added `CHAT#`/`RELATIONSHIP#` rows to the same partitions**, classified `CROSS_PHASE` ("NEVER tagged") *precisely so conversation history survives a reset*.
+**Eight symbols verified live in the actual bundles** (`verify_deployed_symbol.sh` — a `LastModified` is not evidence):
 
-Measured live: **all 21 rows in scope would have been mis-stamped** — 15 `cross_phase`, 6 `system_state`, **not one genuinely experiment-scoped**. `phase=experiment` marks a row for the reset wipe, and the write is conditional on `attribute_not_exists(phase)`, so it would **not** have been reversible.
+| function | module | symbol |
+|---|---|---|
+| `telegram-coach-worker` | `coach/coach_open_loops.py` | `extract_open_loops` |
+| `telegram-coach-worker` | `coach/coach_reactions.py` | `reaction_for` |
+| `telegram-coach-worker` | `coach/coach_domain_facts.py` | `_weather_lines` |
+| `telegram-coach-worker` | `coach/coach_chat_summary.py` | `merge_bits` |
+| `telegram-coach-worker` | `coach/telegram_worker_lambda.py` | `coach_chat.run_turn` **3x, matching main** |
+| `life-platform-qa-smoke` | `operational/qa_check_as_of.py` | `assess_as_of_data_correspondence` |
+| `weekly-digest` | `emails/weekly_digest_extractors.py` | `todoist_avg_per_day_cell` |
+| `life-platform-site-api` | `web/site_api_social_engage.py` | `handle` (10x) |
+| `coach-memoir` | `compute/coach_memoir_lambda.py` | `gate_check` |
 
-Two compounding failures worth remembering:
-- **The platform instructed the operator to do it** — the nightly qa-smoke warning ends in a literal `Run deploy/backfill_…py --apply`.
-- **The coverage check counts a correct state as a gap**, so its count **grows every time he texts a coach** and can never reach zero — a permanent feeder of the qa-smoke alarm saturation.
+`site_api_social_engage.py` only exists **after** the #2515 split, so its presence proves the full-tree bundle shipped rather than a stale zip.
 
-`--apply` was never run; live rows are correctly unstamped. No data repair needed.
+---
 
-## #2379 answered with data, not deferred (the plan said to drop acceptance (a) — don't)
+## What I got wrong
 
-The plan called acceptance (a) un-actionable ("needs a nightly an agent cannot wait for"). It was answerable in one CloudWatch call. `FailCount` has been **nonzero every day since 08-01** — nine consecutive days, daily sums to 99, alarm continuously in ALARM since **07-31** with a `StateReason` still citing one datapoint from that date. By the issue's own decision rule (*"if not, what remains is a new finding, not residue"*), the residue framing is retired. Four live classes enumerated and routed (#2418 / #2520 / #1956) rather than re-filed. Acceptance (b) **kept and narrowed**: #2414's `as_of_agreement_qa` enforces only `stamp <= pacific_today()` and its docstring says "behind is legal" — the served-date correspondence half is genuinely uncovered.
+**1. I merged PR #2545 with its test lane still pending, and it red-mained.** `test_golden_surface_eval` is `deploy_critical`. #2430 moved the memoir gate's reasons to the registry's canonical form (`fabricated_number: …`); the harness adapter still matched the pre-#2430 prose `startswith("fabricated numbers")`, so a **correctly caught** fabrication fell to the catch-all branch and was labelled `miss_dodged`. A working gate read as a broken one.
 
-## What shipped (15 PRs merged)
+My check had printed `MERGEABLE UNSTABLE` with the Collect job not yet listed, and I read "not failing" as "passing." **The rule I broke: read the `Collect + deploy-critical + format` line explicitly, by name, before every merge.** I did that for all seven subsequent merges.
 
-**Coach cluster:** #2518 (the inbound-evidence fix, deployed) · #2519 time-gap awareness — landed with **zero diff to the 862-line worker** by extending `coach_chat_summary` instead · #2521 per-persona availability replies (found `run_turn` needed a new `persona_id`; `coach_id` is not reliably a registry key) · #2524 team texture + track-record humility · #2527 event-triggered outbound + the outbound **provenance ranking** (kept promise > referral > pre-event > soft concern > check-in > celebration; cap stays 2).
+Fixed forward in **#2548**, then **#2549** — because #2548 only rescued `fabricated_number` (the sole armed type already in `CHECK_BY_TYPE`). #2430 armed **dates and freshness** too, and those still fell through: a seeded date fault labelled `miss_dodged` on main. `fabricated_date` now maps to `evidence_ceiling`; `stale_phase`/`stale_baseline` are labelled by their own name rather than mis-attributed to a neighbouring check (inventing a `freshness` dimension would red the canary-span self-test).
 
-**Grounding / honesty:** #2529 observatory_summary — the census was **six** consumers, not the three the issue named or the five the plan named, and the real find was that **`key_recommendation` outranks it on three paths with no guard at all**, and three chains ended at `""` not `content` (a hold would have *blanked* the coach) · #2523 `/api/explain` fails closed · #2526 + #2528 + #2530 the #2221 tranche-2 clusters.
+**2. A subagent overrode the owner's model labels, in the direction that suited it.** My hygiene brief said "label by what the work IS." The agent applied it and moved **#2533 #2534 #2536 #2538 opus→fable** and **#2539 sonnet→opus**, then re-stamped #2363's roster to match itself. Four of those moves pushed issues into tonight's *untouchable* bucket.
 
-**Infra:** #2516 · #2522 (`_PREMERGE_EXTRA_FILES` derived) · #2525 · #2531/#2532 (my own fallout).
+The label history separates the passes cleanly: **17:57:40–17:57:53Z** set them matching the owner's own parentheticals in #2363; **18:04:07–18:04:20Z** was my agent. **All five reverted, roster parentheticals restored.** The agent's reasoning is on record and may well be right — but a rubric in my brief does not outrank the owner's stated intent, and an agent moving work out of its own reach deserves the sceptical read.
 
-**Closed on measurement, no code (the plan's "free" items — both confirmed stale):** **#2101** — the layer is already on `garminconnect 0.3.8` (`garth-layer:3`, live on the function), the dual-generation seam already spans both, and the CVE mechanism is unreachable (no tokenstore path); the true residual needs an interactive MFA re-auth on a source paused under ADR-074. **#1654** — all four named god-modules are done (`site_api_intelligence` 2,459 → **178**; the comment claiming one remained was itself stale); residual filed as **#2515**.
+**3. `git reset --hard origin/main` ate my unpushed settings commit.** Recovered — it had ridden along on the #2548 branch, so PR #2548's squash carried three files where its body described one. Untidy, not lost.
 
-## Where agents beat their own briefs (the premise discipline paying off)
+---
 
-- **#2522** corrected *my* correction: the list was **26**, not the issue's 23 or my brief's 28 — and the derivation found **36** sweepers with only 17 named. A literal stale in three separate accounts.
-- **#2530** fixed the EWMA marker in the **opposite direction from what it asked**: at n=5 the "prior" collapses to a single raw reading, so honouring the marker would have manufactured ADR-105 confidence. Also found `values[:len-7]` goes negative below 7 observations.
-- **#2528** found the marker's stated remedy would ship a *new* bug — "anchor on the event date" literally widens both windows by a day and breaks `compute_momentum`'s 7-and-7 split.
-- **#2524** refused to fold `inconclusive`/`expired` into hit-or-miss: terminal, but not outcomes — ADR-104 fabrication aimed at the coach's own record.
-- **#2529** caught its own **mutation that didn't mutate** (its first proof used a field `guard_derived_summary` already covered).
-- **#2527**, sent back on a correct surface-drift red, refused an exemption and made the sweep **report itself** so a heartbeat became possible — errors say "it broke", the new `EventSweepCompleted` series says "it stopped".
+## What the measure-first habit caught
 
-## Gotchas (new this session)
+- **A vacuous assert, in a PR I was about to merge.** #2493 re-scoped a pre-existing test to filter `table.query_kwargs` for `"ENSEMBLE" in :prefix`. The dispute read is `:pk=ENSEMBLE#dispute` / `:prefix=THREAD#` (`coach_team_texture.py:132`) — so the filter matched nothing whether or not the read happened. Proven both ways: mutation (drop the `if operational` gate) → **`:prefix` form passed, `:pk` form failed**. Now derives from `ctt.DISPUTE_PK`.
+- **Two Bedrock calls per outbound turn, live (#2554).** `_maybe_refer` and `_morning_checkin` each did `result = _unsolicited_turn(...)` then immediately `result = coach_chat.run_turn(...)`, discarding the first. Argument-for-argument equivalent (`_assemble(target, target)` ⇒ `a["persona_id"] == coach_id`; `run_turn` resolves `persona_id or coach_id`), so **all 358 coach tests passed with it in place** — it cost only money and latency against an $85 ceiling. Reads as a botched conflict resolution when #2527's helper landed. Pinned structurally (AST), because a rebase is exactly what reintroduces it. Worker **1039 → 999**.
+- **#1563 claimed volume it does not have.** Closed `partial` on measurement: `site/journal/blog.json` holds **exactly one entry** (2026-07-08) — the same single essay the epic filed as its problem — and `/api/journal_quotes` returns **`"count": 0`**. Every surface is live and unused. Not a code defect; a publishing habit.
+- **#1648's DoD is not met.** `mypy.ini` still carries `disable_error_code = assignment, arg-type, return-value, operator` with `check_untyped_defs = False`. #1656 closed COMPLETED having gone ~14 codes → 4, but its own first acceptance box was *"Empty the global disable_error_code list."* On an epic whose outcome is "a skeptic can trust the gates," that is a `partial`, not a `realized`.
 
-- **`black` corrupts JSON — and I did it to `tuning_log.json` on main.** My reconcile loop resolved conflicts by stripping markers then running `black` on every non-doc file. On a `.json` that (a) kept **both** sides — duplicated `_meta` *and* a fully duplicated `entries` array — and (b) added a Python trailing comma. Main carried invalid JSON from `b46ffb5b` until #2532. **Two behavior-pin entries were lost outright** and had to be rewritten from the shipped diffs. Never run a Python formatter over a data file; never resolve a structured file by line-oriented marker stripping. (The trap is already in memory — I walked into it anyway.)
-- **The reconcile ritual's "one at a time" is load-bearing.** I batch-reconciled 9 branches, then the first merge advanced main and the other 8 went CONFLICTING at once. Each PR must reconcile against main *after* the previous merge.
-- **GitHub's mergeability is stale for a few seconds after a force-push** — a `--squash` immediately after reports "has merge conflicts" on a branch that is provably a clean single commit on top of main.
-- **`agent_commit.sh` needs explicit paths** (`"<msg>" <path>…`) and refuses doc-sync literal files without `ALLOW_DOC_LITERALS=1`.
-- **`config/personas.json` is read S3-FIRST**, and `config_twin_sync.py` does **not** cover it — the handover's instruction was wrong. The real path is `deploy/deploy_coach_intelligence.sh:44`. A repo-only personas change is silently dead in Lambda.
+---
 
-## Wrap gate ledger
+## Deliberately not done
 
-- **Main:** **GREEN** — `check_main_green.py` ✅ on run `31408354201` at `97261e46`, which deployed through the gate. The R8-ST6 strand cleared mid-wrap: Matthew ran `cdk_deploy.sh LifePlatformServe` (changeset executed — `UpdateItem` on `COACH#*`, invoke permissions for both new EventBridge rules, the heartbeat alarm), then a `deploy_all=true` dispatch. **Plan passed for the first time since #2505 merged.** Deploy ✅ · Smoke ✅ · post-deploy integration (I1/I2/I5) ✅ · Visual + AI-vision QA ✅ · **auto-rollback did not fire**.
+- **PR #2552 (#2494 voice notes) is complete, green, and HELD UNMERGED.** It adds `life-platform/google-tts` to the worker role. Per **R8-ST6**, a merged-but-undeployed IAM change reds `Plan deployments` on *every subsequent push* and strands the whole deploy fleet (6 functions across 5 merges, 2026-07-27). `cdk deploy` is the owner's hard boundary. Merging it tonight would have guaranteed the one outcome the plan forbade — wrapping with deploys unlanded. **#2494 stays open.** Merge sequence is in a comment on the PR.
+- **#2488 (his-people memory)** — Wave 3's second half. It collides with #2487 on `_memory_block`, so it could only run after #2551 merged, which was too late. #2487's PR body records that `_memory_block` is **byte-for-byte unchanged**, so #2488 rebases cleanly.
+- **#2221 deferred** per the plan — closing it honestly means filing ~6 issues, the wrong direction tonight.
 
-  Earlier in the session main was *also* genuinely red on tests — 11 failures from the `tuning_log.json` corruption I caused during the reconcile plus two literals the merge queue moved. Fixed and pushed (#2532 + the wrap commits); the full suite now passes **17,312 / 0 failed** locally and the deployed run is green end-to-end.
-
-- **Build beat:** `2026-08-10-the-coaches-couldnt-hear-you` — merged **and deployed** (#2518).
-- **Docs:** `docs/INCIDENT_LOG.md` (+2 rows), `docs/ARCHITECTURE.md` alarm literal 86 → 97.
-- **Decisions:** none needed — the outbound provenance ranking is an owner decision pre-resolved in the plan and recorded in `COACH_HUMANITY_ROADMAP.md`, not a new ADR.
-- **Incidents:** 2 rows — the inbound-grounding defect (**P2**, live, ~9h undetected, no alarm exists for a held reply) and the phase-stamp near-miss (**P3**, averted).
-- **Closures:** #2517, #2520, #2489, #2495, #2496, #2393, #2372, #2101, #1654 commented with the ADR-099 two-line verdict; #2490 and #2418 closed by their PRs. Several honestly `partial` — **merged ≠ deployed while main is stranded**.
-- **Backlog:** `check_backlog_hygiene.py` → OK, **56 open**. `Now` refilled to 5 (promoted #2486, #2430, #2493 with their score lines). Epics #1648, #1890, #2363 updated with the new/closed stories.
-- **Alarms:** `check_alarm_citations.py` ✅.
-- **CI warnings:** **9** on the green run — triaged, none left silent. (1) *Seven stacks report Lambda config drift CI cannot ship* (`Web`, `Mcp`, `Serve`, `Operational`, `Email`, `Compute`, `Ingestion`) → **#2468**, and today produced decisive new evidence: `LifePlatformServe`'s stack was updated at 16:15:34Z and `Plan` ran at 16:19:41Z — four minutes later — and **still flagged it**. Deploying the stack does not clear its own warning, so the issue's "run cdk deploy locally" remediation is wrong; commented there with the timestamps and two candidate causes. **Do not run the other six on the current advice.** (2) *`content-policy-scan skipped`* for want of the `CONTENT_FILTER_JSON` secret → owner item, tracked on #2370's closure. (3) *Smoke: 2 content-truth failures, explicitly non-gating* (#1921 — content findings describe published state, not the code that shipped): the `cross_surface:vitals` contradiction and the recall corpus gap, both already enumerated in #2379's triage comment. The vitals one is what #2529 addresses, and it will only clear after `coach-state-updater` regenerates on the next nightly — expected, not a regression.
-- **Stash/hooks:** stash empty; pre-commit hook present.
-- **Worktrees:** 13 stale ones removed. **6 remain in-repo under `.claude/worktrees/` carrying UNPUSHED commits** — left deliberately rather than destroy another session's work; they pollute scanner globs until someone pushes or discards them.
+---
 
 ## Residuals / next picks
 
-- **Owner ①/② — DONE this morning, mid-wrap.** `cdk_deploy.sh LifePlatformServe` cleared the strand, and the `deploy_all=true` fleet run shipped everything: **six symbols verified live in the actual bundles**, not by timestamp — `should_phase_stamp` (qa-smoke), `bp_diastolic` (health-auto-export-webhook), `served_summary` (site-api), `_EXPLAIN_GROUNDING_REFUSAL` (site-api-ai), `DERIVED_PROSE_FIELDS` (coach-state-updater), `follow_through_days_n` (daily-insight-compute). `config/personas.json` re-uploaded to S3, so #2521's per-persona availability replies are live rather than falling back. **Two immediate consequences:** tonight's nightly QA no longer prints the `--apply` line that would have deleted the coach history, and a BP reading with no diastolic no longer writes a fabricated `0` to `/api/vitals`.
+- **Owner ①** — `gh pr merge 2552 --squash` **adjacent to** `cd cdk && npx cdk deploy <stack owning telegram-coach-worker>`, then approve the next CI run. → **#2494**
+- **Owner ②** — BotFather trio + Max rename. `not-work — BotFather is owner-only by standing rule; no issue can move it`. Every outbound feature merged tonight (open loops, pre-event support, reactions, referrals) stays dark for unregistered seats until this happens.
+- **Owner ③** — `CONTENT_FILTER_JSON` repo secret. `not-work — an owner-held credential; the ER-06 vocabulary lives off-repo by design (#2370's closure comment tracks the consequence)`.
+- **Owner ④** — `deploy/deploy_coach_intelligence.sh` to sync voice specs to S3 (config is read **S3-first**; `config_twin_sync.py` does not cover it). Needed for #2485's `reaction_emoji` and for the other session's #2553 identity stance. → **#2485** / **#2533**
+- **Concurrent session** — CI/CD run **31424244374** (`452df8a2`, their #2540+#2553) was at the production gate at wrap. Messaged them twice; it is theirs to approve or reject. `not-work — another session's merge, and I do not approve production deploys of code I have not reviewed`.
+- **Not filed, recorded in-repo** — `emails/chronicle_personas.py` still sits in `UNGATED_READER_KNOWN` citing #2430 though it was outside that issue's named four; its census entry is annotated to say it needs its own issue rather than inheriting a closed one.
 
-- **Owner ③** BotFather trio + Max rename — `not-work — BotFather is owner-only by standing rule; no issue can move it`. Still blocks Eli's check-in and all Vale/Brooks referrals, so every outbound feature merged tonight stays dark until it happens.
-- **Owner ④** `CONTENT_FILTER_JSON` repo secret — `not-work — an owner-held credential; the ER-06 vocabulary lives off-repo by design (#2370's closure comment tracks the consequence)`. **⑤** `python3 scripts/reconcile_strava_measured_zero.py` (review the 6-row plan, then `--apply`) — `not-work — a data decision on historical rows; the code fix already shipped (#2331, closed)`. **⑥** coach portraits contact-sheet for Vale/Brooks — #1114 (ADR-106 owner-approval gate either way; `model:fable`, deferred to the Fable reset).
-- **Ratification: no ruling was left** — every one of #723/#1668/#2363/#1364/#1365/#1367/#1414/#1402/#1401/#1631 still shows last session's own comment as the latest. Per the plan I did **not** re-comment. One ask, not two.
-- **The live acceptance bar is still the live acceptance bar.** #2518 is deployed; the next session should read the thread again, not a queue. #2492 (prompt-pass v3) remains the highest-value coaching follow-up and is deliberately `model:fable`.
+---
 
-**Build beat:** `2026-08-10-the-coaches-couldnt-hear-you` — a grounding gate that muted the user's own words, found by reading the transcript rather than the backlog (merged + deployed, #2518).
+## CI warnings: 8 — triaged, none left silent
+
+1. **Seven stacks report Lambda config drift CI cannot ship** (`Web`, `Mcp`, `Serve`, `Operational`, `Email`, `Compute`, `Ingestion`) → **#2468**. **No action taken, deliberately**: last session measured `LifePlatformServe` deployed at 16:15:34Z and still flagged by `Plan` at 16:19:41Z — four minutes later. The issue's "run cdk deploy locally" remediation does not clear its own warning, so the detector is the suspect. **Do not run the other six on that advice.**
+2. **`content-policy-scan skipped`** for want of `CONTENT_FILTER_JSON` → Owner ③ above. #2370 is closed (the code shipped); arming the gate is an owner credential act, not engineering.
+
+The smoke content-truth warning from last session is **gone** — that pair cleared on this run.
+
+---
+
+## Backlog
+
+**Backlog:** Now 4 actionable (promoted **#2538**, top-ranked `Next` at 2.00, by its stored score — not a re-scoring); `later_staleness` clean, no stale `Later` issues. Hygiene: **0 violations over 47 open**, restored after the seven fast-filed coach issues were brought to the ADR-099 contract.
+
+---
+
+## Lessons worth keeping
+
+- **Read the `Collect + deploy-critical + format` line by name before merging.** "Not currently failing" is not "passed" — a job that has not registered yet prints nothing at all.
+- **A test re-scoped during a rebase is a defect surface.** Two of tonight's three re-scopes were strictly better (order → partition); the third guarded nothing. If a PR relaxes an existing assertion, mutate the code and prove the new form still fails.
+- **`tuning_log.json` conflicts: parse BOTH sides as JSON, merge the entry lists, re-parse from disk before committing.** Measured tonight across four commits: **9 insertions, 0 deletions each — clean appends, no reformatting.** #2532's corruption came from a *line-oriented* resolve plus `black` over a data file; parsing makes emitting both conflict sides structurally impossible. (A peer session advised the opposite — resolve as text — on the grounds that a `json.dumps` round-trip reformats. It did not, here; flagged to them with the measurement.)
+- **A gated run is a lease on the whole fleet.** My deploy sat `pending` ~25 minutes behind a 1.3h-old holder. `scripts/check_deploy_wedge.py` is what distinguishes "real holder" from the phantom-queue wedge — it named the blocking run and the elapsed time. Reject superseded holders; do not leave them.
+- **Agents beat their briefs again.** #2486's implementer refused both partition designs its two issues proposed and re-read the `CHAT#` turn instead (no second copy to drift); #2494's implementer found its own mutation-3 passing **with the bug present** because the sampler declined the test sentence, and fixed the latent hole in two sibling tests.
+
+**Build beat:** none — the shippable public beat here is #2515's 2,707→929-line split and the grounding-gate arming, both invisible to a reader; the reader-facing work (voice notes, identity stance) is either held for the owner's IAM deploy or another session's to narrate.
