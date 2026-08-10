@@ -60,9 +60,12 @@ _ROOT = os.path.dirname(_HERE)
 
 # Text artifacts that actually ship to the public surface.
 _SCAN_EXT = (".html", ".json", ".txt", ".xml", ".webmanifest", ".svg")
-# /legacy is the private rollback copy (no UI links) — out of scope here; sw.js
-# is generated asset boilerplate.
-_SKIP_DIRS = ("legacy",)
+# No skip dirs (#1905): /legacy used to be excluded as "the private rollback
+# copy", but it is publicly reachable (HTTP 200 — unlinked + noindex are not
+# access controls), so the exclusion silently created a 170-file zone of the
+# public surface no privacy gate inspected. The whole published tree is in
+# scope; the decision of record is in tests/test_legacy_real_person_attributions_1905.py.
+_SKIP_DIRS: tuple = ()
 
 # Emails allowed to appear publicly (the site's own contact identities + the
 # RFC 9116 security.txt contact + obvious form placeholders).

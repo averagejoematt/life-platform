@@ -31,7 +31,10 @@ SCAN_DIRS = [
 
 # Directories within the scan dirs to skip.
 SKIP_SUBDIRS = {
-    "site/legacy",  # preserved verbatim; screened at runtime by the API
+    # site/legacy is deliberately NOT skipped (#1905): the preserved tree is
+    # publicly reachable (HTTP 200) — static pages are never "screened at
+    # runtime by the API", so it must pass the same content policy as the rest
+    # of the published surface.
     "__pycache__",
     ".pytest_cache",
 }
