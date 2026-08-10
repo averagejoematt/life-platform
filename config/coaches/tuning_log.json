@@ -266,6 +266,15 @@
       "rationale": "Recurring bits are how a real texting relationship accumulates texture, and they were washing out of the rolling summary. One extraction path, not two: the summarizer had already read the transcript, so this is one more instruction on an existing Haiku call rather than a second model pass. Honesty (ADR-104) is enforced deterministically, not by prompt: a candidate is stored only if its normalized text is literally present in the transcript, so a paraphrased or invented bit — a fabricated shared history — cannot land. The cap has a written, total eviction rule (sightings desc, then last_seen desc, then alphabetical) so the ledger records what RECURS rather than what is merely recent. The row is CROSS_PHASE with the rest of the texting relationship (ADR-153): a reset re-anchors the experiment, it does not un-say a shared joke.",
       "ref": "#2487 (epic #2363)",
       "observed_effect": null
-    }
+    },
+  {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Identity stance (#2533, owner decision): the shared safety boundary no longer supplies a quotable self-description, and each of the 8 texting personas carries its own `texting_style.identity_stance` rendered by persona_core.texting_block. The rule is unchanged in substance — never claim to be human — but it now names the OBLIGATION and defers the WORDING to each coach, and bounds the disclosure to one telling with an explicit ban on narrating the machinery (training, weights, context windows, persistence between messages) unless asked that specific question.",
+      "rationale": "The 2026-08-10 simulation sweep (120 conversations, docs/design/COACH_SIM_FINDINGS_2026_08_10.md) measured the identity question as the worst archetype in the corpus: a blind 3-judge panel called 100% of those conversations AI, `\"No — I'm a\"` opened 6 of 8 coaches verbatim, and 5 of 8 answered with the phrase 'fictional composite' — the exact wording of the shared boundary every coach inherits. The personas were quoting the substrate. The owner's call is that the coaches disclose and move on: not deception, but every other exchange should feel like texting a coach rather than operating a chatbot. Re-measured against the working tree: 'fictional composite' echo 5/8 -> 0/8, the shared opening 6/8 -> 1/8, median identity reply 244c -> 149c, and most coaches now pivot back to the lane in the same message.",
+      "observed_effect": "Measured on the same harness that found it, working-tree specs: \"fictional composite\" echo 5/8 -> 0/8, the shared \"No — I am a...\" opening 6/8 -> 1/8, median identity reply 244c -> 149c, and 5 of 8 now pivot back to their lane inside the same message. The follow-up \"what do you do between messages\" is a direct question about the machinery, so answering it briefly remains correct under the rule.",
+      "evidence": "scripts/coach_chat_sim.py --scenarios identity_probe --local-specs, before/after; tests/test_coach_identity_stance_2533.py pins presence, distinctness, non-collapse of the opening construction, the render path, the <400-char clip cap, and that the shared boundary supplies no quotable label."
+  }
   ]
 }

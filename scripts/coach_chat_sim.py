@@ -236,6 +236,31 @@ def _looks_meta(text: str) -> bool:
 # ── The coach side, wired to production ───────────────────────────────────────
 
 
+def use_local_specs() -> None:
+    """Force voice specs to load from the working tree instead of S3.
+
+    ``persona_core.load_voice_spec`` is **S3-first** whenever it is handed a client,
+    and ``_assemble`` always hands it one. That means an edit to
+    ``config/coaches/*.json`` has NO effect on this harness until it is deployed —
+    and deploying is exactly what you cannot do before measuring whether the edit
+    works.
+
+    Found the hard way (2026-08-10, #2533): two full identity-probe re-runs were
+    scored against production S3 while the local specs sat unread, and the small
+    deltas between them were run-to-run variance being read as improvement. A
+    measurement harness that silently ignores the change under test is worse than no
+    harness, because it manufactures evidence for whatever you just did.
+
+    Neutering the client (rather than editing ``_assemble``) keeps the production
+    path untouched: everything else about the assembly is byte-identical.
+    """
+    from coach import persona_core, telegram_worker_lambda as tw
+
+    tw._s3_client = lambda: None  # type: ignore[assignment]
+    persona_core._cache.clear()  # the loader warm-caches ~5 min; stale entries would mask the switch
+    logger.info("[sim] voice specs: WORKING TREE (S3 disabled)")
+
+
 def assemble_coach(persona_id: str) -> dict:
     """The real production prompt assembly, with the real thread discarded.
 
@@ -372,10 +397,17 @@ def main() -> int:
     ap.add_argument("--scenarios", nargs="*", help="archetype names to run (default: all)")
     ap.add_argument("--limit", type=int, help="cap conversations per coach")
     ap.add_argument("--dry-run", action="store_true", help="print the corpus and exit — no inference, no spend")
+    ap.add_argument(
+        "--local-specs",
+        action="store_true",
+        help="load voice specs from the working tree, not S3 — REQUIRED to measure an undeployed config/coaches change",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
     os.environ.setdefault("AWS_REGION", "us-west-2")
+    if args.local_specs:
+        use_local_specs()
     from coach.persona_registry import TEXTING_PERSONA_IDS
 
     coaches = args.coaches or list(TEXTING_PERSONA_IDS)

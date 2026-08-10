@@ -77,7 +77,33 @@ reliably tell it isn't a human."* The shared standard says *never claim to be hu
 are right on their own terms; together they are unreconciled, and in that gap the model
 picks — every time, the same way, in every voice.
 
-**This needs Matthew's decision, not an engineer's.** Three coherent positions:
+### DECIDED 2026-08-10 (owner) — option (a)
+
+> *"Yes, it discloses and moves on. It is not trying to deceive — but for the client to
+> feel most immersed with them as a team, all other correspondence should feel like I am
+> texting my coach, and they feel like a person, and interact like a person. I am talking
+> to my coach, not an AI chat bot."*
+
+Shipped in #2533: the shared boundary now names the **obligation** and defers the
+**wording** to each persona's own `texting_style.identity_stance`, and bounds the
+disclosure to one telling with an explicit ban on narrating the machinery unless he asks
+that specific question.
+
+**The root cause was subtler than "no stance existed."** The old boundary read *"every
+coach is a canonical fictional composite"* — and 5 of 8 coaches answered with the phrase
+*"fictional composite."* They were quoting the substrate every one of them inherits. A
+shared prompt that supplies a label produces a shared answer no matter how many
+per-persona stances sit downstream of it. Re-measured on the same harness:
+
+| | before | after |
+|---|---|---|
+| echo the phrase "fictional composite" | 5/8 | **0/8** |
+| open with the shared `"No — I'm a…"` | 6/8 | **1/8** |
+| median identity reply | 244c | **149c** |
+
+The options below are kept as the record of what was weighed.
+
+**The three positions:**
 
 - **(a) Honest and in-character.** Keep the disclosure, make it *once*, in the persona's
   own voice, then stay in character — and never narrate the architecture unless asked
