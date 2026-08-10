@@ -53,6 +53,13 @@ S3_BUCKET = os.environ["S3_BUCKET"]
 USER_PREFIX_MEMORY = f"USER#{USER_ID}#SOURCE#platform_memory"
 MAX_PLATE_HISTORY = 4  # past plates to inject for anti-repeat context
 
+# The one degradation notice this module ships when there is no genuine AI edition
+# (#2221 — previously written out twice, and probed for by substring, which never matched).
+AI_UNAVAILABLE_HTML = (
+    '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
+    "AI content unavailable this week. Check CloudWatch logs.</div>"
+)
+
 # Board of Directors config loader (optional — for voice customization)
 try:
     from coach import board_loader  # noqa: F401  (availability probe)
@@ -145,6 +152,33 @@ def build_plate_history_context(history):
     return "\n".join(lines)
 
 
+def plate_section_titles():
+    """The prescribed section titles, DERIVED from SYSTEM_PROMPT's `### Section N: "Title"`
+    headings — never a literal list here, so renaming a section in the prompt cannot
+    silently desynchronise the summary extractor from the email it reads."""
+    return re.findall(r'###\s*Section\s*\d+:\s*"([^"]+)"', SYSTEM_PROMPT)
+
+
+def _section_span(ai_content, title, titles):
+    """(start, end) of one prescribed section in the rendered email, or None if absent.
+
+    The section runs from its own title to whichever OTHER prescribed title appears
+    next — the email is HTML the model wrote, so headings are the only reliable fence.
+    """
+    lowered = ai_content.lower()
+    start = lowered.find(title.lower())
+    if start < 0:
+        return None
+    end = len(ai_content)
+    for other in titles:
+        if other.lower() == title.lower():
+            continue
+        nxt = lowered.find(other.lower(), start + len(title))
+        if 0 <= nxt < end:
+            end = nxt
+    return start, end
+
+
 def extract_plate_summary(ai_content, top_food_names, date_str):
     """Extract a condensed summary from the AI plate HTML for storage."""
     summary = {
@@ -159,8 +193,20 @@ def extract_plate_summary(ai_content, top_food_names, date_str):
         wc_match = re.search(r"(?i)wildcard[^<>]*>\s*([A-Z][a-z][^<]{5,60})", ai_content)
     if wc_match:
         summary["wildcard"] = wc_match.group(1).strip()[:80]
-    # Extract recipe names: bold/heading text in Try This area, capitalized multi-word
-    recipe_matches = re.findall(r"(?:font-weight:\s*[6-9]00[^>]*>|<strong>|<b>)([A-Z][^<]{6,60})<", ai_content)
+    # Extract recipe names: bold/heading text in the "Try This" section, capitalized
+    # multi-word. #2221: this used to scan the WHOLE email, so the bolded Greatest Hits
+    # food names — by construction his most-frequent REAL foods — were stored as "recipes"
+    # and replayed into the next edition inside the DO-NOT-REPEAT block, steering the
+    # writer away from his own staples. When the model omitted the "Try This" heading
+    # entirely, fall back to the whole email minus Greatest Hits rather than to nothing.
+    titles = plate_section_titles()
+    try_this = _section_span(ai_content, "Try This", titles)
+    if try_this:
+        scan = ai_content[try_this[0] : try_this[1]]
+    else:
+        hits = _section_span(ai_content, "Your Greatest Hits", titles)
+        scan = (ai_content[: hits[0]] + ai_content[hits[1] :]) if hits else ai_content
+    recipe_matches = re.findall(r"(?:font-weight:\s*[6-9]00[^>]*>|<strong>|<b>)([A-Z][^<]{6,60})<", scan)
     skip = {
         "try this",
         "greatest hits",
@@ -173,9 +219,12 @@ def extract_plate_summary(ai_content, top_food_names, date_str):
         "the grocery run",
         "your greatest hits",
     }
+    # A name that IS one of his logged foods is a staple, never a "new recipe to avoid".
+    staples = {str(n).lower().strip() for n in top_food_names}
     recipes = []
     for name in recipe_matches:
-        if name.lower().strip() not in skip and len(name.strip()) > 8 and len(recipes) < 5:
+        key = name.lower().strip()
+        if key not in skip and key not in staples and len(name.strip()) > 8 and len(recipes) < 5:
             recipes.append(name.strip())
     summary["recipes"] = recipes
     return summary
@@ -583,24 +632,31 @@ def lambda_handler(event, context):
             logger.warning(f"IC-16 failed: {e}")
 
     logger.info("Calling Sonnet for The Weekly Plate...")
+    # #2221: `ai_written` is the sentinel for "this edition is genuine AI writing". The
+    # probe it replaces — `"unavailable" not in ai_content[:50]` — could never fire on this
+    # module's own stub: the stub opens with a 78-char inline-styled <div>, so the word sits
+    # at index ~89, outside the 50-char window. Every AI failure therefore ran the AI-3
+    # validator over the stub (which the probe existed to skip) and filed the stub via
+    # insight_writer as a genuine `coaching` insight, which build_insights_context then
+    # replayed into later meal-planning prompts. A flag set where the failure happens
+    # cannot drift the way a substring probe of model-authored HTML does.
+    ai_written = True
     try:
         ai_content = call_anthropic(system_prompt, user_message)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
-        ai_content = (
-            '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
-            "AI content unavailable this week. Check CloudWatch logs.</div>"
-        )
+        ai_content = AI_UNAVAILABLE_HTML
+        ai_written = False
 
     # AI-3: Validate output before rendering
-    if _HAS_AI_VALIDATOR and ai_content and "unavailable" not in ai_content[:50]:
+    if _HAS_AI_VALIDATOR and ai_content and ai_written:
         _val = validate_ai_output(ai_content, AIOutputType.NUTRITION_COACH)
         if _val.blocked:
             logger.error(f"[AI-3] Weekly Plate output BLOCKED: {_val.block_reason}")
-            ai_content = (
-                _val.safe_fallback
-                or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">AI content unavailable this week. Check CloudWatch logs.</div>'
-            )
+            ai_content = _val.safe_fallback or AI_UNAVAILABLE_HTML
+            # A blocked edition is a degradation notice, not coaching — it must not be
+            # filed as an insight and replayed into next week's prompt either.
+            ai_written = False
         elif _val.warnings:
             logger.warning(f"[AI-3] Weekly Plate warnings: {_val.warnings}")
 
@@ -638,8 +694,8 @@ def lambda_handler(event, context):
     )
     logger.info(f"Sent: {subject}")
 
-    # IC-15: Persist plate insight
-    if _HAS_INSIGHT_WRITER and ai_content and "unavailable" not in ai_content[:50]:
+    # IC-15: Persist plate insight (only when the edition is genuine AI writing, #2221)
+    if _HAS_INSIGHT_WRITER and ai_content and ai_written:
         try:
             insight_writer.write_insight(
                 digest_type="weekly_plate",

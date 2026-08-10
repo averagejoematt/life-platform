@@ -174,8 +174,16 @@ EWMA_DECAY = 0.87
 # (avoids calling noise a confirmed direction)
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
-# Expiry multiplier — if window elapsed by more than 2x and still not evaluable
-EXPIRY_MULTIPLIER = 2
+# #2221 — the EWMA observation floor + the provisional-grade rules, reasoned out there.
+from coach.prediction_grading import (  # noqa: E402
+    EWMA_MIN_OBSERVATIONS,
+    EWMA_MIN_PRIOR_POINTS,
+    EWMA_PRIOR_LAG,
+    EXPIRY_MULTIPLIER,
+    build_outcome_notes,
+    check_expiry as _check_expiry,
+    grading_window_still_open,
+)
 
 # ── AWS clients ──────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
@@ -306,6 +314,7 @@ def _fetch_predictions():
     """
     predictions = []
     reclaimed = 0
+    second_look = 0
     partitions = [f"COACH#{coach_id}" for coach_id in COACH_IDS] + [DIARY_CLAIMS_PK]
     for partition_pk in partitions:
         try:
@@ -329,12 +338,15 @@ def _fetch_predictions():
                     elif _was_terminalized_by_duplicate_grader(item):
                         reclaimed += 1
                         predictions.append(item)
+                    elif grading_window_still_open(item):  # #2221: provisional, re-grade
+                        second_look += 1
+                        predictions.append(item)
                 if "LastEvaluatedKey" not in resp:
                     break
                 kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         except Exception as e:
             logger.warning("Failed to fetch predictions for %s: %s", partition_pk, e)
-    logger.info("Total evaluable predictions fetched: %d (%d reclaimed from the duplicate grader, #813)", len(predictions), reclaimed)
+    logger.info("Evaluable predictions: %d (%d reclaimed #813, %d provisional second-look #2221)", len(predictions), reclaimed, second_look)
     return predictions
 
 
@@ -550,8 +562,10 @@ def _get_ewma_trend(metric_key, data_cache, end_date):
     """
     Compute EWMA trend direction and slope for a metric.
 
-    Returns (direction, slope) where direction is 'up', 'down', or 'flat',
-    and slope is the fractional change between current EWMA and 7-day-ago EWMA.
+    Returns (direction, slope) where direction is 'up', 'down', or 'flat', and slope is
+    the fractional change between the current EWMA and the EWMA as of EWMA_PRIOR_LAG
+    observations ago. Fewer than EWMA_MIN_OBSERVATIONS readings is an honest (None, None):
+    no trend, not a flat one — see prediction_grading for why that floor is what it is.
     """
     source = METRIC_SOURCES.get(metric_key)
     if not source:
@@ -573,13 +587,13 @@ def _get_ewma_trend(metric_key, data_cache, end_date):
     series = _extract_metric_series(records, base_metric)
     values = [v for _, v in series]
 
-    if len(values) < 5:
+    if len(values) < EWMA_MIN_OBSERVATIONS:
+        logger.info("No EWMA trend for %s: %d observation(s), floor is %d", metric_key, len(values), EWMA_MIN_OBSERVATIONS)
         return None, None
 
     current_ewma = _compute_ewma(values, EWMA_DECAY)
-    cutoff = max(1, len(values) - 7)
-    prior_values = values[:cutoff]
-    prior_ewma = _compute_ewma(prior_values, EWMA_DECAY) if len(prior_values) >= 2 else None
+    prior_values = values[: max(0, len(values) - EWMA_PRIOR_LAG)]
+    prior_ewma = _compute_ewma(prior_values, EWMA_DECAY) if len(prior_values) >= EWMA_MIN_PRIOR_POINTS else None
 
     if current_ewma is None or prior_ewma is None or prior_ewma == 0:
         return None, None
@@ -846,29 +860,6 @@ def _evaluate_conditional(pred, eval_spec, data_cache, today_str):
     return y_result
 
 
-def _check_expiry(pred, effective_window, today):
-    """
-    Check if a prediction should expire.
-
-    A prediction expires if its window has elapsed by more than 2x
-    the original window AND it's still not evaluable (no data).
-    Returns True if expired.
-    """
-    created_date = pred.get("created_date")
-    if not created_date:
-        return False
-
-    try:
-        created_dt = datetime.strptime(created_date, "%Y-%m-%d")
-    except (ValueError, TypeError):
-        return False
-
-    days_since_creation = (today - created_dt).days
-    max_allowed = effective_window * EXPIRY_MULTIPLIER
-
-    return days_since_creation > max_allowed
-
-
 # =============================================================================
 # DYNAMO WRITES
 # =============================================================================
@@ -880,15 +871,7 @@ def _update_prediction_status(prediction, evaluation):
         pk = prediction.get("pk") or f"COACH#{prediction.get('coach_id', '')}"
         sk = prediction.get("sk") or f"PREDICTION#{prediction.get('prediction_id', '')}"
 
-        outcome_notes = json.dumps(
-            {
-                "actual_value": evaluation.get("actual_value"),
-                "reason": evaluation.get("reason", ""),
-                "beats_null": evaluation.get("beats_null", False),
-                "bayesian_update": evaluation.get("bayesian_update"),
-                "algo_version": ALGO_VERSION,
-            }
-        )
+        outcome_notes = build_outcome_notes(evaluation, ALGO_VERSION)
 
         table.update_item(
             Key={"pk": pk, "sk": sk},
@@ -1127,9 +1110,14 @@ def _evaluate_all(predictions, today_str):
             continue
 
         status = result.get("status", "inconclusive")
+        past_grace = _check_expiry(pred, effective_window, today)
 
-        # Handle expiry: if inconclusive and past expiry window, mark expired
-        if status == "inconclusive" and _check_expiry(pred, effective_window, today):
+        # Retire any undecided call past the 2x window. #2221: this covered 'inconclusive'
+        # only, so a conditional whose precondition never materialised stayed 'pending'
+        # forever — re-graded daily, never decided, never retired, inflating GradableCount
+        # while ADR-105's "every forecast is graded" went unmet. 'expired' moves no
+        # confidence: a call the world never tested is not a hit and not a miss.
+        if status in ("inconclusive", "pending") and past_grace:
             status = "expired"
             result["status"] = "expired"
             result["reason"] = (
@@ -1137,7 +1125,7 @@ def _evaluate_all(predictions, today_str):
                 f"(window={effective_window}, max={effective_window * EXPIRY_MULTIPLIER}). " + result.get("reason", "")
             )
 
-        # If conditional evaluation returns 'pending', don't write yet
+        # Still inside the grace period — the precondition may yet arrive; don't write.
         if status == "pending":
             stats["pending"] += 1
             continue
@@ -1166,6 +1154,8 @@ def _evaluate_all(predictions, today_str):
             "created_date": created_date,
             "evaluated_date": today_str,
             "evaluation_window_days": effective_window,
+            # #2221: undecidable inside the grace period -> provisional, re-graded tomorrow.
+            "grading_open": status == "inconclusive" and not past_grace,
         }
         evaluations.append(evaluation)
 
@@ -1176,8 +1166,11 @@ def _evaluate_all(predictions, today_str):
         if bayesian_update and coach_id and subdomain:
             _update_bayesian_confidence(coach_id, subdomain, bayesian_update)
 
-        # Write learning log record
-        _write_learning_record(coach_id, today_str, evaluation)
+        # Write learning log record. #2221: a provisional grade writes none — one row per
+        # day per undecided call would crowd real outcomes out of the 60-row window the
+        # public coach profile reads. The terminal outcome writes exactly one.
+        if not evaluation["grading_open"]:
+            _write_learning_record(coach_id, today_str, evaluation)
 
         stats[status] = stats.get(status, 0) + 1
 
