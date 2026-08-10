@@ -63,8 +63,8 @@ which is itself a humanity feature: a friend who makes things up stops being one
 | 22 | Referral handoffs — coach A names a colleague's lane, the colleague texts once with context | **shipped** (outbound PR) |
 | 23 | Silence respect — two ignored outbounds ⇒ stop initiating | **shipped** (outbound PR) |
 | 24 | Hard caps as a feature — ≤2 unsolicited texts/day platform-wide; scarcity is what keeps initiative human | **shipped** (outbound PR) |
-| 25 | Event-triggered celebration — a PR on a lift, a weight milestone: the right coach texts first | filed |
-| 26 | Event-triggered concern — three bad recovery days: Lisa checks in softly | filed |
+| 25 | Event-triggered celebration — a PR on a lift, a weight milestone: the right coach texts first | **shipped** (#2490) |
+| 26 | Event-triggered concern — three bad recovery days: Lisa checks in softly | **shipped** (#2490) |
 | 27 | Pre-event support — he mentions a presentation tomorrow; the mind coach texts that morning (COMMITMENT# rows already exist as the substrate) | filed |
 | 28 | Sunday-evening reflection from Eli (the week, in one warm text — distinct from the Monday compass email) | horizon |
 | 29 | Non-data initiative from persona interests ("watched the game?") | horizon (needs real persona-interest grounding to not be hollow) |
@@ -124,3 +124,30 @@ cold reader think a person wrote this?
 - Initiative stays scarce (caps above) — the moment coaches text like an app sends
   notifications, the illusion dies.
 - Filed issues carry `area:coach-humanity` so this ledger and the backlog can't drift.
+
+### The outbound priority decision (owner, 2026-08-10 — #2490)
+
+Ideas 14, 21, 22, 25, 26 and 27 all end in the same place: an unsolicited text, out of
+the same two-a-day budget. First-come-first-served was fine with two features and is a
+bug with six — whichever one happens to fire last in the day is permanently starved, and
+it is never the least valuable one. So **every outbound now declares a provenance class,
+and the classes are ranked** (`coach_outbound.OUTBOUND_PRIORITY`), highest first:
+
+1. **a kept promise** — breaking one is the worst thing a coach can do
+2. **referral** — contextual to a conversation he just had
+3. **pre-event support**
+4. **soft concern**
+5. **morning check-in**
+6. **celebration**
+
+Two consequences, both deliberate. Within one sweep the higher class speaks: a soft
+concern outranks a celebration, because checking on him matters more than congratulating
+him. And **from 09:00 PT the day's SECOND slot is reserved for the top three (reactive)
+classes** — the hour by which every scheduled outbound has already run in both PDT and
+PST — so a routine morning ping can open the day but cannot close it before the text that
+was actually about something happens. In practice that means at most one routine
+unsolicited text a day, with the second slot held for a reactive one.
+
+**The cap stays at 2.** This is ordering, not a raise; the moment it becomes a volume
+knob the scarcity rule above is dead. `tests/test_coach_outbound_behavior.py` pins the
+rank, the reservation, and the cap itself.

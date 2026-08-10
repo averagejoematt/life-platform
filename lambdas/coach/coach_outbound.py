@@ -10,12 +10,22 @@ platform deciding, on its own, that his phone should buzz. Get that wrong twice 
 the coaches become notifications — the thing every one of these personas is written
 NOT to be. So:
 
-  * **Two kinds, one budget.** Referral handoffs and Eli's morning check-in share a
-    single daily ledger (``COACH#outbound_ledger`` / ``DAY#{PT-date}``), cap 2, with
-    a referral sub-cap of 1. Two features cannot each politely spend "only one" and
-    add up to a noisy morning. The claim is an atomic conditional update, and it is
-    taken BEFORE inference — the nudge engine's idiom (#1382), for the same reason:
-    a crash between generating and sending must never license a second send.
+  * **Many kinds, one budget.** Referral handoffs, Eli's morning check-in and the
+    data-triggered pings (#2490) share a single daily ledger
+    (``COACH#outbound_ledger`` / ``DAY#{PT-date}``), cap 2, with a referral sub-cap
+    of 1. Features cannot each politely spend "only one" and add up to a noisy
+    morning. The claim is an atomic conditional update, and it is taken BEFORE
+    inference — the nudge engine's idiom (#1382), for the same reason: a crash
+    between generating and sending must never license a second send.
+  * **Two slots, ranked.** Once several features contend for the same two slots,
+    first-come-first-served silently starves whichever one fires last in the day.
+    Each outbound therefore declares a PROVENANCE class, and from a cutoff hour the
+    day's second slot is reserved for the high-priority (reactive) classes. The cap
+    is unchanged — this is ordering, not a raise.
+  * **An event fires once, ever.** A ping the DATA started also claims the event
+    itself (``COACH#outbound_events`` / ``EVENT#{event-id}``, conditional put, no
+    update path), so the same lift PR or the same three-day slide can never produce
+    a second text on a later sweep.
   * **Quiet hours are structural, not prompted.** 21:00–07:00 PT, checked in code.
     A prompt rule is a request; this is the guarantee (the podcast-gate lesson).
   * **Everything fails DARK.** Unknown persona, no bot token, a chat id that isn't
@@ -78,8 +88,56 @@ CHECKIN_FRAME = (
     "bubbles at most. Do not greet him as if he wrote to you, and do not ask him to reply.]"
 )
 
+CELEBRATION_FRAME = (
+    "[Something in the data is worth naming and it is YOUR lane. There is no inbound message — Matthew has not "
+    "texted you; you are opening this thread yourself. Send ONE short text that says the thing plainly, the way a "
+    "colleague who noticed would: no preamble, no congratulation theatre, no stacked exclamation marks, no plan "
+    "bolted on, no question at the end. Use ONLY the evidence below — if it does not support a sentence, do not "
+    "write that sentence.]\n\nWhat happened:\n{evidence}"
+)
+
+CONCERN_FRAME = (
+    "[Something in the data has been sliding for a few days and it is YOUR lane. There is no inbound message — "
+    "Matthew has not texted you; you are opening this thread yourself. Send ONE short text that checks in like a "
+    "person, not a monitor: name what you noticed once, lightly, and leave the door open. No diagnosis, no "
+    "protocol, no list, no alarm, and never imply you know why — you do not. Use ONLY the evidence "
+    "below.]\n\nWhat you noticed:\n{evidence}"
+)
+
+# ── Provenance: what KIND of unsolicited text this is ─────────────────────────
+#
+# Six features can now open a thread and the day holds two slots, so provenance
+# is no longer a label on a stored row — it is the RANK that decides who gets to
+# speak. The order is the owner's, and it reads as a claim about what a coach
+# owes him: breaking a promise is the worst thing a coach can do, so a kept one
+# outranks everything; a referral is contextual to a conversation he JUST had;
+# support before a thing he told us about beats noticing a thing after it;
+# concern beats celebration, because checking on him matters more than
+# congratulating him; and the routine morning check-in — the one that fires
+# whether or not anything happened — outranks only the pleasantry.
+PROVENANCE_PROMISE = "telegram_promise"
 PROVENANCE_REFERRAL = "telegram_referral"
+PROVENANCE_PRE_EVENT = "telegram_pre_event"
+PROVENANCE_CONCERN = "telegram_concern"
 PROVENANCE_CHECKIN = "telegram_checkin"
+PROVENANCE_CELEBRATION = "telegram_celebration"
+
+OUTBOUND_PRIORITY = {
+    PROVENANCE_PROMISE: 0,
+    PROVENANCE_REFERRAL: 1,
+    PROVENANCE_PRE_EVENT: 2,
+    PROVENANCE_CONCERN: 3,
+    PROVENANCE_CHECKIN: 4,
+    PROVENANCE_CELEBRATION: 5,
+}
+# An unrecognised provenance ranks LAST, never first: a new outbound feature that
+# forgets to register itself may be starved, but it can never starve a promise.
+LOWEST_PRIORITY = max(OUTBOUND_PRIORITY.values()) + 1
+
+EVENT_FRAMES = {
+    PROVENANCE_CELEBRATION: CELEBRATION_FRAME,
+    PROVENANCE_CONCERN: CONCERN_FRAME,
+}
 
 # How much of the referring conversation the referred coach is shown.
 REFERRAL_TAIL_TURNS = 6
@@ -91,6 +149,28 @@ LEDGER_SK_PREFIX = "DAY#"
 DAILY_OUTBOUND_CAP = 2
 DAILY_REFERRAL_CAP = 1
 LEDGER_TTL_DAYS = 30
+
+# The reserved second slot. The cap is NOT raised — this is ordering, and it
+# exists because first-come-first-served has a specific failure: the scheduled
+# features fire in the morning, the reactive ones fire when Matthew actually
+# talks to someone, so a routine ping can pre-spend the day before the valuable
+# text has any chance to happen. From the cutoff hour onward the day's LAST slot
+# belongs to the reactive classes; the first slot is never reserved, so whatever
+# fires first in the morning still gets to speak.
+#
+# 09:00 PT is chosen as the hour by which every SCHEDULED outbound has run in
+# both PDT and PST (the sweep at 09:00/08:00, the check-in at 10:15/09:15 — the
+# UTC-fixed crons drift an hour between them, and the cutoff has to sit under
+# both). Quiet hours end at 07:00, so the unreserved window is deliberately two
+# hours wide and nothing routine is scheduled inside it.
+RESERVED_SLOT_CUTOFF_HOUR = 9
+RESERVED_SLOT_MAX_PRIORITY = OUTBOUND_PRIORITY[PROVENANCE_PRE_EVENT]
+
+# ── The event ledger: one real-world event, one text, ever ────────────────────
+
+EVENT_LEDGER_PK = "COACH#outbound_events"
+EVENT_SK_PREFIX = "EVENT#"
+EVENT_TTL_DAYS = 90
 
 # Quiet hours, Pacific. Inclusive of 21:00, exclusive of 07:00.
 QUIET_START_HOUR = 21
@@ -115,6 +195,72 @@ def in_quiet_hours(now_pt) -> bool:
     return hour >= QUIET_START_HOUR or hour < QUIET_END_HOUR
 
 
+def priority(provenance: Optional[str]) -> int:
+    """Rank of an outbound class — lower speaks first. Unknown ranks last."""
+    return OUTBOUND_PRIORITY.get(provenance or "", LOWEST_PRIORITY)
+
+
+def effective_cap(provenance: Optional[str], now_pt, cap: int = DAILY_OUTBOUND_CAP) -> int:
+    """The cap THIS class may spend against right now.
+
+    Implemented as a smaller cap rather than a separate rule so the reservation
+    rides inside the same atomic conditional update the day budget already uses —
+    two workers cannot race their way around it, and there is no second ledger
+    field to keep consistent. Returns ``cap`` untouched for a high-priority class,
+    or before the cutoff hour; a low-priority class after the cutoff sees one
+    fewer slot, which is exactly "you may open the day, you may not close it".
+    """
+    if priority(provenance) <= RESERVED_SLOT_MAX_PRIORITY:
+        return cap
+    try:
+        hour = now_pt.hour
+    except AttributeError:  # pragma: no cover — an odd caller; keep the reservation ON
+        return max(1, cap - 1)
+    return cap if hour < RESERVED_SLOT_CUTOFF_HOUR else max(1, cap - 1)
+
+
+def event_sk(event_id: str) -> str:
+    return f"{EVENT_SK_PREFIX}{event_id}"
+
+
+def claim_event(table, event_id: str, *, now_ts: Optional[float] = None) -> bool:
+    """Write-once claim on ONE real-world event. False = it already fired.
+
+    The event id is derived from the FACT (the lift and its date, the milestone
+    id, the day a slide started), never from the moment of evaluation — which is
+    what makes a sweep idempotent and a three-day slide that runs to four days
+    silent on day four. The conditional put is the whole mechanism; there is
+    deliberately no update path and no delete path, so an event cannot be
+    un-fired by anything short of a manual write.
+
+    Any storage error returns False, matching ``claim_outbound``: a ledger the
+    platform cannot write is one it cannot be trusted to read, and the safe
+    reading of "I don't know whether I already said this" is "don't say it".
+    """
+    if not event_id:
+        return False
+    now = now_ts if now_ts is not None else time.time()
+    try:
+        table.put_item(
+            Item={
+                "pk": EVENT_LEDGER_PK,
+                "sk": event_sk(event_id),
+                "record_type": "coach_outbound_event",
+                "event_id": event_id,
+                "claimed_ts": int(now),
+                "ttl": int(now + EVENT_TTL_DAYS * 86400),
+            },
+            ConditionExpression="attribute_not_exists(sk)",
+        )
+        return True
+    except Exception as e:  # noqa: BLE001 — ConditionalCheckFailed = already fired
+        if "ConditionalCheckFailed" in type(e).__name__ or "ConditionalCheckFailed" in str(e):
+            logger.info("[outbound] event %s already fired — standing down", event_id)
+        else:
+            logger.warning("[outbound] event claim failed (%s) — standing down", e)
+        return False
+
+
 def claim_outbound(
     table,
     date_pt: str,
@@ -123,6 +269,8 @@ def claim_outbound(
     cap: int = DAILY_OUTBOUND_CAP,
     referral_cap: int = DAILY_REFERRAL_CAP,
     now_ts: Optional[float] = None,
+    provenance: Optional[str] = None,
+    now_pt=None,
 ) -> bool:
     """Atomically claim one unsolicited-outbound slot for the day. False = don't send.
 
@@ -131,7 +279,14 @@ def claim_outbound(
     storage error returns False — a ledger the platform cannot write is a ledger
     it cannot be trusted to count, and the safe reading of "I don't know how many
     I've sent" is "don't send another".
+
+    ``provenance`` + ``now_pt`` arm the reserved-slot rule (see ``effective_cap``).
+    Both are optional and default to the un-reserved behaviour, so a caller that
+    passes neither gets exactly the pre-#2490 cap — the reservation is something a
+    feature opts into by declaring what kind of text it is.
     """
+    if provenance is not None and now_pt is not None:
+        cap = effective_cap(provenance, now_pt, cap)
     names = {"#total": "total", "#ttl": "ttl"}  # both are DynamoDB reserved words
     values = {
         ":one": 1,
@@ -252,6 +407,19 @@ def referral_frame(referring_name: str, tail: str) -> str:
 
 def checkin_frame() -> str:
     return CHECKIN_FRAME
+
+
+def event_frame(provenance: str, evidence: str) -> str:
+    """The frame for a data-triggered ping — or "" when there is nothing behind it.
+
+    Empty evidence returns an empty frame ON PURPOSE, and every caller treats ""
+    as "do not send". An unsolicited text with no rows behind it is the exact
+    thing the grounding gate exists to stop, and it is cheaper to make it
+    unrepresentable here than to catch it three layers later.
+    """
+    template = EVENT_FRAMES.get(provenance)
+    body = (evidence or "").strip()
+    return template.format(evidence=body) if template and body else ""
 
 
 # ── Silence respect ───────────────────────────────────────────────────────────
