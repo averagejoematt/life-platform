@@ -42,6 +42,9 @@ So the arming is:
                into that silence.
   night      — #1968/#2343, the day-correspondence class. The one that matters most
                here and the one a chat can least afford to skip.
+  team       — #2496, composed on top rather than passed as a kwarg: an invented
+               inter-coach meeting ("we talked about you Tuesday") contains no
+               number and no calendar date, so every class above passes it.
 """
 
 from __future__ import annotations
@@ -120,4 +123,17 @@ def build_grounder(
             **cycle_gate_params(gen_date),
         )
 
-    return grounder
+    # #2496 — the team-texture class, composed HERE rather than at each transport.
+    # "We talked about you Tuesday" carries no number and no calendar date, so it is
+    # invisible to all five classes above; and per-transport wiring is precisely how
+    # #1967 found 4 of 15 surfaces arming a class they all believed they had. The
+    # check adjudicates against ``extra_sources`` because that is literally what the
+    # model was shown. Fail-soft to the five-class grounder: a missing sibling module
+    # must not disarm the gate that does exist.
+    try:
+        from coach.coach_team_texture import with_team_meeting_gate
+
+        return with_team_meeting_gate(grounder, *extra_sources)
+    except Exception as e:  # pragma: no cover — bundle edge
+        logger.warning("[coach_chat] team-texture gate unavailable: %s", e)
+        return grounder

@@ -688,6 +688,238 @@ def test_worker_colleagues_block_names_and_pronouns():
     assert "Dr. Sarah Chen" not in block  # retired seats are not colleagues to cite
 
 
+# ── B10: team texture + track-record humility (#2496) ────────────────────────
+#
+# Two grounded reads of rows that already existed and were never surfaced in chat:
+# the coach's OWN graded calls (misses first-class) and the inter-coach threads it
+# was actually a party to. The rendering half is pinned here; the gate that stops an
+# invented meeting lives in tests/test_coach_chat_grounding.py.
+#
+# Wall-clock discipline: every date below is injected. Nothing reads the real clock.
+
+
+def _pred(coach="sleep_coach", claim="a call", status="pending", made="2026-08-11", graded=None, **fields):
+    rec = {
+        "pk": f"COACH#{coach}",
+        "sk": f"PREDICTION#{made}-{abs(hash(claim)) % 9973}",
+        "claim_natural": claim,
+        "status": status,
+        "confidence": 0.7,
+        "created_date": made,
+    }
+    if graded:
+        rec["outcome_date"] = graded
+    rec.update(fields)
+    return rec
+
+
+def _thread(
+    a="sleep_coach", b="nutrition_coach", when="2026-08-09T18:20:00+00:00", topic="whether the deficit is eating his sleep", **fields
+):
+    rec = {
+        "pk": "ENSEMBLE#dispute",
+        "sk": f"THREAD#2026-W32#{topic[:20].replace(' ', '_')}",
+        "coach_a": a,
+        "coach_b": b,
+        "topic": topic,
+        "created_at": when,
+        "turns": [
+            {"speaker": a, "name": "Dr. Lisa Park", "line": "He is under-slept because he is under-fed.", "kind": "position"},
+            {"speaker": b, "name": "Dr. Nathan Reeves", "line": "The deficit is 500 kcal and it is not the cause.", "kind": "reply"},
+        ],
+    }
+    rec.update(fields)
+    return rec
+
+
+class _RecordingTable(_FakeTable):
+    """_FakeTable plus the kwargs boto3 actually saw — the phase-filter pin and the
+    one-query pin are both assertions about the CALL, invisible in the result."""
+
+    def __init__(self, items=None):
+        super().__init__(items)
+        self.query_kwargs = []
+
+    def query(self, **kw):
+        self.query_kwargs.append(kw)
+        return super().query(**kw)
+
+
+def _block(coach="sleep_coach", items=(), today="2026-08-12"):
+    from coach import coach_domain_facts as cdf
+
+    return cdf.domain_facts_block(coach, _FakeTable(list(items)), today=today)
+
+
+# — the graded record —
+
+
+def test_a_coach_names_its_own_miss_as_plainly_as_its_hit():
+    """Track-record humility is the whole point: a coach that only quotes its live
+    positions is a brochure. WRONG is stated as a word, not implied by an absence."""
+    block = _block(items=[_pred(claim="HRV climbs on a 10pm lights-out", status="refuted", graded="2026-08-11")])
+    assert "YOUR TRACK RECORD" in block
+    assert 'Graded WRONG: "HRV climbs on a 10pm lights-out" (made 2026-08-11, graded 2026-08-11).' in block
+
+
+def test_a_miss_keeps_its_slot_when_newer_hits_would_crowd_it_out():
+    """The selection rule, and the reason it is not plain recency: three fresh hits
+    would bury the one refuted call, and a coach is not allowed to present a
+    flattering sample of its own record as its record (ADR-104/105)."""
+    from coach import coach_team_texture as ctt
+
+    items = [
+        _pred(claim="hit three", status="confirmed", made="2026-08-08", graded="2026-08-11"),
+        _pred(claim="hit two", status="confirmed", made="2026-08-07", graded="2026-08-10"),
+        _pred(claim="hit one", status="confirmed", made="2026-08-06", graded="2026-08-09"),
+        _pred(claim="the one he got wrong", status="refuted", made="2026-08-02", graded="2026-08-05"),
+    ]
+    lines = ctt.terminal_prediction_lines(items)
+    assert sum(1 for ln in lines if ln.startswith("Graded ")) == ctt.MAX_TERMINAL_CALLS == 2
+    assert any("the one he got wrong" in ln and "WRONG" in ln for ln in lines)
+    assert any("hit three" in ln for ln in lines)  # the newest still leads
+    # mutation-proof: with no miss to protect, the slots go to the newest two hits
+    hits_only = [i for i in items if i["status"] == "confirmed"]
+    assert not any("wrong" in ln.lower() for ln in ctt.terminal_prediction_lines(hits_only)[:-1])
+
+
+def test_the_record_line_carries_n_and_never_counts_an_undecidable_call_as_a_hit():
+    """ADR-105: uncertainty and n on every statistical claim. 'inconclusive' and
+    'expired' are terminal but they are not outcomes — folding them into either
+    column would be the fabrication class aimed at the coach's own record."""
+    from coach import coach_team_texture as ctt
+
+    lines = ctt.terminal_prediction_lines(
+        [
+            _pred(claim="a hit", status="confirmed", graded="2026-08-10"),
+            _pred(claim="a miss", status="refuted", graded="2026-08-09"),
+            _pred(claim="never decidable", status="inconclusive", graded="2026-08-08"),
+            _pred(claim="ran out of window", status="expired", graded="2026-08-07"),
+        ]
+    )
+    assert "Your graded record this cycle: 1 right, 1 wrong out of 2 decided calls" in lines[-1]
+    assert "2 more could not be decided — those count as neither" in lines[-1]
+
+
+def test_a_coach_with_calls_but_none_graded_says_so_rather_than_implying_a_record():
+    block = _block(items=[_pred(claim="still open", status="pending")])
+    assert "None of your calls has been graded yet this cycle" in block
+
+
+def test_one_prediction_query_serves_both_the_open_calls_and_the_graded_ones():
+    """The chat turn is latency-bound. Two renderers over one partition must not
+    become two round-trips."""
+    from coach import coach_domain_facts as cdf
+
+    table = _RecordingTable([_pred(claim="open one"), _pred(claim="closed one", status="confirmed", graded="2026-08-10")])
+    cdf.domain_facts_block("sleep_coach", table, today="2026-08-12")
+    prediction_queries = [q for q in table.query_kwargs if q["ExpressionAttributeValues"].get(":prefix") == "PREDICTION#"]
+    assert len(prediction_queries) == 1
+
+
+# — the team room —
+
+
+def test_the_team_room_names_the_day_the_colleague_and_both_recorded_lines():
+    block = _block(items=[_thread()])
+    from coach import coach_team_texture as ctt
+
+    assert ctt.TEAM_ROOM_HEADING in block
+    assert "Sunday 2026-08-09 — you and Dr. Nathan Reeves went back and forth about" in block
+    assert "He is under-slept because he is under-fed." in block
+    assert "The deficit is 500 kcal and it is not the cause." in block
+
+
+def test_a_thread_the_coach_was_not_a_party_to_is_not_its_memory():
+    """Overhearing is not participating. A coach may only say 'we talked' about an
+    exchange it was actually in."""
+    from coach import coach_team_texture as ctt
+
+    block = _block(coach="mind_coach", items=[_thread()])
+    assert ctt.TEAM_ROOM_EMPTY_HEADING in block
+
+
+def test_a_thread_that_cannot_be_placed_on_a_day_is_dropped_rather_than_dated():
+    """Half a memory is not a memory: a thread with no timestamp names no day, and a
+    day the coach cannot source is a day it may not claim."""
+    from coach import coach_team_texture as ctt
+
+    assert ctt.team_meeting_lines("sleep_coach", _FakeTable([_thread(created_at="")])) == []
+    # mutation-proof: the same reader DOES render the identical thread once it is dated
+    assert ctt.team_meeting_lines("sleep_coach", _FakeTable([_thread()]))
+
+
+def test_a_one_sided_thread_is_dropped_rather_than_half_quoted():
+    solo = _thread()
+    solo["turns"] = [solo["turns"][0]]
+    from coach import coach_team_texture as ctt
+
+    assert ctt.team_meeting_lines("sleep_coach", _FakeTable([solo])) == []
+
+
+def test_the_absence_form_renders_rather_than_silence():
+    """The empty heading is not decoration — it is the gate's evidence, and a coach
+    told nothing about its team fills the silence from the persona's general idea of
+    what a coaching staff does."""
+    from coach import coach_team_texture as ctt
+
+    block = _block()
+    assert ctt.TEAM_ROOM_EMPTY_HEADING in block
+    assert "do not say you did, in any wording" in block
+
+
+def test_a_chat_tier_coach_reads_no_dispute_partition_at_all():
+    """Eli is not a party to an inter-coach thread, so the read could only return
+    nothing — and the absence line already tells him so, in words."""
+    from coach import coach_domain_facts as cdf, coach_team_texture as ctt
+
+    table = _RecordingTable([_thread()])
+    block = cdf.domain_facts_block("eli_marsh", table, today="2026-08-12")
+    assert ctt.TEAM_ROOM_EMPTY_HEADING in block
+    assert not table.query_kwargs
+
+
+def test_the_dispute_read_goes_through_the_phase_filter(monkeypatch):
+    """ADR-058/#1085: the restart wipe tombstones + pilot-tags every ENSEMBLE#dispute
+    thread, and an unguarded read has already shipped a WIPED cycle's argument to a
+    reader surface once. A coach recounting a deleted cycle's meeting is that bug
+    with a warmer voice. The wrapper is invisible in the RESULT, so the pin is on the
+    call."""
+    from coach import coach_team_texture as ctt
+    from experiment import phase_filter
+
+    seen = []
+    real = phase_filter.with_phase_filter
+
+    def spy(kwargs, **kw):
+        seen.append(dict(kwargs))
+        return real(kwargs, **kw)
+
+    monkeypatch.setattr(phase_filter, "with_phase_filter", spy)
+    table = _RecordingTable([_thread()])
+    ctt.team_meeting_lines("sleep_coach", table)
+    assert any(s["ExpressionAttributeValues"][":pk"] == "ENSEMBLE#dispute" for s in seen)
+    dispute_query = [q for q in table.query_kwargs if q["ExpressionAttributeValues"].get(":pk") == "ENSEMBLE#dispute"][0]
+    assert dispute_query["ExpressionAttributeValues"][":phase_experiment"] == "experiment"
+
+
+def test_a_storage_failure_costs_the_section_and_never_opens_the_gate():
+    """Fail-soft has a direction here. The absence form is the SAFE state (the gate
+    then refuses every team-meeting claim); failing open would be the one
+    unacceptable outcome."""
+    from coach import coach_team_texture as ctt
+
+    class _Boom:
+        def query(self, **kw):
+            raise RuntimeError("ddb down")
+
+        def get_item(self, **kw):
+            raise RuntimeError("ddb down")
+
+    assert ctt.team_meeting_lines("sleep_coach", _Boom()) == []
+    assert ctt.TEAM_ROOM_EMPTY_HEADING in ctt.team_room_section([])
+
+
 # ── B11: availability voice — budget-pause/daily-cap replies (#2495) ─────────
 
 

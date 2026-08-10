@@ -187,6 +187,111 @@ def test_the_grounder_is_reusable_across_turns_without_rebuilding():
     assert first and second and len(first) == len(second)
 
 
+# ── The team-texture class (#2496): the one an invented meeting slips past ────
+#
+# "We talked about you Tuesday" carries no number and no calendar date, so all five
+# classes above pass it. That is the whole reason this class exists, and the first
+# test below is the proof that the pre-existing arming does NOT cover it.
+
+from coach import coach_team_texture as ctt  # noqa: E402
+
+_ON_RECORD = ctt.team_room_section(
+    ['Sunday 2026-08-09 — you and Dr. Nathan Reeves went back and forth about the deficit. You said: "Under-fed." He said: "No."']
+)
+_NOTHING_ON_RECORD = ctt.team_room_section([])
+_INVENTED = "We talked about you on Tuesday and Nathan agreed with me."
+
+
+def test_the_five_classes_alone_do_not_catch_an_invented_meeting():
+    """The measurement, not the assumption. If this ever starts failing, the class
+    below has become redundant and should be deleted rather than kept out of
+    habit."""
+    from ai.grounded_generation import allowed_dates, allowed_numbers, grounding_findings
+    from ai.grounding_gate_params import cycle_gate_params
+    from ai.night_scope import nightly_vitals_from_facts
+
+    assert (
+        grounding_findings(
+            _INVENTED,
+            facts=FACTS,
+            allowed=allowed_numbers(FACTS, _NOTHING_ON_RECORD),
+            allowed_dates=allowed_dates(FACTS, _NOTHING_ON_RECORD),
+            nightly_vitals=nightly_vitals_from_facts(FACTS),
+            **cycle_gate_params("2026-08-08"),
+        )
+        == []
+    )
+
+
+def test_an_invented_meeting_is_a_finding_when_no_thread_is_on_record():
+    findings = grounder(extra_sources=(_NOTHING_ON_RECORD,))(_INVENTED)
+    assert [f["type"] for f in findings] == [ctt.UNGROUNDED_TEAM_MEETING]
+
+
+def test_a_real_meeting_recounted_on_its_own_day_passes():
+    """Mutation-proof for the test above: the guard must PASS the claim it exists to
+    allow, or it is just a ban on a phrase."""
+    assert grounder(extra_sources=(_ON_RECORD,))("We talked about you Sunday — Nathan and I went round on the deficit.") == []
+
+
+def test_a_real_meeting_narrated_onto_the_wrong_day_is_a_finding():
+    """#2343's shape aimed at team texture: the meeting is real, the DAY is the lie,
+    and an existence-only check passes it."""
+    findings = grounder(extra_sources=(_ON_RECORD,))("We talked about you Tuesday.")
+    assert [f["type"] for f in findings] == [ctt.WRONG_TEAM_MEETING_DAY]
+    assert "Sunday" in findings[0]["detail"]
+
+
+def test_the_coach_and_matthew_talking_in_this_very_thread_is_not_a_team_claim():
+    """The false positive that would matter: 'we' meaning the coach and Matthew is
+    the ordinary register of a text message. A gate that flagged it would teach the
+    regen loop to hedge, which is the outcome this class refuses."""
+    for honest in (
+        "We talked about your sleep on Tuesday and you said you'd move lights-out.",
+        "We should talk about you sleeping through the alarm.",
+        "I've been thinking about you not logging food.",
+    ):
+        assert grounder(extra_sources=(_NOTHING_ON_RECORD,))(honest) == [], honest
+
+
+def test_a_miss_citation_renders_in_voice_and_passes_the_gate_without_hedging():
+    """The behavior pin the story asks for. Track-record humility is only humanising
+    if the coach can say it the way a person would — no 'I may have been imprecise',
+    no 'roughly directionally right'. This is what the coach is allowed to send."""
+    miss = 'Graded WRONG: "HRV climbs on a 10pm lights-out" (made 2026-08-02, graded 2026-08-07).'
+    track = ctt.track_record_section([miss, "Your graded record this cycle: 1 right, 1 wrong out of 2 decided calls."])
+    in_voice = "I got that one wrong. I said your HRV would climb once you went lights-out at 10 and it didn't move."
+    assert grounder(extra_sources=(track,))(in_voice) == []
+    # the fact line states the verdict outright — no hedge for the model to copy
+    assert not {"roughly", "arguably", "partially", "inconclusive", "maybe"} & set(miss.lower().replace('"', " ").split())
+    assert "never soften one into a maybe" in ctt.TRACK_RECORD_HEADING  # the instruction, stated once, in the heading
+
+
+def test_the_team_class_composes_onto_the_five_rather_than_replacing_them():
+    """A composed gate that swallowed the classes it wraps would be the worst
+    possible outcome — silently disarming five to arm one."""
+    findings = grounder(extra_sources=(_NOTHING_ON_RECORD,))("We talked about you Tuesday; you averaged 165 g of protein.")
+    types = {f["type"] for f in findings}
+    assert ctt.UNGROUNDED_TEAM_MEETING in types
+    assert "fabricated_number" in types
+
+
+def test_a_missing_sibling_module_leaves_the_five_classes_armed(monkeypatch):
+    """Fail-soft has a direction: a bundle edge may cost the new class, never the
+    ones that were already there."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def boom(name, *a, **kw):
+        if name == "coach.coach_team_texture":
+            raise ImportError("bundle edge")
+        return real_import(name, *a, **kw)
+
+    monkeypatch.setattr(builtins, "__import__", boom)
+    gr = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
+    monkeypatch.setattr(builtins, "__import__", real_import)
+    assert gr("You averaged 165 g."), "the number class must still fire"
 # ── What Matthew just said is evidence (live regression, 2026-08-10) ──────────
 #
 # Measured on the real thread: he texted "I woke up late so ended up just doing a
