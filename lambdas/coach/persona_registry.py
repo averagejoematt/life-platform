@@ -257,3 +257,38 @@ def tts_voice(persona_id, s3_client=None, bucket=None):
     """The persistent Google Chirp 3: HD voice assigned to a persona (podcasts), or None."""
     p = resolve(persona_id, s3_client, bucket)
     return p.get("tts_voice") if p else None
+
+
+# ── Availability voice (#2495) ────────────────────────────────────────────────
+# The budget-pause and daily-cap replies used to be ONE shared string in
+# coach_chat.py — the exact tell the coach-humanity roadmap works to remove. Each
+# TEXTING_PERSONA_IDS persona carries its own pair under an "availability" block
+# ({"paused": "...", "capped": "..."}). This fallback is the last resort for an
+# unregistered id or a stale local/S3 read — same generic tone every coach used to
+# share. ADR-104 still applies to the fallback: it must plainly state the
+# paused/capped condition, just without a persona's voice.
+_FALLBACK_AVAILABILITY = {
+    "paused": (
+        "I'm paused for the month — the AI budget guard is holding at tier {tier} and a "
+        "private chat isn't worth pausing your daily brief over. The site and your brief still run."
+    ),
+    "capped": (
+        "That's {cap} messages today, which is where I stop — not because you're bothering me, but "
+        "because the budget cap is the reason the rest of the platform keeps running. Pick it up tomorrow."
+    ),
+}
+
+
+def availability_reply(persona_id, kind, s3_client=None, bucket=None, **fmt):
+    """The persona-voiced budget-pause/daily-cap reply, or the generic fallback.
+
+    ``kind`` is ``"paused"`` or ``"capped"``. ``persona_id`` may be ``None`` (no
+    handle available) or a value not in the registry (unregistered id, stale
+    read) — both fall back to ``_FALLBACK_AVAILABILITY`` rather than raising, the
+    same fail-soft posture ``lead_name``/``lead_title`` use for the board-lead
+    byline. Every string is a ``str.format`` template; the caller supplies the
+    live values (``tier=`` / ``cap=``) so the deterministic state is never stale.
+    """
+    p = resolve(persona_id, s3_client, bucket) if persona_id else None
+    template = ((p or {}).get("availability") or {}).get(kind) or _FALLBACK_AVAILABILITY[kind]
+    return template.format(**fmt)

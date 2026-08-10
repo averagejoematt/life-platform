@@ -604,6 +604,7 @@ def _maybe_refer(*, marker: Optional[str], referring: dict, chat_id, thread: lis
 
     result = coach_chat.run_turn(
         coach_id=target,
+        persona_id=target,
         coach_name=a["coach_name"],
         persona_block=a["persona"],
         memory_block=a["memory"],
@@ -683,6 +684,7 @@ def _morning_checkin() -> dict:
 
     result = coach_chat.run_turn(
         coach_id=persona_id,
+        persona_id=persona_id,
         coach_name=a["coach_name"],
         persona_block=a["persona"],
         memory_block=a["memory"],
@@ -768,6 +770,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
 
     result = coach_chat.run_turn(
         coach_id=coach_id,
+        persona_id=persona_id,
         coach_name=coach_name,
         persona_block=a["persona"],
         memory_block=a["memory"],

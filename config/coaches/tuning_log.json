@@ -198,6 +198,10 @@
     {
       "date": "2026-08-10",
       "coach": "all",
+      "change_type": "persona",
+      "summary": "Availability voice: the budget-pause and daily-cap replies each of the 8 texting personas (5 operational + pattern/career/eli_marsh) now use their own template in config/personas.json's new availability block, replacing the single shared string coach_chat.py used to send for every coach.",
+      "rationale": "Ledger row docs/design/COACH_HUMANITY_ROADMAP.md:84 (idea 38) — the moment the platform is paused or capped, every persona used to collapse into the same voice, the exact tell the rest of the roadmap works to remove.",
+      "ref": "issue #2495",
       "change_type": "prompt",
       "summary": "Time-gap awareness: a 'TIME GAP' memory line (with inline instruction) is folded into read_recent_summaries() when the real CHAT# history shows >= QUIET_GAP_DAYS=7 days since the last real turn, so a coach can acknowledge a quiet stretch naturally instead of picking the thread back up as if no time passed. Never fires on an empty partition or within an active thread.",
       "rationale": "Coach Humanity Roadmap idea 19 (#2489): after a quiet week the coach showed no awareness time had passed. The instruction rides with the fact rather than in coach_chat.py's CONVERSATION RULES block because that block is under active concurrent edit and heavy existing test coverage (#2481) this change must not disturb.",

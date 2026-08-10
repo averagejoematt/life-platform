@@ -232,3 +232,80 @@ def test_podcast_voice_map_complete_and_unique():
         assert v, f"{s} missing tts_voice"
         assert v.startswith("en-US-Chirp3-HD-"), f"{s} unexpected voice {v!r}"
     assert len(set(voices.values())) == len(voices), "two speakers share a voice"
+
+
+# ── Availability voice: budget-pause/daily-cap replies are per-persona (#2495) ─
+
+
+def test_every_texting_persona_has_availability_voice():
+    """The budget-pause and daily-cap replies used to be ONE shared string across
+    every coach — the exact tell the coach-humanity roadmap works to remove. Every
+    TEXTING_PERSONA_IDS persona (the ones with a live Telegram bot) must carry an
+    availability block with a distinct paused AND a distinct capped template, each
+    still carrying its deterministic state ({tier} / {cap}) so formatting can't go
+    stale. Derived from TEXTING_PERSONA_IDS, not a hand-typed list, so a newly
+    added texting persona is covered automatically (guard the SET)."""
+    personas = _personas()
+    paused_by_pid = {}
+    capped_by_pid = {}
+    for pid in persona_registry.TEXTING_PERSONA_IDS:
+        p = personas.get(pid)
+        assert p, f"{pid} is in TEXTING_PERSONA_IDS but missing from the registry"
+        avail = p.get("availability")
+        assert isinstance(avail, dict), f"{pid} missing an availability block"
+        paused, capped = avail.get("paused"), avail.get("capped")
+        assert paused and "{tier}" in paused, f"{pid}: paused reply missing, or missing the {{tier}} state"
+        assert capped and "{cap}" in capped, f"{pid}: capped reply missing, or missing the {{cap}} state"
+        paused_by_pid[pid] = paused
+        capped_by_pid[pid] = capped
+
+    assert len(set(paused_by_pid.values())) == len(
+        paused_by_pid
+    ), f"two texting personas share a paused-budget reply: {sorted(paused_by_pid.items())}"
+    assert len(set(capped_by_pid.values())) == len(
+        capped_by_pid
+    ), f"two texting personas share a daily-cap reply: {sorted(capped_by_pid.items())}"
+
+
+def _distinct(strings_by_pid: dict) -> bool:
+    """The exact check the two assertions above run — pulled out so the next test
+    can mutation-prove it rather than trust it by inspection."""
+    return len(set(strings_by_pid.values())) == len(strings_by_pid)
+
+
+def test_availability_distinctness_check_actually_catches_a_duplicate():
+    """Mutation-proves the guard above: passes on the real (already-distinct)
+    data, and — the part that matters — actually goes False the moment two
+    personas are forced to share a string, so the assertion isn't vacuously
+    passing on an accident of the current copy."""
+    real = {pid: _personas()[pid]["availability"]["paused"] for pid in persona_registry.TEXTING_PERSONA_IDS}
+    assert _distinct(real) is True
+
+    pids = list(real)
+    mutated = dict(real)
+    mutated[pids[1]] = mutated[pids[0]]  # simulate a copy-paste duplicate
+    assert _distinct(mutated) is False
+
+
+def test_availability_reply_renders_persona_voice_and_states_the_condition():
+    """ADR-104: even rendered in a persona's own register, the pause/cap
+    condition must be stated plainly enough that Matthew can't mistake it for an
+    ordinary reply."""
+    for pid in persona_registry.TEXTING_PERSONA_IDS:
+        paused = persona_registry.availability_reply(pid, "paused", tier=2)
+        capped = persona_registry.availability_reply(pid, "capped", cap=40)
+        assert "2" in paused, f"{pid}: paused reply doesn't surface the tier"
+        assert "40" in capped, f"{pid}: capped reply doesn't surface the cap"
+        assert "{" not in paused and "{" not in capped, f"{pid}: unformatted placeholder leaked into the reply"
+        assert any(w in paused.lower() for w in ("budget", "pause", "tier")), f"{pid}: paused reply too oblique"
+        assert any(w in capped.lower() for w in ("cap", "today", "tomorrow", "stop")), f"{pid}: capped reply too oblique"
+
+
+def test_availability_reply_falls_back_for_unknown_persona():
+    """No handle, or an id the registry doesn't recognise, must not raise — it
+    degrades to the generic fallback rather than crash a chat turn, and the
+    fallback is still honest about the condition (ADR-104)."""
+    text = persona_registry.availability_reply(None, "paused", tier=3)
+    assert "3" in text and "budget" in text.lower()
+    text2 = persona_registry.availability_reply("not_a_real_persona", "capped", cap=40)
+    assert "40" in text2 and "budget" in text2.lower()
