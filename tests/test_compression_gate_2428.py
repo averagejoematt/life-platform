@@ -89,6 +89,23 @@ def _wire_haiku(monkeypatch, payload):
     return calls
 
 
+def _semantic_blob(result):
+    """The result minus volatile timestamps.
+
+    ``compressed_at``/``generated_at`` carry ``datetime.now().isoformat()`` —
+    a '43' in the microseconds field is not the fabricated 43 bpm this gate
+    hunts, and it made these asserts fail on roughly one CI run in ten purely
+    by wall clock (first bitten: run 31351632913, 2026-08-10)."""
+    return json.dumps({k: v for k, v in result.items() if k not in ("compressed_at", "generated_at")})
+
+
+def test_the_semantic_blob_ignores_timestamps_but_not_content():
+    poisoned_time = {"summary": "clean", "compressed_at": "2026-08-10T03:25:43.430430+00:00"}
+    assert "43" not in _semantic_blob(poisoned_time)
+    poisoned_content = {"summary": "rhr hit 43 bpm", "compressed_at": "2026-08-10T03:00:00+00:00"}
+    assert "43" in _semantic_blob(poisoned_content)
+
+
 def test_fabricated_number_never_reaches_compressed_latest(monkeypatch):
     """A compression citing an untraceable number is held — the prior row survives."""
     calls = _wire_haiku(monkeypatch, FABRICATED)
@@ -99,7 +116,7 @@ def test_fabricated_number_never_reaches_compressed_latest(monkeypatch):
 
     assert result.get("_held") is True
     assert result["summary"] == "prior clean summary"
-    assert "43" not in json.dumps(result)
+    assert "43" not in _semantic_blob(result)
     # the gate spent its ONE corrective regen before holding
     assert len(calls) == 2
     assert "43" not in calls[0], "the fabricated figure must come from the model, not the prompt"
@@ -114,7 +131,7 @@ def test_hold_without_prior_falls_back_to_the_deterministic_state(monkeypatch):
 
     assert result.get("_fallback") is True
     assert result.get("grounding_gated") is True  # deterministic-by-construction
-    blob = json.dumps(result)
+    blob = _semantic_blob(result)
     assert "43" not in blob and "17.4" not in blob
 
 
