@@ -66,6 +66,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -97,14 +98,19 @@ class Ledger:
         self.total = 0.0
         self.calls = 0
         self.by_kind: dict = {}
+        # The analyzer's judge panel fans out across threads. `self.total += cost` is
+        # read-modify-write: unlocked, concurrent judges lose increments, and a spend
+        # cap that under-counts is a cap that does not hold.
+        self._lock = threading.Lock()
 
     def add(self, usage: dict, model_id: str, kind: str) -> float:
         from ai.bedrock_client import estimate_cost_usd
 
         cost = estimate_cost_usd(usage or {}, model_id)
-        self.total += cost
-        self.calls += 1
-        self.by_kind[kind] = self.by_kind.get(kind, 0.0) + cost
+        with self._lock:
+            self.total += cost
+            self.calls += 1
+            self.by_kind[kind] = self.by_kind.get(kind, 0.0) + cost
         return cost
 
     def check(self) -> None:

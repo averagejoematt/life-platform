@@ -376,34 +376,75 @@ def judge_conversation(convo: dict, temperature: float, ledger) -> dict:
         return {"verdict": "unparsed", "confidence": 0, "tells": [], "raw": text[:200]}
 
 
-def run_panel(convos: list, ledger, max_usd: float) -> dict:
-    """Three judges per conversation, majority verdict, tells pooled."""
+def run_panel(convos: list, ledger, max_usd: float, workers: int = 6, cache_path: str = None) -> dict:
+    """Three judges per conversation, majority verdict, tells pooled.
+
+    CONCURRENT AND INCREMENTAL, both learned the hard way on the first run. Serially
+    this is 3 calls x N conversations at ~3s each — 20 minutes for a 120-conversation
+    corpus, and the first version wrote nothing until the last verdict landed, so
+    stopping it (or a crash at conversation 118) threw away every dollar already
+    spent. Judges are independent by construction, so the fan-out is free; the cache
+    file makes a re-run resume instead of re-paying.
+
+    Concurrency is per-conversation rather than per-call so a conversation's three
+    votes always land together and the ledger's cap is checked between whole
+    conversations — a partial panel with 2 of 3 votes would silently change what
+    "majority" means.
+    """
+    import concurrent.futures
+
     results = {}
-    for c in convos:
-        if ledger.total >= max_usd:
-            print(f"  panel halted at ${ledger.total:.2f}")
-            break
+    if cache_path and os.path.exists(cache_path):
+        with open(cache_path) as fh:
+            results = json.load(fh)
+        print(f"  resumed {len(results)} judged conversations from cache")
+
+    todo = [c for c in convos if c["scenario_id"] not in results]
+
+    def judge_one(c):
         votes = []
         for temp in PANEL_TEMPERATURES:
             try:
                 votes.append(judge_conversation(c, temp, ledger))
             except Exception as e:
                 print(f"  judge error on {c['scenario_id']}: {e}")
-        if not votes:
-            continue
-        ai_votes = sum(1 for v in votes if v.get("verdict") == "ai")
-        results[c["scenario_id"]] = {
-            "coach": c["coach"],
-            "archetype": c["archetype"],
-            "ai_votes": ai_votes,
-            "n_votes": len(votes),
-            "majority": "ai" if ai_votes * 2 > len(votes) else "human",
-            "mean_confidence": round(statistics.mean([float(v.get("confidence") or 0) for v in votes]), 1),
-            "tells": [t for v in votes for t in (v.get("tells") or [])],
-            "most_human": [v.get("most_human_moment") for v in votes if v.get("most_human_moment")],
-        }
-        print(f"  {c['scenario_id']:42} {ai_votes}/{len(votes)} AI  ${ledger.total:.2f}")
+        return c, votes
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(judge_one, c): c for c in todo}
+        for fut in concurrent.futures.as_completed(futures):
+            if ledger.total >= max_usd:
+                for f in futures:
+                    f.cancel()
+                print(f"  panel halted at ${ledger.total:.2f}")
+                break
+            try:
+                c, votes = fut.result()
+            except Exception as e:
+                print(f"  panel task failed: {e}")
+                continue
+            if not votes:
+                continue
+            ai_votes = sum(1 for v in votes if v.get("verdict") == "ai")
+            results[c["scenario_id"]] = _vote_record(c, votes, ai_votes)
+            print(f"  {c['scenario_id']:42} {ai_votes}/{len(votes)} AI  ${ledger.total:.2f}", flush=True)
+            if cache_path:
+                with open(cache_path, "w") as fh:
+                    json.dump(results, fh)
     return results
+
+
+def _vote_record(c: dict, votes: list, ai_votes: int) -> dict:
+    return {
+        "coach": c["coach"],
+        "archetype": c["archetype"],
+        "ai_votes": ai_votes,
+        "n_votes": len(votes),
+        "majority": "ai" if ai_votes * 2 > len(votes) else "human",
+        "mean_confidence": round(statistics.mean([float(v.get("confidence") or 0) for v in votes]), 1),
+        "tells": [t for v in votes for t in (v.get("tells") or [])],
+        "most_human": [v.get("most_human_moment") for v in votes if v.get("most_human_moment")],
+    }
 
 
 def main() -> int:
@@ -413,6 +454,7 @@ def main() -> int:
     ap.add_argument("--json-out", help="machine-readable metrics output path")
     ap.add_argument("--max-usd", type=float, default=3.0)
     ap.add_argument("--no-panel", action="store_true", help="deterministic metrics only — no spend")
+    ap.add_argument("--workers", type=int, default=6, help="concurrent judge conversations")
     args = ap.parse_args()
 
     os.environ.setdefault("AWS_REGION", "us-west-2")
@@ -434,7 +476,8 @@ def main() -> int:
 
         ledger = Ledger(args.max_usd * 2)
         print("\nrunning blind panel...")
-        panel = run_panel(convos, ledger, args.max_usd)
+        cache = os.path.join(args.runs, ".panel_cache.json")
+        panel = run_panel(convos, ledger, args.max_usd, workers=args.workers, cache_path=cache)
 
     payload = {
         "n_conversations": len(convos),
