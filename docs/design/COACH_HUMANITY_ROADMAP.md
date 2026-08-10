@@ -132,8 +132,8 @@ Repeatedly they named *Matthew's own messages* as the most human thing in the tr
 
 | # | Idea | Status |
 |---|------|--------|
-| 53 | **Adjudicate the identity stance.** The north star ("a cold reader couldn't tell") and `_shared_standard.json`'s `safety_boundaries` ("never claim to be a real human professional") contradict each other; in the gap the model picks, identically, in all 8 voices — `"No — I'm a…"` opens 6 of 8 verbatim | **owner decision** (#2533) |
-| 54 | Per-persona identity stance in each voice spec — the concession made once, in character, without narrating inference architecture | filed (#2533) |
+| 53 | **Adjudicate the identity stance.** The north star ("a cold reader couldn't tell") and `_shared_standard.json`'s `safety_boundaries` ("never claim to be a real human professional") contradict each other; in the gap the model picks, identically, in all 8 voices — `"No — I'm a…"` opens 6 of 8 verbatim | **DECIDED 2026-08-10 — disclose and move on; shipped (#2533)** |
+| 54 | Per-persona identity stance in each voice spec — the concession made once, in character, without narrating inference architecture | **shipped** (#2533) — the shared boundary now supplies no quotable label; echo of "fictional composite" 5/8 -> 0/8, shared opening 6/8 -> 1/8 |
 | 55 | **Deterministic style gate** in `run_turn` — em-dash ceiling + banned-phrase list, sibling to `enforce_emoji_policy`, applied before the grounding gate. Measured: 77% of replies carry an em-dash and the voice spec makes no difference (the coach *permitted* them 80%, the coach told "complete sentences, periods" 78%) | filed (#2535) |
 | 56 | Enforce the #2481 phrase ban deterministically — "Honest answer" appears 23× in 536 replies despite being banned by name. Prompt rules are requests (the standing lesson); the gate in 55 should carry the list | filed (#2535) |
 | 57 | Break the acknowledge→echo→menu template on emotional openers. Given "I'm just tired of all of this", 6 of 8 coaches produce demonstrative-ack → his phrase quoted back → menu question. `"that kind of "` opens replies from 6 different coaches | filed (#2536) |

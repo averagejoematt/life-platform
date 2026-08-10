@@ -231,6 +231,14 @@ def texting_block(spec: dict) -> str:
         ("opening_register", "Openings"),
         ("double_text", "Double-texting"),
         ("emoji_posture", "Emoji"),
+        # #2533 — chat-only by design. The shared standard says every coach is a
+        # fictional composite and must never claim otherwise; this is the same
+        # concession rendered in ONE coach's voice, so eight personas stop
+        # answering "are you a real person?" with the same sentence (measured
+        # 2026-08-10: `"No — I'm a"` opened 6 of 8 verbatim, and the panel called
+        # 100% of those conversations AI). The board and the observatory never
+        # face the question, which is why it rides here and not in voice_block.
+        ("identity_stance", "Identity"),
     )
     bits = [f"- {label}: {_clip(style[key])}" for key, label in labels if style.get(key)]
     if not bits:
