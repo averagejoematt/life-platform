@@ -154,6 +154,29 @@ def _turns_today(thread: list) -> int:
     return len([t for t in thread if t.get("role") == coach_chat.ROLE_MATTHEW])
 
 
+def _colleagues_block(self_persona_id: str) -> str:
+    """The staff roster, from THIS coach's seat — real names + pronouns, so a
+    cross-reference is 'Dr. Nathan Reeves (he)' and never 'the mind coach (her)'.
+    Consulting specialists are included: citable-by-name is their whole tier.
+    Fail-soft "" — a roster miss never blocks the reply."""
+    try:
+        from coach.persona_registry import personas
+
+        lines = []
+        for pid, p in personas(s3_client=_s3_client(), bucket=S3_BUCKET).items():
+            if pid == self_persona_id or not (p.get("operational") or p.get("chat") or p.get("consulting")):
+                continue
+            pr = f" ({p['pronouns']})" if p.get("pronouns") else ""
+            role = p.get("title") or p.get("board_role") or ""
+            lines.append(f"- {p['name']}{pr} — {role}")
+        if not lines:
+            return ""
+        return "YOUR COLLEAGUES (refer to them by name, with these pronouns):\n" + "\n".join(lines)
+    except Exception as e:
+        logger.warning("[telegram] colleagues block unavailable: %s", e)
+        return ""
+
+
 def _last_reply_had_emoji(thread: list) -> bool:
     """Whether the coach's most recent stored reply carried an emoji — feeds the
     never-twice-in-a-row half of the deterministic emoji ceiling."""
@@ -423,6 +446,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         tier=_current_tier(),
         turns_today=_turns_today(thread),
         last_reply_had_emoji=_last_reply_had_emoji(thread),
+        colleagues_block=_colleagues_block(persona_id),
     )
 
     # A burst goes out as separate bubbles ~1s apart with the typing indicator
