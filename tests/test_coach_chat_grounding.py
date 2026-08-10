@@ -292,6 +292,8 @@ def test_a_missing_sibling_module_leaves_the_five_classes_armed(monkeypatch):
     gr = g.build_grounder(FACTS, generation_date_iso="2026-08-08")
     monkeypatch.setattr(builtins, "__import__", real_import)
     assert gr("You averaged 165 g."), "the number class must still fire"
+
+
 # ── What Matthew just said is evidence (live regression, 2026-08-10) ──────────
 #
 # Measured on the real thread: he texted "I woke up late so ended up just doing a
