@@ -47,4 +47,14 @@ Triage: epic #1024 closed complete; 7 Later→Next promotions; 2 fable→opus re
 - **Owner ⑥** portraits contact-sheet for Vale/Brooks (ADR-106); #2465 Monday rituals.
 - **Live QA is the acceptance bar for Act 1** — text the coaches in the morning: do they match your register, skip the stat recital, take an off-topic message like a person, and cite their own predictions naturally? #2492 (prompt-pass v3: grounded pushback + conversational repair) is the filed follow-up.
 
+## Model note (matters for what the next session may pick up)
+
+The Fable weekly allowance was exhausted partway through the close-out; the tail of this session ran on **Opus 5**. Everything after that point was mechanical — merges, gate reruns, deploy verification, the wrap — deliberately **no `model:fable` work was started**, because a voice/taste judgment made by a different model than the one the ritual is calibrated on isn't the same artifact (`feedback_review_ritual_model_identity`). Deferred to the Fable reset (Saturday), not dropped:
+
+- **#2492** prompt-pass v3 — grounded pushback + conversational repair. This is the highest-value coaching follow-up and it is deliberately `model:fable`: it is few-shot and register work against real transcripts.
+- **#1114** coach portrait art direction v2 (ADR-106 — Matthew's approval gate either way).
+- The frontier/ideation `model:fable` set: #1415, #1391, #1389, #1380, #1400 (now opus), #1570, #748.
+
+Anything in that list appearing in a "next picks" prompt should be re-checked against the model budget before it starts.
+
 **Build beat:** `2026-08-10-coaches-that-text-like-people` — the humanity pass, from real transcripts to shipped rules (merged + deployed via run 31354465497).
