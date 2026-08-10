@@ -1,6 +1,6 @@
 # Life Platform — Board of Directors Reference
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-10 (coaching-team v2, ADR-153)
 
 > Three expert boards advise different aspects of the platform. Invoke by name or board type.
 > This file is the single reference for all board composition. Claude Code should read this when board input is needed.
@@ -22,13 +22,15 @@ Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `pa
 
 | Display name | Title | Type | Config key(s) | Domains |
 |--------------|-------|------|---------------|---------|
-| Dr. Sarah Chen | Sports Scientist | fictional | `sarah_chen` | Training, exercise physiology, periodization, recovery |
+| Dr. Sarah Chen | Sports Scientist (**retired 2026-08-10**, ADR-153 — the Performance seat absorbs training; her published history keeps her byline) | fictional | `sarah_chen` | Training, exercise physiology, periodization, recovery |
 | Dr. Marcus Webb | Nutritionist (panel) / Macros (long-form) | fictional + legacy `layne_norton` | `marcus_webb`, `layne_norton` | Nutrition, macros, meal timing, deficit sustainability |
 | Dr. Lisa Park | Sleep Scientist & Circadian Specialist | fictional | `lisa_park` | Sleep architecture, circadian rhythm, sleep debt |
 | Dr. James Okafor | Longevity & Preventive Medicine | fictional | `james_okafor` | Biomarkers, trajectory analysis, ASCVD risk |
 | Coach Maya Rodriguez | Behavioural Performance Coach | fictional | `maya_rodriguez` | Habit formation, motivation, knowing-doing gap |
 | Dr. Amara Patel | Micronutrients, Genome & Longevity | fictional (replaces Patrick) | `rhonda_patrick`, `amara_patel` | Nutrigenomics, supplementation, SNP analysis |
-| Dr. Victor Reyes | Metabolic Health & Longevity | fictional (replaces Attia) | `peter_attia`, `victor_reyes` | CGM, body composition, exercise medicine, DEXA |
+| Dr. Max Reyes | Performance Coach — Training, Cardio & Mobility (renamed from Victor 2026-08-10, ADR-153) | fictional (replaces Attia) | `peter_attia`, `victor_reyes` | Training load, strength+cardio, mobility, body composition, DEXA |
+| Dr. Nora Vale | Pattern Detective — Director of Longitudinal Intelligence (chat tier) | fictional | `nora_vale` | Cross-domain recurrences, hypothesis lifecycle, early warnings |
+| Steve Brooks | Career Coach — Strategy & Leverage (chat tier) | fictional | `steve_brooks` | Career strategy, influence, optionality |
 | Dr. Kai Nakamura | Neuroscience & Protocols | fictional (replaces Huberman) | `andrew_huberman` | Circadian biology, dopamine, stress protocols |
 | Dr. Eli Marsh | Principal Investigator — Program Lead | meta_role (**the board lead**) | `eli_marsh` | Cross-domain synthesis, experiment sequencing, weekly prioritization |
 | Dr. Nathan Reeves | Psychiatrist — Self-Structure | fictional (replaces Conti) | `paul_conti`, `nathan_reeves` | Defense mechanisms, grief, identity, self-compassion |
@@ -149,11 +151,12 @@ In any Claude session (claude.ai or Claude Code):
 
 The Personal Board personas above appear in the **email + observatory surface**. The platform also runs an **8-agent Coach Intelligence pipeline** (ADR-047, ADR-055) with internal coach IDs that drive the underlying deterministic computation and stateful memory. The two systems are connected (coaches contribute to brief sections), but the IDs are different.
 
-Coach IDs (from `lambdas/coach_computation_engine.py:COACH_IDS`):
-`dr_johansson` · `fitness_coach` · `nutrition_coach` · `mind_coach` · `sleep_coach` · `body_comp_coach` · `lifestyle_coach` · `recovery_coach`
+Coach IDs are **registry-derived** (`config/personas.json` via `persona_registry.OPERATIONAL_COACH_IDS` — CC-00/#2334; the pre-CC-00 aliases like `dr_johansson` are dead). Since the 2026-08-10 restructure (ADR-153) the operational set is the 7:
+`sleep_coach` · `nutrition_coach` · `mind_coach` · `physical_coach` · `glucose_coach` · `labs_coach` · `explorer_coach`
+plus the **chat tier** (`pattern_coach` · `career_coach` · `eli_marsh` — Telegram voice specs, no daily compute) and the **retired** `training_coach` (history only).
 
 Each coach maintains episodic memory under `COACH#<coach_id>` partitions, with cross-coach summary under `ENSEMBLE#`, narrative arcs under `NARRATIVE#`, and prediction outcomes under `PREDICTION#` / `LEARNING#`. Prediction loop closed end-to-end per ADR-055.
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-08-10 (coaching-team v2, ADR-153)
