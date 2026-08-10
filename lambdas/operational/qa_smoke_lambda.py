@@ -911,26 +911,33 @@ _PHASE_STAMP_ENSEMBLE_PKS = ("ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEM
 
 
 def check_coach_ensemble_phase_stamp_coverage():
-    """#1970: every row on the tagger-blind COACH#*/ENSEMBLE#* partitions should
-    carry a write-time phase attribute (experiment.phase_taxonomy.experiment_stamp,
-    #1233). restart_phase_tag.py (the reset-time tagger) only reaches
-    USER#matthew#SOURCE#* pks, never COACH#*/ENSEMBLE#* — and
-    PHASE_FILTER_EXPRESSION (phase_filter.py) admits attribute_not_exists(phase)
-    forever — so an unstamped row on these partitions survives every read filter
-    and silently leaks into the next reset cycle as if freshly current, instead
-    of being caught by the wipe's backstop pass.
+    """#1970: every EXPERIMENT_SCOPED row on the tagger-blind COACH#*/ENSEMBLE#*
+    partitions should carry a write-time phase attribute (#1233,
+    experiment.phase_taxonomy.experiment_stamp). restart_phase_tag.py (the
+    reset-time tagger) only reaches USER#matthew#SOURCE#* pks, never
+    COACH#*/ENSEMBLE#*, and PHASE_FILTER_EXPRESSION (phase_filter.py) admits
+    attribute_not_exists(phase) forever — so such a row survives every read filter
+    and leaks into the next reset cycle as if freshly current.
 
-    Read-only: a paginated Query per known pk (no table Scan). WARN, not FAIL —
-    this is a known, low-severity data-hygiene gap with its own reviewed operator
-    tool (deploy/backfill_coach_ensemble_phase_stamps.py, dry-run by default); the
-    point of this check is to keep the gap visible nightly until that backfill
-    lands, not to fail the pipeline over data that predates the #1233 write-time
-    stamping precedent."""
+    #2520: counting EVERY unstamped row became wrong when ADR-153 put the texting
+    relationship (CROSS_PHASE CHAT#/CHAT#summary#/RELATIONSHIP#) and Telegram
+    DEDUPE# rows (SYSTEM_STATE) on the same COACH#<id> partitions, where unstamped
+    is CORRECT: the count grew with every text Matthew sent a coach, could never
+    reach zero (a standing #2379 saturation feeder), and its remediation line told
+    the operator to run a backfill that would have marked his conversation history
+    for the next reset wipe. Now derived via should_phase_stamp(), so a new sk class
+    is classified rather than assumed and an unclassifiable row raises into the
+    errored branch — which, like the all-clear, emits NO --apply remediation.
+
+    Read-only: a paginated Query per known pk (no Scan). WARN, not FAIL — a known,
+    low-severity gap with its own reviewed, dry-run-by-default operator tool."""
     from coach.persona_registry import OPERATIONAL_COACH_IDS
+    from experiment.phase_taxonomy import should_phase_stamp
 
     c = Check("data:coach_ensemble_phase_stamp_coverage", "Phase Stamping", CONTENT_TRUTH)
     pks = [f"COACH#{cid}" for cid in OPERATIONAL_COACH_IDS] + ["COACH#computation"] + list(_PHASE_STAMP_ENSEMBLE_PKS)
     unstamped = []
+    by_design = 0
     try:
         for pk in pks:
             lek = None
@@ -943,26 +950,32 @@ def check_coach_ensemble_phase_stamp_coverage():
                 if lek:
                     kw["ExclusiveStartKey"] = lek
                 resp = table.query(**kw)
-                unstamped.extend(f"{pk}/{it.get('sk')}" for it in resp.get("Items", []))
+                for it in resp.get("Items", []):
+                    if should_phase_stamp(pk, str(it.get("sk", ""))):
+                        unstamped.append(f"{pk}/{it.get('sk')}")
+                    else:
+                        by_design += 1  # cross-phase / system-state: unstamped IS the correct state
                 lek = resp.get("LastEvaluatedKey")
                 if not lek:
                     break
     except Exception as e:
         return [c.warn(f"phase-stamp coverage check errored: {e}")]
 
+    protected = f" {by_design} cross-phase/system-state row(s) are correctly unstamped and excluded." if by_design else ""
     if unstamped:
         sample = ", ".join(unstamped[:5])
         more = f" (+{len(unstamped) - 5} more)" if len(unstamped) > 5 else ""
         # #2378: chronic — awaiting the #1970 backfill; errored branch above stays ALARMED.
+        # The --apply line is emitted ONLY here, where every listed row is safe to stamp.
         return [
             c.warn(
-                f"{len(unstamped)} row(s) on tagger-blind COACH#/ENSEMBLE# partitions carry no phase attribute "
-                f"(#1970) — survives PHASE_FILTER_EXPRESSION forever until backfilled: {sample}{more}. Run "
-                "deploy/backfill_coach_ensemble_phase_stamps.py --apply.",
+                f"{len(unstamped)} row(s) on tagger-blind COACH#/ENSEMBLE# partitions are experiment-scoped but carry "
+                f"no phase attribute (#1970) — survives PHASE_FILTER_EXPRESSION forever until backfilled: {sample}"
+                f"{more}. Run deploy/backfill_coach_ensemble_phase_stamps.py --apply.{protected}",
                 chronic=True,
             )
         ]
-    return [c.ok(f"all rows across {len(pks)} tagger-blind COACH#/ENSEMBLE# partitions carry a phase stamp")]
+    return [c.ok(f"all stampable rows across {len(pks)} tagger-blind COACH#/ENSEMBLE# partitions carry a phase stamp.{protected}")]
 
 
 # ---------------------------------------------------------------------------

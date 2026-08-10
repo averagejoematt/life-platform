@@ -540,6 +540,28 @@ def never_touch(cls: str) -> bool:
     return cls in (CROSS_PHASE, SYSTEM_STATE)
 
 
+def should_phase_stamp(pk: str, sk: str = "") -> bool:
+    """#2520: may a *write-time phase stamp* be put on the row at (pk, sk)?
+
+    The one question both the #1970 backfill (deploy/backfill_coach_ensemble_
+    phase_stamps.py) and its nightly audit (qa_smoke_lambda's
+    check_coach_ensemble_phase_stamp_coverage) ask, so neither can drift from the
+    taxonomy the way both did: they were written when COACH#*/ENSEMBLE#* held only
+    EXPERIMENT_SCOPED rows and so treated "unstamped" as "needs a stamp" for the
+    WHOLE partition. ADR-153 then put CROSS_PHASE `CHAT#`/`RELATIONSHIP#` and
+    SYSTEM_STATE `DEDUPE#` rows on those same partitions, where the ABSENCE of a
+    stamp is the correct, load-bearing state — stamping one marks Matthew's coach
+    conversation history for deletion at the next reset.
+
+    Derived from classify(), never from an sk allow/denylist, so a new sk class on
+    an audited partition is classified rather than assumed. An unclassified pk/sk
+    raises KeyError out of classify() deliberately: a caller must make that visible,
+    never default it to True. The stamp is written under
+    attribute_not_exists(phase), so a wrong one is not reversible by re-running.
+    """
+    return is_taggable(classify(pk, sk))
+
+
 # ── #2113: the read-side companion to is_wipeable ────────────────────────────
 #
 # `is_wipeable` answers "does the reset ARCHIVE this?". Nothing answered the

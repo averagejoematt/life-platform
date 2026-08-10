@@ -148,3 +148,85 @@ def test_wired_into_lambda_handler():
     """The check must actually run nightly (#2307: via qa.check_steps(), the one
     wiring point the handler loops over)."""
     assert ("phase_stamp_coverage", qa.check_coach_ensemble_phase_stamp_coverage) in qa.check_steps()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #2520: the audit must agree with the taxonomy.
+#
+# The tests above were written when every unstamped row on these partitions really
+# was a gap. ADR-153 put the texting relationship (CROSS_PHASE CHAT#/CHAT#summary#/
+# RELATIONSHIP#) and Telegram DEDUPE# rows (SYSTEM_STATE) on the same COACH#<id>
+# partitions, where unstamped is the CORRECT state. Counting those made the finding
+# grow with every text Matthew sent a coach — it could never reach zero (#2379
+# saturation) — and had the check tell the operator to run a backfill that would have
+# marked his whole conversation history for deletion at the next reset.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ADR153_SKS = ["CHAT#2026-08-10#m1", "CHAT#summary#2026-08-10", "RELATIONSHIP#state", "DEDUPE#4711"]
+
+
+def test_unstamped_cross_phase_and_system_state_rows_are_not_a_finding(monkeypatch):
+    """MUTATION PROOF direction 1: a seeded cross-phase row leaves the check silent."""
+    pk = f"COACH#{OPERATIONAL_COACH_IDS[0]}"
+    monkeypatch.setattr(qa, "table", _FakeTable({pk: [{"sk": s} for s in _ADR153_SKS]}))
+
+    (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
+
+    assert c.passed is True  # not a finding
+    assert "--apply" not in c.message  # AC3: no remediation when nothing is safe to repair
+    assert "backfill_coach_ensemble_phase_stamps" not in c.message
+    for s in _ADR153_SKS:
+        assert s not in c.message
+    # Excluded, but visibly excluded — not silently dropped.
+    assert "4 cross-phase/system-state row(s) are correctly unstamped" in c.message
+
+
+def test_a_genuine_scoped_gap_is_still_counted_next_to_protected_rows(monkeypatch):
+    """MUTATION PROOF direction 2: an unstamped experiment-scoped row must STILL be
+    a finding, and still carry the remediation — a fix that merely silenced the check
+    would pass direction 1 on its own."""
+    pk = f"COACH#{OPERATIONAL_COACH_IDS[0]}"
+    rows = [{"sk": s} for s in _ADR153_SKS] + [{"sk": "PREDICTION#pred_x"}]
+    monkeypatch.setattr(qa, "table", _FakeTable({pk: rows}))
+
+    (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
+
+    assert c.passed is None  # WARN
+    assert "1 row(s)" in c.message  # the PREDICTION# row only — the 4 protected rows are not counted
+    assert f"{pk}/PREDICTION#pred_x" in c.message
+    assert "deploy/backfill_coach_ensemble_phase_stamps.py --apply" in c.message
+    for s in _ADR153_SKS:
+        assert s not in c.message  # never named as a gap the operator should stamp
+
+
+def test_the_finding_no_longer_grows_every_time_matthew_texts_a_coach(monkeypatch):
+    """The #2379 saturation property: chat volume must not move this check at all.
+    50 more conversation turns, still zero findings."""
+    pk = f"COACH#{OPERATIONAL_COACH_IDS[0]}"
+    chatty = [{"sk": f"CHAT#2026-08-10#m{i}"} for i in range(50)] + [{"sk": f"DEDUPE#{i}"} for i in range(50)]
+    monkeypatch.setattr(qa, "table", _FakeTable({pk: chatty}, page_size=7))
+
+    (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
+
+    assert c.passed is True
+    assert "100 cross-phase/system-state row(s) are correctly unstamped" in c.message
+
+
+def test_the_audit_and_the_backfill_ask_the_taxonomy_the_same_question():
+    """The audit's job is to predict what the backfill would do. Both now route
+    through phase_taxonomy.should_phase_stamp(), so they cannot disagree — the
+    #1970 pair drifted apart precisely because each restated the rule itself."""
+    import importlib.util
+    from pathlib import Path
+
+    from experiment.phase_taxonomy import should_phase_stamp
+
+    repo_root = Path(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location("_bf2520", repo_root / "deploy/backfill_coach_ensemble_phase_stamps.py")
+    bf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bf)
+
+    pk = f"COACH#{OPERATIONAL_COACH_IDS[0]}"
+    for sk in _ADR153_SKS + ["PREDICTION#pred_x", "BRIEF#2026-08-01", "STANCE#latest"]:
+        stampable, _ = bf.split_by_class(pk, [{"sk": sk}])
+        assert bool(stampable) is should_phase_stamp(pk, sk), sk
