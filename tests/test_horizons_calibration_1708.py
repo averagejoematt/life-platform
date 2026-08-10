@@ -416,9 +416,9 @@ def test_capture_stamps_a_held_verdict_deterministically():
 
     attrs = hc.sensitivity_attrs_for_reaction(LONG_ANSWER)
     assert attrs[gate.STATUS_ATTR] == gate.SENSITIVITY_HELD  # no classifier wired ⇒ cannot vouch ⇒ hold
-    vice = hc.sensitivity_attrs_for_reaction("smoked weed after listening to it")
+    vice = hc.sensitivity_attrs_for_reaction("smoked zzq after listening to it")
     assert vice[gate.STATUS_ATTR] == gate.SENSITIVITY_HELD
-    assert gate.CATEGORY_MARIJUANA in vice[gate.CATEGORIES_ATTR]  # deterministic, offline, always on
+    assert gate.CATEGORY_VICE in vice[gate.CATEGORIES_ATTR]  # deterministic, offline, always on
 
 
 def test_the_stamp_lands_on_the_stored_reaction(fake_table, monkeypatch):

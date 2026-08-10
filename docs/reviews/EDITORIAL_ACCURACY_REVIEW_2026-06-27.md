@@ -17,7 +17,7 @@ But a health-literate first-time visitor who treats **every word** as true **wou
 1. **Computed/derived metrics** (`public_stats.json`) — several values are impossible or mislabeled (a negative "fitness" of −955, a goal date requiring 115 lb of loss in 5 weeks, a "weekly rate" that is really the 14-day total).
 2. **AI prose grounding** — coaches, the chronicle, and chart captions assert specific numbers, scenes, and causal reads that don't match the data, and the *same* metric is described **inconsistently across surfaces** (protein target appears as 140 g, 170 g, and 190 g; last night's recovery as both 30% and 86%).
 
-Plus two **privacy** exposures: unpublished chronicle drafts name a real person (Layne Norton) and a vice (marijuana); the live `/api/board_ask` panel presents personas under real public figures' surnames.
+Plus two **privacy** exposures: unpublished chronicle drafts name a real person (Layne Norton) and a blocked vice; the live `/api/board_ask` panel presents personas under real public figures' surnames.
 
 **Reassuring counterweight:** none of this is malicious fabrication. The AI's dominant failure mode is *inconsistency and staleness*, not invention — and notably `/api/ask` **refuses to fabricate** (it says "I don't have that data" rather than guessing). The bones are sound; the connective tissue needs a pass.
 
@@ -33,7 +33,7 @@ Plus two **privacy** exposures: unpublished chronicle drafts name a real person 
 **Fix:** either build/restore the five under `/data/`, or remove them from `visual_qa.EVIDENCE_TOPICS` + `site_review_bindings` + redirects so harness and reality agree.
 
 ### C2 — Chronicle drafts name a real person + a vice *(privacy-leak; latent — unpublished)*
-The next-to-publish **Week 2 draft** (`SOURCE#chronicle / DATE#2026-06-23`, "Eight Sessions and a Rounding Error", `status=draft`) contains: *"I called **Dr. Layne Norton** about this… 'The training is impressive… some of what's coming off isn't fat.'"* — a real public figure named and given a **fabricated quote**. Two older drafts (`06-02`, `05-19`) name **"marijuana"** explicitly. These are **not live** (drafts only), but the chronicle auto-publishes weekly, so an unguarded publish leaks them. Root cause = stale drafts generated before the `_FALLBACK_ELENA_PROMPT` privacy fix (#215).
+The next-to-publish **Week 2 draft** (`SOURCE#chronicle / DATE#2026-06-23`, "Eight Sessions and a Rounding Error", `status=draft`) contains: *"I called **Dr. Layne Norton** about this… 'The training is impressive… some of what's coming off isn't fat.'"* — a real public figure named and given a **fabricated quote**. Two older drafts (`06-02`, `05-19`) name **a blocked vice** explicitly. These are **not live** (drafts only), but the chronicle auto-publishes weekly, so an unguarded publish leaks them. Root cause = stale drafts generated before the `_FALLBACK_ELENA_PROMPT` privacy fix (#215).
 **Fix:** purge/regenerate the stored drafts; confirm the publish path can never emit a draft that predates the privacy guard.
 
 ### H1 — `/api/board_ask` personas impersonate real public figures *(privacy-leak; LIVE)*
@@ -88,7 +88,7 @@ Full list: 28 medium + 30 low in `qa-screenshots/2026-06-27/` agent transcripts;
 
 | # | Fix | Layer | Effort |
 |---|-----|-------|--------|
-| 1 | Purge/regenerate pre-#215 chronicle drafts (Norton, marijuana); block publishing any draft older than the privacy guard | lambda/data | M |
+| 1 | Purge/regenerate pre-#215 chronicle drafts (Norton, the blocked vice); block publishing any draft older than the privacy guard | lambda/data | M |
 | 2 | Rename `/api/board_ask` personas to fictional roster; strip trademark catchphrases | `web/` site-api | S |
 | 3 | Fix `public_stats.json` CTL/ATL/TSB (non-negative), projection, and weekly-rate; reuse the corrected `/api/journey` logic | compute lambda | M |
 | 4 | Resolve the five 404'd `/data/` pages — build them or remove from harness + redirects | site build / harness | S–M |

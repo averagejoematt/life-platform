@@ -2,7 +2,7 @@
 
 Epic #1668 (The Social Membrane, inbound half). Decision (2) makes the Broadcast feed
 (#1672, S4) an AUTOMATIC public feed — low-touch, not a manual approval queue. But two
-absolutes are non-negotiable: the privacy vices (marijuana / porn) and PII never go
+absolutes are non-negotiable: the never-public vice categories and PII never go
 public, and #1563 is explicit that Matthew's words are NEVER auto-published blind. The
 reconciliation is THIS gate: an automatic classifier runs on every ``origin:human`` post
 and only a post that clears the fail-closed filter is eligible to auto-publish; anything
@@ -28,9 +28,9 @@ Auto-publish is reachable ONLY through this gate — nothing else writes ``"clea
 
 ## Fail-closed posture (reused, not re-invented)
 The deterministic spine is `privacy_guard` — already fail-closed and already the
-canonical vice policy (its ``VICE_KEYWORDS`` is a documented superset of the S3
-``config/content_filter.json`` ``blocked_vice_keywords``). We do NOT hand-roll a second
-vice list; the marijuana/porn categories are DERIVED from ``privacy_guard`` hits. On top
+canonical vice policy (its ``VICE_KEYWORDS`` derives from the ER-06 non-committed
+channel — content_filter_channel, #2370 — plus its own extras). We do NOT hand-roll a
+second vice list; the vice category is DERIVED from ``privacy_guard`` hits. On top
 of that deterministic layer sits an OPTIONAL semantic off-topic classifier (Haiku, via
 `bedrock_client`, budget-gated). Every uncertain path — a classifier error, a budget
 pause, a low-confidence verdict, or simply no classifier wired — resolves to HOLD, never
@@ -59,19 +59,23 @@ SENSITIVITY_CLEARED = "cleared"
 SENSITIVITY_HELD = "held"
 
 # ── Flagged categories (the canonical policy list — NOT ad-hoc) ────────────────────
-# marijuana / porn come from `privacy_guard` (the canonical vice policy); pii + off_topic
-# are this gate's additions. `real_name` reuses privacy_guard's public-figure guard as an
-# extra privacy hold. `classifier_error` is the fail-closed catch-all.
-CATEGORY_MARIJUANA = "marijuana"
-CATEGORY_PORN = "porn"
+# `vice` covers every hit from privacy_guard's channel-derived vice vocabulary (#2370:
+# the category tokens are deliberately NEUTRAL — the never-public category names must
+# not appear in this public repo, so the gate no longer splits the vice family into
+# named per-category tokens; the held post itself tells the reviewer what tripped it).
+# pii + off_topic are this gate's additions. `real_name` reuses privacy_guard's
+# public-figure guard as an extra privacy hold. `classifier_error` is the fail-closed
+# catch-all.
+CATEGORY_VICE = "vice"
 CATEGORY_PII = "pii"
 CATEGORY_OFF_TOPIC = "off_topic"
 CATEGORY_REAL_NAME = "real_name"
 CATEGORY_CLASSIFIER_ERROR = "classifier_error"
 
-# The four AC-named flagged categories, sourced here so callers/tests reference the
-# policy, never a local literal.
-FLAGGED_CATEGORIES = (CATEGORY_MARIJUANA, CATEGORY_PORN, CATEGORY_PII, CATEGORY_OFF_TOPIC)
+# The AC-named flagged categories, sourced here so callers/tests reference the
+# policy, never a local literal. (Pre-#2370 rows may carry the two retired
+# per-family vice tokens; nothing compares stored values to these constants.)
+FLAGGED_CATEGORIES = (CATEGORY_VICE, CATEGORY_PII, CATEGORY_OFF_TOPIC)
 
 # Below this the off-topic classifier's own confidence is treated as "cannot vouch" → hold.
 CONFIDENCE_FLOOR = 0.6
@@ -95,16 +99,14 @@ OfftopicResult = namedtuple("OfftopicResult", ["on_topic", "confidence"])
 def _category_for_privacy_hit(kind: str, term: str) -> str:
     """Map a `privacy_guard.find_violations` hit to a flagged category.
 
-    Derived from `privacy_guard`'s own sets — porn keywords → porn; every other vice
-    (the cannabis family + nicotine) → the marijuana/substance category; a banned real
-    public figure → real_name. No independent keyword list lives here.
+    Derived from `privacy_guard`'s own sets — any vice-vocabulary hit → the single
+    neutral vice category; a banned real public figure → real_name. No independent
+    keyword list lives here, and no category token names a guarded term (#2370).
     """
+    del term  # the specific term never leaves privacy_guard's hit tuple
     if kind == "real_name":
         return CATEGORY_REAL_NAME
-    # kind == "vice": split porn from the substance family using privacy_guard's terms.
-    if term in ("porn", "pornography"):
-        return CATEGORY_PORN
-    return CATEGORY_MARIJUANA
+    return CATEGORY_VICE
 
 
 # ── Deterministic PII detection (always on; no AWS, no AI) ─────────────────────────

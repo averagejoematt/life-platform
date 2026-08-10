@@ -53,7 +53,9 @@ def test_normal_genesis_unchanged(monkeypatch):
     past = (datetime.now(timezone.utc) - timedelta(days=400)).strftime("%Y-%m-%d")
     monkeypatch.setattr(C, "EXPERIMENT_START", past)
     start = C._experiment_date(90)
-    expected = (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d")
+    # #2414: the window anchors in the PACIFIC day (same frame as _clamp_today) —
+    # a UTC expectation here goes red every evening 17:00-24:00 PT.
+    expected = (datetime.now(C.PT) - timedelta(days=89)).strftime("%Y-%m-%d")
     assert start == expected, f"expected the inclusive 90-day start {expected}, got {start}"
 
 

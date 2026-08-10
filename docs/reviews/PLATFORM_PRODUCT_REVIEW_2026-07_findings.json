@@ -2654,7 +2654,7 @@
   {
    "title": "Dead, un-hardened twin of the privacy scrub in site_api_common \u2014 advertised as the cross-cutting helper, one reuse away from weakening the vice filter",
    "type": "risk",
-   "detail": "lambdas/web/site_api_ai_lambda.py carries the HARDENED _scrub_blocked_terms (#132: zero-width char strip so 'mari<zwsp>juana' can't smuggle past, plus fail-safe whole-answer drop on obfuscated long terms). lambdas/web/site_api_common.py:311 carries an older, un-hardened copy (literal regex sub only) with ZERO callers anywhere in lambdas/mcp/tests \u2014 yet the module docstring (site_api_common.py:12) advertises it as one of the 'cross-cutting business helpers'. A future public endpoint that innocently imports the advertised common helper gets the weak scrub with no test coverage (tests/test_ai_scrub_hardening.py pins only the ai_lambda copy). This is precisely the diverged-privacy-logic class the 2026-06-30 audit hit with PRIV-01 (diverged vice denylists), whose 'fuller single-source refactor' was explicitly left as the follow-on. Same file pair also duplicates _load_content_filter, _decimal_to_float, _latest_item, _error, and site_api_social/ai_lambda duplicate _get_token_secret + _emit_rate_limit_metric (subscriber-token auth logic in two places). Fix: delete the dead common copy or replace it with an import of one hardened implementation (privacy_guard layer module is the natural home), and dedupe the token/rate-limit pair.",
+   "detail": "lambdas/web/site_api_ai_lambda.py carries the HARDENED _scrub_blocked_terms (#132: zero-width char strip so a zwsp-split blocked term can't smuggle past, plus fail-safe whole-answer drop on obfuscated long terms). lambdas/web/site_api_common.py:311 carries an older, un-hardened copy (literal regex sub only) with ZERO callers anywhere in lambdas/mcp/tests \u2014 yet the module docstring (site_api_common.py:12) advertises it as one of the 'cross-cutting business helpers'. A future public endpoint that innocently imports the advertised common helper gets the weak scrub with no test coverage (tests/test_ai_scrub_hardening.py pins only the ai_lambda copy). This is precisely the diverged-privacy-logic class the 2026-06-30 audit hit with PRIV-01 (diverged vice denylists), whose 'fuller single-source refactor' was explicitly left as the follow-on. Same file pair also duplicates _load_content_filter, _decimal_to_float, _latest_item, _error, and site_api_social/ai_lambda duplicate _get_token_secret + _emit_rate_limit_metric (subscriber-token auth logic in two places). Fix: delete the dead common copy or replace it with an import of one hardened implementation (privacy_guard layer module is the natural home), and dedupe the token/rate-limit pair.",
    "evidence": [
     {
      "kind": "file",
@@ -2664,7 +2664,7 @@
     {
      "kind": "file",
      "ref": "lambdas/web/site_api_ai_lambda.py (_scrub_blocked_terms docstring)",
-     "quote": "Zero-width chars are stripped first so \"mari<zwsp>juana\" can't smuggle a term past it... we drop the WHOLE answer"
+     "quote": "Zero-width chars are stripped first so a zwsp-split blocked term can't smuggle a term past it... we drop the WHOLE answer"
     },
     {
      "kind": "probe",

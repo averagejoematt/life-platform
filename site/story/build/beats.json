@@ -2,6 +2,29 @@
   "updated_at": "2026-07-21",
   "beats": [
     {
+      "id": "2026-08-10-coaches-that-text-like-people",
+      "date": "2026-08-10",
+      "title": "Reading the transcripts, then fixing what they showed",
+      "shipped": "The coaches had been texting for a day, so instead of guessing at what 'more human' means, the first night of real conversations got read end to end — and it was unflattering. Matthew texts in two to five words; the coaches were answering in five to ten times that. One coach recited the same sleep number three times in 47 minutes, once in reply to a bare 'hey'. Twelve of twenty-two replies ended in a question, several of them filler. Two supposedly distinct voices opened with the identical stock phrase. Each of those is now a rule the coaches follow: match his register, earn the length, end on a statement when the thread has momentum, and never recite a number already sent. They also learned what day of the experiment it is and which of their own predictions are still open, so a coach can say 'I called seven-plus hours this week — holding so far' instead of reciting a dashboard. And they can now text first, rarely: one colleague may hand off a conversation to whoever actually owns the lane, and the head coach may send one weekday morning note — capped at two unsolicited messages a day, silent for good after two ignored ones.",
+      "why_it_mattered": "A coaching relationship that only ever responds isn't a relationship, and a coach who answers a greeting with a stat block isn't someone you want to text twice. The measure that replaced taste here was evidence: the best conversation in the whole corpus turned out to be the one whose replies came closest to the length of his own — so that became the rule, rather than a preference someone asserted.",
+      "gotcha": "The prompt that assembles every coach reply carried a comment explaining that its layout existed so the expensive, stable part could be cached — and the caching had never actually been switched on. The stable half was being re-billed in full on every single message, on the highest-traffic AI surface here. The comment was right about the design and wrong about reality for as long as the feature had existed.",
+      "honest_miss": "Two of the three chat coaches still have no phone number to text from, so their handoffs and the morning note ship dark until those accounts exist. And the real test of all of this isn't a passing suite — it's whether the next morning's conversation feels like texting a person, which no test can answer.",
+      "prs": [
+        {
+          "label": "PR #2481",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2481"
+        },
+        {
+          "label": "PR #2498",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2498"
+        },
+        {
+          "label": "PR #2505",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2505"
+        }
+      ]
+    },
+    {
       "id": "2026-07-06-dating-the-past-so-it-stops-pretending-to-be-now",
       "date": "2026-07-06",
       "title": "Dating the past, so it stops pretending to be now",

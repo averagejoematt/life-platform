@@ -113,10 +113,10 @@ def test_clean_retrospective_publishes(monkeypatch):
 
 def test_pii_or_vice_in_generation_is_held_fail_closed(monkeypatch):
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
-    out = hr.generate(_pick(), invoker=_clean_invoker("reach me at 415-555-1212 about the weed protocol"))
+    out = hr.generate(_pick(), invoker=_clean_invoker("reach me at 415-555-1212 about the zzq protocol"))
     assert out["status"] == hr.STATUS_HELD
     assert "text" not in out
-    assert set(out["categories"]) & {gate.CATEGORY_PII, gate.CATEGORY_MARIJUANA}
+    assert set(out["categories"]) & {gate.CATEGORY_PII, gate.CATEGORY_VICE}
 
 
 def test_generation_failure_is_held_not_raised(monkeypatch):
@@ -243,9 +243,9 @@ def test_a_privacy_hold_is_reported_as_privacy_not_masked_as_ungrounded(tier0):
     """A leaking draft carries ungrounded digits too (415/555/1212). The verdict must
     name the privacy category — a PII hold reported as 'ungrounded' would be triaged
     as a quality bug."""
-    out = hr.generate(_pick(), invoker=_clean_invoker("reach me at 415-555-1212 about the weed protocol"))
+    out = hr.generate(_pick(), invoker=_clean_invoker("reach me at 415-555-1212 about the zzq protocol"))
     assert out["status"] == hr.STATUS_HELD
-    assert set(out["categories"]) & {gate.CATEGORY_PII, gate.CATEGORY_MARIJUANA}
+    assert set(out["categories"]) & {gate.CATEGORY_PII, gate.CATEGORY_VICE}
     assert hr.CATEGORY_UNGROUNDED not in out["categories"]
 
 

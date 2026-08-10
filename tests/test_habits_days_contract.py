@@ -16,7 +16,7 @@ Exercises handle_habits against a faked DynamoDB, pinning the 30-day dot-strip c
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
@@ -26,7 +26,11 @@ from web import site_api_data as data  # noqa: E402
 
 
 def _day(days_ago):
-    return (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+    # #2414: the handler's window anchors in the PACIFIC day — the expectation
+    # must use the same frame or it goes red every evening 17:00-24:00 PT.
+    from common.pacific_time import PACIFIC
+
+    return (datetime.now(PACIFIC) - timedelta(days=days_ago)).strftime("%Y-%m-%d")
 
 
 def _cond_strings(cond, out):
@@ -94,8 +98,9 @@ def _fake_experiment_date(genesis):
     form is what made a 30-day strip render 31 dots."""
 
     def _fn(days_back=30):
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        raw = (datetime.now(timezone.utc) - timedelta(days=max(days_back - 1, 0))).strftime("%Y-%m-%d")
+        # #2414: the real helper anchors in the PACIFIC day — mirror the frame too.
+        today = _day(0)
+        raw = _day(max(days_back - 1, 0))
         return min(max(raw, genesis), today)
 
     return _fn

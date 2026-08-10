@@ -8,9 +8,15 @@ guarded string — `generated/` is Lambda-written daily. This is the missing gat
 scan the about-to-be-published static site BEFORE `sync_site_to_s3.sh` ships it,
 fail-closed on a hit.
 
-Three arms:
-  1. Blocked-vice leakage (always-on) — no `blocked_vice_keywords` from
-     config/content_filter.json (the policy-blocked categories) appears in published text.
+Four arms:
+  1. Blocked-vice leakage — no blocked-category keyword appears in published
+     text. The vocabulary is channel-derived (#2370: env CONTENT_FILTER_JSON /
+     gitignored config/content_filter.local.json / the private S3 copy — NEVER a
+     tracked file); absent → skipped with a notice offline, REQUIRED on the
+     deploy path (--require-vice).
+  0. Repo-hygiene (--tracked, #2370) — the same vocabulary scanned over every
+     git-tracked *.json: a tracked config/seed file carrying a category keyword
+     is itself the leak. Output never echoes the keyword.
   2. Structural PII (always-on) — US SSN, 16-digit card-like numbers, and
      non-allowlisted email addresses (the PII classes in DATA_GOVERNANCE.md).
   3. Literal denylist (best-effort) — partner name / employer / role / industry
@@ -19,7 +25,8 @@ Three arms:
      Skipped with a notice when absent — the repo is PUBLIC, so these literals
      never live in git; the always-on arms still gate in public CI.
 
-Usage:  python3 deploy/pii_surface_guard.py [site_dir]   # exit 1 on any violation
+Usage:  python3 deploy/pii_surface_guard.py [site_dir] [--require-vice]   # exit 1 on any violation
+        python3 deploy/pii_surface_guard.py --tracked [--require-vice]     # repo-hygiene arm (#2370)
         python3 deploy/pii_surface_guard.py --snapshots            # offline endpoint arm (#1945)
         python3 deploy/pii_surface_guard.py --endpoints [base_url] # live endpoint arm (#1945)
 
@@ -47,7 +54,8 @@ build-beat prose legitimately narrates the #1943 fix with the word "genotype" �
 on a static page that word is copy about the class; inside an /api/* payload it
 is a leak tell.
 
-Pure stdlib, no AWS — importable by tests/test_public_surface_pii_guard.py (offline).
+Pure stdlib at import, no AWS SDK required — importable by
+tests/test_public_surface_pii_guard.py (offline; the channel's S3 fallback is lazy).
 """
 
 import json
@@ -60,9 +68,12 @@ _ROOT = os.path.dirname(_HERE)
 
 # Text artifacts that actually ship to the public surface.
 _SCAN_EXT = (".html", ".json", ".txt", ".xml", ".webmanifest", ".svg")
-# /legacy is the private rollback copy (no UI links) — out of scope here; sw.js
-# is generated asset boilerplate.
-_SKIP_DIRS = ("legacy",)
+# No skip dirs (#1905): /legacy used to be excluded as "the private rollback
+# copy", but it is publicly reachable (HTTP 200 — unlinked + noindex are not
+# access controls), so the exclusion silently created a 170-file zone of the
+# public surface no privacy gate inspected. The whole published tree is in
+# scope; the decision of record is in tests/test_legacy_real_person_attributions_1905.py.
+_SKIP_DIRS: tuple = ()
 
 # Emails allowed to appear publicly (the site's own contact identities + the
 # RFC 9116 security.txt contact + obvious form placeholders).
@@ -93,18 +104,23 @@ _DOI_RE = re.compile(r"(?:https?://(?:dx\.)?doi\.org/|\bdoi:\s*)10\.\d{4,9}/\S+"
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 
-def _blocked_vice_keywords() -> list:
-    """The canonical public-content denylist, loaded ONLY from the committed
-    policy file (config/content_filter.json `blocked_vice_keywords`) — never
-    hardcoded here, so the literal category terms live in exactly one place.
-    Fail-closed: if the policy can't be read or is empty, raise rather than
-    silently scan with the vice arm disabled."""
-    path = os.path.join(_ROOT, "config", "content_filter.json")
-    with open(path) as f:
-        kws = [k.lower() for k in json.load(f).get("blocked_vice_keywords", [])]
-    if not kws:
-        raise RuntimeError(f"no blocked_vice_keywords in {path} — refusing to scan with the vice arm disabled")
-    return kws
+def _blocked_vice_keywords(require: bool = False) -> list:
+    """The canonical public-content denylist, loaded ONLY through the ER-06
+    non-committed channel (lambdas/privacy/content_filter_channel.py: env
+    CONTENT_FILTER_JSON → config/content_filter.local.json → the private S3
+    copy) — never hardcoded and never committed, because the category names
+    themselves are the guarded data (#2370).
+
+    require=False returns [] when no channel source is available, and callers
+    MUST then mark the vice arm 'skipped' VISIBLY (never a silent pass — #2203
+    class). require=True is the deploy-path fail-closed form: raise rather than
+    ship with the vice arm disabled (sync_site_to_s3.sh passes --require-vice)."""
+    lambdas_dir = os.path.join(_ROOT, "lambdas")
+    if lambdas_dir not in sys.path:
+        sys.path.insert(0, lambdas_dir)
+    from privacy import content_filter_channel  # noqa: PLC0415 — deliberate lazy import
+
+    return content_filter_channel.blocked_keywords(require=require)
 
 
 def _literal_denylist() -> list:
@@ -165,10 +181,14 @@ def scan_text(text: str, vice=None, literals=None) -> list:
     return out
 
 
-def scan_site(site_dir: str) -> dict:
+def scan_site(site_dir: str, require_vice: bool = False) -> dict:
     """Scan the published site. Returns {violations: [(file, arm, detail)],
-    literal_arm: 'on'|'skipped', files: N}."""
-    vice = _blocked_vice_keywords()
+    vice_arm: 'on'|'skipped', literal_arm: 'on'|'skipped', files: N}.
+
+    require_vice=True (the deploy path) refuses to run without the vice
+    vocabulary; the default reports the arm 'skipped' so offline callers
+    surface the gap loudly instead of red-walling public CI (#2370)."""
+    vice = _blocked_vice_keywords(require=require_vice)
     literals = _literal_denylist()
     violations, n = [], 0
     for path in _iter_files(site_dir):
@@ -181,7 +201,81 @@ def scan_site(site_dir: str) -> dict:
         rel = os.path.relpath(path, site_dir)
         for arm, detail in scan_text(text, vice=vice, literals=literals):
             violations.append((rel, arm, detail))
-    return {"violations": violations, "literal_arm": "on" if literals else "skipped", "files": n}
+    return {
+        "violations": violations,
+        "vice_arm": "on" if vice else "skipped",
+        "literal_arm": "on" if literals else "skipped",
+        "files": n,
+    }
+
+
+# ═══ Repo-hygiene arm (#2370) ══════════════════════════════════════════════════
+#
+# The tracked tree itself is a public surface: this repo is PUBLIC, so a tracked
+# config/seed JSON that carries a blocked-category keyword *is* the leak (the
+# denylist inversion #2370 scrubbed). This arm scans every git-TRACKED *.json in
+# the repo — config/seed files, review artifacts, schema snapshots — for
+# whole-word category-keyword hits. The vocabulary is channel-derived (never
+# committed); when no channel source is available the arm reports itself
+# 'skipped' so the caller surfaces the gap loudly (CI arms it via the
+# CONTENT_FILTER_JSON secret; the deploy path requires it).
+# site/legacy/** is excluded (private rollback copy, runtime-screened, no UI links).
+
+_TRACKED_SKIP_PREFIXES = ("site/legacy/",)
+
+# Zero-width / invisible characters that can smuggle a blocked term past a
+# literal scan (same set the runtime scrub strips — site_api_common).
+_ZERO_WIDTH_CHARS = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
+
+
+def _tracked_json_files() -> list:
+    """Every git-tracked *.json path (relative), minus _TRACKED_SKIP_PREFIXES."""
+    import subprocess  # noqa: PLC0415 — only the repo-hygiene arm shells out
+
+    out = subprocess.run(  # nosec B603/B607 — fixed argv, no shell
+        ["git", "ls-files", "*.json"],
+        capture_output=True,
+        cwd=_ROOT,
+        check=True,
+    )
+    files = out.stdout.decode("utf-8").split()
+    return [f for f in files if not f.startswith(_TRACKED_SKIP_PREFIXES)]
+
+
+def scan_tracked_json(files=None, vocab=None, require_vice: bool = False) -> dict:
+    """Repo-hygiene arm: whole-word category-keyword scan over tracked JSON.
+
+    `files` (paths relative to repo root) and `vocab` are injectable so tests can
+    mutation-prove the arm fires; both default to the real tree + the channel.
+    Violations NEVER echo the keyword (public CI logs) — only file + hit count.
+    Returns {violations: [(file, arm, detail)], vice_arm: 'on'|'skipped', files: N}.
+    """
+    vocab = vocab if vocab is not None else _blocked_vice_keywords(require=require_vice)
+    if not vocab:
+        return {"violations": [], "vice_arm": "skipped", "files": 0}
+    file_list = files if files is not None else _tracked_json_files()
+    low_vocab = [v.lower() for v in vocab]
+    # Long terms also get an obfuscation-resistant pass on a normalized
+    # (zero-width-stripped, non-alphanumeric-stripped) copy — the same fail-safe
+    # layer the runtime scrub applies; short terms are too substring-prone.
+    long_vocab = [re.sub(r"[^a-z0-9]", "", v) for v in low_vocab]
+    long_vocab = [v for v in long_vocab if len(v) >= 7]
+    violations, n = [], 0
+    for rel in file_list:
+        path = rel if os.path.isabs(rel) else os.path.join(_ROOT, rel)
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+        except OSError:
+            continue
+        n += 1
+        low = text.translate(_ZERO_WIDTH_CHARS).lower()
+        hits = set(_word_hits(low, low_vocab))
+        norm = re.sub(r"[^a-z0-9]", "", low)
+        hits |= {v for v in long_vocab if v in norm}
+        if hits:
+            violations.append((rel, "tracked-blocked-vice", f"{len(hits)} blocked-category keyword(s) in a tracked file (masked — #2370)"))
+    return {"violations": violations, "vice_arm": "on", "files": n}
 
 
 # ═══ Endpoint arm (#1945) ══════════════════════════════════════════════════════
@@ -333,7 +427,7 @@ def scan_endpoints(base_url: str, fetcher=None, sleep_seconds: float = 0.25) -> 
     cas.SITE_URL = base_url.rstrip("/")  # dynamic-param lookups must hit the same host
     plan = cas.build_plan()
     records = er.discover_endpoint_records()
-    vice = _blocked_vice_keywords()
+    vice = _blocked_vice_keywords(require=True)  # live arm is owner/QA-run — fail-closed
     literals = _literal_denylist()
     fetch = fetcher or cas._fetch
 
@@ -380,6 +474,18 @@ def _report_endpoint_results(res: dict, what: str) -> int:
 
 
 def main(argv) -> int:
+    if len(argv) > 1 and argv[1] == "--tracked":
+        require = "--require-vice" in argv[2:]
+        res = scan_tracked_json(require_vice=require)
+        if res["vice_arm"] == "skipped":
+            print(
+                "[pii-guard] NOTE: repo-hygiene arm SKIPPED — no content-filter channel source "
+                "(env CONTENT_FILTER_JSON / config/content_filter.local.json / S3). "
+                "Inject the CI secret to arm this gate (#2370)."
+            )
+            return 0
+        print(f"[pii-guard] repo-hygiene arm: scanned {res['files']} tracked JSON files")
+        return _report_endpoint_results(res, "tracked config/seed JSON surface")
     if len(argv) > 1 and argv[1] == "--snapshots":
         res = scan_schema_snapshots()
         print(f"[pii-guard] endpoint arm (offline): scanned {res['files']} shape snapshots covering {len(res['scanned_paths'])} routes")
@@ -392,12 +498,19 @@ def main(argv) -> int:
             f"({len(res['skipped'])} exempt: write-path/param) — literal arm {res['literal_arm']}"
         )
         return _report_endpoint_results(res, "live /api/* surface")
-    site_dir = argv[1] if len(argv) > 1 else os.path.join(_ROOT, "site")
+    args = [a for a in argv[1:] if a != "--require-vice"]
+    require_vice = "--require-vice" in argv[1:]
+    site_dir = args[0] if args else os.path.join(_ROOT, "site")
     if not os.path.isdir(site_dir):
         print(f"[pii-guard] site dir not found: {site_dir}", file=sys.stderr)
         return 2
-    res = scan_site(site_dir)
-    print(f"[pii-guard] scanned {res['files']} files in {site_dir} — literal arm {res['literal_arm']}")
+    res = scan_site(site_dir, require_vice=require_vice)
+    print(f"[pii-guard] scanned {res['files']} files in {site_dir} — vice arm {res['vice_arm']}, literal arm {res['literal_arm']}")
+    if res["vice_arm"] == "skipped":
+        print(
+            "[pii-guard] NOTE: no content-filter channel source (env CONTENT_FILTER_JSON / "
+            "config/content_filter.local.json / S3) — vice arm skipped; structural arms still enforced (#2370)."
+        )
     if res["literal_arm"] == "skipped":
         print(
             "[pii-guard] NOTE: no personal denylist present (env PII_DENYLIST_JSON / "
@@ -406,7 +519,7 @@ def main(argv) -> int:
     if res["violations"]:
         print(f"[pii-guard] ❌ {len(res['violations'])} violation(s) — blocking publish:", file=sys.stderr)
         for rel, arm, detail in res["violations"]:
-            shown = detail if arm != "blocked-vice" else f"blocked term {detail!r}"
+            shown = detail if arm != "blocked-vice" else "blocked-category keyword (masked — #2370: never echoed)"
             print(f"    {rel}: [{arm}] {shown}", file=sys.stderr)
         return 1
     print("[pii-guard] ✅ clean — no guarded strings or PII on the public surface")

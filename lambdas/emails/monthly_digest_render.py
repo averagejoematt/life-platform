@@ -217,7 +217,7 @@ def build_html(data, goals, commentary, windows):
         tr_rows += row("CTL — 42-day Fitness", fmt(tl.get("ctl")), highlight=True)
         tr_rows += row(
             "TSB — Current Form",
-            f'<span style="color:{tcol};">{fmt(tl.get("tsb"))} ({"Fresh" if tsb>=5 else "Neutral" if tsb>=-5 else "Fatigued"})</span>',
+            f'<span style="color:{tcol};">{fmt(tl.get("tsb"))} ({"Fresh" if tsb >= 5 else "Neutral" if tsb >= -5 else "Fatigued"})</span>',
         )
     if cur.get("hevy"):
         h = cur["hevy"]

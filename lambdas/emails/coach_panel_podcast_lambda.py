@@ -249,11 +249,11 @@ _content_filter_cache = None
 def _blocked_vice_terms() -> list:
     global _content_filter_cache
     if _content_filter_cache is None:
-        try:
-            _content_filter_cache = json.loads(s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")["Body"].read())
-        except Exception as e:
-            logger.warning("[panel] content_filter unavailable — %s", e)
-            _content_filter_cache = {}
+        from privacy import content_filter_channel  # #2370: ER-06 channel only; fail-CLOSED (held), never an empty set
+
+        loaded = content_filter_channel.load(require=True)
+        assert loaded is not None  # require=True raises instead of returning None
+        _content_filter_cache = loaded
     cf = _content_filter_cache
     return [t.lower() for t in (cf.get("blocked_vice_keywords") or [])] + [v.lower() for v in (cf.get("blocked_vices") or [])]
 

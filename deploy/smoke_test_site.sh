@@ -143,6 +143,17 @@ check_status "/board/ → 301"        "$BASE/board/"       "301"
 check_status "/platform/ → 301"     "$BASE/platform/"    "301"
 echo ""
 
+# ── /legacy reachability pin (#1905) ───────────────────────────────────────────
+# Decision of record: the preserved v3 archive stays PUBLICLY REACHABLE (200,
+# noindex, never UI-linked) — and in exchange the whole tree sits inside every
+# static privacy gate (pii_surface_guard, content_policy_scan, and the
+# real-person-attribution scan in tests/test_legacy_real_person_attributions_1905.py).
+# If a later decision denies /legacy at the edge instead, flip this pin to
+# assert the denial (403) — never delete it: either state must be asserted.
+echo "── /legacy archive pin (#1905: reachable by design) ─────"
+check_status "/legacy/ pin"          "$BASE/legacy/archive/v1/board/" "200"
+echo ""
+
 # ── /now/ → /cockpit/ rename (#1108) — single-hop, exact targets ───────────────
 # Deploy ordering (the issue's rule 6): S3 content ships FIRST, the CloudFront
 # v4-redirects function is published SECOND — so there is a sanctioned window where

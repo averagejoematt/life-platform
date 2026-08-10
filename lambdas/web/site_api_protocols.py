@@ -29,8 +29,8 @@ def _norm_ws(s):
 def _public_note(text):
     """#1569: screen a VERBATIM Matthew note for public serving.
 
-    Runs the canonical runtime content filter (marijuana/porn etc. — the same term
-    list the CI content-policy scan enforces). A verbatim quote is all-or-nothing:
+    Runs the canonical runtime content filter (the channel-derived blocked-term
+    list — the same vocabulary the CI content-policy scan enforces). A verbatim quote is all-or-nothing:
     if the filter would alter it at all (a blocked term excised, or the refuse-whole
     sentinel), the note is withheld ENTIRELY rather than published as a mangled
     fragment. Empty/withheld → None, and an absent note renders NOTHING on the card
@@ -74,7 +74,7 @@ def experiments(*, _g) -> dict:
     )
     items = _decimal_to_float(resp.get("Items", []))
 
-    datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    datetime.now(PT).strftime("%Y-%m-%d")
 
     experiments = []
     for item in items:
@@ -206,13 +206,13 @@ def supplements(*, _g) -> dict:
     if not registry or not registry.get("groups"):
         # Registry config unavailable — shaped-empty 200 rather than a console 503.
         return _ok(
-            {"groups": {}, "total_count": 0, "genome_snps": [], "as_of_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")},
+            {"groups": {}, "total_count": 0, "genome_snps": [], "as_of_date": datetime.now(PT).strftime("%Y-%m-%d")},
             cache_seconds=300,
         )
 
     # Try to merge DynamoDB adherence data
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
     pk = f"{USER_PREFIX}supplements"
     item = None
     for date in (today, yesterday):

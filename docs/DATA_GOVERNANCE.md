@@ -239,7 +239,7 @@ deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build be
 - No employer / role / industry. Partner is never named.
 - **Vices:** only *alcohol* and *food-delivery* categories are ever named publicly; all
   other vice categories are aggregate-only (streak counts, no labels). See
-  `feedback_sensitive_content` policy — marijuana/porn content must never be public.
+  `feedback_sensitive_content` policy — the two never-public vice categories (vocabulary in the ER-06 non-committed channel, #2370) must never be public.
 - Bereavement content is opt-in only.
 - Correlative framing always ("associated with", never "caused").
 - Down-weeks are always visible — absence of bad data is a lie of omission (ADR-104).

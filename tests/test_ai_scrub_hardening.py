@@ -23,8 +23,11 @@ from web import (
 )
 
 _FILTER = {
-    "blocked_vices": ["No porn", "No marijuana"],
-    "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
+    # Neutral fixture vocabulary (#2370) — the real category names never appear in
+    # this public repo; two long terms (>=7 normalized chars, obfuscation fail-safe
+    # eligible) + one short term (literal-pass-only residual).
+    "blocked_vices": ["No fizzlewick", "No grumbleflax"],
+    "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
 }
 
 
@@ -35,26 +38,26 @@ def _set_filter(monkeypatch):
 
 def test_literal_term_still_removed(monkeypatch):
     _set_filter(monkeypatch)
-    out = ai._scrub_blocked_terms("He asked about marijuana use.")
-    assert "marijuana" not in out.lower()
+    out = ai._scrub_blocked_terms("He asked about fizzlewick use.")
+    assert "fizzlewick" not in out.lower()
 
 
 def test_zero_width_obfuscation_stripped(monkeypatch):
     _set_filter(monkeypatch)
     # zero-width space inside the word → must not survive
-    out = ai._scrub_blocked_terms("about mari​juana today")
-    assert "marijuana" not in common._normalize_for_detection(out)
+    out = ai._scrub_blocked_terms("about fizzle​wick today")
+    assert "fizzlewick" not in common._normalize_for_detection(out)
 
 
 def test_spaced_long_term_drops_whole_answer(monkeypatch):
     _set_filter(monkeypatch)
-    out = ai._scrub_blocked_terms("the answer is m a r i j u a n a for sure")
+    out = ai._scrub_blocked_terms("the answer is f i z z l e w i c k for sure")
     assert out == "I can't share that."
 
 
 def test_punctuated_long_term_drops_whole_answer(monkeypatch):
     _set_filter(monkeypatch)
-    out = ai._scrub_blocked_terms("c-a-n-n-a-b-i-s is the topic")
+    out = ai._scrub_blocked_terms("g-r-u-m-b-l-e-f-l-a-x is the topic")
     assert out == "I can't share that."
 
 
@@ -65,7 +68,7 @@ def test_normal_answer_untouched(monkeypatch):
 
 
 def test_short_substring_does_not_nuke_answer(monkeypatch):
-    # "weed" (<7 normalized) must NOT trigger the whole-answer-drop fail-safe on
+    # "zzq" (<7 normalized) must NOT trigger the whole-answer-drop fail-safe on
     # legit text — only the literal pass touches short terms.
     _set_filter(monkeypatch)
     out = ai._scrub_blocked_terms("We discussed your sleep at length.")
@@ -75,8 +78,8 @@ def test_short_substring_does_not_nuke_answer(monkeypatch):
 
 def test_normalize_collapses_separators(monkeypatch):
     # _normalize_for_detection is the canonical impl from site_api_common; ai re-exports it.
-    assert common._normalize_for_detection("m a r i.j-u_a n a") == "marijuana"
-    assert common._normalize_for_detection("CANNABIS") == "cannabis"
+    assert common._normalize_for_detection("f i z z.l-e_w i c k") == "fizzlewick"
+    assert common._normalize_for_detection("GRUMBLEFLAX") == "grumbleflax"
 
 
 def test_history_turn_is_gated_and_scrubbed():

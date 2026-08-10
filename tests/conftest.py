@@ -78,6 +78,28 @@ _FAKE_AWS_ENV = {
 os.environ.pop("AWS_PROFILE", None)
 os.environ.update(_FAKE_AWS_ENV)
 
+# ── #2370: neutral blocked-category vocabulary for the whole unit suite ────────
+# The real vocabulary lives ONLY in the ER-06 non-committed channel (env
+# CONTENT_FILTER_JSON / config/content_filter.local.json / private S3) — this
+# repo is PUBLIC, so no test may carry the actual category names as literals.
+# The suite runs against this NEUTRAL fixture vocabulary instead, injected at
+# import time (same reasoning as the fake AWS creds above: channel consumers may
+# resolve at collection). It is FORCED (not setdefault) so the unit suite is
+# deterministic even when the real CI secret is present; the pre-existing value
+# is preserved for the few tests that deliberately scan real artifacts with the
+# real vocabulary (tests/test_public_surface_pii_guard.py).
+# Term design: two long terms (>= 7 normalized chars — exercises the obfuscation
+# fail-safe layer in site_api_common._scrub_blocked_terms) + one short term
+# (< 7 — exercises the literal-pass-only residual).
+import json as _json  # noqa: E402
+
+REAL_CONTENT_FILTER_ENV = os.environ.get("CONTENT_FILTER_JSON")
+NEUTRAL_CONTENT_FILTER = {
+    "blocked_vices": ["No fizzlewick", "No grumbleflax"],
+    "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
+}
+os.environ["CONTENT_FILTER_JSON"] = _json.dumps(NEUTRAL_CONTENT_FILTER)
+
 
 @pytest.fixture(autouse=True)
 def _hermetic_aws_credentials(request, monkeypatch):

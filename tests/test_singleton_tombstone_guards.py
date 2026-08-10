@@ -910,14 +910,14 @@ def test_relapse_event_ignores_tombstoned_habit_scores(monkeypatch):
     refreshes from a cycle that no longer exists."""
     import coach_prediction_evaluator as pe
 
-    monkeypatch.setattr(pe, "table", _FakeTable(item={**TOMBSTONED, "vice_streaks": {"weed": 12}}))
+    monkeypatch.setattr(pe, "table", _FakeTable(item={**TOMBSTONED, "vice_streaks": {"zzq": 12}}))
     assert pe._habit_scores_for("2026-07-20") == {}
 
 
 def test_habit_scores_serve_current_cycle(monkeypatch):
     import coach_prediction_evaluator as pe
 
-    live = {"phase": "experiment", "vice_streaks": {"weed": 12}}
+    live = {"phase": "experiment", "vice_streaks": {"zzq": 12}}
     monkeypatch.setattr(pe, "table", _FakeTable(item=live))
     assert pe._habit_scores_for("2026-07-20") == live
 

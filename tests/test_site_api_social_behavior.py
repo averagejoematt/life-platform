@@ -403,8 +403,8 @@ SUBSCRIBER_SECRET = "s" * 64
 RITUAL_SECRET = "r" * 64
 
 CONTENT_FILTER = {
-    "blocked_vices": ["No porn", "No marijuana"],
-    "blocked_vice_keywords": ["porn", "marijuana", "weed"],
+    "blocked_vices": ["No fizzlewick", "No grumbleflax"],
+    "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
 }
 
 
@@ -930,7 +930,7 @@ def test_an_s3_outage_tells_the_reader_to_retry_instead_of_pretending_to_save(mo
 
 def test_the_finding_door_rejects_blocked_vice_text_the_way_the_board_door_does(monkeypatch):
     wire(monkeypatch)
-    assert social._handle_submit_finding(post({**GOOD_FINDING, "finding": "marijuana correlates with my sleep"}))["statusCode"] == 400
+    assert social._handle_submit_finding(post({**GOOD_FINDING, "finding": "fizzlewick correlates with my sleep"}))["statusCode"] == 400
 
 
 # ── board_question ────────────────────────────────────────────────────────────
@@ -947,7 +947,7 @@ def test_a_board_question_is_captured_pending_and_invokes_no_ai(monkeypatch):
 
 def test_a_blocked_vice_question_is_refused_at_the_door(monkeypatch):
     _t, s3, _sec = wire(monkeypatch)
-    assert social._handle_board_question(post({"question": "what about marijuana and recovery"}))["statusCode"] == 400
+    assert social._handle_board_question(post({"question": "what about fizzlewick and recovery"}))["statusCode"] == 400
     assert s3.puts == [], "a rejected question must not reach the queue"
 
 
@@ -1358,7 +1358,7 @@ CATALOG = {
     "challenges": [
         {"id": "cold-shower-finish", "name": "Cold shower finish", "status": "available", "category": "recovery", "duration_days": 7},
         {"id": "no-screens-9pm", "name": "No screens after 9", "status": "backlog", "category": "sleep", "duration_days": 14},
-        {"id": "no-marijuana", "name": "No marijuana", "status": "available", "category": "vice"},
+        {"id": "no-fizzlewick", "name": "No fizzlewick", "status": "available", "category": "vice"},
         {"id": "private-one", "name": "Private one", "status": "available", "public": False},
     ]
 }
@@ -1396,8 +1396,8 @@ def test_the_live_challenge_list_filters_blocked_vices_by_id_and_by_name(monkeyp
     is benign, so BOTH are checked. Pinned in both directions."""
     catalog = {
         "challenges": [
-            {"id": "no-marijuana", "name": "Something benign", "status": "available"},
-            {"id": "benign-id", "name": "No weed week", "status": "available"},
+            {"id": "no-fizzlewick", "name": "Something benign", "status": "available"},
+            {"id": "benign-id", "name": "No zzq week", "status": "available"},
             {"id": "cold-shower-finish", "name": "Cold shower finish", "status": "available"},
         ]
     }

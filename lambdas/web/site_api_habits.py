@@ -2,7 +2,7 @@
 (#1654): habits / habit_streaks / habit_registry / vice_streaks + the #422 causality
 capture helpers and the P1.1 taxonomy. Handlers read facade state via `_g` (see freshness)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
@@ -10,6 +10,7 @@ from experiment import habit_causality
 from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import (
+    PT,
     USER_ID,
     USER_PREFIX,
     _decimal_to_float,
@@ -139,8 +140,8 @@ def habit_streaks(*, _g) -> dict:
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     table = _g["table"]
-    datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    # #2414: "yesterday" is the reader's yesterday — the Pacific calendar day.
+    yesterday = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Read latest habit_scores record
     pk = f"{USER_PREFIX}habit_scores"
@@ -196,7 +197,7 @@ def vice_streaks(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _experiment_date = _g["_experiment_date"]
     table = _g["table"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     ninety_days_ago = _experiment_date(90)
 
     # Stage0 Fix 1 (2026-05-30): _is_blocked_vice catches both blocked_vices
@@ -285,7 +286,7 @@ def habits(*, _g) -> dict:
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _experiment_date = _g["_experiment_date"]
     table = _g["table"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     ninety_days_ago = _experiment_date(90)
 
     pk = f"{USER_PREFIX}habit_scores"
@@ -651,7 +652,7 @@ def habit_registry(*, _g) -> dict:
     page shows "everything I'm trying to do" even right after an experiment reset
     (when the PROFILE#v1 registry and the phase-scoped habit_scores are empty).
 
-    Blocked vice/habit names (porn, marijuana, …) are stripped server-side via
+    Blocked vice/habit names (the never-public categories) are stripped server-side via
     ``_is_blocked_vice`` — content_filter.json's ``habit_data`` rule — so they
     never reach the client even though Habitify tracks them.
     """

@@ -145,7 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 14093,
+    "test_count": 14164,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -256,7 +256,7 @@ def _experiment_date(days_back=30):
     window shrinks rather than reaching into prior-cycle rows, and `_window_span` is
     how a caller learns that it shrank.
     """
-    raw = (datetime.now(timezone.utc) - timedelta(days=max(days_back - 1, 0))).strftime("%Y-%m-%d")
+    raw = (datetime.now(PT) - timedelta(days=max(days_back - 1, 0))).strftime("%Y-%m-%d")
     return _clamp_today(max(raw, EXPERIMENT_START))
 
 
@@ -460,25 +460,36 @@ def _load_supp_metadata() -> dict:
 
 
 def _load_content_filter():
-    """Load blocked terms from S3 config/content_filter.json. Cached after first call."""
+    """Load blocked terms through the ER-06 channel (env override → S3
+    config/content_filter.json). Cached after first call.
+
+    #2370: the pre-scrub hard-coded fallback published the never-public category
+    names in this PUBLIC repo. There is no in-code vocabulary any more — when no
+    channel source is available the filter FAILS CLOSED via an ``unavailable``
+    sentinel: ``_scrub_blocked_terms`` refuses the whole text and
+    ``_is_blocked_vice`` treats every vice as blocked (over-hide, never leak).
+    """
     global _content_filter_cache, _content_filter_cache_at
     if _content_filter_cache is not None and config_cache_valid(_content_filter_cache_at):
         return _content_filter_cache
     try:
-        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-        s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")
-        _content_filter_cache = json.loads(resp["Body"].read())
+        from privacy import content_filter_channel
+
+        loaded = content_filter_channel.load()
+        if loaded is None:
+            raise RuntimeError("no content-filter channel source available")
+        _content_filter_cache = loaded
         _content_filter_cache_at = time.monotonic()
         logger.info(f"[content_filter] Loaded: {len(_content_filter_cache.get('blocked_vice_keywords', []))} blocked terms")
     except Exception as e:
-        logger.warning(f"[content_filter] Failed to load from S3: {e}")
+        logger.warning(f"[content_filter] Failed to load from channel: {e}")
         _content_filter_cache = {
-            "blocked_vices": ["No porn", "No marijuana"],
-            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc", "edible", "edibles"],
+            "blocked_vices": [],
+            "blocked_vice_keywords": [],
+            "unavailable": True,  # fail-closed sentinel — consumers over-hide
         }
-        # Stamped so the hard-coded fallback is retried against S3 after the TTL
-        # instead of being pinned for the container's whole life (#2019).
+        # Stamped so the fail-closed sentinel is retried against the channel after
+        # the TTL instead of being pinned for the container's whole life (#2019).
         _content_filter_cache_at = time.monotonic()
         # BUG-05: emit EMF metric when fallback is active. We use sys.stdout.write
         # rather than print() so this file passes test_no_print_in_new_lambdas —
@@ -511,15 +522,15 @@ def _load_content_filter():
 
 
 # Zero-width / invisible characters that can smuggle a blocked term past a
-# literal substring scrub (e.g. a zero-width space inside "marijuana").
+# literal substring scrub (e.g. a zero-width space inside a blocked word).
 _ZERO_WIDTH_CHARS = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
 
 
 def _normalize_for_detection(text: str) -> str:
     """Lowercase + drop non-alphanumeric after stripping zero-width chars.
 
-    Collapses spaced / punctuated obfuscation ("m a r i j u a n a",
-    "c-a-n-n-a-b-i-s") so a blocked term is detectable even when it slipped
+    Collapses spaced / punctuated obfuscation ("b l o c k e d t e r m",
+    "b-l-o-c-k-e-d t-e-r-m") so a blocked term is detectable even when it slipped
     past the literal pass.
     """
     return re.sub(r"[^a-z0-9]", "", text.translate(_ZERO_WIDTH_CHARS).lower())
@@ -531,19 +542,21 @@ def _scrub_blocked_terms(text: str) -> str:
     Two layers:
       1. Literal case-insensitive removal — the common case; surgical, with no
          false-positives on normal text. Zero-width chars are stripped first so
-         "mari<zwsp>juana" can't smuggle a term past it.
+         a zwsp-split blocked term can't smuggle itself past it.
       2. Fail-safe detection on a normalized (de-spaced, de-punctuated) copy: if
-         a LONG, unambiguous blocked term (>=7 normalized chars — "marijuana",
-         "cannabis", "pornography"…) survived the literal pass, it was obfuscated
-         on purpose, so we drop the WHOLE answer rather than surgically excise an
-         obfuscated span (which would mangle legit text). Short terms
-         ("thc"/"weed"/"porn") are too substring-prone to detect this way safely
-         and are left to the literal pass — a documented residual.
+         a LONG, unambiguous blocked term (>=7 normalized chars) survived the
+         literal pass, it was obfuscated on purpose, so we drop the WHOLE answer
+         rather than surgically excise an obfuscated span (which would mangle
+         legit text). Shorter blocked terms are too substring-prone to detect
+         this way safely and are left to the literal pass — a documented residual.
 
     This is the canonical shared implementation. AI endpoints layer
     privacy_guard.scrub() on top for real-name redaction.
     """
     cf = _load_content_filter()
+    if cf.get("unavailable"):
+        # #2370 fail-closed: no vocabulary means no safe way to excise — refuse.
+        return "I can't share that."
     text = text.translate(_ZERO_WIDTH_CHARS)
     result = text
     for term in cf.get("blocked_vice_keywords", []):
@@ -564,6 +577,10 @@ def _scrub_blocked_terms(text: str) -> str:
 def _is_blocked_vice(name: str) -> bool:
     """Check if a vice/habit name matches the blocked list."""
     cf = _load_content_filter()
+    if cf.get("unavailable"):
+        # #2370 fail-closed: without the vocabulary every vice/habit name is
+        # treated as blocked (over-hide, never leak).
+        return True
     name_lower = name.lower().strip()
     for blocked in cf.get("blocked_vices", []):
         if blocked.lower() == name_lower:

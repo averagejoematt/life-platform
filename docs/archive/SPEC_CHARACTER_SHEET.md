@@ -136,7 +136,7 @@ The Character Sheet is a persistent, gamified scoring system that distills Matth
 | Journal consistency | 15% | Notion | Days with journal entry / total days |
 | State of Mind valence | 15% | State of Mind | Average valence trend (improving = good) |
 | Stress management | 15% | Whoop | Stress score trend, recovery from high-stress days |
-| Vice control | 10% | habit_scores | Vice streak maintenance (alcohol, THC, etc.) |
+| Vice control | 10% | habit_scores | Vice streak maintenance (alcohol, etc.) |
 
 ### 3.6 Relationships (Weight: 7%)
 **Owner:** Social connection scoring (journal-derived)

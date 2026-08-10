@@ -700,7 +700,7 @@
         marks.push({
           icon: 'icon-scale',
           name: 'Visceral fat',
-          context: 'Target <1.0 lb (Attia)',
+          context: 'Target <1.0 lb (longevity-medicine target)',
           value: lbc.visceral_fat_lb,
           unit: 'lbs',
           spark: null,
@@ -901,7 +901,7 @@
         var vfg = lbc.visceral_fat_g || Math.round(lbc.visceral_fat_lb * 453.592);
         setHTML('ph-visceral-text',
           '<strong>' + lbc.visceral_fat_lb + ' lbs (' + vfg.toLocaleString() + ' g).</strong> ' +
-          'Target <1.0 lb (Attia: <1,000 g). Highest-priority metabolic target — responds to dietary intervention in 8–12 weeks.');
+          'Target <1.0 lb (<1,000 g). Highest-priority metabolic target — responds to dietary intervention in 8–12 weeks.');
       }
 
       // Bone
@@ -970,7 +970,7 @@
           : whr > 0.5 ? 'above target but below the high-risk threshold.'
           : 'at or below target — excellent.';
         setHTML('ph-whr-text',
-          '<strong>Target &lt;0.500.</strong> Per Dr. Peter Attia, this is the single most predictive anthropometric for metabolic health and all-cause mortality. ' +
+          '<strong>Target &lt;0.500.</strong> In the longevity-medicine literature this is the single most predictive anthropometric for metabolic health and all-cause mortality. ' +
           'Current ratio (' + whr.toFixed(3) + ') is ' + verdict);
       }
 
@@ -1006,7 +1006,7 @@
             'Normal: &lt;120/80<br>' +
             'Elevated: 120-129/&lt;80<br>' +
             'High: ≥130/≥80<br>' +
-            '<span style="color:var(--text-faint)">Target: &lt;120/80 (Attia)</span>' +
+            '<span style="color:var(--text-faint)">Target: &lt;120/80</span>' +
           '</div>' +
         '</div>';
     }

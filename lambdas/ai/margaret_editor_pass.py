@@ -101,14 +101,22 @@ _FALLBACK_NARRATOR = {
     ),
 }
 
+
 # Same absolute-privacy rules Elena's prompt carries — Margaret reads and can
 # rewrite the piece, so she needs the same guardrails, not just a downstream check.
-_PRIVACY_RULES = (
-    "PRIVACY — ABSOLUTE, even while editing: never name a specific vice or substance Matthew is "
-    "moderating (marijuana, cannabis, weed, alcohol, nicotine, vaping, pornography, etc.) — refer to it "
-    "only in non-specific terms if it's load-bearing to a note, never the substance itself. Never cite a "
-    "specific gene name, rsID, or genotype string. Never name a real public figure as a coach or source."
-)
+def _privacy_rules() -> str:
+    """Built at runtime: the vice enumeration comes from the ER-06 non-committed
+    channel (#2370 — the category names must not live in this public repo).
+    Fail-closed via require=True — no vocabulary, no editor pass."""
+    from privacy import content_filter_channel
+
+    terms = ", ".join(content_filter_channel.blocked_keywords(require=True))
+    return (
+        "PRIVACY — ABSOLUTE, even while editing: never name a specific vice or substance Matthew is "
+        f"moderating ({terms}, alcohol, nicotine, vaping, etc.) — refer to it "
+        "only in non-specific terms if it's load-bearing to a note, never the substance itself. Never cite a "
+        "specific gene name, rsID, or genotype string. Never name a real public figure as a coach or source."
+    )
 
 
 def build_narrator(config):
@@ -156,7 +164,7 @@ def build_critique_system_prompt(narrator):
         "has made to readers that are due this week (her callback ledger); flag any the installment sets up "
         "but never pays off. You do not rewrite anything yet — that's a separate step, and only happens if "
         "your critique earns it.\n\n"
-        f"{_PRIVACY_RULES}\n\n"
+        f"{_privacy_rules()}\n\n"
         "Grade the installment's craft 0-10 (10 = nothing you'd change). A 7+ means solid, ship as-is. Below "
         "7 means it's worth one revision pass.\n\n"
         "OUTPUT — ONLY valid JSON, no markdown, no preamble:\n"
@@ -303,7 +311,7 @@ def build_revision_user_message(installment_text, critique):
             + "\n".join(f"- {c}" for c in critique["callback_debt"])
             + "\nPay these off in the revision, or explicitly extend them in-text — don't just drop them silently."
         )
-    lines.append(_PRIVACY_RULES)
+    lines.append(_privacy_rules())
     lines.append(
         "Do not mention Margaret, an edit, or a revision anywhere in the text — you are Elena, and this is simply this week's installment."
     )

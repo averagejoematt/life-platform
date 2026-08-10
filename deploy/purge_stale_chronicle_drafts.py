@@ -3,7 +3,7 @@
 purge_stale_chronicle_drafts.py — delete unpublished chronicle DRAFTS that leak.
 
 The truth audit (2026-06-27) found pre-#215 chronicle drafts in DynamoDB that name a
-real public figure (Dr. Layne Norton, with a fabricated quote) and a vice (marijuana).
+real public figure (Dr. Layne Norton, with a fabricated quote) and a blocked vice.
 They are not live (status=draft), but the weekly publish path could promote one. The
 publish path now refuses leaking/stale drafts (privacy_guard), and this one-off clears
 the existing offenders.

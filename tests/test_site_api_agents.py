@@ -151,10 +151,10 @@ def test_blocked_content_is_filtered(objs):
     objs["coherence-log/2026-07-05.json"] = {
         "date": "2026-07-05",
         "status": "warn",
-        "findings": [{"name": "narrative_scan", "status": "warn", "detail": "coach mentioned marijuana in a draft"}],
+        "findings": [{"name": "narrative_scan", "status": "warn", "detail": "coach mentioned fizzlewick in a draft"}],
     }
     resp = A.handle_agent_activity({"queryStringParameters": {"week": "2026-06-30"}})
-    assert "marijuana" not in resp["body"].lower()
+    assert "fizzlewick" not in resp["body"].lower()
 
 
 def test_bad_week_param_defaults_gracefully(objs):

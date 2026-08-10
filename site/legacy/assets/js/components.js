@@ -687,7 +687,7 @@ function renderAIAnalysisCard(containerId, expertKey, config) {
   if (!el) return;
 
   var EXPERTS = {
-    mind:      { name: "Dr. Conti's Observations",       color: '#a78bfa' },
+    mind:      { name: "Dr. Nathan Reeves's Observations", color: '#a78bfa' },
     nutrition: { name: "Dr. Webb's Analysis",            color: '#f59e0b' },
     training:  { name: "Coach's Notes — Dr. Sarah Chen", color: '#ef4444' },
     physical:  { name: "Dr. Victor Reyes's Assessment",  color: '#60a5fa' },

@@ -199,3 +199,134 @@ def test_denylist_is_not_committed_in_cleartext():
     with open(example) as f:
         terms = [t for t in json.load(f).get("terms", []) if not t.startswith("<")]
     assert terms == [], "the example denylist must contain no real values (placeholders only)"
+
+
+# ═══ Repo-hygiene arm (#2370) — tracked JSON is itself a public surface ═════════
+#
+# The repo is PUBLIC, so a tracked config/seed JSON that carries a blocked-category
+# keyword IS the leak (the denylist inversion #2370 scrubbed). The unit suite runs
+# on the NEUTRAL fixture vocabulary conftest injects; the real-vocabulary scans
+# below re-resolve the channel (pre-conftest CI secret value, local file, or S3)
+# and SKIP VISIBLY when no source exists — they run armed in ci-lint (secret) and
+# on owner machines (content_filter.local.json), plus fail-closed at deploy time
+# (sync_site_to_s3.sh --require-vice).
+
+import conftest as _conftest  # noqa: E402 — REAL_CONTENT_FILTER_ENV preserved pre-injection
+import pytest  # noqa: E402
+
+
+def _real_channel_vocab(monkeypatch):
+    """Resolve the REAL vocabulary (not the neutral fixture): restore the
+    pre-conftest env value, else fall through to local file / S3. Returns [] when
+    no real source exists (caller skips visibly)."""
+    sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
+    from privacy import content_filter_channel
+
+    if _conftest.REAL_CONTENT_FILTER_ENV:
+        monkeypatch.setenv("CONTENT_FILTER_JSON", _conftest.REAL_CONTENT_FILTER_ENV)
+    else:
+        monkeypatch.delenv("CONTENT_FILTER_JSON", raising=False)
+    content_filter_channel.reset_cache()
+    try:
+        return content_filter_channel.blocked_keywords(require=False)
+    finally:
+        pass
+
+
+@pytest.fixture
+def _restore_channel_cache():
+    yield
+    sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
+    from privacy import content_filter_channel
+
+    content_filter_channel.reset_cache()
+
+
+def test_tracked_json_surface_is_clean_with_real_vocabulary(monkeypatch, _restore_channel_cache):
+    """The gate itself (#2370 AC): no git-tracked JSON file carries a
+    blocked-category keyword. Runs with the REAL vocabulary when a channel source
+    exists; otherwise skips visibly (armed in ci-lint via the secret)."""
+    vocab = _real_channel_vocab(monkeypatch)
+    if not vocab:
+        pytest.skip("no real content-filter channel source — armed in ci-lint (secret) / locally (local.json)")
+    res = guard.scan_tracked_json(vocab=vocab)
+    assert res["vice_arm"] == "on"
+    assert res["files"] > 100, f"suspiciously few tracked JSON files scanned ({res['files']})"
+    assert not res["violations"], "tracked JSON carries blocked-category keyword(s):\n" + "\n".join(
+        f"  {f}: [{arm}] {detail}" for f, arm, detail in res["violations"]
+    )
+
+
+def test_live_site_is_vice_clean_with_real_vocabulary(monkeypatch, _restore_channel_cache):
+    """The committed site/ tree scanned against the REAL vocabulary (the neutral
+    fixture scan in test_live_site_is_clean covers the structural arms)."""
+    vocab = _real_channel_vocab(monkeypatch)
+    if not vocab:
+        pytest.skip("no real content-filter channel source — armed in ci-lint (secret) / locally (local.json)")
+    res = guard.scan_site(_SITE)
+    vice_hits = [v for v in res["violations"] if v[1] == "blocked-vice"]
+    assert res["vice_arm"] == "on"
+    assert not vice_hits, f"{len(vice_hits)} blocked-category hit(s) on the committed site tree (terms masked)"
+
+
+def test_tracked_arm_fires_on_a_seeded_violation(tmp_path):
+    """Mutation proof (#2370 AC: 'a screen whose suite passes with the screen
+    deleted guards nothing'): seed a JSON file with a (neutral) vocabulary term
+    and prove the arm actually fires — and that the violation never echoes the
+    term back (public CI logs)."""
+    dirty = tmp_path / "seed.json"
+    dirty.write_text(json.dumps({"habit": "No fizzlewick"}))
+    clean = tmp_path / "clean.json"
+    clean.write_text(json.dumps({"habit": "No sugar"}))
+    vocab = ["fizzlewick", "zzq"]
+
+    res = guard.scan_tracked_json(files=[str(dirty)], vocab=vocab)
+    assert res["violations"], "the repo-hygiene arm did not fire on a seeded violation — the screen guards nothing"
+    for _f, arm, detail in res["violations"]:
+        assert arm == "tracked-blocked-vice"
+        assert "fizzlewick" not in detail.lower(), "violation output must never echo the term"
+
+    res_clean = guard.scan_tracked_json(files=[str(clean)], vocab=vocab)
+    assert res_clean["violations"] == [], "the arm fired on a clean file — false positive"
+
+
+def test_tracked_arm_catches_zero_width_and_spaced_obfuscation(tmp_path):
+    """The obfuscation classes the runtime scrub defends against must not slip
+    a tracked file past the repo-hygiene arm either: zero-width-split and
+    punctuation-split long terms are caught on the normalized pass."""
+    zwsp = tmp_path / "zwsp.json"
+    # ensure_ascii=False keeps the REAL zero-width char in the file (the escaped
+    # \\u form is a different, out-of-scope obfuscation — a human pasting a term
+    # into a config produces the raw char).
+    zwsp.write_text(json.dumps({"note": "about fizz​lewick today"}, ensure_ascii=False), encoding="utf-8")
+    spaced = tmp_path / "spaced.json"
+    spaced.write_text(json.dumps({"note": "f-i-z-z-l-e-w-i-c-k is the topic"}))
+    for seeded in (zwsp, spaced):
+        res = guard.scan_tracked_json(files=[str(seeded)], vocab=["fizzlewick"])
+        assert res["violations"], f"obfuscated seeded term not caught in {seeded.name}"
+
+
+def test_tracked_arm_skips_visibly_without_vocabulary():
+    """No vocabulary → the arm reports itself SKIPPED (never an empty-vocabulary
+    'pass' — #2203 class)."""
+    res = guard.scan_tracked_json(files=["does-not-matter.json"], vocab=[])
+    assert res["vice_arm"] == "skipped"
+    assert res["violations"] == []
+
+
+def test_site_scan_requires_vice_arm_on_the_deploy_path(monkeypatch, _restore_channel_cache):
+    """--require-vice fail-closed proof: with NO channel source, the deploy-path
+    form raises instead of shipping with the vice arm dark."""
+    sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
+    from privacy import content_filter_channel
+
+    monkeypatch.delenv("CONTENT_FILTER_JSON", raising=False)
+    monkeypatch.setattr(content_filter_channel, "_from_local_file", lambda: None)
+    monkeypatch.setattr(content_filter_channel, "_from_s3_boto", lambda bucket: None)
+    monkeypatch.setattr(content_filter_channel, "_from_s3_cli", lambda bucket: None)
+    content_filter_channel.reset_cache()
+    with pytest.raises(content_filter_channel.ContentFilterUnavailable):
+        guard.scan_site(_SITE, require_vice=True)
+    # The permissive form reports the arm skipped instead (offline CI posture).
+    res = guard.scan_site(_SITE, require_vice=False)
+    assert res["vice_arm"] == "skipped"

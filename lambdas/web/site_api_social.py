@@ -528,7 +528,7 @@ def _handle_submit_finding(event: dict) -> dict:
 
     # Write to S3
     S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    s3_key = f"generated/findings/{datetime.now(timezone.utc).strftime('%Y-%m-%d')}_{finding_id}.json"
+    s3_key = f"generated/findings/{timestamp[:10]}_{finding_id}.json"  # same instant as submitted_at (UTC key prefix, not reader-facing)
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
         s3_client.put_object(
@@ -1262,7 +1262,7 @@ def handle_challenges() -> dict:
     "taken on / active". The challenge catalog (config/challenges_catalog.json,
     84 challenges) is always overlaid as origin='catalog' so the page shows the
     available + backlog pipeline even right after an experiment reset wipes the
-    live partition. Blocked vices (porn/marijuana/…) are filtered server-side.
+    live partition. Blocked vices (the never-public categories) are filtered server-side.
     """
     import re as _re
 
@@ -1400,9 +1400,8 @@ def _handle_challenge_checkin(event: dict) -> dict:
     if not allowed:
         return _rate_limited("challenge_checkin", "Already checked in for this challenge today.", retry_after=86400)
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if not date_str:
-        date_str = today
+    if not date_str:  # #2414: a check-in with no date lands on the reader's Pacific day
+        date_str = datetime.now(PT).strftime("%Y-%m-%d")
 
     challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
     sk = f"CHALLENGE#{challenge_id}"
@@ -2012,7 +2011,7 @@ def handle_broadcast() -> dict:
     predicate (_is_broadcast_visible), and returns facade cards newest-first.
     Fail-soft per source (a query error on one channel never breaks the feed).
     Cache 900s — the feed is refreshed by hourly-ish ingestion, not per-request."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     visible = _membrane_visible_rows()
     # Reverse-chron across all sources (the per-source query is already newest-first;
     # this re-sorts the merged set). sk carries the post id after the date, so sort on it.
@@ -2164,7 +2163,7 @@ def handle_membrane() -> dict:
     Read-only, aggregate + provenance only, fail-soft on every read. Returns the
     three stages of the loop with an explicit state per side so the page can render
     "not wired yet" differently from "wired and quiet"."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
 
     # ── what I said → where it went (the outbound ledger) ──────────────────────
     outbound_channels, outbound_rows = [], []

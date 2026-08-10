@@ -39,7 +39,7 @@ Structure:
        Each assertion was verified RED with its screen commented out (see the PR body).
 
 Privacy note (public repo, permanent history): no real blocked term appears as a source
-literal. Fixtures load the live vocabulary from ``config/content_filter.json`` at test
+literal. Fixtures load the configured vocabulary from the ER-06 channel at test
 time (the #2203/#2211/#2212 technique) and build a throwaway experiment name around it.
 """
 
@@ -85,8 +85,10 @@ EXPERIMENTS_PARTITION_SUFFIX = "experiments"
 
 
 def _cf() -> dict:
-    with open(ROOT / "config" / "content_filter.json", encoding="utf-8") as f:
-        return json.load(f)
+    from privacy import content_filter_channel
+
+    cf = content_filter_channel.load(require=True)  # #2370: the ER-06 channel (neutral fixture vocab in the unit suite)
+    return dict(cf)
 
 
 def _pin_content_filter(monkeypatch) -> dict:

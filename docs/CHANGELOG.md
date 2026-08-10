@@ -998,7 +998,7 @@ Front-end rebuild into the locked Direction 05 design system — one engine, thr
 ### Removed
 - **WAF `life-platform-amj-waf`** — detached from CloudFront `E3S424OXQZ8NBE` and deleted. ~$8/mo saved. Budget tier flipped 1 → 0.
 - **9 pre-restart `ai_analysis` records** tombstoned — `/api/ai_analysis` returns `analysis: null` everywhere until next compute writes fresh records.
-- **Plaintext vice-keyword arrays from client JS** — `site/{mind,habits,stack}/index.html` no longer ship `BLOCKED_KW = ['porn', …]` in view-source. Server-side `_is_blocked_vice()` is authoritative.
+- **Plaintext vice-keyword arrays from client JS** — `site/{mind,habits,stack}/index.html` no longer ship `BLOCKED_KW = ['<blocked keyword>', …]` in view-source. Server-side `_is_blocked_vice()` is authoritative.
 - **Stage0 #2** — "Matthew, PhD" attribution on `/benchmarks/` Why-We-Sleep epigraph corrected to "Matthew Walker, PhD".
 
 ### Fixed
@@ -4429,7 +4429,7 @@ Major implementation session. 4-phase reader engagement rollout, new pages, new 
 - 6 page-specific OG images (home, sleep, glucose, training, character, nutrition) with live stats. Meta tags updated on all 6 pages.
 
 ### Privacy & Security
-- Filter `public: false` challenges (cannabis/porn) server-side + client-side
+- Filter `public: false` challenges (blocked-vice categories) server-side + client-side
 - Add `isBlocked` keyword filter to mind page vice streak rendering
 - Remove behavioral signals group from status page (food delivery streak is health data, not system status)
 

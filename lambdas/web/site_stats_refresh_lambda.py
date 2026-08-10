@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_START_DATE  # ADR-058
+from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 
 from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
 
@@ -54,8 +55,8 @@ def _safe_float(d, key):
 
 def _get_latest(table, source, days_back=2):
     """Return most recent DynamoDB record for source, or {}."""
-    today = date.today().isoformat()
-    start = (date.today() - timedelta(days=days_back)).isoformat()
+    today = datetime.now(PT).date().isoformat()
+    start = (datetime.now(PT).date() - timedelta(days=days_back)).isoformat()
     try:
         # ADR-058: phase=pilot hidden by default.
         from experiment.phase_filter import with_phase_filter
@@ -192,7 +193,7 @@ def lambda_handler(event, context):
     # ── 5f. Training summary (average daily active minutes from Strava) ──
     # Use the experiment start to compute avg daily training
     exp_start = date.fromisoformat(EXPERIMENT_START_DATE)
-    days_in = max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 1
+    days_in = max(1, (datetime.now(PT).date() - exp_start).days + 1) if datetime.now(PT).date() >= exp_start else 1
     try:
         # ADR-058: phase=pilot hidden by default.
         from experiment.phase_filter import with_phase_filter
@@ -204,7 +205,7 @@ def lambda_handler(event, context):
                     "ExpressionAttributeValues": {
                         ":pk": f"USER#{USER_ID}#SOURCE#strava",
                         ":s": f"DATE#{exp_start.isoformat()}",
-                        ":e": f"DATE#{date.today().isoformat()}",
+                        ":e": f"DATE#{datetime.now(PT).date().isoformat()}",
                     },
                 }
             )
@@ -253,7 +254,7 @@ def lambda_handler(event, context):
             **ep,
             "tier0_streak": fresh_streak,
             "protein_avg": fresh_vitals.get("nutrition_protein_g"),
-            "days_in": max(1, (date.today() - exp_start).days + 1) if date.today() >= exp_start else 0,
+            "days_in": max(1, (datetime.now(PT).date() - exp_start).days + 1) if datetime.now(PT).date() >= exp_start else 0,
         },
     }
 

@@ -5,7 +5,7 @@ challenges / habits pages must still render from their config catalogs, and the
 habits list (now sourced from Habitify, which tracks vices too) must never leak a
 blocked vice. These tests cover:
 
-  * the content filter drops blocked habit names (porn/marijuana/…)
+  * the content filter drops blocked habit names (the never-public categories)
   * _habits_from_habitify maps + filters + carries the per-habit group
   * _experiment_catalog surfaces the library tagged origin='library' with a shelf status
 """
@@ -24,8 +24,8 @@ from web import (
 )
 
 _BLOCKLIST = {
-    "blocked_vices": ["No porn", "No marijuana"],
-    "blocked_vice_keywords": ["porn", "marijuana", "cannabis", "weed", "thc", "edible", "edibles"],
+    "blocked_vices": ["No fizzlewick", "No grumbleflax"],
+    "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
 }
 
 
@@ -38,9 +38,9 @@ def _set_filter():
 
 def test_blocked_vices_filtered_from_habit_names():
     _set_filter()
-    assert common._is_blocked_vice("No marijuana") is True
-    assert common._is_blocked_vice("No porn") is True
-    assert common._is_blocked_vice("Cannabis gummies") is True
+    assert common._is_blocked_vice("No fizzlewick") is True
+    assert common._is_blocked_vice("No grumbleflax") is True
+    assert common._is_blocked_vice("Zzq gummies") is True
     assert common._is_blocked_vice("Morning sunlight") is False
     assert common._is_blocked_vice("Creatine 5g") is False
 
@@ -56,8 +56,8 @@ def test_habits_from_habitify_filters_and_groups(monkeypatch):
         "habit_statuses": {
             "Morning sunlight": {"group": "Wellbeing", "periodicity": "daily", "scheduled_today": True},
             "Creatine 5g": {"group": "Supplements", "periodicity": "daily"},
-            "No marijuana": {"group": "Discipline", "periodicity": "daily"},
-            "No porn": {"group": "Discipline", "periodicity": "daily"},
+            "No fizzlewick": {"group": "Discipline", "periodicity": "daily"},
+            "No grumbleflax": {"group": "Discipline", "periodicity": "daily"},
         },
     }
     monkeypatch.setattr(data, "table", FakeDdbTable(rows=[item]))

@@ -126,8 +126,8 @@ Pages in "The Science" section must include this disclaimer once, near the botto
 Any page displaying habit names, vice data, or temptation data must filter blocked terms. Client-side check:
 
 ```javascript
-const BLOCKED_VICES = ['No porn', 'No marijuana'];
-const BLOCKED_KEYWORDS = ['porn', 'pornography', 'marijuana', 'cannabis', 'weed', 'thc'];
+const BLOCKED_VICES = ['<blocked habit>', '<blocked habit>'];
+const BLOCKED_KEYWORDS = ['<blocked keyword>', '...'];
 function isBlocked(text) {
   const lower = text.toLowerCase();
   return BLOCKED_KEYWORDS.some(k => lower.includes(k));

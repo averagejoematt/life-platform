@@ -150,3 +150,22 @@ def test_privacy_gate_catches_a_real_figure_outside_the_owner_field():
 
     with pytest.raises(privacy_guard.PrivacyViolation):
         gx.assert_no_real_figures("<p>Voice shaped by Andrew Huberman's protocols</p>")
+
+
+def test_missing_vocabulary_holds_the_regen_instead_of_crashing(monkeypatch, tmp_path):
+    """#2370 fail-closed, correctly scoped: no content-filter vocabulary means the
+    page must not REGENERATE (the committed artifact was screened when written) —
+    but crashing took down the whole reconcile lane over a missing CI secret
+    (2026-08-10, three red main runs). main() exits 0 and writes nothing."""
+    from privacy.content_filter_channel import ContentFilterUnavailable
+
+    def _raise(*a, **k):
+        raise ContentFilterUnavailable("no vocabulary in this environment")
+
+    monkeypatch.setattr(gx, "render", _raise)
+    sentinel = tmp_path / "index.html"
+    sentinel.write_text("committed artifact", encoding="utf-8")
+    monkeypatch.setattr(gx, "OUT_PATH", sentinel)
+
+    assert gx.main() == 0
+    assert sentinel.read_text(encoding="utf-8") == "committed artifact"

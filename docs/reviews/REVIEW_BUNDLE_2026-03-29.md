@@ -214,7 +214,7 @@ Major implementation session. 4-phase reader engagement rollout, new pages, new 
 - 6 page-specific OG images (home, sleep, glucose, training, character, nutrition) with live stats. Meta tags updated on all 6 pages.
 
 ### Privacy & Security
-- Filter `public: false` challenges (cannabis/porn) server-side + client-side
+- Filter `public: false` challenges (blocked-vice categories) server-side + client-side
 - Add `isBlocked` keyword filter to mind page vice streak rendering
 - Remove behavioral signals group from status page (food delivery streak is health data, not system status)
 

@@ -1,0 +1,25 @@
+{
+  "_README": "ER-06 blocked-content vocabulary TEMPLATE (#2370). Copy to config/content_filter.local.json (gitignored) and fill with the real category names/keywords that must NEVER appear on any public surface. The repo is PUBLIC, so the real vocabulary is never committed: every consumer loads it through lambdas/privacy/content_filter_channel.py — env CONTENT_FILTER_JSON (the full object as a JSON string; inject as a CI secret to arm the CI gates), then config/content_filter.local.json, then the private S3 copy at config/content_filter.json (the runtime source of truth Lambdas consume). Matching is whole-word, case-insensitive; enforcement output never echoes the vocabulary back.",
+  "_meta": {
+    "description": "Public content safety filter — controls what data is hidden from all public-facing surfaces (website, emails, API responses).",
+    "s3_key": "config/content_filter.json",
+    "version": "1.1.0"
+  },
+  "blocked_vices": [
+    "No <blocked habit name>",
+    "No <another blocked habit name>"
+  ],
+  "blocked_vice_keywords": [
+    "<blocked keyword>",
+    "<blocked keyword variant>",
+    "<another blocked keyword>"
+  ],
+  "rules": {
+    "vice_streaks": "Exclude any vice whose name case-insensitively matches blocked_vices from all public outputs.",
+    "habit_data": "Exclude matching habits from public habit displays, heatmaps, adherence reports.",
+    "temptation_log": "Never surface temptation entries with matching categories.",
+    "ai_responses": "System prompt must instruct Claude to never mention blocked terms.",
+    "email_digests": "All email Lambdas must filter blocked vices from BoD commentary.",
+    "journal_entries": "Passages mentioning blocked terms must not appear on public pages."
+  }
+}

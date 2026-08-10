@@ -123,6 +123,42 @@ PAGES = visual_pages()
 _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Loading…")
 
 
+def _payload_is_empty(data) -> bool:
+    """True only for an AFFIRMATIVELY empty collection payload.
+
+    A top-level empty list, or a dict whose every list value is empty and whose
+    numeric counts are zero. Anything unrecognized returns False — an API we
+    can't read stays a gating failure, never a silent pass.
+    """
+    if isinstance(data, list):
+        return len(data) == 0
+    if isinstance(data, dict):
+        lists = [v for v in data.values() if isinstance(v, list)]
+        counts = [v for k, v in data.items() if isinstance(v, (int, float)) and ("count" in k or "total" in k)]
+        if not lists and not counts:
+            return False
+        return all(len(v) == 0 for v in lists) and all(v == 0 for v in counts)
+    return False
+
+
+def _api_deps_all_empty(page, api_deps) -> bool:
+    """Probe the page's own API deps: True iff EVERY dep answers 200 with an
+    affirmatively-empty payload (see _payload_is_empty). Used to tell a genesis
+    dark state (honest data absence rendered as placeholders) from a broken
+    data bind. Fail-closed: no deps, a non-200, or an unparseable body → False.
+    """
+    if not api_deps:
+        return False
+    for dep in api_deps:
+        try:
+            resp = page.request.get(f"{SITE_URL}{dep}", timeout=10000)
+            if resp.status != 200 or not _payload_is_empty(resp.json()):
+                return False
+        except Exception:
+            return False
+    return True
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Page-level checks (run in the browser)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -667,7 +703,17 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
                     if txt in _EMPTY_SENTINELS:
                         empties += 1
                 if els and empties == len(els):
-                    issues.append(f"All '{check['selector']}' empty/placeholder — {check['desc']}")
+                    # Genesis dark-state discrimination (2026-08-10): on cycle Day 1
+                    # /protocols/discoveries/ rendered every readout as a placeholder
+                    # because the API held zero discoveries YET — an honest absence,
+                    # not a broken bind — and the deterministic FAIL rolled back a
+                    # privacy fix in a loop. If the page's own API deps are all
+                    # honestly empty, this is a data-driven dark state: WARN (so the
+                    # AI layer and a human still see it) instead of gating.
+                    if _api_deps_all_empty(page, page_def.get("api_deps")):
+                        warnings.append(f"All '{check['selector']}' empty — API honestly empty (genesis dark state) — {check['desc']}")
+                    else:
+                        issues.append(f"All '{check['selector']}' empty/placeholder — {check['desc']}")
                 elif not els:
                     issues.append(f"'{check['selector']}' not found — {check['desc']}")
 

@@ -23,9 +23,10 @@ zero-that-looks-like-a-real-zero. Captions frame patterns as observation, not ca
 """
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from web.site_api_common import (
+    PT,
     _error,
     _get_profile,
     _ok,
@@ -229,8 +230,8 @@ def handle_autonomic_balance() -> dict:
     baseline, and places each day in Flow / Stress / Recovery / Burnout. Honest empty
     state below 7 days of data. Cache 900s (recovery lands ~once a day)."""
     try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        start = (datetime.now(timezone.utc) - timedelta(days=AUTONOMIC_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
+        today = datetime.now(PT).strftime("%Y-%m-%d")
+        start = (datetime.now(PT) - timedelta(days=AUTONOMIC_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
         whoop = _query_source("whoop", start, today)
         return _ok(_compute_autonomic_balance(whoop), cache_seconds=900)
     except Exception as e:
@@ -430,8 +431,8 @@ def handle_zone2_breakdown() -> dict:
     zone, and rolls up the weekly Zone-2 tally + the 5-zone distribution. Honest empty
     state when no qualifying activity exists. Cache 1800s."""
     try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        start = (datetime.now(timezone.utc) - timedelta(days=ZONE2_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
+        today = datetime.now(PT).strftime("%Y-%m-%d")
+        start = (datetime.now(PT) - timedelta(days=ZONE2_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
         strava = _query_source("strava", start, today)
         return _ok(_compute_zone2_breakdown(strava, _get_profile()), cache_seconds=1800)
     except Exception as e:
