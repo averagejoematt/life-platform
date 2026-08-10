@@ -289,12 +289,16 @@ def assemble_coach(persona_id: str) -> dict:
 def run_conversation(scenario: dict, assembled: dict, ledger: Ledger, *, verbose: bool = False) -> dict:
     """One simulated conversation, turn by turn, through ``coach_chat.run_turn``."""
     from ai.bedrock_client import invoke
-    from coach import coach_chat, telegram_worker_lambda as tw
+    from coach import coach_chat, coach_style_gate, telegram_worker_lambda as tw
 
     model = tw.MODEL
     thread: list = []
     turns: list = []
     last_emoji = False
+    # Mirrors telegram_worker_lambda._last_reply_had_em_dash: the #2535 ceiling
+    # alternates ACROSS replies, so a harness that never passes this exercises only
+    # the per-reply cap and would report the alternation as having no effect.
+    last_em_dash = False
 
     for i in range(scenario["turns"]):
         inbound = simulate_matthew(scenario, thread, ledger, i)
@@ -344,6 +348,7 @@ def run_conversation(scenario: dict, assembled: dict, ledger: Ledger, *, verbose
             tier=None,  # the live tier is checked by the caller; a sim must not self-pause
             turns_today=0,
             last_reply_had_emoji=last_emoji,
+            last_reply_had_em_dash=last_em_dash,
             colleagues_block=assembled["colleagues"],
         )
         elapsed = time.time() - t0
@@ -351,6 +356,7 @@ def run_conversation(scenario: dict, assembled: dict, ledger: Ledger, *, verbose
         thread.append({"role": coach_chat.ROLE_MATTHEW, "text": inbound})
         thread.append({"role": coach_chat.ROLE_COACH, "text": result.text})
         last_emoji = coach_chat.has_emoji(result.text)
+        last_em_dash = coach_style_gate.has_em_dash(result.text)
 
         turns.append(
             {

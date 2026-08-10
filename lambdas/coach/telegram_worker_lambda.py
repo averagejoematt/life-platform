@@ -287,6 +287,23 @@ def _last_reply_had_emoji(thread: list) -> bool:
     return False
 
 
+def _last_reply_had_em_dash(thread: list) -> bool:
+    """Whether the coach's most recent stored reply used an em-dash (#2535).
+
+    The alternation half of the style ceiling, and the reason it is read from the
+    STORED thread rather than tracked in memory: 63% of replies carry exactly one
+    em-dash, so a per-reply cap alone cannot move the rate — the ceiling has to know
+    what the previous reply did. Same shape and same source as
+    ``_last_reply_had_emoji``.
+    """
+    from coach import coach_style_gate
+
+    for t in reversed(thread or []):
+        if t.get("role") == coach_chat.ROLE_COACH:
+            return coach_style_gate.has_em_dash(t.get("text") or "")
+    return False
+
+
 def _memory_block(coach_id: str) -> str:
     """What this coach knows about Matthew — relationship state + recent memory rows.
 
@@ -583,6 +600,7 @@ def _unsolicited_turn(a: dict, frame: str, tier: Optional[int], *extra_sources: 
         tier=tier,
         turns_today=_turns_today(a["thread"]),
         last_reply_had_emoji=_last_reply_had_emoji(a["thread"]),
+        last_reply_had_em_dash=_last_reply_had_em_dash(a["thread"]),
         colleagues_block=a["colleagues"],
     )
 
@@ -920,6 +938,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         tier=_current_tier(),
         turns_today=_turns_today(thread),
         last_reply_had_emoji=_last_reply_had_emoji(thread),
+        last_reply_had_em_dash=_last_reply_had_em_dash(thread),
         colleagues_block=a["colleagues"],
     )
 

@@ -52,6 +52,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
+from coach import coach_style_gate
+
 logger = logging.getLogger(__name__)
 
 # ── Storage: the SAME partition family the dossier and narratives already read ──
@@ -493,6 +495,7 @@ def run_turn(
     last_reply_had_emoji: bool = False,
     colleagues_block: str = "",
     persona_id: Optional[str] = None,
+    last_reply_had_em_dash: bool = False,
 ) -> TurnResult:
     """One conversational turn: budget -> generate -> ground -> regenerate-or-hold.
 
@@ -543,6 +546,13 @@ def run_turn(
         # gate, so the gate adjudicates exactly the text that will be sent — a
         # formatter must never touch a reply after it has been gated.
         bubbles = enforce_emoji_policy(split_bubbles(text), last_reply_had_emoji=last_reply_had_emoji)
+        # The style ceiling (#2535) rides in the SAME pre-gate window and for the same
+        # reason. Both habits it removes were already banned in the prompt and both
+        # survived it — 23 "Honest answer" in 536 replies, an em-dash in 77% of them
+        # with no separation between the coach whose spec permits the character and
+        # the coach whose spec forbids it. Punctuation-only: no number, date or word
+        # is altered, so nothing here can create a grounding finding downstream.
+        bubbles = coach_style_gate.enforce_style(bubbles, last_reply_had_em_dash=last_reply_had_em_dash)
         final_text = "\n\n".join(bubbles)
         findings = grounder(final_text) or []
         if not findings:
