@@ -84,7 +84,13 @@ The label history separates the passes cleanly: **17:57:40–17:57:53Z** set the
 - **Owner ②** — BotFather trio + Max rename. `not-work — BotFather is owner-only by standing rule; no issue can move it`. Every outbound feature merged tonight (open loops, pre-event support, reactions, referrals) stays dark for unregistered seats until this happens.
 - **Owner ③** — `CONTENT_FILTER_JSON` repo secret. `not-work — an owner-held credential; the ER-06 vocabulary lives off-repo by design (#2370's closure comment tracks the consequence)`.
 - **Owner ④** — `deploy/deploy_coach_intelligence.sh` to sync voice specs to S3 (config is read **S3-first**; `config_twin_sync.py` does not cover it). Needed for #2485's `reaction_emoji` and for the other session's #2553 identity stance. → **#2485** / **#2533**
-- **Concurrent session** — CI/CD run **31424244374** (`452df8a2`, their #2540+#2553) was at the production gate at wrap. Messaged them twice; it is theirs to approve or reject. `not-work — another session's merge, and I do not approve production deploys of code I have not reviewed`.
+- **Concurrent session — ACTION MAY BE NEEDED, and they may never have been told.** CI/CD run **31424244374** (`452df8a2`, their #2540+#2553) was `waiting` at the production gate at wrap. I sent three cross-session messages: the first (merge-order go-ahead) was delivered, **the second — the one warning them the run was gated — expired unapproved and was never delivered**, and a third resend went out at wrap with unknown delivery. So the other session may be wrapping with no idea its run is parked.
+
+  Two consequences if nobody actions it: it becomes the #1901 stranded class at 2h, and while it waits it holds the `ci-cd-deploy-main` concurrency group, so **every later deploy queues behind it** — exactly what cost my own fleet run 25 minutes tonight. `python3 scripts/check_deploy_wedge.py` names the holder.
+
+  I did not approve or reject it myself: #2553 changes `persona_core.py` and 8 voice specs, and approving a production deploy of another session's unreviewed code is not mine to do. Rejecting is the clean exit if it should not ship tonight (`bash deploy/reject_deployment.sh 31424244374 "<why>"`). `not-work — another session's merge; owner or that session decides`.
+
+  Also worth passing on if they resurface: their stated plan treats #2553 as needing no CI deploy because voice specs are read S3-first. That is half right — `deploy_coach_intelligence.sh` covers the config half, but the `persona_core.py` label-tuple entry ships in the Lambda bundle (#781) and needs a fleet deploy too. Both halves, or the identity stance is live in neither place.
 - **Not filed, recorded in-repo** — `emails/chronicle_personas.py` still sits in `UNGATED_READER_KNOWN` citing #2430 though it was outside that issue's named four; its census entry is annotated to say it needs its own issue rather than inheriting a closed one.
 
 ---
