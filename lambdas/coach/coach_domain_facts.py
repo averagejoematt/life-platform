@@ -21,6 +21,14 @@ The honesty contract, in order of importance:
   its own domain numbers is never flagged as fabricating them — while the night
   map stays canonical-facts-only (#2343's day-correspondence class unweakened).
 
+Cycle-13 addition — **experiment awareness** (Act 1a). Every texting coach also
+gets an EXPERIMENT FRAME: what day of which cycle it is, and — for the coaches
+that actually make forecasts — their OWN still-open preregistered calls. The
+head coach additionally gets the week's one priority from his team's integrator.
+The same honesty contract applies: pre-genesis renders a countdown, never a fake
+Day 1; the prereg rows are READ-ONLY here; a tombstoned integrator record from a
+wiped cycle contributes nothing (``singleton_visible``, #946/#1969).
+
 Fail-soft everywhere: any storage/import surprise returns "" and the chat runs
 on canonical facts alone, exactly as it did before this module existed.
 """
@@ -180,27 +188,190 @@ def _physical_pack(table, today: str) -> list:
     return lines
 
 
+# ── The experiment frame: what day of which cycle this is ────────────────────
+
+
+def _week_number(day: int) -> int:
+    """The experiment week for a 1-indexed Day-N.
+
+    This mirrors ``ai_expert_analyzer_lambda`` VERBATIM (``max(1, days_in // 7 + 1)``,
+    the expression that stamps ``week_number`` on the EXPERT#integrator record). It is
+    deliberately NOT the Monday-anchored week the field-notes surface computes — the two
+    disagree at week boundaries, and a coach who may cite the integrator's row has to
+    name the same week that row names. Day 1–6 → week 1, Day 7–13 → week 2.
+    """
+    return max(1, day // 7 + 1)
+
+
+def _current_cycle() -> Optional[int]:
+    """The living cycle number, from the explicit CYCLE_GENESES ledger.
+
+    Imported late so tests can patch it (the ``site_api_diary``/``site_api_fingerprint``
+    idiom), and fail-soft: an unreadable ledger costs the cycle number, not the day.
+    """
+    try:
+        from web.site_api_data import CYCLE_GENESES
+
+        return max(CYCLE_GENESES) if CYCLE_GENESES else None
+    except Exception as e:  # pragma: no cover — bundle edge
+        logger.warning("[domain_facts] cycle ledger unavailable: %s", e)
+        return None
+
+
+def _experiment_frame_lines(today_iso: str) -> list:
+    """ "Day N of cycle C (week W)" — or, before genesis, an honest countdown.
+
+    ``day_n`` returns 0 for a pre-genesis date, and cycle 13's genesis was itself set
+    in the future (#931/#939). Rendering "Day 1" during that window would be the exact
+    fabrication class this platform exists to avoid, so the pre-start branch names the
+    start date instead and claims no day at all.
+    """
+    from common.constants import EXPERIMENT_START_DATE, day_n
+
+    day = day_n(today_iso)
+    cycle = _current_cycle()
+    subject = f"cycle {cycle}" if cycle is not None else "the current cycle"
+    if day <= 0:
+        return [f"Experiment: {subject} starts {EXPERIMENT_START_DATE} — pre-genesis, there is no Day 1 yet."]
+    cycle_txt = f" of cycle {cycle}" if cycle is not None else ""
+    return [f"Experiment: Day {day}{cycle_txt} (week {_week_number(day)})."]
+
+
+# ── The coach's own open preregistered calls ─────────────────────────────────
+
+MAX_OWN_PREDICTIONS = 3
+_OPEN_PREDICTION_STATUSES = ("pending", "confirming")
+_MAX_PREDICTION_PAGES = 5  # a chat turn is latency-bound; the partition is small
+
+
+def _own_predictions_lines(coach_id: str, table) -> list:
+    """The coach's still-open PREDICTION# claims — at most three, newest first.
+
+    Read-only: this surface never writes a prediction, never grades one, and never
+    touches the frozen genesis prereg artifact. ``with_phase_filter`` is mandatory
+    (ADR-058) — without it a reset's pilot-tagged calls keep being quoted as live.
+    """
+    from experiment.phase_filter import with_phase_filter
+
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+        "ExpressionAttributeValues": {":pk": f"COACH#{coach_id}", ":prefix": "PREDICTION#"},
+    }
+    items: list = []
+    for _page in range(_MAX_PREDICTION_PAGES):
+        resp = table.query(**with_phase_filter(kwargs))
+        items.extend(resp.get("Items") or [])
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+    open_calls = [
+        i
+        for i in items
+        if str(i.get("status") or "").strip().lower() in _OPEN_PREDICTION_STATUSES and str(i.get("claim_natural") or "").strip()
+    ]
+    open_calls.sort(key=lambda i: (str(i.get("created_date") or ""), str(i.get("sk") or "")), reverse=True)
+
+    lines = []
+    for rec in open_calls[:MAX_OWN_PREDICTIONS]:
+        claim = " ".join(str(rec.get("claim_natural")).split())
+        conf = _num(rec.get("confidence"))
+        made = str(rec.get("created_date") or "").strip()
+        detail = ", ".join(p for p in ((f"confidence {conf:g}" if conf is not None else ""), (f"made {made}" if made else "")) if p)
+        lines.append(f'Your open call: "{claim}"' + (f" ({detail})." if detail else "."))
+    return lines
+
+
+# ── The head coach's week: the integrator's one priority ─────────────────────
+
+
+MAX_PRIORITY_CHARS = 600
+
+
+def _weekly_priority_lines(table) -> list:
+    """The integrator's current cross-coach read — the head coach's week in one line.
+
+    Guarded with ``singleton_visible``: the intelligence wipe tombstones every
+    ai_analysis record in place, and a get_item bypasses the query-level phase filter,
+    so an unguarded read narrates the WIPED cycle as this week's priority (#946/#1969).
+    """
+    from experiment.phase_filter import singleton_visible
+
+    item = table.get_item(Key={"pk": _USER_PK.format(source="ai_analysis"), "sk": "EXPERT#integrator"}).get("Item")
+    if not singleton_visible(item):
+        return []
+    analysis = " ".join(str(item.get("analysis") or "").split())
+    if not analysis:
+        return []
+    if len(analysis) > MAX_PRIORITY_CHARS:
+        analysis = analysis[:MAX_PRIORITY_CHARS].rstrip() + "…"
+    week = _num(item.get("week_number"))
+    label = "your team's integrator" + (f", week {int(week)}" if week else "")
+    return [f"This week's one priority ({label}): {analysis}"]
+
+
+def _lead_pack(table, today: str) -> list:  # noqa: ARG001 — pack signature
+    """Eli Marsh (Principal Investigator): the week's one priority, nothing else."""
+    return _weekly_priority_lines(table)
+
+
 _PACKS = {
     "nutrition": _nutrition_pack,
     "sleep": _sleep_pack,
     "physical": _physical_pack,
     "training": _physical_pack,  # merged Performance seat serves both routes
+    "eli_marsh": _lead_pack,  # chat-tier lead — pack key == persona id (no _coach suffix)
 }
 
 
-def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str:
-    """The coach's domain extension block, or "" (fail-soft, absence-honest)."""
-    key = (coach_id or "").strip().lower()
-    key = key[: -len("_coach")] if key.endswith("_coach") else key
-    pack = _PACKS.get(key)
-    if pack is None:
-        return ""
-    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+def _persona_id(coach_id: str) -> tuple:
+    """(pack key, canonical persona id) for a route id, a short id, or a persona id."""
+    raw = (coach_id or "").strip().lower()
+    key = raw[: -len("_coach")] if raw.endswith("_coach") else raw
     try:
-        lines = pack(table, today)
+        from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+        operational = list(OPERATIONAL_COACH_IDS)
+    except Exception as e:  # pragma: no cover — bundle edge
+        logger.warning("[domain_facts] persona registry unavailable: %s", e)
+        operational = []
+    return key, (f"{key}_coach" if f"{key}_coach" in operational else raw)
+
+
+def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str:
+    """The coach's experiment frame + domain extension, or "" (fail-soft, absence-honest).
+
+    ``today`` must be the PACIFIC date — every other surface on this platform names the
+    Pacific day, and a UTC date would put the coach a day ahead of the site after 5pm PT.
+    """
+    key, persona = _persona_id(coach_id)
+    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    frame: list = []
+    try:
+        frame += _experiment_frame_lines(today)
     except Exception as e:
-        logger.warning("[domain_facts] %s pack failed (chat runs on canonical facts): %s", key, e)
-        return ""
-    if not lines:
-        return ""
-    return "YOUR DOMAIN FACTS (yours specifically, same sources as the site):\n" + "\n".join(f"- {ln}" for ln in lines)
+        logger.warning("[domain_facts] experiment frame failed: %s", e)
+    try:
+        from coach.persona_registry import OPERATIONAL_COACH_IDS
+
+        if persona in OPERATIONAL_COACH_IDS:
+            frame += _own_predictions_lines(persona, table)
+    except Exception as e:
+        logger.warning("[domain_facts] own predictions unavailable for %s: %s", persona, e)
+
+    lines: list = []
+    pack = _PACKS.get(key)
+    if pack is not None:
+        try:
+            lines = pack(table, today)
+        except Exception as e:
+            logger.warning("[domain_facts] %s pack failed (chat runs on canonical facts): %s", key, e)
+            lines = []
+
+    sections = []
+    if frame:
+        sections.append("EXPERIMENT FRAME:\n" + "\n".join(f"- {ln}" for ln in frame))
+    if lines:
+        sections.append("YOUR DOMAIN FACTS (yours specifically, same sources as the site):\n" + "\n".join(f"- {ln}" for ln in lines))
+    return "\n\n".join(sections)

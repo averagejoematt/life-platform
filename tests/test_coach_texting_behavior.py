@@ -473,10 +473,15 @@ def test_physical_pack_serves_recovery_and_last_lift():
     assert "Last logged lift: 2026-08-08 (Push Day)" in block
 
 
-def test_unpacked_coach_gets_no_domain_block():
+def test_unpacked_coach_gets_no_domain_facts_section():
+    """A coach with no domain pack contributes no DOMAIN FACTS — but since the
+    cycle-13 experiment-awareness slice every texting coach still gets the frame
+    (see tests/test_coach_experiment_awareness.py)."""
     from coach import coach_domain_facts as cdf
 
-    assert cdf.domain_facts_block("mind_coach", _RangeTable([]), today="2026-08-09") == ""
+    block = cdf.domain_facts_block("mind_coach", _RangeTable([]), today="2026-08-09")
+    assert "YOUR DOMAIN FACTS" not in block
+    assert "EXPERIMENT FRAME:" in block
 
 
 def test_pack_failure_is_soft():
@@ -489,7 +494,11 @@ def test_pack_failure_is_soft():
         def get_item(self, **kw):
             raise RuntimeError("ddb down")
 
-    assert cdf.domain_facts_block("nutrition", _Boom(), today="2026-08-09") == ""
+    # Storage down costs the DDB-backed sections, never the whole block: the
+    # experiment frame is computed from constants and still renders.
+    block = cdf.domain_facts_block("nutrition", _Boom(), today="2026-08-09")
+    assert "YOUR DOMAIN FACTS" not in block
+    assert "Your open call" not in block
 
 
 # ── B9: chat-tier routing (v2 roster) ────────────────────────────────────────

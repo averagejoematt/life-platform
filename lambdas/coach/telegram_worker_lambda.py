@@ -416,11 +416,23 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     # domain numbers is never flagged as fabrication. The night map stays
     # canonical-facts-only (#2343): the pack widens vocabulary, never vitals.
     moment = _current_moment_line()
+    # PACIFIC, not UTC. Three things have to name the SAME day or the coach argues
+    # with its own gate: the domain pack's date windows, the experiment frame's
+    # Day-N, and the grounder's deterministic Day-N adjudication. Between 5pm PT
+    # and midnight the UTC date is already tomorrow, which is precisely when
+    # Matthew texts. None falls both callees back to their prior UTC default.
+    today_pt = None
+    try:
+        from common.pacific_time import pacific_now
+
+        today_pt = pacific_now().strftime("%Y-%m-%d")
+    except Exception as e:  # pragma: no cover — import edge
+        logger.warning("[telegram] pacific date unavailable: %s", e)
     domain = ""
     try:
         from coach.coach_domain_facts import domain_facts_block
 
-        domain = domain_facts_block(persona_id, _table())
+        domain = domain_facts_block(persona_id, _table(), today_pt)
     except Exception as e:
         logger.warning("[telegram] domain facts unavailable: %s", e)
     facts_block = build_facts_block(facts)
@@ -442,7 +454,11 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         # All five gate classes armed; the memory block and thread text widen the
         # NUMBER vocabulary (quoting memory is not fabrication) while the night map
         # stays facts-only — #2343's class is checked even on remembered figures.
-        grounder=build_grounder(facts, extra_sources=(memory, moment, domain, " ".join(t.get("text") or "" for t in thread))),
+        grounder=build_grounder(
+            facts,
+            generation_date_iso=today_pt,
+            extra_sources=(memory, moment, domain, " ".join(t.get("text") or "" for t in thread)),
+        ),
         tier=_current_tier(),
         turns_today=_turns_today(thread),
         last_reply_had_emoji=_last_reply_had_emoji(thread),
