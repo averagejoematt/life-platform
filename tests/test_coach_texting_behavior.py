@@ -876,7 +876,11 @@ def test_a_chat_tier_coach_reads_no_dispute_partition_at_all():
     table = _RecordingTable([_thread()])
     block = cdf.domain_facts_block("eli_marsh", table, today="2026-08-12")
     assert ctt.TEAM_ROOM_EMPTY_HEADING in block
-    assert not table.query_kwargs
+    # Scoped to the DISPUTE partition, which is the property under test. #2493 added a
+    # weather read that every texting coach makes, so "no queries at all" would now
+    # assert something this test never meant.
+    dispute_reads = [kw for kw in table.query_kwargs if "ENSEMBLE" in str(kw.get("ExpressionAttributeValues", {}).get(":prefix", ""))]
+    assert not dispute_reads, table.query_kwargs
 
 
 def test_the_dispute_read_goes_through_the_phase_filter(monkeypatch):
@@ -1039,3 +1043,75 @@ def test_the_inbound_message_reaches_the_grounder_on_the_path_that_carries_his_w
             )
 
     assert checked == 1, f"expected exactly one inbound=text run_turn call site, found {checked}"
+
+
+# ── B12: weather texture, grounder-safe (#2493) ──────────────────────────────
+#
+# The coach package contained the word "weather" zero times before this: a coach
+# could not say "nice break in the rain" without inventing it, so it either didn't
+# say it or said something ungrounded. The row exists and is fresh; this makes it a
+# SOURCE. Day-of-week texture is deliberately NOT here — `_current_moment_line()`
+# has shipped it since the humanity pass.
+
+_WEATHER_FIELDS = dict(
+    condition="Overcast",
+    temp_high_f=68.4,
+    temp_low_f=55.1,
+    precipitation_mm=0,
+    humidity_pct=71.2,
+    wind_speed_max_mph=9.4,
+    aqi=32,
+    sunrise_local="05:57",
+    sunset_local="20:38",
+    daylight_hours=14.68,
+)
+
+
+def test_weather_renders_from_the_row_for_every_texting_coach():
+    """Weather is texture, not one seat's domain fact — the sleep coach cares about
+    sunrise and the performance coach about heat, so it renders next to the
+    experiment frame rather than inside a pack."""
+    from coach import coach_domain_facts as cdf
+
+    table = _RangeTable([_ddb_row("weather", "2026-08-09", **_WEATHER_FIELDS)])
+    for coach in ("nutrition", "sleep_coach", "physical", "mind_coach", "eli_marsh"):
+        block = cdf.domain_facts_block(coach, table, today="2026-08-09")
+        assert "TODAY'S CONDITIONS" in block, coach
+        assert "Overcast" in block and "high 68F" in block and "low 55F" in block, coach
+        assert "humidity 71%" in block and "wind up to 9 mph" in block and "AQI 32" in block, coach
+        assert "no measurable precipitation" in block, coach  # a measured zero is a measurement
+        assert "Sunrise 05:57, sunset 20:38" in block and "14.7 h of daylight" in block, coach
+
+
+def test_weather_absence_renders_nothing_at_all():
+    """ADR-104: no row for the day means the coach has no weather in its vocabulary
+    — never a seasonal default, and never an 'absent' heading it could text about."""
+    from coach import coach_domain_facts as cdf
+
+    block = cdf.domain_facts_block("sleep_coach", _RangeTable([]), today="2026-08-09")
+    assert "TODAY'S CONDITIONS" not in block and "Weather" not in block
+    assert "EXPERIMENT FRAME:" in block  # the rest of the block is unaffected
+
+
+def test_yesterdays_weather_is_never_relabelled_as_todays():
+    """The window is the single named day, matched on its exact DATE# key. A stale
+    row is absence, not today's sky — the #2343 day-correspondence class applied to
+    a source the night map does not cover."""
+    from coach import coach_domain_facts as cdf
+
+    table = _RangeTable([_ddb_row("weather", "2026-08-08", **_WEATHER_FIELDS)])
+    assert "TODAY'S CONDITIONS" not in cdf.domain_facts_block("sleep_coach", table, today="2026-08-09")
+
+
+def test_weather_storage_failure_costs_the_section_not_the_block():
+    from coach import coach_domain_facts as cdf
+
+    class _BoomOnWeather(_RangeTable):
+        def query(self, **kw):
+            if "SOURCE#weather" in kw.get("ExpressionAttributeValues", {}).get(":pk", ""):
+                raise RuntimeError("ddb down")
+            return super().query(**kw)
+
+    block = cdf.domain_facts_block("sleep_coach", _BoomOnWeather([]), today="2026-08-09")
+    assert "TODAY'S CONDITIONS" not in block
+    assert "EXPERIMENT FRAME:" in block
