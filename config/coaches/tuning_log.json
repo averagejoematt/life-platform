@@ -194,6 +194,15 @@
       "rationale": "Summaries read back into the prompt as the coach's memory; minutes-voice memories leak clinical register into replies, and the 08-09 sleep summary memorialized the coach's own identity error as if Matthew were confused.",
       "ref": "coaching brilliance session 2026-08-10 (Act 1c)",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Time-gap awareness: a 'TIME GAP' memory line (with inline instruction) is folded into read_recent_summaries() when the real CHAT# history shows >= QUIET_GAP_DAYS=7 days since the last real turn, so a coach can acknowledge a quiet stretch naturally instead of picking the thread back up as if no time passed. Never fires on an empty partition or within an active thread.",
+      "rationale": "Coach Humanity Roadmap idea 19 (#2489): after a quiet week the coach showed no awareness time had passed. The instruction rides with the fact rather than in coach_chat.py's CONVERSATION RULES block because that block is under active concurrent edit and heavy existing test coverage (#2481) this change must not disturb.",
+      "ref": "#2489, epic #2363",
+      "observed_effect": null
     }
   ]
 }

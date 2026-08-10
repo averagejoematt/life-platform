@@ -451,3 +451,26 @@ def test_the_rules_welcome_off_lane_conversation():
     """He should be able to text a coach about anything — a person first."""
     s = cc.build_system_prompt("V", "M", "F", "Dr. Lisa Park")
     assert "engage with it as yourself first" in s
+
+
+# ── Time-gap awareness (#2489) — the memory-block seam this module owns ───────
+
+
+def test_a_time_gap_line_in_memory_block_reaches_the_system_prompt_verbatim():
+    """The gap line itself is assembled in coach_chat_summary.time_gap_line and
+    folded into the memory_block string upstream (see that module's docstring
+    for why); this module's only obligation is to carry whatever memory_block
+    contains into the volatile tail untouched, same as any other memory
+    content. Pinned here so a future change to the tail assembly can't silently
+    drop or mangle it."""
+    from coach import coach_chat_summary as ccs
+
+    gap_line = (
+        "TIME GAP: it has been 9 days since your last conversation with Matthew (you last texted on "
+        "2026-08-01). That is a real quiet stretch, not an ongoing thread — acknowledge it naturally and briefly, "
+        "the way a person notices time passed with someone they know ('hey, been a minute'), then move on to what "
+        "he actually said. Never mention this, or any gap, when the thread has been active."
+    )
+    s = cc.build_system_prompt("V", gap_line, "F", "Dr. Lisa Park")
+    assert gap_line in s
+    assert ccs.QUIET_GAP_DAYS == 7  # the threshold this line's wording assumes
