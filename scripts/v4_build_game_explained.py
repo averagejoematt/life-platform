@@ -40,6 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from coach import persona_registry  # noqa: E402  — canonical public roster (#1891)
 from health import character_engine as ce  # noqa: E402
 from privacy import privacy_guard  # noqa: E402  — real-public-figure gate (#1891)
+from privacy.content_filter_channel import ContentFilterUnavailable  # noqa: E402  — #2370 hold-not-crash
 from v4_chrome import (
     doors_nav,
     head_chrome,
@@ -577,7 +578,18 @@ def main() -> int:
         )
     config = load_config()
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUT_PATH.write_text(render(config), encoding="utf-8")
+    try:
+        page = render(config)
+    except ContentFilterUnavailable as e:
+        # #2370 fail-closed, correctly scoped: no vocabulary means this PUBLIC page
+        # cannot be screened, so it must not REGENERATE — but the committed artifact
+        # was screened when it was written, so keeping it is safe. Crashing here took
+        # down the whole reconcile lane (2026-08-10, three red main runs) over a
+        # missing CI secret; holding the regen is the fail-closed posture without the
+        # collateral.
+        print(f"HOLD: {CANONICAL} not regenerated — {e}", file=sys.stderr)
+        return 0
+    OUT_PATH.write_text(page, encoding="utf-8")
     pillars = len(config.get("pillars", {}))
     print(f"{CANONICAL}: {pillars} pillars · engine v{ce.ENGINE_VERSION} · config v{config.get('_meta', {}).get('version', '?')}")
     return 0
