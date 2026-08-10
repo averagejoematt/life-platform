@@ -166,9 +166,13 @@ def test_the_prediction_read_goes_through_the_phase_filter(monkeypatch):
 
     assert seen, "with_phase_filter was never called on the PREDICTION# read"
     assert seen[0]["ExpressionAttributeValues"][":pk"] == "COACH#sleep_coach"
-    # and the wrapper's filter actually reached the query boto3 saw
-    assert "FilterExpression" in table.query_kwargs[0]
-    assert table.query_kwargs[0]["ExpressionAttributeValues"][":phase_experiment"] == "experiment"
+    # and the wrapper's filter actually reached the query boto3 saw. Selected by
+    # PARTITION, not by call order: #2493 added a weather read every texting coach
+    # makes, and an index-0 assertion would pin the order of unrelated reads.
+    coach_reads = [kw for kw in table.query_kwargs if str(kw["ExpressionAttributeValues"].get(":pk", "")).startswith("COACH#")]
+    assert coach_reads, "the PREDICTION# read never reached boto3"
+    assert "FilterExpression" in coach_reads[0]
+    assert coach_reads[0]["ExpressionAttributeValues"][":phase_experiment"] == "experiment"
 
 
 def test_a_route_id_resolves_to_the_canonical_prediction_partition():
@@ -183,7 +187,8 @@ def test_a_chat_tier_coach_makes_no_forecasts_so_none_are_read():
     table = _Table([_prediction()])
     block = cdf.domain_facts_block("eli_marsh", table, today="2026-08-12")
     assert "Your open call" not in block
-    assert not table.query_kwargs, "no PREDICTION# partition exists for a chat-tier coach"
+    coach_reads = [kw for kw in table.query_kwargs if str(kw["ExpressionAttributeValues"].get(":pk", "")).startswith("COACH#")]
+    assert not coach_reads, "no PREDICTION# partition exists for a chat-tier coach"
 
 
 # ── E3: the head coach's week ────────────────────────────────────────────────

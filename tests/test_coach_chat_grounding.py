@@ -329,3 +329,70 @@ def test_widening_on_the_inbound_does_not_disarm_the_night_class():
     gr = grounder(extra_sources=(inbound,))
     findings = gr("Your recovery on 2026-08-07 was 31%.")
     assert findings, "31 is sayable because he said it — but not as 2026-08-07's stored 55%"
+
+
+# ── Weather is texture the gate has to know about too (#2493) ─────────────────
+#
+# Same shape as the inbound-message class above, one layer earlier: the platform
+# HAS a Seattle weather row for today, the coach may now be shown it, and a gate
+# that never saw it would read a true, sourced "68F and overcast" as fabrication
+# (#2517). The fix is not an exemption — it is making the row a source. Which means
+# the complement has to hold: a temperature that is NOT on the row must still fail.
+
+_WEATHER_ROW = {
+    "pk": "USER#matthew#SOURCE#weather",
+    "sk": "DATE#2026-08-08",
+    "condition": "Overcast",
+    "temp_high_f": 68.4,
+    "temp_low_f": 55.1,
+    "precipitation_mm": 0,
+    "humidity_pct": 71.2,
+    "wind_speed_max_mph": 9.4,
+    "aqi": 32,
+    "sunrise_local": "05:57",
+    "sunset_local": "20:38",
+    "daylight_hours": 14.68,
+}
+
+
+class _WeatherTable:
+    """The one query the weather section makes; everything else is empty."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def query(self, **kw):
+        vals = kw.get("ExpressionAttributeValues", {})
+        lo, hi = vals.get(":lo", ""), vals.get(":hi", "")
+        return {"Items": [r for r in self.rows if r.get("pk") == vals.get(":pk") and lo <= str(r.get("sk", "")) <= hi]}
+
+    def get_item(self, **kw):
+        return {}
+
+
+def _weather_block(rows):
+    from coach import coach_domain_facts as cdf
+
+    return cdf._weather_section(cdf._weather_lines(_WeatherTable(rows), "2026-08-08"))
+
+
+def test_a_weather_figure_from_the_row_is_not_a_fabrication():
+    """The rendered conditions block is a source, exactly like the memory block:
+    the coach may say what the weather record says."""
+    block = _weather_block([_WEATHER_ROW])
+    assert "68F" in block, "the block must actually carry the figure under test"
+    gr = grounder(extra_sources=(block,))
+    assert gr("Overcast and 68F today — good weather to walk in.") == []
+
+
+def test_an_unsourced_weather_figure_still_fails_the_gate():
+    """The complement, and the whole reason #2493 is a grounding change rather than
+    a prompt tweak. Two ways to be unsourced, both must still be caught: a figure
+    that is not on the row, and a day with no row at all."""
+    gr = grounder(extra_sources=(_weather_block([_WEATHER_ROW]),))
+    assert gr("It's 91F out there today."), "91 is on no row — an invented temperature must still fail"
+
+    assert _weather_block([]) == "", "no row for the day ⇒ no weather section at all (ADR-104)"
+    assert grounder(extra_sources=(_weather_block([]),))(
+        "Overcast and 68F today — good weather to walk in."
+    ), "with no weather row, the same sentence is unsupported and must fail"

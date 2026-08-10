@@ -246,6 +246,90 @@ def _experiment_frame_lines(today_iso: str) -> list:
     return [f"Experiment: Day {day}{cycle_txt} (week {_week_number(day)})."]
 
 
+# ── Today's conditions: the sky he is actually standing under ────────────────
+
+WEATHER_SOURCE = "weather"
+
+
+def _weather_lines(table, today: str) -> list:
+    """Seattle's measured conditions for ``today`` — or nothing at all (#2493).
+
+    Why this is a grounding change more than a texture change: a coach that says
+    "nice break in the rain today" is either quoting a record or inventing one, and
+    until now the coach package contained the word "weather" zero times, so there was
+    no record to quote. Every figure below is read off the ``SOURCE#weather``
+    ``DATE#`` row and rendered into the block the worker already feeds to
+    ``build_grounder``'s ``extra_sources`` — which is what keeps a TRUE, sourced
+    weather sentence from tripping the gate (#2517's exact failure mode: evidence the
+    model has but the gate does not, read as fabrication).
+
+    It is emphatically NOT a grounding bypass. Only the numbers ON the row enter the
+    allow-list, so an invented temperature still fails ``fabricated_number``, and the
+    night map stays canonical-facts-only (#2343) — this widens vocabulary, never
+    vitals.
+
+    Absence is absence (ADR-104): no row for ``today`` ⇒ no weather line at all. Never
+    a seasonal default, never a guess, and never yesterday's sky relabelled as today's
+    — which is why the window is the single day and the row is matched on its exact
+    ``DATE#`` key rather than "the latest one we have".
+    """
+    rows = [i for i in _query_source(table, WEATHER_SOURCE, today, today) if str(i.get("sk", "")) == f"DATE#{today}"]
+    row = rows[0] if rows else {}
+    if not row:
+        return []
+
+    condition = " ".join(str(row.get("condition") or "").split())
+    hi, lo = _num(row.get("temp_high_f")), _num(row.get("temp_low_f"))
+    head: list = []
+    if condition:
+        head.append(condition)
+    if hi is not None:
+        head.append(f"high {round(hi)}F" + (f", low {round(lo)}F" if lo is not None else ""))
+    elif lo is not None:
+        head.append(f"low {round(lo)}F")
+    if not head:
+        return []
+    lines = [f"Weather in Seattle today ({today}): " + ", ".join(head) + "."]
+
+    detail: list = []
+    precip = _num(row.get("precipitation_mm"))
+    if precip is not None:
+        # "0 mm" is a measurement, not an absence — say the measured zero.
+        detail.append("no measurable precipitation" if precip == 0 else f"{round(precip, 1)} mm precipitation")
+    humidity = _num(row.get("humidity_pct"))
+    if humidity is not None:
+        detail.append(f"humidity {round(humidity)}%")
+    wind = _num(row.get("wind_speed_max_mph"))
+    if wind is not None:
+        detail.append(f"wind up to {round(wind)} mph")
+    aqi = _num(row.get("aqi"))
+    if aqi is not None:
+        detail.append(f"AQI {round(aqi)}")
+    if detail:
+        lines.append("Also measured: " + ", ".join(detail) + ".")
+
+    sunrise, sunset = str(row.get("sunrise_local") or "").strip(), str(row.get("sunset_local") or "").strip()
+    daylight = _num(row.get("daylight_hours"))
+    if sunrise and sunset:
+        lines.append(f"Sunrise {sunrise}, sunset {sunset}" + (f" — {round(daylight, 1)} h of daylight." if daylight else "."))
+    return lines
+
+
+WEATHER_SECTION_HEADING = "TODAY'S CONDITIONS (Seattle, measured — these figures only, and only when they bear on what he asked)"
+
+
+def _weather_section(lines: list) -> str:
+    """The rendered conditions section, or "" when there is no row.
+
+    Unlike the team room (#2496), absence here renders NOTHING rather than an
+    "absent" heading. A heading is evidence, and a coach told "no weather record
+    today" has been handed a fact about the pipeline it has no reason to text about;
+    a coach told nothing simply has no weather in its vocabulary, which is the
+    ADR-104 outcome this issue asks for.
+    """
+    return (WEATHER_SECTION_HEADING + ":\n" + "\n".join(f"- {ln}" for ln in lines)) if lines else ""
+
+
 # ── The coach's own open preregistered calls ─────────────────────────────────
 
 MAX_OWN_PREDICTIONS = 3
@@ -370,6 +454,16 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     except Exception as e:
         logger.warning("[domain_facts] experiment frame failed: %s", e)
 
+    # Weather is EVERY coach's texture, not one seat's domain fact (#2493) — the
+    # sleep coach cares about a 5:57 sunrise, the performance coach about heat on a
+    # long run — so it renders alongside the frame rather than inside a pack. Storage
+    # trouble costs the section, never the block.
+    weather: list = []
+    try:
+        weather = _weather_lines(table, today)
+    except Exception as e:
+        logger.warning("[domain_facts] weather unavailable (chat runs without it): %s", e)
+
     # The forecasting seats only. A chat-tier coach makes no preregistered calls and
     # is not a party to an inter-coach thread, so reading either partition for one
     # could only ever return nothing — and the absence sections below already tell
@@ -409,6 +503,9 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     sections = []
     if frame:
         sections.append("EXPERIMENT FRAME:\n" + "\n".join(f"- {ln}" for ln in frame))
+    conditions = _weather_section(weather)
+    if conditions:
+        sections.append(conditions)
     track_section = coach_team_texture.track_record_section(track_lines)
     if track_section:
         sections.append(track_section)

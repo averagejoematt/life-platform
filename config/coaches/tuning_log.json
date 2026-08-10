@@ -230,6 +230,15 @@
       "rationale": "'We talked about you Tuesday' carries no number and no calendar date, so it passed all five previously-armed grounding classes — an invented meeting was sayable. Owning a miss plainly is the humanising move; inconclusive/expired calls are terminal but are NOT outcomes, so they are counted separately rather than folded into hit-or-miss, which would be ADR-104 fabrication aimed at the coach's own record.",
       "ref": "#2496 (epic #2363); PR #2524",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Weather texture, grounder-safe (#2493): every texting coach's fact block now carries a TODAY'S CONDITIONS section read off the SOURCE#weather DATE# row for the Pacific day (condition, high/low, precipitation, humidity, wind, AQI, sunrise/sunset/daylight). It renders alongside the experiment frame rather than inside a domain pack, and joins the grounder's extra_sources through the existing worker wiring — no new worker lines.",
+      "rationale": "The coach package contained the word 'weather' zero times, so a coach could not mention the sky without inventing it. Making the row a SOURCE is the grounding half: a true, sourced 'overcast and 68F' would otherwise trip fabricated_number, which is #2517's failure mode (evidence the model has but the gate does not). It is not a bypass — only the figures on the row enter the allow-list, so an invented temperature still fails, and no row for the day renders nothing at all rather than a default (ADR-104). Day-of-week texture was NOT built: _current_moment_line() has shipped it since the humanity pass.",
+      "ref": "#2493 (epic #2363)",
+      "observed_effect": null
     }
   ]
 }
