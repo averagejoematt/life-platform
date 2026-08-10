@@ -81,8 +81,16 @@ CHECK_BY_TYPE = {
     "contradiction": "grounding_contradiction",
     "band_contradiction": "band_contradiction",  # #1208 — verdict-vs-band mischaracterization
     "fabricated_number": "evidence_ceiling",
+    "fabricated_date": "evidence_ceiling",  # #2430 armed dates — same dimension: claimed past the evidence
     "causal_language": "causal_language",
 }
+
+# Registry types that are real findings but map to no fixture dimension yet. They must
+# NOT fall through to a surface's catch-all branch: on memoir that branch means
+# miss_dodged (the humblebrag class), so a freshness fault would be reported as a
+# completely different defect. Labelling them by their own name keeps the report honest
+# and makes the gap visible instead of silently mis-attributing it.
+UNMAPPED_REGISTRY_TYPES = ("stale_phase", "stale_baseline")
 
 # The deterministic check dimensions each surface's gate actually enforces —
 # canaries per surface must span these (self-test), else a whole check could rot.
@@ -107,7 +115,7 @@ def _reason_type(reason: str) -> str:
     it stays correct when the prose is reworded.
     """
     head = reason.split(":", 1)[0].strip()
-    return head if head in CHECK_BY_TYPE else ""
+    return head if head in CHECK_BY_TYPE or head in UNMAPPED_REGISTRY_TYPES else ""
 
 
 # ── per-surface adapters: each calls the surface's ACTUAL gate function ───────
@@ -137,6 +145,8 @@ def _eval_memoir(fx, output):
     for r in reasons:
         if r == "empty":
             out.append({"check": "empty_output", "detail": r})
+        elif _reason_type(r) in UNMAPPED_REGISTRY_TYPES:
+            out.append({"check": _reason_type(r), "detail": r})
         elif _reason_type(r) in CHECK_BY_TYPE:
             # #2430 armed the registry's gate classes here, so a reason now arrives
             # as "<canonical_type>: <prose>" ("fabricated_number: the number 72 …").
