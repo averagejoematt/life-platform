@@ -12,10 +12,15 @@ Two guards:
 import os
 import re
 from fnmatch import fnmatch
+from glob import glob
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ROLES = os.path.join(_REPO, "cdk", "stacks", "role_policies.py")
-_SOCIAL = os.path.join(_REPO, "lambdas", "web", "site_api_social.py")
+_WEB = os.path.join(_REPO, "lambdas", "web")
+# #2515: the social module is a facade + `site_api_social_*.py` siblings that hold the
+# handler bodies. The canary counts the FAMILY — globbed, never hand-listed — so the
+# split cannot make the count fall by moving a write instead of removing one.
+_SOCIAL_FAMILY = sorted(glob(os.path.join(_WEB, "site_api_social*.py")))
 
 
 def _read(p):
@@ -59,9 +64,9 @@ def test_leadingkeys_cover_every_site_api_write():
 def test_write_call_site_canary():
     """If this count changes, a write was added/removed — verify its partition is in
     _WRITTEN_KEYS and the role's LeadingKeys before updating this baseline."""
-    n = len(re.findall(r"\.(put_item|update_item)\(", _read(_SOCIAL)))
+    n = sum(len(re.findall(r"\.(put_item|update_item)\(", _read(f))) for f in _SOCIAL_FAMILY)
     assert n == 16, (
-        f"site_api_social write count is {n}, baseline 16 — a write was added/removed. "
+        f"site_api_social family write count is {n}, baseline 16 — a write was added/removed. "
         "Confirm its partition is in the SEC-01 LeadingKeys allowlist + _WRITTEN_KEYS, then update this baseline."
     )
 

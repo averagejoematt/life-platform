@@ -222,8 +222,15 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
         "site_api_mind.py",
         "site_api_protocols.py",
         "site_api_rollups.py",
+        # #2515 split site_api_social.py into a facade + cohesive siblings. The facade
+        # keeps its own screened sites; the moved handlers carry their screens with
+        # them, so the set widened by three FILES with no change to the call-site COUNT
+        # asserted below — a relocation, not a new or dropped screen.
         "site_api_social.py",
-    }, f"expected _is_blocked_vice call sites in exactly these 8 modules, got {found_files}"
+        "site_api_social_challenges.py",
+        "site_api_social_engage.py",
+        "site_api_social_experiments.py",
+    }, f"expected _is_blocked_vice call sites in exactly these 11 modules, got {found_files}"
     assert len(sites) == 26, (
         f"expected 26 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "

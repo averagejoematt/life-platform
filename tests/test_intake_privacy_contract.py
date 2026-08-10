@@ -54,7 +54,9 @@ def test_ledger_is_registered_everywhere_private():
 
 def test_write_path_routes_private_metric_away_from_public_partition():
     # Structural: the routing constant exists and the social module consumes it.
-    src = (_REPO / "lambdas" / "web" / "site_api_social.py").read_text()
+    # #2515: the ritual write door moved to the site_api_social_engage sibling; scan the
+    # whole family so the assertion follows the handler instead of the filename.
+    src = "\n".join(p.read_text() for p in sorted((_REPO / "lambdas" / "web").glob("site_api_social*.py")))
     assert "PRIVATE_RITUAL_METRICS" in src and "private_intake" in src
 
 
@@ -83,7 +85,7 @@ def test_web_modules_never_read_or_serve_the_ledger():
     hits = []
     for p in sorted(web.glob("*.py")):
         text = p.read_text(errors="ignore")
-        if p.name == "site_api_social.py":
+        if p.name.startswith("site_api_social"):  # #2515: facade + split siblings
             # The ONE sanctioned reference: routing the signed tap WRITE to the
             # private partition. It must not import the analysis module, and no
             # LINE naming the partition may be read-shaped (query/eq/get_item) —

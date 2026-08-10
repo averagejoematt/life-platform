@@ -193,9 +193,11 @@ EXPECTED_MEMBERS = {
     "site_api_ledger.py::discoveries",
     "site_api_protocols.py::experiments",
     "site_api_rollups.py::changes_since",
-    "site_api_social.py::_handle_experiment_detail",
     "site_api_social.py::_valid_library_ids",
-    "site_api_social.py::handle_experiment_library",
+    # #2515: the two experiment handler BODIES moved to the site_api_social_experiments
+    # sibling (the facade keeps the routed entrypoint + the vote allowlist above).
+    "site_api_social_experiments.py::_handle_experiment_detail",
+    "site_api_social_experiments.py::handle_experiment_library",
 }
 
 

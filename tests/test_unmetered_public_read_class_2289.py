@@ -53,7 +53,21 @@ _RATE_CALLS = {"_rate_check", "_rate_limited"}
 
 
 def _module_source() -> str:
-    return pathlib.Path(inspect.getfile(social)).read_text()
+    """The whole social FAMILY, facade first (#2515).
+
+    The module was split into ``site_api_social.py`` (routed entrypoints, now thin
+    delegators) plus ``site_api_social_*.py`` siblings that hold the handler bodies.
+    A facade-only scan would classify every delegator as trivially ``edge_cached``
+    (it makes no ``_ok``/``_envelope`` call of its own) and the guard would become a
+    gate that cannot fail. Concatenating facade-then-siblings means the derivation
+    sees the REAL body for every handler: ``classify_handlers`` keys on the function
+    name, so the later definition — the sibling's implementation — is the one judged.
+    The sibling set is globbed, never hand-listed, so a sixth module joins the guard
+    automatically.
+    """
+    facade = pathlib.Path(inspect.getfile(social))
+    parts = [facade] + sorted(facade.parent.glob("site_api_social_*.py"))
+    return "\n".join(p.read_text() for p in parts)
 
 
 def _calls_by_name(fn: ast.FunctionDef, names: set) -> bool:
