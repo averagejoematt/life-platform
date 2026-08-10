@@ -49,6 +49,16 @@ def _synth(text, voice_name):
 _synth.calls = []
 
 
+def _always_sample(monkeypatch):
+    """Take the occasional-ness out of the equation.
+
+    Load-bearing, not convenience: without it a gate test can pass because the
+    sampler happened to decline this sentence, which is a pass for the wrong
+    reason — it survives a mutation that removes the gate entirely. (Measured:
+    the missing-``tts_voice`` pin did exactly that before this was added.)"""
+    monkeypatch.setattr(coach_voice, "sampled", lambda text, rate: rate > 0)
+
+
 @pytest.fixture(autouse=True)
 def _reset():
     _synth.calls = []
@@ -135,6 +145,7 @@ def test_a_persona_with_no_posture_never_speaks(monkeypatch):
     ``emoji_posture`` follows. This is why the feature ships dark: a coach with a
     perfectly good ``tts_voice`` still says nothing until the owner writes its
     spoken register."""
+    _always_sample(monkeypatch)
     monkeypatch.setattr("coach.persona_core.load_voice_spec", lambda *a, **k: {"texting_style": {"emoji_posture": "Essentially never."}})
     monkeypatch.setattr("coach.persona_registry.tts_voice", lambda *a, **k: "en-US-Chirp3-HD-Kore")
     assert coach_voice.voice_note([SPEAKABLE], persona_id="physical_coach", status="sent", tier=0, synth=_synth) is None
@@ -181,6 +192,7 @@ def test_no_shipped_coach_is_armed_yet():
 
 def test_a_posture_without_a_registry_voice_sends_no_voice_note(monkeypatch):
     """The one case that would otherwise put a stranger's voice on the phone."""
+    _always_sample(monkeypatch)
     monkeypatch.setattr("coach.persona_core.load_voice_spec", lambda *a, **k: POSTURE)
     monkeypatch.setattr("coach.persona_registry.tts_voice", lambda *a, **k: None)
     assert coach_voice.voice_note([SPEAKABLE], persona_id="physical_coach", status="sent", tier=0, synth=_synth) is None
@@ -193,7 +205,7 @@ def test_a_posture_without_a_registry_voice_sends_no_voice_note(monkeypatch):
 def _arm(monkeypatch, voice="en-US-Chirp3-HD-Kore"):
     monkeypatch.setattr("coach.persona_core.load_voice_spec", lambda *a, **k: POSTURE)
     monkeypatch.setattr("coach.persona_registry.tts_voice", lambda *a, **k: voice)
-    monkeypatch.setattr(coach_voice, "sampled", lambda text, rate: rate > 0)
+    _always_sample(monkeypatch)
 
 
 def test_an_armed_persona_speaks_in_its_own_voice(monkeypatch):

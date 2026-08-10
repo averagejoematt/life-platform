@@ -104,7 +104,7 @@ def posture_rate(posture: Optional[str]) -> float:
     """How often a qualifying reply is spoken, from the posture's own rate word."""
     if not posture_permits_voice(posture):
         return 0.0
-    low = posture.lower()
+    low = (posture or "").lower()
     for word, rate in _RATES:
         if word in low:
             return rate
