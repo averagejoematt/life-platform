@@ -76,6 +76,61 @@ class TestTheThreeArmedSurfaces:
             assert "dates" not in armed, f"{key} still claims the dates class with allowed_dates removed"
 
 
+class TestTheNewClassIsLoadBEARING:
+    """The AST proofs above show the surface is REGISTERED. These show the registration
+    bought something: a fabricated calendar date that the pre-#2430 check accepted, and
+    that each surface now refuses — with the date components on the numbers allow-list,
+    so the ONE finding is `fabricated_date` and nothing is riding on a number gate that
+    was already there."""
+
+    def test_reflection_er03_passes_the_date_the_registered_gate_refuses(self):
+        from compute import coach_daily_reflection_lambda as reflection
+        from experiment import er03_gate
+
+        facts = {
+            "summary": "recovery averaged 62",
+            "themes": [],
+            "numbers": {"62", "2026", "3", "4"},
+            "allowed": {62.0, 2026.0, 3.0, 4.0},
+            "allowed_dates": {"2026-04-03"},
+            "n": 12,
+        }
+        text = "So far recovery around 62 appears to hold. It looked the same on 2026-03-04."
+        assert er03_gate.er03_check(text, allowed_numbers=facts["numbers"], n=facts["n"])[0], "precondition: the OLD gate passes it"
+        ok, reasons = reflection._accepts(text, facts, "2026-08-10")
+        assert not ok and reasons == ["fabricated_date"], reasons
+
+    def test_memoir_refuses_a_date_it_never_graded(self):
+        from compute import coach_memoir_lambda as memoir
+
+        learning = {"date": "2026-05-04", "subdomain": "sleep", "metric": "hrv", "status": "refuted", "reason": "no change"}
+        facts = {
+            "quarter": "2026-Q2",
+            "total_evaluations": 14,
+            "by_outcome": {"refuted": 1},
+            "decided_count": 1,
+            "hit_rate_pct": None,
+            "calibration": {},
+            "misses": [learning],
+            "hits": [],
+            "learnings_raw": [learning],
+        }
+        grounded = "I was refuted on hrv on 2026-05-04, and I should have hedged."
+        assert memoir.gate_check(grounded, facts, "2026-07-01")[0], "precondition: the real graded date passes"
+        ok, reasons = memoir.gate_check("I was refuted on hrv on 2026-05-14, and I should have hedged.", facts, "2026-07-01")
+        assert not ok and [r.split(":")[0] for r in reasons] == ["fabricated_date"], reasons
+
+    def test_eyeball_drops_only_the_note_and_only_when_it_claims(self):
+        from experiment import eyeball_calibration as ec
+
+        macros = {"calories": 2026, "protein_g": 5, "carbs_g": 4, "fat_g": 40}
+        assert ec._grounded_note("plated pasta", macros) == "plated pasta", "a plain description must survive"
+        assert ec._grounded_note("about 2026 kcal of pasta", macros), "restating its own estimate must survive"
+        assert ec._grounded_note("plated on 2026-05-04", macros) is None, "a date in a photo description is always fabricated"
+        assert ec._grounded_note("roughly 917 kcal of pasta", {"calories": 600}) is None, "a second, different figure must not ship"
+        assert ec._grounded_note(None, macros) is None
+
+
 class TestCensusLedger:
     def test_the_three_left_the_tracked_defect_table_as_surfaces(self):
         import test_invoke_site_census_2390 as census
