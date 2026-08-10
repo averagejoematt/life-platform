@@ -147,7 +147,26 @@
       "Bash(python3 scripts/validate_beats.py *)",
       "Bash(python3 scripts/check_ci_warnings.py *)",
       "Bash(python3 -m py_compile *)",
-      "Bash(aws logs tail *)"
+      "Bash(aws logs tail *)",
+      "Bash(mypy *)",
+      "Bash(bash deploy/verify_deployed_symbol.sh *)",
+      "Bash(python3 scripts/generate_adr_index.py --check*)",
+      "Bash(python3 scripts/content_policy_scan.py *)",
+      "Bash(python3 scripts/check_deploy_wedge.py *)",
+      "Bash(python3 scripts/check_memory_body_facts.py *)",
+      "Bash(python3 tests/mypy_clean_set.py *)",
+      "Bash(node --check *)",
+      "Bash(python3 scripts/check_doc_facts.py *)",
+      "Bash(aws logs start-query *)",
+      "Bash(aws logs get-query-results *)",
+      "Bash(aws events list-* *)",
+      "Bash(aws events describe-* *)",
+      "Bash(aws cloudfront get-* *)",
+      "Bash(aws cloudfront list-* *)",
+      "Bash(aws s3api head-object *)",
+      "Bash(aws s3api list-* *)",
+      "Bash(aws ce get-cost-and-usage *)",
+      "Bash(aws secretsmanager list-secrets *)"
     ]
   }
 }
