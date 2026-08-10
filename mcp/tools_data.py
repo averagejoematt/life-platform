@@ -8,6 +8,7 @@ import operator
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from ingestion.strava_population import DISTANCE_POPULATION_LABEL, ELEVATION_POPULATION_LABEL
 
 from mcp.config import RAW_DAY_LIMIT, SOURCES, USER_PREFIX, table
 from mcp.core import date_diff_days, decimal_to_float, get_sot, query_source, resolve_field
@@ -363,6 +364,15 @@ def tool_find_days(args):
     return modes[mode](args)
 
 
+def _population_label(sort_by):
+    """Name the population an all-time percentile over `sort_by` is computed against (#2331)."""
+    if sort_by == "distance_miles":
+        return DISTANCE_POPULATION_LABEL
+    if sort_by == "total_elevation_gain_feet":
+        return ELEVATION_POPULATION_LABEL
+    return f"Strava activities reporting {sort_by}"
+
+
 def tool_search_activities(args):
     start_date = args.get("start_date", "2010-01-01")
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
@@ -430,6 +440,13 @@ def tool_search_activities(args):
         "showing": len(results),
         "sorted_by": sort_by,
         "all_time_total_acts": total_for_rank,
+        # #2331 — a "top N% all-time" claim is meaningless without saying what the
+        # N% is OF. `all_time_total_acts` counts activities carrying a non-null
+        # `sort_by`, and for distance/elevation that is the measured population
+        # defined in ingestion/strava_population.py (gym sessions and indoor-trainer
+        # or manually-entered records are excluded — those metrics were never
+        # measured for them, so they are absent rather than zero).
+        "population": _population_label(sort_by),
         "activities": results,
     }
 

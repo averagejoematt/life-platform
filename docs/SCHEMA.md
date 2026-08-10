@@ -345,8 +345,8 @@ Individual activity records (inside `activities` list) include:
 | `enriched_name` | string | Auto-generated label with location, stats, recovery context, percentile rank |
 | `enriched_at` | string | ISO timestamp of last enrichment |
 | `sport_type` | string | Activity type (Run, Hike, WeightTraining, etc.) |
-| `distance_miles` | number | Distance |
-| `total_elevation_gain_feet` | number | Elevation gain |
+| `distance_miles` | number \| null | Distance. **`null` means not measured, `0` means measured zero** — see the population rule below |
+| `total_elevation_gain_feet` | number \| null | Elevation gain. Same null-vs-zero semantics as `distance_miles` |
 | `moving_time_seconds` | number | Moving time |
 | `average_heartrate` | number | Avg HR (bpm) |
 | `max_heartrate` | number | Max HR (bpm) |
@@ -363,6 +363,16 @@ Note: `location_*` fields are only populated on activities ingested after 2026-0
 Note: `enriched_name` is written nightly by the `activity-enrichment` Lambda. Original `name` is always preserved and never overwritten.
 
 Note: `search_activities` searches both `name` and `enriched_name` — keyword searches will match renamed activities (e.g. "Machu Picchu", "Mailbox Peak") via the enriched label.
+
+**Distance / elevation population rule (#2331, ADR-104).** Strava never omits `distance` or `total_elevation_gain` — it sends `0.0` for a bench-press session exactly as it sends `0.0` for a pancake-flat run. The derived `distance_miles` / `total_elevation_gain_feet` therefore state *whether the metric was measured for that activity*, and are `null` when it was not:
+
+- **Out of population** — gym / court / studio / fixed-machine types (`WeightTraining`, `Workout`, `Yoga`, `HighIntensityIntervalTraining`, `Elliptical`, tennis and the rest): distance and elevation are not properties of the activity, so both stay `null`. Water sports (`Swim`, `Sail`, `Rowing`, …) are in the *distance* population but out of the *elevation* one.
+- **No measurement channel** — `trainer: true` (indoor, no GPS — every WHOOP-synced session) or `manual: true` (hand-logged): a `0` there is an unmeasured field, so it stays `null`. A non-zero value on such a record is kept (a footpod treadmill run has a real distance).
+- **Measured zero** — a distance-bearing type recorded with a device: `0` is stored as `0` and belongs in the distribution.
+
+The per-type decision table is `lambdas/ingestion/strava_population.py`; its type set is checked against the machine-generated census `config/strava_activity_type_census.json` (regenerate with `python3 scripts/strava_type_census.py --write`). The raw `distance_meters` / `total_elevation_gain_meters` are always stored verbatim, so the derivation can be redone at any time — `scripts/reconcile_strava_measured_zero.py` does exactly that for historical rows.
+
+This population is the denominator of every all-time "top N%" distance/elevation claim (`enrichment_lambda.build_percentile_lookup`, `search_activities`). The day-level `total_*` sums are unaffected: an absent value and a measured `0` both contribute nothing.
 
 ### todoist
 | Field | Type | Description |
