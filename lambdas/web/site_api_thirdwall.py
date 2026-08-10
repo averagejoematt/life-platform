@@ -201,7 +201,7 @@ def handle_diary_reactions(event, *, _g):
 def _public_decision_note(text):
     """#1569: screen a VERBATIM decision note for public serving.
 
-    Same runtime content filter (marijuana/porn etc.) the CI content-policy scan
+    Same runtime content filter (the channel-derived blocked terms) the CI content-policy scan
     enforces. A verbatim quote is all-or-nothing: if the filter would alter it at all
     (a blocked term excised, or the refuse-whole sentinel), the note is withheld
     ENTIRELY — a decision whose note doesn't cleanly survive simply isn't shown."""
@@ -335,7 +335,7 @@ def handle_journal_quotes(event, *, _g):
         # #1804: re-run the FULL taboo gate against the CURRENT vocabulary on every
         # serve — guard_version is stamped at mark time but nothing enforced it
         # retroactively, so a mark made before the taboo vocabulary widened (e.g.
-        # the beverage-noun family / edible additions) would otherwise keep
+        # the beverage-noun family / PRIV-01 additions) would otherwise keep
         # serving forever even after the gate would refuse to mark it today.
         # Fail-closed, same pattern as the grounding check above: withhold, never
         # mangle. jq.find_mark_violations is the FULL vocabulary (privacy_guard's

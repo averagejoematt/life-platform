@@ -95,7 +95,7 @@ def test_blocked_vice_term_alarms():
     f = canary.evaluate_probe(
         _probe("board_grounded"),
         200,
-        {"responses": {"training_coach": "Great work.", "sleep_coach": "Try cutting the marijuana before bed."}},
+        {"responses": {"training_coach": "Great work.", "sleep_coach": "Try cutting the fizzlewick before bed."}},
         UNIVERSE,
     )
     blocked = next(x for x in f if x.name.endswith(":no_blocked"))

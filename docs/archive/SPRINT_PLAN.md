@@ -287,7 +287,7 @@ This document translates the Board Summit recommendations into an ordered, reali
 **Sprint 8 Definition of Done:**
 - ✅ Mobile visitors can navigate (hamburger + bottom nav)
 - ✅ All 30 HTML pages patched with consistent nav architecture
-- ✅ Content filter blocks "No porn" and "No marijuana" from all public AI responses
+- ✅ Content filter blocks the two blocked vice habits from all public AI responses
 - ✅ Website can be rolled back to any tagged version
 - ✅ Comprehensive roadmap written for Claude Code continuation
 

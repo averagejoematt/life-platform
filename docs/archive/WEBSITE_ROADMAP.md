@@ -87,7 +87,7 @@ These pages have MCP tools already returning structured data. The work is purely
 - Synergy stacks — visual display of habit clusters (morning_stack, recovery_stack, etc.)
 - Per-group adherence bars (9 groups: Data, Discipline, Growth, Hygiene, Nutrition, Performance, Recovery, Supplements, Wellbeing)
 - Knowing-doing gap: decision fatigue signal plotted over time
-**Content filter**: Apply `_is_blocked_vice()` to exclude "No porn" and "No marijuana" from all displays
+**Content filter**: Apply `_is_blocked_vice()` to exclude the two blocked vice habits from all displays
 **API needed**: New `/api/habits` endpoint (or client-side fetch from existing public_stats)
 **Effort**: M (4-6h)
 **Shareable asset**: The heatmap is the single most shareable visual on the site
@@ -294,8 +294,8 @@ These pages have MCP tools already returning structured data. The work is purely
 ### Config: `s3://matthew-life-platform/config/content_filter.json`
 ```json
 {
-  "blocked_vices": ["No porn", "No marijuana"],
-  "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"]
+  "blocked_vices": ["<blocked habit>", "<blocked habit>"],
+  "blocked_vice_keywords": ["<blocked keyword>", "..."]
 }
 ```
 
@@ -396,7 +396,7 @@ git tag site-vX.Y.Z
 Any page displaying vice, habit, or temptation data MUST:
 1. Load content filter from S3 (or hardcode the blocked list client-side)
 2. Filter out blocked vices before rendering
-3. Never display "No porn" or "No marijuana" in any context
+3. Never display the two blocked vice habits in any context
 4. The `/api/` response scrubbing handles AI-generated content; static pages need client-side filtering
 
 ### Adding a New Page Checklist

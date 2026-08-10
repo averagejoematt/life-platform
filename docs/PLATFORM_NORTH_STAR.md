@@ -71,7 +71,7 @@ The site should grade **10/10 for interest and returnability**, read as **elite*
 - **Correlative, never causal. N=1.** Every claim flagged with its confidence/sample.
 - **Restraint over gloss.** Elite ≠ shiny. The "beautifully-made instrument" aesthetic is the
   opposite of generic AI-template gloss. Glow/drama is *earned* (on truly-live signals), never decorative.
-- **Privacy absolutes.** Never name substances/vices (marijuana, alcohol, etc.), never expose
+- **Privacy absolutes.** Never name substances/vices (the channel-listed blocked categories, alcohol, etc.), never expose
   genome identifiers or chronological age. See `CLAUDE.md` + the content-privacy memories.
 - **The model never does the math.** Every number is computed in Python; AI only narrates
   pre-computed values, always correlatively. (ADR-062.)

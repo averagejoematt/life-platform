@@ -49,7 +49,7 @@ Structure:
 
 Privacy note (public repo, permanent history): no real blocked term is ever written as a
 source literal here. Every fixture loads the live vocabulary from
-config/content_filter.json at test time (the #2203/#2230/#2211 technique) and builds a
+the ER-06 channel at test time (the #2203/#2230/#2211 technique, #2370) and builds a
 throwaway habit/vice/challenge name around it; the literal never appears in this file's
 text, only in values computed at runtime.
 """
@@ -89,8 +89,10 @@ USER_ID = os.environ["USER_ID"]
 
 
 def _cf() -> dict:
-    with open(ROOT / "config" / "content_filter.json", encoding="utf-8") as f:
-        return json.load(f)
+    from privacy import content_filter_channel
+
+    cf = content_filter_channel.load(require=True)  # #2370: the ER-06 channel (neutral fixture vocab in the unit suite)
+    return dict(cf)
 
 
 def _pin_content_filter(monkeypatch) -> dict:

@@ -65,11 +65,11 @@ def test_safety_gate_fails_closed_on_every_banned_class():
     # The Personal Board's hard line: the autonomous weekly publisher must HOLD
     # (never voice) on any of these. Each must produce a violation reason.
     panel._content_filter_cache = {
-        "blocked_vices": ["No porn", "No marijuana"],
-        "blocked_vice_keywords": ["porn", "marijuana", "cannabis", "weed", "thc", "edibles"],
+        "blocked_vices": ["No fizzlewick", "No grumbleflax"],
+        "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
     }
     cases = {
-        "blocked-vice": "He kept his no-marijuana streak going.",
+        "blocked-vice": "He kept his no-fizzlewick streak going.",
         "body-number": "He's down to 305 pounds this week.",
         "grief/family/named-person": "It's been hard since my mother's diagnosis.",
         "report-card-tone": "Honestly, you should have trained more — not good enough.",
@@ -104,7 +104,7 @@ def test_sensitivity_routing_holds_only_on_current_crisis(monkeypatch):
 
 
 def test_weekly_gate_fails_closed_and_drops_unsafe():
-    panel._content_filter_cache = {"blocked_vices": [], "blocked_vice_keywords": ["marijuana"]}
+    panel._content_filter_cache = {"blocked_vices": [], "blocked_vice_keywords": ["fizzlewick"]}
     turns = [
         {"speaker": "elena", "line": "Good week — you kept showing up, and that's the work."},  # clean → kept
         {"speaker": "coach", "line": "He's down to 305 pounds."},  # body number → HOLD

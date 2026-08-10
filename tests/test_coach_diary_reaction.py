@@ -30,8 +30,8 @@ def _offline_cycle_stamp(monkeypatch):
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda ssm_client=None: 11)
 
 
-_SECRET_BODY = "Relapsed after the fight with Dana. Smoked, then porn until 3am. The debt terrifies me."
-_CANARIES = ["dana", "smoked", "porn", "3am", "debt", "relapsed"]
+_SECRET_BODY = "Relapsed after the fight with Dana. Smoked, then zzq until 3am. The debt terrifies me."
+_CANARIES = ["dana", "smoked", "zzq", "3am", "debt", "relapsed"]
 
 
 def _entry(**over):

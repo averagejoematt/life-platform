@@ -102,7 +102,7 @@ def test_clean_takeaway_is_truncated_to_the_prompt_budget_not_dropped():
 @pytest.mark.parametrize(
     "dirty",
     [
-        "he says the weed helps him wind down",  # substances (privacy_guard.VICE_KEYWORDS)
+        "he says the zzq helps him wind down",  # substances (privacy_guard.VICE_KEYWORDS — neutral fixture vocab, #2370)
         "he split a bottle of wine and slept badly",  # the widened alcohol family
         "he is comparing his protocol to andrew huberman's",  # banned real name
         "my sister moving in reset his whole evening",  # family specifics
@@ -120,11 +120,11 @@ def test_every_content_absolute_withholds_the_takeaway(dirty):
 
 
 def test_withheld_takeaway_never_reaches_the_publicly_served_prompts():
-    dirty = "he says the weed helps him wind down and my sister noticed too"
+    dirty = "he says the zzq helps him wind down and my sister noticed too"
     rec = _conv_learning(takeaway=dirty)
 
     msg = chs._build_compression_message("sleep_coach", _compression_state(rec))
-    assert "weed" not in msg and "my sister" not in msg
+    assert "zzq" not in msg and "my sister" not in msg
     assert ccal.TAKEAWAY_WITHHELD_MARKER in msg
     # the structural signal survives — an honest absence, not a vanished record (ADR-104)
     assert "## Conversation Learnings (1 newest" in msg
@@ -133,14 +133,14 @@ def test_withheld_takeaway_never_reaches_the_publicly_served_prompts():
     track = chs._summarize_track_record([rec], [])
     entry = track["conversation_learnings"]["recent"][0]
     assert entry["takeaway"] == ccal.TAKEAWAY_WITHHELD_MARKER
-    assert "weed" not in str(entry)
+    assert "zzq" not in str(entry)
     assert entry["checkin_id"] == "CHECKIN#2026-07-20#abcd1234"
     assert track["conversation_learnings"]["count"] == 1
 
 
 def test_the_screen_reads_the_full_takeaway_not_the_truncated_prompt_form():
     """Truncation must never launder a violation out of view."""
-    dirty_late = ("a" * (ccal.PUBLIC_PROMPT_TAKEAWAY_CHARS + 50)) + " and the weed helped"
+    dirty_late = ("a" * (ccal.PUBLIC_PROMPT_TAKEAWAY_CHARS + 50)) + " and the zzq helped"
     assert len(dirty_late[: ccal.PUBLIC_PROMPT_TAKEAWAY_CHARS]) == ccal.PUBLIC_PROMPT_TAKEAWAY_CHARS
     assert coach_dossier.find_dossier_violations(dirty_late[: ccal.PUBLIC_PROMPT_TAKEAWAY_CHARS]) == []
     assert ccal.screen_takeaway_for_public_prompt(dirty_late)[0] is None

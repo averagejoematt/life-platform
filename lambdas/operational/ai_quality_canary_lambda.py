@@ -124,16 +124,17 @@ _VENDOR_PATTERNS = [
     re.compile(r"\b(?:large\s+)?language\s+model\b", re.I),
 ]
 
-# Blocked vice terms — mirrors the fallback default in site_api_ai_lambda's
-# content filter. A served answer containing these is a hard content failure.
-_BLOCKED_TERMS = [
-    re.compile(r"\bporn\b", re.I),
-    re.compile(r"\bmarijuana\b", re.I),
-    re.compile(r"\bcannabis\b", re.I),
-    re.compile(r"\bweed\b", re.I),
-    re.compile(r"\bthc\b", re.I),
-    re.compile(r"\bedibles?\b", re.I),
-]
+
+# Blocked vice terms — the same channel-derived vocabulary the runtime content
+# filter enforces (#2370: the category names live ONLY in the ER-06 non-committed
+# channel, never in this public file). A served answer containing one is a hard
+# content failure. Fail-closed via require=True: no vocabulary, no canary verdict
+# — the run errors rather than probing with an empty banned set.
+def _blocked_terms():
+    from privacy import content_filter_channel
+
+    return [re.compile(r"\b" + re.escape(t) + r"\b", re.I) for t in content_filter_channel.blocked_keywords(require=True)]
+
 
 MIN_ANSWER_LEN = 40  # a real per-persona answer is a paragraph, not a stub
 
@@ -147,7 +148,9 @@ def _vendor_hits(text: str):
 
 
 def _blocked_hits(text: str):
-    return [p.pattern for p in _BLOCKED_TERMS if p.search(text)]
+    # NB: never report the pattern itself (the term would leak into canary
+    # findings that reach dashboards/email) — report a masked marker instead.
+    return [f"blocked-term-{i}" for i, p in enumerate(_blocked_terms()) if p.search(text)]
 
 
 def _ungrounded_numbers(text: str, allowed: set):

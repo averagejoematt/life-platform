@@ -4,12 +4,13 @@ patch_content_filter.py — Adds content filter to site_api_lambda.py
 
 RUN: python3 deploy/patch_content_filter.py
 """
+
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LAMBDA_PATH = os.path.join(ROOT, 'lambdas', 'site_api_lambda.py')
+LAMBDA_PATH = os.path.join(ROOT, "lambdas", "site_api_lambda.py")
 
-with open(LAMBDA_PATH, 'r') as f:
+with open(LAMBDA_PATH, "r") as f:
     code = f.read()
 
 # ── 1. Add content filter loader after AWS clients section ──────
@@ -31,8 +32,10 @@ def _load_content_filter():
     except Exception as e:
         logger.warning(f"[content_filter] Failed to load from S3: {e}")
         _content_filter_cache = {
-            "blocked_vices": ["No porn", "No marijuana"],
-            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
+            # #2370: literals redacted from this archived one-time script — the real
+            # vocabulary lives in the ER-06 non-committed channel (content_filter_channel).
+            "blocked_vices": ["<redacted>"],
+            "blocked_vice_keywords": ["<redacted>"],
         }
     return _content_filter_cache
 
@@ -68,8 +71,8 @@ def _is_blocked_vice(name: str) -> bool:
 '''
 
 # Insert after the table = dynamodb.Table(TABLE_NAME) line
-if '_content_filter_cache' not in code:
-    anchor = 'table    = dynamodb.Table(TABLE_NAME)'
+if "_content_filter_cache" not in code:
+    anchor = "table    = dynamodb.Table(TABLE_NAME)"
     if anchor in code:
         code = code.replace(anchor, anchor + FILTER_CODE)
         print("✓ Added content filter loader")
@@ -79,19 +82,19 @@ else:
     print("  Content filter already present, skipping")
 
 # ── 2. Add blocked terms to ask system prompt ───────────────
-ASK_SAFETY_ADDITION = '''
+ASK_SAFETY_ADDITION = """
 CONTENT FILTER (CRITICAL):
 - NEVER mention, reference, or discuss: {blocked_terms}
 - If asked about these topics, say "I don't have data on that topic."
-- This filter applies to ALL responses regardless of question phrasing.'''
+- This filter applies to ALL responses regardless of question phrasing."""
 
-if 'CONTENT FILTER (CRITICAL)' not in code:
+if "CONTENT FILTER (CRITICAL)" not in code:
     # Find the SAFETY section in the prompt and add after it
     old_safety = "- If asked about something outside your data"
     if old_safety in code:
         # Build the blocked terms string
         new_safety = old_safety + '''
-- CONTENT FILTER: NEVER mention porn, pornography, marijuana, cannabis, weed, THC, or any related terms.
+- CONTENT FILTER: NEVER mention <redacted — #2370: the blocked-term enumeration now comes from the non-committed channel>.
 - If asked about these topics, respond only with "I don't have data on that specific topic."'''
         code = code.replace(old_safety, new_safety)
         print("✓ Added content filter to ask system prompt")
@@ -99,7 +102,7 @@ else:
     print("  Ask prompt filter already present, skipping")
 
 # ── 3. Add response scrubbing to /api/ask handler ───────────
-if '_scrub_blocked_terms(answer)' not in code:
+if "_scrub_blocked_terms(answer)" not in code:
     old_answer = '"body": json.dumps({"answer": answer, "remaining": remaining}),'
     if old_answer in code:
         new_answer = '"body": json.dumps({"answer": _scrub_blocked_terms(answer), "remaining": remaining}),'
@@ -109,14 +112,16 @@ else:
     print("  Response scrubbing already present, skipping")
 
 # ── 4. Add response scrubbing to /api/board_ask handler ─────
-if 'board_ask' in code and '_scrub_blocked_terms' not in code.split('board_ask')[1][:500]:
+if "board_ask" in code and "_scrub_blocked_terms" not in code.split("board_ask")[1][:500]:
     old_board = 'responses[pid] = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")'
     if old_board in code:
-        new_board = 'responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))'
+        new_board = (
+            'responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))'
+        )
         code = code.replace(old_board, new_board)
         print("✓ Added response scrubbing to /api/board_ask")
 
-with open(LAMBDA_PATH, 'w') as f:
+with open(LAMBDA_PATH, "w") as f:
     f.write(code)
 
 print("\nDone. Deploy with: bash deploy/deploy_lambda.sh site_api")

@@ -144,8 +144,12 @@ Editorial guardrails + `docs/DATA_GOVERNANCE.md` are *policy*; this is the
 **structural** test that the published static site can't leak them. Offline +
 **gating**, it runs the same scanner the deploy uses (`deploy/pii_surface_guard.py`)
 over the committed `site/` tree. Three arms:
-- **Blocked-vice** (always-on) — no `blocked_vice_keywords` from
-  `seeds/content_filter.json` (the policy-blocked categories) on the public surface.
+- **Blocked-vice** — no channel-configured `blocked_vice_keywords` (the
+  policy-blocked categories) on the public surface. The vocabulary comes from the
+  ER-06 non-committed channel (#2370: env `CONTENT_FILTER_JSON` / gitignored
+  `config/content_filter.local.json` / the private S3 copy) — armed in CI via the
+  repo secret, REQUIRED fail-closed on the deploy path (`--require-vice`), and a
+  `--tracked` repo-hygiene arm scans every git-tracked JSON for the same terms.
 - **Structural PII** (always-on) — US SSN, 16-digit card-like numbers, and
   non-allowlisted email addresses (the PII classes in `DATA_GOVERNANCE.md`).
 - **Literal denylist** (best-effort) — partner name / employer / role / industry

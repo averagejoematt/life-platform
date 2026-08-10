@@ -163,7 +163,7 @@ def test_apply_revision_rejects_fabricated_numbers():
 
 
 def test_apply_revision_rejects_privacy_violation():
-    leaking = SAMPLE_INSTALLMENT.replace("Matthew logged", "Matthew smoked marijuana and logged")
+    leaking = SAMPLE_INSTALLMENT.replace("Matthew logged", "Matthew smoked fizzlewick and logged")
     allowed = _allowed_numbers(SAMPLE_INSTALLMENT)  # the revision keeps all the same numbers — only privacy should trip
     text, applied, reason = mep.apply_revision(SAMPLE_INSTALLMENT, CLEAN_CRITIQUE, allowed, revise_fn=lambda s, u: leaking)
     assert text == SAMPLE_INSTALLMENT
@@ -212,7 +212,7 @@ def test_extract_editors_note_grounding_gate():
 
 
 def test_extract_editors_note_privacy_gate():
-    critique = {"editors_note": "Matthew's marijuana use came up in the draft and I cut it."}
+    critique = {"editors_note": "Matthew's fizzlewick use came up in the draft and I cut it."}
     assert mep.extract_editors_note(critique, note_eligible=True, allowed_numbers=set()) is None
 
 
@@ -359,7 +359,7 @@ def test_build_narrator_uses_board_config_when_present():
 
 def test_critique_prompt_carries_privacy_rules():
     system = mep.build_critique_system_prompt(mep.build_narrator(None))
-    assert "marijuana" in system.lower()
+    assert "fizzlewick" in system.lower()
     assert "gene name" in system.lower() or "rsid" in system.lower()
 
 

@@ -38,9 +38,9 @@ from fakes import FakeDdbTable  # noqa: E402
 # One seeded violation per standing content absolute. Each MUST be caught.
 SEEDED_VIOLATIONS = [
     # substances (privacy_guard.VICE_KEYWORDS reused via journal_quotes)
-    ("substance_cannabis", "committed to zero cannabis for the rest of the cycle"),
-    ("substance_thc", "the THC experiment is over as far as I'm concerned"),
-    ("substance_porn", "we agreed the porn moderation streak gets logged daily"),
+    ("substance_long", "committed to zero fizzlewick for the rest of the cycle"),
+    ("substance_short", "the ZZQ experiment is over as far as I'm concerned"),
+    ("substance_second", "we agreed the grumbleflax moderation streak gets logged daily"),
     ("substance_alcohol_family", "he reported three beers at the wedding reception"),
     # chronological-age leakage (PhenoAge Option A — never public)
     ("age_years_old", "remarkable adherence for a man 43 years old"),
@@ -120,7 +120,7 @@ def test_violating_commitment_is_withheld_wholesale():
     item = {
         "sk": "COMMITMENT#commit_x",
         "created_date": "2026-07-23",
-        "commitment_natural": "zero cannabis for the rest of the cycle",
+        "commitment_natural": "zero fizzlewick for the rest of the cycle",
         "status": "pending",
     }
     entry, status = cd.commitment_entry(item)
@@ -352,7 +352,7 @@ def test_apply_corrections_correct_attaches_dated_note():
 def test_apply_corrections_violating_note_is_withheld_but_dated():
     kept, _ = cd.apply_corrections(
         [{"record_id": "COMMITMENT#a", "date": "2026-07-20", "text": "x"}],
-        cd.dossier_corrections([_ledger_row("COMMITMENT#a", "correct", note="actually it was about cannabis")], "sleep_coach"),
+        cd.dossier_corrections([_ledger_row("COMMITMENT#a", "correct", note="actually it was about fizzlewick")], "sleep_coach"),
     )
     n = kept[0]["corrections"][0]
     assert n["note"] is None and n["note_withheld"] is True and n["date"]
@@ -425,7 +425,7 @@ def _seeded_table(corrections_rows=None, corrections_error=False, extra_commitme
                 "pk": coach_pk,
                 "sk": "COMMITMENT#commit_20260721_vice",
                 "created_date": "2026-07-21",
-                "commitment_natural": "zero cannabis this cycle",
+                "commitment_natural": "zero fizzlewick this cycle",
                 "status": "pending",
             },
             {  # retracted below via the corrections ledger
@@ -519,7 +519,7 @@ def test_site_dossier_renders_verbatim_with_dates_and_evidence(monkeypatch):
 def test_site_dossier_withholds_seeded_violation_and_counts_it(monkeypatch):
     d = _dossier_via_api(monkeypatch)
     blob = json.dumps(d)
-    assert "cannabis" not in blob
+    assert "fizzlewick" not in blob
     assert d["withheld"] >= 1
 
 

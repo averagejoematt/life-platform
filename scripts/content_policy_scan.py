@@ -1,21 +1,25 @@
 """
 scripts/content_policy_scan.py — repo-wide content-policy gate (#354).
 
-Scans public-facing content files for blocked terms from config/content_filter.json.
-Exits 1 on any match not covered by the allowlist.
+Scans public-facing content files for the blocked-category terms. Exits 1 on any
+match not covered by the allowlist.
 
 Scope: site/ pages, email lambdas, MCP tools — the surfaces that reach readers.
-Internal docs (handovers/, docs/, seeds/), implementation files that define the
-filter, and archive directories are explicitly excluded.
+Internal docs (handovers/, docs/, seeds/) and archive directories are excluded.
 
 Usage (run from repo root):
     python3 scripts/content_policy_scan.py
 
-The same term list the live site's runtime filter enforces is the source of truth
-here — one definition of "blocked" everywhere.
+#2370: the vocabulary comes from the ER-06 NON-COMMITTED channel
+(lambdas/privacy/content_filter_channel.py — env CONTENT_FILTER_JSON /
+config/content_filter.local.json / the private S3 copy), the same source the
+live site's runtime filter enforces — one definition of "blocked" everywhere,
+and the category names never live in a tracked file. When no channel source is
+available the scan SKIPS with a loud notice (exit 0) — public CI arms it by
+injecting the CONTENT_FILTER_JSON secret. Violation output is MASKED: it names
+the file/line, never the term (CI logs are public).
 """
 
-import json
 import os
 import re
 import sys
@@ -40,22 +44,12 @@ SKIP_SUBDIRS = {
 }
 
 # Individual files explicitly allowed to contain blocked terms.
-# These are implementation files where the terms appear as filter definitions,
-# test fixtures, LLM system-prompt instructions, or content-policy text —
-# not as personal content served to readers.
-ALLOWLIST_FILES = {
-    "scripts/content_policy_scan.py",  # this scanner (contains the terms as strings)
-    "mcp/tools_lifestyle.py",  # _BLOCKED_VICE_KEYWORDS constant (filter definition)
-    "mcp/tools_health.py",  # same pattern
-    "mcp/handler.py",  # same pattern
-    "mcp/core.py",  # same pattern
-    # LLM system-prompt strings that enumerate blocked terms to instruct the model
-    # what NOT to mention — necessary, never served to readers.
-    "lambdas/emails/wednesday_chronicle_lambda.py",
-    "lambdas/emails/chronicle_prompt.py",  # the Elena system-prompt's substance-privacy guardrail (extracted from wednesday_chronicle_lambda, #1654)
-    "lambdas/emails/coach_panel_podcast_lambda.py",
-    "lambdas/emails/panelcast_scripts.py",  # the intro/weekly builders' safety guardrail (extracted from the lambda, #1185)
-}
+# #2370 emptied this set: the scanner, the MCP filter constants, and the LLM
+# system prompts no longer carry the terms as tracked literals — every consumer
+# derives them from the non-committed channel at runtime, so NOTHING in the
+# scanned tree may legitimately contain one any more. Add entries back only with
+# a written justification (and expect the reviewer to push back).
+ALLOWLIST_FILES: set[str] = set()
 
 # File extensions to scan (text only).
 TEXT_EXTENSIONS = {
@@ -70,12 +64,13 @@ TEXT_EXTENSIONS = {
 
 
 def load_blocked_terms() -> list[str]:
-    """Load blocked keywords from config/content_filter.json."""
-    path = os.path.join(REPO_ROOT, "config", "content_filter.json")
-    with open(path, encoding="utf-8") as f:
-        cf = json.load(f)
-    terms = cf.get("blocked_vice_keywords", [])
-    return [t.lower() for t in terms if t]
+    """Load blocked keywords from the ER-06 non-committed channel (#2370)."""
+    lambdas_dir = os.path.join(REPO_ROOT, "lambdas")
+    if lambdas_dir not in sys.path:
+        sys.path.insert(0, lambdas_dir)
+    from privacy import content_filter_channel  # noqa: PLC0415 — path set just above
+
+    return content_filter_channel.blocked_keywords(require=False)
 
 
 def is_allowlisted(rel_path: str) -> bool:
@@ -108,9 +103,10 @@ def scan_file(path: str, rel_path: str, patterns: list[tuple[str, re.Pattern]]) 
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
             for lineno, line in enumerate(f, 1):
-                for term, pattern in patterns:
+                for idx, (_term, pattern) in enumerate(patterns):
                     if pattern.search(line):
-                        violations.append(f"  {rel_path}:{lineno}: '{term}' found in: {line.rstrip()[:120]}")
+                        # #2370: NEVER echo the term or the line (CI logs are public)
+                        violations.append(f"  {rel_path}:{lineno}: blocked term #{idx} (masked)")
     except (OSError, UnicodeDecodeError):
         pass
     return violations
@@ -119,8 +115,14 @@ def scan_file(path: str, rel_path: str, patterns: list[tuple[str, re.Pattern]]) 
 def main() -> int:
     blocked = load_blocked_terms()
     if not blocked:
-        print("[content-policy-scan] No blocked terms loaded — check config/content_filter.json")
-        return 1
+        # No channel source (public CI without the secret, or a bare local clone).
+        # Skip VISIBLY — never scan with an empty vocabulary and call it a pass.
+        print(
+            "::warning title=content-policy-scan skipped::no content-filter channel source "
+            "(env CONTENT_FILTER_JSON / config/content_filter.local.json / S3) — "
+            "inject the CI secret to arm this gate (#2370)."
+        )
+        return 0
 
     patterns = [(term, build_term_pattern(term)) for term in blocked]
     print(f"[content-policy-scan] Scanning {len(SCAN_DIRS)} directories for {len(blocked)} blocked terms...")

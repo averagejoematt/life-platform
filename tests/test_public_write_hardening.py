@@ -59,10 +59,10 @@ def test_vote_rejects_unknown_catalog_id(monkeypatch):
 
 def test_vote_rejects_private_challenge(monkeypatch):
     # public:false vice entries must not be voteable from the public site
-    monkeypatch.setattr(social, "_challenge_catalog_cache", {"challenges": [{"id": "no-weed-30", "public": False}]})
+    monkeypatch.setattr(social, "_challenge_catalog_cache", {"challenges": [{"id": "no-zzq-30", "public": False}]})
     ft = _FakeTable()
     monkeypatch.setattr(social, "table", ft)
-    r = social._handle_challenge_vote(_event({"catalog_id": "no-weed-30"}))
+    r = social._handle_challenge_vote(_event({"catalog_id": "no-zzq-30"}))
     assert r["statusCode"] == 404
     assert ft.put_called is False
 

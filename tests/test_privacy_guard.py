@@ -32,9 +32,11 @@ def test_real_surname_blocked():
 
 
 def test_vice_blocked():
-    assert not pg.is_clean("the no-marijuana streak held")
-    assert not pg.is_clean("cut out cannabis")
-    assert not pg.is_clean("avoiding pornography")
+    # Neutral fixture vocabulary (conftest, #2370) — the real category names never
+    # appear in this public repo; the channel supplies them at runtime.
+    assert not pg.is_clean("the no-fizzlewick streak held")
+    assert not pg.is_clean("cut out grumbleflax")
+    assert not pg.is_clean("avoiding zzq")
 
 
 def test_subject_name_not_a_false_positive():
@@ -51,9 +53,9 @@ def test_common_words_not_false_positives():
 
 
 def test_scrub_redacts_inline():
-    out, n = pg.scrub("Goggins says marijuana is fine")
+    out, n = pg.scrub("Goggins says fizzlewick is fine")
     assert n >= 2
-    assert "Goggins" not in out and "marijuana" not in out
+    assert "Goggins" not in out and "fizzlewick" not in out
     assert "[redacted]" in out
 
 
@@ -64,22 +66,49 @@ def test_stale_draft_detection():
     assert not pg.is_stale_draft("2099-01-01")
 
 
-def test_edible_blocked():
-    # AUDIT PRIV-01: "edible"/"edibles" (a cannabis form) must trip the chronicle gate.
-    assert not pg.is_clean("the edible from last weekend")
-    assert not pg.is_clean("skipped edibles this week")
-    assert ("vice", "edible") in pg.find_violations("one edible on Friday")
+def test_every_configured_keyword_blocked():
+    # AUDIT PRIV-01 generalized: EVERY keyword the channel configures must trip the
+    # gate as a whole word (no keyword form silently missed).
+    for kw in pg.VICE_KEYWORDS:
+        assert not pg.is_clean(f"one {kw} on Friday"), kw
+        assert ("vice", kw) in pg.find_violations(f"one {kw} on Friday"), kw
 
 
 def test_vice_keywords_superset_of_content_filter():
     """Drift guard (AUDIT PRIV-01, theme #3): the deterministic chronicle gate must
-    never be NARROWER than the configured public filter — every blocked_vice_keyword
-    in config/content_filter.json must be covered by privacy_guard.VICE_KEYWORDS."""
-    import json
+    never be NARROWER than the configured public filter — every channel-configured
+    blocked_vice_keyword must be covered by privacy_guard.VICE_KEYWORDS (#2370: the
+    vocabulary now arrives via the non-committed channel, injected as a neutral
+    fixture by conftest; the derivation itself is what this pins)."""
+    from privacy import content_filter_channel
 
-    cf_path = os.path.join(os.path.dirname(__file__), "..", "config", "content_filter.json")
-    with open(cf_path, encoding="utf-8") as f:
-        configured = {k.lower() for k in json.load(f)["blocked_vice_keywords"]}
+    configured = {k.lower() for k in content_filter_channel.blocked_keywords(require=True)}
+    assert configured, "channel vocabulary missing — conftest injection broken"
     gate = {k.lower() for k in pg.VICE_KEYWORDS}
     missing = configured - gate
-    assert not missing, f"privacy_guard.VICE_KEYWORDS missing configured vice terms: {sorted(missing)}"
+    assert not missing, f"privacy_guard.VICE_KEYWORDS missing {len(missing)} configured vice term(s)"
+    # The extra hard-blocked keywords ride on top of the channel set.
+    for extra in pg._EXTRA_VICE_KEYWORDS:
+        assert extra in gate
+
+
+def test_vocabulary_unavailable_fails_closed(monkeypatch):
+    """#2370 fail-closed proof: with NO channel source, the gate refuses to scan
+    (raises) rather than passing text through a one-keyword vocabulary — a publish
+    gate with an empty banned set guards nothing (#2203 class)."""
+    from privacy import content_filter_channel
+
+    monkeypatch.delenv("CONTENT_FILTER_JSON", raising=False)
+    monkeypatch.setattr(content_filter_channel, "_from_local_file", lambda: None)
+    monkeypatch.setattr(content_filter_channel, "_from_s3_boto", lambda bucket: None)
+    monkeypatch.setattr(content_filter_channel, "_from_s3_cli", lambda bucket: None)
+    content_filter_channel.reset_cache()
+    pg.reset_vocabulary_cache()
+    try:
+        import pytest
+
+        with pytest.raises(content_filter_channel.ContentFilterUnavailable):
+            pg.is_clean("any text at all")
+    finally:
+        content_filter_channel.reset_cache()
+        pg.reset_vocabulary_cache()

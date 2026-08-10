@@ -167,7 +167,7 @@ Output: a **starting taste hypothesis** Cora states with honest low confidence a
 
 ## 11. The anti-Goggins rule (named, explicit)
 
-The default failure mode is "fitness guy → discipline porn." The engine **steers away from the goal-domain by default.** He is saturated in optimization; what makes him more rounded and more content is the texture his current life has none of: story, interiority, beauty, other people's inner lives, the long view.
+The default failure mode is "fitness guy → discipline-worship reading." The engine **steers away from the goal-domain by default.** He is saturated in optimization; what makes him more rounded and more content is the texture his current life has none of: story, interiority, beauty, other people's inner lives, the long view.
 
 - **"More interesting"** = texture he lacks — fiction, poetry, biography, history. Things to talk about at dinner, not more utility.
 - **"More interested"** = the right book at the right moment — momentum and joy, never homework.

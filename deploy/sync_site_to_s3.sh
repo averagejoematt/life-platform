@@ -127,9 +127,18 @@ DRY_RUN="${1:-}"
 # static site for blocked-vice terms, structural PII, and (if a local/CI denylist
 # is present) guarded personal literals. A hit aborts the sync. set -e propagates
 # the non-zero exit; the explicit message makes the block unmissable.
+# --require-vice (#2370): the deploy path MUST have the blocked-category
+# vocabulary (env CONTENT_FILTER_JSON / config/content_filter.local.json / the
+# private S3 copy — this script already requires AWS credentials, so S3 serves
+# CI). Shipping with the vice arm silently skipped is not an option here.
 echo "→ PII surface guard (ER-06)…"
-if ! python3 "$(dirname "$0")/pii_surface_guard.py" "$SITE_DIR"; then
+if ! python3 "$(dirname "$0")/pii_surface_guard.py" "$SITE_DIR" --require-vice; then
   echo "❌ PII surface guard FAILED — a guarded string or PII is on the public surface. Publish blocked." >&2
+  exit 1
+fi
+echo "→ PII surface guard — repo-hygiene arm (#2370)…"
+if ! python3 "$(dirname "$0")/pii_surface_guard.py" --tracked --require-vice; then
+  echo "❌ Repo-hygiene arm FAILED — a tracked JSON file carries a blocked-category keyword. Publish blocked." >&2
   exit 1
 fi
 

@@ -63,7 +63,7 @@ def test_clean_line_is_markable():
 @pytest.mark.parametrize(
     "line,category",
     [
-        ("I really wanted an edible tonight", "substances"),  # privacy_guard base set
+        ("I really wanted a fizzlewick tonight", "substances"),  # privacy_guard base set (neutral fixture vocab, #2370)
         ("two beers and I was drunk by nine", "substances"),  # the widened alcohol family
         ("my sister called about the estate", "family_specifics"),
         ("dinner with my mother-in-law went sideways", "family_specifics"),
@@ -248,8 +248,6 @@ def coach_module(monkeypatch):
 
 
 def _body(resp):
-    import json
-
     assert resp["statusCode"] == 200
     return json.loads(resp["body"])
 
@@ -293,16 +291,16 @@ def test_endpoint_withholds_a_quote_the_first_screen_flags(coach_module):
     ft.put_item(
         Item={
             "pk": QUOTES_PK,
-            "sk": jq.quote_sk("2026-07-21", "weed on my mind"),
+            "sk": jq.quote_sk("2026-07-21", "zzq on my mind"),
             "date": "2026-07-21",
-            "quote": "weed on my mind",
+            "quote": "zzq on my mind",
             "marked_at": "2026-07-21T20:00:00Z",
             "grounding": "verified",
         }
     )
     # Precondition that motivates this being a first-layer (not second-layer) test:
     # the fixture trips find_mark_violations itself.
-    assert jq.find_mark_violations("weed on my mind") != []
+    assert jq.find_mark_violations("zzq on my mind") != []
     body = _body(sc.handle_journal_quotes({"queryStringParameters": None}))
     assert body["quotes"] == [] and body["featured"] is None
 
@@ -324,18 +322,19 @@ def test_endpoint_withholds_a_quote_only_the_second_screen_would_catch(coach_mod
     handler withholds the quote — this is the ONLY one of the two screens that
     catches this fixture, so a screen-2 regression genuinely reds this test.
 
-    The vice term is pulled live from config/content_filter.json (the same file
-    _scrub_blocked_terms's runtime fallback mirrors) rather than hardcoded, so the
-    fixture tracks the real vocabulary instead of a copy of it."""
+    The vice term is pulled live from the ER-06 channel (#2370: the same
+    non-committed source _scrub_blocked_terms enforces at runtime — the unit
+    suite sees conftest's neutral fixture vocabulary) rather than hardcoded, so
+    the fixture tracks the configured vocabulary instead of a copy of it."""
     sc, ft = coach_module
-    cf_path = os.path.join(_REPO, "config", "content_filter.json")
-    with open(cf_path, encoding="utf-8") as f:
-        cf = json.load(f)
+    from privacy import content_filter_channel
+
+    keywords = content_filter_channel.blocked_keywords(require=True)
     # _scrub_blocked_terms's normalized fail-safe only fires for terms whose
     # de-spaced form is >=7 chars (see its docstring) — pick the shortest term
     # that qualifies, so the fixture stays as mild as the vocabulary allows.
     term = min(
-        (kw for kw in cf["blocked_vice_keywords"] if len(sac._normalize_for_detection(kw)) >= 7),
+        (kw for kw in keywords if len(sac._normalize_for_detection(kw)) >= 7),
         key=len,
     )
     obfuscated_term = " ".join(term)  # defeats the \b-anchored regex both screens' literal passes use
@@ -592,7 +591,7 @@ def test_1804_clean_quote_still_serves_normally(coach_module):
 
 def test_1804_serve_withholds_a_verified_quote_only_the_widened_gate_catches(coach_module):
     """A stored quote clean under the OLD narrow _scrub_blocked_terms list (it
-    only blocks marijuana/porn-family terms, never the alcohol-beverage family)
+    only blocks the channel vice-family terms, never the alcohol-beverage family)
     but caught by jq.find_mark_violations (SUBSTANCE_EXTRA) must be withheld at
     serve time — proving the re-screen is retroactive, not just mark-time."""
     sc, ft = coach_module

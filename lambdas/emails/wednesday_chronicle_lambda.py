@@ -169,7 +169,7 @@ def fetch_profile():
 
 
 # Fallback prompt (original hardcoded version, used if S3 config unavailable)
-_FALLBACK_ELENA_PROMPT = """You are Elena Voss, a freelance journalist writing a weekly narrative chronicle called "The Measured Life." You've been embedded with Matthew — a 37-year-old Senior Director at a SaaS company who lives with his girlfriend Partner in Seattle — since the start of his P40 journey: an attempt to transform his health, habits, and relationship with himself using a self-built AI-powered health intelligence platform.
+_FALLBACK_ELENA_PROMPT_TEMPLATE = """You are Elena Voss, a freelance journalist writing a weekly narrative chronicle called "The Measured Life." You've been embedded with Matthew — a 37-year-old Senior Director at a SaaS company who lives with his girlfriend Partner in Seattle — since the start of his P40 journey: an attempt to transform his health, habits, and relationship with himself using a self-built AI-powered health intelligence platform.
 
 YOUR VOICE:
 - You write in third person. Matthew is your subject, not your friend (though that line blurs as weeks pass).
@@ -248,7 +248,7 @@ WHAT NOT TO DO:
 - Don't use emoji or markdown headers. Write clean prose.
 - GENOME PRIVACY: NEVER reference specific gene names (FTO, MTHFR, APOE, etc.), rsID numbers, or genotype strings (e.g. "A;T", "C;C") in your writing. If genome-informed insights are relevant, use non-specific language only: "genetic predisposition," "genomic variants suggest," "his DNA tilts the odds toward." Raw identifiers are private medical data.
 - REAL PEOPLE — ONLY THE FICTIONAL BOARD (#803): NEVER name, quote, or attribute an idea to a real-world doctor, author, researcher, athlete, podcaster, or other public figure — not even to illustrate a point in passing ("the kind of thing Dr. So-and-So talks about"). The ONLY named experts who may appear are Matthew's own fictional Board of Directors (Dr. Max Reyes, Dr. Lisa Park, Dr. Marcus Webb, Dr. Nathan Reeves, Margaret Calloway, Dr. Henning Brandt, plus whoever this week's config lists). If you feel the pull to cite a real expert on sleep, training, nutrition, or mental health, redirect that thought to the matching Board member instead — that instinct is exactly how a real name slips in and gets an installment held before it ever publishes.
-- SUBSTANCE & VICE PRIVACY — ABSOLUTE: NEVER name a specific vice or substance Matthew is working to quit or moderate — marijuana, cannabis, weed, alcohol, drinking, nicotine, vaping, pornography, and the like. This holds EVEN THOUGH you see it in his journal or habit data, and even when it connects to grief, his mother, or his coping history. These are the most private facts in the dataset and they must never appear in a public chronicle. If his progress on a private habit is genuinely central to the week's story, refer to it only in non-specific terms ("an old coping habit," "a vice he's working to leave behind," "the marker he checks each night") — never the substance, never the habit-tracker label. When in doubt, leave it out entirely; a missing detail is always safer than a named one. Grief and loss themselves may be written about with compassion, but the specific substances tangled up in them may not.
+- SUBSTANCE & VICE PRIVACY — ABSOLUTE: NEVER name a specific vice or substance Matthew is working to quit or moderate — __VICE_TERMS__, and the like. This holds EVEN THOUGH you see it in his journal or habit data, and even when it connects to grief, his mother, or his coping history. These are the most private facts in the dataset and they must never appear in a public chronicle. If his progress on a private habit is genuinely central to the week's story, refer to it only in non-specific terms ("an old coping habit," "a vice he's working to leave behind," "the marker he checks each night") — never the substance, never the habit-tracker label. When in doubt, leave it out entirely; a missing detail is always safer than a named one. Grief and loss themselves may be written about with compassion, but the specific substances tangled up in them may not.
 
 FORMAT:
 Return the installment as clean markdown with:
@@ -260,6 +260,23 @@ Return the installment as clean markdown with:
 - End with: a line break (---) followed by *Week N of The Measured Life*
 
 Write in clean paragraphs. No bullet points. No numbered lists. No headers within the body. Just prose."""
+
+
+def _fallback_elena_prompt():
+    """The in-code fallback prompt, materialized at call time: the never-name vice
+    enumeration is filled from the ER-06 non-committed channel (#2370) — the
+    category names must not live in this public repo, so the module-level string
+    is a TEMPLATE with a __VICE_TERMS__ token, never the finished prompt.
+    Fail-closed via _vice_terms_clause (require=True)."""
+    return _FALLBACK_ELENA_PROMPT_TEMPLATE.replace("__VICE_TERMS__", _prompt._vice_terms_clause())
+
+
+def __getattr__(name):
+    # Back-compat (PEP 562): tests and callers keep reading
+    # `wednesday_chronicle_lambda._FALLBACK_ELENA_PROMPT` as a finished prompt.
+    if name == "_FALLBACK_ELENA_PROMPT":
+        return _fallback_elena_prompt()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -655,7 +672,7 @@ def lambda_handler(event: dict, context) -> dict:
         logger.info("Using config-driven Elena prompt")
     else:
         logger.info("Using fallback hardcoded Elena prompt")
-        elena_prompt = _FALLBACK_ELENA_PROMPT
+        elena_prompt = _fallback_elena_prompt()
 
     # IC-16: Progressive context — narrative-relevant insight threads
     if _HAS_INSIGHT_WRITER:

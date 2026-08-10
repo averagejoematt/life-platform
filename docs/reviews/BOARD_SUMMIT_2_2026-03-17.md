@@ -24,7 +24,7 @@
 - Current weight: **287.7 lbs** (down 14.3 from 302.0 start on 2026-02-22)
 - BMI: 42.5 (Obese Class III — next milestone: Class II at BMI <40, ~17.5 lbs away)
 - Rate flags: ⚠️ Multiple weeks flagged "losing too fast" (>2.5 lbs/wk)
-- 7 Tier 0 habits: Calorie Goal, Hydrate 3L, Morning Sunlight, No Alcohol, No Marijuana, Primary Exercise, Walk 5k
+- 7 Tier 0 habits: Calorie Goal, Hydrate 3L, Morning Sunlight, No Alcohol, [a blocked habit], Primary Exercise, Walk 5k
 - 65 total habits (7 T0 / 22 T1 / 36 T2)
 
 ---

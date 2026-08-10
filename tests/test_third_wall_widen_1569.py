@@ -39,8 +39,8 @@ import mcp.tools_lifestyle as tl  # noqa: E402
 # The runtime content filter's term source — pinned here so scrubbing is deterministic
 # and hits no S3. This is the SAME shape site_api_common._load_content_filter returns.
 _FILTER = {
-    "blocked_vices": ["No porn", "No marijuana"],
-    "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
+    "blocked_vices": ["No fizzlewick", "No grumbleflax"],
+    "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
 }
 
 
@@ -227,7 +227,7 @@ def test_experiments_omits_absent_note(monkeypatch):
 def test_experiments_drops_note_that_fails_content_filter(monkeypatch):
     """A verbatim note mentioning a blocked vice is withheld entirely → renders
     nothing (never a partially-scrubbed fragment on this public card)."""
-    prot, g = _protocols_module(monkeypatch, [_exp_row(matthew_note="Cut back on marijuana this cycle.")])
+    prot, g = _protocols_module(monkeypatch, [_exp_row(matthew_note="Cut back on fizzlewick this cycle.")])
     exp = _body(prot.experiments(_g=g))["experiments"][0]
     assert "matthew_note" not in exp
 
@@ -287,7 +287,7 @@ def test_decisions_empty_when_no_notes(monkeypatch):
 
 
 def test_decisions_content_filters_the_note(monkeypatch):
-    rows = [_dec_row("2026-07-20T10:00:00.000Z", note="Skipped the marijuana this week.", note_at="2026-07-20T10:00:00.000Z")]
+    rows = [_dec_row("2026-07-20T10:00:00.000Z", note="Skipped the fizzlewick this week.", note_at="2026-07-20T10:00:00.000Z")]
     body = _coach_decisions(monkeypatch, rows)
     # The note is withheld by the filter → the decision has no publishable note → not shown.
     assert body["count"] == 0

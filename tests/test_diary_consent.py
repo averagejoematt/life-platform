@@ -18,10 +18,10 @@ from privacy import diary_consent as dc  # noqa: E402
 # A deliberately sensitive raw entry — every distinctive token here is a canary: if any
 # of them ever appears in a public context, the leak boundary is broken.
 _SECRET_BODY = (
-    "Relapsed again last night after the fight with Dana. I smoked and then watched porn "
+    "Relapsed again last night after the fight with Dana. I smoked and then watched zzq "
     "until 3am and felt disgusting. The specific thing I can't tell anyone is the debt."
 )
-_CANARIES = ["Dana", "smoked", "porn", "disgusting", "debt", "relapsed", "3am"]
+_CANARIES = ["Dana", "smoked", "zzq", "disgusting", "debt", "relapsed", "3am"]
 
 
 def _flatten(obj):

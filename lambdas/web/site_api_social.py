@@ -1262,7 +1262,7 @@ def handle_challenges() -> dict:
     "taken on / active". The challenge catalog (config/challenges_catalog.json,
     84 challenges) is always overlaid as origin='catalog' so the page shows the
     available + backlog pipeline even right after an experiment reset wipes the
-    live partition. Blocked vices (porn/marijuana/…) are filtered server-side.
+    live partition. Blocked vices (the never-public categories) are filtered server-side.
     """
     import re as _re
 
