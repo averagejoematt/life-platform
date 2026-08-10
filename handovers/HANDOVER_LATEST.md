@@ -47,6 +47,13 @@ Triage: epic #1024 closed complete; 7 Later→Next promotions; 2 fable→opus re
 - **Owner ⑥** portraits contact-sheet for Vale/Brooks (ADR-106); #2465 Monday rituals.
 - **Live QA is the acceptance bar for Act 1** — text the coaches in the morning: do they match your register, skip the stat recital, take an off-topic message like a person, and cite their own predictions naturally? #2492 (prompt-pass v3: grounded pushback + conversational repair) is the filed follow-up.
 
+## Exact CI/deploy state at close (read before shipping anything)
+
+- **main is GREEN** — `check_main_green.py` ✅ at `5914d111`, the last completed ci-cd run (success, deployed through the gate). Site-deploy green at `6dcb4cda`.
+- **Everything through `5914d111` is DEPLOYED and spot-verified.** `verify_deployed_symbol.sh` confirms both coach changes are live in the `telegram-coach-worker` bundle (2026-08-10T04:23Z): `build_system_blocks` in `coach/coach_chat.py` (the caching rewrite) and `_experiment_frame_lines` in `coach/coach_domain_facts.py` (Day-N + predictions). So the register rules, the caching, and the experiment frame are already in the worker Matthew texts this morning.
+- **#2505 is MERGED but NOT deployed, and its push event was swallowed.** GitHub minted **zero** workflow runs for `1a7d66c4` even though it touches `lambdas/**`, `cdk/**` and `config/**` (all ci-cd trigger paths) — the `push-CI silent death` class; `check_deploy_wedge.py` reports no wedge, so this is a dropped event, not a lease problem. **Deliberately not force-dispatched:** a dispatched run would red at Plan anyway (R8-ST6, #2505's own IAM diff) and a red run would falsely muddy main's green state overnight for no gain.
+- **The recovery is free, because the owner's cdk run is the fix.** `cdk_deploy.sh LifePlatformServe` deploys the Serve stack's Lambda code (full-tree bundle, #781) *and* the new rule *and* the IAM in one step — so Owner ① below covers #2505 completely. If a later session wants CI back first instead: `gh workflow run ci-cd.yml -f deploy_all=true` **after** the cdk run, never before.
+
 ## Model note (matters for what the next session may pick up)
 
 The Fable weekly allowance was exhausted partway through the close-out; the tail of this session ran on **Opus 5**. Everything after that point was mechanical — merges, gate reruns, deploy verification, the wrap — deliberately **no `model:fable` work was started**, because a voice/taste judgment made by a different model than the one the ritual is calibrated on isn't the same artifact (`feedback_review_ritual_model_identity`). Deferred to the Fable reset (Saturday), not dropped:
