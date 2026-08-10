@@ -342,6 +342,31 @@ class ServeStack(Stack):
         )
         _telegram_worker_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # Act 1b: the worker gained a SCHEDULED path (the morning check-in), and a
+        # scheduled path has no human on the other end to notice it broke — the
+        # inbound half at least has Matthew wondering why nobody answered. The
+        # function was created with alerts_topic=None, so until now it had no error
+        # alarm at all. Threshold 3/hour rather than 1: the outbound gates are
+        # deliberately fail-soft and a single transient DDB/Bedrock blip is already
+        # absorbed, so one error is noise and a repeated one is a broken deploy.
+        _telegram_worker_errors = cloudwatch.Alarm(
+            self,
+            "TelegramWorkerErrors",
+            alarm_name="telegram-worker-errors",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": "telegram-coach-worker"},
+                period=Duration.hours(1),
+                statistic="Sum",
+            ),
+            threshold=3,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _telegram_worker_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         _telegram_webhook_throttles = cloudwatch.Alarm(
             self,
             "TelegramWebhookThrottles",
