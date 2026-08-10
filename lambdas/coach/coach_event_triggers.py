@@ -436,7 +436,7 @@ def candidates(signals: dict, today: str) -> list:
     for two daily slots, so a soft concern outranks a celebration inside one sweep
     and the last-to-fire feature is not permanently starved.
     """
-    found = []
+    found: list = []
     for detector, arg in (
         (detect_open_loops, (signals or {}).get("open_loops") or []),
         (detect_recovery_slide, (signals or {}).get("recovery") or {}),

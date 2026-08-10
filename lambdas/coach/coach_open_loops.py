@@ -60,7 +60,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ _IN_N_DAYS_RE = re.compile(r"\bin\s+(\d{1,2}|one|two|three|four|five|six|seven|t
 _WORD_N = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "ten": 10}
 
 
-def _day(value) -> Optional[object]:
+def _day(value) -> Optional[date]:
     try:
         return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
     except (TypeError, ValueError):

@@ -47,7 +47,7 @@ which is itself a humanity feature: a friend who makes things up stops being one
 |---|------|--------|
 | 12 | First-person memory voice — summaries as the coach's notes-to-self, not meeting minutes | **shipped** (#2481) |
 | 13 | Persona outranks poisoned notes — identity is never re-litigated from a bad memory row | **shipped** (#2481) |
-| 14 | Open-loop keeping — "I'll check in Friday" is a promise the coach actually keeps (scheduled follow-through on coach commitments) | filed |
+| 14 | Open-loop keeping — "I'll check in Friday" is a promise the coach actually keeps (scheduled follow-through on coach commitments) | **shipped** (#2486 — extracted from the stored `CHAT#` turn, not a derived row) |
 | 15 | Memory callbacks with feeling — "how'd the 5am push day actually go?" | **shipped** in substance (summaries + morning check-in); quality tracked here |
 | 16 | Inside references — recurring bits accumulate per relationship (a RELATIONSHIP#bits ledger, capped, curated) | filed |
 | 17 | His-people memory — names he mentions (friends, family) persist so a coach can ask about them later (internal only, never on any public surface) | filed |
@@ -65,7 +65,7 @@ which is itself a humanity feature: a friend who makes things up stops being one
 | 24 | Hard caps as a feature — ≤2 unsolicited texts/day platform-wide; scarcity is what keeps initiative human | **shipped** (outbound PR) |
 | 25 | Event-triggered celebration — a PR on a lift, a weight milestone: the right coach texts first | **shipped** (#2490) |
 | 26 | Event-triggered concern — three bad recovery days: Lisa checks in softly | **shipped** (#2490) |
-| 27 | Pre-event support — he mentions a presentation tomorrow; the mind coach texts that morning (COMMITMENT# rows already exist as the substrate) | filed |
+| 27 | Pre-event support — he mentions a presentation tomorrow; the coach he TOLD texts that morning | **shipped** (#2486, same extractor — the `COMMITMENT#` substrate premise was wrong: those rows are the nightly `OUTPUT#` extraction, coach→Matthew actions) |
 | 28 | Sunday-evening reflection from Eli (the week, in one warm text — distinct from the Monday compass email) | horizon |
 | 29 | Non-data initiative from persona interests ("watched the game?") | horizon (needs real persona-interest grounding to not be hollow) |
 
