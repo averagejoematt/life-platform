@@ -20,6 +20,12 @@ Checks:
   2. Decision class compliance — does the output exceed the evidence ceiling?
   3. Voice distinctiveness — does the output match the coach's structural signature?
   4. Cross-coach similarity — does this output sound too similar to other coaches?
+  5. Self-repetition (#2350, ADR-105) — deterministic, NO LLM: the candidate is
+     scored against this coach's own trailing OUTPUT# history by
+     `coach.coach_repetition_detector` (shingle Jaccard, personal-variance
+     threshold) BEFORE the LLM verdict. Attached as the advisory `repetition`
+     section of the report; never affects `passed` (ADR-108 promotion pattern —
+     advisory until the flag rate is measured on real outputs).
 
 Returns a quality report with pass/fail, score, and detailed findings.
 
@@ -252,6 +258,50 @@ def _load_voice_spec(coach_id):
     except Exception as e:
         logger.warning("Failed to load voice spec for %s: %s — using empty default", coach_id, e)
         return {}
+
+
+def _self_repetition_report(coach_id, output_text):
+    """Deterministic self-repetition detector (#2350, ADR-105).
+
+    Scores the candidate against this coach's OWN trailing OUTPUT# history via
+    plain-code shingle similarity (coach_repetition_detector) — computed before
+    and independently of the LLM verdict, no AI call, so it runs identically at
+    every budget tier. Advisory: the section is attached to the report and never
+    flips `passed` (ADR-108 posture — measure the flag rate before promoting).
+
+    Fail-soft: any failure returns verdict=None with status="error" — a missing
+    verdict is absence, never a green "no repetition".
+    """
+    try:
+        from datetime import datetime, timezone
+
+        from coach import coach_repetition_detector as repdet
+
+        # A candidate too short to ever earn a verdict shouldn't cost a DDB read.
+        precheck = repdet.detect(output_text, [])
+        if precheck.get("status") == "insufficient_text":
+            return precheck
+
+        items = _query_begins_with(
+            f"COACH#{coach_id}",
+            "OUTPUT#",
+            scan_forward=False,
+            limit=repdet.TRAILING_WINDOW + 1,
+        )
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        history = []
+        for it in items:
+            sk = it.get("sk", "")
+            content = it.get("content") or ""
+            # A same-day record with byte-identical content is this run's own
+            # already-published draft (gate re-run), not an earlier output.
+            if content == output_text and sk.startswith(f"OUTPUT#{today}"):
+                continue
+            history.append({"id": sk, "content": content})
+        return repdet.detect(output_text, history)
+    except Exception as e:
+        logger.warning("repetition detector failed for %s (advisory, fail-soft): %s", coach_id, e)
+        return {"status": "error", "verdict": None, "error": str(e), "advisory": True}
 
 
 def _fetch_other_coaches_recent_outputs(coach_id, other_coach_ids=None):
@@ -592,6 +642,10 @@ def lambda_handler(event, context):
                 # Fetch recent outputs from other coaches
                 other_outputs = _fetch_other_coaches_recent_outputs(coach_id)
 
+        # #2350 — deterministic self-repetition check FIRST (ADR-105: computed
+        # before any LLM verdict). Advisory section; never affects `passed`.
+        repetition = _self_repetition_report(coach_id, output_text)
+
         # Run the quality gate
         report = _run_quality_gate(
             coach_id,
@@ -600,12 +654,14 @@ def lambda_handler(event, context):
             generation_brief,
             other_outputs,
         )
+        report["repetition"] = repetition
 
         logger.info(
-            "coach-quality-gate COMPLETE — coach=%s, passed=%s, score=%s",
+            "coach-quality-gate COMPLETE — coach=%s, passed=%s, score=%s, repetition=%s",
             coach_id,
             report.get("passed"),
             report.get("score"),
+            repetition.get("verdict"),
         )
 
         return {
@@ -627,4 +683,6 @@ def lambda_handler(event, context):
             "voice_distinctiveness_score": 0,
             "cross_coach_similarity_flags": [],
             "suggestions": [f"Quality gate crashed: {e}"],
+            # #2350 — honest absence: the detector did not run, so no verdict.
+            "repetition": {"status": "error", "verdict": None, "error": str(e), "advisory": True},
         }
