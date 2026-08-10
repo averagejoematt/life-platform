@@ -374,8 +374,19 @@ never re-diagnose them as ordinary red/green:
    (`reference_push_ci_silent_death`) — which has the OPPOSITE fix. **The
    distinguishing tell: phantom = 0 jobs AND no other run in the group; stranded
    gate = 0-job runs queued BEHIND an older run in `waiting`.** Check
-   `gh run list --branch main` for a `waiting` run FIRST. Recovery: action the gate —
-   `bash deploy/approve_deployment.sh` (approve or reject, on Matthew's say-so). Do
+   `gh run list --branch main` for a `waiting` run FIRST. Recovery splits on the
+   holder's AGE (#2467): a **fresh** run (younger than ~24h,
+   `STALE_GATE_REJECT_HOURS` in `check_deploy_wedge.py`) — action the gate,
+   `bash deploy/approve_deployment.sh` (approve or reject, on Matthew's say-so). A
+   **stale** one — **REJECT it immediately**: `bash deploy/reject_deployment.sh
+   <run_id>` (`POST …/actions/runs/<id>/pending_deployments` with
+   `state=rejected` — the run dies, nothing stale deploys, the slot frees). Never
+   approve a stale run (it deploys the old sha it was minted from) and never leave
+   one waiting: a Deploy parked at the gate OCCUPIES the job-level
+   `ci-cd-deploy-<ref>` slot, so leave-waiting holds the whole fleet hostage (the
+   2026-08-09 all-day wedge — and "GitHub expires them at 30d" was false at day 8).
+   `deploy/watch_deploy_gate.sh` now enforces this posture automatically (stale →
+   reject, logged; the old pin-exclude-and-leave-waiting zombie list is retired). Do
    NOT cancel the waiting run: a cancelled run strands its deploy → recover with a
    `deploy_all=true` workflow_dispatch of `ci-cd.yml`. (Observed 2026-07-28: run
    30324990970 held the gate ~15h; the #1653 merge queued behind it and never
@@ -417,7 +428,10 @@ never re-diagnose them as ordinary red/green:
    holder + blocked past the threshold = phantom.
 
    Do not diagnose this by eye. Run **`python3 scripts/check_deploy_wedge.py`**, which
-   fetches the per-run job state `gh run list` does not carry. Recovery:
+   fetches the per-run job state `gh run list` does not carry — and, since #2467,
+   enumerates ALL non-completed runs on the workflow (each in-flight status queried
+   explicitly, paginated, **no recency bound**), so a gate-parked `waiting` run of ANY
+   age is named as the holder with its age before "phantom" can be concluded. Recovery:
    `--recover` (cancel the wedged run, re-dispatch `ci-cd.yml` with `deploy_all=true` —
    a dispatch has no push diff, so change detection would otherwise deploy nothing).
    **Do NOT salt the concurrency group** — see the ledger below.
@@ -447,7 +461,7 @@ fix before #2052 was shipped **blind**: nothing measured the wedge while it was 
 | 3 | 2026-08-02 | same, group otherwise EMPTY | salt `-v4` | recurred same day |
 | 4 | 2026-08-02 | same, sole member of its group | **#2009 redesign** — workflow group per-`run_id`; the real invariant moved to a job-level group on `deploy` | moved the wedge, did not remove it |
 | 5 | 2026-08-02 | **5 green jobs**, `Deploy` blocked, gate never opens | **#2052** — detection + escape hatch (`check_deploy_wedge.py`, `deploy-wedge-watch.yml`) | measured for the first time |
-| 6 | 2026-08-09 | all-day wedge; THREE `deploy_all` dispatches blocked in sequence; `--recover` looped | **root cause finally measured (#2467): not phantom** — two 8-day-old gated runs (08-01/02) sat `waiting` with Deploy parked at the gate, silently holding the job-level slot; the script's recent-run window couldn't see them, so it read "no holder = phantom". Cure: **REJECT the zombies' pending_deployments** (state=rejected — run dies, nothing stale ships, slot frees). The "pin-exclude and leave waiting" zombie posture is retired — leave-waiting = hold-the-fleet-hostage; and "GitHub expires them at 30d" was false at day 8 | the sixth entry closes the ledger's question: entries 1–5's "phantom" may have been unseen gate-parked holders all along |
+| 6 | 2026-08-09 | all-day wedge; THREE `deploy_all` dispatches blocked in sequence; `--recover` looped | **root cause finally measured (#2467): not phantom** — two 8-day-old gated runs (08-01/02) sat `waiting` with Deploy parked at the gate, silently holding the job-level slot; the script's recent-run window couldn't see them, so it read "no holder = phantom". Cure: **REJECT the zombies' pending_deployments** (state=rejected — run dies, nothing stale ships, slot frees). The "pin-exclude and leave waiting" zombie posture is retired — leave-waiting = hold-the-fleet-hostage; and "GitHub expires them at 30d" was false at day 8. **Fix shipped (#2467): the holder scan enumerates ALL non-completed runs (paginated, no recency bound); stale gate holders get reject guidance (`deploy/reject_deployment.sh`), and `watch_deploy_gate.sh` auto-rejects them** | the sixth entry closes the ledger's question: entries 1–5's "phantom" may have been unseen gate-parked holders all along |
 
 Two things the ledger settles. **Salting never worked** — three attempts, three
 recurrences, median 3 days; a `-v5` is not a fix. And **#2009's consolation was wrong**:
