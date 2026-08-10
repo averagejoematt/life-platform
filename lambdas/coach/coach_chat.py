@@ -175,7 +175,7 @@ def format_thread(thread: list, max_turns: int = MAX_THREAD_TURNS) -> list:
     return messages
 
 
-def build_system_prompt(persona_block: str, memory_block: str, facts_block: str, coach_name: str) -> str:
+def build_system_prompt(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> str:
     """The system message: WHO the coach is, WHAT they remember, WHAT is true today.
 
     Order is deliberate. Persona first because it is the largest and most stable
@@ -193,8 +193,24 @@ def build_system_prompt(persona_block: str, memory_block: str, facts_block: str,
             f"You may split a reply into separate bubbles the way a person fires off consecutive texts: put a line "
             f'containing only "{BUBBLE_DELIM}" between bubbles, {MAX_BUBBLES} bubbles at most. Most replies are one '
             "bubble; use two or three only when the rhythm genuinely calls for it.",
+            colleagues_block,
             memory_block,
             facts_block,
+            # The go-live QA (2026-08-09 evening) found the three robotic tells these
+            # rules exist for: a stats recap opening every reply, a re-answer of an
+            # already-answered question after a bare "hey", and the CURRENT MOMENT
+            # context line parroted back as its own bubble.
+            "CONVERSATION RULES — the thread above is shared memory, not a to-do list:\n"
+            "- Respond to his LATEST message. Earlier messages are context you both already have.\n"
+            "- Never re-answer a question you already answered, and never restate a number or reading you already "
+            "sent in this conversation unless he asks for it again.\n"
+            "- Do NOT open with your domain data unless he asked for it — lead with a response to what he actually "
+            "said. Your facts are for when they're wanted, like a person who knows things but doesn't recite them.\n"
+            "- If an earlier question of his only became answerable now (new data arrived), say that plainly "
+            "('now that I can see it: …') instead of answering cold.\n"
+            "- Never announce the current date or time unless he asks; it is context for YOU.\n"
+            "- When something is another coach's lane, refer to them by their real name from YOUR COLLEAGUES (and "
+            "their correct pronouns) — never a generic 'the mind coach'.",
             "HARD RULE: every number, date, and day-reference you state must come from the facts above. If the facts "
             "do not contain what he asked about, say you don't have it — do not estimate, do not reach for a typical "
             "value, and do not attach today to a reading from another day. Naming the day a reading belongs to is "
@@ -214,6 +230,7 @@ def build_request(
     inbound: str,
     model: str,
     max_tokens: int = 400,
+    colleagues_block: str = "",
 ) -> dict:
     """The Anthropic Messages body. Pure — builds a dict, calls nothing."""
     messages = format_thread(thread)
@@ -221,7 +238,7 @@ def build_request(
     return {
         "model": model,
         "max_tokens": max_tokens,
-        "system": build_system_prompt(persona_block, memory_block, facts_block, coach_name),
+        "system": build_system_prompt(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block),
         "messages": messages,
     }
 
@@ -374,6 +391,7 @@ def run_turn(
     turns_today: int = 0,
     cap: int = DAILY_TURN_CAP,
     last_reply_had_emoji: bool = False,
+    colleagues_block: str = "",
 ) -> TurnResult:
     """One conversational turn: budget -> generate -> ground -> regenerate-or-hold.
 
@@ -400,6 +418,7 @@ def run_turn(
         thread=thread,
         inbound=inbound,
         model=model,
+        colleagues_block=colleagues_block,
     )
 
     attempts = 0

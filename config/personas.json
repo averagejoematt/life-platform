@@ -31,7 +31,8 @@
       "tts_voice": "en-US-Chirp3-HD-Kore",
       "title": "Sleep & Recovery",
       "lens": "sleep architecture, recovery, HRV, circadian rhythm",
-      "telegram_route": "sleep"
+      "telegram_route": "sleep",
+      "pronouns": "she/her"
     },
     "training_coach": {
       "name": "Dr. Sarah Chen",
@@ -50,7 +51,8 @@
       "tts_voice": "en-US-Chirp3-HD-Leda",
       "retired": true,
       "retired_date": "2026-08-10",
-      "retirement_note": "Retired at the cycle-13 genesis; the Performance seat (Dr. Max Reyes) absorbs training, cardio, and mobility. Published history under her byline stays attributed to her."
+      "retirement_note": "Retired at the cycle-13 genesis; the Performance seat (Dr. Max Reyes) absorbs training, cardio, and mobility. Published history under her byline stays attributed to her.",
+      "pronouns": "she/her"
     },
     "nutrition_coach": {
       "name": "Dr. Marcus Webb",
@@ -69,7 +71,8 @@
       "tts_voice": "en-US-Chirp3-HD-Charon",
       "title": "Evidence-Based Nutrition",
       "lens": "energy balance, protein, adherence, a sustainable deficit",
-      "telegram_route": "nutrition"
+      "telegram_route": "nutrition",
+      "pronouns": "he/him"
     },
     "mind_coach": {
       "name": "Dr. Nathan Reeves",
@@ -88,7 +91,8 @@
       "tts_voice": "en-US-Chirp3-HD-Fenrir",
       "title": "Mind & Behaviour",
       "lens": "habits, stress, motivation, behavioural patterns",
-      "telegram_route": "mind"
+      "telegram_route": "mind",
+      "pronouns": "he/him"
     },
     "physical_coach": {
       "name": "Dr. Max Reyes",
@@ -107,7 +111,8 @@
       "tts_voice": "en-US-Chirp3-HD-Orus",
       "title": "Performance & Training",
       "lens": "training load, strength + cardio programming, movement capability, body composition",
-      "telegram_route": "physical"
+      "telegram_route": "physical",
+      "pronouns": "he/him"
     },
     "glucose_coach": {
       "name": "Dr. Amara Patel",
@@ -126,7 +131,8 @@
       "tts_voice": "en-US-Chirp3-HD-Zephyr",
       "consulting": true,
       "title": "Glucose & Metabolic Response",
-      "lens": "glucose response, meal timing, metabolic flexibility"
+      "lens": "glucose response, meal timing, metabolic flexibility",
+      "pronouns": "she/her"
     },
     "labs_coach": {
       "name": "Dr. James Okafor",
@@ -145,7 +151,8 @@
       "tts_voice": "en-US-Chirp3-HD-Puck",
       "consulting": true,
       "title": "Labs & Biomarkers",
-      "lens": "bloodwork, biomarkers, long-run risk factors"
+      "lens": "bloodwork, biomarkers, long-run risk factors",
+      "pronouns": "he/him"
     },
     "explorer_coach": {
       "name": "Dr. Henning Brandt",
@@ -164,7 +171,8 @@
       "tts_voice": "en-US-Chirp3-HD-Iapetus",
       "title": "Research & Longevity",
       "lens": "evidence appraisal, N=1 methodology, what a claim actually permits",
-      "telegram_route": "explorer"
+      "telegram_route": "explorer",
+      "pronouns": "he/him"
     },
     "pattern_coach": {
       "name": "Dr. Nora Vale",
@@ -183,7 +191,8 @@
       "tts_voice": "en-US-Chirp3-HD-Erinome",
       "title": "Patterns & Early Warnings",
       "lens": "cross-domain recurrences, hypothesis lifecycle, what precedes the pattern",
-      "telegram_route": "pattern"
+      "telegram_route": "pattern",
+      "pronouns": "she/her"
     },
     "career_coach": {
       "name": "Steve Brooks",
@@ -202,7 +211,8 @@
       "tts_voice": "en-US-Chirp3-HD-Sadaltager",
       "title": "Career & Leverage",
       "lens": "career strategy, promotion readiness, influence, optionality",
-      "telegram_route": "career"
+      "telegram_route": "career",
+      "pronouns": "he/him"
     },
     "the_chair": {
       "name": "The Chair",
@@ -352,7 +362,8 @@
       "telegram_route": "headcoach",
       "chat": true,
       "title": "Head Coach",
-      "lens": "integrated strategy, cross-domain trade-offs, the one priority that matters this week"
+      "lens": "integrated strategy, cross-domain trade-offs, the one priority that matters this week",
+      "pronouns": "he/him"
     },
     "cora_vance": {
       "name": "Dr. Cora Vance",

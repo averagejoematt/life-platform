@@ -534,3 +534,35 @@ def test_eli_voice_spec_loads_offline():
     assert persona_core.texting_block(spec).startswith("HOW YOU TEXT")
     block = persona_core.persona_block("eli_marsh")
     assert "YOUR SHARED STANDARD" in block and "one decision" in block.lower()
+
+
+# ── B10: conversation continuity (go-live QA, 2026-08-09 evening) ────────────
+
+
+def test_system_prompt_carries_the_conversation_rules():
+    sysp = coach_chat.build_system_prompt("persona", "", "", "Dr. Lisa Park")
+    assert "shared memory, not a to-do list" in sysp
+    assert "never restate a number" in sysp
+    assert "Do NOT open with your domain data" in sysp
+    assert "Never announce the current date" in sysp
+    assert "now that I can see it" in sysp
+
+
+def test_colleagues_block_joins_the_prompt_between_persona_and_memory():
+    sysp = coach_chat.build_system_prompt("persona", "MEMORY", "FACTS", "Dr. Lisa Park", colleagues_block="YOUR COLLEAGUES:\n- X")
+    assert "YOUR COLLEAGUES" in sysp
+    assert sysp.index("YOUR COLLEAGUES") < sysp.index("MEMORY")
+
+
+def test_worker_colleagues_block_names_and_pronouns():
+    import unittest.mock as mock
+
+    from coach import telegram_worker_lambda as worker
+
+    with mock.patch.object(worker, "_s3_client", return_value=None):
+        block = worker._colleagues_block("sleep_coach")
+    assert "Dr. Nathan Reeves (he/him)" in block
+    assert "Dr. Max Reyes (he/him)" in block
+    assert "Dr. Lisa Park" not in block  # never lists the coach to themself
+    assert "Dr. Amara Patel (she/her)" in block  # consulting tier is citable by name
+    assert "Dr. Sarah Chen" not in block  # retired seats are not colleagues to cite
