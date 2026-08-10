@@ -25,7 +25,6 @@ from mcp import tools_lifestyle as tl  # noqa: E402
 
 OPERATIONAL = [
     "sleep_coach",
-    "training_coach",
     "nutrition_coach",
     "mind_coach",
     "physical_coach",

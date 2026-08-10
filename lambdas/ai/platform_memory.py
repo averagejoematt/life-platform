@@ -70,7 +70,7 @@ _TIER_RANK = {t: i for i, t in enumerate(PRIVACY_TIERS)}
 # #2334 roster-copy waiver: the zero-dep import contract above is deliberate;
 # equality is enforced by tests/test_platform_memory_block.py AND re-asserted by
 # tests/test_coach_roster_set_guard_2334.py.
-COACH_DOMAINS = frozenset({"sleep", "training", "nutrition", "mind", "physical", "glucose", "labs", "explorer"})
+COACH_DOMAINS = frozenset({"sleep", "nutrition", "mind", "physical", "glucose", "labs", "explorer"})
 ALL_DOMAINS = "all"
 
 # ── the taxonomy ─────────────────────────────────────────────────────────────

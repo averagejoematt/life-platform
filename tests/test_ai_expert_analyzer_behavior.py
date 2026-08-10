@@ -902,9 +902,9 @@ class TestMovementIntegrityPrompt:
     def test_an_unassessable_movement_picture_forbids_the_under_training_verdict(self, monkeypatch):
         monkeypatch.setattr(az, "_persona_core", None)
         p = az.build_prompt(
-            "training",
+            "physical",
             {
-                "expert_key": "training",
+                "expert_key": "physical",
                 "movement_source_state": {"strava": "paused", "garmin": "rate_limited", "steps": "missing"},
                 "movement_ingest_health": {},
                 "hevy_sessions": 3,
@@ -918,9 +918,9 @@ class TestMovementIntegrityPrompt:
     def test_a_confirmed_live_pipe_with_no_activity_unlocks_an_honest_rest_verdict(self, monkeypatch):
         monkeypatch.setattr(az, "_persona_core", None)
         p = az.build_prompt(
-            "training",
+            "physical",
             {
-                "expert_key": "training",
+                "expert_key": "physical",
                 "movement_source_state": {"strava": "stale", "garmin": "stale", "steps": "missing"},
                 "movement_ingest_health": {"strava": "ok"},
                 "hevy_sessions": 0,
@@ -933,9 +933,9 @@ class TestMovementIntegrityPrompt:
     def test_a_live_movement_picture_adds_no_integrity_block(self, monkeypatch):
         monkeypatch.setattr(az, "_persona_core", None)
         p = az.build_prompt(
-            "training",
+            "physical",
             {
-                "expert_key": "training",
+                "expert_key": "physical",
                 "movement_source_state": {"strava": "live", "garmin": "live", "steps": "live"},
                 "movement_ingest_health": {"strava": "ok"},
             },

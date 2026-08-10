@@ -933,6 +933,14 @@ _GENERATION_PACKAGES = ("intelligence", "coach")
 
 _GENERATION_GET_ITEM_EXEMPT: dict = {
     (
+        "coach/coach_chat_summary.py",
+        "summary_sk(target)",
+    ): "CHAT#summary — CROSS_PHASE since ADR-153 (the texting relationship survives resets); never tombstoned",
+    (
+        "coach/coach_domain_facts.py",
+        "'PROFILE#v1'",
+    ): "user profile — cross_phase, no phase attr, never tombstoned (same as intelligence_common's entry)",
+    (
         "intelligence/ai_expert_analyzer_lambda.py",
         "ingest_health_sk(src)",
     ): "SYSTEM# ingest-health ops row — system_state, never tombstoned",

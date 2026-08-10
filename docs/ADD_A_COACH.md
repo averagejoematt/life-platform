@@ -28,11 +28,14 @@ smallest tier that does the job.
 If you only need a new *voice on the board*, do §2 (personas.json) + the board member block and
 stop. The rest of this doc is the operational path.
 
-> **Invariant to respect:** the operational roster is deliberately **8** (`test_persona_registry`
-> asserts `len(_operational()) == 8` in a couple of places, and the lead-persona test asserts
-> "adding the lead must not change the operational count"). Making a 9th coach operational means
-> **updating those count assertions too** — they are a guardrail, not a law of physics, but touch
-> them consciously.
+> **Invariant to respect:** the operational roster is deliberately **7** since the 2026-08-10
+> retirement (ADR-153; it was 8 before Dr. Sarah Chen's seat merged into Performance).
+> `test_persona_registry` asserts the count, and the lead-persona test asserts "adding the lead
+> must not change the operational count". Changing the roster size means **updating those count
+> assertions too** — they are a guardrail, not a law of physics, but touch them consciously.
+> **There is also now a CHAT tier** (`chat: true` — voice spec + Telegram bot, no engine wiring:
+> pattern_coach, career_coach, eli_marsh) and a **consulting flag** (`consulting: true` — no bot:
+> glucose, labs); most new seats should start in one of those, not operational.
 
 ---
 
@@ -357,11 +360,10 @@ lists — that's the grep's job.
 1. **Sync config to S3** — the compute + site-api lambdas read config from S3:
    - `config/coaches/*_coach.json` (voice specs) + `influence_graph.json` are covered by
      `bash deploy/deploy_coach_intelligence.sh`.
-   - **`config/personas.json` and `config/coaches/<coach>_stance.json` are NOT covered by that
-     script's glob** — sync them explicitly:
-     `aws s3 cp config/personas.json s3://matthew-life-platform/config/personas.json` and the same
-     for the `_stance.json`. (Confirm against the current script before running — this is a known
-     gap in the paved path.)
+   - **`config/personas.json` is covered since 2026-08-10** (the v2-roster session widened the
+     script to every non-stance `config/coaches/*.json` + the registry itself). Only
+     `config/coaches/<coach>_stance.json` still needs an explicit
+     `aws s3 cp` — stance files are deliberately outside the glob (S3-only, engine-written).
 2. **Deploy the fleet** — the private coach-id lists ship inside every function bundle (#781, one
    bundle, no layer), so a coach-id change reaches the fleet via `bash deploy/deploy_fleet.sh` or
    `cd cdk && npx cdk deploy --all` (CI fleet-deploys automatically on unmapped `lambdas/`

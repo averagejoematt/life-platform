@@ -101,7 +101,7 @@ MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
 # #2334 roster-copy waiver: a fail-soft LITERAL is this constant's whole point
 # (deriving it would fail with the registry); asserted equal to
 # OPERATIONAL_SHORT_IDS by tests/test_coach_roster_set_guard_2334.py.
-_FALLBACK_COACH_IDS = ("sleep", "nutrition", "training", "mind", "physical", "glucose", "labs", "explorer")
+_FALLBACK_COACH_IDS = ("sleep", "nutrition", "mind", "physical", "glucose", "labs", "explorer")
 
 
 # ── Scope policy (fingerprinted by the Methods Registry — do not edit casually) ──

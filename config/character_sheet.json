@@ -44,7 +44,7 @@
     "movement": {
       "weight": 0.18,
       "ema_lambda": 0.9,
-      "owner": "Dr. Sarah Chen",
+      "owner": "Dr. Max Reyes",
       "components": {
         "training_frequency": {
           "weight": 0.15,

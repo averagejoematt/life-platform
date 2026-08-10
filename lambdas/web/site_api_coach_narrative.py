@@ -25,6 +25,10 @@ This module does NOT import the facade; no import cycle.
 """
 
 from boto3.dynamodb.conditions import Key
+from coach.persona_registry import (  # coaching-team v2: names come from the registry
+    display_map as _registry_display_map,
+    short_id_names as _registry_short_names,
+)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 from web.site_api_common import (
@@ -229,7 +233,9 @@ def handle_coach_analysis(event, *, _g):
     _coach_map = {
         "sleep": "sleep_coach",
         "nutrition": "nutrition_coach",
-        "training": "training_coach",
+        # Coaching-team v2 (2026-08-10): the merged Performance seat serves the
+        # training domain — Dr. Sarah Chen retired, Dr. Max Reyes absorbs it.
+        "training": "physical_coach",
         "mind": "mind_coach",
         "physical": "physical_coach",
         "glucose": "glucose_coach",
@@ -238,7 +244,7 @@ def handle_coach_analysis(event, *, _g):
     }
     # The Cockpit (/cockpit/) discloses the 7 CHARACTER PILLARS, whose names differ from the
     # coach-domain names above — alias them so a pillar click resolves to the right coach.
-    _pillar_alias = {"movement": "training", "metabolic": "glucose"}
+    _pillar_alias = {"movement": "physical", "metabolic": "glucose"}
     # Pillars with no dedicated board coach: return a graceful empty read (200), not a 400,
     # so the Cockpit shows its deterministic fallback without a console error.
     _no_coach_pillars = {"relationships", "consistency"}
@@ -249,21 +255,19 @@ def handle_coach_analysis(event, *, _g):
             return _ok({"coach_id": None, "domain": raw_domain, "analysis": None}, cache_seconds=600)
         return _error(400, f"Invalid domain. Use one of: {', '.join(sorted(_coach_map))}")
 
-    _coach_display = {
-        "sleep_coach": {"name": "Dr. Lisa Park", "initials": "LP", "title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
-        "nutrition_coach": {"name": "Dr. Marcus Webb", "initials": "MW", "title": "Evidence-Based Nutrition", "color": "#10b981"},
-        "training_coach": {"name": "Dr. Sarah Chen", "initials": "SC", "title": "Exercise Physiology & Strength", "color": "#3db88a"},
-        "mind_coach": {
-            "name": "Dr. Nathan Reeves",
-            "initials": "NR",
-            "title": "Psychiatrist \u2014 Behavioral Patterns",
-            "color": "#a78bfa",
-        },
-        "physical_coach": {"name": "Dr. Victor Reyes", "initials": "VR", "title": "Longevity & Body Composition", "color": "#f59e0b"},
-        "glucose_coach": {"name": "Dr. Amara Patel", "initials": "AP", "title": "Metabolic Health & CGM", "color": "#2dd4bf"},
-        "labs_coach": {"name": "Dr. James Okafor", "initials": "JO", "title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
-        "explorer_coach": {"name": "Dr. Henning Brandt", "initials": "HB", "title": "Biostatistics & N=1 Research", "color": "#e879f9"},
+    # Registry-derived names/initials (coaching-team v2) + surface-local styling.
+    _reg = _registry_display_map(include=("operational", "retired"))
+    _style = {
+        "sleep_coach": {"title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
+        "nutrition_coach": {"title": "Evidence-Based Nutrition", "color": "#10b981"},
+        "training_coach": {"title": "Exercise Physiology & Strength (retired seat)", "color": "#3db88a"},
+        "mind_coach": {"title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa"},
+        "physical_coach": {"title": "Performance — Training, Cardio & Mobility", "color": "#f59e0b"},
+        "glucose_coach": {"title": "Metabolic Health & CGM", "color": "#2dd4bf"},
+        "labs_coach": {"title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
+        "explorer_coach": {"title": "Research & Longevity — Evidence Appraisal", "color": "#e879f9"},
     }
+    _coach_display = {cid: {**(_reg.get(cid) or {}), **style} for cid, style in _style.items() if _reg.get(cid)}
 
     try:
         coach_pk = f"COACH#{coach_id}"
@@ -459,16 +463,7 @@ def handle_coach_timeline(event, *, _g):
         qs = event.get("queryStringParameters") or {}
         coach_id = qs.get("coach_id", "")
 
-        _tl_coach_names = {
-            "sleep": "Dr. Lisa Park",
-            "nutrition": "Dr. Marcus Webb",
-            "training": "Dr. Sarah Chen",
-            "mind": "Dr. Nathan Reeves",
-            "physical": "Dr. Victor Reyes",
-            "glucose": "Dr. Amara Patel",
-            "labs": "Dr. James Okafor",
-            "explorer": "Dr. Henning Brandt",
-        }
+        _tl_coach_names = _registry_short_names(include_retired=True)  # history keeps real bylines
         _tl_coach_id_map = {
             "sleep": "sleep_coach",
             "nutrition": "nutrition_coach",

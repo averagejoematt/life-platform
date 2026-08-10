@@ -2,7 +2,7 @@
   "version": "1",
   "_meta": {
     "purpose": "Canonical persona registry (CC-00). The single source of truth that reconciles the three historically-divergent coach name-spaces: config/coaches/*.json keys, the engine COACH_IDS, and the board_of_directors.json personas. A coach's public byline must provably be the coach that authored the data — this file is what makes that true.",
-    "model": "distinct-but-linked: operational coaches are the 8 personas with a live coach_config_key + daily outputs; the broader Board (the_chair, narrators, real-expert inspirations, non-coach advisors) stays on /method/board/, cross-linked via board_persona_key.",
+    "model": "distinct-but-linked, three tiers: operational coaches (7) carry a live coach_config_key + daily engine outputs; chat-tier coaches (chat: true — pattern_coach, career_coach, and the lead eli_marsh) carry a voice spec + a Telegram bot but no daily compute; consulting specialists (consulting: true — glucose/labs) keep pipelines + site, no bots, citable by name. The broader Board stays on /method/board/, cross-linked via board_persona_key.",
     "links": {
       "voice_specs": "config/coaches/<coach_config_key>.json",
       "board": "config/<user>/board_of_directors.json (member keys = board_persona_key)",
@@ -11,7 +11,7 @@
     },
     "enforced_by": "tests/test_persona_registry.py (no orphans either direction)",
     "loader": "lambdas/coach/persona_registry.py",
-    "last_reviewed": "2026-08-03"
+    "last_reviewed": "2026-08-10"
   },
   "personas": {
     "sleep_coach": {
@@ -28,12 +28,15 @@
       "voice_spec_ref": "config/coaches/sleep_coach.json",
       "board_persona_key": "lisa_park",
       "board_role": "Sleep Scientist & Circadian Specialist",
-      "tts_voice": "en-US-Chirp3-HD-Kore"
+      "tts_voice": "en-US-Chirp3-HD-Kore",
+      "title": "Sleep & Recovery",
+      "lens": "sleep architecture, recovery, HRV, circadian rhythm",
+      "telegram_route": "sleep"
     },
     "training_coach": {
       "name": "Dr. Sarah Chen",
-      "type": "both",
-      "operational": true,
+      "type": "retired",
+      "operational": false,
       "domain": "exercise_physiology",
       "short_bio": "Sports scientist. Periodization, training load, recovery, ACWR; process over outcomes.",
       "emoji": "🏋️",
@@ -44,7 +47,10 @@
       "voice_spec_ref": "config/coaches/training_coach.json",
       "board_persona_key": "sarah_chen",
       "board_role": "Sports Scientist",
-      "tts_voice": "en-US-Chirp3-HD-Leda"
+      "tts_voice": "en-US-Chirp3-HD-Leda",
+      "retired": true,
+      "retired_date": "2026-08-10",
+      "retirement_note": "Retired at the cycle-13 genesis; the Performance seat (Dr. Max Reyes) absorbs training, cardio, and mobility. Published history under her byline stays attributed to her."
     },
     "nutrition_coach": {
       "name": "Dr. Marcus Webb",
@@ -60,7 +66,10 @@
       "voice_spec_ref": "config/coaches/nutrition_coach.json",
       "board_persona_key": "marcus_webb",
       "board_role": "Nutritionist",
-      "tts_voice": "en-US-Chirp3-HD-Charon"
+      "tts_voice": "en-US-Chirp3-HD-Charon",
+      "title": "Evidence-Based Nutrition",
+      "lens": "energy balance, protein, adherence, a sustainable deficit",
+      "telegram_route": "nutrition"
     },
     "mind_coach": {
       "name": "Dr. Nathan Reeves",
@@ -76,14 +85,17 @@
       "voice_spec_ref": "config/coaches/mind_coach.json",
       "board_persona_key": "nathan_reeves",
       "board_role": "Psychiatrist — Behavioral Patterns",
-      "tts_voice": "en-US-Chirp3-HD-Fenrir"
+      "tts_voice": "en-US-Chirp3-HD-Fenrir",
+      "title": "Mind & Behaviour",
+      "lens": "habits, stress, motivation, behavioural patterns",
+      "telegram_route": "mind"
     },
     "physical_coach": {
-      "name": "Dr. Victor Reyes",
+      "name": "Dr. Max Reyes",
       "type": "both",
       "operational": true,
-      "domain": "longevity_medicine",
-      "short_bio": "Longevity physician & body-composition specialist. Metabolic health, body comp, and the long arc.",
+      "domain": "performance_science",
+      "short_bio": "Performance coach — training, cardio, mobility, and body composition. Sports scientist of the concurrent-training school: keep the identity, adjust the dose; strength and aerobic capacity as complements; the next decade over Tuesday.",
       "emoji": "📊",
       "color": "#f59e0b",
       "coach_config_key": "physical_coach",
@@ -91,8 +103,11 @@
       "short_id": "physical",
       "voice_spec_ref": "config/coaches/physical_coach.json",
       "board_persona_key": "victor_reyes",
-      "board_role": "Longevity Physician — Body Composition Specialist",
-      "tts_voice": "en-US-Chirp3-HD-Orus"
+      "board_role": "Performance Coach — Training, Cardio & Mobility",
+      "tts_voice": "en-US-Chirp3-HD-Orus",
+      "title": "Performance & Training",
+      "lens": "training load, strength + cardio programming, movement capability, body composition",
+      "telegram_route": "physical"
     },
     "glucose_coach": {
       "name": "Dr. Amara Patel",
@@ -108,7 +123,10 @@
       "voice_spec_ref": "config/coaches/glucose_coach.json",
       "board_persona_key": "amara_patel",
       "board_role": "Metabolic Health Researcher",
-      "tts_voice": "en-US-Chirp3-HD-Zephyr"
+      "tts_voice": "en-US-Chirp3-HD-Zephyr",
+      "consulting": true,
+      "title": "Glucose & Metabolic Response",
+      "lens": "glucose response, meal timing, metabolic flexibility"
     },
     "labs_coach": {
       "name": "Dr. James Okafor",
@@ -124,7 +142,10 @@
       "voice_spec_ref": "config/coaches/labs_coach.json",
       "board_persona_key": "james_okafor",
       "board_role": "Longevity & Preventive Medicine",
-      "tts_voice": "en-US-Chirp3-HD-Puck"
+      "tts_voice": "en-US-Chirp3-HD-Puck",
+      "consulting": true,
+      "title": "Labs & Biomarkers",
+      "lens": "bloodwork, biomarkers, long-run risk factors"
     },
     "explorer_coach": {
       "name": "Dr. Henning Brandt",
@@ -140,7 +161,48 @@
       "voice_spec_ref": "config/coaches/explorer_coach.json",
       "board_persona_key": "henning_brandt",
       "board_role": "Biostatistician — N=1 Research",
-      "tts_voice": "en-US-Chirp3-HD-Iapetus"
+      "tts_voice": "en-US-Chirp3-HD-Iapetus",
+      "title": "Research & Longevity",
+      "lens": "evidence appraisal, N=1 methodology, what a claim actually permits",
+      "telegram_route": "explorer"
+    },
+    "pattern_coach": {
+      "name": "Dr. Nora Vale",
+      "type": "chat",
+      "operational": false,
+      "chat": true,
+      "domain": "longitudinal_patterns",
+      "short_bio": "Pattern Detective — Director of Longitudinal Intelligence. Converts longitudinal observations into calibrated hypotheses without confusing correlation, causation, or identity; persona-fronts the hypothesis engine. The quietest member of the staff.",
+      "emoji": "🧩",
+      "color": "#64748b",
+      "coach_config_key": "pattern_coach",
+      "short_id": "pattern",
+      "voice_spec_ref": "config/coaches/pattern_coach.json",
+      "board_persona_key": "nora_vale",
+      "board_role": "Pattern Detective — Director of Longitudinal Intelligence",
+      "tts_voice": "en-US-Chirp3-HD-Erinome",
+      "title": "Patterns & Early Warnings",
+      "lens": "cross-domain recurrences, hypothesis lifecycle, what precedes the pattern",
+      "telegram_route": "pattern"
+    },
+    "career_coach": {
+      "name": "Steve Brooks",
+      "type": "chat",
+      "operational": false,
+      "chat": true,
+      "domain": "career_strategy",
+      "short_bio": "Career coach — former talent strategist and executive adviser. Leverage, reputation, learning velocity, optionality; career subordinate to a well-lived life. Chat + check-in tier: no data pipeline yet.",
+      "emoji": "🧭",
+      "color": "#b45309",
+      "coach_config_key": "career_coach",
+      "short_id": "career",
+      "voice_spec_ref": "config/coaches/career_coach.json",
+      "board_persona_key": "steve_brooks",
+      "board_role": "Career Coach — Strategy & Leverage",
+      "tts_voice": "en-US-Chirp3-HD-Sadaltager",
+      "title": "Career & Leverage",
+      "lens": "career strategy, promotion readiness, influence, optionality",
+      "telegram_route": "career"
     },
     "the_chair": {
       "name": "The Chair",
@@ -286,7 +348,11 @@
       "lead_briefing": "Where Matthew is, what the staff is focused on, and the one call for this phase — synthesized from the team's current stances.",
       "lead_role_keys": [
         "integrator"
-      ]
+      ],
+      "telegram_route": "headcoach",
+      "chat": true,
+      "title": "Head Coach",
+      "lens": "integrated strategy, cross-domain trade-offs, the one priority that matters this week"
     },
     "cora_vance": {
       "name": "Dr. Cora Vance",

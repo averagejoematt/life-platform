@@ -1164,10 +1164,10 @@ class TestDecimalCoercion:
 
 def commitment(**extra):
     base = {
-        "pk": "COACH#training_coach",
+        "pk": "COACH#physical_coach",
         "sk": "COMMITMENT#c1",
         "commitment_id": "c1",
-        "coach_id": "training_coach",
+        "coach_id": "physical_coach",
         "created_date": days_before(30),
         "window_days": 7,
         "status": "pending",
@@ -1202,7 +1202,7 @@ class TestCommitments:
         daily_series("hrv", TestEwmaTrend.RISING, table=table)
         stats = ev._evaluate_commitments([commitment(action_check=METRIC_CHECK)], TODAY, {})
         assert stats["kept"] == 1
-        assert table.items[("COACH#training_coach", "COMMITMENT#c1")]["status"] == "kept"
+        assert table.items[("COACH#physical_coach", "COMMITMENT#c1")]["status"] == "kept"
 
     def test_a_metric_backed_commitment_the_data_contradicts_is_broken(self, table):
         daily_series("hrv", TestEwmaTrend.FALLING, table=table)
@@ -1221,7 +1221,7 @@ class TestCommitments:
     def test_a_metric_backed_commitment_with_no_data_is_unresolved_past_twice_its_window(self, table):
         stats = ev._evaluate_commitments([commitment(created_date=days_before(30), action_check=METRIC_CHECK)], TODAY, {})
         assert stats["unresolved"] == 1
-        assert table.items[("COACH#training_coach", "COMMITMENT#c1")]["outcome"] == "unresolved"
+        assert table.items[("COACH#physical_coach", "COMMITMENT#c1")]["outcome"] == "unresolved"
 
     def test_a_commitment_with_no_machine_check_waits_for_the_coach_then_expires(self, table):
         assert ev._evaluate_commitments([commitment(created_date=days_before(10))], TODAY, {})["pending"] == 1

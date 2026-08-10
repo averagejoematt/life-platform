@@ -110,17 +110,11 @@ DIARY_THEME_COACH = {
 }
 DEFAULT_COACH = "mind_coach"
 
-# Display names — the same roster the site renders (coaching.js BOARD_PERSONAS).
-COACH_NAMES = {
-    "mind_coach": "Dr. Nathan Reeves",
-    "physical_coach": "Dr. Victor Reyes",
-    "sleep_coach": "Dr. Lisa Park",
-    "nutrition_coach": "Dr. Marcus Webb",
-    "training_coach": "Dr. Sarah Chen",
-    "glucose_coach": "Dr. Amara Patel",
-    "labs_coach": "Dr. James Okafor",
-    "explorer_coach": "Dr. Henning Brandt",
-}
+# Display names — registry-derived (coaching-team v2): the same roster every
+# surface renders, so a rename/retirement propagates from config/personas.json.
+from coach.persona_registry import OPERATIONAL_COACH_IDS, display_name as _display_name
+
+COACH_NAMES = {cid: _display_name(cid) for cid in OPERATIONAL_COACH_IDS}
 
 USER_ID = os.environ.get("USER_ID", "matthew")
 DIARY_REACTIONS_PK = f"USER#{USER_ID}#SOURCE#diary_reactions"

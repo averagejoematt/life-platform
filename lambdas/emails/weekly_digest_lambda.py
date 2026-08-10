@@ -713,7 +713,7 @@ RULES:
 
 Write exactly these six sections with these exact headers:
 
-🏋️ DR. SARAH CHEN — SPORTS SCIENTIST
+🏋️ DR. MAX REYES — PERFORMANCE COACH
 Training quality, Zone 2 adequacy, TSB/CTL/ATL, periodisation, recovery. Is Matthew building fitness or just accumulating fatigue? What does the Banister model + day grades say about his readiness?
 
 🥗 DR. MARCUS WEBB — NUTRITIONIST
@@ -729,7 +729,7 @@ Long-term trajectory. What does the 4-week trend say? What leading indicator is 
 The gap between knowing and doing. Where did Matthew underperform vs his own standards? Use journal data (mood, themes, avoidance flags, cognitive patterns) + habit data + day grades to connect subjective experience with objective performance. Be direct and human.
 
 🎯 THE CHAIR — VERDICT & PRIORITY
-4–6 sentences. Clear verdict. Reference day grade average and trend. CROSS-DOMAIN SYNTHESIS: Connect the advisors' observations — if Chen says training load is high, Webb says nutrition is low, and Park says sleep is degraded, name the cascade and the single intervention that breaks it. Don't just summarize each advisor — identify the interaction. Name ONE priority for next week with specific data justification. One sentence of genuine encouragement grounded in data.
+4–6 sentences. Clear verdict. Reference day grade average and trend. CROSS-DOMAIN SYNTHESIS: Connect the advisors' observations — if Reyes says training load is high, Webb says nutrition is low, and Park says sleep is degraded, name the cascade and the single intervention that breaks it. Don't just summarize each advisor — identify the interaction. Name ONE priority for next week with specific data justification. One sentence of genuine encouragement grounded in data.
 
 💡 PATTERN OF THE WEEK
 2-3 sentences. Not a fact — a PATTERN. Structure: (1) one observable pattern from this week's data, (2) one hypothesis about why it's happening, (3) one forward-looking implication or question. Example: "Sleep efficiency dropped despite longer duration — this often correlates with high training strain the prior 2 days. If next week's deload doesn't restore efficiency, the issue may be circadian, not load." Must reference actual numbers.

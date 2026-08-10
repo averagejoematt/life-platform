@@ -81,7 +81,7 @@ def test_prompt_injects_register_and_banned_scaffolds(monkeypatch):
 
 
 def test_old_shared_stems_are_no_longer_suggested(monkeypatch):
-    prompt = _offline_prompt(monkeypatch, "training")
+    prompt = _offline_prompt(monkeypatch, "physical")  # any live expert works; training retired 2026-08-10
     # The stems may appear ONLY inside the banned list, never as a suggestion.
     assert 'Use "What strikes me most' not in prompt
     banned_section = prompt.split("NEVER open with any of these shared-scaffold phrases", 1)

@@ -352,6 +352,17 @@ MEMORY_SCOPED_CATEGORIES = frozenset(
 # ── Classification for non-SOURCE pks (full pk or pk prefix) ───────────────────
 # Evaluated in order; first match wins. Each entry: (predicate(pk, sk) -> bool, class).
 _PK_RULES: list = [
+    # Coaching-team v2 (2026-08-10, owner request): the TEXTING RELATIONSHIP
+    # survives an experiment reset. A chat thread with a coach — its turns, the
+    # compressed CHAT#summary long memory, and RELATIONSHIP#state — is a
+    # relationship with a person, not an artifact of the current cycle; wiping
+    # it at a reset would make every coach a stranger each Monday. Evaluated
+    # BEFORE the blanket COACH#* rule (first match wins).
+    (lambda pk, sk: pk.startswith("COACH#") and sk.startswith("CHAT#"), CROSS_PHASE),
+    (lambda pk, sk: pk.startswith("COACH#") and sk.startswith("RELATIONSHIP#"), CROSS_PHASE),
+    # Telegram update_id dedupe rows: transport plumbing with a 24h self-TTL —
+    # system state, never tagged, never wiped by a reset.
+    (lambda pk, sk: pk.startswith("COACH#") and sk.startswith("DEDUPE#"), SYSTEM_STATE),
     # Coach intelligence tier — all experiment-scoped.
     (lambda pk, sk: pk.startswith("COACH#"), EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#digest", EXPERIMENT_SCOPED),

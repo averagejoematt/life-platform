@@ -213,17 +213,13 @@ def _current_cycle():
         return None
 
 
-# Shared coach id/name maps for the calibration + predictions surfaces.
-_CALIB_COACH_NAMES = {
-    "sleep": "Dr. Lisa Park",
-    "nutrition": "Dr. Marcus Webb",
-    "training": "Dr. Sarah Chen",
-    "mind": "Dr. Nathan Reeves",
-    "physical": "Dr. Victor Reyes",
-    "glucose": "Dr. Amara Patel",
-    "labs": "Dr. James Okafor",
-    "explorer": "Dr. Henning Brandt",
-}
+# Shared coach id/name maps for the calibration + predictions surfaces —
+# REGISTRY-DERIVED (coaching-team v2): these are career-backed history surfaces,
+# so retired coaches stay in the walk and their records keep their real byline
+# (Dr. Sarah Chen's predictions remain hers after the 2026-08-10 retirement).
+from coach.persona_registry import short_id_names as _short_id_names  # noqa: E402
+
+_CALIB_COACH_NAMES = _short_id_names(include_retired=True)
 
 
 _CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
@@ -563,27 +559,9 @@ def handle_predictions(event, *, _g):
         coach_filter = qs.get("coach_id", "")
         limit = min(int(qs.get("limit", "50")), 200)
 
-        _pred_coach_names = {
-            "sleep": "Dr. Lisa Park",
-            "nutrition": "Dr. Marcus Webb",
-            "training": "Dr. Sarah Chen",
-            "mind": "Dr. Nathan Reeves",
-            "physical": "Dr. Victor Reyes",
-            "glucose": "Dr. Amara Patel",
-            "labs": "Dr. James Okafor",
-            "explorer": "Dr. Henning Brandt",
-        }
+        _pred_coach_names = dict(_CALIB_COACH_NAMES)  # registry-derived; retired bylines stay real on history
         _pred_coach_ids = list(_pred_coach_names.keys())
-        _pred_coach_id_map = {
-            "sleep": "sleep_coach",
-            "nutrition": "nutrition_coach",
-            "training": "training_coach",
-            "mind": "mind_coach",
-            "physical": "physical_coach",
-            "glucose": "glucose_coach",
-            "labs": "labs_coach",
-            "explorer": "explorer_coach",
-        }
+        _pred_coach_id_map = {c: f"{c}_coach" for c in _pred_coach_ids}
 
         if coach_filter and coach_filter not in _pred_coach_ids:
             return _error(400, "Invalid coach_id")

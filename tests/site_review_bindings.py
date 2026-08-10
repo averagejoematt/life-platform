@@ -332,13 +332,13 @@ PAGE_BINDINGS = [
         ],
     },
     {
-        "path": "/coaching/by-coach/#training_coach",
+        "path": "/coaching/by-coach/#physical_coach",
         "name": "Coaching · By Coach (read-on-data, deep-link)",
         "door": "coaching",
         "narrative_order": 72,
-        "story_intent": "a coach's read sitting on top of the actual domain data — cardio/lifts/volume this week",
+        "story_intent": "a coach's read sitting on top of the actual domain data — cardio/lifts/volume this week (the merged Performance seat since 2026-08-10)",
         "endpoints": [
-            {"url": "/api/coach/training_coach", "role": "primary", "metrics": []},
+            {"url": "/api/coach/physical_coach", "role": "primary", "metrics": []},
             {"url": "/api/coach_analysis?domain=training", "role": "primary", "metrics": []},
             {"url": "/api/observatory_week?domain=training", "role": "secondary", "metrics": []},
         ],

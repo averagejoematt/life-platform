@@ -86,9 +86,10 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 # sees a nutrition challenge. explorer_coach is the cross-domain coach → None = all.
 COACH_DOMAINS = {
     "sleep_coach": {"sleep"},
-    "training_coach": {"movement"},
     "nutrition_coach": {"nutrition", "metabolic"},
     "mind_coach": {"mental", "mind", "social", "discipline"},
+    # Coaching-team v2 (2026-08-10): the merged Performance seat carries the
+    # whole movement domain the retired training seat used to split.
     "physical_coach": {"movement", "general"},
     "glucose_coach": {"metabolic", "nutrition"},
     "labs_coach": {"supplements", "metabolic"},
@@ -111,7 +112,9 @@ def _coach_wants_journal_mood(coach_id: str) -> bool:
     """True if this coach's domain covers Matthew's inner state (deterministic routing,
     not inference). explorer_coach (domains=None) is cross-domain — sees everything,
     matching how _gather_site_protocols treats a None domain set."""
-    domains = COACH_DOMAINS.get(coach_id)
+    if coach_id not in COACH_DOMAINS:
+        return False  # not on the routing map (e.g. a retired seat) — never cross-domain by accident
+    domains = COACH_DOMAINS[coach_id]
     if domains is None:
         return True
     return bool(domains & _JOURNAL_MOOD_DOMAINS)

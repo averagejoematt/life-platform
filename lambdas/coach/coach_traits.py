@@ -37,10 +37,6 @@ COACH_TRAITS = {
         "scores": {"evidence_bar": 60, "boldness": 25, "revision_speed": 85, "intervention_urge": 40, "range": 45},
         "note": "A careful reader of converging signals — quick to say she was wrong, slow to say she's sure.",
     },
-    "training_coach": {
-        "scores": {"evidence_bar": 45, "boldness": 65, "revision_speed": 65, "intervention_urge": 80, "range": 35},
-        "note": "Adjusts the plan inside the week — bold about load and recovery, quiet about mechanism.",
-    },
     "nutrition_coach": {
         "scores": {"evidence_bar": 70, "boldness": 85, "revision_speed": 75, "intervention_urge": 70, "range": 25},
         "note": "Flat statements inside his lane, hedges the moment he leaves it — unsentimental when a call misses.",

@@ -69,7 +69,6 @@ except Exception:  # noqa: BLE001 — fall back to the known roster if the impor
     # script — deriving it is the try-branch; this only serves when that import breaks.
     DEFAULT_COACHES = [
         "sleep_coach",
-        "training_coach",
         "nutrition_coach",
         "mind_coach",
         "physical_coach",

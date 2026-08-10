@@ -104,7 +104,14 @@ def test_tuning_log_is_shaped():
 
 
 def test_every_entry_is_valid():
-    valid_coaches = set(persona_registry.OPERATIONAL_COACH_IDS) | {"all"}
+    # The log is append-only HISTORY: entries for retired or chat-tier coaches
+    # stay valid forever (coaching-team v2 retired training_coach 2026-08-10).
+    valid_coaches = (
+        set(persona_registry.OPERATIONAL_COACH_IDS)
+        | set(persona_registry.CHAT_COACH_IDS)
+        | set(persona_registry.RETIRED_COACH_IDS)
+        | {"all"}
+    )
     for e in _load_log()["entries"]:
         assert e.get("coach") in valid_coaches, f"unknown coach {e.get('coach')!r}"
         assert e.get("change_type") in VALID_CHANGE_TYPES, f"bad change_type {e.get('change_type')!r}"

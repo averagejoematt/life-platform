@@ -149,6 +149,33 @@
       "rationale": "Grounds the re-missioned Research & Longevity seat (anti-pseudoscience, N-of-1 methodology) in a coherent character.",
       "ref": "coaching-team v2 big-bang session (epic #2363 / #2402); MOS character bibles v1",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "physical_coach",
+      "change_type": "persona",
+      "summary": "Renamed Dr. Victor Reyes → Dr. Max Reyes; domain performance_science; the Performance seat absorbs training/cardio/mobility (training_coach retires).",
+      "rationale": "Owner call 2026-08-09 (roster restructure). Surname kept for published-history continuity; the merge lands at cycle-13 day 1, the cheapest possible moment.",
+      "ref": "coaching-team v2 Wave 3 (epic #2363); owner decisions 2026-08-09",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "training_coach",
+      "change_type": "persona",
+      "summary": "Dr. Sarah Chen retires — operational:false, retired:true; published history stays under her byline.",
+      "rationale": "Two overlapping training seats confused readers and split the domain's memory; the merged Performance seat is the single owner.",
+      "ref": "coaching-team v2 Wave 3 (epic #2363); owner decisions 2026-08-09",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "persona",
+      "summary": "Chat tier added: Dr. Nora Vale (pattern_coach), Steve Brooks (career_coach), Dr. Eli Marsh (eli_marsh voice spec) — voice specs + bots, no daily engine outputs.",
+      "rationale": "MOS bibles 02/06/00 male-adapted where owner-decided; Eli becomes Matthew's operational point of contact per the head-coach mandate.",
+      "ref": "coaching-team v2 Wave 3 (epic #2363); owner decisions 2026-08-09",
+      "observed_effect": null
     }
   ]
 }

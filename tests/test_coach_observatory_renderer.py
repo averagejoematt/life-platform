@@ -416,7 +416,7 @@ def test_card_names_the_other_coach_in_an_active_disagreement(monkeypatch):
             "pk": "ENSEMBLE#digest",
             "sk": "CYCLE#2026-08-09",
             "active_disagreements": [
-                {"coaches": ["nutrition_coach", "training_coach"], "topic": "the deficit size"},
+                {"coaches": ["nutrition_coach", "physical_coach"], "topic": "the deficit size"},
                 {"coaches": ["sleep_coach", "mind_coach"], "topic": "evening screen time"},
             ],
         },
@@ -461,7 +461,7 @@ def test_card_has_no_cross_coach_reference_when_the_digest_ignores_this_coach(mo
         {
             "pk": "ENSEMBLE#digest",
             "sk": "CYCLE#2026-08-09",
-            "active_disagreements": [{"coaches": ["nutrition_coach", "training_coach"], "topic": "the deficit size"}],
+            "active_disagreements": [{"coaches": ["nutrition_coach", "physical_coach"], "topic": "the deficit size"}],
             "coach_summaries": json.dumps([{"coach_id": "sleep_coach", "wants_team_input_on": []}]),
         },
     ]
@@ -508,7 +508,7 @@ def test_card_ensemble_fallback_false_for_a_genuine_digest(monkeypatch):
         {
             "pk": "ENSEMBLE#digest",
             "sk": "CYCLE#2026-08-09",
-            "active_disagreements": [{"coaches": ["nutrition_coach", "training_coach"], "topic": "the deficit size"}],
+            "active_disagreements": [{"coaches": ["nutrition_coach", "physical_coach"], "topic": "the deficit size"}],
             "coach_summaries": [],
         },
     ]
@@ -830,7 +830,7 @@ def test_handler_all_mode_degrades_one_broken_card_without_losing_the_others(mon
     body = _body(cobs.lambda_handler({"all": True}, None))
     assert len(body["coaches"]) == len(cobs.DOMAIN_COACH_MAP)
     broken = next(c for c in body["coaches"] if c["domain"] == "training")
-    assert broken == {"coach_id": "training_coach", "domain": "training", "analysis": None}
+    assert broken == {"coach_id": "physical_coach", "domain": "training", "analysis": None}
     assert all(c["analysis"] == "ok" for c in body["coaches"] if c["domain"] != "training")
 
 

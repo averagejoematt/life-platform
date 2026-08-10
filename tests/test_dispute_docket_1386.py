@@ -116,7 +116,7 @@ def _criterion(**over):
         "condition": "lte",
         "threshold": 242.0,
         "resolution_days": 14,
-        "sides": {"physical_coach": True, "training_coach": False},
+        "sides": {"physical_coach": True, "nutrition_coach": False},
     }
     base.update(over)
     return base
@@ -132,7 +132,7 @@ OPEN_DATE = "2026-07-20"
 
 class TestAC1MachineCheckableGate:
     def test_valid_criterion_normalizes_and_freezes_the_date(self):
-        ok, reason, norm = dd.validate_criterion(_criterion(), "physical_coach", "training_coach", OPEN_DATE)
+        ok, reason, norm = dd.validate_criterion(_criterion(), "physical_coach", "nutrition_coach", OPEN_DATE)
         assert ok, reason
         assert norm["metric"] == "weight_lbs_7day_avg"
         assert norm["threshold"] == 242.0
@@ -141,7 +141,7 @@ class TestAC1MachineCheckableGate:
 
     def test_explicit_resolution_date_is_honored(self):
         ok, _, norm = dd.validate_criterion(
-            _criterion(resolution_date="2026-08-10", resolution_days=None), "physical_coach", "training_coach", OPEN_DATE
+            _criterion(resolution_date="2026-08-10", resolution_days=None), "physical_coach", "nutrition_coach", OPEN_DATE
         )
         assert ok
         assert norm["resolution_date"] == "2026-08-10"
@@ -157,13 +157,13 @@ class TestAC1MachineCheckableGate:
             (_criterion(resolution_days=None), "no date and no day count — nothing frozen"),
             (_criterion(resolution_days=1), "horizon below the minimum"),
             (_criterion(resolution_days=400), "horizon beyond the maximum"),
-            (_criterion(sides={"physical_coach": True, "training_coach": True}), "same side — no divergence"),
+            (_criterion(sides={"physical_coach": True, "nutrition_coach": True}), "same side — no divergence"),
             (_criterion(sides={"physical_coach": True}), "sides don't name both coaches"),
             (_criterion(sides={"physical_coach": True, "sleep_coach": False}), "sides name the wrong coach"),
         ],
     )
     def test_non_resolvable_disagreements_cannot_enter(self, broken, why):
-        ok, reason, norm = dd.validate_criterion(broken, "physical_coach", "training_coach", OPEN_DATE)
+        ok, reason, norm = dd.validate_criterion(broken, "physical_coach", "nutrition_coach", OPEN_DATE)
         assert not ok, f"should have been rejected: {why}"
         assert norm is None
         assert reason
@@ -173,8 +173,8 @@ class TestAC1MachineCheckableGate:
             [
                 {
                     "topic": "whether motivation is the limiter",
-                    "coaches": ["mind_coach", "training_coach"],
-                    "positions": {"mind_coach": "it is", "training_coach": "it is not"},
+                    "coaches": ["mind_coach", "nutrition_coach"],
+                    "positions": {"mind_coach": "it is", "nutrition_coach": "it is not"},
                     "resolution_criterion": None,  # not machine-checkable
                 }
             ],
@@ -211,9 +211,9 @@ class TestAC1MachineCheckableGate:
             [
                 {
                     "topic": "display name echo",
-                    "coaches": ["Sleep Coach", "training_coach"],
-                    "positions": {"Sleep Coach": "x", "training_coach": "y"},
-                    "resolution_criterion": _criterion(sides={"Sleep Coach": True, "training_coach": False}),
+                    "coaches": ["Sleep Coach", "nutrition_coach"],
+                    "positions": {"Sleep Coach": "x", "nutrition_coach": "y"},
+                    "resolution_criterion": _criterion(sides={"Sleep Coach": True, "nutrition_coach": False}),
                 }
             ],
             OPEN_DATE,
@@ -227,10 +227,10 @@ class TestAC1MachineCheckableGate:
             [
                 {
                     "topic": "Weight trajectory through early August",
-                    "coaches": ["physical_coach", "training_coach"],
+                    "coaches": ["physical_coach", "nutrition_coach"],
                     "positions": {
                         "physical_coach": "The 7-day average breaks 242 by Aug 3.",
-                        "training_coach": "It stalls above 242 without more volume.",
+                        "nutrition_coach": "It stalls above 242 without more volume.",
                     },
                     "resolution_criterion": _criterion(),
                     "sk": "ACTIVE#weight-trajectory",
@@ -245,7 +245,7 @@ class TestAC1MachineCheckableGate:
         assert item["resolution_date"] == "2026-08-03"  # frozen
         assert item["claims"]["physical_coach"].startswith("The 7-day average")
         # each side's stake is present: domain Brier (None honest pre-grading) + confidence
-        for cid in ("physical_coach", "training_coach"):
+        for cid in ("physical_coach", "nutrition_coach"):
             stake = item["stakes"][cid]
             assert "brier" in stake and "confidence" in stake and stake["subdomain"] == "weight"
 
@@ -261,16 +261,16 @@ def _open_docket_item(resolution_date="2026-08-03"):
     # resolving through the same path (resolution reads fields, never parses the sk).
     return {
         "pk": dd.DOCKET_PK,
-        "sk": "OPEN#physical_coach__training_coach#weight-trajectory",
+        "sk": "OPEN#nutrition_coach__physical_coach#weight-trajectory",
         "record_type": "dispute_docket",
         "status": "open",
         "topic": "Weight trajectory through early August",
         "topic_slug": "weight-trajectory",
         "coach_a": "physical_coach",
-        "coach_b": "training_coach",
+        "coach_b": "nutrition_coach",
         "claims": {
             "physical_coach": "The 7-day average breaks 242 by Aug 3.",
-            "training_coach": "It stalls above 242 without more volume.",
+            "nutrition_coach": "It stalls above 242 without more volume.",
         },
         "criterion": {
             "metric": "weight_lbs_7day_avg",
@@ -278,13 +278,13 @@ def _open_docket_item(resolution_date="2026-08-03"):
             "threshold": 242.0,
             "description": "weight_lbs_7day_avg <= 242 on 2026-08-03",
         },
-        "sides": {"physical_coach": True, "training_coach": False},
+        "sides": {"physical_coach": True, "nutrition_coach": False},
         "resolution_date": resolution_date,
         "opened_date": OPEN_DATE,
         "opened_at": "2026-07-20T18:00:00+00:00",
         "stakes": {
             "physical_coach": {"brier": 0.18, "brier_n": 11, "confidence": 0.7, "subdomain": "weight"},
-            "training_coach": {"brier": 0.31, "brier_n": 9, "confidence": 0.55, "subdomain": "weight"},
+            "nutrition_coach": {"brier": 0.31, "brier_n": 9, "confidence": 0.55, "subdomain": "weight"},
         },
         "subdomain": "weight",
     }
@@ -316,7 +316,7 @@ class TestAC2DeterministicResolution:
         assert len(summary["resolved"]) == 1
         verdict = summary["resolved"][0]
         assert verdict["winner"] == "physical_coach"  # 241.2 <= 242 — the 'holds' side
-        assert verdict["loser"] == "training_coach"
+        assert verdict["loser"] == "nutrition_coach"
         assert verdict["actual_value"] == 241.2
 
     def test_not_due_dockets_are_untouched(self, fake_table, monkeypatch):
@@ -331,24 +331,24 @@ class TestAC2DeterministicResolution:
         # LEARNING# rows: winner confirmed, loser refuted — the public
         # _track_record and the stance grounding both read exactly these.
         win = [v for (pk, sk), v in table.store.items() if pk == "COACH#physical_coach" and sk.startswith("LEARNING#")]
-        loss = [v for (pk, sk), v in table.store.items() if pk == "COACH#training_coach" and sk.startswith("LEARNING#")]
+        loss = [v for (pk, sk), v in table.store.items() if pk == "COACH#nutrition_coach" and sk.startswith("LEARNING#")]
         assert win and win[0]["status"] == "confirmed" and win[0]["channel"] == "data"
         assert loss and loss[0]["status"] == "refuted" and loss[0]["record_type"] == "docket_concession"
         # resolved PREDICTION# rows feed the Brier scoreboard (calibration_core)
         from experiment import calibration_core
 
-        for cid, outcome in (("physical_coach", 1), ("training_coach", 0)):
+        for cid, outcome in (("physical_coach", 1), ("nutrition_coach", 0)):
             preds = [v for (pk, sk), v in table.store.items() if pk == f"COACH#{cid}" and sk.startswith("PREDICTION#docket-")]
             assert len(preds) == 1
             pairs = calibration_core.pairs_from_prediction_records(preds)
             assert len(pairs) == 1 and pairs[0][1] == outcome
         # Bayesian confidence: the evaluator's own update path, both coaches
         assert ("physical_coach", "weight", "success") in confidence_updates
-        assert ("training_coach", "weight", "failure") in confidence_updates
+        assert ("nutrition_coach", "weight", "failure") in confidence_updates
 
     def test_docket_moves_open_to_resolved(self, resolved_run):
         table, _s, _c = resolved_run
-        assert ("ENSEMBLE#docket", "OPEN#physical_coach__training_coach#weight-trajectory") in table.deleted
+        assert ("ENSEMBLE#docket", "OPEN#nutrition_coach__physical_coach#weight-trajectory") in table.deleted
         resolved = [v for (pk, sk), v in table.store.items() if pk == dd.DOCKET_PK and sk.startswith("RESOLVED#")]
         assert len(resolved) == 1
         assert resolved[0]["winner"] == "physical_coach"
@@ -382,7 +382,7 @@ class TestAC2DeterministicResolution:
 class TestAC3ConcessionMemory:
     def test_concession_recorded_verbatim_on_the_losers_partition(self, resolved_run):
         table, summary, _c = resolved_run
-        loss = [v for (pk, sk), v in table.store.items() if pk == "COACH#training_coach" and sk.startswith("LEARNING#")][0]
+        loss = [v for (pk, sk), v in table.store.items() if pk == "COACH#nutrition_coach" and sk.startswith("LEARNING#")][0]
         resolved_entry = [v for (pk, sk), v in table.store.items() if str(sk).startswith("RESOLVED#")][0]
         # VERBATIM: the docket's concession and the memory row are byte-identical
         assert loss["concession"] == resolved_entry["concession"]
@@ -395,7 +395,7 @@ class TestAC3ConcessionMemory:
         table, _s, _c = resolved_run
         import coach_history_summarizer as chs
 
-        loss_rows = [v for (pk, sk), v in table.store.items() if pk == "COACH#training_coach" and sk.startswith("LEARNING#")]
+        loss_rows = [v for (pk, sk), v in table.store.items() if pk == "COACH#nutrition_coach" and sk.startswith("LEARNING#")]
         track = chs._summarize_track_record(loss_rows, [])
         # the concession is a standing, citable evidence class — verbatim
         standing = track["standing_concessions"]
@@ -403,7 +403,7 @@ class TestAC3ConcessionMemory:
         assert standing["recent"][0]["concession"] == loss_rows[0]["concession"]
         # ...and it counts as a refuted verdict in the same tally (skin in the game)
         assert track["refuted"] == 1
-        message = chs._build_stance_message("training_coach", {"summary": ""}, track, None)
+        message = chs._build_stance_message("nutrition_coach", {"summary": ""}, track, None)
         import json
 
         # a read touching the topic sees the concession VERBATIM (the grounding
@@ -419,9 +419,9 @@ class TestAC3ConcessionMemory:
         import coach_history_summarizer as chs
         from ai.grounded_generation import allowed_numbers, grounding_findings
 
-        loss_rows = [v for (pk, sk), v in table.store.items() if pk == "COACH#training_coach" and sk.startswith("LEARNING#")]
+        loss_rows = [v for (pk, sk), v in table.store.items() if pk == "COACH#nutrition_coach" and sk.startswith("LEARNING#")]
         track = chs._summarize_track_record(loss_rows, [])
-        message = chs._build_stance_message("training_coach", {"summary": ""}, track, None)
+        message = chs._build_stance_message("nutrition_coach", {"summary": ""}, track, None)
         allowed = allowed_numbers(message)
         citing = "I conceded the weight dispute: the 7-day average came in at 241.2 against my 242 line."
         assert grounding_findings(citing, allowed=allowed) == []
@@ -464,9 +464,9 @@ class TestAC4PublicSurface:
         assert body["counts"]["open"] == 1
         entry = body["open"][0]
         assert entry["stakes"]["physical_coach"]["brier"] == 0.18
-        assert entry["stakes"]["training_coach"]["brier"] == 0.31
+        assert entry["stakes"]["nutrition_coach"]["brier"] == 0.31
         assert entry["resolution_date"] == "2026-08-03"
-        assert entry["claims"]["training_coach"]
+        assert entry["claims"]["nutrition_coach"]
 
     def test_docket_privacy_violation_is_withheld_wholesale_and_counted(self, api):
         # #1795: the same standing content-absolute filter the coach dossier
@@ -497,12 +497,12 @@ class TestAC4PublicSurface:
         item.update(
             {
                 "pk": dd.DOCKET_PK,
-                "sk": "RESOLVED#2026-08-03#physical_coach__training_coach#weight-trajectory",
+                "sk": "RESOLVED#2026-08-03#physical_coach__nutrition_coach#weight-trajectory",
                 "status": "resolved",
                 "winner": "physical_coach",
-                "loser": "training_coach",
+                "loser": "nutrition_coach",
                 "resolved_date": "2026-08-03",
-                "verdict": {"winner": "physical_coach", "loser": "training_coach", "actual_value": 241.2},
+                "verdict": {"winner": "physical_coach", "loser": "nutrition_coach", "actual_value": 241.2},
                 "concession": "CONCESSION — the rs429358 variant explains the lipid response",
             }
         )
@@ -524,11 +524,11 @@ class TestAC4PublicSurface:
         assert body["counts"] == {"open": 0, "resolved": 1}
         entry = body["resolved"][0]
         # winner AND loser named side by side; the concession ships in the payload
-        assert entry["winner"] == "physical_coach" and entry["loser"] == "training_coach"
+        assert entry["winner"] == "physical_coach" and entry["loser"] == "nutrition_coach"
         assert entry["concession"] and "CONCESSION" in entry["concession"]
         # the losing side's claim + stake render from the SAME fields as the winner's
-        assert set(entry["claims"]) == {"physical_coach", "training_coach"}
-        assert set(entry["stakes"]) == {"physical_coach", "training_coach"}
+        assert set(entry["claims"]) == {"physical_coach", "nutrition_coach"}
+        assert set(entry["stakes"]) == {"physical_coach", "nutrition_coach"}
 
     def test_route_registered_end_to_end(self):
         from web import site_api_lambda as L
@@ -545,18 +545,18 @@ class TestAC5ThrottleReplacesWeeklyCap:
     def test_one_open_docket_per_pair_per_subdomain(self, fake_table):
         """#1801 re-keyed the throttle from topic slug → metric subdomain; the
         pair-scoping and the order-independence of the pair are unchanged."""
-        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "training_coach", OPEN_DATE)
+        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "nutrition_coach", OPEN_DATE)
         assert ok
-        first = dd.open_docket("Weight trajectory", "physical_coach", "training_coach", {}, norm, OPEN_DATE)
+        first = dd.open_docket("Weight trajectory", "physical_coach", "nutrition_coach", {}, norm, OPEN_DATE)
         assert first["opened"]
-        second = dd.open_docket("Weight trajectory", "training_coach", "physical_coach", {}, norm, OPEN_DATE)
+        second = dd.open_docket("Weight trajectory", "nutrition_coach", "physical_coach", {}, norm, OPEN_DATE)
         assert not second["opened"] and "throttled" in second["reason"]
         # a different SUBDOMAIN for the same pair is NOT throttled
         ok, _, protein = dd.validate_criterion(
-            _criterion(metric="total_protein_g", threshold=180.0), "physical_coach", "training_coach", OPEN_DATE
+            _criterion(metric="total_protein_g", threshold=180.0), "physical_coach", "nutrition_coach", OPEN_DATE
         )
         assert ok
-        third = dd.open_docket("Protein floor", "physical_coach", "training_coach", {}, protein, OPEN_DATE)
+        third = dd.open_docket("Protein floor", "physical_coach", "nutrition_coach", {}, protein, OPEN_DATE)
         assert third["opened"]
         # …and the same subdomain against a DIFFERENT opponent is its own docket
         ok, _, other = dd.validate_criterion(
@@ -585,8 +585,8 @@ class TestAC5ThrottleReplacesWeeklyCap:
                     "pk": icd.DISAGREEMENTS_PK,
                     "sk": f"ACTIVE#{slug}",
                     "topic": slug,
-                    "coaches": ["sleep_coach", "training_coach"],
-                    "positions": {"sleep_coach": "yes", "training_coach": "no"},
+                    "coaches": ["sleep_coach", "nutrition_coach"],
+                    "positions": {"sleep_coach": "yes", "nutrition_coach": "no"},
                     "cycle_count": 3,
                 }
             )
@@ -692,7 +692,7 @@ class TestDerivedKeysArePairScoped1798:
     def two_dockets_resolved(self, fake_table, monkeypatch):
         """physical_coach holds TWO same-topic dockets against two different
         opponents and they grade on the SAME day — he WINS one and LOSES the other."""
-        fake_table.put_item(Item=_docket_for("physical_coach", "training_coach", {"physical_coach": True, "training_coach": False}))
+        fake_table.put_item(Item=_docket_for("physical_coach", "nutrition_coach", {"physical_coach": True, "nutrition_coach": False}))
         fake_table.put_item(Item=_docket_for("physical_coach", "sleep_coach", {"physical_coach": False, "sleep_coach": True}))
         monkeypatch.setattr(evaluator, "_resolve_metric_value", lambda *a: 241.2)  # holds: 241.2 <= 242
         monkeypatch.setattr(evaluator, "_update_bayesian_confidence", lambda *a: None)
@@ -725,7 +725,7 @@ class TestDerivedKeysArePairScoped1798:
         assert summary["n"] == 2
 
     def test_derived_keys_carry_the_pair(self, two_dockets_resolved):
-        for coach in ("physical_coach", "training_coach", "sleep_coach"):
+        for coach in ("physical_coach", "nutrition_coach", "sleep_coach"):
             for prefix in ("LEARNING#", "PREDICTION#"):
                 for row in self._rows(two_dockets_resolved, coach, prefix):
                     assert row["pk"].endswith(coach)
@@ -734,7 +734,7 @@ class TestDerivedKeysArePairScoped1798:
     def test_a_key_collision_never_overwrites_silently(self, fake_table):
         """The belt to #1798's suspenders: even if a future key change reintroduced a
         collision, the write disambiguates loudly instead of destroying the row."""
-        docket = _docket_for("physical_coach", "training_coach", {"physical_coach": True, "training_coach": False})
+        docket = _docket_for("physical_coach", "nutrition_coach", {"physical_coach": True, "nutrition_coach": False})
         dd._write_docket_learning("physical_coach", "2026-08-03", docket, "confirmed")
         dd._write_docket_learning("physical_coach", "2026-08-03", docket, "refuted")  # same key by construction
         rows = [v for (pk, sk), v in fake_table.store.items() if pk == "COACH#physical_coach" and sk.startswith("LEARNING#")]
@@ -747,7 +747,7 @@ class TestDerivedKeysArePairScoped1798:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def _disagreement(topic, metric="weight_lbs_7day_avg", threshold=242.0, coaches=("physical_coach", "training_coach")):
+def _disagreement(topic, metric="weight_lbs_7day_avg", threshold=242.0, coaches=("physical_coach", "nutrition_coach")):
     a, b = coaches
     return {
         "topic": topic,
@@ -779,15 +779,15 @@ class TestDeterministicThrottleKey1801:
         assert len(result["skipped"]) == 2
         assert all("throttled" in s["reason"] for s in result["skipped"])
         open_rows = [sk for (pk, sk) in fake_table.store if pk == dd.DOCKET_PK]
-        assert open_rows == ["OPEN#physical_coach__training_coach#sleep"]
+        assert open_rows == ["OPEN#nutrition_coach__physical_coach#sleep"]
 
     def test_the_key_contains_no_llm_authored_text(self, fake_table):
-        sk = dd.open_sk("training_coach", "physical_coach", "weight_lbs_7day_avg")
-        assert sk == "OPEN#physical_coach__training_coach#weight"
+        sk = dd.open_sk("nutrition_coach", "physical_coach", "weight_lbs_7day_avg")
+        assert sk == "OPEN#nutrition_coach__physical_coach#weight"
         # the topic is stored as DATA, never as key material
-        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "training_coach", OPEN_DATE)
+        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "nutrition_coach", OPEN_DATE)
         res = dd.open_docket(
-            "A 60+ character topic the model wrote today, phrased just so", *("physical_coach", "training_coach"), {}, norm, OPEN_DATE
+            "A 60+ character topic the model wrote today, phrased just so", *("physical_coach", "nutrition_coach"), {}, norm, OPEN_DATE
         )  # noqa: E501
         assert res["sk"] == sk
 
@@ -822,11 +822,11 @@ class TestDeterministicThrottleKey1801:
     def test_a_throttled_open_never_pays_for_the_stake_scans(self, fake_table, monkeypatch):
         """#1801's cost half: the pre-check short-circuits BEFORE build_stake, so a
         rephrased topic can't re-run two paginated PREDICTION# scans to be rejected."""
-        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "training_coach", OPEN_DATE)
-        assert dd.open_docket("weight", "physical_coach", "training_coach", {}, norm, OPEN_DATE)["opened"]
+        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "nutrition_coach", OPEN_DATE)
+        assert dd.open_docket("weight", "physical_coach", "nutrition_coach", {}, norm, OPEN_DATE)["opened"]
         calls = []
         monkeypatch.setattr(dd, "build_stake", lambda cid, sub: calls.append(cid) or {})
-        second = dd.open_docket("weight, rephrased", "physical_coach", "training_coach", {}, norm, OPEN_DATE)
+        second = dd.open_docket("weight, rephrased", "physical_coach", "nutrition_coach", {}, norm, OPEN_DATE)
         assert not second["opened"]
         assert calls == []
 
@@ -834,10 +834,10 @@ class TestDeterministicThrottleKey1801:
         """ADR-077: the reset TOMBSTONES ENSEMBLE#docket rather than deleting it, and
         #1801's key space is finite — a wiped row parked on a key would otherwise lock
         that pair out of that subdomain for good."""
-        sk = dd.open_sk("physical_coach", "training_coach", "weight_lbs_7day_avg")
+        sk = dd.open_sk("physical_coach", "nutrition_coach", "weight_lbs_7day_avg")
         fake_table.put_item(Item={"pk": dd.DOCKET_PK, "sk": sk, "tombstone": True, "phase": "pilot", "status": "open"})
-        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "training_coach", OPEN_DATE)
-        result = dd.open_docket("Weight trajectory", "physical_coach", "training_coach", {}, norm, OPEN_DATE)
+        ok, _, norm = dd.validate_criterion(_criterion(), "physical_coach", "nutrition_coach", OPEN_DATE)
+        result = dd.open_docket("Weight trajectory", "physical_coach", "nutrition_coach", {}, norm, OPEN_DATE)
         assert result["opened"], result.get("reason")
         assert not fake_table.store[(dd.DOCKET_PK, sk)].get("tombstone")
 
@@ -889,14 +889,14 @@ def _resolved_row(n, phase=None):
     item = _open_docket_item()
     item.update(
         {
-            "sk": f"RESOLVED#2026-0{1 + n % 8}-{1 + n % 27:02d}#physical_coach__training_coach#topic-{n:03d}",
+            "sk": f"RESOLVED#2026-0{1 + n % 8}-{1 + n % 27:02d}#physical_coach__nutrition_coach#topic-{n:03d}",
             "status": "resolved",
             "topic": f"resolved topic {n}",
             "topic_slug": f"topic-{n:03d}",
             "resolved_date": "2026-08-03",
             "winner": "physical_coach",
-            "loser": "training_coach",
-            "verdict": {"outcome": "graded", "winner": "physical_coach", "loser": "training_coach"},
+            "loser": "nutrition_coach",
+            "verdict": {"outcome": "graded", "winner": "physical_coach", "loser": "nutrition_coach"},
         }
     )
     if phase:

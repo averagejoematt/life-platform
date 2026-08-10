@@ -637,7 +637,7 @@ _CURATED = [
         # Two deep-link sweeps preserved verbatim from the pre-#1426 registry:
         "visual_variants": [
             {
-                "fragment": "#training_coach",
+                "fragment": "#physical_coach",  # v2 roster: the merged Performance seat (training retired 2026-08-10)
                 "name": "Coaching · By Coach (read-on-data, deep-link)",
                 "wait_for": "[data-dx-read]",
                 "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "coach read + domain data rendered"}],

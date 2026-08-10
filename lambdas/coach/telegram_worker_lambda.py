@@ -42,7 +42,7 @@ except ImportError:  # pragma: no cover
 
 from coach import coach_chat, telegram_gateway
 from coach.coach_chat_grounding import build_facts_block, build_grounder
-from coach.persona_registry import display_name
+from coach.persona_registry import display_name, persona_for_telegram_route
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
@@ -263,6 +263,17 @@ def _current_tier() -> Optional[int]:
 # ── The handler ───────────────────────────────────────────────────────────────
 
 
+def _partition_id(route: str) -> str:
+    """Persona-derived partition key input for a Telegram route — the same
+    resolution the handler performs later, callable before it (dedupe runs
+    first). Falls back to the route itself (old behaviour) offline."""
+    try:
+        pid, _ = persona_for_telegram_route(route)
+        return pid or route
+    except Exception:
+        return route
+
+
 def _seen_update(coach_id: str, update_id) -> bool:
     """True when this Telegram update was already processed (redelivery).
 
@@ -320,7 +331,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
 
     # Redelivered update (Telegram retries after outages/late webhook registration)
     # — already answered once; answering again is the double-greeting from go-live.
-    if _seen_update(coach_id, order.get("update_id")):
+    if _seen_update(_partition_id(coach_id), order.get("update_id")):
         logger.info("[telegram] duplicate update %s for %s — skipping", order.get("update_id"), coach_id)
         return {"ok": True, "reason": "duplicate"}
 
@@ -340,7 +351,12 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
 
     _tg(token, "sendChatAction", {"chat_id": chat_id, "action": "typing"})
 
-    persona_id = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
+    # Route → persona is REGISTRY data (coaching-team v2): chat-tier coaches like
+    # eli_marsh broke the old f"{route}_coach" string surgery. The derivation
+    # stays as the offline fallback so a registry outage degrades, never renames.
+    persona_id, _route_persona = persona_for_telegram_route(coach_id, s3_client=_s3_client(), bucket=S3_BUCKET)
+    if not persona_id:
+        persona_id = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
     # S3 first (fresh config without a redeploy), bundled config/ as the offline
     # fallback — the pair of paths that was MISSING when every conversation ran
     # nameless ("I'm mind_coach") and persona-free. Both failing is an incident:
@@ -350,9 +366,9 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         _emit_metric("TelegramPersonaMissing", coach_id)
         logger.error("[telegram] persona registry unreadable for %s — degraded name", persona_id)
         coach_name = f"Matthew's {coach_chat.normalize_coach_id(coach_id)} coach"
-    thread = _thread_today(coach_id)
+    thread = _thread_today(persona_id)
     facts = _facts()
-    memory = _memory_block(coach_id)
+    memory = _memory_block(persona_id)
 
     try:
         from coach.persona_core import load_voice_spec, persona_block, texting_block
@@ -381,7 +397,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     try:
         from coach.coach_domain_facts import domain_facts_block
 
-        domain = domain_facts_block(coach_id, _table())
+        domain = domain_facts_block(persona_id, _table())
     except Exception as e:
         logger.warning("[telegram] domain facts unavailable: %s", e)
     facts_block = build_facts_block(facts)
@@ -428,7 +444,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         except Exception:
             pass
         table = _table()
-        for item in coach_chat.turn_records(coach_id, coach_name, text, result, cycle=cycle):
+        for item in coach_chat.turn_records(persona_id, coach_name, text, result, cycle=cycle):
             table.put_item(Item=item)
     except Exception as e:
         logger.warning("[telegram] turn storage failed (reply already sent): %s", e)
@@ -441,7 +457,9 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         if tier is None or tier < 2:
             from coach.coach_chat_summary import ensure_daily_summary
 
-            ensure_daily_summary(_table(), coach_chat.chat_pk(coach_id), coach_name, lambda body: bedrock_client.invoke(body), cycle=cycle)
+            ensure_daily_summary(
+                _table(), coach_chat.chat_pk(persona_id), coach_name, lambda body: bedrock_client.invoke(body), cycle=cycle
+            )
     except Exception as e:
         logger.warning("[telegram] chat summary upkeep failed (reply already sent): %s", e)
 
