@@ -44,6 +44,7 @@ from privacy import privacy_guard  # deterministic real-name + vice scrub (layer
 
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.site_api_ai_prompt import (  # noqa: F401
+    _EXPLAIN_GROUNDING_REFUSAL,
     _EXPLAIN_SYSTEM,
     _EXPLAIN_WEEK_DOMAINS,
     _grounding_allow_lists,
@@ -1501,12 +1502,14 @@ def _handle_explain(event: dict) -> dict:
             _tol = {"number_tolerance": _gg.NUMBER_TOLERANCE_EXACT}  # #2290
             if _gg.grounding_findings(explanation, allowed=_allowed, allowed_dates=_allowed_dates, **_tol, **cycle_gate_params()):
                 logger.warning(f"[explain] ungrounded numbers for {surface} — refusing")
-                explanation = (
-                    "I'd rather not narrate numbers I can't ground in this page's data. "
-                    "The chart itself is the honest read — try again in a moment."
-                )
+                explanation = _EXPLAIN_GROUNDING_REFUSAL
         except ImportError:
-            pass
+            # #2393: a PARTIAL bundle regression (grounded_generation / grounding_gate_params
+            # missing while bedrock_client imported fine, so we got this far) must fail
+            # CLOSED — the old bare `pass` here served ungated Haiku output on this public
+            # endpoint with zero signal, inverting the ADR-104 gate's fail mode.
+            logger.warning(f"[explain] grounding gate unavailable for {surface} — refusing (fail-closed, #2393)")
+            explanation = _EXPLAIN_GROUNDING_REFUSAL
 
         return {
             "statusCode": 200,

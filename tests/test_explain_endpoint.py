@@ -93,6 +93,58 @@ def test_ungrounded_numbers_fail_closed(monkeypatch):
     assert "48" not in body["explanation"] and "63" not in body["explanation"]
 
 
+def _simulate_partial_bundle_missing(monkeypatch, dotted: str) -> None:
+    """Simulate #2393's real-world failure mode: a partial deploy bundle where
+    ``dotted`` (e.g. "ai.grounded_generation") is simply absent from the zip while
+    sibling modules (bedrock_client) import fine.
+
+    Setting ``sys.modules[dotted] = None`` alone is not enough — CPython's
+    ``from package import name`` first checks whether the PARENT package already has
+    ``name`` bound as an attribute (true as soon as anything in the process imported
+    it for real, which earlier tests in this suite will have done) and returns that
+    attribute WITHOUT ever raising, silently ignoring the None sentinel (see
+    ``tests/bundle_stubs.py``'s docstring for the same trap). So both the sys.modules
+    entry AND the parent-package attribute must be cleared for the import to actually
+    fail the way a missing bundle file would.
+    """
+    import importlib
+
+    pkg_name, _, attr = dotted.rpartition(".")
+    pkg = importlib.import_module(pkg_name)
+    monkeypatch.delattr(pkg, attr, raising=False)
+    monkeypatch.setitem(sys.modules, dotted, None)
+
+
+def test_partial_bundle_importerror_fails_closed(monkeypatch):
+    """#2393 mutation proof: the ADR-104 gate used to sit inside a bare
+    ``except ImportError: pass`` — a partial bundle regression (grounded_generation
+    or grounding_gate_params missing while bedrock_client imports fine, so execution
+    gets past the surface fetch and the model call) served the model's raw,
+    ungrounded output with zero signal. The gate must now fail CLOSED: same refusal
+    copy as a normal ungrounded-numbers finding, not the raw text."""
+    ai = _ai()
+    monkeypatch.setattr(ai, "_ai_paused_response", lambda: None)
+    monkeypatch.setattr(ai, "_ask_rate_check", lambda ip, limit=5: (True, 4))
+    monkeypatch.setattr(ai, "_fetch_surface_json", lambda s: {"deltas": []})
+
+    class _FakeBedrock:
+        @staticmethod
+        def invoke(req):
+            # A number that appears NOWHERE in the fetched payload — exactly what the
+            # grounding gate exists to catch. If the gate is silently skipped (the
+            # bug), this ungated text serves verbatim.
+            return {"content": [{"type": "text", "text": "HRV climbed from 48 to 63 ms this month."}], "usage": {}}
+
+    stub_bundled_module(monkeypatch, "ai.bedrock_client", _FakeBedrock)
+    _simulate_partial_bundle_missing(monkeypatch, "ai.grounded_generation")
+
+    resp = ai._handle_explain(_post_event({"surface": "what_changed"}))
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert "rather not narrate numbers" in body["explanation"]
+    assert "48" not in body["explanation"] and "63" not in body["explanation"]
+
+
 def test_shrink_bounds_lists_not_midtoken():
     ai = _ai()
     fat = {"deltas": [{"i": i, "label": f"metric-{i}"} for i in range(400)]}
