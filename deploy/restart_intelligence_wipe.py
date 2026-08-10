@@ -293,7 +293,17 @@ def extract_date(item: dict) -> str | None:
     return None
 
 
-def should_tombstone(item: dict, mode: str) -> bool:
+def should_tombstone(item: dict, mode: str, pk: str = "") -> bool:
+    # ADR-153 (coaching-team v2): the taxonomy is the single source of truth PER
+    # ROW, not per partition. Inside otherwise experiment-scoped COACH#*
+    # partitions, CHAT#/CHAT#summary#/RELATIONSHIP# are cross_phase (the texting
+    # relationship survives resets — owner request) and DEDUPE# is system_state
+    # (24h self-TTL). A partition-level "all" that ignored the sk is exactly the
+    # guard-the-set failure: the registry said cross_phase while this walker
+    # would have tombstoned Matthew's chats at the next reset.
+    sk = str(item.get("sk", ""))
+    if pk.startswith("COACH#") and taxonomy.classify(pk, sk) != taxonomy.EXPERIMENT_SCOPED:
+        return False
     if mode == "all":
         return True
     if mode == "pregenesis":
@@ -467,7 +477,7 @@ def main():
             resp = table.query(**kwargs)
             for item in resp.get("Items", []):
                 c["total"] += 1
-                if not should_tombstone(item, mode):
+                if not should_tombstone(item, mode, pk=pk):
                     c["skipped_mode"] += 1
                     continue
                 if is_already_tombstoned(item):
