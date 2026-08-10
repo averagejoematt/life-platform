@@ -35,6 +35,7 @@ remember that.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import urllib.parse
@@ -52,7 +53,7 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger("telegram-worker")
     logger.setLevel(logging.INFO)
 
-from coach import coach_chat, coach_outbound, telegram_gateway
+from coach import coach_chat, coach_outbound, coach_reactions, telegram_gateway
 from coach.coach_chat_grounding import build_facts_block, build_grounder
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
@@ -154,20 +155,56 @@ def _chat_authorized(chat_id, chat_ids: list) -> bool:
     return str(chat_id) in {str(c) for c in chat_ids or []}
 
 
+def _tg_body(payload: dict) -> tuple:
+    """``(bytes, content-type)`` for one Bot API call — form-urlencoded today. Split
+    out of ``_tg`` so the next method that cannot use a form body (``sendVoice`` needs
+    multipart, #2494) branches HERE, leaving every caller and ``_tg`` untouched."""
+    return urllib.parse.urlencode(payload).encode(), "application/x-www-form-urlencoded"
+
+
 def _tg(token: str, method: str, payload: dict) -> None:
     """One Telegram Bot API call. Fire-and-log — a failed typing indicator or even a
     failed send must never crash the worker into Lambda retries (which would re-run
     inference and double-charge the budget for one message)."""
     try:
+        data, content_type = _tg_body(payload)
         req = urllib.request.Request(
             TELEGRAM_API.format(token=token, method=method),
-            data=urllib.parse.urlencode(payload).encode(),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data=data,
+            headers={"Content-Type": content_type},
         )
         with urllib.request.urlopen(req, timeout=15) as r:
             r.read()
     except Exception as e:
         logger.warning("[telegram] %s failed: %s", method, e)
+
+
+def _react(token: str, chat_id, message_id, persona_id: str, coach_name: str, text: str, thread: list) -> bool:
+    """Close the turn with a reaction on his message instead of a reply (#2485).
+
+    Terminal when it fires: no inference, no bubble — the needless reply is the
+    thing this exists to not send. The exchange still joins memory (his message,
+    and the reaction as the coach's answer with status ``reacted``), because a gap
+    in the thread would read as a message the coach ignored.
+    """
+    if message_id is None or not coach_chat.reaction_allowed(text, _current_tier(), _turns_today(thread)):
+        return False
+    from coach.persona_core import load_voice_spec  # warm-cached; _assemble already loaded this spec
+
+    emoji = coach_reactions.reaction_for(load_voice_spec(persona_id, s3_client=_s3_client(), bucket=S3_BUCKET))
+    if not emoji:
+        return False
+    payload = {"chat_id": chat_id, "message_id": message_id, "reaction": json.dumps([{"type": "emoji", "emoji": emoji}])}
+    _tg(token, "setMessageReaction", payload)
+    _emit_metric("TelegramReactionSent", persona_id)
+    result = coach_chat.TurnResult(emoji, coach_chat.STATUS_REACTED)
+    try:
+        table = _table()
+        for item in coach_chat.turn_records(persona_id, coach_name, text, result, cycle=_cycle()):
+            table.put_item(Item=item)
+    except Exception as e:
+        logger.warning("[telegram] reaction storage failed (reaction already sent): %s", e)
+    return True
 
 
 # ── Memory + facts assembly ───────────────────────────────────────────────────
@@ -203,7 +240,11 @@ def _thread_today(coach_id: str, limit: int = 40) -> list:
 
 
 def _turns_today(thread: list) -> int:
-    return len([t for t in thread if t.get("role") == coach_chat.ROLE_MATTHEW])
+    """Real answers spent today. Exchanges the coach closed with a reaction are
+    discounted (#2485): a reaction costs no inference, so it must not eat one of
+    the DAILY_TURN_CAP answers the cap exists to protect."""
+    reacted = len([t for t in thread if t.get("status") == coach_chat.STATUS_REACTED])
+    return len([t for t in thread if t.get("role") == coach_chat.ROLE_MATTHEW]) - reacted
 
 
 def _colleagues_block(self_persona_id: str, allow_referral: bool = False) -> str:
@@ -881,6 +922,12 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     a = _assemble(persona_id, coach_id, allow_referral=True)
     coach_name = a["coach_name"]
     thread = a["thread"]
+
+    # Sometimes the human move is a reaction on his message, not another bubble
+    # (#2485). Checked BEFORE inference: the trigger is deterministic and free,
+    # and a reaction that had already paid for a model call would be pointless.
+    if _react(token, chat_id, order.get("message_id"), persona_id, coach_name, text, thread):
+        return {"ok": True, "status": coach_chat.STATUS_REACTED}
 
     from ai import bedrock_client
 

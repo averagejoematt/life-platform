@@ -414,6 +414,36 @@ def budget_refusal(tier: Optional[int], turns_today: int, cap: int = DAILY_TURN_
     return None
 
 
+# The stored status of an exchange the coach closed with a reaction (#2485). Its
+# own status rather than a flavour of "sent" because the thread must show what
+# actually happened, and because ``_turns_today`` discounts exactly these rows.
+STATUS_REACTED = "reacted"
+
+
+def reaction_allowed(inbound: str, tier: Optional[int], turns_today: int, cap: int = DAILY_TURN_CAP) -> bool:
+    """Whether this turn may be closed with a reaction instead of a reply (#2485).
+
+    The cap hangs off the SAME mechanism the reply path already obeys —
+    ``budget_refusal``/``DAILY_TURN_CAP``. Two properties, and they are different
+    things:
+
+    * **Cap-bound.** A paused or capped coach does NOT silently react. Its honest
+      refusal is the whole point of that state (ADR-104); swapping it for a 👍
+      would hide the condition behind a friendly gesture.
+    * **Cap-neutral.** A reaction consumes no inference and no turn — the worker's
+      ``_turns_today`` discounts reacted exchanges, so a day of thumbs-ups cannot
+      spend the 40 real answers the cap is protecting.
+
+    (The issue's acceptance criterion tied this to ``claim_outbound``, which the
+    reply path never calls — that ledger belongs to the check-in/outbound paths.)
+    """
+    from coach import coach_reactions  # module data — keeps the transport-free split
+
+    if budget_refusal(tier, turns_today, cap) is not None:
+        return False
+    return coach_reactions.is_bare_acknowledgement(inbound)
+
+
 # ── The turn ──────────────────────────────────────────────────────────────────
 
 
