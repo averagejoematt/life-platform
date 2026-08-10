@@ -123,8 +123,21 @@ def normalize_coach_id(coach_id: str) -> str:
 
 
 def chat_pk(coach_id: str) -> str:
-    """The evaluator-convention partition — suffixed id, same as CHECKIN#/STANCE#."""
-    return f"COACH#{normalize_coach_id(coach_id)}_coach"
+    """The evaluator-convention partition — suffixed id, same as CHECKIN#/STANCE#.
+
+    A full registry chat-tier id is used VERBATIM: ``eli_marsh`` must land on
+    ``COACH#eli_marsh`` — the partition RELATIONSHIP#/profile/evaluator already
+    key the lead by — not a synthetic ``COACH#eli_marsh_coach`` no other surface
+    reads. Suffixed ids (``pattern_coach``) round-trip identically through either
+    branch; only shorthand ("nutrition") needs the suffix appended. Fixed before
+    any eli traffic exists, so no rows migrate.
+    """
+    cid = (coach_id or "").strip().lower()
+    from coach.persona_registry import CHAT_COACH_IDS  # module constant — no S3 load
+
+    if cid in CHAT_COACH_IDS:
+        return f"COACH#{cid}"
+    return f"COACH#{normalize_coach_id(cid)}_coach"
 
 
 def new_chat_sk(date_str: Optional[str] = None, uid: Optional[str] = None) -> str:
@@ -175,49 +188,96 @@ def format_thread(thread: list, max_turns: int = MAX_THREAD_TURNS) -> list:
     return messages
 
 
-def build_system_prompt(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> str:
-    """The system message: WHO the coach is, WHAT they remember, WHAT is true today.
+def _system_parts(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> tuple:
+    """(stable_prefix_parts, volatile_tail_parts) — the ONE composition both the
+    string and block renderers derive from, so they cannot fork.
 
-    Order is deliberate. Persona first because it is the largest and most stable
-    block, which is what makes it worth caching (COST-OPT-2 wraps the system message
-    as a cached content block, and cache hits require a stable prefix). Facts last
-    because they change every day and are what the grounding gate will check against.
+    Prefix = persona + texting identity + colleagues: byte-identical across turns
+    for a given coach, which is what makes it a cacheable prefix. Tail = memory +
+    facts + rules: memory shifts daily and facts every turn (the CURRENT MOMENT
+    line), so caching them would buy nothing. The rules ride in the tail not
+    because they change but because recency matters for compliance — the facts
+    the HARD RULE polices sit directly above it.
     """
-    return "\n\n".join(
-        p
-        for p in [
-            persona_block,
-            f"You are texting Matthew directly. You ARE {coach_name} — first person, no third-person self-reference, "
-            "no salutation or sign-off. This is a text message, not a report: short, one idea, the way a person who "
-            "knows him would actually text. If a longer answer is genuinely warranted, earn it. "
-            f"You may split a reply into separate bubbles the way a person fires off consecutive texts: put a line "
-            f'containing only "{BUBBLE_DELIM}" between bubbles, {MAX_BUBBLES} bubbles at most. Most replies are one '
-            "bubble; use two or three only when the rhythm genuinely calls for it.",
-            colleagues_block,
-            memory_block,
-            facts_block,
-            # The go-live QA (2026-08-09 evening) found the three robotic tells these
-            # rules exist for: a stats recap opening every reply, a re-answer of an
-            # already-answered question after a bare "hey", and the CURRENT MOMENT
-            # context line parroted back as its own bubble.
-            "CONVERSATION RULES — the thread above is shared memory, not a to-do list:\n"
-            "- Respond to his LATEST message. Earlier messages are context you both already have.\n"
-            "- Never re-answer a question you already answered, and never restate a number or reading you already "
-            "sent in this conversation unless he asks for it again.\n"
-            "- Do NOT open with your domain data unless he asked for it — lead with a response to what he actually "
-            "said. Your facts are for when they're wanted, like a person who knows things but doesn't recite them.\n"
-            "- If an earlier question of his only became answerable now (new data arrived), say that plainly "
-            "('now that I can see it: …') instead of answering cold.\n"
-            "- Never announce the current date or time unless he asks; it is context for YOU.\n"
-            "- When something is another coach's lane, refer to them by their real name from YOUR COLLEAGUES (and "
-            "their correct pronouns) — never a generic 'the mind coach'.",
-            "HARD RULE: every number, date, and day-reference you state must come from the facts above. If the facts "
-            "do not contain what he asked about, say you don't have it — do not estimate, do not reach for a typical "
-            "value, and do not attach today to a reading from another day. Naming the day a reading belongs to is "
-            "always correct; implying a reading is today's when it is not is the one unforgivable error.",
-        ]
-        if p
-    )
+    prefix = [
+        persona_block,
+        f"You are texting Matthew directly. You ARE {coach_name} — first person, no third-person self-reference, "
+        "no salutation or sign-off. This is a text message, not a report: short, one idea, the way a person who "
+        "knows him would actually text. If a longer answer is genuinely warranted, earn it. "
+        f"You may split a reply into separate bubbles the way a person fires off consecutive texts: put a line "
+        f'containing only "{BUBBLE_DELIM}" between bubbles, {MAX_BUBBLES} bubbles at most. Most replies are one '
+        "bubble; use two or three only when the rhythm genuinely calls for it.",
+        colleagues_block,
+    ]
+    tail = [
+        memory_block,
+        facts_block,
+        # The go-live QA (2026-08-09 evening) found the first three robotic tells;
+        # the first real transcripts (same night) found the rest: a stat recited
+        # three times in 47 minutes, replies 5-10x his message length, a question
+        # bolted onto every close, stock phrases shared across supposedly distinct
+        # voices, and a coach arguing with Matthew about her own name because an
+        # old note said otherwise.
+        "CONVERSATION RULES — the thread above is shared memory, not a to-do list:\n"
+        "- Respond to his LATEST message. Earlier messages are context you both already have.\n"
+        "- Never re-answer a question you already answered, and never restate a number or reading you already "
+        "sent in this conversation unless he asks for it again.\n"
+        "- Do NOT open with your domain data unless he asked for it — lead with a response to what he actually "
+        "said. Your facts are for when they're wanted, like a person who knows things but doesn't recite them.\n"
+        "- If an earlier question of his only became answerable now (new data arrived), say that plainly "
+        "('now that I can see it: …') instead of answering cold.\n"
+        "- Never announce the current date or time unless he asks; it is context for YOU.\n"
+        "- When something is another coach's lane, refer to them by their real name from YOUR COLLEAGUES (and "
+        "their correct pronouns) — never a generic 'the mind coach'.\n"
+        "- Match his register. He texts short and casual — a bare 'hey' gets a bare hey back, not a briefing. "
+        "Default to one bubble of a sentence or two; anything longer must be earned by a question that deserves it.\n"
+        "- Not every message needs a question. When the thread has momentum, end on a statement. Never close on "
+        "a filler question ('What's on your mind?').\n"
+        "- No assistant-isms ('Honest answer:', 'Great question'), and use his name sparingly — people who text "
+        "every day don't keep saying each other's names.\n"
+        "- Text like a person: sentence fragments are fine, a short casual bubble can drop its final period, and "
+        "never format — no bullet points, headers, or numbered lists in a text.\n"
+        "- If he texts about something outside your lane — his day, an idea, anything at all — engage with it as "
+        "yourself first; you're a person he knows, not a service line. Bridge back to your lane only when it "
+        "genuinely connects.\n"
+        "- WHO YOU ARE above is authoritative over remembered notes: if an old note contradicts your own name or "
+        "identity, trust the persona and move on — never tell him he has your name wrong when it matches WHO YOU ARE.",
+        "HARD RULE: every number, date, and day-reference you state must come from the facts above. If the facts "
+        "do not contain what he asked about, say you don't have it — do not estimate, do not reach for a typical "
+        "value, and do not attach today to a reading from another day. Naming the day a reading belongs to is "
+        "always correct; implying a reading is today's when it is not is the one unforgivable error.",
+    ]
+    return prefix, tail
+
+
+def build_system_prompt(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> str:
+    """The system message as one string: WHO the coach is, WHAT they remember, WHAT
+    is true today. Kept for tests and any consumer that wants the flat text; the
+    request path uses ``build_system_blocks`` so the stable prefix actually caches.
+    """
+    prefix, tail = _system_parts(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block)
+    return "\n\n".join(p for p in prefix + tail if p)
+
+
+def build_system_blocks(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> list:
+    """The system message as Anthropic content blocks with a real cached prefix.
+
+    Until tonight this surface sent ``system`` as a plain string — the docstring
+    claimed COST-OPT-2 caching that never happened, and the persona substrate
+    (the largest block in the platform's highest-frequency AI surface) was
+    re-billed at full price every turn. The stable prefix now carries
+    ``cache_control: ephemeral`` like every other coach surface; the volatile
+    tail rides uncached behind it.
+    """
+    prefix, tail = _system_parts(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block)
+    prefix_text = "\n\n".join(p for p in prefix if p)
+    tail_text = "\n\n".join(p for p in tail if p)
+    blocks = []
+    if prefix_text:
+        blocks.append({"type": "text", "text": prefix_text, "cache_control": {"type": "ephemeral"}})
+    if tail_text:
+        blocks.append({"type": "text", "text": tail_text})
+    return blocks
 
 
 def build_request(
@@ -238,7 +298,7 @@ def build_request(
     return {
         "model": model,
         "max_tokens": max_tokens,
-        "system": build_system_prompt(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block),
+        "system": build_system_blocks(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block),
         "messages": messages,
     }
 

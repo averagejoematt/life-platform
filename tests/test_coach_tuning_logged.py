@@ -34,6 +34,11 @@ VOICE_KEYS = {
     "anti_pattern_detection",
     "display_name",
     "domain",
+    # The chat-surface character fields (#2402) are voice too — a texting-register
+    # or few-shot change alters how the coach reads on the highest-frequency
+    # surface and must carry the same tuning_log discipline as the bible keys.
+    "texting_style",
+    "texting_few_shots",
 }
 VALID_CHANGE_TYPES = {"prompt", "voice", "persona", "few_shot", "model"}
 

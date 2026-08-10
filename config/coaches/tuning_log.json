@@ -176,6 +176,24 @@
       "rationale": "MOS bibles 02/06/00 male-adapted where owner-decided; Eli becomes Matthew's operational point of contact per the head-coach mandate.",
       "ref": "coaching-team v2 Wave 3 (epic #2363); owner decisions 2026-08-09",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "Conversation rules v2 from the first real transcripts: register matching (bare hey gets a bare hey), question budget + filler-question ban, assistant-ism and stock-opener ban, sparing name use, no formatting in texts, off-lane conversation welcomed, persona authoritative over remembered notes.",
+      "rationale": "The go-live corpus showed replies 5-10x Matthew's message length, a stat recited three times in 47 minutes, a question bolted onto nearly every close, 'Honest answer:' shared across two voices, and a coach arguing about her own name because a poisoned summary row said otherwise.",
+      "ref": "coaching brilliance session 2026-08-10 (Act 1c); transcript QA report",
+      "observed_effect": null
+    },
+    {
+      "date": "2026-08-10",
+      "coach": "all",
+      "change_type": "prompt",
+      "summary": "CHAT#summary voice: third-person meeting minutes become the coach's first-person notes to self ('he asked what to eat', 'I still need his food logs'); explicit no-editorializing rule.",
+      "rationale": "Summaries read back into the prompt as the coach's memory; minutes-voice memories leak clinical register into replies, and the 08-09 sleep summary memorialized the coach's own identity error as if Matthew were confused.",
+      "ref": "coaching brilliance session 2026-08-10 (Act 1c)",
+      "observed_effect": null
     }
   ]
 }
