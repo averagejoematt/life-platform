@@ -12,6 +12,8 @@ Pins the Wave-2 contract of the coaching-team v2 session (2026-08-09):
   B6  persona_core: the shared MOS substrate prefixes every resolving persona and
       never substitutes for a missing one; the texting register renders only from
       texting_style
+  B11 availability voice (#2495): budget-pause/daily-cap replies render per
+      persona via run_turn's persona_id, not one shared string
 """
 
 import os
@@ -684,6 +686,68 @@ def test_worker_colleagues_block_names_and_pronouns():
     assert "Dr. Lisa Park" not in block  # never lists the coach to themself
     assert "Dr. Amara Patel (she/her)" in block  # consulting tier is citable by name
     assert "Dr. Sarah Chen" not in block  # retired seats are not colleagues to cite
+
+
+# ── B11: availability voice — budget-pause/daily-cap replies (#2495) ─────────
+
+
+def test_budget_refusal_renders_in_persona_voice_when_paused():
+    generic = coach_chat.budget_refusal(2, 0)
+    sleep_voice = coach_chat.budget_refusal(2, 0, persona_id="sleep_coach")
+    nutrition_voice = coach_chat.budget_refusal(2, 0, persona_id="nutrition_coach")
+    assert sleep_voice != generic
+    assert sleep_voice != nutrition_voice
+    assert "2" in sleep_voice  # the tier is still stated, in whichever voice
+
+
+def test_budget_refusal_renders_in_persona_voice_when_capped():
+    generic = coach_chat.budget_refusal(0, coach_chat.DAILY_TURN_CAP)
+    sleep_voice = coach_chat.budget_refusal(0, coach_chat.DAILY_TURN_CAP, persona_id="sleep_coach")
+    assert sleep_voice != generic
+    assert str(coach_chat.DAILY_TURN_CAP) in sleep_voice
+
+
+def test_run_turn_passes_persona_id_through_to_the_refusal():
+    """run_turn's new persona_id param (#2495) must actually reach
+    budget_refusal — a signature change that changes nothing is worse than no
+    change at all."""
+    result = coach_chat.run_turn(
+        coach_id="some-route-string-not-a-persona-id",
+        persona_id="nutrition_coach",
+        coach_name="Dr. Marcus Webb",
+        persona_block="",
+        memory_block="",
+        facts_block="",
+        thread=[],
+        inbound="hey",
+        model="test-model",
+        caller=_fake_caller("unused — refused before inference"),
+        grounder=lambda text: [],
+        tier=3,
+    )
+    assert result.status == "paused"
+    assert result.text == coach_chat.budget_refusal(3, 0, persona_id="nutrition_coach")
+
+
+def test_run_turn_falls_back_to_coach_id_when_no_persona_id_given():
+    """Older-shaped call sites (coach_id already equal to a persona id) still get
+    a coherent, persona-voiced reply without passing persona_id explicitly —
+    run_turn falls back to coach_id."""
+    result = coach_chat.run_turn(
+        coach_id="sleep_coach",
+        coach_name="Dr. Lisa Park",
+        persona_block="",
+        memory_block="",
+        facts_block="",
+        thread=[],
+        inbound="hey",
+        model="test-model",
+        caller=_fake_caller("unused"),
+        grounder=lambda text: [],
+        tier=2,
+    )
+    assert result.status == "paused"
+    assert result.text == coach_chat.budget_refusal(2, 0, persona_id="sleep_coach")
 
 
 # ── The inbound message is evidence (live regression, 2026-08-10) ─────────────

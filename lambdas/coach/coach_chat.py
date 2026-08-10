@@ -107,8 +107,10 @@ DAILY_TURN_CAP = 40
 _HELD_REPLY = (
     "Let me check that before I answer — I'd rather say nothing than give you a number I can't stand behind. Ask me again in a minute."
 )
-_PAUSED_REPLY = "I'm paused for the month — the AI budget guard is holding at tier {tier} and a private chat isn't worth pausing your daily brief over. The site and your brief still run."
-_CAPPED_REPLY = "That's {cap} messages today, which is where I stop — not because you're bothering me, but because the budget cap is the reason the rest of the platform keeps running. Pick it up tomorrow."
+# The paused/capped replies themselves are per-persona now (#2495) — see
+# persona_registry.availability_reply and each texting persona's "availability"
+# block in config/personas.json. persona_registry also owns the generic fallback
+# used when no persona handle is available.
 
 
 def normalize_coach_id(coach_id: str) -> str:
@@ -388,7 +390,7 @@ def enforce_emoji_policy(bubbles: list, last_reply_had_emoji: bool = False) -> l
 # ── Budget posture ────────────────────────────────────────────────────────────
 
 
-def budget_refusal(tier: Optional[int], turns_today: int, cap: int = DAILY_TURN_CAP) -> Optional[str]:
+def budget_refusal(tier: Optional[int], turns_today: int, cap: int = DAILY_TURN_CAP, persona_id: Optional[str] = None) -> Optional[str]:
     """The honest refusal to send INSTEAD of inference, or None to proceed.
 
     Checked before the model is touched, so a refusal costs nothing. An unknown tier
@@ -396,11 +398,19 @@ def budget_refusal(tier: Optional[int], turns_today: int, cap: int = DAILY_TURN_
     every coach on an unrelated SSM blip, and the budget has its own hard backstop in
     ``bedrock_client``/``budget_guard`` regardless. This is a soft gate in front of a
     hard one, not the only line of defence.
+
+    ``persona_id`` renders the refusal in that coach's own voice (#2495) via
+    ``persona_registry.availability_reply`` — every persona still plainly states
+    the paused/capped condition (ADR-104), just not in the same shared sentence.
+    ``None``, or an id the registry doesn't recognise, degrades to the generic
+    fallback rather than raising.
     """
+    from coach.persona_registry import availability_reply  # module data — no S3 load at import
+
     if tier is not None and tier >= _PAUSE_TIER:
-        return _PAUSED_REPLY.format(tier=tier)
+        return availability_reply(persona_id, "paused", tier=tier)
     if turns_today >= cap:
-        return _CAPPED_REPLY.format(cap=cap)
+        return availability_reply(persona_id, "capped", cap=cap)
     return None
 
 
@@ -452,6 +462,7 @@ def run_turn(
     cap: int = DAILY_TURN_CAP,
     last_reply_had_emoji: bool = False,
     colleagues_block: str = "",
+    persona_id: Optional[str] = None,
 ) -> TurnResult:
     """One conversational turn: budget -> generate -> ground -> regenerate-or-hold.
 
@@ -465,8 +476,13 @@ def run_turn(
     analyzer publishing narratives whose finding count merely *dropped* — a rewrite
     that goes 6 findings to 2 still ships two ungrounded claims. Here the retry must
     come back CLEAN or the reply is held.
+
+    ``persona_id`` is the registry key (#2495) that renders a budget refusal in
+    this coach's own voice. ``coach_id`` is not always that key — a route-derived
+    caller may pass a shorthand or an aliased route — so it is a SEPARATE param
+    that defaults to ``coach_id`` only when the caller has nothing better.
     """
-    refusal = budget_refusal(tier, turns_today, cap)
+    refusal = budget_refusal(tier, turns_today, cap, persona_id=persona_id or coach_id)
     if refusal:
         return TurnResult(refusal, "paused" if tier is not None and tier >= _PAUSE_TIER else "capped")
 
