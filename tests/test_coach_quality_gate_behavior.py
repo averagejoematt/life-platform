@@ -289,7 +289,17 @@ class TestQualityGateMessage:
         assert "circle back" in msg
         assert "three bullets" in msg
 
-    def test_an_empty_voice_spec_omits_the_anti_pattern_section_entirely(self):
+    def test_an_empty_voice_spec_still_inherits_the_shared_avoid_list(self):
+        """Since the MOS substrate (coaching-team v2, 2026-08-09) every coach —
+        even one with a bare spec — inherits the shared banned-phrase floor; the
+        checklist section only disappears when the shared standard is ALSO
+        unavailable (fail-soft)."""
+        msg = gate._build_quality_gate_message("sleep_coach", "draft", {}, None)
+        assert "Anti-Pattern Checklist" in msg
+        assert "keep up the good work" in msg
+
+    def test_no_spec_and_no_shared_standard_omits_the_section(self, monkeypatch):
+        monkeypatch.setattr(gate, "_shared_blacklists", lambda: ([], []))
         msg = gate._build_quality_gate_message("sleep_coach", "draft", {}, None)
         assert "Anti-Pattern Checklist" not in msg
 

@@ -341,6 +341,24 @@ QUALITY_GATE_SYSTEM_PROMPT = (
 )
 
 
+def _shared_blacklists():
+    """The substrate's banned phrases/structures (config/coaches/_shared_standard.json).
+
+    Fail-soft ([], []) — a coach whose own blacklist loads must never lose its
+    gate because the shared file is unreadable.
+    """
+    try:
+        from coach.persona_core import load_voice_spec
+
+        std = load_voice_spec("_shared_standard") or {}
+        return (
+            [str(p) for p in std.get("shared_phrase_blacklist") or []],
+            [str(s) for s in std.get("shared_structural_blacklist") or []],
+        )
+    except Exception:
+        return [], []
+
+
 def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_brief, other_outputs=None):
     """Build the user message for the quality gate LLM call."""
     parts = [
@@ -353,16 +371,23 @@ def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_br
         "",
     ]
 
-    # Voice spec anti-patterns
+    # Voice spec anti-patterns + the MOS shared avoid-list (every coach inherits
+    # the substrate's banned clichés on top of their own list — the shared
+    # standard's "communication avoid" made concrete and enforceable).
     anti_patterns = voice_spec.get("anti_pattern_detection", {})
-    if anti_patterns:
+    shared_phrases, shared_structural = _shared_blacklists()
+    phrase_bl = list(anti_patterns.get("phrase_blacklist", [])) + [
+        p for p in shared_phrases if p not in anti_patterns.get("phrase_blacklist", [])
+    ]
+    structural_bl = list(anti_patterns.get("structural_blacklist", [])) + [
+        s for s in shared_structural if s not in anti_patterns.get("structural_blacklist", [])
+    ]
+    if phrase_bl or structural_bl:
         parts.append("## Anti-Pattern Checklist")
-        phrase_bl = anti_patterns.get("phrase_blacklist", [])
         if phrase_bl:
             parts.append("### Forbidden Phrases")
             for phrase in phrase_bl:
                 parts.append(f'  - "{phrase}"')
-        structural_bl = anti_patterns.get("structural_blacklist", [])
         if structural_bl:
             parts.append("### Forbidden Structural Patterns")
             for pattern in structural_bl:
