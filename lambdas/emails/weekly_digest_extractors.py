@@ -356,8 +356,16 @@ def ex_todoist(recs_dict):
     # ingestion_validator.py) — reading the pre-rename `tasks_completed` matched nothing
     # and published a permanent measured zero. The OUTPUT key stays `tasks_completed`:
     # it is the renderer's and the Board prompt's contract, not the storage field.
-    c = [int(r.get("completed_count", 0) or 0) for r in recs]
-    return {"tasks_completed": sum(c), "avg_per_day": avg(c), "days": len(recs)}
+    # ADR-104 (#2332): a record that exists but carries no `completed_count` at all — an
+    # ingestion gap, or a write that omitted the field — is ABSENCE, not a recorded zero.
+    # It used to read `r.get("completed_count", 0) or 0`, so a gap contributed a 0 to both
+    # the sum and the avg_per_day denominator, same shape as ex_habitify's fix above:
+    # data that was never collected dragged the average down as if it had been measured.
+    # `days` is the count of days that actually backed the average, not the raw record
+    # count, so the renderer can say "n" alongside the figure instead of implying a full
+    # week's worth of reporting.
+    c = [int(r["completed_count"]) for r in recs if r.get("completed_count") is not None]
+    return {"tasks_completed": sum(c), "avg_per_day": avg(c), "days": len(c)}
 
 
 def ex_journal(entries_by_date):
