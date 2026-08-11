@@ -1282,6 +1282,11 @@ def _allowlist_prompt(system_prompt, few_shot_block):
     return system_prompt
 
 
+# #1374: the gate's wire contract lives in its own module so the calibration
+# harness replays the REAL payload instead of a hand-rebuilt lookalike.
+from ai.quality_gate_contract import QUALITY_GATE_FUNCTION_NAME, quality_gate_event  # noqa: E402,F401
+
+
 def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief):
     """Synchronous (RequestResponse) call to coach-quality-gate.
 
@@ -1295,16 +1300,9 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
     """
     try:
         resp = lambda_client.invoke(
-            FunctionName="coach-quality-gate",
+            FunctionName=QUALITY_GATE_FUNCTION_NAME,
             InvocationType="RequestResponse",
-            Payload=json.dumps(
-                {
-                    "coach_id": coach_id,
-                    "output_text": output_text,
-                    "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
-                    "generation_date": _date_cls.today().isoformat(),
-                }
-            ).encode(),
+            Payload=json.dumps(quality_gate_event(coach_id, output_text, generation_brief)).encode(),
         )
         payload = json.loads(resp["Payload"].read())
         if not isinstance(payload, dict):

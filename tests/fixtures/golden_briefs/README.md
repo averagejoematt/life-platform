@@ -44,6 +44,46 @@ Five fixtures that each inject a fault the gate must catch. Each adds:
 harness asserts every expected check fires; an uncaught canary fails the run. The
 five together must span all three dimensions (a self-test enforces this).
 
+## Second use: calibrating the LLM JUDGE (#1374)
+
+The same 35 fixtures are the labeled set for `tests/judge_calibration.py`, reachable as
+`python3 tests/golden_brief_eval.py --judge-calibration`. The deterministic harness above
+asks *"does the honesty gate work?"*; the calibration mode asks *"how good is the LLM
+quality-gate judge that BLOCKS coach drafts (ADR-108/#390)?"* and answers with a confusion
+matrix carrying its n and a 95% Wilson interval on every rate.
+
+**Ground truth is the label already here:** the 30 goldens are the positives (genuinely
+publishable), the 5 canaries the negatives (induced defect). That is why the story did not
+need the "~30 days of verdict history" its deferral asked for — see the module header for
+why that wait could never have ended.
+
+**The denominators are asymmetric and the report says so.** 30 positives is workable; **5
+negatives is thin** — a perfect 5/5 still has a 95% lower bound near 0.57, so no
+specificity figure from this corpus is a measurement. Anything published from it must
+carry the interval, never the point estimate.
+
+**Known corpus/rubric mismatch.** These canaries were authored for the *deterministic*
+gate. Only `canary_anti_pattern` is squarely inside the LLM judge's four-criterion rubric
+(anti-patterns, decision class, voice distinctiveness, cross-coach similarity) — the
+fabrication and contradiction canaries test faults that rubric never asks about. The
+harness classifies each canary (`RUBRIC_SCOPE`) and reports specificity split by scope, so
+a low number is not silently read as "the judge is bad" when it may be "the rubric has no
+rule for this."
+
+### Re-evaluation cadence (drift)
+
+| When | What | Why |
+|---|---|---|
+| On any change to `QUALITY_GATE_SYSTEM_PROMPT`, `PASS_SCORE_THRESHOLD`, or the judge model/tier | Re-run `--judge-calibration` and record the matrix in the PR | Those three ARE the instrument; changing one invalidates the prior calibration |
+| Quarterly, unprompted | Re-run and compare cells to the last recorded matrix | Vendor model updates move a judge with no repo change to trigger a re-run |
+| Whenever a canary or golden is added | Re-run | The denominators change, so every interval changes |
+
+Deliberately **not** on a CI schedule: at ~35 Haiku calls a run this is cheap but not free,
+and a number nobody reads is worse than no number. It is an instrument you pick up, not a
+gate. It pauses only at budget tier 3 (the #1927 lesson — an AI check that pauses at tier 1
+is dark most of the month while still reporting green) and reports `NOT_RUN` rather than
+emitting a matrix it did not measure.
+
 ## Adding a fixture
 
 Append a JSON object. For a canary, pick the `expect_checks` that matches the fault
