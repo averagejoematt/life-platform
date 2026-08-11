@@ -219,6 +219,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_dead_intelligence_functions.py",
         "test_hevy_compiler_isolation.py",
         "test_public_surface_pii_guard.py",  # privacy — the one most costly to catch late
+        "test_coach_his_people_2488.py",  # #2488: the his-people sk must stay unreachable from the whole coach perimeter
         "test_leak_token_sweep.py",
         "test_csp_native_embeds_1678.py",
         "test_archive_handover.py",  # a dated handover committed to main (#1650)
