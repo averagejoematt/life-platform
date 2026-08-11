@@ -22,6 +22,17 @@ even with pr-checks.yml/fresh-eyes.yml's stale pins in the mix, because
 ci-cd.yml/ci-test.yml already carry the correct version — a stale pin can hide
 behind a correct one from another file. The check is now exact-set equality
 per tool across the whole _CI_FILES surface.
+
+Extended #2570: the next instance of the SAME shape — "outside the guard's scope,
+not beyond its capability". _CI_FILES is a HAND-LIST of workflow files, so a pin
+declared anywhere else was invisible: the Makefile's `preflight` target sat on
+black 25.9.0 / ruff 0.14.0 / mypy 2.1.0, three versions stale, while advertising
+itself as "match CI gates locally", and nothing went red. The declaration surface
+is now DERIVED from the tracked tree (`git ls-files`, every `tool==version`), so a
+new place that writes a pin is covered the moment it exists rather than the moment
+someone remembers this file. The resolution half of #2570 — which black binary the
+pre-commit hook actually EXECUTES, versus the version declared here — is a
+different question and lives in tests/test_formatter_pin_resolution.py.
 """
 
 import os
@@ -201,3 +212,126 @@ def test_doc_lint_pin_grep_surfaces_the_ci_side():
 def test_dev_pins_match_ci_gate():
     mismatches = _pin_mismatches(_ci_gate_text(), _GATED_TOOLS)
     assert not mismatches, "dev tooling pins drifted from the enforced CI gate (CQ-01):\n" + "\n".join(mismatches)
+
+
+# --- The declaration surface, DERIVED rather than hand-listed (#2570) ----------
+# _CI_FILES above is a hand-list, so a pin written down anywhere else — the
+# Makefile, a script, a doc — could disagree indefinitely with nothing red. That is
+# exactly what happened to `make preflight`. These tests derive the surface instead.
+
+# Paths whose `tool==version` strings are HISTORY, not declarations: frozen review
+# artifacts, archived docs and session handovers all quote the pins that were live
+# when they were written, and are deliberately never updated (editing a dated record
+# would falsify it). Plus the two pin-guard test files, which carry synthetic pins.
+_HISTORICAL_PREFIXES = ("docs/reviews/", "docs/archive/", "handovers/")
+_HISTORICAL_FILES = ("tests/test_ci_pin_consistency.py", "tests/test_formatter_pin_resolution.py")
+
+# Declarations that are KNOWN stale and deliberately out of scope for the change
+# that added this derivation (#2570 is a formatter-toolchain fix). Keyed by
+# (path, tool) so a version bump doesn't silently re-arm them; each needs a reason.
+# An entry here is a debt, not an exemption — delete it by fixing the file.
+_KNOWN_STALE_DECLARATIONS = {
+    ("docs/LICENSES.md", "playwright"): "license table lags requirements-dev.txt (1.61.0 vs 1.62.0) — pre-existing, not #2570's to fix",
+    (
+        "docs/LICENSES.md",
+        "hypothesis",
+    ): "license table lags requirements-dev.txt (6.161.2 vs 6.165.0) — pre-existing, and dependabot moves this pin",
+}
+
+# The code that RESOLVES a pinned tool at runtime must derive the version, never
+# carry a second copy of it (#2570). Derived from the tracked tree the same way as
+# everything else: any tracked shell file that sources or is the resolver.
+_RESOLVER = os.path.join("deploy", "lib", "pinned_formatters.sh")
+
+
+def _tracked_files():
+    out = subprocess.run(["git", "-C", _REPO, "ls-files", "-z"], capture_output=True, text=True, check=True).stdout
+    return [p for p in out.split("\0") if p]
+
+
+def _declaration_sites(tools=_GATED_TOOLS):
+    """Derive {tool: {version: [paths]}} from every tracked file that declares a pin."""
+    rx = re.compile(r"\b(%s)==([0-9][0-9A-Za-z.+\-]*)" % "|".join(re.escape(t) for t in tools))
+    found: dict = {t: {} for t in tools}
+    for rel in _tracked_files():
+        if rel in _HISTORICAL_FILES or rel.startswith(_HISTORICAL_PREFIXES):
+            continue
+        try:
+            with open(os.path.join(_REPO, rel), encoding="utf-8") as f:
+                text = f.read()
+        except (UnicodeDecodeError, OSError):
+            continue
+        for tool, ver in rx.findall(text):
+            if (rel, tool) in _KNOWN_STALE_DECLARATIONS:
+                continue
+            found[tool].setdefault(ver, []).append(rel)
+    return found
+
+
+def _declaration_disagreements(sites):
+    """Factored out so a synthetic `sites` map can prove the guard fires (same
+    pattern as test_guard_fires_on_synthetic_divergence_for_a_newly_covered_tool)."""
+    problems = []
+    for tool, by_version in sorted(sites.items()):
+        if len(by_version) > 1:
+            detail = "; ".join(f"{ver} in {sorted(set(paths))}" for ver, paths in sorted(by_version.items()))
+            problems.append(f"{tool} is declared at {len(by_version)} different versions — {detail}")
+    return problems
+
+
+def test_declaration_derivation_is_not_vacuous():
+    """A derivation that finds nothing passes forever. Assert it actually sees the
+    two sources the pin contract is built on, without hand-listing the surface."""
+    sites = _declaration_sites()
+    for tool in ("black", "ruff"):
+        paths = sorted({p for ps in sites[tool].values() for p in ps})
+        assert paths, f"derived zero declaration sites for {tool} — the derivation is broken, not the tree"
+        assert "requirements-dev.txt" in paths, f"{tool} is no longer pinned in requirements-dev.txt (the resolver reads it)"
+        assert any(p.startswith(".github/workflows/") for p in paths), f"{tool} is no longer pinned in any CI workflow"
+
+
+def test_every_declared_pin_agrees_tree_wide():
+    """One version per tool, everywhere it is written down — workflows, Makefile,
+    scripts, docs. This is the #2570 box: the local gate's version and CI's pin
+    cannot diverge again without a red."""
+    problems = _declaration_disagreements(_declaration_sites())
+    assert not problems, (
+        "tool pins have diverged across the tracked tree (CQ-01 / #2570). Every declaration must "
+        "equal requirements-dev.txt, which is what the pre-commit hook and deploy/agent_commit.sh "
+        "resolve against:\n  " + "\n  ".join(problems)
+    )
+
+
+def test_tree_wide_guard_fires_on_a_synthetic_divergence():
+    """Prove-red for the derived surface, mirroring the #1963 pattern above: a
+    synthetic sites map with one tool declared twice must be reported."""
+    synthetic = {"black": {"26.3.1": ["requirements-dev.txt"], "25.9.0": ["Makefile"]}}
+    problems = _declaration_disagreements(synthetic)
+    assert problems, "the tree-wide declaration guard failed to fire on a synthetic divergence — regression"
+    assert "Makefile" in problems[0] and "25.9.0" in problems[0], problems
+
+
+def test_known_stale_declarations_are_still_real():
+    """The debt ledger must not rot: an entry whose file no longer declares that
+    tool is a stale exemption quietly widening the guard's blind spot."""
+    rx_cache = {}
+    for (rel, tool), reason in _KNOWN_STALE_DECLARATIONS.items():
+        assert reason, f"{rel}/{tool} needs a reason"
+        path = os.path.join(_REPO, rel)
+        assert os.path.exists(path), f"_KNOWN_STALE_DECLARATIONS names a missing file: {rel}"
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        rx = rx_cache.setdefault(tool, re.compile(rf"\b{re.escape(tool)}==[0-9]"))
+        assert rx.search(text), f"_KNOWN_STALE_DECLARATIONS entry ({rel}, {tool}) no longer applies — delete it"
+
+
+def test_pin_readers_hardcode_no_version():
+    """The resolver and both of its callers must READ the pin, never carry a copy —
+    a copy is a future divergence with a guaranteed silent window (#2570)."""
+    rx = re.compile(r"\b(%s)==([0-9][0-9A-Za-z.+\-]*)" % "|".join(re.escape(t) for t in _GATED_TOOLS))
+    for rel in (_RESOLVER, os.path.join("scripts", "install_hooks.sh"), os.path.join("deploy", "agent_commit.sh")):
+        path = os.path.join(_REPO, rel)
+        assert os.path.exists(path), f"{rel} is missing — the pinned-formatter resolver contract is broken (#2570)"
+        with open(path, encoding="utf-8") as f:
+            hits = rx.findall(f.read())
+        assert not hits, f"{rel} hardcodes a tool pin {hits} — read it from requirements-dev.txt instead (#2570)"

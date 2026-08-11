@@ -1,5 +1,5 @@
-"""tests/test_formatter_pin_resolution.py — #2570: the local format gate must run
-the SAME black/ruff CI pins, and must fail closed rather than substitute another.
+"""tests/test_formatter_pin_resolution.py — #2570: the local format gate must EXECUTE
+the black/ruff CI pins, and must fail closed rather than substitute another.
 
 WHAT WENT WRONG. CI's format gate installs an exact pair (`.github/workflows/
 ci-lint.yml`: `pip install black==… ruff==…`). The pre-commit hook resolved those
@@ -8,23 +8,17 @@ and the two disagreed on a real file (`lambdas/ai/ai_calls.py`): the hook refuse
 commit CI would have passed, and the reformat it demanded produced a tree CI's gate
 then rejected. Both directions wrong.
 
-TWO GUARDS, BECAUSE THERE ARE TWO WAYS TO DRIFT.
+SCOPE — this file is the RESOLUTION half only. Whether the declared pins AGREE with
+each other is already CQ-01's job, and tests/test_ci_pin_consistency.py owns it
+(#2570 extended that file to derive its declaration surface from the tracked tree
+so the Makefile and friends stopped being invisible to it). Adding a second parallel
+pin guard is a mistake this repo has already made once; what has never been guarded
+is which binary the hook actually runs.
 
-  1. DECLARATION drift — the same pin written down in more than one place, and the
-     copies disagree. tests/test_ci_pin_consistency.py already compares
-     requirements-dev.txt against a HAND-LISTED tuple of workflow files, which is
-     why the Makefile's `preflight` target sat three versions stale with nothing
-     red: it was outside the guard's scope, not beyond its capability. The guard
-     here DERIVES the declaration set from the whole tracked tree instead, so a new
-     place that writes `black==x.y.z` is covered the moment it exists.
-
-  2. RESOLUTION drift — the declarations agree but the binary the hook actually
-     executes is something else. Covered by exercising
-     deploy/lib/pinned_formatters.sh directly with version-reporting shims, and by
-     running the real pre-commit hook body end-to-end in a throwaway repo.
-
-Everything here is hermetic: no network, and no dependency on any particular
-machine having .venv-black installed.
+Everything here is hermetic: no network, and no dependency on any particular machine
+having .venv-black installed. The declared pin is read from requirements-dev.txt —
+one file, deliberately not a tree sweep, so this stays a behaviour suite rather than
+a second repo-shape ratchet.
 """
 
 import os
@@ -42,82 +36,13 @@ _REQ = os.path.join(_REPO, "requirements-dev.txt")
 
 _TOOLS = ("black", "ruff")
 
-# Paths whose `tool==version` strings are HISTORY, not declarations: frozen review
-# artifacts, archived docs, and session handovers all quote the pins that were live
-# when they were written and are never updated (editing them would be falsifying a
-# dated record — see the "frozen artifact supersede annotation" convention). Plus
-# the two pin-guard tests themselves, which contain deliberately synthetic pins.
-_FROZEN_PREFIXES = (
-    "docs/reviews/",
-    "docs/archive/",
-    "handovers/",
-)
-_FROZEN_FILES = (
-    "tests/test_ci_pin_consistency.py",
-    "tests/test_formatter_pin_resolution.py",
-)
 
-_PIN_RE = re.compile(r"\b(black|ruff)==([0-9][0-9A-Za-z.+\-]*)")
-
-
-def _tracked_files():
-    out = subprocess.run(["git", "-C", _REPO, "ls-files", "-z"], capture_output=True, text=True, check=True).stdout
-    return [p for p in out.split("\0") if p]
-
-
-def _declared_pins():
-    """Derive {tool: {version: [paths]}} from every tracked file that declares a pin.
-
-    Guard the SET, not the instance: nothing here names ci-lint.yml or the Makefile.
-    A new declaration site is picked up because it exists, not because someone
-    remembered to add it to a list.
-    """
-    found: dict = {t: {} for t in _TOOLS}
-    for rel in _tracked_files():
-        if rel in _FROZEN_FILES or rel.startswith(_FROZEN_PREFIXES):
-            continue
-        path = os.path.join(_REPO, rel)
-        try:
-            with open(path, encoding="utf-8") as f:
-                text = f.read()
-        except (UnicodeDecodeError, OSError):
-            continue
-        for tool, ver in _PIN_RE.findall(text):
-            found[tool].setdefault(ver, []).append(rel)
-    return found
-
-
-# ── Guard 1: declaration drift ────────────────────────────────────────────────
-
-
-def test_declaration_set_is_non_empty_and_covers_the_authoritative_sources():
-    """Sanity on the DERIVATION itself — a guard that finds nothing always passes."""
-    pins = _declared_pins()
-    for tool in _TOOLS:
-        sites = sorted({p for paths in pins[tool].values() for p in paths})
-        assert sites, f"derived zero declaration sites for {tool} — the derivation is broken, not the tree"
-        assert "requirements-dev.txt" in sites, f"{tool} is no longer pinned in requirements-dev.txt (the resolver reads it)"
-        assert any(s.startswith(".github/workflows/") for s in sites), f"{tool} is no longer pinned in any CI workflow"
-
-
-def test_every_declared_black_and_ruff_pin_agrees():
-    """One pin per tool, tree-wide. This is the box #2570 asks for: a test that goes
-    red when the local gate's version and CI's pin diverge, instead of relying on
-    someone noticing."""
-    pins = _declared_pins()
-    problems = []
-    for tool in _TOOLS:
-        if len(pins[tool]) > 1:
-            detail = "; ".join(f"{ver} in {sorted(set(paths))}" for ver, paths in sorted(pins[tool].items()))
-            problems.append(f"{tool} is declared at {len(pins[tool])} different versions — {detail}")
-    assert not problems, (
-        "black/ruff pins have diverged across the tracked tree (#2570). Every declaration must "
-        "equal requirements-dev.txt, which is what the pre-commit hook and deploy/agent_commit.sh "
-        "resolve against:\n  " + "\n  ".join(problems)
-    )
-
-
-# ── Guard 2: resolution drift ─────────────────────────────────────────────────
+def _declared_pin(tool):
+    """The version requirements-dev.txt declares — the single source the resolver reads."""
+    with open(_REQ, encoding="utf-8") as f:
+        found = re.findall(rf"^{re.escape(tool)}==([0-9][0-9A-Za-z.+\-]*)\s*$", f.read(), re.MULTILINE)
+    assert len(found) == 1, f"expected exactly one {tool} pin in requirements-dev.txt, found {found}"
+    return found[0]
 
 
 def _read(path):
@@ -134,17 +59,10 @@ def _hook_body():
     return m.group(1)
 
 
-def test_pin_readers_hardcode_no_version():
-    """The resolver, the hook and agent_commit.sh must DERIVE the pin, never carry a
-    second copy of it — a copy is a future divergence with a guaranteed silent
-    window between the bump and someone noticing."""
-    for label, text in (
-        ("deploy/lib/pinned_formatters.sh", _read(_LIB)),
-        ("scripts/install_hooks.sh", _read(_INSTALLER)),
-        ("deploy/agent_commit.sh", _read(_AGENT_COMMIT)),
-    ):
-        hits = _PIN_RE.findall(text)
-        assert not hits, f"{label} hardcodes a formatter pin {hits} — read it from requirements-dev.txt instead (#2570)"
+# NB: "the resolver and its callers must hardcode no version" lives with the other
+# declaration-surface checks in tests/test_ci_pin_consistency.py
+# (test_pin_readers_hardcode_no_version) — it is a statement about declarations, and
+# that file is where declarations are guarded.
 
 
 def test_hook_body_resolves_the_pinned_formatters():
@@ -206,9 +124,8 @@ def test_resolver_reports_the_declared_pin():
     )
     assert proc.returncode == 0, proc.stderr
     reported = proc.stdout.split()
-    declared = _declared_pins()
-    expected = [next(iter(declared["black"])), next(iter(declared["ruff"]))]
-    assert reported == expected, f"resolver reported {reported} but the tree declares {expected}"
+    expected = [_declared_pin("black"), _declared_pin("ruff")]
+    assert reported == expected, f"resolver reported {reported} but requirements-dev.txt declares {expected}"
 
 
 def test_resolver_accepts_a_binary_at_the_declared_version():
@@ -226,10 +143,9 @@ def test_resolver_rejects_a_binary_at_the_wrong_version():
     version and the guard must go red. Run against the REAL declared pin with the
     exact versions that caused the incident — black 25.9.0 vs CI's 26.3.1, and the
     matching ruff skew — so this is the incident, not an analogue of it."""
-    declared = _declared_pins()
     skewed = {"black": "25.9.0", "ruff": "0.14.0"}
     for tool in _TOOLS:
-        real_pin = next(iter(declared[tool]))
+        real_pin = _declared_pin(tool)
         assert skewed[tool] != real_pin, f"{tool}: pick a different skew version, {skewed[tool]} is now the real pin"
         with tempfile.TemporaryDirectory() as bindir:
             shim = _make_shim(bindir, tool, skewed[tool])
