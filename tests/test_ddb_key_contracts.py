@@ -77,6 +77,19 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
     ): "#545 the blind voice-fidelity scoreboard — seeded by voice-fidelity-harness's first monthly run; "
     "handle_voice_fidelity tolerates absence (empty/insufficient_data response)",
     (
+        "COACHSIM#scoreboard",
+        "latest",
+    ): "#2539 the coach-chat simulation scoreboard — seeded by `coach_sim_replay.py --seed-baseline` "
+    "(on-demand, no schedule: a full corpus run costs ~$3.73 against the ADR-063/133 ceiling, so it is "
+    "not a CI gate). coach_sim_scoreboard.read_latest() tolerates absence and returns {}, which callers "
+    "report as 'no stored baseline' rather than as a zero.",
+    (
+        "COACHSIM#scoreboard",
+        "LIMITATIONS",
+    ): "#2539 the known-limitations row that rides with the coach-sim scoreboard — written by the same "
+    "write_run() call that stores a run, so it is absent until the first run is stored; read_limitations() "
+    "returns {}",
+    (
         "USER#matthew#SOURCE#ai_analysis",
         "EXPERT#integrator_month",
     ): "#1115 the integrator's month rollup — written by ai-expert-analyzer's weekly pass once >=2 weekly lab "
