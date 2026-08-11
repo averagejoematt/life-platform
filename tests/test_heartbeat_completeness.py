@@ -211,6 +211,11 @@ COVERAGE = {
     # The detectors' own heartbeats (REL-01): gauge absent 2 straight days = the
     # detector Lambda itself went dark.
     "pipeline-health-check": (ALARM, "ingest-liveness-heartbeat"),
+    # #1400: the Permanence Contract's nightly run. Its failure mode is pure
+    # silence — the archive just gets older while its manifest keeps asserting
+    # yesterday's numbers, and nobody notices until someone tries to download a
+    # promise. Emits LifePlatform/Permanence::ArchiveBuilt on every completed run.
+    "life-platform-permanence": (ALARM, "permanence-heartbeat"),
     "life-platform-freshness-checker": (ALARM, "freshness-interior-gap-heartbeat"),
     # ── Compute cascade feeding the 17:00 UTC brief (#1455 added the alarm leg:
     #    pipeline-health-check's 16:58 UTC {check_compute_outputs} run has emitted

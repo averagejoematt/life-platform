@@ -78,6 +78,7 @@ KNOWN_SECRETS = {
     "life-platform/bluesky",  # #1676 (epic #1668): inbound-social Bluesky handle (key `handle`); keyless public AppView pull, owner-provisioned
     "life-platform/mastodon",  # #1676 (epic #1668): inbound-social Mastodon instance + handle (keys `instance`/`handle`); keyless public REST pull, owner-provisioned
     "life-platform/digest",  # #1623 (2026-07-26): milestone-digest recipients + reply-to; operator-provisioned, disarmed no-op until it exists
+    "life-platform/continuity-contacts",  # #1400 (2026-08-10): continuity contacts for the Permanence Contract's dead-man's switch — real people's contact details, owner-provisioned, NEVER in git (DATA_GOVERNANCE). The switch runs disarmed (falls back to the operator address and reports contacts_configured=false) until it exists.
     "life-platform/telegram",  # #2364 (2026-08-09): coach chat — per-bot tokens + chat-id allow-list + webhook_secret; owner-provisioned via setup_telegram_bots.py
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }

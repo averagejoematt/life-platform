@@ -823,6 +823,24 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # #1400 (the Permanence Contract): the nightly public archive and
+                    # its manifest/continuity documents. The stable address is the
+                    # whole promise — /archive/latest.tar.gz must be the same URL
+                    # tomorrow, so the tarball is overwritten in place rather than
+                    # rotated. One hour of edge caching: the archive changes once a
+                    # night, and a reader who mirrors an hour-stale copy still gets a
+                    # manifest whose checksum matches the bytes they received.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/archive/*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=3600,
+                        max_ttl=86400,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/public_stats.json",
                         target_origin_id="S3GeneratedOrigin",

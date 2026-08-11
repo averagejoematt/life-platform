@@ -191,6 +191,15 @@ NON_RECORD_KEYS = {
     "compute/hypothesis_engine_lambda.py": {
         "score": "hypothesis payload key",
     },
+    "operational/continuity_watch.py": {
+        # #1400: AMBIENT_REASONS is keyed by SOURCE NAME ("todoist", "weather",
+        # "whoop", ...) and its values are prose. The two flagged tokens are
+        # REGISTRY facets read off lambdas/ingestion/source_registry.py entries,
+        # not attributes of a todoist DATE# record — the module's only record
+        # read is `sk`, which it uses to date the row and nothing else.
+        "behavioral": "a source_registry facet, not a todoist record field",
+        "paused": "a source_registry facet, not a todoist record field",
+    },
 }
 
 # Every module the scan classes as a todoist-record reader. Reviewed once, then
@@ -215,6 +224,10 @@ READER_INVENTORY = {
     "web/site_api_fulfillment.py",
     "content/html_builder.py",
     "mcp/tools_todoist.py",
+    # #1400: the continuity clock queries every behavioural source's partition
+    # (todoist among the names it classifies) for the newest DATE# sort key. It
+    # reads no record fields at all — see NON_RECORD_KEYS above.
+    "operational/continuity_watch.py",
 }
 
 

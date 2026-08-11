@@ -25,6 +25,7 @@ Visible at `averagejoematt.com` to anyone:
 - Character sheet level + pillar tier (not raw component values)
 - Public stats (`public_stats.json`): weight, day count, total achievements
 - Blog/chronicle content (written deliberately for public consumption)
+- The nightly public archive at `/archive/*` (#1400, `docs/PERMANENCE_CONTRACT.md`) — a repackaging of the Tier 0 surface and **nothing else**. It widens no tier: its API arm is fetched with no credentials, so the Tier 1/2/3 projections are unreachable by construction, and its admission registry is gated by `tests/test_public_archive_privacy_gate_1400.py`. The published continuity document alongside it carries a day count and a state, never a location or an identity.
 
 ### Tier 1 — Subscriber-only (auth via subscriber token)
 - Detailed per-metric trends and correlations
@@ -98,6 +99,7 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | `uploads/` (HAE webhooks etc.) | **Current: 30 days; non-current: 7 days** | P1.3 — `uploads-expire-30d` |
 | `generated/` (Lambda-written: OG images, dashboard, journals) | **Current: forever; non-current: 7 days (keep 1)** | P1.3 — `generated-expire-noncurrent-7d` |
 | `generated/qa_archive/` (generation-time AI-surface archive: text + screenshots, #1441) | **Listed 90 days; bytes fully purged ≈ day 97** (audit-log class — the D3 review-pack evidentiary window). Versioned-bucket mechanics: delete marker at 90d → the noncurrent data version expires 7d later (own rule, NO keep-newest carve-out — the `generated/` keep-1 rule must not shield these write-once keys) → expired delete marker swept | #1441 — `qa-archive-expire-90d` + `qa-archive-clean-delete-markers` |
+| `generated/archive/` (the nightly public permanence archive, #1400) | **Current: forever; non-current: 7 days (keep 1)** — inherits the `generated/` rule unchanged, and needs no rule of its own: the run overwrites three fixed keys in place rather than accumulating dated ones. The single dated artefact (`final-YYYY-MM-DD.tar.gz`) is written only if the continuity switch trips, and is meant to be permanent. | P1.3 — `generated-expire-noncurrent-7d` (inherited) |
 | `config/` (platform config: filters, schemas) | **Current: forever; non-current: 30 days (keep 3)** | P1.3 — `config-expire-noncurrent-30d` |
 | `deploys/` (Lambda deploy artifacts) | **30 days** | Pre-existing |
 | `cloudtrail/` (audit logs) | **90 days** | P2.5 / P7 — `cloudtrail-expire-90d` |
@@ -139,6 +141,7 @@ No Glacier or deep-archive tier is in use today. Could be added if compliance de
 ## Data Subject Rights (if ever required)
 
 ### Export
+- Two distinct artefacts, and conflating them would be a privacy incident: `lambdas/operational/data_export_lambda.py` is the **owner's** full export (every partition, private `exports/` prefix, on demand); the #1400 nightly archive at `/archive/latest.tar.gz` is **public** and contains only the Tier 0 surface. The public archive makes no promise about the owner's export, and the owner's export never enters it — see `docs/PERMANENCE_CONTRACT.md` §6.
 - `lambdas/data_export_lambda.py` exists; on-demand only. Generates a snapshot of all DDB partitions + S3 archive references.
 - Census derives from `phase_taxonomy.SOURCE_CLASS` (#498/X-10), not a hand count — every non-`SYSTEM_STATE` source is covered automatically as new sources are added (86 sources as of 2026-07-18). The prior "audit P7.1 still outstanding" concern (a hand-maintained count that would silently drift) is resolved structurally by that dynamic derivation.
 
