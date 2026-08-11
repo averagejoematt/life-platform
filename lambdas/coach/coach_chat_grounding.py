@@ -39,7 +39,10 @@ So the arming is:
   behavioral — #1699. Load-bearing right now: with MacroFactor quiet 45 days (#2326)
                a nutrition coach asked "how'd I do yesterday" has no food log at all,
                and this is the class that stops "you hit your protein" being said
-               into that silence.
+               into that silence. ARMING IT TAKES A READ, and until #2564 that read
+               did not happen: the class needs `available_logs`, the gate returns []
+               without one, and the live chat call site passed none — declared as
+               coverage, dark in production. `chat_available_logs` below is the read.
   night      — #1968/#2343, the day-correspondence class. The one that matters most
                here and the one a chat can least afford to skip.
   team       — #2496, composed on top rather than passed as a kwarg: an invented
@@ -50,10 +53,58 @@ So the arming is:
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
+
+USER_ID = os.environ.get("USER_ID", "matthew")
+
+
+def _gen_date(generation_date_iso: Optional[str]) -> str:
+    """The ONE generation day this surface adjudicates against.
+
+    Both the grounder and the availability map below default the same way, and they
+    have to: a map built for UTC-today against a gate adjudicating Pacific-today would
+    grade a claim against the wrong day's logs, which is #2343's failure shape wearing
+    #1699's clothes. One definition, two callers.
+    """
+    return generation_date_iso or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def chat_available_logs(table, generation_date_iso: Optional[str] = None):
+    """#2564 — the #1699 availability map for the CHAT surface.
+
+    `build_grounder` has always ARMED the behavioral class, and the registry has always
+    declared it armed with no exemption. But `ungrounded_behavioral_findings` returns []
+    the moment `available_logs` is None, and the live chat call site never passed one:
+    the class read as coverage and could not fire. This is the read that makes it real.
+
+    The derivation is `ai.behavior_logs.available_logs_from_presence` — the SAME helper
+    `coach_history_summarizer` uses for the stance and compression gates, deliberately
+    not a second walker over the same record. What is chat-specific is only WHERE the
+    signal comes from: one GetItem of the platform-wide engagement_state STATE#current
+    record, read through `singleton_visible` because that singleton is exactly the kind
+    a restart tombstones in place (#1969) and a wiped cycle's map is worse than none.
+
+    Fail-soft to None — the summarizer's guarded posture, kept verbatim: no signal, an
+    unreadable table, or a missing module leaves the class DARK for that turn. None is
+    the honest value there. An empty set would be a lie in the other direction: it means
+    "nothing was logged", and every true same-day claim would flag as fabricated.
+    """
+    try:
+        from ai.behavior_logs import available_logs_from_presence
+        from experiment.phase_filter import singleton_visible
+
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}) or {}
+        signal = resp.get("Item")
+        if not signal or not singleton_visible(signal):
+            return None
+        return available_logs_from_presence(signal, _gen_date(generation_date_iso))
+    except Exception as e:
+        logger.warning("[coach_chat] presence signal unavailable — behavioral class dark for this turn: %s", e)
+        return None
 
 
 def build_facts_block(facts: dict) -> str:
@@ -103,7 +154,7 @@ def build_grounder(
     from ai.grounding_gate_params import cycle_gate_params
     from ai.night_scope import nightly_vitals_from_facts
 
-    gen_date = generation_date_iso or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    gen_date = _gen_date(generation_date_iso)
     allowed = allowed_numbers(facts or {}, *extra_sources)
     dates = allowed_dates(facts or {}, *extra_sources)
     vitals = nightly_vitals_from_facts(facts)
