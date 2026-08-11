@@ -233,14 +233,23 @@ def extract_daily_nutrition(mf_data):
             name = item.get("food_name", "unknown")
             if any(s in name.lower() for s in ("supplement",)):
                 continue
+            # ADR-104 (#2584, mirroring #2558): an absent item macro is an ABSENCE,
+            # not a measured zero. These dicts are not internal — they ride
+            # `day["foods"]` into `payload["this_week"]["daily_detail"]` and out
+            # through `json.dumps` into the panel's user message, under a prompt
+            # that demands "Every recommendation must cite a specific food he ate,
+            # a specific number". A `0` default made an unmacroed item read to the
+            # model as a genuine 0-calorie food. `None` serialises to JSON `null`,
+            # which is the honest signal, and matches what the DAY totals below
+            # have always done (`safe_float(rec, ...)` with no default).
             foods.append(
                 {
                     "name": name,
                     "time": item.get("time", "?"),
-                    "cal": safe_float(item, "calories_kcal", 0),
-                    "protein_g": safe_float(item, "protein_g", 0),
-                    "carbs_g": safe_float(item, "carbs_g", 0),
-                    "fat_g": safe_float(item, "fat_g", 0),
+                    "cal": safe_float(item, "calories_kcal"),
+                    "protein_g": safe_float(item, "protein_g"),
+                    "carbs_g": safe_float(item, "carbs_g"),
+                    "fat_g": safe_float(item, "fat_g"),
                     "fiber_g": safe_float(item, "fiber_g"),
                 }
             )
@@ -823,6 +832,18 @@ _AI_UNAVAILABLE_HTML = (
     "AI analysis unavailable. Review data table above.</div>"
 )
 
+# ADR-104 (#2584): the absence statement that stands in for the panel when the
+# week carries MacroFactor day records but ZERO logged food items. It carries the
+# same marker as the failure card so the two downstream gates treat it the same
+# way: AI-3 does not safety-validate a hardcoded string, and IC-15 does not write
+# a non-edition into the insight ledger.
+_NO_FOOD_LOG_HTML = (
+    f'<div {_AI_UNAVAILABLE_MARKER} style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
+    "No individual foods were logged this week, so there is no food-level analysis to give. "
+    "The daily totals above are what MacroFactor recorded; the panel was not asked to review a food log it does not have."
+    "</div>"
+)
+
 # A compliant edition is ~1500-2000 words of inline-styled HTML — far past the
 # validator's 5k default, which would otherwise emit the "unusually long" WARN on
 # every single edition and mean nothing. This bound is set from the shape the
@@ -882,6 +903,17 @@ def lambda_handler(event, context):
         logger.error("No MacroFactor data this week")
         return {"statusCode": 500, "body": "No nutrition data"}
 
+    # ADR-104 (#2584): day records are not food. MacroFactor's daily-summary
+    # import path writes rows with real totals and `food_log: []`
+    # (macrofactor_lambda.py `build_summary_day_items`), so `days_this` being
+    # non-empty says nothing about whether a single food was logged. The panel
+    # prompt demands "Every recommendation must cite a specific food he ate" —
+    # with an empty food log that can only be met by inventing one. The DAY
+    # TOTALS are still real, so the email still ships (#2221 contract: a week of
+    # records without totals still sends a review); what is withheld is the AI
+    # commissioning, replaced by an explicit statement of the absence.
+    logged_food_items = sum(len(d.get("foods") or []) for d in days_this)
+
     summary_table = build_summary_table(days_this, profile)
     user_message = build_user_message(data)
     logger.info(f"Prompt size: {len(user_message)} chars")
@@ -939,12 +971,16 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-16 failed: {e}")
 
-    logger.info("Calling Sonnet for analysis...")
-    try:
-        ai_content = call_anthropic(system, user_message)
-    except Exception as e:
-        logger.error(f"Anthropic failed: {e}")
-        ai_content = _AI_UNAVAILABLE_HTML
+    if not logged_food_items:
+        logger.error(f"No logged food items this week ({len(days_this)} MacroFactor day record(s), 0 food items) — panel not commissioned")
+        ai_content = _NO_FOOD_LOG_HTML
+    else:
+        logger.info("Calling Sonnet for analysis...")
+        try:
+            ai_content = call_anthropic(system, user_message)
+        except Exception as e:
+            logger.error(f"Anthropic failed: {e}")
+            ai_content = _AI_UNAVAILABLE_HTML
 
     # AI-3: Validate output before rendering. Runs on every REAL edition (#2216) —
     # only the failure card, which carries the explicit marker, is exempt.
