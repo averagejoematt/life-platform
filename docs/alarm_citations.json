@@ -39,5 +39,9 @@
   "slo-source-freshness": {
     "citation": "incident 2026-08-08 — measured, no code defect (see note)",
     "note": "Red since 2026-08-05. MEASURED live 2026-08-08 against each source's own stale_hours in ingestion/source_registry.py, not inherited from a prior handover: food_delivery 133d (thr 14), measurements 132d (thr 60), macrofactor 45d (thr 4), strava 5d (thr 2), supplements 5d (thr 2), garmin 54d but PAUSED by ADR-074. Every one is a manual-drop or behavioural source with no writer running - i.e. the alarm is telling the truth and there is no code defect to fix. Kept RED on purpose: suppressing it would make the freshness SLO unable to report the condition it exists for. Re-measure before carrying this note forward; the set changes as Matthew drops files."
+  },
+  "token-alarm-genesis-window-active": {
+    "citation": "#2116",
+    "note": "NOT A FAULT — by design. This is a boolean gauge sub-alarm carrying NO SNS action of its own (cdk/stacks/monitoring_stack.py, the TokenAlarmGenesisWindowActive block). ALARM means literally 'we are inside the genesis window', which the two composite alarms combine with the token-threshold breach so a genesis-week breach is digested rather than paged (#2116, after #1961's post-genesis rebuild pages). Cycle 13's genesis is 2026-08-10, so red since 2026-08-07 is the correct state. Expected to return to OK when the window closes; treat_missing_data=NOT_BREACHING so a stale gauge can never silently suppress a real page. If it is still ALARM well after the genesis window ends, THAT is the finding — file it, don't re-cite."
   }
 }

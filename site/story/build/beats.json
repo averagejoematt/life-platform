@@ -2514,6 +2514,21 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2518"
         }
       ]
+    },
+    {
+      "id": "2026-08-11-the-inspector-that-never-looked",
+      "date": "2026-08-11",
+      "title": "We finally tested the inspector — it passes fabricated numbers",
+      "shipped": "A calibration harness for the automated reviewer that sits between the coaching AI and Matthew, and can block a message from ever being sent. It has been running as a blocking check for weeks. Nobody had ever measured whether it works. So we replayed 35 pre-labelled examples through it — 30 known-good, 5 deliberately broken — three separate times, and got identical results every run. It agrees with good work 90% of the time. But of the five broken examples, three were briefs containing invented numbers, and the reviewer passed all three, scoring them 92, 92 and 82 out of 100. Not marginal. Comfortably approved.",
+      "why_it_mattered": "The cause turned out to be more interesting than a weak reviewer: the checklist it grades against has four criteria, and not one of them mentions making up numbers. It cannot fail a message for inventing a figure because it is never asked to look. That is a specific and unglamorous kind of failure — not a system that is wrong, but a system that is confidently silent about the exact thing you built it to catch. The same run turned up a second surprise: four of its five rejections came from the model simply deciding 'no' while scoring above the pass mark, which means the numeric threshold everyone assumed was the control knob was not controlling much at all. A separate, deterministic check does catch invented numbers, so nothing is known to have reached a reader — but the layer we thought was the second line of defence was reading a different page.",
+      "gotcha": "Measuring the reviewer required 5 known-bad examples, and 5 is not enough to state a rate honestly. The temptation was to publish the tidy number — 40% of defects caught — on a page for readers. We didn't, because a 40% derived from five cases has an uncertainty range running from 12% to 77%, and putting the point estimate on a page would be the instrument overstating its own precision, which is the exact failure the work exists to prevent. The finding that mattered needed no statistics at all: the checklist has no rule about invented numbers. You can read that off the criteria list. So the rate stayed unpublished and the rubric gap got filed.",
+      "honest_miss": "The work is a measurement, not a fix — the reviewer still passes fabricated numbers today. The issue that would close the gap is filed, not shipped. Two of the four acceptance criteria on the original task were deliberately left undone for the same reason the rate stayed unpublished: both required treating a five-case sample as if it were precise. And the sample itself is thin in a way more data will not quickly fix, because of how the system stores its own history — only flagged verdicts are kept, so examples of the reviewer correctly approving good work never accumulate. Waiting longer produces the same empty set.",
+      "prs": [
+        {
+          "label": "PR #2567",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2567"
+        }
+      ]
     }
   ]
 }
