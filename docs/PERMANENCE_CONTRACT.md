@@ -206,6 +206,13 @@ python3 scripts/verify_public_archive.py --archive latest.tar.gz --check-urls
 read-only, so it can be run by anyone, from a mirror, long after this repository has
 stopped changing.
 
+And if you have the archive but not this repository — which is the case the contract
+actually has to survive — the archive's own `README.txt` carries the entire procedure
+as a runnable snippet, no download and no network required. That snippet is not
+decoration: `tests/test_public_archive_privacy_gate_1400.py` lifts it back out of a
+generated README, runs it, and asserts it both passes a good archive and names the
+file in a tampered one.
+
 ---
 
 ## 6. Relationship to the rest of the platform
