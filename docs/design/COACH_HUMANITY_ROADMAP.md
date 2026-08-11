@@ -67,7 +67,7 @@ which is itself a humanity feature: a friend who makes things up stops being one
 | 26 | Event-triggered concern — three bad recovery days: Lisa checks in softly | **shipped** (#2490) |
 | 27 | Pre-event support — he mentions a presentation tomorrow; the coach he TOLD texts that morning | **shipped** (#2486, same extractor — the `COMMITMENT#` substrate premise was wrong: those rows are the nightly `OUTPUT#` extraction, coach→Matthew actions) |
 | 28 | Sunday-evening reflection from Eli (the week, in one warm text — distinct from the Monday compass email) | horizon |
-| 29 | Non-data initiative from persona interests ("watched the game?") | horizon (needs real persona-interest grounding to not be hollow) |
+| 29 | Non-data initiative from persona interests ("watched the game?") | horizon — **unblocking condition: [COACH_INNER_LIFE_BOUNDARY.md](COACH_INNER_LIFE_BOUNDARY.md) (#2538), now written.** Measured against it, "watched the game?" is OUT on all three clauses: no rendered bible field carries an interest in sport (R1), the claim is false the next day (R2), and it asserts an occasion the coach cannot have had (R3). The idea survives only in the form the boundary permits — initiative from a *stable* persona interest that some rendered field actually carries — which no spec has today. Start by adding the field, not the outbound |
 
 ## 4. Inner life & texture
 
@@ -78,7 +78,7 @@ which is itself a humanity feature: a friend who makes things up stops being one
 | 32 | Grounded pushback — "you sure? last time 5am starts wrecked your week" (facts-backed, gate-safe) | filed |
 | 33 | Weather & season texture — the platform already ingests weather; "cold one this morning, warm up properly" | filed |
 | 34 | Day-of-week texture — Friday-ness and Monday-ness in voice (moment line already carries the day) | filed (same issue as #33) |
-| 35 | Persona-stable routine references ("just got out of a session") — bible-consistent texture, never variable fabrication | horizon (needs a written boundary: texture from the bible is voice; invented events are lies) |
+| 35 | Persona-stable routine references — bible-consistent texture, never variable fabrication | horizon — **the boundary this row was waiting on is written: [COACH_INNER_LIFE_BOUNDARY.md](COACH_INNER_LIFE_BOUNDARY.md) (#2538).** Its ruling on this row's own example: "just got out of a session" is OUT (an occasion, R2/R3); the bible's undatable past ("moved between weight rooms, running tracks, and rehab teams") is IN, so past tense is permitted and *datability* is the line. Before this row starts: the roster-wide prohibition lands in `_shared_standard.json`, and the `ungrounded_inner_life` / `coach_occasion_claim` check ships in the SAME PR as the texture |
 | 36 | Per-coach emoji palettes and verbal tics | **shipped** (texting_style exists per persona; tuning continues) |
 | 37 | Voice notes — Telegram `sendVoice` in the persona's TTS voice (registry already carries `tts_voice`; podcast TTS infra exists) | filed |
 | 38 | Coach availability in voice — budget pauses and caps phrased as the persona would say them, per coach | filed |
@@ -141,7 +141,7 @@ Repeatedly they named *Matthew's own messages* as the most human thing in the tr
 | 57c | Widen the "not X, but Y" detector to the general balanced-clause class — it is the #1 judge tell at 25% but matched only 9 times deterministically, so the metric nearly missed the corpus's loudest signal | filed (#2537) |
 | 57d | Length variance must be *real*, not performed — a judge caught a short reply landing after a run of verbose ones and read it as "AI recognizing it should vary length." Variance bolted onto a consistent baseline is worse than consistency | horizon (depends on 57b) |
 | 58 | Voice-flat honest refusals — absence is handled correctly but identically: `"let me check that"` (3 coaches), `"i don't have your"` (3), `"honest answer: i don't"` (3) | filed (#2536) |
-| 59 | **Write the inner-life boundary** before implementing #29/#35 — across 536 replies, essentially zero reference anything outside the conversation and his data. Needs the written rule (bible-derived texture is voice; invented events are lies) first | filed (#2538) |
+| 59 | **Write the inner-life boundary** before implementing #29/#35 — across 536 replies, essentially zero reference anything outside the conversation and his data | **shipped** (#2538) — [COACH_INNER_LIFE_BOUNDARY.md](COACH_INNER_LIFE_BOUNDARY.md). Three clauses (provenance / invariance / no-substrate), a decision procedure, worked examples both sides. Rulings: past tense is permitted and datability is the line; the grounding gate is exempt *today* by written decision (measured — five invented coach lives returned `[]` under all four grounder arming shapes, while every gate class fired on a purpose-built positive) and owes an `ungrounded_inner_life` / `coach_occasion_claim` composition the day texture ships; the prohibition lives roster-wide in `_shared_standard.json` (which does not carry it yet) and the texture per-persona in the existing rendered fields |
 | 60 | Wire the sim harness as a standing regression measure — re-run after each humanity change; the §7 metrics are gate-shaped | filed (#2539) |
 
 **Confirmed working by the same sweep** (measured, not assumed): register symmetry holds

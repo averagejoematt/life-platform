@@ -94,6 +94,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [design/JOURNEYS.md](design/JOURNEYS.md) | The four audience journeys — map, exit-link audit, the `.loop-forward` close mechanism (#1468) |
 | [design/PORTRAIT_RUNBOOK.md](design/PORTRAIT_RUNBOOK.md) | Coach-portrait style bible + commissioning gate (ADR-106) |
 | [design/DESIGN_PARTNER_BRIEF.md](design/DESIGN_PARTNER_BRIEF.md) | The design-session contract + Slop Litmus v1 — synced into the v5 design project as BRIEF.md (#1464) |
+| [design/COACH_INNER_LIFE_BOUNDARY.md](design/COACH_INNER_LIFE_BOUNDARY.md) | What a coach may say about its own life — bible-derived texture vs. invented events, and the rulings on tense, the grounding gate, and where the stance lives (#2538) |
 | [COST_TRACKER.md](COST_TRACKER.md) | The $85 budget (surge $100 — ADR-133) + real run-rate |
 | [STACK_MANIFEST.md](STACK_MANIFEST.md) | `/data/stack.json` — the public "fork the architecture, not the data" instrument manifest: what it derives from, the privacy allowlists, the honest cost block (#1401) |
 | [RESERVED_CONCURRENCY.md](RESERVED_CONCURRENCY.md) | Concurrency strategy |
