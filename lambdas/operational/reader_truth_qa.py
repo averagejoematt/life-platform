@@ -166,6 +166,39 @@ def _phase_line(phase):
 # existing data on a countdown day — four highs, all against the DESIGNED #931/#939
 # pre-start state. The two clauses below teach it what "··" and habitual-present
 # design copy mean; genuinely-asserted past measurements stay flaggable.
+#
+# ── 2026-08-11 (#2575): the GENESIS-WEEK ruling, written down ──────────────────
+# The 2026-08-11 nightly published "2 high truth finding(s) at Day 1". Both were
+# false, and both are the same shape: the grader treating a CORRECT genesis-week
+# artefact as a contradiction.
+#
+#   (a) Home: "This attempt starts at the Day-1 weigh-in, aimed at 185 lbs held for
+#       90 …". This is verbatim the string the 2026-08-09 clause above was written
+#       for. It recurred because that clause reads as PRE-START-scoped ("including
+#       pre-start"), and Day 1 is not pre-start. Same copy, same correctness, one
+#       phase later. Widened below to name the genesis week.
+#   (b) /api/sleep_detail: `night_of: 2026-08-09` (the night before Day 1) under
+#       `as_of_date: 2026-08-10`. That is not a contradiction, it is the #1923
+#       wake-date frame being right: sleep/recovery/HRV/RHR are keyed to the MORNING
+#       they were recorded against, so the night behind Day 1's morning is
+#       necessarily the night before Day 1. It is unavoidable on every Day 1 of
+#       every cycle — which is exactly why leaving it unruled makes it #1966
+#       normalized noise.
+#
+# WHY A CLAUSE AND NOT A SURFACE FIX. The deterministic half of this question is
+# already asked and already passes: `phase_plausibility._night_label_findings` (R5,
+# #1968) requires every night-scoped figure to NAME its night, and the live payload
+# names it three ways — `frame: "last_night"`, `night_of`, and a `figure_scope`
+# block spelling the convention out in English. ADR-105 puts deterministic
+# computation ahead of any LLM verdict, so where the two layers disagree about a
+# payload the deterministic one has already graded, the LLM is the one that is
+# wrong. There is nothing left to correct on the surface.
+#
+# SCOPED, NOT A BLANKET SUPPRESSION. The clause exempts one thing: a night-scoped
+# figure whose night is the day before the cycle's genesis, on a surface dated at or
+# after genesis. A pre-genesis night on a surface claiming any OTHER day, a
+# pre-genesis MEASUREMENT presented as this cycle's, or prose asserting history that
+# genesis makes impossible all stay flaggable at full severity.
 
 _PROMPT_HEADER = """You are a meticulous editorial truth reviewer for a public "measured life" \
 experiment site. Below is the RENDERED TEXT of {k} of its surfaces (page prose and/or API payloads — \
@@ -203,8 +236,14 @@ honest state, not an implied history);
 - durable design copy and structural UI affordances describing what the experiment DOES once \
 running — "starts at the Day-1 weigh-in", "tap any day", "the week ahead", section headings for \
 instruments that currently read "··". Habitual-present descriptions of the design are correct in \
-every phase, including pre-start; flag only prose asserting that specific measurements or progress \
-ALREADY happened when the phase makes that impossible;
+EVERY phase — before Day 1, ON Day 1, and after; flag only prose asserting that specific \
+measurements or progress ALREADY happened when the phase makes that impossible;
+- a sleep/recovery/HRV/RHR figure whose `night_of` (or narrated night) is the day BEFORE the cycle \
+start, on a surface dated on or after the cycle start. These metrics are keyed to the MORNING they \
+were recorded against, so the night behind Day 1's morning is necessarily the night before Day 1 — \
+that is the frame being correct, not two surfaces disagreeing about the date. Still flag a night \
+that precedes the cycle start by MORE than one day, and still flag a pre-cycle measurement \
+presented as this cycle's progress;
 - story/archive/chronicle content clearly dated before the current cycle;
 - the same header/nav/footer chrome appearing on every page;
 - API field names or JSON structure — judge only human-readable narrative values inside them;

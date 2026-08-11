@@ -14,13 +14,21 @@ and neither was stale by any age rule — they came from two DIFFERENT producers
     / `computed_at=2026-08-11T16:40:18Z`). It is therefore structurally one morning
     behind the Spine whenever whoop has finalized today's recovery.
 
-The live DDB rows on the failing day make the arithmetic exact: whoop held
-DATE#2026-08-09 recovery 53 and DATE#2026-08-10 recovery 46, and the newest
-`computed_metrics` row was DATE#2026-08-09 (recovery_pct 53). The coach cited 53
-because that was genuinely the newest ROLLUP; the cockpit served 46 because that was
-genuinely the newest READING. Same class as #2113 (an unbounded newest-first read of
-a lagging partition), different trigger: #2113 fixed the PRE-GENESIS case, and a row
-that is merely a day behind sails straight through it.
+Measured end-to-end against the live table on 2026-08-11T19:0xZ, running both readers
+side by side: the Spine served recovery 54.0 / HRV 41.07 / RHR 56.0 as of 2026-08-11,
+while the coach's canonical facts held 46.0 / 38.0 / 57.0 as of 2026-08-10 —
+`night_of: 2026-08-09`, which is verbatim the night the live sleep card opened with.
+Three of four columns past their cross-surface tolerance (recovery 8 pts vs 2.0, HRV
+3.07 ms vs 1.5, weight 3.1 lb vs 1.5).
+
+The lag reproduces on other days, which is how we know it is structural and not one
+bad row: an earlier nightly published "Dr. Marcus Webb cites hrv 42 ms vs cockpit 32
+ms; recovery 55% vs 31%", and whoop held exactly 55/42.03 on 2026-08-07 and 31/32 on
+2026-08-08 — again two consecutive mornings, again rollup-behind-reading.
+
+Same class as #2113 (an unbounded newest-first read of a lagging partition), different
+trigger: #2113 fixed the PRE-GENESIS case, and a row that is merely a day behind sails
+straight through it.
 
 So the rollup stops being the coach's source for latest-reading facts. This module is
 the read half — the live resolvers, in the field names `canonical_facts` uses — and
@@ -65,6 +73,13 @@ def resolve_latest_readings(table, user_prefix, withings_latest=None, now=None):
     read (which applies the ADR-077 cycle floor via `phase_taxonomy.cycle_read_floor`)
     stays the one weigh-in read — a second query here could disagree with it, which is
     the failure mode this whole module exists to remove.
+
+    ``now`` is passed in for the same reason ``withings_latest`` is: the caller owns the
+    clock. `ai_expert_analyzer_lambda`'s test harness pins time by monkeypatching that
+    module's `datetime`, which cannot reach a second module's own import — read the
+    clock here and the recency arithmetic silently disagrees with every other date in
+    the same fact set (caught by `test_the_scale_recency_travels_so_a_stale_rate_can_be_dated`,
+    which measured 0 days against a 14-day-old weigh-in).
 
     Fail-soft by leg: a resolver that raises contributes no fields at all rather than a
     guess, and `overlay_latest_readings` then leaves the rollup's value untouched. A

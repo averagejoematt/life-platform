@@ -187,7 +187,7 @@ def _load_canonical_facts():
         # "Lisa Park cites recovery 53% vs cockpit 46%". Latest-reading facts (and the
         # weigh-in riders) now derive from the resolvers /api/vitals serves; the rollup keeps
         # the window-derived ones. Rule + evidence: canonical_facts.overlay_latest_readings.
-        _live = resolve_latest_readings(table, USER_PREFIX, _latest_item("withings"))
+        _live = resolve_latest_readings(table, USER_PREFIX, _latest_item("withings"), now=datetime.now(timezone.utc))
         facts = overlay_latest_readings(facts, _live)
         facts.update({_k: _live[_k] for _k in ("last_weighin_date", "days_since_weighin") if _live.get(_k) is not None})
     except Exception as _e:
