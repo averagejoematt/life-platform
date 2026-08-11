@@ -191,11 +191,17 @@ def _confidence(n_finished: int, n_abandoned: int) -> str:
 
 def _reason_string(components: dict, resonance: float, penalties: dict) -> str:
     """Assemble a decomposed reason from the top contributing components."""
-    contrib = dict(components)
-    if resonance > 0:
-        contrib["resonance"] = resonance
-    top = sorted(contrib.items(), key=lambda kv: kv[1], reverse=True)[:3]
+    top = sorted(components.items(), key=lambda kv: kv[1], reverse=True)[:3]
     parts = [_REASON[name] for name, score in top if score > 0.45 and name in _REASON]
+    # #2349: resonance clears the same 0.45 bar as everything else, but it is NOT
+    # ranked against the other components — it is on a different scale (a calibrated
+    # journal cosine, not a rules-based fit), and capacity/breadth/difficulty routinely
+    # sit near 1.0 by construction, so competing on raw score crowded it out of the
+    # top 3 even on the pick it had just promoted (measured live: resonance 0.649 moved
+    # a book from 4th to 1st and the reason never mentioned it). A term that changed
+    # the ranking has to say so — that is the anti-black-box rule, not a nicety.
+    if resonance > 0.45:
+        parts.append(_REASON["resonance"])
     if not parts:
         parts = ["it's a reasonable next step"]
     reason = "Recommended because " + ", ".join(parts[:-1] + ([("and " + parts[-1]) if len(parts) > 1 else parts[-1]])) + "."

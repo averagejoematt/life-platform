@@ -28,6 +28,7 @@ from reading import (
     reading_onboarding,
     reading_recall,
     reading_recommender,
+    reading_resonance,
     reading_store,
 )
 
@@ -119,13 +120,21 @@ def _count_by_status() -> tuple[int, int]:
     return finished, abandoned
 
 
-def _build_recommender_state() -> dict:
+def _build_recommender_state(candidates: list | None = None) -> tuple[dict, dict]:
     """Assemble the recommender's state from reading + platform reads. Pure gather —
-    no fabrication; missing signals fall back to honest neutral defaults."""
+    no fabrication; missing signals fall back to honest neutral defaults.
+
+    Returns `(state, resonance_envelope)`. `journal_resonance` (#2349) is the one
+    signal that costs a Bedrock call, so it needs the candidate set and it returns its
+    own provenance (n, window, calibration) for the tool to surface. It is fail-soft
+    end to end: an empty score map leaves the key empty and the recommender scores
+    resonance at 0.0, exactly as it did when nothing wrote the key at all.
+    """
     profile = reading_store.get_profile() or {}
     n_finished, n_abandoned = _count_by_status()
     finished = reading_store.finished()
     last_finished = finished[-1] if finished else None
+    resonance = reading_resonance.compute(table, candidates or [])
     return {
         "week_color": _week_color(),
         "wheel_distribution": reading_store.wheel_distribution(),
@@ -137,7 +146,8 @@ def _build_recommender_state() -> dict:
         "last_finished": last_finished,
         "last_2_books": list(reversed(finished[-2:])) if finished else [],
         "recent_streak_genre": (profile.get("recentStreakGenre")),
-    }
+        "journal_resonance": resonance.get("scores") or {},
+    }, resonance
 
 
 def _candidates_from_queue() -> list:
@@ -171,11 +181,22 @@ def tool_get_reading_recommendation(args):
     log_outcome later resolves (the track record was write-less before this) and
     what auto-becomes the public "why this book" note when the book is started."""
     candidates = _candidates_from_queue()
-    state = _build_recommender_state()
+    state, resonance = _build_recommender_state(candidates)
     top_n = int(args.get("limit", 3))
     result = reading_recommender.rank(candidates, state, top_n=top_n)
     if not candidates:
         result["note"] = "Nothing in the queue yet — add a book (manage_reading add_book) to get a pick."
+    # AC3 (#2349): resonance is inspectable, not a silent nudge — each pick already
+    # carries its `resonance` score, and this names where it came from (how many
+    # journal entries, over what window, and the raw cosine behind each calibrated
+    # score). A status other than "ok" is the honest reason the term is 0.0.
+    result["resonance_provenance"] = {
+        "status": resonance.get("status"),
+        "n_journal_entries": resonance.get("n_entries"),
+        "journal_window": resonance.get("window"),
+        "raw_cosine": resonance.get("raw") or {},
+        "calibration": resonance.get("calibration"),
+    }
     _persist_recommendations(result)
     return result
 

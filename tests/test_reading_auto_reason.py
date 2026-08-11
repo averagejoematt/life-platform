@@ -59,7 +59,7 @@ def store(monkeypatch):
 
 def test_recommendation_persists_open_rec_with_reason_string(store, monkeypatch):
     monkeypatch.setattr(tr, "_candidates_from_queue", lambda: [{"bookId": "b1"}])
-    monkeypatch.setattr(tr, "_build_recommender_state", lambda: {})
+    monkeypatch.setattr(tr, "_build_recommender_state", lambda candidates=None: ({}, {"status": "skipped:budget"}))
     monkeypatch.setattr(
         tr.reading_recommender,
         "rank",
