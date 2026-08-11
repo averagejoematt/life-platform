@@ -409,12 +409,19 @@ The count and the table below must agree, and the count's `live-verified` stamp 
 | `life-platform/bluesky` | Syndication — handle + scoped app password (`docs/RUNBOOK_SYNDICATION.md`) |
 | `life-platform/digest` | `milestone-digest` — operator-configured recipient list (kept out of git) |
 | `life-platform/telegram` | Telegram coach chat (#2364) — per-bot tokens, chat-id allow-list, webhook secret |
-| `life-platform/continuity-contacts` | The Permanence Contract's continuity contacts (#1400) — real people's addresses, owner-provisioned, never in git. Until it exists the switch is disarmed: notices go to the operator address and the run reports `contacts_configured: false` |
 | ~~`life-platform/dropbox`~~ | **DELETED** — window closed 2026-05; the `ingestion-keys` bundle is authoritative |
 | ~~`life-platform/anthropic-api-key`~~ | **DELETED** — window closed 2026-05 (orphan, no consumer in source) |
 | ~~`life-platform/webhook-key`~~ | **HARD-DELETED 2026-03-14** |
 | ~~`life-platform/google-calendar`~~ | **HARD-DELETED 2026-03-15 (ADR-030)** |
 | ~~`life-platform/api-keys`~~ | **HARD-DELETED 2026-03-14** |
+
+**Not yet created (owner-provisioned, deliberately absent from the table above — the
+count is live-verified and this secret does not exist in AWS yet):**
+`life-platform/continuity-contacts` — the Permanence Contract's continuity contacts
+(#1400, `docs/PERMANENCE_CONTRACT.md` clause P7). Real people's addresses, so it never
+enters git. Until it exists the switch is disarmed but honest: transition notices go to
+the operator address and the run reports `contacts_configured: false`. Add it to the
+table and bump `secret_count` when it is created.
 
 ---
 
