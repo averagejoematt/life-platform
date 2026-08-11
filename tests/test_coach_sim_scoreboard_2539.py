@@ -209,8 +209,15 @@ def test_the_replay_runner_imports_no_bedrock_path():
     assert not any("bedrock" in name for name in imported), sorted(imported)
     assert not any("ai_calls" in name for name in imported), sorted(imported)
 
-    # And it is not reachable transitively through what it does import.
-    assert "ai.bedrock_client" not in sys.modules, "importing the replay path pulled in the inference chokepoint"
+    # And it is not reachable transitively through what it does import. Checked in a
+    # FRESH interpreter: sys.modules in this session is polluted by every other test that
+    # imported the chokepoint, so an in-process assertion here would pass or fail on test
+    # ordering rather than on this module's imports.
+    env = dict(os.environ, PYTHONPATH=f"{ROOT / 'lambdas'}{os.pathsep}{ROOT / 'scripts'}")
+    probe = "import sys, coach_sim_replay; print(any('bedrock' in m for m in sys.modules))"
+    proc = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, env=env, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "False", "importing the replay path pulled in the inference chokepoint"
 
 
 def test_replay_cli_runs_advisory_and_exits_zero():
