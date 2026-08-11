@@ -32,9 +32,15 @@ format-check:  ## Verify formatting (no changes) — will gate CI once the basel
 	$(PYTHON) -m ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 	$(PYTHON) -m black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
-preflight:  ## Match CI gates locally: black==25.9.0 + ruff==0.14.0 + mypy + py_compile + test_shared_modules
-	@echo "Installing CI-pinned tool versions (black==25.9.0 ruff==0.14.0 mypy==2.1.0)…"
-	pip install --quiet black==25.9.0 ruff==0.14.0 mypy==2.1.0
+preflight:  ## Match CI gates locally: pinned black + ruff + mypy + py_compile + test_shared_modules
+	@# #2570: DERIVE the pins from requirements-dev.txt — never retype them here.
+	@# This recipe carried black 25.9.0 / ruff 0.14.0 / mypy 2.1.0 long after CI moved
+	@# to 26.3.1 / 0.14.14 / 2.3.0, so "make preflight" installed a toolchain that
+	@# disagreed with the gate it claims to match — it sat outside the pin guard,
+	@# which only read the workflow files. tests/test_formatter_pin_resolution.py now
+	@# derives the pin-declaration set from the whole tracked tree.
+	@echo "Installing CI-pinned tool versions from requirements-dev.txt…"
+	pip install --quiet $$(grep -E '^(black|ruff|mypy)==' requirements-dev.txt)
 	@echo "1/5  black --check…"
 	black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 	@echo "2/5  ruff check…"

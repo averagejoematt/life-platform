@@ -24,6 +24,10 @@
 #          matching docs/CONVENTIONS.md — the update_architecture_header.sh
 #          indirection is retired, it was a same-behavior wrapper)
 # v1.3.0 — 2026-07-24 (#1663: add a shell commit-msg Conventional-Commits gate)
+# v1.4.0 — 2026-08-11 (#2570: the format gate resolves black/ruff at the version CI
+#          pins via deploy/lib/pinned_formatters.sh instead of off bare PATH, and
+#          FAILS CLOSED when the pin is missing — a PATH black 25.9.0 vs CI's
+#          26.3.1 blocked commits CI would pass and reformats CI then rejected)
 
 set -euo pipefail
 
@@ -44,26 +48,48 @@ cat > "$HOOK_FILE" << 'EOF'
 
 PROJ_ROOT="$(git rev-parse --show-toplevel)"
 
-# ── Format gate (#785 / CLAUDE-02) ────────────────────────────────────────────
+# ── Format gate (#785 / CLAUDE-02; PINNED by #2570) ───────────────────────────
 # Match CI's Lint job (black --check + ruff) on staged Python before the commit
 # lands, so an unformatted or unsorted file can't red main and email a failure.
-# Only staged files under the CI-formatted roots; fail-open if the tools aren't
-# installed so a bare checkout can still commit.
-if command -v black >/dev/null 2>&1 && command -v ruff >/dev/null 2>&1; then
-  STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(lambdas|mcp|cdk|tests|scripts|deploy)/.*\.py$' || true)
-  if [[ -n "$STAGED_PY" ]]; then
-    if ! black --check $STAGED_PY; then
-      echo "[pre-commit] ❌ black would reformat staged files — run: black $STAGED_PY" >&2
-      exit 1
-    fi
-    if ! ruff check $STAGED_PY; then
-      echo "[pre-commit] ❌ ruff check failed on staged files — run: ruff check --fix $STAGED_PY" >&2
-      exit 1
-    fi
-    echo "[pre-commit] ✓ black + ruff clean on staged Python"
+#
+# The tools must be the EXACT versions CI pins. This gate used to resolve them
+# off bare PATH, and on 2026-08-11 that PATH black was 25.9.0 against CI's
+# 26.3.1 — the two disagree on real files in this tree, so the hook refused
+# commits CI would have passed and the reformat it demanded produced a tree CI
+# then rejected (#2570). deploy/lib/pinned_formatters.sh reads the pin from
+# requirements-dev.txt and version-verifies every candidate binary.
+#
+# There is deliberately NO fall back to PATH and no fail-open skip: an unpinned
+# gate is worse than no gate because it lies with authority. If the pin isn't
+# installed the hook says exactly that and exits 1. Emergency bypass is the
+# normal git one: `git commit --no-verify`.
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(lambdas|mcp|cdk|tests|scripts|deploy)/.*\.py$' || true)
+if [[ -n "$STAGED_PY" ]]; then
+  PF_LIB="$PROJ_ROOT/deploy/lib/pinned_formatters.sh"
+  if [[ ! -f "$PF_LIB" ]]; then
+    echo "[pre-commit] ❌ $PF_LIB is missing — cannot verify the formatter pin." >&2
+    echo "[pre-commit]    Refusing to run an unpinned format gate (#2570)." >&2
+    exit 1
   fi
-else
-  echo "[pre-commit] ⚠ black/ruff not installed — skipping format gate" >&2
+  # shellcheck source=/dev/null
+  source "$PF_LIB"
+  if ! BLACK_BIN="$(resolve_pinned_formatter black)"; then
+    echo "[pre-commit] ❌ format gate FAILED CLOSED — no black at the pinned version (#2570)." >&2
+    exit 1
+  fi
+  if ! RUFF_BIN="$(resolve_pinned_formatter ruff)"; then
+    echo "[pre-commit] ❌ format gate FAILED CLOSED — no ruff at the pinned version (#2570)." >&2
+    exit 1
+  fi
+  if ! "$BLACK_BIN" --check $STAGED_PY; then
+    echo "[pre-commit] ❌ black would reformat staged files — run: $BLACK_BIN $STAGED_PY" >&2
+    exit 1
+  fi
+  if ! "$RUFF_BIN" check $STAGED_PY; then
+    echo "[pre-commit] ❌ ruff check failed on staged files — run: $RUFF_BIN check --fix $STAGED_PY" >&2
+    exit 1
+  fi
+  echo "[pre-commit] ✓ black $(pinned_formatter_version black) + ruff $(pinned_formatter_version ruff) clean on staged Python"
 fi
 
 # ── Doc-sync (#818: hook runs sync_doc_metadata.py directly — this IS the

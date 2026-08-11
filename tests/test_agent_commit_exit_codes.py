@@ -15,6 +15,13 @@ exit 0 when the tools pass and nonzero when they fail, so a refusal assertion ca
 pass vacuously. Every refusal test also asserts HEAD did not move — the behavioural
 half of "refused".
 
+#2570: the script no longer trusts a tool just because it is on PATH — it resolves
+black/ruff through deploy/lib/pinned_formatters.sh, which accepts a binary only if
+it reports the version requirements-dev.txt declares. So the scratch repo now also
+carries the real resolver plus a requirements-dev.txt pinning the stubs' own
+reported version. That is not a loosening: swap the pin and the stubs are refused
+(tests/test_formatter_pin_resolution.py proves that half against the real pin).
+
 Trap avoided deliberately: subprocess.run with capture_output, never a shell
 pipeline — a pipe eats the exit code, which is this bug's whole genre.
 """
@@ -28,11 +35,16 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "deploy" / "agent_commit.sh"
+RESOLVER = REPO_ROOT / "deploy" / "lib" / "pinned_formatters.sh"
+
+# The version the stubs report AND the version the scratch repo pins — they must
+# match or the resolver refuses the stubs before their exit code is ever consulted.
+STUB_VERSION = "0.0.0-stub"
 
 STUB = """#!/bin/sh
 # Test stub for {tool}: --version always succeeds; anything else exits ${{{var}:-0}}.
 if [ "$1" = "--version" ]; then
-  echo "{tool} 0.0.0-stub"
+  echo "{tool} {version}"
   exit 0
 fi
 exit "${{{var}:-0}}"
@@ -59,6 +71,9 @@ def scratch(tmp_path):
 
     (repo / "deploy").mkdir()
     (repo / "deploy" / "agent_commit.sh").write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+    (repo / "deploy" / "lib").mkdir()
+    (repo / "deploy" / "lib" / "pinned_formatters.sh").write_text(RESOLVER.read_text(encoding="utf-8"), encoding="utf-8")
+    (repo / "requirements-dev.txt").write_text(f"black=={STUB_VERSION}\nruff=={STUB_VERSION}\n", encoding="utf-8")
     (repo / "scripts").mkdir()
     (repo / "scripts" / "mod.py").write_text("x = 1\n", encoding="utf-8")
     (repo / "notes.txt").write_text("base\n", encoding="utf-8")
@@ -69,7 +84,7 @@ def scratch(tmp_path):
     bin_dir.mkdir()
     for tool, var in (("black", "BLACK_STUB_EXIT"), ("ruff", "RUFF_STUB_EXIT")):
         stub = bin_dir / tool
-        stub.write_text(STUB.format(tool=tool, var=var), encoding="utf-8")
+        stub.write_text(STUB.format(tool=tool, var=var, version=STUB_VERSION), encoding="utf-8")
         stub.chmod(stub.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return repo, bin_dir
 
@@ -171,6 +186,26 @@ def test_nothing_staged_refusal_exits_nonzero(scratch):
     before = _head(repo)
     r = run_script(scratch, ["feat: noop", "scripts/mod.py"])  # unchanged vs HEAD
     assert "nothing staged" in r.stderr
+    _assert_refused(repo, before, r)
+
+
+def test_version_skew_refusal_exits_nonzero(scratch):
+    """#2570: a formatter at the WRONG version is a refusal, not a fallback.
+
+    Same harness, same passing stubs — only the declared pin moves. The script must
+    refuse rather than run the tool it can see, because a gate running a different
+    black than CI refuses correct code and blesses code CI will reject.
+    """
+    repo, _ = scratch
+    skewed_pin = "9.9.9-not-the-stub"
+    (repo / "requirements-dev.txt").write_text(f"black=={skewed_pin}\nruff=={skewed_pin}\n", encoding="utf-8")
+    _git(repo, "commit", "-q", "-am", "skew the pin")
+    before = _head(repo)
+    (repo / "scripts" / "mod.py").write_text("x = 4\n", encoding="utf-8")
+    r = run_script(scratch, ["feat: skewed toolchain", "scripts/mod.py"])
+    assert "FAILED CLOSED" in r.stderr, r.stderr
+    assert skewed_pin in r.stderr, r.stderr
+    assert STUB_VERSION in r.stderr, "the refusal must name the version it rejected"
     _assert_refused(repo, before, r)
 
 

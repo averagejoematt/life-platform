@@ -123,54 +123,50 @@ fi
 # ── The format gate, kept (this is the half CI actually enforces) ─────────────
 STAGED_PY="$(printf '%s\n' "${STAGED}" | grep -E '^(lambdas|mcp|cdk|tests|scripts|deploy)/.*\.py$' || true)"
 
-# PREFER THE PINNED BLACK, NOT THE ONE ON PATH. CI runs black 26.3.1; a typical
-# local install is 25.9.0, and the two disagree in BOTH directions — a file the
-# local one calls clean can be one CI reformats, and vice versa. Resolving from
-# PATH is how an agent's green commit red-mained main's Lint job on 2026-08-08
-# (lambdas/emails/anomaly_detector_lambda.py). The repo keeps the pin in
-# .venv-black; use it when present and say loudly when it is not.
+# USE THE PINNED BLACK AND RUFF, NEVER THE ONES ON PATH. CI runs an exact pair
+# (requirements-dev.txt == ci-lint.yml, CQ-01); a typical local black is 25.9.0
+# against CI's 26.3.1, and the two disagree in BOTH directions — a file the local
+# one calls clean can be one CI reformats, and vice versa. Resolving from PATH is
+# how an agent's green commit red-mained main's Lint job on 2026-08-08
+# (lambdas/emails/anomaly_detector_lambda.py), and how the pre-commit hook spent
+# 2026-08-11 refusing commits CI would have passed (#2570).
 #
-# MUST ALSO LOOK IN THE MAIN CHECKOUT, NOT JUST ${ROOT}. Implementers run in git
-# worktrees, and .venv-black is untracked — it exists only in the primary clone,
-# so a worktree-local lookup silently falls back to PATH and reintroduces exactly
-# the skew this guard exists to stop (observed the same day it was added).
-# `git rev-parse --git-common-dir` resolves to the primary clone's .git from any
-# worktree; its parent is that clone's root.
-BLACK="black"
-_COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null)"
-case "${_COMMON_DIR}" in
-  /*) ;;
-  *) _COMMON_DIR="${ROOT}/${_COMMON_DIR}" ;;
-esac
-_MAIN_ROOT="$(cd "${_COMMON_DIR}/.." 2>/dev/null && pwd)"
-
-for _cand in "${ROOT}/.venv-black/bin/black" "${_MAIN_ROOT}/.venv-black/bin/black"; do
-  if [ -x "${_cand}" ]; then
-    BLACK="${_cand}"
-    break
-  fi
-done
-
-if [ "${BLACK}" = "black" ]; then
-  echo "[agent-commit] ⚠ .venv-black not found (looked in ${ROOT} and ${_MAIN_ROOT:-?}) —" >&2
-  echo "[agent-commit]   falling back to black on PATH ($(black --version 2>/dev/null | head -1))." >&2
-  echo "[agent-commit]   CI pins 26.3.1; a version skew here can pass locally and red main's Lint job." >&2
-fi
-
+# The search, the version verification and the fail-closed message all live in
+# deploy/lib/pinned_formatters.sh — ONE resolver shared with the pre-commit hook,
+# reading the pin from requirements-dev.txt. It already looks in the PRIMARY
+# clone as well as ${ROOT} (implementers run in worktrees and .venv-black is
+# untracked, so a worktree-local lookup alone misses it), and it version-verifies
+# every candidate including PATH, so a correct PATH install is accepted and a
+# skewed one never is.
 if [ -n "${STAGED_PY}" ]; then
-  if command -v "${BLACK}" >/dev/null 2>&1 || [ -x "${BLACK}" ]; then
-    if ! "${BLACK}" --check ${STAGED_PY}; then
-      echo "[agent-commit] ❌ black would reformat — run: ${BLACK} ${STAGED_PY}" >&2
-      refuse 1
-    fi
-    if ! ruff check ${STAGED_PY}; then
-      echo "[agent-commit] ❌ ruff check failed — run: ruff check --fix ${STAGED_PY}" >&2
-      refuse 1
-    fi
-    echo "[agent-commit] ✓ black + ruff clean"
-  else
-    echo "[agent-commit] ⚠ black/ruff not on PATH — format gate SKIPPED, CI will catch it" >&2
+  _PF_LIB="${ROOT}/deploy/lib/pinned_formatters.sh"
+  if [ ! -f "${_PF_LIB}" ]; then
+    echo "[agent-commit] ❌ ${_PF_LIB} is missing — cannot verify the formatter pin." >&2
+    echo "[agent-commit]    Refusing to run an unpinned format gate (#2570)." >&2
+    refuse 1
   fi
+  # shellcheck source=lib/pinned_formatters.sh
+  . "${_PF_LIB}"
+
+  # Fail CLOSED: an unpinned format gate is worse than no gate, because it
+  # refuses correct code and blesses code CI will reject.
+  if ! BLACK="$(resolve_pinned_formatter black)"; then
+    echo "[agent-commit] ❌ format gate FAILED CLOSED — no black at the pinned version (#2570)." >&2
+    refuse 1
+  fi
+  if ! RUFF="$(resolve_pinned_formatter ruff)"; then
+    echo "[agent-commit] ❌ format gate FAILED CLOSED — no ruff at the pinned version (#2570)." >&2
+    refuse 1
+  fi
+  if ! "${BLACK}" --check ${STAGED_PY}; then
+    echo "[agent-commit] ❌ black would reformat — run: ${BLACK} ${STAGED_PY}" >&2
+    refuse 1
+  fi
+  if ! "${RUFF}" check ${STAGED_PY}; then
+    echo "[agent-commit] ❌ ruff check failed — run: ${RUFF} check --fix ${STAGED_PY}" >&2
+    refuse 1
+  fi
+  echo "[agent-commit] ✓ black $(pinned_formatter_version black) + ruff $(pinned_formatter_version ruff) clean"
 fi
 
 # --no-verify is deliberate: the gate above replaces the hook's useful half, and
