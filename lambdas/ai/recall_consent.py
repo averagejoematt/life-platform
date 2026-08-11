@@ -50,11 +50,15 @@ resolved, so it is private — never "probably fine"). The precedence itself is 
 re-implemented here: tier resolution is `diary_consent.resolve_consent` /
 `diary_consent.public_context`, called, not copied.
 
-NOT A REVOCATION SWEEP. This gate governs what ENTERS the corpus. It does not delete a row
-that was indexed before a consent marker was withdrawn — the live corpus has zero journal
-rows (audited above), so there is nothing to revoke today, and a delete path with no live
-case to exercise it is worse than an explicit boundary. Revocation is an operator sweep if
-and when a cleared entry is ever un-cleared.
+NOT A REVOCATION SWEEP — the one named gap. This gate governs what ENTERS the corpus. It
+does not repair a row written under a consent marker that was later WITHDRAWN or downgraded:
+a quote→allude downgrade leaves the cleared line on an already-indexed row (`text_sha` is
+unchanged, so `recall_indexer`'s idempotency gate early-returns, and `metadata_drift`
+compares only `link`/`cycle`), and a downgrade to private leaves the row itself. The live
+corpus has zero journal rows (audited above), so there is nothing to revoke today, and a
+delete/repair path with no live case to exercise it is worse than a boundary stated out
+loud. Revocation is an operator sweep — or a `snippet` term in `metadata_drift` — if and
+when a cleared entry is ever un-cleared.
 
 Stdlib + two bundled pure modules, no AWS, no I/O — so the leak-proof invariant is
 unit-testable with zero live calls.
