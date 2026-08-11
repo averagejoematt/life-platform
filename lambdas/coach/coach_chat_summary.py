@@ -57,17 +57,60 @@ deliberate choices:
   ``read_recent_summaries``, the call ``_memory_block`` already makes, so the
   feature costs the size-guarded ``telegram_worker_lambda.py`` zero lines.
 
+HIS PEOPLE (#2488). The same one Haiku call ALSO returns the first names Matthew
+mentioned that day, kept in a capped ``RELATIONSHIP#people`` row beside the bits
+row and rendered into the same memory block, so a coach can ask how someone's
+thing went a week later — the thing a friend does and a metrics dashboard never
+will. It follows #2487's shape on purpose rather than inventing a second one:
+
+* **Still ONE model call.** The ``PEOPLE:`` tail is another instruction on the
+  summarizer call that has already read the transcript. There are already two
+  Bedrock calls per outbound turn (#2554); a third would be a regression, and an
+  extraction that costs nothing extra is the only version worth shipping.
+* **Still verbatim-or-nothing, and stricter.** A name survives only when it is
+  first-name SHAPED, is not Matthew or the coach themself, and appears in the
+  day's transcript **as a whole word** — ``grounded_people``. The bits gate uses
+  substring containment, which is right for a phrase and wrong for a name:
+  "Ana" is a substring of "Dana", and inventing a person out of a substring is
+  exactly the fabrication ADR-104 forbids.
+* **Still ONE eviction policy.** ``merge_bits`` gained a ``cap`` argument and
+  does the people row too — same total, deterministic order (sightings desc,
+  ``last_seen`` desc, text asc), same idempotent re-sighting. Two ledgers, one
+  rule, so they cannot drift apart.
+* **Still zero extra reads and zero worker lines.** The read folds through
+  ``read_recent_summaries`` (the call ``_memory_block`` already makes), and the
+  per-row ``get_item`` #2487 used on that path became ONE ``begins_with``
+  ``RELATIONSHIP#`` query that returns both rows — so his-people memory costs no
+  additional DynamoDB call at all, and ``telegram_worker_lambda.py`` is untouched.
+
+PRIVACY IS THE FEATURE, not a caveat on it (#2488 AC2/AC4). These are real first
+names of real people on a PUBLIC repo, so the store is internal-only and proven
+so rather than asserted so:
+
+* No module outside this one may name the sk, and no module on the coach
+  perimeter that touches DynamoDB may prefix-sweep ``RELATIONSHIP#`` — both are
+  pinned as properties over a derived module set in
+  ``tests/test_coach_his_people_2488.py``, not as a hand-kept path list.
+* Nothing on the write or read path logs a name: the counts go to CloudWatch,
+  the names never do, and the failure path logs the exception CLASS rather than
+  its message so a DynamoDB error echoing the item cannot exfiltrate one.
+* The row carries ``sensitivity="internal_only"`` so the record says out loud
+  what it is, for anyone reading the table rather than this file.
+
 Reset semantics: ``COACH#*`` + ``RELATIONSHIP#*`` is CROSS_PHASE
-(``lambdas/experiment/phase_taxonomy.py``, the ADR-153 rule) and a bits row is
-deliberately inside that family. An inside reference is a fact about the
-relationship, not about the experiment cycle it happened to be born in — wiping
-it at a reset would make the coach forget a shared joke because a diet changed.
+(``lambdas/experiment/phase_taxonomy.py``, the ADR-153 rule) and both the bits
+row and the people row are deliberately inside that family. An inside reference
+is a fact about the relationship, not about the experiment cycle it happened to
+be born in — wiping it at a reset would make the coach forget a shared joke
+because a diet changed, and forget that Matthew has a sister because he started
+a new cut.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
@@ -99,6 +142,28 @@ MAX_NEW_BITS_PER_DAY = 3
 _MAX_BIT_CHARS = 80
 _BITS_MARKER = "BITS:"
 
+# His people (#2488, Coach Humanity Roadmap idea 17). The sk sits beside BITS_SK
+# inside the same CROSS_PHASE RELATIONSHIP# family; the shared prefix is what lets
+# ONE query serve both rows (see read_relationship_memory).
+_RELATIONSHIP_PREFIX = "RELATIONSHIP#"
+PEOPLE_SK = _RELATIONSHIP_PREFIX + "people"
+# A ledger of the people in a life, not a contact list: twelve is roughly how many
+# names actually recur in someone's conversation, and it is a hard ceiling enforced
+# on every write by merge_bits(cap=MAX_PEOPLE), not a guideline.
+MAX_PEOPLE = 12
+# One chatty day cannot rewrite who his people are.
+MAX_NEW_PEOPLE_PER_DAY = 3
+# A first name, and only a first name: one capitalized token, no surname, no
+# sentence. Anything else the model offers is dropped rather than cleaned up — a
+# store this sensitive should shrink under ambiguity, never stretch.
+_NAME_RE = re.compile(r"^[A-Z][A-Za-z'\-]{1,19}$")
+# The two names that are never "his people": the subject himself and the coach
+# doing the remembering. Storing either would make the ledger about the pair
+# already modelled by RELATIONSHIP#state.
+_NEVER_PEOPLE = {"matthew", "matt", "coach"}
+_PEOPLE_MARKER = "PEOPLE:"
+_TAIL_MARKERS = (_BITS_MARKER, _PEOPLE_MARKER)
+
 _SYSTEM = (
     "You are the coach, jotting a private note to self after a day of texting "
     "with Matthew — 2-4 sentences you will rely on in later conversations. "
@@ -113,7 +178,13 @@ _SYSTEM = (
     "a shorthand phrase — one per line, each prefixed with '- ', copied "
     "WORD-FOR-WORD from the transcript. Most days have none: write 'BITS: none'. "
     "Never paraphrase and never invent one; a missed bit costs nothing, an "
-    "invented one is a lie about a shared history."
+    "invented one is a lie about a shared history.\n\n"
+    "Then, on one final line after that, write 'PEOPLE:' followed by the first "
+    "names of any PEOPLE IN HIS LIFE he mentioned today — one per line, each "
+    "prefixed with '- ', spelled exactly as he spelled them. First name only, "
+    "never a surname. Do not list yourself or Matthew. Do not list public "
+    "figures, authors, brands or coaches he merely talked about. Most days have "
+    "none: write 'PEOPLE: none'. Never guess a name you did not read."
 )
 
 
@@ -158,12 +229,35 @@ def read_recent_summaries(table, pk: str, limit: int = MAX_SUMMARY_ROWS_IN_PROMP
     # #2487: the inside-references ledger folds in HERE for the same reason the
     # time-gap line does — this call is already the one `_memory_block` makes, so
     # the feature reaches the prompt without touching the size-guarded worker.
-    parts = [p for p in (gap_line, summary_text, bits_block(read_bits(table, pk))) if p]
+    # #2488: his-people rides the SAME fold, and the two rows come back from ONE
+    # query rather than two get_items, so the second ledger costs zero extra reads.
+    bits, people = read_relationship_memory(table, pk)
+    parts = [p for p in (gap_line, summary_text, bits_block(bits), people_block(people)) if p]
     return "\n\n".join(parts)
 
 
 def _normalize(text) -> str:
     return " ".join(str(text or "").lower().split())
+
+
+def _parse_list_tail(tail: str) -> list:
+    """The '- item' lines under a tail marker, stopping at the NEXT marker.
+
+    The stop condition is the #2488 addition and it is load-bearing: with two
+    tails on one reply, a model that emits them out of order would otherwise
+    spill one section's lines into the other's list — inside references filed as
+    people, or worse, people filed as inside references (a name rendered into a
+    'things you said to each other' block). Parsing never raises.
+    """
+    items = []
+    for line in str(tail or "").splitlines():
+        line = line.strip().lstrip("-•*").strip().strip("\"'").strip()
+        if any(line.lower().startswith(m.lower()) for m in _TAIL_MARKERS):
+            break
+        if not line or _normalize(line) in ("none", "no bits", "n/a"):
+            continue
+        items.append(line[:_MAX_BIT_CHARS])
+    return items
 
 
 def split_note_and_bits(raw: str) -> tuple:
@@ -178,24 +272,33 @@ def split_note_and_bits(raw: str) -> tuple:
     idx = lowered.rfind(_BITS_MARKER.lower())
     if idx < 0:
         return text.strip(), []
-    note = text[:idx].strip()
-    tail = text[idx + len(_BITS_MARKER) :]
-    candidates = []
-    for line in tail.splitlines():
-        line = line.strip().lstrip("-•*").strip().strip("\"'").strip()
-        if not line or _normalize(line) in ("none", "no bits", "n/a"):
-            continue
-        candidates.append(line[:_MAX_BIT_CHARS])
-    return note, candidates
+    return text[:idx].strip(), _parse_list_tail(text[idx + len(_BITS_MARKER) :])
 
 
-def grounded_bits(candidates, transcript: str) -> list:
+def split_note_bits_and_people(raw: str) -> tuple:
+    """(note, candidate bits, candidate names) from the ONE summarizer reply.
+
+    ``PEOPLE:`` is the last tail, so it is split off FIRST and the remainder goes
+    through the unchanged #2487 splitter — which is why adding a second tail did
+    not need a second parser or a second model call.
+    """
+    text = str(raw or "")
+    idx = text.lower().rfind(_PEOPLE_MARKER.lower())
+    if idx < 0:
+        note, bits = split_note_and_bits(text)
+        return note, bits, []
+    note, bits = split_note_and_bits(text[:idx])
+    return note, bits, _parse_list_tail(text[idx + len(_PEOPLE_MARKER) :])
+
+
+def grounded_bits(candidates, transcript: str, limit: int = MAX_NEW_BITS_PER_DAY) -> list:
     """The ADR-104 gate: a bit survives only if it is LITERALLY in the day's
     transcript. The model is allowed to notice a running joke; it is not allowed
     to infer, paraphrase, or invent one — an inside reference the pair never
     actually said is a fabricated shared history, the most corrosive kind.
 
-    Deduplicated on normalized text, capped at ``MAX_NEW_BITS_PER_DAY``.
+    Deduplicated on normalized text, capped at ``limit`` (``MAX_NEW_BITS_PER_DAY``
+    by default).
     """
     hay = _normalize(transcript)
     kept: list = []
@@ -206,13 +309,65 @@ def grounded_bits(candidates, transcript: str) -> list:
             continue
         seen.add(norm)
         kept.append(str(c).strip())
-        if len(kept) >= MAX_NEW_BITS_PER_DAY:
+        if len(kept) >= limit:
             break
     return kept
 
 
-def merge_bits(existing, new_bits, date: str) -> list:
+def is_first_name_shaped(token) -> bool:
+    """One capitalized token and nothing else — see ``_NAME_RE``."""
+    return bool(_NAME_RE.match(str(token or "").strip()))
+
+
+def grounded_people(candidates, transcript: str, exclude=()) -> list:
+    """The #2488 gate on names — the bits gate plus two things a NAME needs.
+
+    1. **Shape.** ``is_first_name_shaped``: one capitalized token. A surname, a
+       full name, or a sentence is dropped rather than trimmed down to something
+       that looks like a name; storing less is always the safe direction here.
+    2. **Whole-word grounding, not substring.** ``grounded_bits`` asks whether
+       the candidate is *contained* in the transcript, which is right for a
+       phrase and dangerous for a name: "Ana" is inside "Dana", so substring
+       matching would let the model conjure a person who was never mentioned.
+       A name must appear on a word boundary or it does not exist (ADR-104).
+    3. **Never the pair itself.** Matthew and the coach are the relationship
+       ``RELATIONSHIP#state`` already models; ``exclude`` carries the coach's own
+       display name so a coach cannot end up in its own people ledger.
+
+    Deduplicated case-insensitively, capped at ``MAX_NEW_PEOPLE_PER_DAY``.
+    """
+    hay = _normalize(transcript)
+    # Tokenized, because a coach's display name is usually two words ("Eli Marsh")
+    # while a candidate is always one — blocking the whole string would block
+    # nothing.
+    blocked = set(_NEVER_PEOPLE)
+    for x in exclude or ():
+        blocked.update(t for t in _normalize(x).split() if t)
+    kept: list = []
+    seen = set()
+    for c in candidates or []:
+        name = str(c or "").strip()
+        if not is_first_name_shaped(name):
+            continue
+        norm = _normalize(name)
+        if norm in seen or norm in blocked:
+            continue
+        if not re.search(r"\b" + re.escape(norm) + r"\b", hay):
+            continue
+        seen.add(norm)
+        kept.append(name)
+        if len(kept) >= MAX_NEW_PEOPLE_PER_DAY:
+            break
+    return kept
+
+
+def merge_bits(existing, new_bits, date: str, cap: int = MAX_BITS) -> list:
     """Fold today's grounded bits into the stored ledger and enforce the cap.
+
+    ``cap`` exists so the #2488 people ledger reuses THIS eviction rule instead of
+    growing a second one (``merge_bits(..., cap=MAX_PEOPLE)``). Two ledgers with
+    two eviction policies would eventually disagree about what "weakest" means;
+    one policy with two ceilings cannot.
 
     THE EVICTION RULE, deterministic and total: bits are ordered strongest-first
     by (1) sightings descending, (2) ``last_seen`` descending, (3) text ascending
@@ -260,7 +415,7 @@ def merge_bits(existing, new_bits, date: str) -> list:
     merged.sort(key=lambda b: b["text"])
     merged.sort(key=lambda b: b["last_seen"], reverse=True)
     merged.sort(key=lambda b: b["count"], reverse=True)
-    return merged[:MAX_BITS]
+    return merged[:cap]
 
 
 def read_bits(table, pk: str) -> list:
@@ -272,6 +427,41 @@ def read_bits(table, pk: str) -> list:
         return []
     bits = item.get("bits")
     return list(bits) if isinstance(bits, list) else []
+
+
+def read_relationship_memory(table, pk: str) -> tuple:
+    """``(bits, people)`` from ONE query over the ``RELATIONSHIP#`` prefix.
+
+    Both ledgers live under the same prefix, so the prompt path reads them in a
+    single DynamoDB call — this REPLACES the per-row ``get_item`` #2487 used on
+    the read path rather than adding to it, which is how the second ledger costs
+    zero extra reads. (The write path keeps its own exact-key ``read_bits``: a
+    merge must see the row it is about to overwrite, and only that row.)
+
+    Fail-soft to ``([], [])`` — memory is a nicety, chat is the job.
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": pk, ":pfx": _RELATIONSHIP_PREFIX},
+        )
+        rows = {str(i.get("sk", "")): i for i in resp.get("Items") or []}
+    except Exception as e:
+        # No name can be in this message (the query names no name), but keep the
+        # #2488 discipline uniform across the people path: class, not message.
+        logger.warning("[chat_summary] relationship read failed for %s: %s", pk, e.__class__.__name__)
+        return [], []
+
+    def _listed(sk: str, field: str) -> list:
+        val = (rows.get(sk) or {}).get(field)
+        return list(val) if isinstance(val, list) else []
+
+    return _listed(BITS_SK, "bits"), _listed(PEOPLE_SK, "people")
+
+
+def read_people(table, pk: str) -> list:
+    """The stored people, strongest-first. Fail-soft to []."""
+    return read_relationship_memory(table, pk)[1]
 
 
 def bits_block(bits) -> str:
@@ -291,6 +481,33 @@ def bits_block(bits) -> str:
     return (
         "INSIDE REFERENCES (things the two of you actually said to each other — "
         "reuse one only when it lands naturally, never explain it, never force it):\n" + "\n".join(lines)
+    )
+
+
+def people_block(people) -> str:
+    """The his-people prompt block (#2488). "" for an empty ledger — a coach who
+    has not been told about anyone must be told nothing, not told it knows no one.
+
+    The rendered dates are what make this useful rather than merely present: "he
+    last mentioned her three weeks ago" is the difference between asking after
+    someone and reciting a list.
+    """
+    lines = []
+    for p in people or []:
+        name = str((p or {}).get("text") or "").strip()
+        if not name:
+            continue
+        count = int((p or {}).get("count") or 1)
+        last = str((p or {}).get("last_seen") or "")
+        detail = ", ".join(x for x in (f"last mentioned {last}" if last else "", f"{count}x" if count > 1 else "") if x)
+        lines.append(f"- {name} ({detail})" if detail else f"- {name}")
+    if not lines:
+        return ""
+    return (
+        "HIS PEOPLE (first names he has mentioned to you — ask after them the way a "
+        "friend would, by name, and only when it fits. Never assume a relationship "
+        "he has not told you. These names are private to this conversation: never "
+        "put one in anything that leaves this chat):\n" + "\n".join(lines)
     )
 
 
@@ -316,6 +533,41 @@ def _store_bits(table, pk: str, new_bits, date: str, coach_name: str = "", cycle
         return merged
     except Exception as e:
         logger.warning("[chat_summary] bits write failed for %s (chat unaffected): %s", pk, e)
+        return None
+
+
+def _store_people(table, pk: str, new_people, date: str, coach_name: str = "", cycle=None) -> Optional[list]:
+    """Merge + write the capped people row. Returns the stored list, or None when
+    there was nothing to change. Never raises.
+
+    LOGGING DISCIPLINE (#2488 AC4) — the one thing this function does differently
+    from ``_store_bits``: it emits a COUNT and never a name, and the failure path
+    logs the exception CLASS rather than its message. A DynamoDB validation error
+    can quote the item it rejected, and CloudWatch is off-box; "names never appear
+    in off-box logs" has to survive the error path, not just the happy one.
+    """
+    if not new_people:
+        return None
+    try:
+        merged = merge_bits(read_people(table, pk), new_people, date, cap=MAX_PEOPLE)
+        item = {
+            "pk": pk,
+            "sk": PEOPLE_SK,
+            "type": "relationship_people",
+            # Says out loud, in the record itself, what the privacy screen enforces
+            # in the test suite — for whoever is reading the table, not this file.
+            "sensitivity": "internal_only",
+            "people": merged,
+            "coach_name": coach_name,
+            "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }
+        if cycle is not None:
+            item["cycle"] = cycle
+        table.put_item(Item=item)
+        logger.info("[chat_summary] stored %d remembered people for %s", len(merged), pk)
+        return merged
+    except Exception as e:
+        logger.warning("[chat_summary] people write failed for %s (chat unaffected): %s", pk, e.__class__.__name__)
         return None
 
 
@@ -448,10 +700,12 @@ def ensure_daily_summary(
             if isinstance(block, dict) and block.get("type") == "text":
                 text = (block.get("text") or "").strip()
                 break
-        # #2487: the same reply carries the day's inside references in a BITS:
-        # tail. Split it off BEFORE the note is stored so the tail never leaks
-        # into the prose the coach reads back as "what I remember".
-        text, bit_candidates = split_note_and_bits(text)
+        # #2487/#2488: the same reply carries the day's inside references in a
+        # BITS: tail and the day's first names in a PEOPLE: tail. Both are split
+        # off BEFORE the note is stored — a name must never leak into the prose
+        # the coach reads back as "what I remember", because that prose has a
+        # much wider blast radius than the gated people row.
+        text, bit_candidates, people_candidates = split_note_bits_and_people(text)
         text = text[:_MAX_SUMMARY_CHARS]
         if not text:
             return None
@@ -470,6 +724,14 @@ def ensure_daily_summary(
         # Only the worker that WON the conditional summary put gets here, so the
         # un-conditioned bits write is single-writer per day by construction.
         _store_bits(table, pk, grounded_bits(bit_candidates, transcript), target, coach_name=coach_name, cycle=cycle)
+        _store_people(
+            table,
+            pk,
+            grounded_people(people_candidates, transcript, exclude=(coach_name,)),
+            target,
+            coach_name=coach_name,
+            cycle=cycle,
+        )
         return target
     except Exception as e:
         if e.__class__.__name__ == "ConditionalCheckFailedException":
