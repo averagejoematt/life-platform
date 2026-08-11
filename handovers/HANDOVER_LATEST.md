@@ -1,4 +1,4 @@
-# Handover — 2026-08-11 overnight: draining the non-fable queue (47 → 44)
+# Handover — 2026-08-11 overnight: draining the non-fable queue (47 → 45)
 
 **Session:** autonomous, Opus, no `model:fable` work. Driver + 10 implementer agents + 1 adversarial verifier.
 **Plan:** `~/.claude/plans/shiny-sauteeing-gizmo.md` (Acts 0–6 all executed).
@@ -9,7 +9,7 @@
 **Main:** green (`9388c176`)
 **Incidents:** 3 rows added — semantic recall never indexed a journal entry; the blocking quality gate passing fabricated numbers; recall-corpus link rot (repaired in-session)
 **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢
-**Closures:** #2535, #2534, #2538, #2536, #2488, #2349, #2348, #2221, #2564, #2556 commented
+**Closures:** #2535, #2534, #2538, #2536, #2488, #2349, #2348, #2221, #2564 commented (+#2556, which had auto-closed pre-session)
 **Backlog:** Now refilled to 4 actionable (promoted #2574, #2492, #2539; #1400 labelled `gate:owner`); Later sweep — no stale issues
 **Alarms:** 1 red >72h, now cited — `token-alarm-genesis-window-active` (#2116; not a fault, see below)
 **CI warnings:** 9 — 3 smoke content-truth failures → filed #2575; 7× Lambda config drift → #2468 (`gate:owner`, do NOT `cdk deploy`, measured last session that deploying does not clear it); `CONTENT_FILTER_JSON` gate → #2370 (owner credential)
@@ -18,15 +18,18 @@
 
 ## The number, honestly
 
-**Target was 47 → 34–38. Actual: 47 → 44.** I missed it, and the arithmetic is the point:
+**Target was 47 → 34–38. Actual: 47 → 45.** I missed it, and the arithmetic is the point:
 
 | | |
 |---|---|
-| start | 47 |
-| closed | **−10** (#2535, #2534, #2538, #2536, #2488, #2349, #2348, #2221, #2564, #2556) |
-| filed from verification | **+6** (#2558, #2569, #2570, #2573, #2574, #2575) |
+| start (Act 0, measured ~02:10Z) | 47 |
+| pre-existing issues closed | **−8** (#2535, #2534, #2538, #2536, #2488, #2349, #2348, #2221) |
+| filed from verification, still open | **+6** (#2558, #2569, #2570, #2573, #2574, #2575) |
+| filed *and* closed same session | ±0 (#2564 — found by a verifier, fixed by PR #2568) |
 | closed-then-reopened on honest re-read | ±0 (#2541, #2537, #2347) |
-| **end** | **44** |
+| **end** | **45** ✓ reconciles exactly |
+
+*Correction made at wrap:* I first wrote −10 and 44, crediting **#2556** (the auto-filed deploy-wedge alert) as a session closure. It closed at **01:10Z — an hour before Act 0's count** — so it was already closed when I measured 47 and was never mine to claim. Its closure comment stands; the credit doesn't.
 
 The target assumed ~13 closures against a static corpus. What happened instead is that **verification kept finding real defects** — three of them P1 — and I refused three closes that weren't true. The corpus is more accurate than it was, not smaller. If the next session wants the number down, the honest lever is that six of the seven remaining non-fable items are now filed, scoped, and small.
 
