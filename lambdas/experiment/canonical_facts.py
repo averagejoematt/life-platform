@@ -221,3 +221,77 @@ def build_canonical_facts(record, genesis=None) -> dict:
     facts["facts_are_pre_genesis"] = pre_genesis
     facts["cycle_genesis"] = genesis
     return facts
+
+
+# ── #2575: a COMPLETE-DAY rollup is not "the latest reading" ──────────────────
+#
+# The facts above come from `computed_metrics`, which is a rollup of a FINISHED day:
+# the row for day D is written the next afternoon. Read newest-first it is therefore
+# one morning behind the cockpit's live resolvers whenever today's whoop has already
+# finalized — measured on 2026-08-11 as "Dr. Lisa Park cites recovery 53% vs cockpit
+# 46%", where 53 was the newest ROLLUP and 46 the newest READING. #2113 fixed the
+# pre-genesis version of this same unbounded-newest-first read; a row that is merely a
+# day behind sails straight through it.
+#
+# So the cockpit's resolvers are AUTHORITATIVE for the latest-reading facts and this
+# is the seam where the coach derives them. Fields grouped by the reading they come
+# from, because they move together: recovery/HRV/RHR are three columns of ONE whoop
+# morning (the #1369 Truth Spine's contract), and mixing this morning's recovery with
+# yesterday's HRV would be a new contradiction, not a fix.
+#
+# Window-derived facts (protein average, weekly rate, its CI) are NOT here. The rollup
+# is the right producer for those and re-deriving them live would be sprawl.
+LATEST_READING_GROUPS = (
+    (("recovery_pct", "hrv_ms", "rhr_bpm"), "recovery_as_of"),
+    (("latest_weight",), "weight_as_of"),
+)
+
+
+def overlay_latest_readings(facts, readings, genesis=None):
+    """Replace the rollup's latest-reading facts with the live resolvers', when newer.
+
+    ``readings`` is `intelligence.latest_readings.resolve_latest_readings`'s output —
+    values in this module's field names, each group carrying its own ``*_as_of``.
+
+    Three rules, all deliberate:
+
+      * **Newer only.** A group whose reading is not strictly newer than the rollup's
+        own date is left alone. The overlay corrects a lag; it must never regress a
+        fact to an older one, and it must be a no-op on the (common) day where the two
+        already agree — so turning it on cannot itself move a published number.
+      * **Genesis still bites.** The Spine has no genesis clamp by design (#1369: the
+        latest reading is the latest reading). A FACT SET does — #2113 — so a reading
+        that predates ``genesis`` is withheld here exactly as `build_canonical_facts`
+        withholds a pre-genesis rollup, and ``facts_are_pre_genesis`` is stamped true.
+        Withheld, not annotated: the value never enters the set, so
+        `grounded_generation.allowed_numbers` never allows it.
+      * **Provenance travels.** When the vitals group moves, ``as_of`` and ``night_of``
+        move with it. They describe the wake-date-keyed vitals (#1923/#1968), so
+        leaving them behind would relabel a correct number with the wrong night — the
+        live symptom was a coach narrating "the night of 2026-08-09" while the cockpit
+        published ``night_of: 2026-08-10``.
+
+    Pure — no clock, no boto3 — so the rule is unit-testable offline. Missing/absent
+    readings are a clean no-op (ADR-104: absence is never a correction).
+    """
+    facts = dict(facts or {})
+    readings = readings or {}
+    genesis = _resolve_genesis(genesis)
+    # Captured once: a group that moves must not change how a later group is judged.
+    rollup_date = str(facts.get("as_of") or "")[:10] or None
+
+    for fields, date_key in LATEST_READING_GROUPS:
+        as_of = str(readings.get(date_key) or "")[:10]
+        if not as_of or not all(v is not None for v in (_night_of(as_of),)):
+            continue  # absent or unparseable — nothing to derive from
+        if rollup_date and as_of <= rollup_date:
+            continue  # the rollup is not behind
+        pre_genesis = bool(genesis and as_of < genesis)
+        for field in fields:
+            facts[field] = None if pre_genesis else _num(readings.get(field))
+        if pre_genesis:
+            facts["facts_are_pre_genesis"] = True
+        elif date_key == "recovery_as_of":
+            facts["as_of"] = as_of
+            facts["night_of"] = _night_of(as_of)
+    return facts

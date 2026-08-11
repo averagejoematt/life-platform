@@ -169,7 +169,9 @@ def _load_canonical_facts():
         # ONE schema (canonical_facts.build_canonical_facts) that the Coherence Sentinel
         # also reads — so the value a coach is grounded on is exactly the value the
         # Sentinel checks the narrative against. No more per-site dict construction.
-        from experiment.canonical_facts import build_canonical_facts
+        from experiment.canonical_facts import build_canonical_facts, overlay_latest_readings
+
+        from intelligence.latest_readings import resolve_latest_readings
 
         _cm = _latest_item("computed_metrics") or {}
         facts = build_canonical_facts(_cm)
@@ -180,16 +182,14 @@ def _load_canonical_facts():
         # (grounded_generation.authoritative_facts_block) can force past-tense,
         # dated rate language once the scale goes dark.
         facts["rate_provisional"] = bool(_cm.get("rate_provisional"))
-        _w = _latest_item("withings") or {}
-        _w_date = str(_w.get("sk", ""))[5:15] if str(_w.get("sk", "")).startswith("DATE#") else None
-        if _w_date:
-            facts["last_weighin_date"] = _w_date
-            try:
-                facts["days_since_weighin"] = max(
-                    0, (datetime.now(timezone.utc).date() - datetime.strptime(_w_date, "%Y-%m-%d").date()).days
-                )
-            except ValueError:
-                pass
+        # #2575: `computed_metrics` is a COMPLETE-DAY rollup written the next afternoon, so
+        # newest-first it lags the cockpit's live resolvers by a morning — published as
+        # "Lisa Park cites recovery 53% vs cockpit 46%". Latest-reading facts (and the
+        # weigh-in riders) now derive from the resolvers /api/vitals serves; the rollup keeps
+        # the window-derived ones. Rule + evidence: canonical_facts.overlay_latest_readings.
+        _live = resolve_latest_readings(table, USER_PREFIX, _latest_item("withings"))
+        facts = overlay_latest_readings(facts, _live)
+        facts.update({_k: _live[_k] for _k in ("last_weighin_date", "days_since_weighin") if _live.get(_k) is not None})
     except Exception as _e:
         logger.warning("canonical facts load failed: %s", _e)
     _CANON_FACTS_CACHE["facts"] = facts
