@@ -54,7 +54,7 @@ except ImportError:  # pragma: no cover
     logger.setLevel(logging.INFO)
 
 from coach import coach_chat, coach_outbound, coach_reactions, telegram_gateway
-from coach.coach_chat_grounding import build_facts_block, build_grounder
+from coach.coach_chat_grounding import build_facts_block, build_grounder, chat_available_logs
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -561,10 +561,16 @@ def _grounder_for(a: dict, *extra: str):
     ``generation_date_iso`` rides through so an OUTBOUND turn adjudicates Day-N
     against the same Pacific day the inbound path does — a referral generated at
     5:30pm PT must not be gated against tomorrow's UTC date.
+
+    ``available_logs`` (#2564) is what makes the behavioral class real rather than
+    merely declared: without it the gate short-circuits to [] and a coach can assert
+    a behavior Matthew never logged. Derived — never re-derived — by
+    ``chat_available_logs``, on the SAME Pacific day the rest of the gate uses.
     """
     return build_grounder(
         a["facts"],
         generation_date_iso=a["today_pt"],
+        available_logs=chat_available_logs(_table(), a["today_pt"]),
         extra_sources=(
             a["memory"],
             a["moment"],

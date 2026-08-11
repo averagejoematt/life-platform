@@ -179,6 +179,11 @@ SURFACES = {
     # only, citing one night's real recovery and HRV as today's; the values existed,
     # the DAY was wrong). A surface that cannot predict its own topic cannot exempt
     # a class on the grounds that the topic will not come up.
+    # #2564: declaring `behavioral` armed here was true of the ARMING and false of the
+    # RUNTIME — the gate needs `available_logs` and the live chat call site passed none,
+    # so the class could not fire. Now derived per turn from the engagement_state
+    # presence record (coach_chat_grounding.chat_available_logs), and pinned end-to-end
+    # through the production call path by tests/test_chat_behavioral_gate_2564.py.
     "lambdas/coach/coach_chat_grounding.py::build_grounder": _entry(
         ("numbers", "dates", "freshness", "behavioral", "night"),
         {},
