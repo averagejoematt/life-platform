@@ -1595,8 +1595,7 @@ def _semantic_recall_for_coach(coach_id, query_text, *, table=None, exclude_date
         query_vec = _bc.embed_text(query_text)
         precedents = _sr.retrieve(table, query_vec, exclude_dates=exclude_dates, resolve=True)
         block = _sr.recall_block(precedents)
-        if precedents:
-            print(f"[COACH-V2:{coach_id}] semantic recall: {len(precedents)} resolved precedent(s)")
+        print(_sr.retrieval_log_line(coach_id, precedents))  # #2347: emitted on a HIT *and* on a MISS
         return block, precedents
     except Exception as _sr_e:  # noqa: BLE001 — semantic recall is never load-bearing
         print(f"[COACH-V2:{coach_id}] semantic recall unavailable (non-blocking): {_sr_e}")

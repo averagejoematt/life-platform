@@ -388,6 +388,35 @@ def render_precedent_line(precedent: dict) -> str:
     return f"This period echoes the week of {date} ({paren}){tail}"
 
 
+def retrieval_log_line(coach_id, precedents: list) -> str:
+    """#2347: ONE line per retrieval, emitted on a HIT **and on a MISS**.
+
+    This module previously emitted nothing at all — no ``put_metric_data``, no EMF
+    block, not one ``print`` — and the single trace anywhere in the tree sat inside
+    ``if precedents:`` at the ai_calls call site. So a run that retrieved NOTHING was
+    indistinguishable from a run where recall never executed, and the miss is exactly
+    the outcome #2347's corpus-scope decision turns on. Its AC1 wants ~4 weeks of
+    hit/miss data; those four weeks were never going to accumulate.
+
+    Observability lives HERE rather than at the call site because this module owns
+    retrieval — and because ``ai_calls.py`` is size-baselined, so growth belongs in a
+    cohesive home beside the thing it describes.
+
+    ``top_similarity`` is the **max**, not ``precedents[0]``, so the line never
+    silently depends on ``rank_precedents``' tie-break ordering. It is deliberately
+    ABSENT (``n/a``) on a miss: ``rank_precedents`` drops sub-threshold docs before
+    returning, so the top cosine of a miss would cost a second full cosine sweep of
+    the corpus on every turn. ADR-104 — an unmeasured number is stated absent, never
+    reported as a fabricated ``0.0``.
+    """
+    top = max((p.get("similarity") for p in precedents or [] if p.get("similarity") is not None), default=None)
+    return (
+        f"[COACH-V2:{coach_id}] semantic recall: outcome={'hit' if precedents else 'miss'} "
+        f"resolved={len(precedents or [])} threshold={DEFAULT_THRESHOLD} "
+        f"top_similarity={top if top is not None else 'n/a'}"
+    )
+
+
 def recall_block(precedents: list) -> str:
     """The prompt-injection block for a coach render (mirrors the coach-corrections
     prompt-memory block). Lists the RESOLVED precedents with dates/links/similarity
