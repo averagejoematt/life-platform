@@ -257,11 +257,39 @@ PROFILE = {
 }
 
 
+# #2584: the default gathered week now carries a real FOOD LOG, not just day
+# totals. The handler's ADR-104 sufficiency gate counts food items, so a fixture
+# of totals-only days is a week the panel is (correctly) never asked to review —
+# it would have quietly turned every "the panel was told X" test into a test of
+# the absence path. This is also the shape the live diary-export rows have
+# (entries_count 9-22 per day).
+def _food(name, time, cal, protein, carbs, fat, **extra):
+    rec = {"food_name": name, "time": time, "calories_kcal": cal, "protein_g": protein, "carbs_g": carbs, "fat_g": fat}
+    rec.update(extra)
+    return rec
+
+
 def _gathered(**over):
     data = {
         "macrofactor_this": {
-            "2026-06-06": _mf_day(cal=1700, protein=180, carbs=140, fat=60, fiber=32, micro=74),
-            "2026-06-07": _mf_day(cal=1900, protein=200, carbs=160, fat=70, fiber=28, micro=66),
+            "2026-06-06": _mf_day(
+                cal=1700,
+                protein=180,
+                carbs=140,
+                fat=60,
+                fiber=32,
+                micro=74,
+                food_log=[_food("Greek yogurt", "08:10", 220, 22, 18, 6), _food("Carnitas bowl", "12:40", 720, 52, 60, 24)],
+            ),
+            "2026-06-07": _mf_day(
+                cal=1900,
+                protein=200,
+                carbs=160,
+                fat=70,
+                fiber=28,
+                micro=66,
+                food_log=[_food("Egg scramble", "08:05", 340, 28, 6, 22), _food("Chicken teriyaki", "18:30", 810, 61, 88, 18)],
+            ),
         },
         "macrofactor_prior": {"2026-05-30": _mf_day(cal=2100, protein=150, carbs=200, fat=80, fiber=20, micro=55)},
         "withings": {"2026-05-14": {"weight_lbs": 315.0}, "2026-06-12": {"weight_lbs": 309.4}},
@@ -417,6 +445,32 @@ def test_an_unnamed_untimed_food_item_says_so_rather_than_guessing():
 def test_a_food_item_with_no_fiber_figure_reports_absence_not_zero():
     day = m.extract_daily_nutrition({"2026-06-06": _mf_day(food_log=[{"food_name": "Rice", "calories_kcal": 200}])})[0]
     assert day["foods"][0]["fiber_g"] is None
+    # #2584: fiber was the only one of the five that said so. The other four
+    # defaulted to 0, so this same item claimed 0 g protein / 0 g carbs / 0 g fat
+    # as measurements. Absence is absence for all five.
+    assert day["foods"][0]["protein_g"] is None
+    assert day["foods"][0]["carbs_g"] is None
+    assert day["foods"][0]["fat_g"] is None
+    assert day["foods"][0]["cal"] == 200.0  # the one figure that WAS logged is untouched
+
+
+def test_an_item_with_no_logged_macros_is_absent_not_a_zero_calorie_food():
+    """ADR-104 (#2584): an unmacroed item must not reach the panel as a measured zero."""
+    day = m.extract_daily_nutrition({"2026-06-06": _mf_day(food_log=[{"food_name": "Leftover casserole", "time": "19:00"}])})[0]
+    food = day["foods"][0]
+    assert food["name"] == "Leftover casserole"
+    assert (food["cal"], food["protein_g"], food["carbs_g"], food["fat_g"], food["fiber_g"]) == (None, None, None, None, None)
+
+
+def test_an_unmacroed_item_reaches_the_panel_as_null_not_as_zero():
+    """The consequence, at the boundary that matters: the serialised AI payload."""
+    payload = m.build_user_message(
+        _gathered(macrofactor_this={"2026-06-06": _mf_day(cal=1700, food_log=[{"food_name": "Leftover casserole"}])})
+    )
+    food = json.loads(payload)["this_week"]["daily_detail"][0]["foods"][0]
+    assert food["cal"] is None and food["protein_g"] is None
+    assert '"cal": null' in payload
+    assert '"cal": 0' not in payload
 
 
 def test_numeric_strings_in_a_record_are_parsed_as_numbers():
@@ -1639,3 +1693,76 @@ def test_a_week_of_records_without_totals_still_sends_a_review(handler_env):
     resp = m.lambda_handler({}, None)
     assert resp["statusCode"] == 200
     assert len(handler_env["ses"].sent) == 1
+    # #2584: ...but with no food logged, the panel is not commissioned to review one.
+    assert handler_env["calls"]["anthropic"] == []
+
+
+# ── #2584: the data-sufficiency gate counts FOOD ITEMS, not day records ──────
+
+
+def _totals_only_week():
+    """MacroFactor's daily-summary import shape: real totals, `food_log: []`."""
+    return _gathered(
+        macrofactor_this={
+            "2026-06-06": _mf_day(cal=1700, protein=180, carbs=140, fat=60, fiber=32, micro=74, food_log=[]),
+            "2026-06-07": _mf_day(cal=1900, protein=200, carbs=160, fat=70, fiber=28, micro=66, food_log=[]),
+        }
+    )
+
+
+def test_a_week_of_day_records_with_no_logged_foods_never_commissions_the_panel(handler_env):
+    """ADR-104: day records are not food. The prompt demands the panel cite
+    "a specific food he ate"; with an empty food log that can only be invented."""
+    handler_env["state"]["data"] = _totals_only_week()
+    m.lambda_handler({}, None)
+    assert handler_env["calls"]["anthropic"] == []
+
+
+def test_a_week_with_no_logged_foods_says_so_instead_of_shipping_a_review(handler_env):
+    handler_env["state"]["data"] = _totals_only_week()
+    handler_env["state"]["ai"] = "<p>Your carnitas bowls were the week's protein anchor.</p>"
+    m.lambda_handler({}, None)
+    html = _sent_html(handler_env)
+    assert "No individual foods were logged this week" in html
+    assert "carnitas" not in html.lower()
+
+
+def test_the_real_day_totals_still_reach_the_reader_when_no_foods_were_logged(handler_env):
+    """The absence is of FOOD ITEMS, not of data — withholding the whole email
+    would discard sixteen real day-total fields (#2221's standing contract)."""
+    handler_env["state"]["data"] = _totals_only_week()
+    m.lambda_handler({}, None)
+    html = _sent_html(handler_env)
+    assert _day_row(html, "Sat 06/06")[1] == "1700"
+    assert "1800 kcal" in _sent_subject(handler_env)
+
+
+def test_a_foodless_week_is_not_recorded_as_a_panel_review_in_the_insight_ledger(handler_env):
+    handler_env["state"]["data"] = _totals_only_week()
+    m.lambda_handler({}, None)
+    assert handler_env["writer"].written == []
+
+
+def test_one_logged_food_item_is_enough_to_commission_the_panel(handler_env):
+    """The gate is 'any food item', not 'a food item every day' — the boundary."""
+    handler_env["state"]["data"] = _gathered(
+        macrofactor_this={
+            "2026-06-06": _mf_day(cal=1700, protein=180, food_log=[]),
+            "2026-06-07": _mf_day(cal=1900, protein=200, food_log=[_food("Chicken teriyaki", "18:30", 810, 61, 88, 18)]),
+        }
+    )
+    m.lambda_handler({}, None)
+    assert len(handler_env["calls"]["anthropic"]) == 1
+
+
+def test_a_week_whose_only_entries_are_supplements_is_treated_as_no_food(handler_env):
+    """`extract_daily_nutrition` drops supplements, so the gate must count what
+    SURVIVES that filter — not `len(rec["food_log"])` at the source."""
+    handler_env["state"]["data"] = _gathered(
+        macrofactor_this={
+            "2026-06-06": _mf_day(cal=1700, protein=180, food_log=[_food("Creatine supplement", "07:00", 0, 0, 0, 0)]),
+        }
+    )
+    m.lambda_handler({}, None)
+    assert handler_env["calls"]["anthropic"] == []
+    assert "No individual foods were logged this week" in _sent_html(handler_env)
