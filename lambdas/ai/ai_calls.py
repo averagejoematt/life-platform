@@ -1284,7 +1284,7 @@ def _allowlist_prompt(system_prompt, few_shot_block):
 
 # #1374: the gate's wire contract lives in its own module so the calibration
 # harness replays the REAL payload instead of a hand-rebuilt lookalike.
-from ai.quality_gate_contract import QUALITY_GATE_FUNCTION_NAME, quality_gate_event  # noqa: E402,F401
+from ai.quality_gate_contract import QUALITY_GATE_FUNCTION_NAME, brief_with_grounding, quality_gate_event  # noqa: E402,F401
 
 
 def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief):
@@ -1819,6 +1819,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         # render works exactly as before (no facts block, no gate).
         _gg_mod = None
         _canon_facts = {}
+        _allowed = None  # #2573: the ADR-104 allow-list, forwarded to the quality gate below
         _facts_block = ""
         try:
             from boto3.dynamodb.conditions import Key as _Key
@@ -2120,7 +2121,7 @@ Write your {domain_label} coaching section now."""
             lambda_client,
             coach_id,
             output,
-            generation_brief,
+            brief_with_grounding(generation_brief, _canon_facts, _allowed),  # #2573: deterministic grounding context
             regenerate_fn=lambda _note: call_anthropic(
                 system_prompt + "\n\n" + user_message_full + "\n\n" + _note, api_key, max_tokens=600
             ),
