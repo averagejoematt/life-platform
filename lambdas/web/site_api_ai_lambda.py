@@ -43,6 +43,7 @@ from ingestion.source_registry import public_board_sources, public_paused_source
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
 
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
+from web.ask_retrieval import retrieve_block as _ask_retrieve  # #2348: the question selects published-archive passages (fail-soft)
 from web.site_api_ai_prompt import (  # noqa: F401
     _EXPLAIN_GROUNDING_REFUSAL,
     _EXPLAIN_SYSTEM,
@@ -736,6 +737,7 @@ def _ask_build_prompt(ctx: dict) -> str:
     # platform's computed read instead of "I can't tell you".
     reads_block = _ask_reads_block(ctx.get("reads") or {})
     reads_section = f"\nCOMPUTED READS (precomputed by the platform's analysis pipeline):\n{reads_block}\n" if reads_block else ""
+    archive_section = ctx.get("archive_block") or ""  # #2348: "" ⇒ the prompt is byte-identical to the pre-retrieval one
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking \
 {_LIVE_SOURCE_COUNT} live data sources ({_PAUSED_SOURCE_COUNT} paused).
 
@@ -751,7 +753,7 @@ CURRENT DATA:
   T0 habit streak: {ctx.get('tier0_streak', '?')} days
   Pillars:
 {pillars_str or '    Not available'}
-{reads_section}
+{reads_section}{archive_section}
 RULES:
 - You answer READERS of Matthew's public experiment — the reader is NOT Matthew. Never tell the reader to check, sync, or refresh "your" device: the devices are Matthew's (Whoop, Withings, Eight Sleep). If a reading is missing, say the platform hasn't received it yet.
 - Answer from the data above. If you don't have data, say so honestly.
@@ -1269,6 +1271,7 @@ def _handle_ask(event: dict) -> dict:
             return _error(503, "AI service configuration error")
 
         ctx = _ask_fetch_context()
+        ctx["archive_block"], _retrieval = _ask_retrieve(question, table=table)  # #2348: question-selected, fail-soft to ""
         system_prompt = _ask_build_prompt(ctx)
 
         req_body = json.dumps(
