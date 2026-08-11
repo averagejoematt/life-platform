@@ -70,6 +70,16 @@ from collections import Counter, defaultdict
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# The shape metrics live next door (#2536) — see coach_sim_shapes for why the seam is
+# there. Imported rather than re-exported: a caller that wants a shape metric should
+# import it from the module that owns it, so the owner is unambiguous when it changes.
+from coach_sim_shapes import (  # noqa: E402  (path set above)
+    absence_phrasing_collisions,
+    opening_construction_collisions,
+    structural_collapse,
+)
 
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 PANEL_TEMPERATURES = (0.1, 0.4, 0.7)
@@ -597,98 +607,6 @@ def opener_collisions(convos: list) -> list:
     return sorted(out, key=lambda x: -x[2])
 
 
-_DEMONSTRATIVE_ACK = re.compile(r"^(that|this|it|there)\b[^.!?]{0,60}[.!?]", re.I)
-_MENU_QUESTION = re.compile(r"\?[\s\"']*$")
-# The menu question — "the tracking, the whole project, or something else?" — is the
-# template's signature move. The span between the first comma and the "or" routinely
-# contains further commas, so it must not be excluded from the middle class.
-_OR_LIST = re.compile(r",[^?]{2,80}\bor\b[^?]{2,40}\?")
-
-
-def structural_signature(reply: str, inbound: str) -> str:
-    """A compact shape-of-the-reply fingerprint, content words removed.
-
-    Shingle-Jaccard measures shared WORDS, and it badly understates the failure this
-    exists to catch: eight coaches answering "honestly I'm just tired of all of this"
-    with the same two-move template — a demonstrative acknowledgement ("That lands.")
-    followed by a menu question echoing his phrase back ("What's the 'all of this' —
-    the tracking, the project, or something else?"). Synonym choice keeps the Jaccard
-    near zero while the STRUCTURE is identical, which is exactly what makes a roster
-    of eight read as one model wearing name tags.
-
-    The signature is deliberately coarse. It is not trying to describe the reply; it
-    is trying to make two replies that would feel interchangeable to a reader hash to
-    the same string, so "how many distinct shapes did eight personas produce" becomes
-    a countable number.
-    """
-    r = (reply or "").strip()
-    if not r:
-        return "EMPTY"
-    parts = []
-    first = (_SENTENCE_SPLIT.split(r)[0] or "").strip()
-    if _DEMONSTRATIVE_ACK.match(r):
-        parts.append("ACK_DEMONSTRATIVE")
-    elif re.match(r"^(hey|hi|morning|yeah|ha|fair)\b", r, re.I):
-        parts.append("OPEN_GREETING")
-    elif first.endswith("?"):
-        parts.append("OPEN_QUESTION")
-    else:
-        parts.append("OPEN_STATEMENT")
-
-    # Does it quote his own words back at him? The tell of the template, not of care.
-    # The opening quote must be at a word boundary: an unanchored character class
-    # matches the apostrophe inside "What's" first and captures the wrong span, which
-    # silently zeroed this signal on exactly the replies it exists to catch.
-    echo = False
-    for token in re.findall(r"(?:(?<=\s)|^)[\"“‘']([^\"”’']{4,40})[\"”’']", r):
-        if token.lower() in (inbound or "").lower():
-            echo = True
-    parts.append("ECHO_QUOTE" if echo else "NO_ECHO")
-
-    if _OR_LIST.search(r):
-        parts.append("MENU_QUESTION")
-    elif _MENU_QUESTION.search(r):
-        parts.append("CLOSING_QUESTION")
-    else:
-        parts.append("CLOSES_STATEMENT")
-
-    n = len([s for s in _SENTENCE_SPLIT.split(r) if s.strip()])
-    parts.append(f"SENT_{'1' if n == 1 else '2-3' if n <= 3 else '4+'}")
-    return "|".join(parts)
-
-
-def structural_collapse(convos: list) -> list:
-    """Per archetype: how many DISTINCT reply shapes did the eight personas produce?
-
-    Eight distinct signatures means eight voices. One or two means the personas are
-    decoration on a single template, and the fix belongs in the engine (or in what
-    the voice specs are asked to differentiate), not in one coach's config.
-    """
-    by_arch = defaultdict(dict)
-    for c in convos:
-        turns = c.get("turns") or []
-        if turns:
-            by_arch[c["archetype"]][c["coach"]] = structural_signature(turns[0]["reply"], turns[0]["inbound"])
-
-    rows = []
-    for arch, by_coach in by_arch.items():
-        if len(by_coach) < 4:  # a per-coach domain scenario has nothing to compare against
-            continue
-        sigs = Counter(by_coach.values())
-        top_sig, top_n = sigs.most_common(1)[0]
-        rows.append(
-            {
-                "archetype": arch,
-                "coaches": len(by_coach),
-                "distinct_shapes": len(sigs),
-                "largest_cluster": top_n,
-                "dominant_shape": top_sig,
-                "collapse_ratio": round(top_n / len(by_coach), 2),
-            }
-        )
-    return sorted(rows, key=lambda r: -r["collapse_ratio"])
-
-
 def cross_coach_similarity(convos: list) -> list:
     """Shingle-Jaccard between different coaches answering the SAME archetype."""
     from coach.coach_repetition_detector import similarity
@@ -874,6 +792,8 @@ def main() -> int:
     collisions = opener_collisions(convos)
     similarity_pairs = cross_coach_similarity(convos)
     collapse = structural_collapse(convos)
+    opening_constructions = opening_construction_collisions(convos)
+    absence_phrasings = absence_phrasing_collisions(convos)
 
     panel = {}
     ledger = None
@@ -892,6 +812,8 @@ def main() -> int:
         "cross_coach_similarity": similarity_pairs[:40],
         "structural_collapse": collapse,
         "symmetry_by_coach": symmetry_by_coach(metrics),
+        "opening_constructions": opening_constructions,
+        "absence_phrasings": absence_phrasings,
         "panel": panel,
         "panel_spend": ledger.summary() if ledger else None,
     }
@@ -1028,13 +950,33 @@ def write_report(p: dict, path: str) -> None:
             "structurally different replies they produced; `collapse` is the share landing on "
             "the single most common shape. A high collapse ratio is one model wearing eight name tags.",
             "",
-            "| archetype | coaches | distinct shapes | collapse | dominant shape |",
-            "|---|---|---|---|---|",
+            "| archetype | coaches | distinct shapes | collapse | dominant shape | who shares it |",
+            "|---|---|---|---|---|---|",
         ]
         lines += [
-            f"| {r['archetype']} | {r['coaches']} | {r['distinct_shapes']} | {r['collapse_ratio']} | `{r['dominant_shape']}` |"
+            f"| {r['archetype']} | {r['coaches']} | {r['distinct_shapes']} | {r['collapse_ratio']} | `{r['dominant_shape']}` "
+            f"| {', '.join(r.get('dominant_coaches') or [])} |"
             for r in p["structural_collapse"]
         ]
+
+    for key, title, blurb in (
+        (
+            "opening_constructions",
+            "Opening CONSTRUCTIONS shared across coaches (3-word stem)",
+            "The three-word stem of the first reply. `that kind of` is one construction whether it "
+            "lands on tired, Monday or day — which is the collision a four-word opener key cannot see.",
+        ),
+        (
+            "absence_phrasings",
+            "Honest-absence phrasing shared across coaches (3-word stem)",
+            "Admitting there is no data is required (ADR-104). Eight coaches admitting it in the same "
+            "three words is the defect: one person doing the honest thing eight times.",
+        ),
+    ):
+        rows = p.get(key) or []
+        if rows:
+            lines += ["", f"## {title}", "", blurb, "", "| stem | coaches | uses |", "|---|---|---|"]
+            lines += [f"| `{r['stem']}` | {r['n_coaches']} — {', '.join(r['coaches'])} | {r['uses']} |" for r in rows[:20]]
 
     if p["opener_collisions"]:
         lines += ["", "## Opening phrases shared across coaches", "", "| phrase | coaches | uses |", "|---|---|---|"]
