@@ -640,17 +640,8 @@ class TestExtractFoodData:
         assert days[0]["total_calories"] == 1810.4
         assert not isinstance(days[0]["total_calories"], Decimal)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery, ADR-104): extract_food_data defaults a food item's "
-            "calories/protein/carbs/fat to 0 when the field is absent (safe_float(..., 0)), while "
-            "the same function correctly defaults the DAY totals to None. An item logged without "
-            "macros is handed to the AI as a genuine zero, which the prompt then treats as ground "
-            "truth ('every food reference must come from his ACTUAL food log data')."
-        ),
-    )
     def test_an_item_with_no_logged_macros_is_absent_not_a_zero_calorie_food(self):
+        """ADR-104 (#2558, was xfail): an absent item macro is None, like the day totals."""
         _, all_foods = wp.extract_food_data({"2026-06-04": mf_rec([food("Leftover casserole")])})
         assert all_foods[0]["cal"] is None
         assert all_foods[0]["protein_g"] is None
@@ -986,26 +977,19 @@ class TestHandlerGuards:
         wp.lambda_handler({}, None)
         assert called == []
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "DEFECT (tranche-2 discovery, ADR-104): the handler's data-sufficiency gate tests "
-            "`if not days` — the count of macrofactor DAY RECORDS — but every reader-visible "
-            "section of this email is about FOOD ITEMS. MacroFactor's API-refresh path writes day "
-            "records with `food_log: []` (macrofactor_lambda.py:553), so a fortnight with zero "
-            "logged foods passes the gate and the AI is asked for '3-4 most frequent food items' "
-            "and a grocery list with an empty food_frequency table — pure fabrication."
-        ),
-    )
     def test_a_window_of_days_with_no_logged_foods_does_not_ship_an_invented_plate(self, table, ses, monkeypatch):
+        """ADR-104 (#2558, was xfail): the gate counts FOOD ITEMS, not day records."""
         table.items[("USER#matthew", "PROFILE#v1")] = profile_row()
         for i in range(14):
             d = (datetime.strptime(END, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
             row = mf_row(d, [], total_calories_kcal=Decimal("0"))
             table.items[(row["pk"], row["sk"])] = row
-        monkeypatch.setattr(wp, "call_anthropic", lambda s, u: AI_HTML)
+        called = []
+        monkeypatch.setattr(wp, "call_anthropic", lambda s, u: called.append(1) or AI_HTML)
         wp.lambda_handler({}, None)
         assert ses.sent == []
+        # ...and the fabrication never even got commissioned.
+        assert called == []
 
 
 class TestHandlerHappyPath:
