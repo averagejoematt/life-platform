@@ -176,6 +176,11 @@ BASELINE = {
     # findings now HOLD publication instead of shipping keep-if-better text. New
     # behaviour, not sprawl; comments were compressed first (+16 draft → +9 landed).
     # 2026-08-09 (#2334): +3 — same registry-conversion shape as intelligence_common.
+    # 2026-08-11 (#2575): unchanged at 1898, deliberately. This file was AT its number,
+    # so the fix was paid for the #2221 way rather than by raising it: the inline
+    # withings-recency arithmetic moved into the new intelligence/latest_readings.py
+    # (which had to read the weigh-in anyway) and the overlay RULE lives in
+    # experiment/canonical_facts.py. Net zero — no headroom taken, none banked.
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1898,
     "deploy/archive/onetime/daily_brief_lambda.py": 1881,
     "lambdas/ingestion/health_auto_export_lambda.py": 1779,
