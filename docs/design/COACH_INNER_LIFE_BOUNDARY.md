@@ -38,17 +38,49 @@ candidates and nearly all were about *his* data, not the coach's. The blind pane
 the absence in 6% of its tells.
 
 **2 — nothing in the prompt substrate rules on it.** A scan of all 22 files in
-`config/coaches/` for the vocabulary of this question (`own life`, `my day`, `weekend`,
-`routine`, `invent`, `fabricat`, `make up`, `made up`, `personal life`, `outside the
-conversation`, `hobby`, `interests`, `biograph`) returns four hits, and **none of them is
-about a coach**: the
-three `routine` hits (`pattern_coach.json`, `mind_coach_stance.json`,
-`sleep_coach_stance.json`) and the one `make up` hit (`nutrition_coach.json`) are all
-about Matthew's routines and his macros. `_shared_standard.json` returns nothing.
+`config/coaches/` for the vocabulary of this question (`own life`, `your life`, `my day`,
+`your day`, `weekend`, `routine`, `invent`, `fabricat`, `make up`, `made up`, `personal
+life`, `outside the conversation`, `hobby`, `hobbies`, `interests`, `biograph`, `past
+tense`) returns **12 matching lines / 16 term occurrences across 5 files** — six distinct
+file×term pairs. `_shared_standard.json` returns nothing.
 
-**3 — the grounding gate does not see it.** Seven candidate replies were run through the
-live chat grounder (`coach_chat_grounding.build_grounder`, all six classes armed, a
-non-empty facts dict plus a memory block and a thread as `extra_sources`):
+Four of the five files are irrelevant on inspection and are the ones this note relies on:
+the three `routine` files (`pattern_coach.json`, `mind_coach_stance.json`,
+`sleep_coach_stance.json`) and the one `make up` file (`nutrition_coach.json`) are all
+about *Matthew's* routines and his macros, not a coach's.
+
+**The fifth file is `tuning_log.json`, and it must be named rather than quietly dropped**
+— it carries 8 of the 16 occurrences (`invent` ×4, `fabricat` ×4), and one of them is
+squarely about a coach fabricating: the #2496 entry records that "we talked about you
+Tuesday" carried no number and no calendar date, so *an invented meeting was sayable*.
+That is this note's own thesis, already written down. It does not change the finding,
+for a reason that is structural rather than convenient: **`tuning_log.json` is never
+rendered into a prompt.** It is the public per-coach changelog behind the site's coach
+profiles, and its only readers are `lambdas/web/site_api_coach.py` and
+`lambdas/web/site_api_coach_profile.py`; no renderer in `lambdas/coach/persona_core.py`
+loads it. A rule a coach never sees cannot govern what a coach says.
+
+So the accurate statement of the finding is narrower than "nothing mentions it" and is the
+one that matters: **no file that reaches a prompt rules on the coach's own life.** The one
+file that discusses the problem is a record *about* the platform, not an instruction *to* a
+coach.
+
+**3 — the grounding gate does not see it.** Five invented-life candidates were run through
+the live chat grounder, `coach_chat_grounding.build_grounder`. The exact call, so this
+reproduces:
+
+```python
+CANON = {"night_of": "2026-08-10", "recovery_pct": 61, "hrv_ms": 48,
+         "rhr_bpm": 55, "sleep_hours": 7.2, "date": "2026-08-10"}
+EXTRAS = ["MEMORY: he committed to 170 g protein.",
+          "THREAD:\nMatthew: rough morning\n"]
+grounder = build_grounder(CANON, generation_date_iso="2026-08-10",
+                          available_logs={"workouts": []}, extra_sources=EXTRAS)
+```
+
+`available_logs` is passed explicitly because that keyword is what arms the behavioral
+class; `build_grounder`'s own signature defaults it to `None`, and a reproduction that
+omits it arms five classes rather than six (shape B below).
 
 | Candidate reply | Findings |
 |---|---|
@@ -57,13 +89,30 @@ non-empty facts dict plus a memory block and a thread as `extra_sources`):
 | "I watched the game last night and could not stop thinking about your taper." | `[]` |
 | "I am a morning person, so I am biased here." | `[]` |
 | "My old coach used to say the same thing to me when I was competing." | `[]` |
-| *control:* "We talked about you Tuesday, good things." | `ungrounded_team_meeting` |
-| *control:* "Your HRV was 63 last night." | `fabricated_number` |
 
-The two controls fire, so the gate was armed and working. Five invented coach lives passed
-silently. This is the expected result and not a defect report — an invented biography
-contains no number and no calendar date, which is precisely the observation
-`coach_team_texture`'s docstring already makes about invented team meetings.
+**The gate was armed, and each class fires on a purpose-built positive** — so the five
+empties are a real negative and not a dead harness:
+
+| Probe | Findings |
+|---|---|
+| "Your HRV was 63 last night." | `fabricated_number` |
+| "Back on 2026-07-04 you said the same thing." | `fabricated_date` |
+| "You're 400 days into this experiment now." | `experiment_span`, `fabricated_number` |
+| "You maintained your eating window today." | `ungrounded_behavioral` |
+| "Recovery sits at 61." | `unlabeled_night_figure` |
+| "We talked about you Tuesday, good things." | `ungrounded_team_meeting` |
+| *negative control:* "asdf qwerty zzz blorp" | `[]` |
+
+**And the result is robust across arming shapes.** The five candidates were re-run under
+four different grounder configurations — (A) the canonical call above; (B) the same with
+`available_logs=None`, i.e. `build_grounder`'s default, five classes armed; (C) empty
+facts, no `extra_sources`, `available_logs=set()`; (D) canonical facts at a different
+`generation_date_iso`. **All five returned `[]` in all four shapes**, while the team and
+number controls fired in all four. The finding does not depend on how the gate is armed.
+
+This is the expected result and not a defect report — an invented biography contains no
+number and no calendar date, which is precisely the observation `coach_team_texture`'s
+docstring already makes about invented team meetings.
 
 **The consequence for this page:** the boundary is being written against a blank surface.
 Nothing has to be retracted, no shipped line becomes non-compliant, and the rule lands
@@ -215,12 +264,13 @@ Answered in two parts, because the honest answer today and the required answer a
 time are different, and neither may be left implicit.
 
 **Today: a deliberate written exemption, recorded here with its measurement.** The chat
-grounder arms six classes — numbers, dates, freshness, behavioral, night (the five in
-`tests/grounding_wiring.py`'s `GATE_CLASSES`) plus the composed team class — and **none of
-them adjudicates a coach's claim about its own life.** The measurement table above is the
-evidence: five invented lives returned `[]` against two firing controls. This exemption is
-safe *only* because no coach has any texture to invent from; it expires the moment that
-changes.
+grounder can arm six classes — numbers, dates, freshness, behavioral, night (the five in
+`tests/grounding_wiring.py`'s `GATE_CLASSES`) plus the composed team class, with behavioral
+armed only when `available_logs` is passed — and **none of them adjudicates a coach's claim
+about its own life.** The measurement above is the evidence: five invented lives returned
+`[]` under all four arming shapes, while every class fired on a purpose-built positive and
+nonsense returned `[]`. This exemption is safe *only* because no coach has any texture to
+invent from; it expires the moment that changes.
 
 **At ship time: a deterministic occasion-claim check is mandatory, and its shape is fixed
 here.** Texture ships in the same PR as its check, never before. The roadmap's own
@@ -257,7 +307,7 @@ to be held. A findings-producing check with a HOLD disposition belongs on the gr
 closure, which is the half of `run_turn` that already has one.
 
 **What this means for `coach_chat_grounding.py` today: no change is owed.** Its module
-docstring enumerates the six classes it arms and claims nothing about persona texture, so
+docstring enumerates the classes it arms and claims nothing about persona texture, so
 its silence is accurate rather than misleading — there is no false coverage claim to
 correct. The change it *will* owe is the composition above, and it is owed by whichever of
 #29/#35 ships first, not before.
