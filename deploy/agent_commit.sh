@@ -138,16 +138,16 @@ STAGED_PY="$(printf '%s\n' "${STAGED}" | grep -E '^(lambdas|mcp|cdk|tests|script
 # untracked, so a worktree-local lookup alone misses it), and it version-verifies
 # every candidate including PATH, so a correct PATH install is accepted and a
 # skewed one never is.
-_PF_LIB="${ROOT}/deploy/lib/pinned_formatters.sh"
-if [ ! -f "${_PF_LIB}" ]; then
-  echo "[agent-commit] ❌ ${_PF_LIB} is missing — cannot verify the formatter pin." >&2
-  echo "[agent-commit]    Refusing to run an unpinned format gate (#2570)." >&2
-  refuse 1
-fi
-# shellcheck source=lib/pinned_formatters.sh
-. "${_PF_LIB}"
-
 if [ -n "${STAGED_PY}" ]; then
+  _PF_LIB="${ROOT}/deploy/lib/pinned_formatters.sh"
+  if [ ! -f "${_PF_LIB}" ]; then
+    echo "[agent-commit] ❌ ${_PF_LIB} is missing — cannot verify the formatter pin." >&2
+    echo "[agent-commit]    Refusing to run an unpinned format gate (#2570)." >&2
+    refuse 1
+  fi
+  # shellcheck source=lib/pinned_formatters.sh
+  . "${_PF_LIB}"
+
   # Fail CLOSED: an unpinned format gate is worse than no gate, because it
   # refuses correct code and blesses code CI will reject.
   if ! BLACK="$(resolve_pinned_formatter black)"; then

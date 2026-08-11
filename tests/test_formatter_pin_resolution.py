@@ -223,14 +223,28 @@ def test_resolver_accepts_a_binary_at_the_declared_version():
 
 def test_resolver_rejects_a_binary_at_the_wrong_version():
     """MUTATION PROOF (#2570 acceptance): point the gate at a deliberately different
-    version and the guard must go red. This is the exact 25.9.0-vs-26.3.1 shape."""
+    version and the guard must go red. Run against the REAL declared pin with the
+    exact versions that caused the incident — black 25.9.0 vs CI's 26.3.1, and the
+    matching ruff skew — so this is the incident, not an analogue of it."""
+    declared = _declared_pins()
+    skewed = {"black": "25.9.0", "ruff": "0.14.0"}
     for tool in _TOOLS:
+        real_pin = next(iter(declared[tool]))
+        assert skewed[tool] != real_pin, f"{tool}: pick a different skew version, {skewed[tool]} is now the real pin"
         with tempfile.TemporaryDirectory() as bindir:
-            shim = _make_shim(bindir, tool, "1.2.3")
-            proc = _run_resolver(tool, f"{tool}==9.9.9\n", candidate=shim)
-            assert proc.returncode != 0, f"{tool}: resolver ACCEPTED a binary at 1.2.3 while the pin is 9.9.9 — the guard is dead"
-            assert "1.2.3" in proc.stderr, f"{tool}: the refusal must report what the rejected candidate actually was\n{proc.stderr}"
-            assert "9.9.9" in proc.stderr, f"{tool}: the refusal must report the pin it wanted\n{proc.stderr}"
+            shim = _make_shim(bindir, tool, skewed[tool])
+            # No requirements override: this reads the repo's real pin.
+            env = dict(os.environ, **{f"PINNED_FORMATTER_BIN_{tool.upper()}": shim})
+            proc = subprocess.run(
+                ["bash", "-c", f'. "{_LIB}"\nresolve_pinned_formatter {tool}\n'],
+                capture_output=True,
+                text=True,
+                env=env,
+                cwd=_REPO,
+            )
+            assert proc.returncode != 0, f"{tool}: resolver ACCEPTED {skewed[tool]} while the pin is {real_pin} — the guard is dead"
+            assert skewed[tool] in proc.stderr, f"{tool}: the refusal must report what the rejected candidate actually was\n{proc.stderr}"
+            assert real_pin in proc.stderr, f"{tool}: the refusal must report the pin it wanted\n{proc.stderr}"
             assert not proc.stdout.strip(), f"{tool}: a refusal must emit no binary path (a caller would run it)"
 
 

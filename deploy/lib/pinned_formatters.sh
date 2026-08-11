@@ -33,8 +33,11 @@
 #
 # TEST HOOKS (both are still version-verified — neither can be used as a bypass):
 #   PINNED_FORMATTER_REQUIREMENTS   override the requirements file to read the pin from
-#   PINNED_FORMATTER_BIN_BLACK      colon-separated candidate list tried FIRST for black
-#   PINNED_FORMATTER_BIN_RUFF       colon-separated candidate list tried FIRST for ruff
+#   PINNED_FORMATTER_BIN_BLACK      EXCLUSIVE candidate list (colon-separated) for black
+#   PINNED_FORMATTER_BIN_RUFF       EXCLUSIVE candidate list (colon-separated) for ruff
+# The BIN_* overrides REPLACE the search rather than prepending to it, so a test can
+# point the gate at one deliberately-skewed binary and see it refuse — a prepending
+# override would silently fall through to a correct install and prove nothing.
 
 # ── Where the pin is declared ─────────────────────────────────────────────────
 # Resolve the repo root from this file's own location so the library works from a
@@ -88,8 +91,11 @@ _pf_candidates() {
     ruff) override="${PINNED_FORMATTER_BIN_RUFF:-}" ;;
     *) override="" ;;
   esac
+  # An explicit override REPLACES the search (see the header) — it is still
+  # version-verified, so it can point the gate somewhere but never past the pin.
   if [ -n "${override}" ]; then
     printf '%s\n' "${override}" | tr ':' '\n'
+    return 0
   fi
 
   common="$(git -C "${root}" rev-parse --git-common-dir 2>/dev/null || true)"
