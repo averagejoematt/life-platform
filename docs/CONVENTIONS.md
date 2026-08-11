@@ -787,7 +787,21 @@ read that section for the incident narrative and the exact mechanics.
 | Defect class | Owning gate | Where |
 |---|---|---|
 | A staged Python file isn't `black`/`ruff` clean | Format gate (#785/CLAUDE-02) | `scripts/install_hooks.sh` |
+| The hook's `black`/`ruff` is a *different version* than CI pins — it blocks correct commits, and obeying it reds CI | Pinned-formatter resolution (#2570) | `deploy/lib/pinned_formatters.sh`, shared by the hook + `deploy/agent_commit.sh` + `make preflight` |
 | A doc-sync literal is stale at commit time | `sync_doc_metadata.py --apply`, auto-staged | `scripts/install_hooks.sh` |
+
+**The format gate resolves the pin, and fails closed (#2570).** It reads the version from
+`requirements-dev.txt` (the CQ-01 source of truth, the file Dependabot bumps) and probes each
+candidate — `.venv-black`/`.venv` in the worktree *and* in the primary clone via
+`git rev-parse --git-common-dir` — accepting one **only at the exact pinned version**. It is
+version-verified, not location-trusted. No match refuses the commit rather than falling back to
+`PATH`; the measured incident was a `PATH` black 25.9.0 against CI's 26.3.1, which disagreed on a
+real file in both directions. Two consequences worth knowing: **every clone must re-run
+`bash scripts/install_hooks.sh`** (the hook is generated and untracked, so an old one keeps
+resolving off `PATH` until it is regenerated — `deploy/session_postflight.py` reports it STALE),
+and the pinned venv needs *both* tools installed
+(`.venv-black/bin/pip install -q $(grep -E '^(black|ruff)==' requirements-dev.txt)`) or the
+resolver falls through to whatever `PATH` happens to carry.
 
 ---
 
