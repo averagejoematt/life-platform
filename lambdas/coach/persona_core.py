@@ -246,6 +246,18 @@ def texting_block(spec: dict) -> str:
         # single shared sentence would fix the tone and leave the collapse untouched
         # (the #2533 lesson).
         ("restraint", "Restraint"),
+        # #2536 — the two situations where the roster measurably converged on ONE
+        # template. Given the identical opener "honestly I'm just tired of all of
+        # this", 7 of 8 coaches opened by naming his state back at him and the
+        # three-word stem "that kind of" opened replies from 5 of them; on honest
+        # absence, "don't have that" opened the admission for 6 of 8. The shared
+        # prompt can only forbid those constructions — it cannot supply eight
+        # different replacements without becoming the ninth template — so what each
+        # coach does INSTEAD is per-persona, and rides here for the same reason
+        # restraint does: the board answers in paragraphs and never faces either
+        # moment, so this is chat-surface calibration, not identity.
+        ("vulnerable_shape", "When he brings you something heavy, or just a bad day"),
+        ("absence_shape", "When you don't have it"),
     )
     bits = [f"- {label}: {_clip(style[key])}" for key, label in labels if style.get(key)]
     if not bits:

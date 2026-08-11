@@ -209,6 +209,34 @@ vulnerable, the roster is at its least distinct — a template wearing eight nam
 Same for refusals: `"let me check that"` (3 coaches, 7×), `"i don't have your"` (3),
 `"honest answer: i don't"` (3). Honest absence is working; it just sounds like one person.
 
+### Re-measured 2026-08-10 after #2534, then fixed in #2536
+
+The numbers above predate the composure pass, so the baseline was re-taken with it in
+place (`--local-specs`, 8 coaches × 3 archetypes, one run per arm) before anything was
+tuned. Two things changed in the *metric* first, because the old fingerprint could not
+score the fix: its opening axis read grammatical FORM ("does the reply start with a
+demonstrative"), which stops discriminating the moment that construction is banned; and
+a leading `Yeah.` or an unpunctuated bubble break split clusters that were the same
+shape. The axis is now the opening MOVE — whose the first clause is about — and the
+sentence-count bucket (a length proxy `reply_metrics` already measures exactly) came
+out, so the signature space *shrank* 72 → 42 cells rather than growing.
+
+| measure (n = 8 coaches per archetype, 1 run per arm) | before | after |
+|---|---|---|
+| `venting_no_question` distinct shapes | 4/8 | **5/8** |
+| `off_lane` distinct shapes | 4/8 | **5/8** |
+| `fabrication_bait` distinct shapes / collapse | 2/8 · 0.88 | **3/8 · 0.38** |
+| opening constructions shared by >2 coaches | 2 (`that kind of` ×5, `don't have that` ×5) | **0** |
+| honest-absence stems shared by >2 coaches | 1 (`don't have that` ×6) | **0** |
+
+Under the *pre-#2536* signature, on the same two run directories, `venting_no_question`
+reads 4 → 6 distinct and 0.38 → 0.25 collapse — the direction holds under both
+fingerprints. That older signature cannot see the `fabrication_bait` improvement at all,
+which is the case for the axis swap.
+
+Still open: `career_coach` produced the full banned template on `venting_no_question` in
+both after-arms — his own phrase quoted back plus a four-option menu. One reply in 24.
+
 ## Finding 5 — no coach has a life
 
 Across 536 replies, **essentially zero** reference anything outside the conversation and
