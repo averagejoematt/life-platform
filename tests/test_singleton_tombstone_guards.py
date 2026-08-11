@@ -991,6 +991,13 @@ _GENERATION_GET_ITEM_EXEMPT: dict = {
         "coach/voice_fidelity_harness.py",
         "f'RUN#{run_month}'",
     ): "monthly-run idempotency marker — ops bookkeeping; a tombstoned marker suppressing a re-run is conservative",
+    (
+        "coach/coach_sim_scoreboard.py",
+        "sk",
+    ): "COACHSIM# is CROSS_PHASE (#2539) — the coach-sim scoreboard measures the coaching ENGINE's design across "
+    "cycles, exactly like its sibling VOICEFIDELITY#, so phase_taxonomy never tags it and a reset never tombstones "
+    "it. The rows it reads (latest / RUN#<date> / LIMITATIONS) are also never written by generation and never feed "
+    "a generated surface — they are a measurement ledger read by a laptop script.",
 }
 
 
