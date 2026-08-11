@@ -79,6 +79,30 @@ OG_CARD_BY_SECTION = {
 }
 DEFAULT_OG_CARD = "og-home.png"
 
+# #2541 — the fork-me front door. The machine-readable stack manifest (/data/stack.json,
+# built by scripts/v4_build_stack_manifest.py, described by /data/stack.schema.json) was
+# published with NOTHING on the site linking it: measured 2026-08-10, zero non-legacy HTML
+# referenced it, so it was reachable only by someone who already knew the URL. This block
+# rides the per-section {proof} slot on /story/build/ — the page whose whole audience is
+# builders — so the "fork the architecture, not the data" framing has a reader-facing door.
+# Deliberately carries NO figures: the cost numbers live in the manifest's
+# `cost_of_ownership` (each with its own basis/confidence per ADR-104/105) and restating
+# one here would mint a second hand-maintained copy to drift.
+BUILDER_FRONT_DOOR = (
+    '<aside class="dx-subscribe" aria-label="Fork this stack">'
+    '<p class="dx-sub-h">Fork the architecture, not the data.</p>'
+    '<p class="dx-sub-p">Every source this platform reads, every protocol it runs, and what it costs to keep '
+    "running are published as one machine-readable manifest — each cost figure carrying its own basis and "
+    "confidence, so you can tell a measured number from an estimate. The readings inside are mine; the shape of "
+    "the machine is yours to copy.</p>"
+    '<p class="dx-sub-cta">'
+    '<a class="dx-sub-btn" href="/data/stack.json">The stack manifest</a>'
+    '<a class="dx-sub-rss" href="/data/stack.schema.json">what its fields mean</a>'
+    '<a class="dx-sub-rss" href="https://github.com/averagejoematt/life-platform" rel="noopener">the source, in full</a>'
+    "</p>"
+    "</aside>"
+)
+
 SHELL = """<!DOCTYPE html>
 <html lang="en" data-door="story">
 <head>
@@ -173,6 +197,19 @@ SHELL = """<!DOCTYPE html>
 SHELL = SHELL.replace("{ribbon}", loop_ribbon("story"))
 
 
+def _section_proof(key: str, chronicle_proof: str) -> str:
+    """The per-section static block that rides the shell's {proof} slot.
+
+    chronicle → the dated, crawlable post list (#730/#803); build → the fork-me
+    front door (#2541); everything else → nothing.
+    """
+    if key == "chronicle":
+        return chronicle_proof
+    if key == "build":
+        return BUILDER_FRONT_DOOR
+    return ""
+
+
 def write(path: Path, html_text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html_text, encoding="utf-8")
@@ -217,7 +254,7 @@ def main() -> None:
                 og_card=OG_CARD_BY_SECTION.get(key, DEFAULT_OG_CARD),
                 og_title=section_title,
                 og_desc=desc,
-                proof=chronicle_proof if key == "chronicle" else "",
+                proof=_section_proof(key, chronicle_proof),
             ),
         )
     print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
