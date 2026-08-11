@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import boto3  # noqa: E402
 from ai import (
     bedrock_client as bc,  # noqa: E402
+    recall_consent as rc,  # noqa: E402
     recall_indexer as ri,  # noqa: E402
     semantic_recall as sr,  # noqa: E402
 )
@@ -167,6 +168,10 @@ def gather_journal(table):
                 "artifact_sk": sk,
                 "link": "/story/journal/",
                 "cycle": it.get("cycle"),
+                # #2587: the SOURCE record rides along so the consent tier is resolved at
+                # index time from the owner's own marker. Without it `recall_consent.decide`
+                # withholds the doc — an entry whose consent cannot be resolved is private.
+                rc.RECORD_KEY: it,
             }
         )
     return docs
@@ -219,13 +224,21 @@ def main():
         docs += gather_journal(table)
 
     rows = existing_rows(table)
-    embedded = skipped = relinked = 0
+    embedded = skipped = relinked = withheld = 0
     est_tokens = 0
     est_usd = 0.0
     for doc in docs:
         if args.limit and embedded >= args.limit:
             break
         sk = sr.sk_for(doc["kind"], doc["date"])
+        # #2587 — the consent gate, ahead of the idempotency compare and ahead of any
+        # spend. Same verdict function the publish-time Lambda uses, so this operator run
+        # and `recall_indexer.index_document` cannot disagree about what may be indexed.
+        decision = rc.decide_doc(doc)
+        if not decision.indexable:
+            print(f"  withheld {sk}: {decision.reason}")
+            withheld += 1
+            continue
         new_sha = sr.sha_text(doc["text"])
         existing = rows.get(sk)
         if not args.force and existing is not None and existing.get("text_sha") == new_sha:
@@ -259,7 +272,11 @@ def main():
             artifact_pk=doc["artifact_pk"],
             artifact_sk=doc["artifact_sk"],
             link=doc.get("link", ""),
-            snippet=_snippet(doc["text"]),
+            # #2587: what CONSENT permits — the owner-cleared line for a quote-tier entry,
+            # a built theme descriptor for allude, the collapsed lead only for a published
+            # artifact. Never `_snippet(doc["text"])` unconditionally, which is what put a
+            # verbatim diary excerpt one backfill away from the published coach prompt.
+            snippet=decision.snippet,
             model=bc.TITAN_EMBED_MODEL_ID,
             dims=len(vector),
             embedded_at=datetime.now(timezone.utc).isoformat(),
@@ -272,7 +289,7 @@ def main():
     mode = "APPLIED (single bulk run)" if args.apply else "DRY-RUN (no spend)"
     print(
         f"\n{mode}: {embedded} embedded, {relinked} metadata-refreshed (link/cycle, no spend), "
-        f"{skipped} skipped (unchanged), {len(docs)} scanned. "
+        f"{skipped} skipped (unchanged), {withheld} WITHHELD by the consent gate (#2587), {len(docs)} scanned. "
         f"~{est_tokens} input tokens ≈ ${est_usd:.4f} (Titan v2 @ $0.02/1M). "
         f"Incremental re-runs are cheap; re-run after new chronicle/coach/journal writes."
     )

@@ -79,7 +79,13 @@ logger = logging.getLogger(__name__)
 # The corpus kinds a READER may be shown. `semantic_recall.KINDS` also carries coach
 # outputs and journal enrichments — internal narrative that has no published page — so
 # the reader-facing set is an explicit allow-list, not "everything in the partition".
-PUBLISHED_KINDS: tuple[str, ...] = (sr.KIND_CHRONICLE,)
+#
+# #2587 moved the decision itself into `semantic_recall.READER_KIND_DECISIONS` (one entry
+# per kind, derived into a tuple, so a new kind is excluded until someone decides) because
+# the chronicle recall card is a SECOND reader surface reading the same corpus. This name
+# stays as the local vocabulary; the value is now derived rather than restated, so the two
+# reader surfaces cannot drift apart.
+PUBLISHED_KINDS: tuple[str, ...] = sr.READER_KINDS
 
 # Defaults. Read through the helpers below (never frozen into module globals) so an env
 # override on the Lambda takes effect on the next invocation rather than the next deploy.
