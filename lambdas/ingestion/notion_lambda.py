@@ -60,6 +60,11 @@ import boto3
 from boto3.dynamodb.conditions import Key  # #476/E-6: deletion-reconcile query
 from common.pacific_time import pacific_date_of, pacific_now  # #1964: the one Pacific frame + ISO parse
 
+# #2569: the journal text attributes are named ONCE, here-adjacent, and read back through
+# the same constants by every consumer (the recall backfill among them). A reader that
+# re-guesses the name silently indexes nothing.
+from common.record_text import JOURNAL_BODY_FIELD, JOURNAL_RAW_FIELD, journal_text
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from common.platform_logger import get_logger
@@ -550,7 +555,7 @@ def parse_page(page, api_key=None):
         try:
             body_text = fetch_page_body(page["id"], api_key)
             if body_text:
-                item["body_text"] = body_text
+                item[JOURNAL_BODY_FIELD] = body_text
         except Exception as e:
             logger.warning(f"Failed to fetch body for {page['id']}: {e}")
 
@@ -564,7 +569,7 @@ def parse_page(page, api_key=None):
         raw_parts.append("")
         raw_parts.append("--- Properties ---")
         raw_parts.extend(prop_lines)
-    item["raw_text"] = "\n".join(raw_parts)
+    item[JOURNAL_RAW_FIELD] = "\n".join(raw_parts)
 
     # #476/X-7: second copy of the text before it only lives in DynamoDB.
     _archive_page_raw(page, item, date_str)
@@ -609,7 +614,7 @@ def _archive_page_raw(page, item, date_str):
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "notion_page_id": page.get("id"),
             "date": date_str,
-            "text": item.get("body_text") or item.get("raw_text", ""),
+            "text": journal_text(item),
             "raw_page": page,
         }
         s3_client.put_object(Bucket=S3_BUCKET, Key=key, Body=json.dumps(payload, default=str), ContentType="application/json")

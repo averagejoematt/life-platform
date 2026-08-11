@@ -38,6 +38,7 @@ from ai import (
     semantic_recall as sr,  # noqa: E402
 )
 from boto3.dynamodb.conditions import Key  # noqa: E402
+from common.record_text import coach_output_text, journal_text  # noqa: E402
 
 # The doc-shaping helpers live in `ai.recall_indexer` (bundled) so the Lambda that indexes
 # a week AT PUBLISH and this catch-up script share ONE definition — most importantly of
@@ -78,6 +79,25 @@ except Exception:  # noqa: BLE001 — fall back to the known roster if the impor
     ]
 
 
+def _query_all(table, **kwargs):
+    """Every item for a query, following LastEvaluatedKey.
+
+    #2569 companion: the gatherers read a single 1MB page. `existing_rows` already
+    paginates, so a truncated gather would have looked like "already indexed" for the
+    head of a partition and silently dropped its tail — the same shape of invisible loss
+    as reading the wrong attribute. Chronicle installments and coach outputs both carry
+    multi-KB bodies, so the cap is reachable.
+    """
+    items = []
+    while True:
+        resp = table.query(**kwargs)
+        items += list(resp.get("Items", []))
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            return items
+        kwargs["ExclusiveStartKey"] = lek
+
+
 def gather_chronicle(table):
     """Chronicle installments — pk SOURCE#chronicle, sk DATE#<date>. One doc/week.
 
@@ -86,8 +106,7 @@ def gather_chronicle(table):
     per-record shaping is `recall_indexer.chronicle_doc`, shared with the publish-time
     indexer so a week embedded by either path produces the identical row.
     """
-    resp = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PK_PREFIX}chronicle") & Key("sk").begins_with("DATE#"))
-    items = list(resp.get("Items", []))
+    items = _query_all(table, KeyConditionExpression=Key("pk").eq(f"{USER_PK_PREFIX}chronicle") & Key("sk").begins_with("DATE#"))
     links = published_post_links(items)
     return [doc for doc in (ri.chronicle_doc(it, links) for it in items) if doc]
 
@@ -96,10 +115,12 @@ def gather_coach_outputs(table, coaches):
     """Coach outputs — pk COACH#<id>, sk OUTPUT#<date>#<type>."""
     docs = []
     for coach_id in coaches:
-        resp = table.query(KeyConditionExpression=Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#"))
-        for it in resp.get("Items", []):
+        for it in _query_all(table, KeyConditionExpression=Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#")):
             date = _date_from_sk(it.get("sk", ""), "OUTPUT#")
-            text = (it.get("output_text") or it.get("text") or "").strip()
+            # #2569: `output_text`/`text` were a guess — the writer
+            # (`coach_state_updater._write_output_record`) puts the narrative under
+            # `content`, so every one of the 851 live OUTPUT# rows was skipped as empty.
+            text = coach_output_text(it)
             if not date or not text:
                 continue
             docs.append(
@@ -119,15 +140,21 @@ def gather_coach_outputs(table, coaches):
 
 
 def gather_journal(table):
-    """Journal entries — pk SOURCE#notion, sk DATE#<date>#journal#<template>."""
+    """Journal entries — pk SOURCE#notion, sk DATE#<date>#journal#<template>.
+
+    #2569: this read `content`/`body`/`text` — three attribute names that have never
+    existed on a live journal row. The notion writer puts the body in `body_text` /
+    `raw_text` (`common.record_text.JOURNAL_TEXT_FIELDS`, which the writer itself names
+    its attributes from), so every entry failed the empty-text guard below and semantic
+    recall indexed zero journal entries between #1384 shipping and this fix.
+    """
     docs = []
-    resp = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PK_PREFIX}notion"))
-    for it in resp.get("Items", []):
+    for it in _query_all(table, KeyConditionExpression=Key("pk").eq(f"{USER_PK_PREFIX}notion")):
         sk = it.get("sk", "")
         if "#journal#" not in sk:
             continue
         date = _date_from_sk(sk)
-        text = (it.get("content") or it.get("body") or it.get("text") or "").strip()
+        text = journal_text(it)
         if not date or not text:
             continue
         docs.append(
