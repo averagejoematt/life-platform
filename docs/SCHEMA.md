@@ -189,6 +189,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `ENSEMBLE#influence_graph` / — | static influence config | config seed | ensemble | system_state | n/v |
 | `NARRATIVE#arc` / `STATE#current`, `HISTORY#<date>` | season/arc narrative state | narrative updater | chronicle | experiment_scoped | ✓ |
 | `VOICEFIDELITY#<…>` / — | blind voice-fidelity scoreboard (#545) | `coach/voice_fidelity_harness.py` | scoreboard | cross_phase | empty (sampled pk) |
+| `COACHSIM#scoreboard` / `latest`, `RUN#<date>`, `LIMITATIONS` | coach-chat simulation scoreboard — blind-panel AI-verdict rate + the LLM-free deterministic subset, on demand (#2539) | `coach/coach_sim_scoreboard.py` (written by `scripts/coach_sim_replay.py`) | scoreboard | cross_phase | n/v |
 | `EVALRET#<surface>` / — | retained ADR-104 gate verdict/regen pairs (#812/#744) | `lambdas/experiment/eval_retention.py` | monthly eval harvest | cross_phase | n/v |
 
 ### Reading / Mind pillar (ADR-097 — all CROSS_PHASE; scheme in `lambdas/reading/reading_keys.py`)

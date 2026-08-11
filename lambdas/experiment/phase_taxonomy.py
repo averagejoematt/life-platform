@@ -394,6 +394,15 @@ _PK_RULES: list = [
     # it's a long-run scoreboard that must survive a reset, even though the OUTPUT#
     # records it samples FROM (pk COACH#*, above) are themselves experiment-scoped.
     (lambda pk, sk: pk.startswith("VOICEFIDELITY#"), CROSS_PHASE),
+    # #2539: the coach-chat simulation scoreboard — the sibling measure to
+    # VOICEFIDELITY# above. That one asks whether the coaches are distinguishable
+    # from EACH OTHER; this one asks whether they are distinguishable from a
+    # PERSON. Same rationale for the same classification: it scores the coaching
+    # engine's design across cycles, so a reset must not erase the trend. It has no
+    # experiment-scoped source records at all — the conversations it summarizes are
+    # synthetic and were never written to the table (the sim is read-only by
+    # construction, coach_chat_sim.py).
+    (lambda pk, sk: pk.startswith("COACHSIM#"), CROSS_PHASE),
     # #812/#744: retained ADR-104 gate verdict/regeneration pairs — the honesty
     # layer's own eval dataset (eval_retention.py, harvested monthly into the
     # golden-surface fixture packs). Same rationale as VOICEFIDELITY# above: it

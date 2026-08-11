@@ -142,7 +142,7 @@ Repeatedly they named *Matthew's own messages* as the most human thing in the tr
 | 57d | Length variance must be *real*, not performed — a judge caught a short reply landing after a run of verbose ones and read it as "AI recognizing it should vary length." Variance bolted onto a consistent baseline is worse than consistency | horizon (depends on 57b) |
 | 58 | Voice-flat honest refusals — absence is handled correctly but identically: `"let me check that"` (3 coaches), `"i don't have your"` (3), `"honest answer: i don't"` (3) | filed (#2536) |
 | 59 | **Write the inner-life boundary** before implementing #29/#35 — across 536 replies, essentially zero reference anything outside the conversation and his data | **shipped** (#2538) — [COACH_INNER_LIFE_BOUNDARY.md](COACH_INNER_LIFE_BOUNDARY.md). Three clauses (provenance / invariance / no-substrate), a decision procedure, worked examples both sides. Rulings: past tense is permitted and datability is the line; the grounding gate is exempt *today* by written decision (measured — five invented coach lives returned `[]` under all four grounder arming shapes, while every gate class fired on a purpose-built positive) and owes an `ungrounded_inner_life` / `coach_occasion_claim` composition the day texture ships; the prohibition lives roster-wide in `_shared_standard.json` (which does not carry it yet) and the texture per-persona in the existing rendered fields |
-| 60 | Wire the sim harness as a standing regression measure — re-run after each humanity change; the §7 metrics are gate-shaped | filed (#2539) |
+| 60 | Wire the sim harness as a standing regression measure — re-run after each humanity change; the §7 metrics are gate-shaped | **shipped** (#2539) — see §7a below |
 
 **Confirmed working by the same sweep** (measured, not assumed): register symmetry holds
 ("Hey" → "Hey" from 8/8; median reply 195 chars, median ratio 3.1×, down from the 5–10×
@@ -150,6 +150,51 @@ the first transcripts showed); closing-question rate 20%, with Dr. Nathan Reeves
 *by spec* ("He asks more than he concludes") rather than by defect; zero formatting
 violations in 536 replies; the honesty gate firing at 13 regenerated / 7 held; colleague
 referrals by real name; off-lane engagement.
+
+## 7a. The cadence for re-measuring (#2539)
+
+The 64% is only useful if the next run can be read against it, so the harness now has a
+written cadence, a stored scoreboard, and a free layer that repeats between runs.
+
+**Cadence: on demand, around `area:coach-humanity` merges** — once before the first PR of
+a batch lands, once after the batch is merged *and deployed*. Floor: if a calendar month
+passes with no humanity work shipped, run it anyway beside `voice_fidelity_harness`'s
+monthly pass. The two are complements — that one asks whether the coaches are
+distinguishable *from each other*, this one whether they are distinguishable *from a
+person* — and a scoreboard with one datapoint shows no trend.
+
+```bash
+bash scripts/coach_sim_runall.sh <out-dir>                    # ~$2.88, ~25 min, 8 processes
+python3 scripts/coach_sim_analyze.py --runs <out-dir> --report report.md   # ~$0.85 panel
+```
+
+**Why it is not a per-PR CI gate.** A run is ~$3.73 and ~25 minutes. The AI ceiling is $85
+base (ADR-063/133 — an $115 dated window for August 2026 only, auto-reverting 2026-09-01)
+and the month is already projecting over it. Gating every PR would spend more measuring
+the coaches than running them, and would push the tier ladder into pausing reader-facing
+narratives to pay for a dev metric — the audience ordering ADR-125 exists to forbid.
+
+**What does repeat, at $0:** `scripts/coach_sim_replay.py` runs the deterministic subset
+— em-dash rate, closing-question rate, assistant-isms, formatting violations, balanced
+clauses, structural collapse — over an existing corpus with no model in the loop.
+**Advisory, and never armed** (the ADR-108 promotion pattern): it prints and exits 0, and
+`--strict` exists only so a future promotion is a flag flip behind a measured flag rate.
+
+**The scoreboard** is `COACHSIM#scoreboard` in DynamoDB (`latest`, `RUN#<date>`,
+`LIMITATIONS`), written by `lambdas/coach/coach_sim_scoreboard.py` and classified
+**CROSS_PHASE** — it scores the engine's design across cycles, so a reset must not erase
+the trend. Seed the 2026-08-10 baseline once with
+`python3 scripts/coach_sim_replay.py --seed-baseline`; after that a later run reads the
+previous numbers back out of the partition (`--compare`) instead of out of a scratch file.
+
+**Limitations stored with every run, not just written here:** the simulated subject is not
+Matthew (it has his register, not his taste — it cannot say whether a reply *landed*); the
+deterministic layer alone would have missed the top finding (#2537 — symmetry was 25% of
+2,404 judge tells and 9 deterministic matches, so do not drop the panel for the cheap
+metrics); a harness that stops tracking its production call site measures its own drift
+(#2518); and no real corpus is committed to this public repo — run artifacts carry the
+real AUTHORITATIVE FACTS block, so a corpus is pinned into the scoreboard row by sha256
+manifest and only a small synthetic fixture lives in `tests/fixtures/coach_sim_replay/`.
 
 ## Porting beyond Telegram
 
