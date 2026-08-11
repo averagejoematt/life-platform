@@ -307,6 +307,28 @@ DECLARED_OVERLAPS: dict[str, tuple] = {
     # `baseline_mismatch_findings` is a registered freshness AUDITOR, while the seam
     # itself is the critic's ranking call, which produces a float and no prose.
     "lambdas/content/review_pack_ranker.py": ("surfaces", "exemption"),
+    # SAME SHAPE as review_pack_ranker, and deliberately NOT a retirement (#2573).
+    #
+    # The retirements above (#2419/#2420/#2421/#2425/#2426/#2428) share one structure: the
+    # module's SEAM CALL was a prose WRITER that nothing gated, and registering a chokepoint
+    # over that same prose left the exemption with nothing to excuse. The exemption died
+    # because the thing it excused became gated.
+    #
+    # This module is the other shape. Its seam call (`_call_haiku` -> `call_anthropic_raw`)
+    # is a JUDGE and stays one: it returns a verdict JSON that regenerates or holds, and no
+    # byte of it is ever rendered to a reader. That is exactly what the EXEMPTIONS entry
+    # says, and #2573 did not change one word of it — the OPERATIONAL destination is still
+    # verified true.
+    #
+    # What #2573 added is a DIFFERENT function with NO seam call in it at all:
+    # `_number_grounding_report` runs the deterministic ADR-104 grounder over the coach's
+    # draft — someone else's text, arriving as input — before the LLM is consulted, and the
+    # gate consumes that verdict rather than re-deciding it in prose. That earns a SURFACES
+    # registration (numbers + freshness) because it IS a grounding chokepoint caller. It does
+    # not make the Bedrock call a grounded generation, and retiring the exemption would
+    # record that it did — asserting the judge's own output is now gated reader prose, which
+    # is false in both halves.
+    "lambdas/coach/coach_quality_gate.py": ("surfaces", "exemption"),
 }
 
 

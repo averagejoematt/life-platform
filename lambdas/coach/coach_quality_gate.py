@@ -20,7 +20,17 @@ Checks:
   2. Decision class compliance — does the output exceed the evidence ceiling?
   3. Voice distinctiveness — does the output match the coach's structural signature?
   4. Cross-coach similarity — does this output sound too similar to other coaches?
-  5. Self-repetition (#2350, ADR-105) — deterministic, NO LLM: the candidate is
+  5. Fabricated / ungrounded numbers (#2573, ADR-104/105) — deterministic, NO LLM,
+     and BLOCKING. The rubric used to have no rule about invented numbers at all,
+     so the blocking gate could not fail a brief for making one up: measured
+     2026-08-11, all three fabricated-number canaries scored 92/92/82 and PASSED.
+     The fix does not ask the LLM to judge arithmetic in prose — it CONSUMES the
+     ADR-104 deterministic verdict (`grounded_generation.grounding_findings`
+     against the caller-supplied allow-list) computed BEFORE the LLM call, injects
+     it into the rubric as an already-decided input, and forces `passed=False`
+     when it fires. Honest absence: no allow-list on the wire ⇒ verdict None,
+     advisory, never a green.
+  6. Self-repetition (#2350, ADR-105) — deterministic, NO LLM: the candidate is
      scored against this coach's own trailing OUTPUT# history by
      `coach.coach_repetition_detector` (shingle Jaccard, personal-variance
      threshold) BEFORE the LLM verdict. Attached as the advisory `repetition`
@@ -47,6 +57,10 @@ import urllib.error
 import urllib.request
 
 import boto3
+
+# #2573: the deterministic grounding context's key names — defined once, in the wire
+# contract, so the caller that attaches them and the gate that reads them cannot drift.
+from ai.quality_gate_contract import AUTHORITATIVE_FACTS_KEY, GROUNDING_ALLOWLIST_KEY
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
 # Structured logger
@@ -304,6 +318,92 @@ def _self_repetition_report(coach_id, output_text):
         return {"status": "error", "verdict": None, "error": str(e), "advisory": True}
 
 
+def _number_grounding_report(output_text, generation_brief, generation_date=None):
+    """Deterministic fabricated-number verdict (#2573, ADR-104/105) — no LLM.
+
+    CONSUMES the platform's existing deterministic grounder rather than re-deciding
+    the number question in the judge's prose. `grounded_generation.grounding_findings`
+    is the same function the generation path's ADR-104 gate and the golden-brief eval
+    already run, so the quality gate and the honesty gate cannot disagree by
+    construction.
+
+    Grounding context arrives inside the brief (see
+    `ai.quality_gate_contract.brief_with_grounding`): the caller's already-computed
+    numeric allow-list, plus the canonical facts for the RHR/recovery/HRV
+    contradiction check. The gate cannot derive the allow-list itself — it is built
+    from the assembled generation prompt, which never crosses the wire.
+
+    Fail-soft in BOTH honest directions:
+      * no allow-list on the wire  -> status="no_grounding_context", verdict=None.
+        Absence, not a pass. This is what an un-upgraded caller gets, and it leaves
+        the gate exactly as (in)effective as it was before #2573 — never worse.
+      * detector raised            -> status="error", verdict=None.
+    Only status="measured" with findings blocks.
+    """
+    brief = generation_brief if isinstance(generation_brief, dict) else {}
+    if GROUNDING_ALLOWLIST_KEY not in brief:
+        return {
+            "status": "no_grounding_context",
+            "verdict": None,
+            "advisory": True,
+            "detail": (
+                "caller supplied no numeric allow-list "
+                f"(generation_brief.{GROUNDING_ALLOWLIST_KEY}) — the number check did not run. "
+                "This is honest absence, not a clean verdict."
+            ),
+        }
+    try:
+        from ai import grounded_generation as _gg
+        from ai.grounding_gate_params import cycle_gate_params
+
+        allowed = {float(n) for n in (brief.get(GROUNDING_ALLOWLIST_KEY) or [])}
+        facts = brief.get(AUTHORITATIVE_FACTS_KEY) or {}
+        # #1967 policy floor: the cycle-freshness classes are framing-scoped and free,
+        # and have no valid exemption. The event carries the generation date, so this
+        # surface grades the draft's "Day N" framing against the same anchors the
+        # generation gate used rather than against today.
+        findings = _gg.grounding_findings(output_text, facts=facts or None, allowed=allowed, **cycle_gate_params(generation_date))
+        return {
+            "status": "measured",
+            "verdict": "ungrounded" if findings else "clean",
+            "findings": findings,
+            "n_findings": len(findings),
+            "n_allowed": len(allowed),
+        }
+    except Exception as e:
+        logger.warning("number-grounding detector failed (fail-soft, no verdict): %s", e)
+        return {"status": "error", "verdict": None, "advisory": True, "error": str(e)}
+
+
+def _number_grounding_block(grounding):
+    """Render the deterministic verdict for the judge prompt — as a DECIDED input,
+    not a question. The judge is told the answer and told not to re-litigate it."""
+    status = grounding.get("status")
+    if status != "measured":
+        return (
+            "## Number Grounding (deterministic verdict)\n"
+            "  UNAVAILABLE — the deterministic number check did not run for this draft.\n"
+            "  Do not guess. Say nothing about invented numbers; report only what criteria 1-4 support.\n"
+        )
+    findings = grounding.get("findings") or []
+    if not findings:
+        return (
+            "## Number Grounding (deterministic verdict)\n"
+            f"  CLEAN — every number in the output was matched against the {grounding.get('n_allowed', 0)} "
+            "numbers the coach was actually given. Do NOT raise number complaints of your own.\n"
+        )
+    lines = [
+        "## Number Grounding (deterministic verdict — ALREADY DECIDED)",
+        f"  FAILED — {len(findings)} finding(s). This output states figures that are not in its evidence:",
+    ]
+    for f in findings[:8]:
+        if isinstance(f, dict):
+            lines.append(f"    - [{f.get('type', 'finding')}] {f.get('detail', '')}")
+    lines.append("  This verdict is computed by deterministic code, not by you. Do not re-derive it and do not")
+    lines.append('  argue with it: set "passed": false and score the output no higher than 40.')
+    return "\n".join(lines) + "\n"
+
+
 def _fetch_other_coaches_recent_outputs(coach_id, other_coach_ids=None):
     """Fetch the most recent output from other coaches for cross-coach comparison.
 
@@ -370,6 +470,21 @@ QUALITY_GATE_SYSTEM_PROMPT = (
     "  - Phrasing patterns match another coach closely\n"
     "  - The opening structure mirrors another coach's recent opening\n"
     "  - Recommendations overlap without acknowledging the other coach\n\n"
+    "### 5. Fabricated / Ungrounded Numbers (BLOCKING — deterministic input)\n"
+    "The single failure class this platform cares most about (ADR-104: honest "
+    "numbers): the output states a figure — a vital, a weight, a trend endpoint, a "
+    "range — that appears nowhere in the evidence the coach was given, or that "
+    "contradicts the authoritative reading.\n"
+    "This criterion is NOT yours to decide in prose. Deterministic code has already "
+    "resolved it and its verdict is supplied under 'Number Grounding' in the message "
+    "below (ADR-105: deterministic computation before any LLM verdict). Your job is "
+    "to REPORT that verdict, never to re-derive or override it:\n"
+    '  - Verdict FAILED -> return "passed": false and a score no higher than 40, '
+    "and list each finding under number_grounding_violations. A fabricated number is "
+    "disqualifying on its own, however good the voice is.\n"
+    "  - Verdict CLEAN -> the numbers are grounded. Do not invent a number complaint.\n"
+    "  - Verdict UNAVAILABLE -> the check did not run. Say nothing about numbers; "
+    "do not guess, and do not treat silence as clean.\n\n"
     "## Output Format\n"
     "Return ONLY valid JSON:\n"
     "{\n"
@@ -385,6 +500,9 @@ QUALITY_GATE_SYSTEM_PROMPT = (
     '  "voice_distinctiveness_score": 0-100,\n'
     '  "cross_coach_similarity_flags": [\n'
     '    {"similar_to": "coach_id", "reason": "why they sound similar"}\n'
+    "  ],\n"
+    '  "number_grounding_violations": [\n'
+    '    {"detail": "restate the deterministic finding verbatim"}\n'
     "  ],\n"
     '  "suggestions": ["actionable suggestions for improvement"]\n'
     "}\n"
@@ -409,7 +527,7 @@ def _shared_blacklists():
         return [], []
 
 
-def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_brief, other_outputs=None):
+def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_brief, other_outputs=None, grounding=None):
     """Build the user message for the quality gate LLM call."""
     parts = [
         f"## Coach: {coach_id}",
@@ -420,6 +538,12 @@ def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_br
         "---",
         "",
     ]
+
+    # #2573: the deterministic number verdict goes in FIRST, before the stylistic
+    # material, because it is the one criterion the judge must not reason its way
+    # out of. Always rendered — including UNAVAILABLE — so silence is never mistaken
+    # for a clean bill.
+    parts.append(_number_grounding_block(grounding or {}))
 
     # Voice spec anti-patterns + the MOS shared avoid-list (every coach inherits
     # the substrate's banned clichés on top of their own list — the shared
@@ -515,17 +639,45 @@ def _build_fallback_report(coach_id, error_msg):
     }
 
 
-def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other_outputs=None):
+def _apply_number_grounding_verdict(result, grounding):
+    """Consume the deterministic verdict (#2573) — the LLM cannot overrule it.
+
+    The prompt asks the judge to report the verdict; this makes it structural. A
+    judge that ignores criterion 5 (or a future prompt edit that drops it) still
+    cannot ship a draft the deterministic grounder failed. Mirrors #1973's
+    cycle-boundary rule: one report, one regenerate-or-hold path, no parallel
+    enforcement mechanism.
+    """
+    if grounding.get("status") != "measured":
+        return result
+    findings = grounding.get("findings") or []
+    if not findings:
+        return result
+    result["passed"] = False
+    result["number_grounding_violations"] = [{"type": f.get("type"), "detail": f.get("detail")} for f in findings if isinstance(f, dict)]
+    for f in result["number_grounding_violations"]:
+        # Rendered into the corrective-rewrite note by ai_calls._quality_gate_correction_note,
+        # which already walks `suggestions` — so the regeneration loop gets the specific
+        # number complaint without ai_calls learning a new field.
+        msg = f"Ungrounded number ({f.get('type')}): {f.get('detail')}"
+        if msg not in result.get("suggestions", []):
+            result.setdefault("suggestions", []).append(msg)
+    return result
+
+
+def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other_outputs=None, grounding=None):
     """Run the quality gate check via Haiku.
 
     Returns the quality report dict.
     """
+    grounding = grounding or {}
     user_message = _build_quality_gate_message(
         coach_id,
         output_text,
         voice_spec,
         generation_brief,
         other_outputs,
+        grounding=grounding,
     )
 
     try:
@@ -538,7 +690,7 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
 
         if not isinstance(result, dict):
             logger.warning("Quality gate LLM returned non-dict for %s — using fallback", coach_id)
-            return _build_fallback_report(coach_id, "LLM returned non-JSON")
+            return _apply_number_grounding_verdict(_build_fallback_report(coach_id, "LLM returned non-JSON"), grounding)
 
         # Ensure required fields with defaults
         result.setdefault("passed", True)
@@ -548,6 +700,11 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
         result.setdefault("voice_distinctiveness_score", 50)
         result.setdefault("cross_coach_similarity_flags", [])
         result.setdefault("suggestions", [])
+
+        # #2573: the deterministic verdict is applied to the report structurally,
+        # BEFORE the score threshold — a fabricated number blocks whatever the model
+        # scored (measured: 92/92/82 with passed=true on the three canaries).
+        _apply_number_grounding_verdict(result, grounding)
 
         # Apply pass/fail logic based on score and violations
         # Even if LLM said "passed", override based on thresholds
@@ -572,7 +729,10 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
 
     except Exception as e:
         logger.error("Quality gate LLM call failed for %s: %s", coach_id, e)
-        return _build_fallback_report(coach_id, str(e))
+        # Deterministic-first (ADR-105): a fabricated number the grounder already
+        # caught still blocks even when the judge is unreachable. The permissive
+        # fallback exists for the LLM's opinion, not for the arithmetic.
+        return _apply_number_grounding_verdict(_build_fallback_report(coach_id, str(e)), grounding)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -646,6 +806,11 @@ def lambda_handler(event, context):
         # before any LLM verdict). Advisory section; never affects `passed`.
         repetition = _self_repetition_report(coach_id, output_text)
 
+        # #2573 — deterministic number grounding, also BEFORE the LLM. Unlike
+        # repetition this one is BLOCKING: it is the ADR-104 verdict, and the LLM
+        # is handed it as a decided input rather than asked to re-decide it.
+        grounding = _number_grounding_report(output_text, generation_brief, event.get("generation_date"))
+
         # Run the quality gate
         report = _run_quality_gate(
             coach_id,
@@ -653,15 +818,18 @@ def lambda_handler(event, context):
             voice_spec,
             generation_brief,
             other_outputs,
+            grounding=grounding,
         )
         report["repetition"] = repetition
+        report["number_grounding"] = grounding
 
         logger.info(
-            "coach-quality-gate COMPLETE — coach=%s, passed=%s, score=%s, repetition=%s",
+            "coach-quality-gate COMPLETE — coach=%s, passed=%s, score=%s, repetition=%s, number_grounding=%s",
             coach_id,
             report.get("passed"),
             report.get("score"),
             repetition.get("verdict"),
+            grounding.get("verdict"),
         )
 
         return {
@@ -685,4 +853,6 @@ def lambda_handler(event, context):
             "suggestions": [f"Quality gate crashed: {e}"],
             # #2350 — honest absence: the detector did not run, so no verdict.
             "repetition": {"status": "error", "verdict": None, "error": str(e), "advisory": True},
+            # #2573 — same honest-absence contract for the number check.
+            "number_grounding": {"status": "error", "verdict": None, "error": str(e), "advisory": True},
         }

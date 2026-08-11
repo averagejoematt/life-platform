@@ -241,6 +241,28 @@ SURFACES = {
             )
         },
     ),
+    # #2573: the BLOCKING quality gate's deterministic number pre-pass. It is not a
+    # generation surface — it re-runs the ADR-104 number class on a draft the coach-v2
+    # pipeline has ALREADY gated, inside a separate Lambda, so that the blocking verdict
+    # covers the fabricated-number class its LLM rubric was blind to (measured: 92/92/82).
+    "lambdas/coach/coach_quality_gate.py::_number_grounding_report": _entry(
+        ("numbers", "freshness"),
+        {
+            cls: (
+                "the quality gate is a SEPARATE Lambda and its event carries only "
+                "`{coach_id, output_text, generation_brief, generation_date}` "
+                "(ai.quality_gate_contract.quality_gate_event). #2573 threads exactly ONE new input "
+                "across that wire — the caller's already-computed numeric allow-list — because the "
+                "allow-list is derived from the assembled generation prompt and cannot be "
+                f"recomputed here. The {cls} class needs an input this layer does not have and the "
+                "wire does not carry, and it is already armed one gate up, at generation time, on "
+                "both coach paths (see the ai_calls entries above). Re-grading it here would mean "
+                "shipping a second copy of the map to a post-hoc checker, not new coverage. Revisit "
+                "only if the gate ever scores text the generation gate never saw."
+            )
+            for cls in ("dates", "behavioral", "night")
+        },
+    ),
     "lambdas/coach/coach_history_summarizer.py::_apply_compression_gate": _entry(
         ("numbers", "dates", "freshness", "behavioral"),
         {"night": _NO_NIGHT_MAP},

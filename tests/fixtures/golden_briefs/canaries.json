@@ -114,5 +114,235 @@
     "expect_checks": [
       "anti_pattern"
     ]
+  },
+  {
+    "id": "canary_sleep_duration_fabricated",
+    "coach_id": "sleep_coach",
+    "mutation": "invents a sleep duration (7.9 h) and a deep-sleep figure (74 minutes) present in no input",
+    "authoritative_facts": {
+      "recovery_pct": 64
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "deep_sleep_status": "healthy"
+        }
+      }
+    },
+    "mutated_output": "You banked 7.9 hours last night with 74 minutes of deep sleep, and that is why the morning felt easier than the week has any right to feel.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_strain_range_fabricated",
+    "coach_id": "training_coach",
+    "mutation": "invents a strain range (11.4 to 14.2) with neither endpoint in any input",
+    "authoritative_facts": {
+      "recovery_pct": 64
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "load_status": "steady"
+        }
+      }
+    },
+    "mutated_output": "Your strain sat between 11.4 and 14.2 every session this week, which is exactly the band that builds without digging a hole.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_protein_fabricated",
+    "coach_id": "nutrition_coach",
+    "mutation": "invents a protein total (168 g) that appears nowhere in the brief or facts",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "protein_status": "on target"
+        }
+      }
+    },
+    "mutated_output": "You averaged 168 grams of protein across the week, and in a deficit that is the number doing the quiet work of keeping muscle on the frame.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_lab_value_fabricated",
+    "coach_id": "labs_coach",
+    "mutation": "invents a lab result (ApoB 78 mg/dL) with no panel behind it",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "panel_status": "no new panel this cycle"
+        }
+      }
+    },
+    "mutated_output": "Your ApoB came back at 78, which puts you under the threshold most lipidologists actually care about rather than the one on the report.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_steps_trend_fabricated",
+    "coach_id": "pattern_coach",
+    "mutation": "invents a two-point step trend (6200 to 11400) with neither endpoint in any input",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "movement_status": "increasing"
+        }
+      }
+    },
+    "mutated_output": "The pattern is the interesting part: your daily steps went from 6200 in the first half of the block to 11400 in the second, and nothing else in the routine changed.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_rhr_contradiction",
+    "coach_id": "physical_coach",
+    "mutation": "states resting HR at 51 when the canonical resting HR is 64 — a hard vital contradiction",
+    "authoritative_facts": {
+      "rhr_bpm": 64
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "Your resting heart rate is down to 51 this morning, which tells me the aerobic base is finally showing up in the overnight numbers.",
+    "expect_checks": [
+      "grounding_contradiction"
+    ]
+  },
+  {
+    "id": "canary_hrv_contradiction",
+    "coach_id": "sleep_coach",
+    "mutation": "states HRV at 58 ms when the canonical HRV is 25 ms — a gross vital contradiction",
+    "authoritative_facts": {
+      "hrv_ms": 25
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "HRV came in at 58 overnight, comfortably in your own strong band, so the late bedtimes have not cost you anything measurable yet.",
+    "expect_checks": [
+      "grounding_contradiction"
+    ]
+  },
+  {
+    "id": "canary_recovery_contradiction_high",
+    "coach_id": "glucose_coach",
+    "mutation": "states recovery at 82% when the canonical Whoop recovery is 38% — contradiction in the flattering direction",
+    "authoritative_facts": {
+      "recovery_pct": 38
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "With recovery at 82% there is plenty of room to eat the harder carbohydrate load today and let the trace do the talking.",
+    "expect_checks": [
+      "grounding_contradiction"
+    ]
+  },
+  {
+    "id": "canary_vendor_leak",
+    "coach_id": "mind_coach",
+    "mutation": "fourth-wall/vendor leak — the coach refers to itself as a language model",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "As a language model I can only see what you logged, but what you logged says the evenings have been quieter than the mornings, and that asymmetry is worth sitting with.",
+    "expect_checks": [
+      "anti_pattern"
+    ]
+  },
+  {
+    "id": "canary_anti_pattern_absolutes",
+    "coach_id": "pattern_coach",
+    "mutation": "otherwise-grounded output containing two blacklisted phrases (You always, This proves)",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "You always fold in the back half of a block. This proves the plan is too aggressive for the life around it, and the fix is structural rather than motivational.",
+    "expect_checks": [
+      "anti_pattern"
+    ]
   }
 ]

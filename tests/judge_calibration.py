@@ -127,17 +127,34 @@ ADJACENT = "adjacent"  # criterion 2 talks about an "evidence ceiling", but in t
 # recommendation-strength sense, not the invented-number sense
 OUT_OF_RUBRIC = "out_of_rubric"  # no criterion mentions it at all
 
-RUBRIC_SCOPE = {
+# The rubric AS MEASURED 2026-08-11 (#2573's finding): four criteria, none of which
+# mentions an invented number. Kept verbatim so the before/after split is legible
+# rather than asserted — the whole point of the finding was that the gap was
+# readable off the criteria list.
+RUBRIC_SCOPE_PRE_2573 = {
     "anti_pattern": IN_RUBRIC,
     "evidence_ceiling": ADJACENT,
     "grounding_contradiction": OUT_OF_RUBRIC,
 }
 
+# The rubric after #2573 adds criterion 5 (fabricated / ungrounded numbers), which
+# CONSUMES the deterministic ADR-104 verdict rather than re-deciding it. Both the
+# fabricated-number class ("evidence_ceiling" in the deterministic eval's labelling)
+# and the canonical-contradiction class are now squarely in scope.
+RUBRIC_SCOPE_POST_2573 = {
+    "anti_pattern": IN_RUBRIC,
+    "evidence_ceiling": IN_RUBRIC,
+    "grounding_contradiction": IN_RUBRIC,
+}
 
-def rubric_scope(expect_checks):
+RUBRIC_SCOPE = RUBRIC_SCOPE_POST_2573  # what the CURRENT judge is asked to look for
+
+
+def rubric_scope(expect_checks, mapping=None):
     """Weakest-link scope for one canary: a fault is only IN_RUBRIC if every check
     it expects is."""
-    scopes = {RUBRIC_SCOPE.get(c, OUT_OF_RUBRIC) for c in (expect_checks or [])}
+    mapping = mapping if mapping is not None else RUBRIC_SCOPE
+    scopes = {mapping.get(c, OUT_OF_RUBRIC) for c in (expect_checks or [])}
     if not scopes:
         return OUT_OF_RUBRIC
     for level in (OUT_OF_RUBRIC, ADJACENT, IN_RUBRIC):
@@ -204,6 +221,15 @@ def labeled_cases():
     the `generation_brief` production would have sent alongside it.
     """
     import golden_brief_eval as gbe
+    from ai.quality_gate_contract import brief_with_grounding
+
+    def _brief(fx):
+        """The brief production now ships (#2573): the fixture's own brief plus the
+        DETERMINISTIC grounding context — canonical facts and the numeric allow-list
+        the generation path computed. `gbe.allowed_for` is the same allow-list the
+        deterministic eval curated these 30 goldens against, so a golden cannot be
+        false-flagged here without also failing `golden_brief_eval`."""
+        return brief_with_grounding(fx.get("generation_brief"), fx.get("authoritative_facts") or {}, gbe.allowed_for(fx))
 
     golden, canaries = gbe.load_fixtures()
     cases = []
@@ -214,7 +240,7 @@ def labeled_cases():
                 "coach_id": fx["coach_id"],
                 "label": LABEL_GOOD,
                 "output_text": fx["reference_output"],
-                "generation_brief": fx.get("generation_brief"),
+                "generation_brief": _brief(fx),
             }
         )
     for cn in canaries:
@@ -224,10 +250,11 @@ def labeled_cases():
                 "coach_id": cn["coach_id"],
                 "label": LABEL_DEFECTIVE,
                 "output_text": cn["mutated_output"],
-                "generation_brief": cn.get("generation_brief"),
+                "generation_brief": _brief(cn),
                 "mutation": cn.get("mutation"),
                 "expect_checks": cn.get("expect_checks") or [],
                 "rubric_scope": rubric_scope(cn.get("expect_checks")),
+                "rubric_scope_pre_2573": rubric_scope(cn.get("expect_checks"), RUBRIC_SCOPE_PRE_2573),
             }
         )
     return cases
@@ -348,7 +375,14 @@ def _judge_one(gate, case, call_haiku=None, generation_date="2026-01-01"):
         "judge_passed": bool(report.get("passed")) if isinstance(report, dict) else None,
         "voice_distinctiveness_score": report.get("voice_distinctiveness_score") if isinstance(report, dict) else None,
         "rubric_scope": case.get("rubric_scope"),
+        "rubric_scope_pre_2573": case.get("rubric_scope_pre_2573"),
         "mutation": case.get("mutation"),
+        # #2573: which mechanism spoke. `deterministic_verdict` is the ADR-104
+        # grounder's answer, computed before the LLM; `deterministic_block` is
+        # whether it alone was sufficient to fail the draft.
+        "deterministic_status": (report.get("number_grounding") or {}).get("status") if isinstance(report, dict) else None,
+        "deterministic_verdict": (report.get("number_grounding") or {}).get("verdict") if isinstance(report, dict) else None,
+        "deterministic_block": bool((report.get("number_grounding") or {}).get("findings")) if isinstance(report, dict) else None,
         "voice_spec_reached_prompt": reached,
         "blacklist_probe": probe,
         "prompt_chars": len(prompt) if prompt else 0,
@@ -378,11 +412,18 @@ def confusion_matrix(results):
     # rubric. Both sub-rates are far below the thin floor and are reported as
     # such — the split exists to stop one number conflating two questions, not to
     # manufacture a better-looking one.
-    by_scope = {}
-    for scope in (IN_RUBRIC, ADJACENT, OUT_OF_RUBRIC):
-        rows = [r for r in usable if r["label"] == LABEL_DEFECTIVE and r.get("rubric_scope") == scope]
-        if rows:
-            by_scope[scope] = rate(sum(1 for r in rows if not r["judge_passed"]), len(rows))
+    def _split(key):
+        out = {}
+        for scope in (IN_RUBRIC, ADJACENT, OUT_OF_RUBRIC):
+            rows = [r for r in usable if r["label"] == LABEL_DEFECTIVE and r.get(key) == scope]
+            if rows:
+                out[scope] = rate(sum(1 for r in rows if not r["judge_passed"]), len(rows))
+        return out
+
+    by_scope = _split("rubric_scope")
+    # #2573: the same negatives scored against the PRE-fix rubric map, so the
+    # published split shows what moved rather than only where it landed.
+    by_scope_pre = _split("rubric_scope_pre_2573")
 
     return {
         "convention": CONVENTION,
@@ -398,6 +439,7 @@ def confusion_matrix(results):
         "sensitivity_agrees_with_good_work": rate(golden_passed, n_good),
         "specificity_catches_defects": rate(canary_failed, n_bad),
         "specificity_by_rubric_scope": by_scope,
+        "specificity_by_rubric_scope_pre_2573": by_scope_pre,
         "accuracy_overall": rate(golden_passed + canary_failed, len(usable)),
     }
 
@@ -422,21 +464,33 @@ def threshold_attribution(results, base_threshold):
     """
     usable = [r for r in results if r["usable"]]
     failed = [r for r in usable if not r["judge_passed"]]
-    by_score = [r["id"] for r in failed if r["score"] < base_threshold]
-    by_boolean = [r["id"] for r in failed if r["score"] >= base_threshold]
+    # #2573 adds a THIRD mechanism, and it outranks the other two: the deterministic
+    # ADR-104 grounder's verdict, computed before the LLM and applied structurally.
+    # Attributed first, because when it fires the other two are not what decided.
+    by_determ = [r["id"] for r in failed if r.get("deterministic_block")]
+    rest = [r for r in failed if not r.get("deterministic_block")]
+    by_score = [r["id"] for r in rest if r["score"] < base_threshold]
+    by_boolean = [r["id"] for r in rest if r["score"] >= base_threshold]
     out = {
         "threshold": base_threshold,
         "n_fail_decisions": len(failed),
+        "by_deterministic_number_grounding": len(by_determ),
         "by_score_threshold": len(by_score),
         "by_model_boolean_at_or_above_threshold": len(by_boolean),
+        "deterministic_ids": sorted(by_determ),
         "model_boolean_ids": sorted(by_boolean),
+        "operative_control": (
+            "deterministic_number_grounding"
+            if len(by_determ) >= max(len(by_score), len(by_boolean))
+            else ("model_boolean" if len(by_boolean) > len(by_score) else "PASS_SCORE_THRESHOLD")
+        ),
     }
-    if failed and len(by_boolean) > len(by_score):
+    if failed and len(by_score) < len(failed):
         out["note"] = (
-            f"{len(by_boolean)} of {len(failed)} blocking decisions came from the model's own passed=False "
-            f"while it scored AT OR ABOVE {base_threshold} — the score and the verdict disagree. "
-            f"PASS_SCORE_THRESHOLD is not the operative control on this corpus; retuning it would not move "
-            f"most of these decisions."
+            f"Of {len(failed)} blocking decisions: {len(by_determ)} by the deterministic number-grounding "
+            f"verdict, {len(by_boolean)} by the model's own passed=False while scoring AT OR ABOVE "
+            f"{base_threshold}, {len(by_score)} by the score threshold itself. PASS_SCORE_THRESHOLD is the "
+            f"operative control for {len(by_score)} of {len(failed)} — retuning it would not move the rest."
         )
     return out
 
@@ -564,11 +618,11 @@ def run(call_haiku=None, check_budget=True):
     report["matrix"] = confusion_matrix(results)
     report["threshold_attribution"] = threshold_attribution(results, gate.PASS_SCORE_THRESHOLD)
     report["threshold_sweep"] = threshold_sweep(results, gate.PASS_SCORE_THRESHOLD)
-    report["cannot_support"] = _cannot_support(report["matrix"])
+    report["cannot_support"] = _cannot_support(report["matrix"], report["threshold_attribution"])
     return report
 
 
-def _cannot_support(matrix):
+def _cannot_support(matrix, attribution=None):
     """What this matrix does NOT license anyone to claim. Emitted even — especially
     — when the numbers look good: an instrument that overstates its own precision
     is the failure #1374 exists to prevent."""
@@ -583,9 +637,9 @@ def _cannot_support(matrix):
             f"Do not publish {spec['point']} as the judge's catch rate."
         )
     out.append(
-        "The 5 canaries are HAND-AUTHORED faults of three known classes (fabricated number, vital "
-        "contradiction, blacklisted phrase). They are not a sample of the defects real generation "
-        "produces, so this specificity does not generalise to field failure modes."
+        f"The {matrix['n_negatives_defective']} canaries are HAND-AUTHORED faults of three known classes "
+        "(fabricated number, vital contradiction, blacklisted phrase). They are not a sample of the defects "
+        "real generation produces, so this specificity does not generalise to field failure modes."
     )
     scoped = matrix.get("specificity_by_rubric_scope") or {}
     n_in = (scoped.get(IN_RUBRIC) or {}).get("denominator", 0)
@@ -611,9 +665,19 @@ def _cannot_support(matrix):
     if sens["denominator"] and sens["point"] == 1.0:
         out.append("A saturated 1.0 is a lower bound, not a measurement — the corpus contains no case this judge failed.")
     out.append(
-        "Margin-aware gating (this issue's third acceptance item) is NOT derivable from these numbers: "
-        "an error margin set from a 5-case denominator would be a made-up margin wearing a statistic."
+        f"Margin-aware gating (#1374's third acceptance item) is NOT derivable from these numbers: an error "
+        f"margin set from an n={spec['denominator']} denominator would be a made-up margin wearing a "
+        f"statistic. Clearing the {THIN_DENOMINATOR_N}-case floor makes a specificity FIGURE publishable; it "
+        "does not make a per-decision error margin estimable."
     )
+    n_det = (attribution or {}).get("by_deterministic_number_grounding") or 0
+    if n_det:
+        out.append(
+            f"#2573: {n_det} of the caught defects were caught by the DETERMINISTIC number-grounding verdict, "
+            "not by the LLM's own judgement. Post-#2573 specificity is therefore the specificity of the "
+            "COMBINED gate (deterministic prepass + judge), which is what actually ships — but it is NOT a "
+            "measurement of the judge's own discrimination, and must not be quoted as one."
+        )
     return out
 
 
@@ -655,13 +719,17 @@ def text_report(report):
     lines.append(_fmt_rate("sensitivity (agrees with good work)", m["sensitivity_agrees_with_good_work"]))
     lines.append(_fmt_rate("specificity (catches defects)      ", m["specificity_catches_defects"]))
     lines.append(_fmt_rate("overall accuracy                   ", m["accuracy_overall"]))
-    scoped = m.get("specificity_by_rubric_scope") or {}
-    if scoped:
-        lines.append("")
-        lines.append("  specificity split by whether the fault is in this judge's rubric at all:")
-        for scope in (IN_RUBRIC, ADJACENT, OUT_OF_RUBRIC):
-            if scope in scoped:
-                lines.append(_fmt_rate(f"  {scope:<14}", scoped[scope]))
+    for label, key in (
+        ("CURRENT rubric (post-#2573, criterion 5 present)", "specificity_by_rubric_scope"),
+        ("PRE-#2573 rubric (four criteria, none about numbers)", "specificity_by_rubric_scope_pre_2573"),
+    ):
+        scoped = m.get(key) or {}
+        if scoped:
+            lines.append("")
+            lines.append(f"  specificity split by rubric scope — {label}:")
+            for scope in (IN_RUBRIC, ADJACENT, OUT_OF_RUBRIC):
+                if scope in scoped:
+                    lines.append(_fmt_rate(f"  {scope:<14}", scoped[scope]))
     if report.get("n_unavailable"):
         lines.append(
             f"\n{report['n_unavailable']} of {len(report['results'])} case(s) produced NO verdict and are excluded from every denominator:"
@@ -670,9 +738,11 @@ def text_report(report):
     ta = report.get("threshold_attribution") or {}
     if ta.get("n_fail_decisions"):
         lines.append(
-            f"\nWhat actually blocked: {ta['by_score_threshold']} of {ta['n_fail_decisions']} by the "
-            f"score threshold, {ta['by_model_boolean_at_or_above_threshold']} by the model's own "
-            f"passed=False at or above {ta['threshold']}."
+            f"\nWhat actually blocked ({ta['n_fail_decisions']} decisions): "
+            f"{ta.get('by_deterministic_number_grounding', 0)} by the DETERMINISTIC number-grounding verdict, "
+            f"{ta['by_score_threshold']} by the score threshold, "
+            f"{ta['by_model_boolean_at_or_above_threshold']} by the model's own passed=False at or above "
+            f"{ta['threshold']}.  Operative control: {ta.get('operative_control')}."
         )
         if ta.get("note"):
             lines.append(f"   ! {ta['note']}")
@@ -700,6 +770,6 @@ def ops_line(report):
     spec = m["specificity_catches_defects"]
     return (
         f"✓ Judge calibration: sensitivity {sens['numerator']}/{sens['denominator']}, "
-        f"specificity {spec['numerator']}/{spec['denominator']} (thin), "
+        f"specificity {spec['numerator']}/{spec['denominator']}{' (thin)' if spec['thin'] else ''}, "
         f"{report['n_unavailable']} no-verdict — n={m['n_usable']} usable of {corp['n_total']}"
     )
