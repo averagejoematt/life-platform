@@ -401,7 +401,25 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="machine-readable report")
     ap.add_argument("--judge", action="store_true", help="+ advisory Haiku voice rubric (Bedrock spend)")
     ap.add_argument("--emit", action="store_true", help="+ CloudWatch metrics (LifePlatform/GoldenBrief)")
+    ap.add_argument(
+        "--judge-calibration",
+        action="store_true",
+        help="calibrate the LLM QUALITY GATE judge against the 35 labeled fixtures (#1374; Bedrock spend)",
+    )
     args = ap.parse_args(argv)
+
+    # #1374 — a different question from the deterministic verdict above. That asks
+    # "does the honesty gate work?"; this asks "how good is the LLM JUDGE that
+    # blocks coach drafts?" and answers with a confusion matrix carrying its n.
+    # Separate mode, separate module (tests/judge_calibration.py), separate exit
+    # semantics: a poor matrix is a FINDING, not a red build — only a corpus that
+    # cannot support a calibration at all is an error.
+    if args.judge_calibration:
+        import judge_calibration as jc
+
+        creport = jc.run()
+        print(json.dumps(creport, indent=2, default=str) if args.json else jc.text_report(creport))
+        return 1 if creport["verdict"] == jc.ERROR else 0
 
     report = run(judge=args.judge)
     if args.emit:
