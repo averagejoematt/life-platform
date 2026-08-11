@@ -1,4 +1,4 @@
-"""#2536 — the shape metrics in scripts/coach_sim_analyze.py.
+"""#2536 — the shape metrics in scripts/coach_sim_shapes.py.
 
 WHY THESE TESTS ARE THE POINT. The failure this issue attacks was invisible to the
 metric that was already watching for it: shingle-Jaccard between coaches ran under
@@ -34,7 +34,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 
-from coach_sim_analyze import (  # noqa: E402  (path set above)
+from coach_sim_shapes import (  # noqa: E402  (path set above)
     absence_phrasing_collisions,
     opening_construction_collisions,
     structural_collapse,

@@ -145,11 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-<<<<<<< HEAD
     "test_count": 14664,
-=======
-    "test_count": 14620,
->>>>>>> 62c32a426 (feat(coach): break the acknowledge/echo/menu template — 8 personas, 8 moves (#2536))
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
