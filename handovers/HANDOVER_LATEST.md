@@ -23,7 +23,13 @@ Hitting 40–43 from 63 would have meant 20+ closures, which exceeds the plan's 
 
 ---
 
-## Main: GREEN and fully deployed
+## Main: code-green; the last CI/CD run reads FAILURE by my own hand
+
+**Main:** red-by-rejection — `check_main_green.py` reports `❌ FAILURE at 452df8a2` because **I rejected that run's deploy gate**, and a rejected run concludes as a failure. **The code is green.** The last run that actually executed, **31421561199 (`1bc4b051`), succeeded end-to-end** — Deploy ✅ Smoke ✅ post-deploy integration ✅ Visual + AI-vision QA ✅, no rollback. Everything after `1bc4b051` on main is docs plus one label tuple, and that tuple is deployed and symbol-verified.
+
+Do not "fix" this by re-running or approving anything at `452df8a2` — see the concurrent-session residual below for why approving an ancestor would be a silent rollback. It clears on its own with the next real push to main.
+
+## What was deployed, and verified
 
 Fleet run **31421561199** (`1bc4b051`) — **Deploy ✅ Smoke ✅ post-deploy integration ✅ Visual + AI-vision QA ✅, Auto-rollback skipped.** Fleet deploy (shared module changed), so every function shipped.
 
@@ -83,12 +89,16 @@ The label history separates the passes cleanly: **17:57:40–17:57:53Z** set the
 - **Owner ①** — `gh pr merge 2552 --squash` **adjacent to** `cd cdk && npx cdk deploy <stack owning telegram-coach-worker>`, then approve the next CI run. → **#2494**
 - **Owner ②** — BotFather trio + Max rename. `not-work — BotFather is owner-only by standing rule; no issue can move it`. Every outbound feature merged tonight (open loops, pre-event support, reactions, referrals) stays dark for unregistered seats until this happens.
 - **Owner ③** — `CONTENT_FILTER_JSON` repo secret. `not-work — an owner-held credential; the ER-06 vocabulary lives off-repo by design (#2370's closure comment tracks the consequence)`.
-- **Owner ④** — `deploy/deploy_coach_intelligence.sh` to sync voice specs to S3 (config is read **S3-first**; `config_twin_sync.py` does not cover it). Needed for #2485's `reaction_emoji` and for the other session's #2553 identity stance. → **#2485** / **#2533**
+- **Owner ④ — DONE post-wrap, and it exposed a half-deploy worth remembering.** The owner ran `deploy/deploy_coach_intelligence.sh`: all coach configs synced to S3, three coach-intelligence Lambdas deployed at `9cc85fcf`, 66 DDB items seeded. **But the config sync alone left the identity stance live in the data and absent from the prompt** — #2553 also added the `("identity_stance", "Identity")` label tuple to `persona_core.py`, and `telegram-coach-worker` was still at `1bc4b051`, so it read the new field with no code to render it. Measured, not assumed: `identity_stance` **present** on `coach-state-updater`, **ABSENT** on the worker. Closed with `deploy_lambda.sh telegram-coach-worker` and re-verified — `identity_stance` ✅ plus all four of my symbols (`extract_open_loops`, `reaction_for`, `_weather_lines`, `merge_bits`) and `coach_chat.run_turn` still at 3x. → **#2485** / **#2533**
+
+  **Carry this:** an S3-first config change and its rendering code are two halves of one deploy. Syncing configs makes the change *look* shipped while the surface that reads it stays blind — and the config sync is the half that gets remembered.
 - **Concurrent session — ACTION MAY BE NEEDED, and they may never have been told.** CI/CD run **31424244374** (`452df8a2`, their #2540+#2553) was `waiting` at the production gate at wrap. I sent three cross-session messages: the first (merge-order go-ahead) was delivered, **the second — the one warning them the run was gated — expired unapproved and was never delivered**, and **a third resend also expired unapproved**. Final state: of three messages, only the merge-order go-ahead was ever delivered. **The other session was never told its run is parked, and the cross-session channel is not a way to tell it** — every message needs the owner's approval, and two in a row timed out. If this needs saying to them, it has to be said by the owner or in their own session.
 
   Two consequences if nobody actions it: it becomes the #1901 stranded class at 2h, and while it waits it holds the `ci-cd-deploy-main` concurrency group, so **every later deploy queues behind it** — exactly what cost my own fleet run 25 minutes tonight. `python3 scripts/check_deploy_wedge.py` names the holder.
 
-  I did not approve or reject it myself: #2553 changes `persona_core.py` and 8 voice specs, and approving a production deploy of another session's unreviewed code is not mine to do. Rejecting is the clean exit if it should not ship tonight (`bash deploy/reject_deployment.sh 31424244374 "<why>"`). `not-work — another session's merge; owner or that session decides`.
+  **RESOLVED post-wrap — rejected on the owner's say-so, and the reason changed between wrap and then.** At wrap I declined to action it (another session's unreviewed runtime code). By the time it reached **5.3h stranded**, approving had become the *wrong* move rather than merely not-mine: the owner had run `deploy_coach_intelligence.sh` and I had deployed `telegram-coach-worker`, both at **`9cc85fcf`**, and the run's tree `452df8a2` is a strict **ancestor** of that. Approving would have deployed an older tree and stamped `build_info.json` back to `452df8a2` while main sat at `9cc85fcf` — breaking the `/version.json == HEAD` invariant for zero gain, since the only delta was four docs/handover commits and **no runtime code**. Rejected instead (`reject_deployment.sh`, never `cancel` — a cancelled run strands its deploy). `check_deploy_wedge.py` now reports **✅ no wedged deploy**; the slot is free for #2555/#2557.
+
+  **The general lesson, worth carrying:** a stranded gated run gets *more* dangerous to approve as it ages, not less — the fleet moves past it, and approving an ancestor is a silent rollback. Check `git merge-base --is-ancestor <run-sha> <deployed-sha>` before approving anything that has sat.
 
   Also worth passing on if they resurface: their stated plan treats #2553 as needing no CI deploy because voice specs are read S3-first. That is half right — `deploy_coach_intelligence.sh` covers the config half, but the `persona_core.py` label-tuple entry ships in the Lambda bundle (#781) and needs a fleet deploy too. Both halves, or the identity stance is live in neither place.
 - **Not filed, recorded in-repo** — `emails/chronicle_personas.py` still sits in `UNGATED_READER_KNOWN` citing #2430 though it was outside that issue's named four; its census entry is annotated to say it needs its own issue rather than inheriting a closed one.
