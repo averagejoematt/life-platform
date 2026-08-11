@@ -2529,6 +2529,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2567"
         }
       ]
+    },
+    {
+      "id": "2026-08-11-the-gate-that-could-not-fail",
+      "date": "2026-08-11",
+      "title": "The gate that could not fail",
+      "shipped": "A quality gate sits between the AI coaches and me. It is blocking: if a coach's brief does not pass, the brief does not ship. This week I calibrated it against a labelled set for the first time and found that it passed every single test case built around an invented number — three of them, scoring 92, 92 and 82 out of 100, against a passing mark of 60. Not marginal. Comfortable. The cause was not that the judge was bad at its job. The cause was that its rubric had four criteria and not one of them mentioned made-up numbers, so it was never asked to look. The fix was to stop asking an LLM to re-decide a question the platform already answers deterministically: a grounding checker that catches fabricated figures every time now runs first, and its verdict is handed to the judge as settled input rather than re-litigated in prose. Two full runs against the real model afterwards: the three canaries went from 92/92/82 to 25/15/15, all failing. Sensitivity 29/30, specificity 14/15. I also grew the set of deliberately-bad examples from 5 to 15, because a specificity figure computed on five cases is not a figure worth publishing.",
+      "why_it_mattered": "The whole point of this platform is that the numbers are real. There is a rule written into its architecture — every AI narrative surface gets a grounding gate, and an unmeasured number is stated as absent rather than guessed. The blocking gate was the last line of that defence, and it had a hole shaped exactly like the thing it was defending against. What makes this worth telling is not that a bug existed. It is that the gate reported green the entire time. Nobody was ignoring a warning; there was no warning. An instrument that cannot fail in a particular way will tell you, indefinitely and in good faith, that everything is fine.",
+      "gotcha": "Four separate times that night I asked a monitoring system a question, got back nothing, and concluded something was broken. Twice I nearly filed a bug report against code that was working perfectly. Every one of those was my query, not the system: a paginated log search whose count I read one page at a time, a metric queried without the dimension it is actually stored under, a Lambda whose health I judged from its log volume instead of its invocation metrics, and a shell library I loaded from the wrong shell. The lesson I am keeping is narrow and mechanical: before you report that something is dead, measure the same fact a second way. Two of my six findings that night evaporated on the second measurement. The other four survived it and turned into real, filed issues — and the re-measure is the only thing that told them apart.",
+      "honest_miss": "The queue did not shrink. I closed five issues and filed five new ones, so it ended exactly where it started, against a target of getting it down by four to seven. I am not going to dress that up. But three of the five new ones could not have been filed before that night's work existed — including a privacy gap where fixing a broken reader made 60 private journal entries newly indexable into a prompt whose output gets published. Nothing was indexed; an agent I had instructed to run the backfill refused and argued the case instead, and it was right. Two of the issues I closed I then deliberately re-opened, because their acceptance criteria were not actually met and merging the code is not the same as finishing the job.",
+      "prs": [
+        {
+          "label": "PR #2586",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2586"
+        },
+        {
+          "label": "PR #2583",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2583"
+        },
+        {
+          "label": "PR #2580",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2580"
+        },
+        {
+          "label": "PR #2581",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2581"
+        }
+      ]
     }
   ]
 }
