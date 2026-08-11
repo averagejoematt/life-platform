@@ -43,7 +43,7 @@ re-embed, so re-running the hook on an already-indexed week is free and writes n
 
 from __future__ import annotations
 
-from ai import semantic_recall as sr
+from ai import recall_consent as rc, semantic_recall as sr
 
 # Status strings returned by the indexing entry points. Callers log these; the two
 # that mean "the corpus changed" are INDEXED (a row was embedded + written) and
@@ -55,6 +55,11 @@ SKIPPED_BUDGET = "skipped:budget"
 SKIPPED_NO_RECORD = "skipped:no-record"
 SKIPPED_NOT_PUBLISHED = "skipped:not-published"
 SKIPPED_NO_TEXT = "skipped:no-text"
+# #2587: the doc's consent tier does not permit it in the corpus at all (an unmarked or
+# private diary entry, a kind with no policy). Kept DISTINCT from the other skips: this
+# one is the privacy gate doing its job, and a freshness sensor must not read it as a
+# fault to be repaired.
+SKIPPED_CONSENT = "skipped:consent"
 # An embed or write that actually failed, kept DISTINCT from the "nothing to do" skips:
 # the first is a fault the freshness guard should keep reporting, the rest are correct
 # outcomes. Collapsing them would let a broken embedder read as a quiet no-op.
@@ -215,6 +220,14 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
     if not doc or not (doc.get("text") or "").strip():
         return SKIPPED_NO_TEXT
 
+    # #2587 — the consent gate, BEFORE the idempotency read and before any spend. It sits
+    # ahead of the sha compare deliberately: a doc that may not be in the corpus may not be
+    # in the corpus regardless of what a stored row says, and the repair path below would
+    # otherwise happily refresh metadata on a row that should never have existed.
+    decision = rc.decide_doc(doc)
+    if not decision.indexable:
+        return SKIPPED_CONSENT
+
     sk = sr.sk_for(doc["kind"], doc["date"])
     new_sha = sr.sha_text(doc["text"])
     if not force:
@@ -258,7 +271,10 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
                 artifact_pk=doc["artifact_pk"],
                 artifact_sk=doc["artifact_sk"],
                 link=doc.get("link", ""),
-                snippet=snippet(doc["text"]),
+                # #2587: the snippet is what CONSENT permits, never the raw lead of the
+                # body. For a quote-tier entry that is the single owner-cleared line; for
+                # allude, a built theme descriptor with no verbatim text in it.
+                snippet=decision.snippet,
                 model=model,
                 dims=len(vector),
                 embedded_at=now,
@@ -296,7 +312,11 @@ def recall_card_for_text(table, text: str, *, exclude_dates=None, embed=None):
             from ai import bedrock_client as _bc
 
             embed = _bc.embed_text
-        return sr.recall_card(sr.retrieve(table, embed(text), exclude_dates=exclude_dates, resolve=True))
+        # #2587: READER_KINDS, not the coach allowlist — this card renders into a
+        # published chronicle installment, so it may only cite a kind that has a page a
+        # reader can open. Same decision as `ask_retrieval.PUBLISHED_KINDS`, derived from
+        # the same registry.
+        return sr.recall_card(sr.retrieve(table, embed(text), exclude_dates=exclude_dates, resolve=True, kinds=sr.READER_KINDS))
     except Exception:  # noqa: BLE001 — a card is decoration; its absence is honest, its failure is not fatal
         return None
 

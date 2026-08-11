@@ -220,6 +220,13 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_no_dead_intelligence_functions.py",
         "test_hevy_compiler_isolation.py",
         "test_public_surface_pii_guard.py",  # privacy — the one most costly to catch late
+        # #2587: the recall-corpus consent gate. Two of its assertions are pure repo-shape —
+        # the writer set (every file calling `make_embedding_item` must also call the consent
+        # gate) is a `os.walk` sweep, and the kind registries are derived from
+        # `semantic_recall.KINDS` so a new corpus kind reds until someone classifies it. Both
+        # are exactly the "invisible until someone adds a file" shape this list exists for,
+        # and this one stands between a new kind/writer and an unreviewed privacy exposure.
+        "test_recall_consent_2587.py",
         "test_coach_his_people_2488.py",  # #2488: the his-people sk must stay unreachable from the whole coach perimeter
         "test_leak_token_sweep.py",
         "test_csp_native_embeds_1678.py",

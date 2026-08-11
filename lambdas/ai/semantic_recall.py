@@ -71,6 +71,50 @@ KIND_COACH = "coach_output"
 KIND_JOURNAL = "journal"
 KINDS = (KIND_CHRONICLE, KIND_COACH, KIND_JOURNAL)
 
+# ── which kinds each CONSUMER may see (#2587) ───────────────────────────────
+# `retrieve()` used to rank the whole partition: load_corpus → rank_precedents →
+# reconcile_precedent, with no `kind` predicate anywhere. Whatever was indexed was
+# retrievable, and the coach prompt it feeds is published. `web/ask_retrieval.py` had
+# already written the guard for the sibling reader path (`PUBLISHED_KINDS`); these are
+# the same guard for this one.
+#
+# The decision is recorded PER KIND rather than as a bare tuple, and the tuple is
+# DERIVED from it, so a kind added to `KINDS` upstream lands with no entry, evaluates
+# falsy, and is EXCLUDED — the opposite of the previous include-everything default.
+# `tests/test_recall_consent_2587.py` asserts every KIND has an explicit entry, so the
+# addition goes red until someone writes down which consumers may see it.
+#
+# coach — the coach-prompt path (`ai_calls._semantic_recall_for_coach`).
+#   chronicle:    published installments; already the whole live corpus.
+#   coach_output: the platform's own coach narrative, served publicly on /coaching/.
+#                 Whether it belongs in the corpus at ALL is a signal-quality question
+#                 owned by #2347, not a privacy one — flipping this to False is the
+#                 one-line form of that decision.
+#   journal:      private diary — admissible ONLY because `ai/recall_consent.py` now
+#                 resolves the owner's tier at INDEX time, so a journal row that exists
+#                 in the corpus is one the owner cleared to allude to or quote. The
+#                 coach prompt is precisely the "public reaction" surface
+#                 `privacy/diary_consent.py` was written to gate.
+#
+# reader — the reader-facing surfaces: the chronicle recall card
+#   (`recall_indexer.recall_card_for_text`, rendered into a published installment) and
+#   /api/ask (`ask_retrieval.PUBLISHED_KINDS`, which derives from READER_KINDS below so
+#   there is ONE reader decision rather than two that can drift). Chronicle only: coach
+#   outputs and journal entries have no published page for a reader to open, and an
+#   allude-tier journal date has been cleared for a coach's use, not for the front page.
+COACH_KIND_DECISIONS: dict[str, bool] = {
+    KIND_CHRONICLE: True,
+    KIND_COACH: True,
+    KIND_JOURNAL: True,
+}
+READER_KIND_DECISIONS: dict[str, bool] = {
+    KIND_CHRONICLE: True,
+    KIND_COACH: False,
+    KIND_JOURNAL: False,
+}
+COACH_KINDS: tuple[str, ...] = tuple(k for k in KINDS if COACH_KIND_DECISIONS.get(k) is True)
+READER_KINDS: tuple[str, ...] = tuple(k for k in KINDS if READER_KIND_DECISIONS.get(k) is True)
+
 # #1827: the link form the original backfill emitted for chronicle precedents.
 # `/chronicle/week-N/` is NOT a page on averagejoematt.com (installments publish at
 # `/journal/posts/week-NN/` — `chronicle_render.journal_post_ref`) and no redirect
@@ -240,6 +284,18 @@ def load_corpus(table) -> list:
     return corpus
 
 
+def filter_kinds(corpus, kinds) -> list:
+    """The subset of `corpus` whose `kind` is in `kinds` — the #2587 allowlist filter.
+
+    Fail-closed on both edges: a doc with a missing/unknown `kind` is dropped (it cannot
+    be shown to be allowed), and an empty/None `kinds` allows NOTHING rather than
+    everything. Applied BEFORE ranking so an excluded kind cannot consume a top-k slot
+    that a permitted doc would otherwise have taken.
+    """
+    allowed = set(kinds or ())
+    return [doc for doc in (corpus or []) if (doc or {}).get("kind") in allowed]
+
+
 def resolve_precedent(table, precedent: dict) -> bool:
     """AC2: does this precedent resolve to a REAL record? True iff the artifact it
     points at (artifact_pk/artifact_sk) still exists in the table. A precedent whose
@@ -338,17 +394,24 @@ def rank_precedents(query_vector, corpus, *, top_k=DEFAULT_TOP_K, threshold=DEFA
     return out
 
 
-def retrieve(table, query_vector, *, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRESHOLD, exclude_dates=None, resolve=True) -> list:
-    """Convenience: load_corpus + rank_precedents, then (AC2) drop any precedent
-    that does not resolve to a real record. The precedents that survive are safe to
-    cite — every one points at a dated artifact the reader can open.
+def retrieve(
+    table, query_vector, *, top_k=DEFAULT_TOP_K, threshold=DEFAULT_THRESHOLD, exclude_dates=None, resolve=True, kinds=None
+) -> list:
+    """Convenience: load_corpus + KIND ALLOWLIST + rank_precedents, then (AC2) drop any
+    precedent that does not resolve to a real record. The precedents that survive are
+    safe to cite — every one points at a dated artifact the reader can open.
+
+    `kinds` (#2587) is the consumer's allowlist and defaults to `COACH_KINDS`, because
+    the coach prompt is this function's production caller. Pass `READER_KINDS` for a
+    reader-facing surface. `kinds=()` returns nothing, which is the correct fail-closed
+    reading of "no kind is permitted" — there is deliberately no "all kinds" sentinel.
 
     The resolution pass is also the RECONCILIATION pass (#1828): each surviving
     precedent's cycle label is re-derived from the authoritative artifact record, so a
     reset's re-stamping can never leave the citation labeled with a stale cycle."""
     ranked = rank_precedents(
         query_vector,
-        load_corpus(table),
+        filter_kinds(load_corpus(table), COACH_KINDS if kinds is None else kinds),
         top_k=top_k,
         threshold=threshold,
         exclude_dates=exclude_dates,
