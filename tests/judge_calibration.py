@@ -665,8 +665,10 @@ def _cannot_support(matrix, attribution=None):
     if sens["denominator"] and sens["point"] == 1.0:
         out.append("A saturated 1.0 is a lower bound, not a measurement — the corpus contains no case this judge failed.")
     out.append(
-        "Margin-aware gating (this issue's third acceptance item) is NOT derivable from these numbers: "
-        "an error margin set from a 5-case denominator would be a made-up margin wearing a statistic."
+        f"Margin-aware gating (#1374's third acceptance item) is NOT derivable from these numbers: an error "
+        f"margin set from an n={spec['denominator']} denominator would be a made-up margin wearing a "
+        f"statistic. Clearing the {THIN_DENOMINATOR_N}-case floor makes a specificity FIGURE publishable; it "
+        "does not make a per-decision error margin estimable."
     )
     n_det = (attribution or {}).get("by_deterministic_number_grounding") or 0
     if n_det:
@@ -768,6 +770,6 @@ def ops_line(report):
     spec = m["specificity_catches_defects"]
     return (
         f"✓ Judge calibration: sensitivity {sens['numerator']}/{sens['denominator']}, "
-        f"specificity {spec['numerator']}/{spec['denominator']} (thin), "
+        f"specificity {spec['numerator']}/{spec['denominator']}{' (thin)' if spec['thin'] else ''}, "
         f"{report['n_unavailable']} no-verdict — n={m['n_usable']} usable of {corp['n_total']}"
     )

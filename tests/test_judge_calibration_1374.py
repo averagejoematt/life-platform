@@ -13,8 +13,10 @@ restore -> green):
     a spec that "loaded" but never made the prompt calibrates nothing);
   * a gate that cannot evaluate produces NOT_RUN, never a matrix — the fallback
     report wears `passed=True` and would otherwise manufacture sensitivity 1.0;
-  * an all-pass judge reports specificity 0/5, and the harness says so;
-  * every rate carries its denominator and an interval, and n=5 is marked thin.
+  * an all-pass judge is no longer enough to ship a fabricated number — since #2573
+    the DETERMINISTIC prepass blocks that class before the judge speaks — but it is
+    still enough to ship the classes only the LLM can see, and the split says which;
+  * every rate carries its denominator and an interval, and a thin n is marked thin.
 
 Fully offline: `_call_haiku` is always stubbed here, so no Bedrock call is made.
 """
@@ -31,6 +33,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import judge_calibration as jc  # noqa: E402
 import pytest  # noqa: E402
+
+# Derived, never typed: #2573 grew the negative corpus past the thin floor and a
+# hand-typed 35/5 here is exactly the literal that goes stale the next time it grows.
+_CASES = jc.labeled_cases()
+N_ALL = len(_CASES)
+N_GOOD = sum(1 for c in _CASES if c["label"] == jc.LABEL_GOOD)
+N_BAD = sum(1 for c in _CASES if c["label"] == jc.LABEL_DEFECTIVE)
+# The negatives the DETERMINISTIC prepass resolves on its own (#2573) vs the ones only
+# the LLM judge can catch (blacklisted phrases, vendor leaks). Computed, not asserted.
+_LLM_ONLY = [c for c in _CASES if c["label"] == jc.LABEL_DEFECTIVE and c["expect_checks"] == ["anti_pattern"]]
+N_DETERMINISTIC = N_BAD - len(_LLM_ONLY)
 
 
 # ── deterministic stub judges (no Bedrock) ───────────────────────────────────
@@ -54,7 +67,7 @@ def _stub(score_for):
 
 
 def _perfect_judge():
-    """Scores the 5 canary texts low and everything else high — the judge the
+    """Scores every canary text low and everything else high — the judge the
     corpus would need to earn a clean matrix."""
     from judge_calibration import labeled_cases
 
@@ -71,9 +84,11 @@ def test_corpus_is_not_empty_and_carries_both_classes():
     cases = jc.labeled_cases()
     good = [c for c in cases if c["label"] == jc.LABEL_GOOD]
     bad = [c for c in cases if c["label"] == jc.LABEL_DEFECTIVE]
-    assert len(cases) == 35, len(cases)
-    assert len(good) == 30, len(good)
-    assert len(bad) == 5, len(bad)
+    assert len(cases) == N_ALL == N_GOOD + N_BAD, len(cases)
+    assert len(good) == N_GOOD == 30, len(good)
+    # #2573 (acceptance item 5): the negative corpus must clear the thin floor, so a
+    # published specificity has a denominator that can carry a figure.
+    assert len(bad) == N_BAD >= jc.THIN_DENOMINATOR_N, len(bad)
     # No case may reach the judge without the brief production sends alongside it.
     assert all(isinstance(c["generation_brief"], dict) for c in cases)
 
@@ -197,7 +212,7 @@ def test_the_permissive_fallback_is_never_counted_as_a_pass():
     r = jc.run(call_haiku=_boom, check_budget=False)
     assert r["verdict"] == jc.NOT_RUN, r.get("matrix")
     assert "matrix" not in r
-    assert r["n_unavailable"] == 35
+    assert r["n_unavailable"] == N_ALL
     assert all(not x["usable"] for x in r["results"])
     assert any("fallback" in reason for reason in r["unavailable_reasons"])
 
@@ -220,8 +235,8 @@ def test_a_partial_outage_shrinks_the_denominator_rather_than_the_truth():
     r = jc.run(call_haiku=_flaky, check_budget=False)
     assert r["verdict"] == jc.MEASURED
     m = r["matrix"]
-    assert 0 < r["n_unavailable"] < 35
-    assert m["n_usable"] == 35 - r["n_unavailable"]
+    assert 0 < r["n_unavailable"] < N_ALL
+    assert m["n_usable"] == N_ALL - r["n_unavailable"]
     assert m["n_positives_good"] + m["n_negatives_defective"] == m["n_usable"]
     assert sum(m["cells"].values()) == m["n_usable"]
 
@@ -239,21 +254,26 @@ def test_a_perfect_judge_yields_the_expected_cells():
     r = jc.run(call_haiku=_perfect_judge(), check_budget=False)
     assert r["verdict"] == jc.MEASURED
     c = r["matrix"]["cells"]
-    assert c == {"golden_passed_tp": 30, "golden_failed_fn": 0, "canary_failed_tn": 5, "canary_passed_fp": 0}
-    assert r["matrix"]["sensitivity_agrees_with_good_work"]["denominator"] == 30
-    assert r["matrix"]["specificity_catches_defects"]["denominator"] == 5
+    assert c == {"golden_passed_tp": N_GOOD, "golden_failed_fn": 0, "canary_failed_tn": N_BAD, "canary_passed_fp": 0}
+    assert r["matrix"]["sensitivity_agrees_with_good_work"]["denominator"] == N_GOOD
+    assert r["matrix"]["specificity_catches_defects"]["denominator"] == N_BAD
 
 
-def test_an_all_pass_judge_reports_zero_specificity_and_says_so():
-    """The flattering-looking failure: a judge that passes everything scores a
-    perfect sensitivity. The report must not read as good news."""
+def test_an_all_pass_judge_still_cannot_ship_a_fabricated_number(gate_prepass=None):
+    """Pre-#2573 this test asserted specificity 0/5 — a judge that passes everything
+    caught nothing, which is what let 92/92/82 ship. The deterministic prepass now
+    blocks the number class before the judge speaks, so an all-pass judge scores
+    exactly the deterministic share and no more. Both halves matter: the numbers are
+    caught, and the LLM-only classes are still wide open, which the split must say
+    rather than average away."""
     r = jc.run(call_haiku=_all_pass_judge(), check_budget=False)
     m = r["matrix"]
-    assert m["cells"]["canary_failed_tn"] == 0
-    assert m["specificity_catches_defects"]["point"] == 0.0
+    assert m["cells"]["canary_failed_tn"] == N_DETERMINISTIC, "the deterministic prepass is what caught these"
+    assert m["cells"]["canary_passed_fp"] == len(_LLM_ONLY), "the LLM-only classes still ship past an all-pass judge"
     assert m["sensitivity_agrees_with_good_work"]["point"] == 1.0
-    assert "specificity 0/5" in jc.ops_line(r)
-    assert any("lower bound" in s for s in r["cannot_support"])
+    missed = {x["id"] for x in r["results"] if x["label"] == jc.LABEL_DEFECTIVE and x["judge_passed"]}
+    assert missed == {c["id"] for c in _LLM_ONLY}, missed
+    assert r["threshold_attribution"]["by_deterministic_number_grounding"] == N_DETERMINISTIC
 
 
 def test_the_matrix_is_sensitive_to_a_single_flipped_verdict():
@@ -262,10 +282,14 @@ def test_the_matrix_is_sensitive_to_a_single_flipped_verdict():
 
     cases = labeled_cases()
     bad = [c for c in cases if c["label"] == jc.LABEL_DEFECTIVE]
-    leaked, rest = bad[0]["output_text"], {c["output_text"] for c in bad[1:]}
+    # The flipped canary must be one the DETERMINISTIC prepass does not already block,
+    # or the flip is unobservable and the test would pass for the wrong reason (#2573).
+    leaked_case = next(c for c in bad if c["expect_checks"] == ["anti_pattern"])
+    leaked = leaked_case["output_text"]
+    rest = {c["output_text"] for c in bad if c["id"] != leaked_case["id"]}
     judge = _stub(lambda msg: 85 if (leaked in msg or not any(t in msg for t in rest)) else 20)
     c = jc.run(call_haiku=judge, check_budget=False)["matrix"]["cells"]
-    assert c == {"golden_passed_tp": 30, "golden_failed_fn": 0, "canary_failed_tn": 4, "canary_passed_fp": 1}
+    assert c == {"golden_passed_tp": N_GOOD, "golden_failed_fn": 0, "canary_failed_tn": N_BAD - 1, "canary_passed_fp": 1}
 
 
 # ── uncertainty is mandatory, and n=5 is loud about being thin ───────────────
@@ -279,17 +303,21 @@ def test_every_rate_carries_numerator_denominator_and_interval():
         assert not isinstance(rt, float), key
 
 
-def test_five_negatives_is_reported_as_a_thin_denominator():
+def test_the_negative_denominator_now_clears_the_thin_floor():
+    """#2573 acceptance item 5. Pre-#2573 this asserted the OPPOSITE — n=5, thin, and
+    "Do not publish" — because 5 canaries could not carry a published figure. The floor
+    itself is unchanged and still discriminates (see the unit assertions below); what
+    changed is that the corpus now clears it."""
     r = jc.run(call_haiku=_perfect_judge(), check_budget=False)
     spec = r["matrix"]["specificity_catches_defects"]
-    assert spec["denominator"] == 5
-    assert spec["thin"] is True
-    assert "below the 10-case floor" in spec["note"]
-    # 5/5 does NOT license "the judge catches ~100% of defects".
-    lo, hi = spec["ci95_wilson"]
+    assert spec["denominator"] == N_BAD >= jc.THIN_DENOMINATOR_N
+    assert spec["thin"] is False, "a denominator at or above the floor must not be marked thin"
+    assert not any("Do not publish" in s for s in r["cannot_support"])
+    # The floor still bites where it should — the flag discriminates, it is not gone.
+    assert jc.rate(5, 5)["thin"] is True
+    assert "below the 10-case floor" in jc.rate(5, 5)["note"]
+    lo, _hi = jc.wilson_interval(5, 5)
     assert lo < 0.6, f"a 5/5 lower bound of {lo} would overstate what 5 cases can show"
-    assert any("Do not publish" in s for s in r["cannot_support"])
-    assert any("n=5" in s or "n=5 " in s for s in r["cannot_support"])
 
 
 def test_thirty_positives_is_not_flagged_thin():
@@ -323,37 +351,58 @@ def test_rubric_scope_classifies_each_canary_fault_class():
     """The judge's prompt has four criteria — anti-patterns, decision class, voice
     distinctiveness, cross-coach similarity — and NO rule about fabricated numbers
     or contradicted vitals. That mismatch has to be a computed fact."""
-    assert jc.rubric_scope(["anti_pattern"]) == jc.IN_RUBRIC
-    assert jc.rubric_scope(["evidence_ceiling"]) == jc.ADJACENT
-    assert jc.rubric_scope(["grounding_contradiction"]) == jc.OUT_OF_RUBRIC
+    # The PRE-#2573 rubric — the four criteria as measured, and the gap that let
+    # 92/92/82 ship. Kept as a live assertion so the before/after is measured, not recalled.
+    pre = jc.RUBRIC_SCOPE_PRE_2573
+    assert jc.rubric_scope(["anti_pattern"], pre) == jc.IN_RUBRIC
+    assert jc.rubric_scope(["evidence_ceiling"], pre) == jc.ADJACENT
+    assert jc.rubric_scope(["grounding_contradiction"], pre) == jc.OUT_OF_RUBRIC
+    # The CURRENT rubric: criterion 5 consumes the deterministic verdict, so the
+    # fabricated-number and vital-contradiction classes are squarely in scope.
+    assert jc.rubric_scope(["evidence_ceiling"]) == jc.IN_RUBRIC
+    assert jc.rubric_scope(["grounding_contradiction"]) == jc.IN_RUBRIC
     # weakest link wins, and an unknown/absent class is never optimistically scoped
-    assert jc.rubric_scope(["anti_pattern", "grounding_contradiction"]) == jc.OUT_OF_RUBRIC
+    assert jc.rubric_scope(["anti_pattern", "grounding_contradiction"], pre) == jc.OUT_OF_RUBRIC
     assert jc.rubric_scope([]) == jc.OUT_OF_RUBRIC
     assert jc.rubric_scope(["something_new"]) == jc.OUT_OF_RUBRIC
 
 
-def test_only_one_of_the_five_negatives_is_in_rubric():
+def test_the_rubric_gap_closed_and_the_before_is_still_measurable():
+    """#2573's finding was that only ONE of the negatives fell inside the rubric at
+    all. That is now a historical measurement, not the current state — and both must
+    stay computable from the corpus, otherwise the PR's own claim is unverifiable."""
     bad = [c for c in jc.labeled_cases() if c["label"] == jc.LABEL_DEFECTIVE]
-    scopes = [c["rubric_scope"] for c in bad]
-    assert scopes.count(jc.IN_RUBRIC) == 1, scopes
-    assert scopes.count(jc.IN_RUBRIC) + scopes.count(jc.ADJACENT) + scopes.count(jc.OUT_OF_RUBRIC) == 5
+    pre = [c["rubric_scope_pre_2573"] for c in bad]
+    now = [c["rubric_scope"] for c in bad]
+    assert pre.count(jc.OUT_OF_RUBRIC) + pre.count(jc.ADJACENT) > 0, "the pre-fix gap must remain visible"
+    assert now.count(jc.IN_RUBRIC) == len(bad), now
+    assert len(pre) == len(now) == N_BAD
 
 
-def test_specificity_is_split_by_rubric_scope_and_every_split_is_thin():
+def test_specificity_is_split_by_rubric_scope_both_before_and_after():
+    """The acceptance item asks for a rubric-scoped split rather than one conflated
+    number. Publishing only the post-fix split would hide the thing that moved."""
     r = jc.run(call_haiku=_perfect_judge(), check_budget=False)
-    scoped = r["matrix"]["specificity_by_rubric_scope"]
-    assert set(scoped) == {jc.IN_RUBRIC, jc.ADJACENT, jc.OUT_OF_RUBRIC}
-    assert sum(s["denominator"] for s in scoped.values()) == 5
-    assert scoped[jc.IN_RUBRIC]["denominator"] == 1
-    assert all(s["thin"] for s in scoped.values()), "a sub-rate over 1-3 cases must never be presented as a figure"
+    m = r["matrix"]
+    now = m["specificity_by_rubric_scope"]
+    pre = m["specificity_by_rubric_scope_pre_2573"]
+    assert set(now) == {jc.IN_RUBRIC}, "every negative is in scope of the current rubric"
+    assert sum(s["denominator"] for s in now.values()) == N_BAD
+    assert sum(s["denominator"] for s in pre.values()) == N_BAD
+    assert set(pre) - {jc.IN_RUBRIC}, "the pre-fix split must still show the out-of-scope classes"
+    # Sub-rates over a handful of cases must still refuse to be figures.
+    assert all(s["thin"] for s in pre.values() if s["denominator"] < jc.THIN_DENOMINATOR_N)
 
 
-def test_the_corpus_rubric_mismatch_is_stated_in_what_it_cannot_support():
+def test_what_the_post_2573_matrix_cannot_support_is_stated():
+    """The mismatch clause was the pre-#2573 caveat. Its successor is the one that
+    matters now: most of the catch is the DETERMINISTIC prepass, so the combined
+    gate's specificity is not a measurement of the judge's own discrimination."""
     r = jc.run(call_haiku=_perfect_judge(), check_budget=False)
     joined = " ".join(r["cannot_support"])
-    assert "CORPUS/RUBRIC MISMATCH" in joined
-    assert "only 1 of the 5 negatives" in joined
-    assert "coverage gap" in joined
+    assert "#2573" in joined
+    assert "not a measurement of the judge" in joined.replace("NOT a measurement of the judge", "not a measurement of the judge")
+    assert "does not generalise to field failure modes" in joined
 
 
 # ── the report says what it cannot support, even when it looks good ──────────
@@ -367,9 +416,12 @@ def test_a_clean_matrix_still_states_what_it_cannot_support():
 
 def test_text_report_renders_the_matrix_with_its_n():
     out = jc.text_report(jc.run(call_haiku=_perfect_judge(), check_budget=False))
-    assert "n=30" in out and "n= 5" in out
-    assert "95% CI" in out and "THIN" in out
+    assert f"n={N_GOOD}" in out and f"n={N_BAD:>2}" in out
+    assert "95% CI" in out
     assert "CANNOT support" in out
+    # #2573: the split is published both ways, and the operative control is named.
+    assert "PRE-#2573 rubric" in out and "CURRENT rubric" in out
+    assert "Operative control:" in out
 
 
 def test_text_report_for_not_run_emits_no_numbers(monkeypatch):
@@ -399,11 +451,14 @@ def test_threshold_attribution_separates_the_numeric_gate_from_the_model_boolean
 
     ta = jc.run(call_haiku=_call, check_budget=False)["threshold_attribution"]
     assert ta["threshold"] == 60
-    assert ta["n_fail_decisions"] == 6
-    assert ta["by_score_threshold"] == 5
+    # Three mechanisms since #2573, attributed in precedence order: the deterministic
+    # verdict first (when it fires the other two did not decide), then the numeric
+    # gate, then the model's own boolean above the threshold.
+    assert ta["n_fail_decisions"] == N_BAD + 1
+    assert ta["by_deterministic_number_grounding"] == N_DETERMINISTIC
+    assert ta["by_score_threshold"] == len(_LLM_ONLY), "the canaries the grounder does not see, scored 20"
     assert ta["by_model_boolean_at_or_above_threshold"] == 1
     assert ta["model_boolean_ids"] == ["sleep_01"]
-    assert "note" not in ta, "the note must only fire when the model boolean DOMINATES"
 
 
 def test_a_score_exactly_at_the_threshold_is_attributed_to_the_model_not_the_gate():
@@ -416,9 +471,9 @@ def test_a_score_exactly_at_the_threshold_is_attributed_to_the_model_not_the_gat
         return {"passed": False, "score": 60, "voice_distinctiveness_score": 70}
 
     ta = jc.run(call_haiku=_call, check_budget=False)["threshold_attribution"]
-    assert ta["n_fail_decisions"] == 35
+    assert ta["n_fail_decisions"] == N_ALL
     assert ta["by_score_threshold"] == 0, "score == threshold must NOT be credited to the numeric gate"
-    assert ta["by_model_boolean_at_or_above_threshold"] == 35
+    assert ta["by_model_boolean_at_or_above_threshold"] == N_ALL - N_DETERMINISTIC
 
 
 def test_a_dominant_model_boolean_earns_the_threshold_is_inert_note():
@@ -427,8 +482,9 @@ def test_a_dominant_model_boolean_earns_the_threshold_is_inert_note():
 
     ta = jc.run(call_haiku=_call, check_budget=False)["threshold_attribution"]
     assert ta["by_score_threshold"] == 0
-    assert ta["by_model_boolean_at_or_above_threshold"] == 35
-    assert "not the operative control" in ta["note"]
+    assert ta["by_model_boolean_at_or_above_threshold"] == N_ALL - N_DETERMINISTIC
+    assert ta["operative_control"] != "PASS_SCORE_THRESHOLD"
+    assert "operative control for 0 of" in ta["note"]
 
 
 # ── --json must be machine-parseable (the gate logs to stdout) ───────────────
@@ -450,7 +506,7 @@ def test_json_mode_emits_exactly_one_parseable_document(monkeypatch, capsys):
     out = capsys.readouterr().out
     parsed = json.loads(out)  # raises if any log line leaked into stdout
     assert parsed["verdict"] == jc.MEASURED
-    assert parsed["matrix"]["n_usable"] == 35
+    assert parsed["matrix"]["n_usable"] == N_ALL
 
 
 def test_the_gate_logger_is_quiet_during_the_replay_and_restored_after():
@@ -474,7 +530,7 @@ def test_the_gate_logger_is_quiet_during_the_replay_and_restored_after():
     gate.logger.setLevel(logging.INFO)
     try:
         jc.run(call_haiku=_call, check_budget=False)
-        assert len(seen) == 35
+        assert len(seen) == N_ALL
         assert set(seen) == {logging.WARNING}, f"gate logger was not quieted during the replay: {sorted(set(seen))}"
         assert gate.logger.level == logging.INFO, "quieting leaked out of the run"
     finally:

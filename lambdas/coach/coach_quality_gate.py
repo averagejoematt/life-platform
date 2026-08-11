@@ -318,7 +318,7 @@ def _self_repetition_report(coach_id, output_text):
         return {"status": "error", "verdict": None, "error": str(e), "advisory": True}
 
 
-def _number_grounding_report(output_text, generation_brief):
+def _number_grounding_report(output_text, generation_brief, generation_date=None):
     """Deterministic fabricated-number verdict (#2573, ADR-104/105) — no LLM.
 
     CONSUMES the platform's existing deterministic grounder rather than re-deciding
@@ -354,10 +354,15 @@ def _number_grounding_report(output_text, generation_brief):
         }
     try:
         from ai import grounded_generation as _gg
+        from ai.grounding_gate_params import cycle_gate_params
 
         allowed = {float(n) for n in (brief.get(GROUNDING_ALLOWLIST_KEY) or [])}
         facts = brief.get(AUTHORITATIVE_FACTS_KEY) or {}
-        findings = _gg.grounding_findings(output_text, facts=facts or None, allowed=allowed)
+        # #1967 policy floor: the cycle-freshness classes are framing-scoped and free,
+        # and have no valid exemption. The event carries the generation date, so this
+        # surface grades the draft's "Day N" framing against the same anchors the
+        # generation gate used rather than against today.
+        findings = _gg.grounding_findings(output_text, facts=facts or None, allowed=allowed, **cycle_gate_params(generation_date))
         return {
             "status": "measured",
             "verdict": "ungrounded" if findings else "clean",
@@ -804,7 +809,7 @@ def lambda_handler(event, context):
         # #2573 — deterministic number grounding, also BEFORE the LLM. Unlike
         # repetition this one is BLOCKING: it is the ADR-104 verdict, and the LLM
         # is handed it as a decided input rather than asked to re-decide it.
-        grounding = _number_grounding_report(output_text, generation_brief)
+        grounding = _number_grounding_report(output_text, generation_brief, event.get("generation_date"))
 
         # Run the quality gate
         report = _run_quality_gate(
