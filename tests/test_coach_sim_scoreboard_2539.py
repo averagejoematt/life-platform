@@ -155,6 +155,26 @@ def test_coachsim_partition_is_cross_phase(sk):
     assert phase_taxonomy.classify(sb.SCOREBOARD_PK, sk) == phase_taxonomy.CROSS_PHASE
 
 
+def test_the_tombstone_exemption_reason_is_true_not_merely_plausible():
+    """The `_GENERATION_GET_ITEM_EXEMPT` entries for this module are justified by ONE
+    claim — that COACHSIM# is CROSS_PHASE and therefore never tombstoned. Nothing in that
+    registry checks whether a stated reason is actually true; a wrong-but-fluent reason
+    passes it forever. So the premise is asserted here, at the partition it is about.
+
+    If someone reclassifies COACHSIM# as experiment-scoped, this fails and the three
+    exemptions have to be re-argued instead of silently becoming false.
+    """
+    from test_singleton_tombstone_guards import _GENERATION_GET_ITEM_EXEMPT
+
+    ours = {sk: reason for (f, sk), reason in _GENERATION_GET_ITEM_EXEMPT.items() if f == "coach/coach_sim_scoreboard.py"}
+    assert set(ours) == {"LATEST_SK", "f'{RUN_SK_PREFIX}{run_date}'", "LIMITATIONS_SK"}, ours
+    for reason in ours.values():
+        assert "CROSS_PHASE" in reason and "tombstoned" in reason
+    # The premise itself, checked against the taxonomy rather than trusted from the prose.
+    for sk in (sb.LATEST_SK, sb.LIMITATIONS_SK, f"{sb.RUN_SK_PREFIX}2026-08-10"):
+        assert phase_taxonomy.classify(sb.SCOREBOARD_PK, sk) == phase_taxonomy.CROSS_PHASE
+
+
 def test_coachsim_is_classified_the_same_way_as_its_sibling_harness():
     """If VOICEFIDELITY# is ever reclassified, this one should be reconsidered with it —
     they measure the same kind of thing and diverging silently would be an accident."""

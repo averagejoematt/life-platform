@@ -991,13 +991,26 @@ _GENERATION_GET_ITEM_EXEMPT: dict = {
         "coach/voice_fidelity_harness.py",
         "f'RUN#{run_month}'",
     ): "monthly-run idempotency marker — ops bookkeeping; a tombstoned marker suppressing a re-run is conservative",
+    # #2539, three rows of one CROSS_PHASE partition. The shared reason: COACHSIM# scores
+    # the coaching ENGINE's design across cycles — exactly like its sibling VOICEFIDELITY#
+    # at the bottom of this dict — so phase_taxonomy.py registers the prefix CROSS_PHASE,
+    # it is never tagged, and a reset never tombstones it. Filtering these would hide the
+    # multi-cycle trend the scoreboard exists to show. They are also read only by a laptop
+    # script, never by generation, and feed no generated surface.
     (
         "coach/coach_sim_scoreboard.py",
-        "sk",
-    ): "COACHSIM# is CROSS_PHASE (#2539) — the coach-sim scoreboard measures the coaching ENGINE's design across "
-    "cycles, exactly like its sibling VOICEFIDELITY#, so phase_taxonomy never tags it and a reset never tombstones "
-    "it. The rows it reads (latest / RUN#<date> / LIMITATIONS) are also never written by generation and never feed "
-    "a generated surface — they are a measurement ledger read by a laptop script.",
+        "LATEST_SK",
+    ): "COACHSIM#scoreboard/latest — the most recent sim run; CROSS_PHASE, never tombstoned",
+    (
+        "coach/coach_sim_scoreboard.py",
+        "f'{RUN_SK_PREFIX}{run_date}'",
+    ): "COACHSIM#scoreboard/RUN#<date> — the immutable per-run rows the trend is read from; CROSS_PHASE, never "
+    "tombstoned. seed_baseline() also reads this to stay idempotent: a tombstone-filtered miss would re-seed the "
+    "2026-08-10 baseline over a stored run.",
+    (
+        "coach/coach_sim_scoreboard.py",
+        "LIMITATIONS_SK",
+    ): "COACHSIM#scoreboard/LIMITATIONS — the known-limitations + cadence row; CROSS_PHASE, never tombstoned",
 }
 
 

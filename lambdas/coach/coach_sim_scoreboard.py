@@ -305,27 +305,40 @@ def seed_baseline(*, table=None, now=None, overwrite: bool = False) -> dict:
     return write_run(record, table=tbl, now=now, update_latest=not newer_exists)
 
 
-def _get(sk: str, table=None) -> dict:
-    tbl = _table(table)
-    try:
-        return tbl.get_item(Key={"pk": SCOREBOARD_PK, "sk": sk}).get("Item") or {}
-    except Exception:
-        # Absence is the designed state before the first seed; a read failure must not
-        # take a replay run down with it. The caller reports "no stored baseline".
-        return {}
+# The three reads below are written out rather than routed through one `_get(sk)` helper
+# on purpose. tests/test_singleton_tombstone_guards.py keys its tombstone exemptions by
+# (file, unparsed sk expression) so that an entry "survives line drift but dies with a
+# refactor — forcing the reason to be re-argued, not inherited". A shared helper collapses
+# all three sites onto the key `sk`, a bare local name that would go on matching through
+# refactors that ought to invalidate it. Naming each constant at its own call site is what
+# makes the exemption a statement about a specific row rather than about this file.
+#
+# Every one of them fail-softs to {}: absence is the designed state before the first seed
+# (see the KNOWN_OPTIONAL entries in tests/test_ddb_key_contracts.py), and a read failure
+# must not take a $0 replay run down with it. Callers report "no stored baseline" — they
+# never substitute a zero.
 
 
 def read_latest(*, table=None) -> dict:
     """The most recent stored run. ``{}`` before the first seed — never a fabricated zero."""
-    return _get(LATEST_SK, table)
+    try:
+        return _table(table).get_item(Key={"pk": SCOREBOARD_PK, "sk": LATEST_SK}).get("Item") or {}
+    except Exception:
+        return {}
 
 
 def read_run(run_date: str, *, table=None) -> dict:
-    return _get(f"{RUN_SK_PREFIX}{run_date}", table)
+    try:
+        return _table(table).get_item(Key={"pk": SCOREBOARD_PK, "sk": f"{RUN_SK_PREFIX}{run_date}"}).get("Item") or {}
+    except Exception:
+        return {}
 
 
 def read_limitations(*, table=None) -> dict:
-    return _get(LIMITATIONS_SK, table)
+    try:
+        return _table(table).get_item(Key={"pk": SCOREBOARD_PK, "sk": LIMITATIONS_SK}).get("Item") or {}
+    except Exception:
+        return {}
 
 
 def _as_float(value):
