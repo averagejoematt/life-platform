@@ -1,4 +1,4 @@
-# Handover — 2026-08-11 evening: the three P1s, and a corpus that would not shrink (46 → 46)
+# Handover — 2026-08-11 evening: the three P1s, and the gate that answered a scope question (46 → 44)
 
 **Session:** autonomous, Opus, no `model:fable` work. Driver + 8 implementer agents.
 **Plan:** `~/.claude/plans/gate-audit-and-the-p1-trio.md` (Acts 0–4 + 6 executed; Act 5 / #2578 not started).
@@ -6,33 +6,37 @@
 **Build beat:** `2026-08-11-the-gate-that-could-not-fail`
 **Docs:** `docs/CONVENTIONS.md` (§ pre-commit gate — the pinned-formatter rule, #2570); agent PRs carried `docs/PHASE_TAXONOMY.md`, `docs/SCHEMA.md`, `docs/design/COACH_HUMANITY_ROADMAP.md` §7a, `tests/fixtures/coach_sim_replay/README.md`
 **Decisions:** none requiring an ADR — the session applied existing contracts (ADR-104/105 honest numbers, ADR-108 promotion pattern, ADR-125 audience ordering, #2467's gated-run lease, R8-ST6)
-**Main:** see **Deploy** below
+**Main:** ✅ GREEN at `7f228a76` — but it read FAILURE for most of the session, see #2590
 **Stash/hooks:** hook reinstalled this session (#2570 requires it in every clone); pinned black 26.3.1 + ruff 0.14.14 installed into `.venv-black`
-**Closures:** #2558, #2570, #2584, #2539, #2573 — and **#2569 + #2575 deliberately REOPENED** after their PRs merged (see "Two closes I undid")
+**Closures:** #2558, #2570, #2584, #2539, #2573, #2587, #2569 — **#2575 remains REOPENED** (its after-number needs tomorrow's regeneration); #2569 was reopened mid-session and then legitimately closed once the gate deployed and the backfill ran
 **CI warnings:** 9 at Act 0, all pre-triaged (3 content-truth → #2575, 7× Lambda config drift → #2468 `gate:owner`, `CONTENT_FILTER_JSON` → #2370)
 
 ---
 
 ## The number, honestly
 
-**46 → 46.** Not the 39–42 I restated in Act 0, and not the plan's 38–41.
+**46 → 44** (non-fable 21 → 19). Short of the 39–42 I restated in Act 0, and of the plan's 38–41.
 
 | | |
 |---|---|
 | open at Act 0 | 46 (the plan said 45 — one had been filed since) |
-| closed | 5 — #2558, #2570, #2584, #2539, #2573 |
-| filed | 5 — #2584, #2587, #2588, #2589, #2590 |
-| **net** | **0** |
+| closed | **7** — #2558, #2570, #2584, #2539, #2573, #2587, #2569 |
+| filed | **5** — #2584, #2587, #2588, #2589, #2590 |
+| **net** | **−2** |
 
-The plan budgeted "+2–4 newly filed, because that is what happened last time." It came in at **+5**, and one of those (#2584) was closed the same session. This is the second consecutive session where verification filed roughly as fast as it closed.
+Two closures (#2587, #2569) landed in the last half hour, after the consent gate deployed and the backfill ran. For most of the session the honest number was **46 → 46, net zero**, and that is worth recording rather than hiding — the win came from finishing the chain, not from the merges.
 
-**That is not a shortfall to explain away, but it is also not noise.** Three of the five are things nobody could have filed before tonight's work existed:
+The plan budgeted "+2–4 newly filed." It came in at **+5**. But two of those five were closed the same session, which is the pattern worth noticing: **a filing is not automatically a debt.**
+
+**The miss is still a miss, and it is also not noise.** Three of the five filings could not have existed before tonight's own work:
 
 - **#2587** could not be found until #2580 fixed the readers — the consent gap only becomes reachable once journal rows are indexable.
 - **#2589** could not be found until someone went looking for the data #2560 was supposed to be accumulating.
 - **#2590** could not be found until someone actually followed #2467's reject prescription.
 
-If the queue is the metric, the session broke even. If *known* correctness is the metric, it moved a long way: a blocking gate that could not fail now fails, two reader-facing surfaces stopped disagreeing, and a privacy leak was caught **before** anything was indexed rather than after.
+If *known* correctness is the metric rather than the queue, it moved a long way: a blocking gate that could not fail now fails, two reader-facing surfaces stopped disagreeing, and a privacy leak was caught **before** anything was indexed rather than after.
+
+**And the last measurement of the night answered a question that had been open for weeks.** With the consent gate live, the journal backfill ran and indexed **zero of 60** rows — every entry resolves to `private`, because none has ever been owner-cleared. So the corpus stays chronicle-only, but for a completely different reason than before: it was chronicle-only because of a **silent reader bug**, and it is now chronicle-only because of a **consent decision that was always in force and had nothing enforcing it**. #2347's scope question therefore is not an engineering question about latency or corpus size at all — it is *does Matthew want to clear journal entries for recall, and at which tier*. The machinery to honour either answer is now live.
 
 ---
 
@@ -79,8 +83,8 @@ Two honest misses were kept in the record rather than smoothed: `canary_vendor_l
 
 Both PRs merged and auto-closed their issues. Both had genuinely unmet acceptance boxes, so I reopened them with the boxes named. Three closes were undone last session for exactly this; the fix is to catch it at merge, not next session.
 
-- **#2569** — the reader fix is complete and the audit was excellent, but the **backfill and corpus re-count did not run**, and are now blocked on **#2587**.
-- **#2575** — the fix is complete and independently verified, but box 4 (`failed_content_truth` → 0 with real after-numbers) **cannot be measured until the code is deployed and coaches regenerate**. Before is real: `3 failures (0 deploy_health, 3 content_truth), 10 warnings`.
+- **#2569** — reopened because the **backfill and corpus re-count had not run**. Later in the session #2587 landed and deployed, the backfill ran, and it closed **legitimately**. Reopening was still right: had it stayed closed, the backfill would never have run and the finding below would not exist.
+- **#2575** — the fix is complete, deployed and independently verified, but box 4 (`failed_content_truth` → 0 with real after-numbers) is **confirmed unmeasurable tonight, not merely unmeasured**: today's coach narratives were generated at 17:00Z and the deploy landed at 20:13–20:22Z, so the published text the check reads is still pre-fix. **This one stays open** for tomorrow's regeneration. Latest measured: `2 failures (0 deploy_health, 2 content_truth), 11 warnings` (the third original FAIL was the recall link rot, already repaired).
 
 ---
 
@@ -129,6 +133,30 @@ Each time a query returned "nothing" and I read it as a broken system:
 
 ---
 
+## The last measurement — the consent gate answered #2347
+
+With #2587 deployed and symbol-verified, the journal backfill ran for the first time:
+
+```
+APPLIED: 0 embedded, 0 metadata-refreshed, 0 skipped (unchanged),
+         60 WITHHELD by the consent gate (#2587), 60 scanned.  ~$0.0000
+corpus by kind:  19 chronicle    (before: 19 chronicle / 0 journal — unchanged)
+```
+
+**All 60 journal entries resolve to `private`.** None has ever been owner-cleared with a
+`public_quote` line or an `allude` tier, and `private` is the default for anything unmarked.
+
+So the reader bug is fixed and the corpus did not change — and that is the correct outcome,
+not an anticlimax. Chronicle-only *was* the product of a silent reader bug; it is *now* the
+product of a consent decision that was always in force with nothing enforcing it. Two very
+different states that looked identical from outside.
+
+This is the third reframing #2347 took in one session, and the most consequential: its scope
+question is not about latency or corpus size, it is **an owner-consent question**. The answer
+lives with Matthew, and both tiers are now supported and live.
+
+---
+
 ## Deploy
 
 One fleet run approved at the end, covering all seven merges (`deploy/verify_deployed_symbol.sh`, symbols not timestamps). Two superseded gated runs were **rejected** first per #2467 — `32734614d` and `b177805f6`, both confirmed ancestors of main; approving either would have deployed a tree missing up to five later merges.
@@ -145,9 +173,9 @@ pk=COACHSIM#scoreboard → LIMITATIONS   RUN#2026-08-10   latest
 
 ## For the next session
 
-1. **#2587 first** — it is a P1 privacy gate and it unblocks #2569's remaining half. An implementer was dispatched on it this session; check whether its PR landed.
-2. **#2575's box 4** — one measurement, then it closes.
-3. **#2589** — determine which early return fires, by measurement not inference; then #2347's four-week clock can finally start.
+1. **#2575's box 4** — one measurement after the ~17:0xZ regeneration, then it closes. This is the cheapest close in the corpus.
+2. **#2589** — determine which early return fires, by measurement not inference; then #2347's four-week clock can finally start. Note this is now *more* urgent, not less: with the corpus confirmed chronicle-only by consent, hit/miss data is the only remaining evidence #2347 can be decided on.
+3. **#2347 is now an owner question, not an engineering one** — see the closing note on #2569. Ask whether journal entries should be cleared for recall, and at which tier (`allude` = paraphrase only, `quote` = one specific cleared line). Both are supported and live.
 4. **Ask the owner about `metrics.json`** (see #2537) — one answer either unblocks it at $0 or costs $3.73.
 5. **#2578 was not started.** If attempted, the first slice remains: enumerate the gate inventory *from source* and report coverage with `n`. Tonight added a third and fourth measured instance to its thesis — #2573 (blocking but rubric-blind) and #2590 (a gate whose correct use makes another gate report a falsehood).
 6. **The owner residuals are unchanged:** PR #2552 + #2572 (cdk + P5 ratification), BotFather ×3, `CONTENT_FILTER_JSON`, and #2468's `cdk deploy` — which, note, is `model:fable`.
