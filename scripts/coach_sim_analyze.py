@@ -22,6 +22,16 @@ THE DETERMINISTIC SET, and why each one is here:
                     the em-dash, so this measures HABIT, not legality.
   not_x_but_y       the "it's not X, it's Y" antithesis construction — the second
                     most-cited tell, and one no voice spec asks for.
+  balanced_clauses  the WIDER class "not X, but Y" is only one member of (#2537).
+                    Rhetorical symmetry was the #1 judge tell — 25% of 2,404
+                    free-text tells — while the narrow regex above matched 9 times
+                    in 536 replies. A detector that undercounts the corpus's
+                    loudest signal by two orders of magnitude is a guard that
+                    guards nothing, so the class is now five NAMED patterns (the
+                    original frame, the "X, not Y" verdict, comparative antithesis,
+                    parallel construction, the closing flourish) reported per coach
+                    so a spec that legitimately asks for symmetry can be told apart
+                    from the model's habit. Advisory only: it counts, never rewrites.
   assistant_isms    #2481 banned a list of these in the prompt. A prompt rule is a
                     request; this measures whether the request is being honoured.
   formatting        bullets/headers/numbered lists in a text message. Banned in prompt,
@@ -97,6 +107,169 @@ _NUMBER = re.compile(r"\b\d+(?:\.\d+)?\b")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
+# ── The balanced-clause class (#2537) ─────────────────────────────────────────
+#
+# WHY THIS IS FIVE PATTERNS AND NOT ONE. The blind panel's 2,404 free-text tells
+# put rhetorical symmetry at 25% — the single loudest signal in the corpus — and
+# `_NOT_X_BUT_Y` above found 9 instances in 536 replies. The regex was not wrong;
+# it was answering a narrower question than the judges were asking. The judges
+# flag a family, and a family needs members that can be counted separately,
+# because "symmetry is up 40%" is unactionable while "the closing flourish is up
+# 40%" names the sentence to cut.
+#
+# ADVISORY, DELIBERATELY (the coach_repetition_detector posture). This is a
+# measuring instrument: pure functions, corpus passed in, no mutation of any
+# reply, and no verdict from a sample too small to carry one. The mutating
+# enforcement path (#2555's style gate) is a different module on purpose — an
+# instrument that can rewrite the thing it measures cannot be trusted to report
+# on it.
+#
+# Each pattern below is anchored to a span the judges actually cited, quoted in
+# `docs/design/COACH_SIM_FINDINGS_2026_08_10.md` and in #2537.
+
+# "That's signal, not alarm." — the balanced two-clause verdict. The negated
+# appositive must CLOSE the sentence: mid-sentence ", not " is ordinary
+# qualification ("I'd rest today, not because you're weak, but because…" is
+# caught by _NOT_X_BUT_Y instead), while a sentence that lands on it is the
+# aphorism shape.
+_BAL_X_NOT_Y = re.compile(r"[^.,;!?—]{3,60},\s*not\s+[^.,;!?]{2,40}(?=\s*[.!?]|\s*$)", re.I)
+
+# "The number itself is less important than what it's doing over time" —
+# antithesis with no `not` anywhere. The comparand after `than` must be a CLAUSE,
+# not a noun phrase: "your sleep is more consistent than last month" is a data
+# statement and must stay silent, while "…than what it's doing" opposes two ideas.
+_BAL_COMPARATIVE = re.compile(
+    r"\b(?:is|are|was|were|isn't|aren't|matters?|feels?|reads?|counts?|means?|says?|tells?)\s+"
+    r"(?:a\s+lot\s+|much\s+|far\s+|way\s+|rather\s+)?(?:less|more)\s+[\w'’-]+(?:\s+[\w'’-]+){0,2}\s+than\s+"
+    r"(?:what|how|whether|why|who|where|(?:[\w'’-]+\s+){0,3}(?:is|are|was|were|does|do|did|has|have|can|could|would|will))\b"
+    r"|\bless\s+about\s+[^.;!?]{2,50}\bthan\s+about\b"
+    r"|\bnot\s+so\s+much\s+[^.;!?]{2,50}\bas\b",
+    re.I,
+)
+
+# "Which is either reassuring or unsettling depending on how you look at it." —
+# the summarising flourish that closes a reply too neatly. Scored on the FINAL
+# sentence only: the same construction mid-reply is a thought, at the end it is a
+# bow tied on the paragraph, and the judges cited the ending specifically
+# ("poetic construction that wraps up the advice too neatly").
+_BAL_FLOURISH = re.compile(
+    r"^which\b"
+    r"|\beither\s+[^.;!?]{2,60}\bor\b"
+    r"|\bdepending on (?:how|what|which|who|whether)\b"
+    r"|\bnot because\s+[^.;!?]{2,60}\bbut because\b"
+    r"|\bwhich is (?:both|either|why|what|the)\b",
+    re.I,
+)
+
+# Clause boundaries for parallel construction. The em-dash and the colon are
+# boundaries too: "I don't exist between conversations — no background
+# processing, no waiting around, no boredom" is a run of THREE `no` clauses only
+# if the dash splits; on commas alone it reads as two and the tell is missed.
+_CLAUSE_SPLIT = re.compile(r"\s*[,;:—–]\s*|\s+-\s+")
+
+# Anaphora needs three limbs to be rhetoric rather than coincidence: two clauses
+# opening on the same word happens constantly in ordinary prose, three is a
+# deliberate figure. Stated as a tunable so the bar is visible, not buried.
+PARALLEL_MIN_LIMBS = 3
+# Each limb must be more than a bare connective, or "and, and, and" would score.
+PARALLEL_MIN_WORDS_PER_LIMB = 2
+
+# The five members, in report order. Named so a per-coach rate can be attributed
+# to a construction rather than to an undifferentiated "symmetry" number.
+BALANCED_CLAUSE_CLASSES = (
+    "not_x_but_y",
+    "x_not_y",
+    "comparative_antithesis",
+    "parallel_construction",
+    "closing_flourish",
+)
+
+# Below this many replies a per-coach rate is noise, so no verdict is issued —
+# absence, never a green "this coach is fine" (ADR-104/105).
+MIN_REPLIES_FOR_COACH_VERDICT = 20
+# A platform baseline drawn from fewer coaches than this cannot support a
+# mean+std threshold, so the per-coach verdicts stay None.
+MIN_COACHES_FOR_BASELINE = 4
+# Flag a coach whose rate exceeds the platform mean by this many standard
+# deviations of the per-coach rate distribution (personal-variance threshold,
+# ADR-105 — not a guessed constant).
+BASELINE_K = 1.0
+
+
+def _sentences(text):
+    return [s.strip() for s in _SENTENCE_SPLIT.split((text or "").strip()) if s.strip()]
+
+
+def _first_word(segment):
+    m = re.match(r"[\"“‘'(]*([\w'’-]+)", segment or "")
+    return m.group(1).lower() if m else ""
+
+
+def _parallel_construction_hits(reply):
+    """Anaphora: PARALLEL_MIN_LIMBS+ consecutive clauses opening on the same word.
+
+    Two shapes count. Within a sentence — "No background processing, no waiting
+    around, no boredom." Across sentences — consecutive sentences sharing their
+    first two words, which is the rhythm the judges called "identical shape every
+    time" ("validate feeling, reframe as information, ask clarifying question").
+    """
+    hits = []
+    sents = _sentences(reply)
+
+    for sent in sents:
+        limbs = [seg for seg in _CLAUSE_SPLIT.split(sent) if seg.strip()]
+        run_word, run_len, run_start = None, 0, 0
+        for i, limb in enumerate(limbs):
+            word = _first_word(limb)
+            long_enough = len(limb.split()) >= PARALLEL_MIN_WORDS_PER_LIMB
+            if word and long_enough and word == run_word:
+                run_len += 1
+            else:
+                run_word, run_len, run_start = (word if long_enough else None), 1, i
+            if run_len == PARALLEL_MIN_LIMBS:
+                hits.append(", ".join(limbs[run_start : i + 1])[:120])
+
+    # Sentence-level anaphora: two consecutive sentences is already a figure at
+    # this granularity, because a whole sentence repeating an opening is far less
+    # likely to be accidental than a clause is.
+    for a, b in zip(sents, sents[1:]):
+        wa, wb = a.split(), b.split()
+        if len(wa) >= 4 and len(wb) >= 4:
+            head_a = " ".join(w.lower().strip(".,;:!?\"'") for w in wa[:2])
+            head_b = " ".join(w.lower().strip(".,;:!?\"'") for w in wb[:2])
+            if head_a and head_a == head_b:
+                hits.append(f"{a[:60]} / {b[:60]}")
+    return hits
+
+
+def balanced_clause_hits(reply):
+    """The balanced-clause / antithesis family in one reply (#2537).
+
+    Pure function over one string — no corpus fetch, no model, no mutation.
+    Returns {class_name: [matched spans]} containing only the classes that fired,
+    so an empty dict is a genuine zero rather than five zeroes to filter.
+    """
+    text = (reply or "").strip()
+    if not text:
+        return {}
+    found = {}
+
+    def add(name, spans):
+        spans = [s.strip()[:120] for s in spans if s and s.strip()]
+        if spans:
+            found[name] = spans
+
+    add("not_x_but_y", _NOT_X_BUT_Y.findall(text))
+    add("x_not_y", [m.group(0) for m in _BAL_X_NOT_Y.finditer(text)])
+    add("comparative_antithesis", [m.group(0) for m in _BAL_COMPARATIVE.finditer(text)])
+    add("parallel_construction", _parallel_construction_hits(text))
+
+    sents = _sentences(text)
+    if sents and _BAL_FLOURISH.search(sents[-1]):
+        add("closing_flourish", [sents[-1]])
+    return found
+
+
 def load_runs(run_dir: str) -> list:
     convos = []
     for path in sorted(glob.glob(os.path.join(run_dir, "*.jsonl"))):
@@ -119,6 +292,7 @@ def reply_metrics(inbound: str, reply: str) -> dict:
     in_words = max(1, len(inbound.split()))
     sentences = [s for s in _SENTENCE_SPLIT.split(reply.strip()) if s.strip()]
     isms = [p for p, rx in _ASSISTANT_RE if rx.search(reply)]
+    balanced = balanced_clause_hits(reply)
     return {
         "chars": len(reply),
         "words": words,
@@ -128,6 +302,12 @@ def reply_metrics(inbound: str, reply: str) -> dict:
         "closes_on_question": reply.rstrip().endswith("?"),
         "em_dashes": reply.count("—"),
         "not_x_but_y": len(_NOT_X_BUT_Y.findall(reply)),
+        # The wider family (#2537). `not_x_but_y` above is kept unchanged as its
+        # own number so the widening is auditable against the 9-in-536 baseline
+        # rather than silently absorbed into a bigger one.
+        "balanced_classes": sorted(balanced),
+        "balanced_spans": balanced,
+        "balanced_hits": sum(len(v) for v in balanced.values()),
         "assistant_isms": isms,
         "formatting_hits": len(_FORMATTING.findall(reply)),
         "name_uses": len(re.findall(r"\bMatthew\b", reply)),
@@ -146,12 +326,28 @@ def conversation_metrics(convo: dict) -> dict:
         "coach": convo["coach"],
         "coach_name": convo.get("coach_name"),
         "archetype": convo["archetype"],
+        # Carried so the panel's per-scenario verdicts and tells can be joined back
+        # to the deterministic rows — without it the judge tells cannot be used as
+        # labelled data, which is what #2537 asks the detector to be validated on.
+        "scenario_id": convo.get("scenario_id"),
     }
     if not per:
         # A zero-turn conversation is a real outcome (the simulator ended it, or the
         # run halted mid-scenario). It keeps its identity fields so the by-coach
         # rollup can still see that the scenario was attempted and produced nothing.
-        return dict(base, empty=True, assistant_isms=[], stat_recital={}, not_x_but_y=0, formatting_hits=0, name_uses=0, per_turn=[])
+        return dict(
+            base,
+            empty=True,
+            assistant_isms=[],
+            stat_recital={},
+            not_x_but_y=0,
+            balanced_classes=[],
+            balanced_hits=0,
+            balanced_replies=0,
+            formatting_hits=0,
+            name_uses=0,
+            per_turn=[],
+        )
 
     # Stat recital: a number stated in more than one reply of the same conversation.
     # Small integers are excluded — "one", "2 days", "3 sets" recur legitimately and
@@ -176,6 +372,9 @@ def conversation_metrics(convo: dict) -> dict:
         "em_dash_replies": sum(1 for m in per if m["em_dashes"] > 0),
         "em_dash_rate": round(sum(1 for m in per if m["em_dashes"] > 0) / len(per), 2),
         "not_x_but_y": sum(m["not_x_but_y"] for m in per),
+        "balanced_hits": sum(m["balanced_hits"] for m in per),
+        "balanced_replies": sum(1 for m in per if m["balanced_classes"]),
+        "balanced_classes": [c for m in per for c in m["balanced_classes"]],
         "assistant_isms": [i for m in per for i in m["assistant_isms"]],
         "formatting_hits": sum(m["formatting_hits"] for m in per),
         "name_uses": sum(m["name_uses"] for m in per),
@@ -183,6 +382,199 @@ def conversation_metrics(convo: dict) -> dict:
         "statuses": dict(statuses),
         "first_reply": turns[0]["reply"][:120],
         "per_turn": per,
+    }
+
+
+def symmetry_by_coach(metrics_rows: list) -> dict:
+    """Per-coach balanced-clause rate, advisory, with n on every claim (#2537).
+
+    WHY PER COACH. Platform-wide "symmetry: 9" told nobody what to change. Per
+    coach it becomes attributable: a persona whose spec asks for the labelled
+    interpretation may legitimately run high, while the same rate on a spec that
+    says "Plain, complete sentences" is the model's habit leaking through. None of
+    the eight specs currently asks for symmetry, so today every point of this is
+    habit — but the report has to be able to tell them apart before any spec does.
+
+    The flag threshold is derived from the measured per-coach distribution
+    (mean + BASELINE_K·std), not a guessed constant. It is a RELATIVE reading and
+    says so: it finds the outlier coaches, and a platform where all eight are
+    equally symmetric produces no flags at all, which is why the platform rate is
+    reported alongside.
+
+    Returns {"coaches": [...], "platform": {...}}. A coach with fewer than
+    MIN_REPLIES_FOR_COACH_VERDICT replies, or a platform with fewer than
+    MIN_COACHES_FOR_BASELINE comparable coaches, gets verdict None and a stated
+    reason — never a green "typical".
+    """
+    per_coach = defaultdict(lambda: {"replies": 0, "flagged": 0, "classes": Counter(), "name": None})
+    for row in metrics_rows or []:
+        bucket = per_coach[row.get("coach")]
+        bucket["name"] = bucket["name"] or row.get("coach_name")
+        for m in row.get("per_turn") or []:
+            bucket["replies"] += 1
+            if m.get("balanced_classes"):
+                bucket["flagged"] += 1
+            for cls in m.get("balanced_classes") or []:
+                bucket["classes"][cls] += 1
+
+    total_replies = sum(b["replies"] for b in per_coach.values())
+    total_flagged = sum(b["flagged"] for b in per_coach.values())
+    platform = {
+        "n_replies": total_replies,
+        "n_flagged": total_flagged,
+        "rate": round(total_flagged / total_replies, 3) if total_replies else 0.0,
+        "by_class": dict(sum((b["classes"] for b in per_coach.values()), Counter())),
+    }
+
+    rows = []
+    for coach, b in per_coach.items():
+        rows.append(
+            {
+                "coach": coach,
+                "coach_name": b["name"] or coach,
+                "n_replies": b["replies"],
+                "n_flagged": b["flagged"],
+                "rate": round(b["flagged"] / b["replies"], 3) if b["replies"] else 0.0,
+                "by_class": dict(b["classes"]),
+            }
+        )
+
+    eligible = [r for r in rows if r["n_replies"] >= MIN_REPLIES_FOR_COACH_VERDICT]
+    if len(eligible) < MIN_COACHES_FOR_BASELINE:
+        reason = (
+            f"{len(eligible)} coaches have >= {MIN_REPLIES_FOR_COACH_VERDICT} replies; "
+            f"{MIN_COACHES_FOR_BASELINE} are needed to state a cross-coach threshold, "
+            "so no per-coach verdict is issued (ADR-105)"
+        )
+        for r in rows:
+            r["verdict"] = None
+            # Two different reasons can block a verdict and they are not
+            # interchangeable: "this coach has 3 replies" is fixed by running more
+            # of that coach, "the platform has 2 comparable coaches" is fixed by
+            # running more coaches. Saying only the second would send an operator
+            # to the wrong lever.
+            r["reason"] = (
+                f"{r['n_replies']} replies; minimum {MIN_REPLIES_FOR_COACH_VERDICT} for a rate verdict"
+                if r["n_replies"] < MIN_REPLIES_FOR_COACH_VERDICT
+                else reason
+            )
+        platform["threshold"] = None
+        platform["threshold_reason"] = reason
+        return {"coaches": sorted(rows, key=lambda r: -r["rate"]), "platform": platform}
+
+    rates = [r["rate"] for r in eligible]
+    mean = statistics.mean(rates)
+    std = statistics.pstdev(rates)
+    threshold = round(mean + BASELINE_K * std, 3)
+    platform["threshold"] = {
+        "threshold": threshold,
+        "baseline_mean": round(mean, 3),
+        "baseline_std": round(std, 3),
+        "baseline_k": BASELINE_K,
+        "n_coaches": len(eligible),
+        "derivation": (
+            f"mean+{BASELINE_K}*std of the per-coach balanced-clause rate over "
+            f"n={len(eligible)} coaches with >= {MIN_REPLIES_FOR_COACH_VERDICT} replies each"
+        ),
+    }
+    for r in rows:
+        if r["n_replies"] < MIN_REPLIES_FOR_COACH_VERDICT:
+            r["verdict"] = None
+            r["reason"] = f"{r['n_replies']} replies; minimum {MIN_REPLIES_FOR_COACH_VERDICT} for a rate verdict"
+        else:
+            r["verdict"] = "elevated" if r["rate"] > threshold else "typical"
+    return {"coaches": sorted(rows, key=lambda r: -r["rate"]), "platform": platform}
+
+
+# The judges' own vocabulary for this tell, taken from the free-text they wrote
+# ("balanced", "rhetorical symmetry", "parallel structure", "wraps up too
+# neatly"). It labels TELLS, not replies — deliberately narrow, because widening
+# it into the neighbouring themes (over-polish, templating) would let the
+# detector score credit for catching a different finding.
+_SYMMETRY_TELL_VOCAB = re.compile(
+    r"\b(?:symmetr\w*|balanc\w*|antithe\w*|parallel\w*|chiasm\w*|cadence|aphoris\w*|epigram\w*)\b"
+    r"|\bnot\s+x\b.{0,6}\bbut\s+y\b"
+    r"|\b(?:too\s+)?neatl?y?\b"
+    r"|\bwraps?\s+up\b",
+    re.I,
+)
+
+
+def validate_against_judge_tells(payload: dict) -> dict:
+    """Score the detector against the panel's free-text tells as labelled data.
+
+    The panel wrote 2,404 tells over the corpus and 25% of them cite this class.
+    Those tells are the only independent labels that exist, so this joins them to
+    the deterministic rows by `scenario_id` and reports the confusion matrix:
+    a conversation is LABELLED positive when any judge tell uses the symmetry
+    vocabulary, and PREDICTED positive when any of its replies fires a
+    balanced-clause pattern.
+
+    Precision/recall here are against a noisy label — three judges reading a whole
+    transcript, not a span-level annotation — so this is a correlation check, and
+    the returned dict says so rather than dressing it as accuracy. It is the
+    measurement that decides whether widening worked: the pre-#2537 detector fired
+    on 9 replies of 536 against a 25%-of-tells label, which no threshold could
+    rescue.
+
+    Pure: the payload is passed in (the `--json-out` file of a previous run).
+    Returns verdict None when too few conversations carry panel labels.
+    """
+    rows = (payload or {}).get("metrics") or []
+    panel = (payload or {}).get("panel") or {}
+    by_id = {r.get("scenario_id"): r for r in rows if r.get("scenario_id")}
+
+    tp = fp = fn = tn = 0
+    n_tells = 0
+    n_symmetry_tells = 0
+    for scenario_id, verdict in panel.items():
+        row = by_id.get(scenario_id)
+        if row is None:
+            continue
+        tells = [str(t) for t in (verdict.get("tells") or [])]
+        n_tells += len(tells)
+        hits = [t for t in tells if _SYMMETRY_TELL_VOCAB.search(t)]
+        n_symmetry_tells += len(hits)
+        labelled = bool(hits)
+        predicted = bool(row.get("balanced_replies"))
+        if labelled and predicted:
+            tp += 1
+        elif labelled and not predicted:
+            fn += 1
+        elif predicted and not labelled:
+            fp += 1
+        else:
+            tn += 1
+
+    n = tp + fp + fn + tn
+    base = {
+        "n_conversations_joined": n,
+        "n_tells": n_tells,
+        "n_symmetry_tells": n_symmetry_tells,
+        "label": "any judge tell citing the symmetry vocabulary (conversation-level, noisy)",
+        "advisory": True,
+    }
+    if n < MIN_REPLIES_FOR_COACH_VERDICT:
+        return {
+            **base,
+            "verdict": None,
+            "reason": (
+                f"{n} conversations carry both deterministic rows and panel tells; "
+                f"minimum {MIN_REPLIES_FOR_COACH_VERDICT} to state a correlation (ADR-105)"
+            ),
+        }
+    labelled_pos = tp + fn
+    return {
+        **base,
+        "verdict": "measured",
+        "true_positive": tp,
+        "false_positive": fp,
+        "false_negative": fn,
+        "true_negative": tn,
+        "recall_on_labelled": round(tp / labelled_pos, 3) if labelled_pos else None,
+        "precision": round(tp / (tp + fp), 3) if (tp + fp) else None,
+        "labelled_positive_rate": round(labelled_pos / n, 3),
+        "predicted_positive_rate": round((tp + fp) / n, 3),
     }
 
 
@@ -449,13 +841,27 @@ def _vote_record(c: dict, votes: list, ai_votes: int) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", required=True, help="directory of *.jsonl sim outputs")
-    ap.add_argument("--report", required=True, help="markdown report output path")
+    ap.add_argument("--runs", help="directory of *.jsonl sim outputs")
+    ap.add_argument("--report", help="markdown report output path")
+    ap.add_argument(
+        "--validate-from",
+        help="re-score the balanced-clause detector against the judge tells already captured in an existing --json-out payload; no spend, no re-run",
+    )
     ap.add_argument("--json-out", help="machine-readable metrics output path")
     ap.add_argument("--max-usd", type=float, default=3.0)
     ap.add_argument("--no-panel", action="store_true", help="deterministic metrics only — no spend")
     ap.add_argument("--workers", type=int, default=6, help="concurrent judge conversations")
     args = ap.parse_args()
+
+    if args.validate_from:
+        with open(args.validate_from) as fh:
+            prior = json.load(fh)
+        print(json.dumps(validate_against_judge_tells(prior), indent=2))
+        print(json.dumps((prior.get("symmetry_by_coach") or symmetry_by_coach(prior.get("metrics") or []))["platform"], indent=2))
+        return 0
+
+    if not args.runs or not args.report:
+        ap.error("--runs and --report are required unless --validate-from is given")
 
     os.environ.setdefault("AWS_REGION", "us-west-2")
     convos = load_runs(args.runs)
@@ -485,9 +891,14 @@ def main() -> int:
         "opener_collisions": collisions[:40],
         "cross_coach_similarity": similarity_pairs[:40],
         "structural_collapse": collapse,
+        "symmetry_by_coach": symmetry_by_coach(metrics),
         "panel": panel,
         "panel_spend": ledger.summary() if ledger else None,
     }
+    # Graded against the panel's own tells in the same run, so the widened
+    # detector never reports a rate without the check on whether that rate tracks
+    # what the judges independently flagged (#2537).
+    payload["symmetry_validation"] = validate_against_judge_tells(payload)
     if args.json_out:
         with open(args.json_out, "w") as fh:
             json.dump(payload, fh, indent=2, default=str)
@@ -525,6 +936,8 @@ def write_report(p: dict, path: str) -> None:
         f"| closing-question rate | {agg(m, 'closing_question_rate')} |",
         f"| em-dash reply rate | {agg(m, 'em_dash_rate')} |",
         f"| 'not X but Y' (total) | {sum(r['not_x_but_y'] for r in m)} |",
+        f"| balanced clauses, all 5 constructions (total) | {sum(r.get('balanced_hits', 0) for r in m)} |",
+        f"| replies with >=1 balanced clause | {sum(r.get('balanced_replies', 0) for r in m)} |",
         f"| assistant-isms (total hits) | {sum(len(r['assistant_isms']) for r in m)} |",
         f"| formatting violations (total) | {sum(r['formatting_hits'] for r in m)} |",
         f"| name uses (total) | {sum(r['name_uses'] for r in m)} |",
@@ -553,6 +966,58 @@ def write_report(p: dict, path: str) -> None:
     if isms:
         lines += ["", "## Assistant-isms by phrase", "", "| pattern | hits |", "|---|---|"]
         lines += [f"| `{k}` | {v} |" for k, v in isms.most_common(20)]
+
+    sym = p.get("symmetry_by_coach") or {}
+    if sym.get("coaches"):
+        plat = sym.get("platform") or {}
+        thr = plat.get("threshold")
+        lines += [
+            "",
+            "## Balanced clauses / rhetorical symmetry, by coach (#2537)",
+            "",
+            f"**{plat.get('n_flagged', 0)} of {plat.get('n_replies', 0)} replies "
+            f"(rate {plat.get('rate', 0)})** contain at least one balanced-clause construction. "
+            "Advisory: this counts, it does not rewrite. No voice spec currently asks for symmetry, "
+            "so a coach above the derived threshold is showing the model's habit, not its character.",
+            "",
+        ]
+        lines.append(
+            f"Threshold: {thr['threshold']} — {thr['derivation']}."
+            if thr
+            else "No threshold derived — too few coaches with enough replies."
+        )
+        lines += [
+            "",
+            "| coach | replies (n) | flagged | rate | verdict | top class |",
+            "|---|---|---|---|---|---|",
+        ]
+        for r in sym["coaches"]:
+            top = max(r["by_class"].items(), key=lambda kv: kv[1])[0] if r["by_class"] else "—"
+            lines.append(
+                f"| {r['coach_name']} | {r['n_replies']} | {r['n_flagged']} | {r['rate']} | "
+                f"{r['verdict'] or 'no verdict (n too small)'} | {top} |"
+            )
+        if plat.get("by_class"):
+            lines += ["", "| construction | hits |", "|---|---|"]
+            lines += [f"| `{k}` | {v} |" for k, v in sorted(plat["by_class"].items(), key=lambda kv: -kv[1])]
+
+    val = p.get("symmetry_validation") or {}
+    if val:
+        lines += ["", "### Does it track what the judges flagged?", ""]
+        if val.get("verdict") is None:
+            lines.append(f"No verdict — {val.get('reason')}")
+        else:
+            lines += [
+                f"Joined **n={val['n_conversations_joined']}** conversations "
+                f"({val['n_symmetry_tells']} of {val['n_tells']} judge tells cite this class). "
+                f"Recall on judge-labelled conversations **{val['recall_on_labelled']}**, "
+                f"precision **{val['precision']}** "
+                f"(TP {val['true_positive']} · FP {val['false_positive']} · "
+                f"FN {val['false_negative']} · TN {val['true_negative']}).",
+                "",
+                "The label is conversation-level and noisy — three judges reading a whole "
+                "transcript, not span annotation — so this is a correlation check, not accuracy.",
+            ]
 
     if p.get("structural_collapse"):
         lines += [
