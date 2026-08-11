@@ -327,13 +327,19 @@ def extract_food_data(mf_data):
             # Skip supplements — we're interested in real food
             if any(s in name.lower() for s in ("supplement", "vitamin", "fish oil", "creatine", "magnesium")):
                 continue
+            # ADR-104 (#2558): an absent item macro is an ABSENCE, not a measured zero.
+            # These fields go straight into the AI payload under a prompt that says "every
+            # food reference must come from his ACTUAL food log data" — a `0` default made
+            # an unmacroed item read as a genuine 0-calorie food. `None` serialises to JSON
+            # `null`, which is the honest signal, and matches what the DAY totals below have
+            # always done (`safe_float(rec, ...)` with no default).
             food = {
                 "name": name,
                 "time": item.get("time", "?"),
-                "cal": safe_float(item, "calories_kcal", 0),
-                "protein_g": safe_float(item, "protein_g", 0),
-                "carbs_g": safe_float(item, "carbs_g", 0),
-                "fat_g": safe_float(item, "fat_g", 0),
+                "cal": safe_float(item, "calories_kcal"),
+                "protein_g": safe_float(item, "protein_g"),
+                "carbs_g": safe_float(item, "carbs_g"),
+                "fat_g": safe_float(item, "fat_g"),
                 "fiber_g": safe_float(item, "fiber_g"),
             }
             day_foods.append(food)
@@ -602,8 +608,14 @@ def lambda_handler(event, context):
     profile = data["profile"]
 
     days, all_foods = extract_food_data(data["macrofactor"])
-    if not days:
-        logger.error("No MacroFactor data in last 14 days")
+    # ADR-104 (#2558): gate on the thing the email is actually about. Every reader-visible
+    # section — Greatest Hits, This Week, the grocery list — is built from FOOD ITEMS, but
+    # this gate used to test `days`, the count of MacroFactor DAY RECORDS. MacroFactor's
+    # API-refresh path writes day rows with `food_log: []`, so a fortnight with zero logged
+    # foods sailed through and the AI was asked for "3-4 most frequent food items" against
+    # an empty frequency table. No items ⇒ nothing to report ⇒ no email, no Bedrock call.
+    if not all_foods:
+        logger.error(f"No logged food items in the last 14 days ({len(days)} MacroFactor day record(s), 0 food items)")
         return {"statusCode": 500, "body": "No food data"}
 
     logger.info(f"Food data: {len(days)} days, {len(all_foods)} food items")
