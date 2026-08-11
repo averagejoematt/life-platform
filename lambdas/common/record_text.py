@@ -42,6 +42,11 @@ JOURNAL_TEXT_FIELDS: tuple[str, ...] = (JOURNAL_BODY_FIELD, JOURNAL_RAW_FIELD)
 # ── coach outputs ───────────────────────────────────────────────────────────
 # `coach.coach_state_updater._write_output_record` puts the generated narrative here, and
 # every serving path (site_api_coach, the quality gate's history read) falls back to it.
+# That writer does NOT import this constant — it is at its #1665 size ceiling and this
+# would push it over, which the guard is right to refuse. The agreement is pinned instead
+# by the parity test, which RUNS `_write_output_record` and asserts `gather_coach_outputs`
+# extracts the item it produced: rename the writer's attribute and that test goes red, so
+# the pin is executable either way rather than a comment asking to be believed.
 COACH_OUTPUT_FIELD = "content"
 COACH_OUTPUT_TEXT_FIELDS: tuple[str, ...] = (COACH_OUTPUT_FIELD,)
 

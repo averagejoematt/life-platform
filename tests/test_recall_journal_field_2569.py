@@ -19,7 +19,10 @@ same wrong guess. So nothing here hand-lists a field name at the read site:
 
   * the PARITY tests run a record through the real writer (`parse_page`,
     `_write_output_record`) and assert the gatherer extracts that writer's text. Rename a
-    writer's attribute and these go red instead of a corpus silently emptying.
+    writer's attribute and these go red instead of a corpus silently emptying. For the
+    coach half this is the ONLY pin — `coach_state_updater` sits at its #1665 size
+    ceiling, so it cannot import the shared constant, and an executable parity check is
+    the honest substitute for a comment claiming the two agree.
   * the LIVE-SHAPE test uses the verbatim attribute set of a real row (issue #2569).
   * the MUTATION test reverts `JOURNAL_TEXT_FIELDS` to the pre-fix guess and asserts the
     corpus comes back EMPTY — the failure mode reproduced on demand.

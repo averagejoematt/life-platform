@@ -25,7 +25,6 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from common.record_text import COACH_OUTPUT_FIELD  # #2569: the ONE name for an OUTPUT# record's narrative
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
 from coach import coach_derived_prose  # #2418: the derived reader-prose SET — blob / regen / hold / read
@@ -574,9 +573,7 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
     item = {
         "pk": f"COACH#{coach_id}",
         "sk": f"OUTPUT#{date}#{output_type}",
-        # #2569: named from the shared constant so a reader (the recall backfill) reads the
-        # attribute this writer actually puts, instead of guessing `output_text`/`text`.
-        COACH_OUTPUT_FIELD: output_text,
+        "content": output_text,
         "themes": extraction.get("themes", []),
         "structural_fingerprint": extraction.get("structural_fingerprint", {}),
         "predictions_made": extraction.get("predictions_made", []),
