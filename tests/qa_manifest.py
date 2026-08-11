@@ -340,9 +340,27 @@ _CURATED = [
         "name": "Story · build dispatches",
         "tier": 3,
         "content_class": "narrative",
-        "api_deps": [],
+        # #2541: NOT fetched by the page — these two are the fork-me front door's LINK
+        # TARGETS, declared here so the smoke's JSON-health leg (#1586) guards them.
+        # The manifest was published with nothing on the site linking it; a front door
+        # whose target 404s is worse than no front door, and only this leg would catch
+        # that (the page renders fine either way).
+        "api_deps": ["/data/stack.json", "/data/stack.schema.json"],
         "js_modules": ["story.js"],
-        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "build dispatches content"}]},
+        "visual": {
+            "checks": [
+                {"selector": "main, [data-readout], article", "not_empty": True, "desc": "build dispatches content"},
+                # #2541: the fork-me front door itself. Selector is the LINK, not its
+                # container — a card that renders with the manifest anchor dropped must
+                # red here, so this cannot pass against a page missing the link.
+                {
+                    "selector": '.dx-subscribe a[href="/data/stack.json"]',
+                    "not_empty": True,
+                    "min_count": 1,
+                    "desc": "fork-me front door → the stack manifest (#2541)",
+                },
+            ]
+        },
     },
     {
         # #1399: the Remediation Agent's public track record. Static build-time page —

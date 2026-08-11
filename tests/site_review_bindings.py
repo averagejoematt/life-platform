@@ -238,8 +238,15 @@ PAGE_BINDINGS = [
         "name": "Story · build dispatches",
         "door": "story",
         "narrative_order": 88,
-        "story_intent": "the build-in-public log — merged+deployed work only, never plans (#380/#736)",
-        "endpoints": [],  # editorial
+        "story_intent": (
+            "the build-in-public log — merged+deployed work only, never plans (#380/#736); "
+            "also the fork-me front door: the page hands a builder the machine-readable stack "
+            "manifest and its schema, so 'fork the architecture, not the data' is reachable "
+            "without already knowing the URL (#2541)"
+        ),
+        # #2541: linked, not fetched — the editorial feed itself is still baked/JS-rendered.
+        # Declared so the review corroborates that the door the page opens actually answers.
+        "endpoints": [{"url": "/data/stack.json", "role": "primary", "metrics": []}],
     },
     {
         # #1399: the remediation agent's public track record
