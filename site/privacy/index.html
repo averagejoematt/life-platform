@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Privacy Policy — averagejoematt</title>
-  <meta name="description" content="Privacy policy for averagejoematt.com — how subscriber data is handled, in plain terms.">
+  <meta name="description" content="Privacy policy for averagejoematt.com — how subscriber data is handled, in plain terms — and the Permanence Contract: what happens to the record if Matthew stops.">
   <link rel="canonical" href="https://averagejoematt.com/privacy/">
   <meta property="og:title" content="Privacy Policy — averagejoematt">
   <meta property="og:description" content="Privacy policy and AI disclaimer for averagejoematt.com.">
@@ -54,6 +54,42 @@
     .policy-section strong { color: var(--ink); font-weight: var(--weight-med); }
     .policy-section a { color: var(--ember); text-decoration: underline; text-underline-offset: 0.15em; }
     .policy-section a:hover { text-decoration-thickness: 2px; }
+    /* #2574 — the Permanence Contract, on the site. The clause list between the
+       generated markers is rendered from docs/PERMANENCE_CONTRACT.md by
+       scripts/v4_build_permanence_terms.py; the live panel above it reads the
+       published archive documents at load and states an absent number absent. */
+    .perm-live { margin-top: var(--sp-5); border: var(--border-hair); border-left: 2px solid var(--ember);
+      border-radius: var(--radius-sm); background: var(--surface); padding: var(--sp-5); }
+    .perm-live .pl-h { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ember); margin: 0; }
+    .pl-grid { margin: var(--sp-4) 0 0; display: grid; gap: var(--sp-4);
+      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+    .pl-grid dt { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ink-faint); }
+    .pl-grid dd { margin: var(--sp-2) 0 0; font-family: var(--font-mono); font-size: var(--fs-body);
+      color: var(--ink); overflow-wrap: anywhere; }
+    .pl-grid dd[data-absent="1"] { color: var(--ink-faint); }
+    /* The fifth cell is the longest string in the panel and auto-fit never fits
+       five columns in the reading measure — it orphaned into a quarter-width
+       column and wrapped to three lines. Give it the whole row deliberately. */
+    .pl-grid .pl-wide { grid-column: 1 / -1; }
+    .pl-sum { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--rule); }
+    .pl-sum code { display: block; margin-top: var(--sp-2); font-family: var(--font-mono);
+      font-size: var(--fs-small, var(--fs-label)); color: var(--ink-muted); overflow-wrap: anywhere; }
+    .pl-links { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; gap: var(--sp-3);
+      font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; }
+    .pl-note { margin-top: var(--sp-4); color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
+    .perm-clauses { list-style: none; margin: var(--sp-6) 0 0; padding: 0; display: grid; gap: var(--sp-5); }
+    .perm-clause { border-top: 1px solid var(--rule); padding-top: var(--sp-4); }
+    .perm-clause .pc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-3); margin: 0; }
+    .perm-clause .pc-id { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      color: var(--ember); }
+    .perm-clause .pc-title { font-family: var(--font-serif); font-size: var(--fs-h3, var(--fs-quote));
+      line-height: var(--lh-snug); color: var(--ink); }
+    .perm-clause .pc-kind { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ink-faint); }
+    .perm-clause p + p { margin-top: var(--sp-3); }
     .policy-back { margin-top: var(--sp-8); padding-top: var(--sp-6); border-top: 1px solid var(--rule); }
     .policy-back a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
       text-transform: uppercase; color: var(--ember); text-decoration: none; }
@@ -71,7 +107,7 @@
 
     <p class="policy-kicker label">the paperwork</p>
     <h1 class="policy-title">Privacy Policy</h1>
-    <p class="policy-updated">last updated · july 2026</p>
+    <p class="policy-updated">last updated · august 2026</p>
 
     <div class="policy-tldr">
       <p class="pt-h">the short version</p>
@@ -129,8 +165,64 @@
       <p>Questions you type into /ask or /board are sent to Anthropic&#x27;s API to generate a response. I do not store your questions. Anthropic&#x27;s data handling is governed by their <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
     </section>
 
+    <section class="policy-section" id="permanence">
+      <h2><span class="ps-n">09</span> what happens to all this if I stop</h2>
+      <p>The question friends actually ask, answered in writing rather than in reassurance. Every night the whole public record is packaged into a single download at a fixed address, with a manifest that lists every file and its checksum, and a clock that measures how long it has been since the platform last heard from me. The terms below are the contract; the numbers above them are what it produced last night. Both are checkable — that is the point of writing it down.</p>
+
+      <div class="perm-live" id="perm-live">
+        <p class="pl-h">the archive right now</p>
+        <dl class="pl-grid">
+          <div><dt>built</dt><dd data-perm="built">reading…</dd></div>
+          <div><dt>download size</dt><dd data-perm="bytes">reading…</dd></div>
+          <div><dt>files inside</dt><dd data-perm="entries">reading…</dd></div>
+          <div><dt>edition</dt><dd data-perm="version">reading…</dd></div>
+          <div class="pl-wide"><dt>continuity</dt><dd data-perm="state">reading…</dd></div>
+        </dl>
+        <p class="pl-sum"><span class="label">sha-256 of the download</span> <code data-perm="sha">reading…</code></p>
+        <p class="pl-links"><a href="/archive/latest.tar.gz">download the archive</a> <a href="/archive/manifest.json">the manifest</a> <a href="/archive/continuity.json">the continuity clock</a></p>
+        <p class="pl-note" data-perm="note" hidden></p>
+      </div>
+
+      <!-- BEGIN PERMANENCE TERMS · generated by scripts/v4_build_permanence_terms.py -->
+    <ol class="perm-clauses" data-built-version="1.0.0">
+      <li class="perm-clause" id="clause-P1">
+        <p class="pc-head"><span class="pc-id">P1</span><span class="pc-title">Nothing here is for sale</span><span class="pc-kind">policy</span></p>
+        <p>No reader&#x27;s email address, question, or submitted finding is ever sold, rented, or handed to an advertiser, a data broker, or a sponsor. Neither is any of Matthew&#x27;s own health data. There is no advertising business here to be tempted by.</p>
+      </li>
+      <li class="perm-clause" id="clause-P2">
+        <p class="pc-head"><span class="pc-id">P2</span><span class="pc-title">The public record is rebuilt as a single download every night</span><span class="pc-kind">mechanism</span></p>
+        <p>Every night the platform packages everything it already publishes — the data, the methods, the chronicle, the sealed pre-registrations — into one compressed archive at a fixed address, and overwrites yesterday&#x27;s. It is not generated on request and it is not gated: it is simply there.</p>
+      </li>
+      <li class="perm-clause" id="clause-P3">
+        <p class="pc-head"><span class="pc-id">P3</span><span class="pc-title">What may enter the archive is decided by a gate, not by hand</span><span class="pc-kind">mechanism</span></p>
+        <p>Nothing enters because someone remembered to add it. An artefact enters only if the public site already serves it at a public address, and only if a registry classifies that address as part of the published record. Anything the registry does not classify is refused. The API portion is fetched with no credentials at all, over the same public address a reader would use, so it can contain nothing a reader could not already fetch themselves.</p>
+      </li>
+      <li class="perm-clause" id="clause-P4">
+        <p class="pc-head"><span class="pc-id">P4</span><span class="pc-title">Every archive publishes its own inventory and checksum</span><span class="pc-kind">mechanism</span></p>
+        <p>Alongside the archive sits a manifest listing every file in it with a size and a SHA-256, the checksum of the archive as a whole, the moment it was built, and — in the same document — a list of what was deliberately left out and why. You do not have to trust the description; you can check it.</p>
+      </li>
+      <li class="perm-clause" id="clause-P5">
+        <p class="pc-head"><span class="pc-id">P5</span><span class="pc-title">Silence is measured out loud</span><span class="pc-kind">mechanism</span></p>
+        <p>The platform watches for its own silence: the number of days since the last signal from any source that only produces data when a living person is doing something. That number, and the state it puts the contract in, are published in the same place as the archive, every night, whether the news is good or not.</p>
+      </li>
+      <li class="perm-clause" id="clause-P6">
+        <p class="pc-head"><span class="pc-id">P6</span><span class="pc-title">Ninety days of silence freezes the record and raises the alarm</span><span class="pc-kind">mechanism</span></p>
+        <p>At 30 days of silence the contract enters a notice state, at 60 a warning state, and at 90 the switch trips: the archive stops being overwritten and is sealed as a final, dated edition, the published state says so plainly, and the people configured as continuity contacts are told where the record is and how to check it. Any new signal from any watched source resets the clock — the switch is a measurement, and it is reversible.</p>
+      </li>
+      <li class="perm-clause" id="clause-P7">
+        <p class="pc-head"><span class="pc-id">P7</span><span class="pc-title">What this contract does not promise</span><span class="pc-kind">limit</span></p>
+        <p>It does not promise the archive outlives the bill: everything here sits in one cloud account, and if that account lapses the archive lapses with it. This edition grants no mirroring rights, so that single point of failure is not mitigated by anything written here. It does not promise a third-party mirror — no automatic copy is made to any host outside this account, and any claim that one exists would be false. It does not promise the archive is complete: audio, artwork, and the site&#x27;s presentation layer are excluded, and the manifest names every exclusion. It does not promise the switch detects a person: it detects the absence of data, which a long holiday, a hardware failure, or a vendor lockout can also produce — that is why the first two thresholds notify rather than act. And it does not promise to publish anything currently private: the archive is a repackaging of the public surface, never a widening of it.</p>
+      </li>
+      <li class="perm-clause" id="clause-P8">
+        <p class="pc-head"><span class="pc-id">P8</span><span class="pc-title">The terms are versioned, and amendments are append-only</span><span class="pc-kind">mechanism</span></p>
+        <p>This contract carries a version and a dated amendment history. Clauses are added or superseded, never quietly rewritten, and the published version number tells you which edition you are reading.</p>
+      </li>
+    </ol>
+    <!-- END PERMANENCE TERMS -->
+    </section>
+
     <section class="policy-section">
-      <h2><span class="ps-n">09</span> changes</h2>
+      <h2><span class="ps-n">10</span> changes</h2>
       <p>Material changes will be notified to subscribers before taking effect. The last-updated date above reflects the current version.</p>
     </section>
 
@@ -139,6 +231,132 @@
   </main>
 
   <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/cockpit/">the cockpit</a> — Start with today&#x27;s live read</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside><footer class="site-foot"><nav class="wayfinder" aria-label="The loop"><p class="wf-lede label">the loop</p><div class="wf-ribbon"><a class="wf-stop is-next is-vantage" data-station="cockpit" href="/cockpit/"><span class="wf-name">Now</span><span class="wf-role">today&#x27;s slice</span><span class="wf-tag">start here</span></a><span class="wf-sep" aria-hidden="true">&middot;</span><a class="wf-stop" data-station="data" href="/data/"><span class="wf-name">Data</span><span class="wf-role">the engine</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="coaching" href="/coaching/"><span class="wf-name">Coaching</span><span class="wf-role">AI reads the data</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="protocols" href="/protocols/"><span class="wf-name">Protocols</span><span class="wf-role">the levers</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="story" href="/story/"><span class="wf-name">Story</span><span class="wf-role">narrates the loop</span></a><span class="wf-arrow wf-cycle" aria-hidden="true">&#8635;</span></div></nav><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col" data-station="data"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col" data-station="coaching"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col" data-station="protocols"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col" data-station="story"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script></footer>
+
+  <script>
+    /* #2574 — fill the permanence panel from the published archive documents.
+       Two rules, both ADR-104: never render a number that was not read, and
+       never let the terms depend on the fetch — the clause list is static and
+       stands whether or not these two documents answer. */
+    (function(){
+      var panel = document.getElementById("perm-live");
+      if (!panel) return;
+      var slot = function(name){ return panel.querySelector('[data-perm="' + name + '"]'); };
+      var ABSENT = "not available";
+
+      function absent(name){
+        var el = slot(name);
+        if (!el) return;
+        el.textContent = ABSENT;
+        el.setAttribute("data-absent", "1");
+      }
+      function fill(name, value){
+        var el = slot(name);
+        if (!el) return;
+        if (value === null || value === undefined || value === "") { absent(name); return; }
+        el.textContent = value;
+        el.removeAttribute("data-absent");
+      }
+      function note(text){
+        var el = slot("note");
+        if (!el) return;
+        el.textContent = text;
+        el.hidden = false;
+      }
+      function mib(bytes){
+        if (typeof bytes !== "number" || !isFinite(bytes) || bytes < 0) return null;
+        if (bytes < 1024) return bytes + " bytes";
+        var mb = bytes / (1024 * 1024);
+        return mb >= 1 ? mb.toFixed(1) + " MB" : (bytes / 1024).toFixed(0) + " KB";
+      }
+      function stamp(iso){
+        if (typeof iso !== "string" || !iso) return null;
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        var p = function(n){ return String(n).padStart(2, "0"); };
+        return d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()) +
+               " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + " UTC";
+      }
+      function getJSON(url){
+        return fetch(url, { cache: "no-store" }).then(function(r){
+          if (!r.ok) throw new Error(url + " " + r.status);
+          return r.json();
+        });
+      }
+
+      function plural(n, word){ return n + " " + word + (n === 1 ? "" : "s"); }
+
+      // Two failure classes, kept apart on purpose. "unreadable" is a document
+      // that did not answer; "incomplete" is a document that answered 200 with
+      // a shape this panel cannot state a number from — a half-written nightly.
+      // Both must SAY so: an unexplained absence reads as an empty box, and an
+      // empty box reads as zero.
+      var unreadable = [];
+      var incomplete = [];
+      var mismatch = null;
+
+      var manifest = getJSON("/archive/manifest.json").then(function(m){
+        if (!m || typeof m !== "object") throw new Error("manifest: not an object");
+        var arc = (m.archive && typeof m.archive === "object") ? m.archive : {};
+        var built = stamp(m.generated_at);
+        var size = mib(arc.bytes);
+        var count = typeof m.entry_count === "number" ? plural(m.entry_count, "file") : null;
+        var sha = (typeof arc.sha256 === "string" && arc.sha256) ? arc.sha256 : null;
+        fill("built", built);
+        fill("bytes", size);
+        fill("entries", count);
+        fill("sha", sha);
+        if (built === null || size === null || count === null || sha === null) incomplete.push("the manifest");
+      }).catch(function(){
+        ["built", "bytes", "entries", "sha"].forEach(absent);
+        unreadable.push("the manifest");
+      });
+
+      var continuity = getJSON("/archive/continuity.json").then(function(c){
+        if (!c || typeof c !== "object") throw new Error("continuity: not an object");
+        var days = typeof c.days_silent === "number" ? c.days_silent : null;
+        var state = typeof c.state === "string" ? c.state : null;
+        if (state === null) { absent("state"); incomplete.push("the continuity clock"); }
+        else if (c.measurement_failed || state === "unknown") { fill("state", "not measured on the last run"); }
+        else { fill("state", state + (days === null ? "" : " · " + plural(days, "day") + " since the last signal")); }
+
+        var live = (c.terms && typeof c.terms.version === "string") ? c.terms.version : null;
+        var list = document.querySelector(".perm-clauses");
+        var built = list ? list.getAttribute("data-built-version") : null;
+        fill("version", live);
+        if (live === null && incomplete.indexOf("the continuity clock") === -1) incomplete.push("the continuity clock");
+        if (live && built && live !== built) {
+          mismatch = "The published edition of these terms is " + live + ", but the clauses on this page were rendered from edition " +
+                     built + ". Read the published document as authoritative until this page catches up.";
+        }
+      }).catch(function(){
+        absent("state");
+        absent("version");
+        unreadable.push("the continuity clock");
+      });
+
+      Promise.all([manifest, continuity]).then(function(){
+        // Every reachable state gets its own sentence, and they compose — an
+        // edition mismatch must not swallow the reason four numbers are blank.
+        var lines = [];
+        if (unreadable.length) {
+          var line = "Could not read " + unreadable.join(" or ") + " just now, so those numbers are shown as unavailable rather than guessed.";
+          // Hedge about the download ONLY when the manifest is what failed. If
+          // the manifest answered, this panel has just published the archive's
+          // build time, size and checksum — warning that the download may not
+          // answer would contradict evidence the page is itself showing.
+          if (unreadable.indexOf("the manifest") !== -1) {
+            line += " The download address above is fixed and does not move, but it may not answer either until the next nightly build.";
+          }
+          lines.push(line);
+        }
+        if (incomplete.length) {
+          lines.push("The last published copy of " + incomplete.join(" and ") + " did not carry every number this panel states, so the missing ones are left unavailable rather than filled in.");
+        }
+        if (mismatch) lines.push(mismatch);
+        if (lines.length) note(lines.join(" "));
+      });
+    })();
+  </script>
 
   <script>
     (function(){

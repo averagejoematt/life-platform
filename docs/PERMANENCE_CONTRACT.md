@@ -181,6 +181,14 @@ named in a public git history.
 
 Nothing below requires access to anything private.
 
+The terms in §2 are also published to readers at
+[averagejoematt.com/privacy/#permanence](https://averagejoematt.com/privacy/#permanence),
+beside the archive's live size, build date and checksum. That page is **generated** from
+the marked block above by `scripts/v4_build_permanence_terms.py` and pinned by
+`tests/test_permanence_public_page_2574.py` (#2574) — nobody hand-copies a clause onto
+the website, because a clause that exists in three places and is enforced in two is not
+a contract, it is three drafts.
+
 ```bash
 # The archive, its inventory, and the continuity clock (all public URLs):
 curl -sO https://averagejoematt.com/archive/latest.tar.gz

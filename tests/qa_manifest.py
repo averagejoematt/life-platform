@@ -802,10 +802,21 @@ _CURATED = [
         "name": "Privacy",
         "tier": 3,
         "content_class": "static",
-        "api_deps": [],
+        # #2574: the page carries the Permanence Contract's public terms and
+        # reads the archive's live size/date/checksum from the two published
+        # documents. Declared here so the smoke's api_deps JSON-health sweep is
+        # the /archive/* coverage — #1400 deliberately left it out because the
+        # nightly had never run; it has now.
+        "api_deps": ["/archive/manifest.json", "/archive/continuity.json"],
         "js_modules": [],
-        "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "privacy policy content"}]},
-        "structural": {"marker": 'class="policy-title"'},
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "privacy policy content"},
+                {"selector": ".perm-clause", "min_count": 8, "desc": "the eight permanence clauses render"},
+                {"selector": "#perm-live .pl-grid dd", "not_empty": True, "desc": "the live archive panel resolved"},
+            ]
+        },
+        "structural": {"marker": 'class="perm-clauses"'},
     },
     {
         "path": "/subscribe/",

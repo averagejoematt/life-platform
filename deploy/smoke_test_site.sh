@@ -231,6 +231,19 @@ check_status "feed.xml alias"       "$BASE/feed.xml"
 check_status "Sitemap"              "$BASE/sitemap.xml"
 echo ""
 
+# ── The permanence archive (#1400 / #2574) ─────────────────────────────────────
+# The contract's whole promise is a STABLE address: /archive/latest.tar.gz must
+# be the same URL tomorrow. #1400 shipped this without smoke coverage on purpose
+# — the nightly had never run, so a check here would have red-ed the pipeline
+# before there was anything to check. It has run now, and /privacy/ publishes the
+# terms beside these numbers, so an absent archive is a real regression.
+# The two JSON documents are covered by the api_deps sweep below (they are
+# declared on the /privacy/ row in tests/qa_manifest.py); the tarball is not
+# JSON, so it gets its own status check.
+echo "── Permanence archive ────────────────────────────────────"
+check_status "archive tarball"      "$BASE/archive/latest.tar.gz"
+echo ""
+
 # ── API endpoints (HTTP 200) ───────────────────────────────────────────────────
 echo "── API endpoints ─────────────────────────────────────────"
 check_status "/api/vitals"          "$BASE/api/vitals"
