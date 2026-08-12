@@ -48,28 +48,23 @@ except ImportError:  # pragma: no cover — layer-module fallback (local tooling
 
 import boto3
 
-# ── Per-channel constants ──────────────────────────────────────────────────────
-# Written out one literal at a time (rather than derived in a loop) because the raw-
-# archive parity guard (tests/test_raw_archive_role_parity.py, #1949) AST-resolves every
-# IngestionConfig's source_name + s3_archive_prefix and cross-checks them against
-# role_policies and the registry's raw_layout facet. A prefix it cannot resolve is a
-# prefix nobody proves a role can write.
-X_SOURCE = "x"
-X_PREFIX = "raw/matthew/x"
-INSTAGRAM_SOURCE = "instagram"
-INSTAGRAM_PREFIX = "raw/matthew/instagram"
-TIKTOK_SOURCE = "tiktok"
-TIKTOK_PREFIX = "raw/matthew/tiktok"
-
+# ── Per-channel config ─────────────────────────────────────────────────────────
+# No `s3_archive_prefix`, and `enable_raw_archive=False`: nothing is FETCHED here, so
+# there is no API response to archive. What a raw archive would hold — the exact strings
+# the owner pasted — is already stored durably as the `PASTE#` staging row in the same
+# table, so an S3 copy would be a duplicate under a raw/ prefix nothing else writes.
+# The registry's `raw_layout: None` for these three says the same thing, and the day a
+# token-backed fetch lands (box 1 of #1677) is the day both should change together,
+# alongside the role_policies grant that lets a real Lambda write it.
 _LOOKBACK = int(os.environ.get("LOOKBACK_DAYS", "7"))
 
 
-def _config(source, prefix):
+def _config(source):
     return IngestionConfig(
         source_name=source,
         secret_id=None,  # NO secret: there is no token for these platforms, by decision
-        s3_archive_prefix=prefix,
         schema_version=1,
+        enable_raw_archive=False,  # nothing fetched -> nothing to archive (see above)
         # A paste can arrive days after the post — gap-fill the trailing week so a
         # back-dated paste still lands on its own day.
         enable_gap_detection=True,
@@ -77,11 +72,7 @@ def _config(source, prefix):
     )
 
 
-CONFIGS = {
-    X_SOURCE: _config(X_SOURCE, X_PREFIX),
-    INSTAGRAM_SOURCE: _config(INSTAGRAM_SOURCE, INSTAGRAM_PREFIX),
-    TIKTOK_SOURCE: _config(TIKTOK_SOURCE, TIKTOK_PREFIX),
-}
+CONFIGS = {channel: _config(channel) for channel in inbox.PASTE_ONLY_CHANNELS}
 
 
 # ── Source callbacks ───────────────────────────────────────────────────────────

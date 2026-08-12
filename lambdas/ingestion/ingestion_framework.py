@@ -290,6 +290,7 @@ class IngestionConfig:
         refresh_today: bool = False,
         refresh_trailing_days: int = 0,
         carry_forward_fn=None,
+        enable_raw_archive: bool = True,
     ):
         self.source_name = source_name
         self.secret_id = secret_id
@@ -323,6 +324,15 @@ class IngestionConfig:
         # `carry_forward_fn(existing_item, new_item) -> new_item`, called by
         # _store_item with the currently-stored record. None = plain replace.
         self.carry_forward_fn = carry_forward_fn
+        # #1677: a source whose "raw" is already durable has nothing to archive. The
+        # closed-platform paste fallback fetches NOTHING — its input is the owner's
+        # pasted text, already stored verbatim as a PASTE# row in the same table — so an
+        # S3 copy would be a duplicate under a raw/ prefix nothing else writes. Setting
+        # this False skips the archive entirely; the source must then carry
+        # `raw_layout: None` in source_registry so the facet stays honest.
+        # NOT a way to quiet a failing archive: #1949 made a FAILED archive a failed run
+        # on purpose. This is "there is no raw response", not "the write is broken".
+        self.enable_raw_archive = enable_raw_archive
 
         # Environment
         self.region = os.environ.get("AWS_REGION", "us-west-2")
@@ -772,7 +782,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
             # OUT of `errors` so it can't trip the ADR-052 auth breaker (an S3
             # AccessDenied is an IAM/role fault, not an upstream credential one)
             # and can't stop the loop from storing the remaining dates.
-            archive_exc = _archive_raw(s3, config, date_str, raw)
+            archive_exc = _archive_raw(s3, config, date_str, raw) if config.enable_raw_archive else None
             if archive_exc is not None:
                 archive_failures += 1
                 last_archive_error = archive_exc

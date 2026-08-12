@@ -204,8 +204,14 @@ def test_pasted_post_reaches_the_membrane_through_the_framework(monkeypatch):
     assert rec["sensitivity_status"] == paste.gate.SENSITIVITY_CLEARED
     # ...and the record is RAW_TIMESERIES to the phase machinery.
     assert phase_taxonomy.classify(rec["pk"], rec["sk"]) == phase_taxonomy.RAW_TIMESERIES
-    # The framework's own raw archive ran, under the prefix the registry documents.
-    assert s3.keys == [f"{reg.SOURCE_REGISTRY['x']['raw_layout']['prefix']}/2026/08/{_DATE}.json"]
+    # No S3 raw archive: nothing was fetched, so there is no API response to copy — and
+    # the registry's raw_layout facet says exactly that, rather than claiming a tree that
+    # would never be written (#1949's honesty rule, from the other direction).
+    assert s3.keys == [], f"the paste path archived to S3: {s3.keys}"
+    assert reg.SOURCE_REGISTRY["x"]["raw_layout"] is None
+    # The staged row is the durable raw record, and it still holds the pasted text.
+    staged = [i for k, i in table.store.items() if k[1].startswith("PASTE#")]
+    assert len(staged) == 1 and staged[0]["text"] == rec["text"]
 
 
 def test_membrane_handoff_passes_the_channel_and_the_posts_own_text(monkeypatch):
