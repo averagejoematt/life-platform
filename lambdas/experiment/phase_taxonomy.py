@@ -136,6 +136,12 @@ SOURCE_CLASS: dict[str, str] = {
     "youtube": RAW_TIMESERIES,  # #1669: inbound social — Matthew's own posts, a logged fact layer
     "bluesky": RAW_TIMESERIES,  # #1676: inbound social — Matthew's own posts, a logged fact layer
     "mastodon": RAW_TIMESERIES,  # #1676: inbound social — Matthew's own posts, a logged fact layer
+    # #1677: the closed platforms. Paste-captured rather than fetched, but the SAME fact
+    # layer — a post he made is a logged fact however it reached the table, and the staged
+    # PASTE# rows live in these very partitions, so one classification covers both.
+    "x": RAW_TIMESERIES,
+    "instagram": RAW_TIMESERIES,
+    "tiktok": RAW_TIMESERIES,
     # (kept forever, genesis-anchored on read) like notion; provenance (`origin`) lives on the row.
     "food_delivery": RAW_TIMESERIES,  # behavioral archive (incl. longest-ever streak)
     "sick_days": RAW_TIMESERIES,

@@ -388,7 +388,7 @@
   },
   "shared_layer_retired": "#781 (2026-07-06): the shared layer is gone — shared modules ship inside every function bundle (deploy/build_bundle.py). CI fleet-deploys on any unmapped lambdas/ change.",
   "skip_deploy": {
-    "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
+    "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17. #1677: closed_social_paste_lambda.py is a handler with no deployed function on purpose — the closed platforms have no token and nothing to poll, so the paste path runs via scripts/paste_social_post.py; wire it into CDK the day token-backed polling lands.",
     "files": [
       "lambdas/ingestion/hevy_webhook_lambda.py",
       "lambdas/ingestion/ingestion_validator.py",
@@ -418,7 +418,8 @@
       "lambdas/health/genome_coaching.py",
       "lambdas/ai/ai_output_validator.py",
       "lambdas/health/labs_coaching.py",
-      "lambdas/ingestion/ingestion_framework.py"
+      "lambdas/ingestion/ingestion_framework.py",
+  "lambdas/ingestion/closed_social_paste_lambda.py"
     ]
   },
   "_retired_sleep_reconciler": {

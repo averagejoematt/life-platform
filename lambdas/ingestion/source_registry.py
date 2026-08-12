@@ -55,9 +55,14 @@ file at /var/task, which shadows the layer copy harmlessly.
 from datetime import date
 from typing import Any, cast
 
+# #1677: the CLOSED platforms' entries + their `inbound_mode` value, kept in a sibling
+# (one registry, spliced in below) — see source_registry_closed_social.py.
+from ingestion.source_registry_closed_social import CLOSED_SOCIAL_PASTE_SOURCES, INBOUND_PASTE_ONLY  # noqa: F401
+
 # Default staleness threshold when a source has no override (hours). The
 # checker may still override its own default via the STALE_HOURS env var.
 DEFAULT_STALE_HOURS = 48
+
 
 # Per-source fields:
 #   label          public board label
@@ -102,6 +107,11 @@ DEFAULT_STALE_HOURS = 48
 #                  raw trees (apple_health's HAE datatypes) carries them as a
 #                  `sub_layouts` sub-dict, each with its own prefix/scheme/filename
 #                  (#2278 — a prose `note` is not something a reader can resolve).
+#   inbound_mode   (#1677) how a record can arrive AT ALL. Absent = a fetch of some kind
+#                  exists. 'paste-only' = the closed platforms (X/Instagram/TikTok):
+#                  no client, no secret, no token path in this repo — the owner pastes
+#                  or nothing arrives. Read by paste_only_source_ids(); do NOT infer it
+#                  from active_api:False, which only means "not yet polling".
 #   provider_reconcile
 #                  True = OPT-IN source-of-truth reconciliation (DI-2/TR-07): a
 #                  daily job diffs the PROVIDER API against stored records and
@@ -162,7 +172,9 @@ DEFAULT_STALE_HOURS = 48
 #                  the streams Matthew captures by hand (CGM/water/BP/State of Mind)
 #                  vs the passive device streams (steps/workouts) — only the manual
 #                  ones are nudge-eligible. Read by hae_datatype_thresholds().
-SOURCE_REGISTRY = {
+# Annotated explicitly: splicing in the closed-social section (#1677) otherwise widens
+# the inferred value type to `object` and reds every facet helper under mypy.
+SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
     "whoop": {
         "label": "Whoop",
         "checker_label": "Whoop recovery/sleep",
@@ -679,6 +691,10 @@ SOURCE_REGISTRY = {
             "note": "per-post filename (many posts per day); a per-day feed snapshot (YYYY-MM-DD.json) is also written for audit",
         },
     },
+    # #1677 (epic #1668): the closed platforms — X, Instagram, TikTok. Paste-only, no
+    # token; their entries and the rationale live in source_registry_closed_social.py,
+    # spliced in here so SOURCE_REGISTRY stays the one dict every consumer reads.
+    **CLOSED_SOCIAL_PASTE_SOURCES,
     "weather": {
         "label": "Weather",
         "checker_label": "Weather",
@@ -866,6 +882,15 @@ def active_api_source_ids() -> list:
     """Scheduled API pulls that must attempt at least daily — the silent-auth-rot
     class. Replaces pipeline_health_check.ACTIVE_API_SOURCES."""
     return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("active_api"))
+
+
+def paste_only_source_ids() -> list:
+    """Closed platforms whose ONLY inbound path is a manual paste (#1677, epic #1668).
+
+    Read by the paste ingestion Lambda so its channel set can never drift from the
+    registry. See source_registry_closed_social.py for what the facet commits to.
+    """
+    return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("inbound_mode") == INBOUND_PASTE_ONLY)
 
 
 def best_effort_source_ids() -> set:
