@@ -1577,28 +1577,19 @@ def _semantic_recall_for_coach(coach_id, query_text, *, table=None, exclude_date
     - Budget-gated (band 2, ADR-125) + fully fail-soft: budget pause, no module, no
       corpus, no embedding, or any error → ("", []) so the coach reads exactly as it
       did before recall existed. Adds no behavior on the hot path when it can't run.
+
+    #2589 moved the body to `semantic_recall.recall_for_coach`, which wraps every exit
+    in a try/finally so no path can leave without an outcome line. This wrapper is the
+    one case that module cannot instrument — the import of the module itself failing —
+    so it emits the `not_attempted` line in the module's own shape.
     """
     try:
-        if not (query_text or "").strip():
-            return "", []
-        try:
-            from ai.budget_guard import allow as _budget_allow
+        from ai import semantic_recall as _sr
 
-            if not _budget_allow("semantic_recall"):
-                return "", []
-        except ImportError:
-            pass
-        from ai import bedrock_client as _bc, semantic_recall as _sr
-
-        if table is None:
-            table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
-        query_vec = _bc.embed_text(query_text)
-        precedents = _sr.retrieve(table, query_vec, exclude_dates=exclude_dates, resolve=True)
-        block = _sr.recall_block(precedents)
-        print(_sr.retrieval_log_line(coach_id, precedents))  # #2347: emitted on a HIT *and* on a MISS
-        return block, precedents
+        return _sr.recall_for_coach(coach_id, query_text, table=table, exclude_dates=exclude_dates)
     except Exception as _sr_e:  # noqa: BLE001 — semantic recall is never load-bearing
         print(f"[COACH-V2:{coach_id}] semantic recall unavailable (non-blocking): {_sr_e}")
+        print(f"[COACH-V2:{coach_id}] semantic recall: outcome=not_attempted reason=no_module resolved=n/a")
         return "", []
 
 

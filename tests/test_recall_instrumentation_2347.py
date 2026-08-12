@@ -139,6 +139,11 @@ def test_the_line_is_built_in_semantic_recall_not_inlined_at_the_call_site():
     exactly the kind of thing that gets re-inlined there by a later edit. Delegation is
     the contract: the formatting lives beside retrieval, the call site just prints it.
 
+    #2589 went further and moved the whole retrieval body to
+    `semantic_recall.recall_for_coach`, so the call site now delegates rather than
+    orchestrating — but the contract this test guards is the same one, and it is
+    STRICTER now: not one field of the log line may be spelled in `ai_calls.py`.
+
     Mutation-proof: inline the f-string back into `_semantic_recall_for_coach` → red.
     """
     import inspect
@@ -147,8 +152,9 @@ def test_the_line_is_built_in_semantic_recall_not_inlined_at_the_call_site():
 
     assert callable(sr.retrieval_log_line)
     src = inspect.getsource(ac._semantic_recall_for_coach)
-    assert "retrieval_log_line" in src
+    assert "recall_for_coach" in src, "the call site no longer delegates to the module that owns retrieval"
     assert "top_similarity=" not in src, "the log line was re-inlined into the baselined module"
+    assert "threshold=" not in src
 
 
 def test_the_helper_is_pure_and_states_both_outcomes_standalone():
