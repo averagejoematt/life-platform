@@ -52,6 +52,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import math
+import os
 import re
 import struct
 
@@ -451,6 +452,29 @@ def render_precedent_line(precedent: dict) -> str:
     return f"This period echoes the week of {date} ({paren}){tail}"
 
 
+# ── retrieval outcomes (#2347 instrumentation, #2589 third state) ───────────
+# The outcome vocabulary is NAMED rather than inlined so the log line, the tests and
+# any future scraper share one spelling. `not_attempted` (#2589) is the third state:
+# #2560 shipped hit/miss and called the instrument complete, but the coach entry point
+# had two returns that ran BEFORE the retrieval — an empty query and a budget pause —
+# and both exited emitting nothing at all. Silence therefore still meant either "recall
+# was never reached" or "recall ran and found nothing", which is precisely the
+# ambiguity #2560 set out to remove, one level up the call stack.
+OUTCOME_HIT = "hit"
+OUTCOME_MISS = "miss"
+OUTCOME_NOT_ATTEMPTED = "not_attempted"
+
+# The reasons a retrieval was never attempted. `error:<ExceptionType>` is composed at
+# the point of failure rather than enumerated here.
+REASON_EMPTY_QUERY = "empty_query"
+REASON_BUDGET_PAUSED = "budget_paused"
+REASON_ERROR = "error"
+
+# The budget-guard feature key this path is gated on (band 2, ADR-125). Shared with
+# `web/ask_retrieval.py`, which deliberately gates on the SAME name.
+BUDGET_FEATURE = "semantic_recall"
+
+
 def retrieval_log_line(coach_id, precedents: list) -> str:
     """#2347: ONE line per retrieval, emitted on a HIT **and on a MISS**.
 
@@ -474,10 +498,91 @@ def retrieval_log_line(coach_id, precedents: list) -> str:
     """
     top = max((p.get("similarity") for p in precedents or [] if p.get("similarity") is not None), default=None)
     return (
-        f"[COACH-V2:{coach_id}] semantic recall: outcome={'hit' if precedents else 'miss'} "
+        f"[COACH-V2:{coach_id}] semantic recall: outcome={OUTCOME_HIT if precedents else OUTCOME_MISS} "
         f"resolved={len(precedents or [])} threshold={DEFAULT_THRESHOLD} "
         f"top_similarity={top if top is not None else 'n/a'}"
     )
+
+
+def retrieval_not_attempted_line(coach_id, reason) -> str:
+    """#2589: the THIRD outcome — retrieval never ran, and says so with its reason.
+
+    Same field set and same order as ``retrieval_log_line`` on purpose, so ONE regex
+    over ``semantic recall: outcome=(\\w+)`` counts all three states and a scraper
+    never has to know which shape it is reading.
+
+    ``resolved`` and ``top_similarity`` are ``n/a``, not ``0`` — ADR-104. Zero
+    precedents is a MEASURED result of a retrieval that happened; a retrieval that
+    never happened measured nothing, and reporting ``resolved=0`` here would quietly
+    inflate the miss count that #2347's corpus decision is supposed to rest on.
+    ``threshold`` IS published, because it is knowable without retrieving and keeps the
+    field set identical across outcomes.
+    """
+    return (
+        f"[COACH-V2:{coach_id}] semantic recall: outcome={OUTCOME_NOT_ATTEMPTED} "
+        f"reason={reason} resolved=n/a threshold={DEFAULT_THRESHOLD} top_similarity=n/a"
+    )
+
+
+def recall_for_coach(coach_id, query_text, *, table=None, exclude_dates=None):
+    """The coach-prompt retrieval path: (block_text, resolved_precedents), NEVER raises.
+
+    Lifted here from ``ai_calls._semantic_recall_for_coach`` by #2589. Two reasons, in
+    order of weight:
+
+    1. **Every exit now emits exactly one outcome line.** That guarantee is a
+       ``try/finally``, not a print at each ``return`` — a later edit can add a new
+       early return and cannot make it silent. `web/ask_retrieval.py` (the sibling
+       reader path) already had this shape; this is the same guarantee for the coach
+       path, which did not.
+    2. ``ai_calls.py`` is size-baselined, and #2560 already established that this
+       instrumentation belongs beside retrieval rather than at the call site.
+
+    Posture is UNCHANGED from the call site it replaces — budget-gated (band 2,
+    ADR-125) and fully fail-soft: budget pause, empty query, no module, no corpus, no
+    embedding, or any error at all yields ``("", [])``, so the coach reads exactly as it
+    did before recall existed. Only precedents that RESOLVE to a real record are
+    returned (AC2), and `retrieve` applies the #2587 ``COACH_KINDS`` consent allowlist.
+
+    On the error path this emits TWO lines: the human diagnostic (which carries the
+    exception's MESSAGE, the part worth reading at 3am) and the machine outcome line
+    (which carries only its type, the part worth counting).
+    """
+    outcome_line = None
+    reason = REASON_EMPTY_QUERY
+    try:
+        if not (query_text or "").strip():
+            return "", []
+        reason = REASON_BUDGET_PAUSED
+        try:
+            from ai.budget_guard import allow as _budget_allow
+
+            if not _budget_allow(BUDGET_FEATURE):
+                return "", []
+        except ImportError:
+            pass  # budget guard absent (offline/test) ⇒ open, as it always was
+
+        from ai import bedrock_client as _bc
+
+        if table is None:
+            import boto3
+
+            region = os.environ.get("DYNAMODB_REGION", "us-west-2")
+            table = boto3.resource("dynamodb", region_name=region).Table(os.environ.get("TABLE_NAME", "life-platform"))
+        precedents = retrieve(table, _bc.embed_text(query_text), exclude_dates=exclude_dates, resolve=True)
+        block = recall_block(precedents)
+        # Set LAST: a failure inside retrieve/recall_block must fall through to the
+        # not_attempted line, never publish a hit/miss for a retrieval that broke.
+        outcome_line = retrieval_log_line(coach_id, precedents)
+        return block, precedents
+    except Exception as e:  # noqa: BLE001 — semantic recall is never load-bearing
+        reason = f"{REASON_ERROR}:{type(e).__name__}"
+        print(f"[COACH-V2:{coach_id}] semantic recall unavailable (non-blocking): {e}")
+        return "", []
+    finally:
+        # Pure f-strings on both branches — this must not be able to raise out of a
+        # `finally` and turn instrumentation into the thing that breaks the coach.
+        print(outcome_line if outcome_line is not None else retrieval_not_attempted_line(coach_id, reason))
 
 
 def recall_block(precedents: list) -> str:
