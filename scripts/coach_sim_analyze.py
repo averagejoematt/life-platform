@@ -72,9 +72,17 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# The shape metrics live next door (#2536) — see coach_sim_shapes for why the seam is
-# there. Imported rather than re-exported: a caller that wants a shape metric should
-# import it from the module that owns it, so the owner is unambiguous when it changes.
+# Both neighbours are imported rather than re-exported: a caller that wants one of
+# these should import it from the module that owns it, so the owner is unambiguous
+# when it changes. (isort orders these two, not editorial preference.)
+#
+# coach_sim_validation — the statistics that grade this module's detector against the
+# panel's tells (#2537 items 2/4). Its own module because a measuring instrument and
+# the arithmetic that grades it should be able to fail independently, and because the
+# grading needs Wilson/Fisher/partial-Spearman implementations nothing else here wants.
+import coach_sim_validation as simval  # noqa: E402  (path set above)
+
+# coach_sim_shapes — the shape metrics (#2536); see that module for why the seam is there.
 from coach_sim_shapes import (  # noqa: E402  (path set above)
     absence_phrasing_collisions,
     opening_construction_collisions,
@@ -534,7 +542,7 @@ def validate_against_judge_tells(payload: dict) -> dict:
     panel = (payload or {}).get("panel") or {}
     by_id = {r.get("scenario_id"): r for r in rows if r.get("scenario_id")}
 
-    tp = fp = fn = tn = 0
+    joined = []
     n_tells = 0
     n_symmetry_tells = 0
     for scenario_id, verdict in panel.items():
@@ -545,23 +553,30 @@ def validate_against_judge_tells(payload: dict) -> dict:
         n_tells += len(tells)
         hits = [t for t in tells if _SYMMETRY_TELL_VOCAB.search(t)]
         n_symmetry_tells += len(hits)
-        labelled = bool(hits)
-        predicted = bool(row.get("balanced_replies"))
-        if labelled and predicted:
-            tp += 1
-        elif labelled and not predicted:
-            fn += 1
-        elif predicted and not labelled:
-            fp += 1
-        else:
-            tn += 1
+        joined.append(
+            {
+                "labelled": bool(hits),
+                # The detector under test, and the pre-#2537 regex on the identical
+                # join. The control is not decoration: "fires more" is free, and only
+                # the comparison can show the extra firings are the RIGHT ones.
+                "predicted": bool(row.get("balanced_replies")),
+                "predicted_narrow": bool(row.get("not_x_but_y")),
+                "hits": row.get("balanced_hits") or 0,
+                "narrow_hits": row.get("not_x_but_y") or 0,
+                "n_sym": len(hits),
+                "n_other": len(tells) - len(hits),
+                "turns": row.get("turns") or 0,
+            }
+        )
 
-    n = tp + fp + fn + tn
+    n = len(joined)
     base = {
         "n_conversations_joined": n,
         "n_tells": n_tells,
         "n_symmetry_tells": n_symmetry_tells,
+        "symmetry_tell_share": round(n_symmetry_tells / n_tells, 3) if n_tells else None,
         "label": "any judge tell citing the symmetry vocabulary (conversation-level, noisy)",
+        "label_rule": _SYMMETRY_TELL_VOCAB.pattern,
         "advisory": True,
     }
     if n < MIN_REPLIES_FOR_COACH_VERDICT:
@@ -573,18 +588,98 @@ def validate_against_judge_tells(payload: dict) -> dict:
                 f"minimum {MIN_REPLIES_FOR_COACH_VERDICT} to state a correlation (ADR-105)"
             ),
         }
-    labelled_pos = tp + fn
+
+    wide = simval.contingency([(r["labelled"], r["predicted"]) for r in joined])
+    narrow = simval.contingency([(r["labelled"], r["predicted_narrow"]) for r in joined])
     return {
         **base,
         "verdict": "measured",
-        "true_positive": tp,
-        "false_positive": fp,
-        "false_negative": fn,
-        "true_negative": tn,
-        "recall_on_labelled": round(tp / labelled_pos, 3) if labelled_pos else None,
-        "precision": round(tp / (tp + fp), 3) if (tp + fp) else None,
-        "labelled_positive_rate": round(labelled_pos / n, 3),
-        "predicted_positive_rate": round((tp + fp) / n, 3),
+        # ── Backwards-compatible keys (unchanged meaning, same numbers) ──────────
+        "true_positive": wide["true_positive"],
+        "false_positive": wide["false_positive"],
+        "false_negative": wide["false_negative"],
+        "true_negative": wide["true_negative"],
+        "recall_on_labelled": wide["recall"],
+        "precision": wide["p_label_given_fires"],
+        "labelled_positive_rate": wide["base_rate"],
+        "predicted_positive_rate": wide["fire_rate"],
+        # ── What item 4 actually asked for ───────────────────────────────────────
+        # `precision` above is a conditional rate against a base rate that can be
+        # very high; on the 2026-08-10 corpus it is 0.915 against a base rate of
+        # 0.783, which sounds far better than it is. These three blocks are the
+        # comparison that makes the number interpretable, and they are returned
+        # together so no consumer can quote the flattering one alone.
+        "detector": wide,
+        "control_narrow": narrow,
+        "correlation": _symmetry_correlation(joined),
+        "caveats": [
+            "Labels are conversation-level free text from three judges reading a whole "
+            "transcript, not span-level annotation of the construction.",
+            "The detector's five patterns were authored against spans quoted from this "
+            "same corpus (8 of 536 replies), so this is not a fully held-out test.",
+            "A judge who believes a transcript is AI writes more tells of every kind; "
+            "`correlation.partial_*` are the controls for that, not the headline.",
+        ],
+    }
+
+
+def _symmetry_correlation(joined: list) -> dict:
+    """Dose-response between detector hits and judge symmetry tells, with controls.
+
+    The binary contingency throws away magnitude: a conversation with one flagged
+    reply and one with six are the same cell. This keeps it, and then removes the two
+    things that could produce a positive coefficient without any symmetry in it —
+    conversation length (more replies, more of everything) and overall tell volume
+    (an AI-looking transcript draws more complaints of every kind).
+    """
+    hits = [r["hits"] for r in joined]
+    narrow = [r["narrow_hits"] for r in joined]
+    turns = [r["turns"] for r in joined]
+    n_sym = [r["n_sym"] for r in joined]
+    n_other = [r["n_other"] for r in joined]
+    share = [(r["n_sym"] / (r["n_sym"] + r["n_other"]) if (r["n_sym"] + r["n_other"]) else 0.0) for r in joined]
+
+    def _ci(stat):
+        lo, hi, kept = simval.bootstrap_ci(joined, stat)
+        return {"ci95": [lo, hi], "resamples_used": kept}
+
+    def _col(sample, key):
+        if key == "share":
+            return [(r["n_sym"] / (r["n_sym"] + r["n_other"]) if (r["n_sym"] + r["n_other"]) else 0.0) for r in sample]
+        return [r[key] for r in sample]
+
+    return {
+        "n": len(joined),
+        "statistic": "Spearman rank correlation over conversations (ties averaged)",
+        "hits_vs_symmetry_tell_count": {
+            "rho": round(simval.spearman(hits, n_sym), 3),
+            **_ci(lambda s: simval.spearman(_col(s, "hits"), _col(s, "n_sym"))),
+        },
+        "hits_vs_symmetry_tell_share": {
+            "rho": round(simval.spearman(hits, share), 3),
+            **_ci(lambda s: simval.spearman(_col(s, "hits"), _col(s, "share"))),
+        },
+        # CONTROL 1 — the confound itself, reported so its size is visible. A
+        # coefficient here near the headline would mean the detector is tracking
+        # "this transcript drew complaints", not symmetry.
+        "hits_vs_NON_symmetry_tell_count": {
+            "rho": round(simval.spearman(hits, n_other), 3),
+            **_ci(lambda s: simval.spearman(_col(s, "hits"), _col(s, "n_other"))),
+        },
+        # CONTROL 2 and 3 — the confounds held fixed.
+        "partial_share_given_turns": {
+            "rho": round(simval.partial_spearman(hits, share, turns), 3),
+            **_ci(lambda s: simval.partial_spearman(_col(s, "hits"), _col(s, "share"), _col(s, "turns"))),
+        },
+        "partial_count_given_other_tells": {
+            "rho": round(simval.partial_spearman(hits, n_sym, n_other), 3),
+            **_ci(lambda s: simval.partial_spearman(_col(s, "hits"), _col(s, "n_sym"), _col(s, "n_other"))),
+        },
+        # The same length-controlled statistic for the pre-#2537 regex.
+        "control_narrow_partial_share_given_turns": {
+            "rho": round(simval.partial_spearman(narrow, share, turns), 3),
+            **_ci(lambda s: simval.partial_spearman(_col(s, "narrow_hits"), _col(s, "share"), _col(s, "turns"))),
+        },
     }
 
 
@@ -929,16 +1024,37 @@ def write_report(p: dict, path: str) -> None:
         if val.get("verdict") is None:
             lines.append(f"No verdict — {val.get('reason')}")
         else:
+            det = val.get("detector") or {}
+            nar = val.get("control_narrow") or {}
+            cor = val.get("correlation") or {}
+            part = (cor.get("partial_share_given_turns") or {}).get("rho")
+            part_ci = (cor.get("partial_share_given_turns") or {}).get("ci95")
             lines += [
                 f"Joined **n={val['n_conversations_joined']}** conversations "
-                f"({val['n_symmetry_tells']} of {val['n_tells']} judge tells cite this class). "
-                f"Recall on judge-labelled conversations **{val['recall_on_labelled']}**, "
-                f"precision **{val['precision']}** "
-                f"(TP {val['true_positive']} · FP {val['false_positive']} · "
-                f"FN {val['false_negative']} · TN {val['true_negative']}).",
+                f"({val['n_symmetry_tells']} of {val['n_tells']} judge tells cite this class, "
+                f"{val.get('symmetry_tell_share')}).",
+                "",
+                "| detector | fires on | P(symmetry tell \\| fires) | P(symmetry tell \\| silent) | phi | Fisher p |",
+                "|---|---|---|---|---|---|",
+                f"| widened (5-class) | {det.get('fire_rate')} | {det.get('p_label_given_fires')} "
+                f"{det.get('p_label_given_fires_ci')} | {det.get('p_label_given_silent')} "
+                f"{det.get('p_label_given_silent_ci')} | {det.get('phi')} | {det.get('fisher_p')} |",
+                f"| narrow `not_x_but_y` (control) | {nar.get('fire_rate')} | {nar.get('p_label_given_fires')} "
+                f"{nar.get('p_label_given_fires_ci')} | {nar.get('p_label_given_silent')} "
+                f"{nar.get('p_label_given_silent_ci')} | {nar.get('phi')} | {nar.get('fisher_p')} |",
+                "",
+                # The base rate goes in the same breath as precision, always. Reported
+                # alone, "precision 0.915" against a base rate of 0.783 reads as a
+                # triumph and is barely a lift — the report used to do exactly that.
+                f"**Read the two arms together.** The label's base rate is **{det.get('base_rate')}**, so "
+                f"precision on its own is not evidence; the lift over the silent arm and the exact p are. "
+                f"Length-controlled rank correlation between detector hits and the judges' symmetry-tell "
+                f"share: **rho={part}** 95% CI {part_ci}.",
                 "",
                 "The label is conversation-level and noisy — three judges reading a whole "
-                "transcript, not span annotation — so this is a correlation check, not accuracy.",
+                "transcript, not span annotation — so this is a correlation check, not accuracy. "
+                "Judges write more tells of every kind about transcripts they read as AI, which is "
+                "why the partial correlations are reported and not just the raw one.",
             ]
 
     if p.get("structural_collapse"):

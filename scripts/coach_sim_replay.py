@@ -67,7 +67,7 @@ sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from coach import coach_sim_scoreboard as sb  # noqa: E402  (path set above)
-from coach_sim_analyze import conversation_metrics  # noqa: E402
+from coach_sim_analyze import conversation_metrics, validate_against_judge_tells  # noqa: E402
 from coach_sim_shapes import structural_collapse  # noqa: E402
 
 DEFAULT_CORPUS = os.path.join(_ROOT, "tests", "fixtures", "coach_sim_replay")
@@ -145,6 +145,28 @@ def deterministic_metrics(convos: list) -> dict:
     }
 
 
+def validate_symmetry(convos: list, panel_path: str) -> dict:
+    """Grade the balanced-clause detector against a PRIOR run's judge tells (#2537).
+
+    Costs nothing and needs no model: the panel already ran, its verdicts are in that
+    run's ``metrics.json``, and the deterministic rows are recomputed here from the
+    corpus with today's detector. That combination is the point — the labels are
+    frozen at the date the judges wrote them, the predictions move with the code, so
+    a detector change can be re-graded against the same labels for $0 forever.
+
+    The join is on ``scenario_id``, which the corpus JSONL carries and
+    ``conversation_metrics`` propagates. Rows the panel never scored are dropped
+    rather than counted as negatives — an unjudged conversation is absence of a
+    label, not evidence the judges saw nothing (ADR-104).
+    """
+    with open(panel_path) as fh:
+        prior = json.load(fh)
+    panel = prior.get("panel") or {}
+    if not panel:
+        raise SystemExit(f"{panel_path} carries no `panel` block — it is not a judged run")
+    return validate_against_judge_tells({"metrics": [conversation_metrics(c) for c in convos], "panel": panel})
+
+
 def honesty_gate_counts(convos: list) -> dict:
     counts: dict = {}
     for c in convos:
@@ -181,6 +203,12 @@ def main() -> int:
     ap.add_argument("--seed-baseline", action="store_true", help="one-time: store the 2026-08-10 baseline, then exit")
     ap.add_argument("--json", dest="as_json", action="store_true", help="emit the payload as JSON instead of a report")
     ap.add_argument("--strict", action="store_true", help="reserved for the ADR-108 promotion — NOT armed anywhere today")
+    ap.add_argument(
+        "--validate-symmetry",
+        metavar="METRICS_JSON",
+        default=None,
+        help="grade the balanced-clause detector against a prior judged run's tells (#2537); $0, no model",
+    )
     args = ap.parse_args()
 
     if args.seed_baseline:
@@ -191,6 +219,12 @@ def main() -> int:
     convos = load_corpus(args.corpus)
     det = deterministic_metrics(convos)
     man = manifest(args.corpus, convos)
+
+    if args.validate_symmetry:
+        # Always JSON: this is a table of statistics meant to be diffed and pasted
+        # into an issue, not skimmed. Printed alone so the exit is unambiguous.
+        print(json.dumps(validate_symmetry(convos, args.validate_symmetry), indent=2, default=str))
+        return 0
 
     trend = None
     if args.compare or args.write:
