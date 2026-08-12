@@ -53,7 +53,7 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger("telegram-worker")
     logger.setLevel(logging.INFO)
 
-from coach import coach_chat, coach_outbound, coach_reactions, telegram_gateway
+from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway
 from coach.coach_chat_grounding import build_facts_block, build_grounder, chat_available_logs
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
@@ -156,9 +156,13 @@ def _chat_authorized(chat_id, chat_ids: list) -> bool:
 
 
 def _tg_body(payload: dict) -> tuple:
-    """``(bytes, content-type)`` for one Bot API call — form-urlencoded today. Split
-    out of ``_tg`` so the next method that cannot use a form body (``sendVoice`` needs
-    multipart, #2494) branches HERE, leaving every caller and ``_tg`` untouched."""
+    """``(bytes, content-type)`` for one Bot API call — form-urlencoded, EXCEPT when
+    a value is a ``(filename, bytes)`` tuple: audio cannot ride a form body, so
+    ``sendVoice`` (#2494) encodes multipart instead. The branch lives here, the seam
+    #2485 split out for it, so every caller and ``_tg``'s fire-and-log stay untouched."""
+    files = {k: v for k, v in payload.items() if isinstance(v, tuple)}
+    if files:
+        return coach_voice.multipart_body({k: v for k, v in payload.items() if k not in files}, files)
     return urllib.parse.urlencode(payload).encode(), "application/x-www-form-urlencoded"
 
 
@@ -611,15 +615,27 @@ def _unsolicited_turn(a: dict, frame: str, tier: Optional[int], *extra_sources: 
     )
 
 
-def _send_bubbles(token: str, chat_id, bubbles: list, *, max_bubbles: Optional[int] = None) -> list:
+def _send_bubbles(token: str, chat_id, bubbles: list, *, max_bubbles: Optional[int] = None, persona_id=None, status=None) -> list:
     """Send 1..n bubbles ~1s apart with the typing indicator between — the texture
     of a person, not a report renderer. Markers are stripped on EVERY path here,
-    so machine syntax can never reach the phone. Returns what was actually sent."""
+    so machine syntax can never reach the phone. Returns what was actually sent.
+
+    ``persona_id``/``status`` opt this send into voice notes (#2494): a qualifying
+    reply is SPOKEN instead of typed, in the coach's own registry voice. Every gate
+    lives in ``coach_voice``, which returns None for "text" on any doubt or failure,
+    so the typed path below is unchanged and unreachable-by-accident only when audio
+    is actually in hand. What is stored is the same text either way."""
     import time as _time
 
     sendable = coach_outbound.strip_referral_markers(bubbles) or []
     if max_bubbles and len(sendable) > max_bubbles:
         sendable = sendable[: max_bubbles - 1] + ["\n\n".join(sendable[max_bubbles - 1 :])]
+    tier = _current_tier() if persona_id else None  # only the opted-in path pays for the tier read
+    audio = coach_voice.voice_note(sendable, persona_id=persona_id, status=status, tier=tier, s3=_s3_client(), bucket=S3_BUCKET)
+    if audio:
+        _tg(token, "sendVoice", {"chat_id": chat_id, "voice": (coach_voice.FILENAME, audio)})
+        _emit_metric("TelegramVoiceNoteSent", persona_id)
+        return sendable
     for i, bubble in enumerate(sendable):
         if i:
             _tg(token, "sendChatAction", {"chat_id": chat_id, "action": "typing"})
@@ -955,7 +971,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     # bubble leaves — Matthew never sees machine syntax, whether or not the
     # deterministic gate below lets the handoff through.
     marker = coach_outbound.parse_referral(result.text)
-    sent = _send_bubbles(token, chat_id, result.bubbles or [result.text])
+    sent = _send_bubbles(token, chat_id, result.bubbles or [result.text], persona_id=persona_id, status=result.status)
     if not sent and result.text:
         # Degenerate: the model replied with NOTHING but a handoff marker, so
         # stripping it left no message. Rare, but it must not be invisible — and
