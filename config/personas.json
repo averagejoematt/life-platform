@@ -2,7 +2,7 @@
   "version": "1",
   "_meta": {
     "purpose": "Canonical persona registry (CC-00). The single source of truth that reconciles the three historically-divergent coach name-spaces: config/coaches/*.json keys, the engine COACH_IDS, and the board_of_directors.json personas. A coach's public byline must provably be the coach that authored the data — this file is what makes that true.",
-    "model": "distinct-but-linked, three tiers: operational coaches (7) carry a live coach_config_key + daily engine outputs; chat-tier coaches (chat: true — pattern_coach, career_coach, and the lead eli_marsh) carry a voice spec + a Telegram bot but no daily compute; consulting specialists (consulting: true — glucose/labs) keep pipelines + site, no bots, citable by name. The broader Board stays on /method/board/, cross-linked via board_persona_key.",
+    "model": "distinct-but-linked, three tiers: operational coaches (7) carry a live coach_config_key + daily engine outputs; chat-tier coaches (chat: true — pattern_coach, career_coach, and the lead eli_marsh) carry a voice spec but no daily compute; consulting specialists (consulting: true — glucose/labs) keep pipelines + site, citable by name. The broader Board stays on /method/board/, cross-linked via board_persona_key. NOTE (ADR-153 amendment 2026-08-12): a Telegram bot is granted by `telegram_route`, NOT by a tier flag — sleep_coach is chat:false and has always had one, and labs_coach is consulting:true and now has one too. The tiers drive compute, citability and site surfaces; the route drives transport. Do not infer one from the other.",
     "links": {
       "voice_specs": "config/coaches/<coach_config_key>.json",
       "board": "config/<user>/board_of_directors.json (member keys = board_persona_key)",
@@ -124,7 +124,6 @@
       "title": "Performance & Training",
       "lens": "training load, strength + cardio programming, movement capability, body composition",
       "telegram_route": "physical",
-      "telegram_route_aliases": ["training"],
       "pronouns": "he/him",
       "availability": {
         "paused": "Budget's at tier {tier}, so I'm off the clock for texting — the brief and the site are the priority load right now, not this chat. I'll be back when it clears.",
@@ -167,6 +166,7 @@
       "board_role": "Longevity & Preventive Medicine",
       "tts_voice": "en-US-Chirp3-HD-Puck",
       "consulting": true,
+      "telegram_route": "labs",
       "title": "Labs & Biomarkers",
       "lens": "bloodwork, biomarkers, long-run risk factors",
       "pronouns": "he/him"

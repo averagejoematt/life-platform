@@ -26,10 +26,19 @@ WHAT IT DOES PER BOT
      integration uses, needs a single IAM grant and a single cached read, and costs
      ~$2.40/month less against a ceiling where that is real money.
 
-GLUCOSE AND LABS ARE DELIBERATELY NOT CREATED. Both coaches keep running on the
-platform — daily cards, narratives, the board — but Matthew does not want them as
-texting contacts, and an uncreated bot is one fewer public webhook endpoint to
-defend. Either can be added later by naming it explicitly.
+GLUCOSE IS DELIBERATELY NOT CREATED. Dr. Patel keeps running on the platform —
+daily cards, narratives, the board — but Matthew does not want her as a texting
+contact, and an uncreated bot is one fewer public webhook endpoint to defend. She
+can be added later by naming her explicitly: `setup_telegram_bots.py glucose`.
+
+LABS WAS PROMOTED 2026-08-12 (ADR-153 amendment). Dr. Okafor was in that same
+"no bot" class until the owner asked whether the roster needed a longevity coach.
+It turned out one already existed with no way to reach him — his own bio reads
+"Longevity & preventive medicine" and his lens is long-run risk factors — so
+rather than mint a seat that would have overlapped him, he got the door. Note
+that a bot is granted by `telegram_route` in config/personas.json, NOT by the
+tier flags: `consulting: true` still holds for Okafor, and it never blocked
+texting.
 
 RE-RUNNABLE. It merges rather than replaces, so adding the sixth bot later leaves the
 first five untouched. Re-entering a token for an existing bot updates just that one.
@@ -77,26 +86,42 @@ BOTS = [
     ("nutrition", "ajm_nutrition_bot", "Dr. Marcus Webb"),
     ("sleep", "ajm_sleep_bot", "Dr. Lisa Park"),
     ("mind", "ajm_mind_bot", "Dr. Nathan Reeves"),
-    # Coaching-team v2 (2026-08-10): the merged Performance seat. The @username
-    # survives the Victor→Max rename (usernames are sticky); /setname updates the
-    # display side whenever the owner runs this script.
-    ("physical", "ajm_longevity_bot", "Dr. Max Reyes"),
+    # Coaching-team v2 (2026-08-10), re-pointed 2026-08-12 (ADR-153 amendment).
+    # The merged Performance seat now answers on @ajm_training_bot — the thread
+    # Matthew already had open with the training lane Max absorbed — instead of
+    # on @ajm_longevity_bot. Telegram will not rename a bot username once it is
+    # taken, and "longevity" described the retired Victor framing, not Max's
+    # performance/movement mandate. So the handle moves to the coach it actually
+    # fits (below) and Max keeps the conversation, not the misnomer.
+    ("physical", "ajm_training_bot", "Dr. Max Reyes"),
     ("explorer", "ajm_research_bot", "Dr. Henning Brandt"),
     ("pattern", "ajm_pattern_bot", "Dr. Nora Vale"),
     ("career", "ajm_career_bot", "Steve Brooks"),
     ("board", "ajm_board_bot", "Grand Rounds"),
+    # Owner-called 2026-08-12: "should we not just have a longevity coach?" The
+    # answer was that one already existed without a door — Okafor's own bio reads
+    # "Longevity & preventive medicine" and his lens is long-run risk factors. So
+    # rather than mint a seat that would overlap him, he gets the bot, and he
+    # inherits @ajm_longevity_bot because that handle finally describes its owner.
+    ("labs", "ajm_longevity_bot", "Dr. James Okafor"),
 ]
 
-# Succession routes: the SEAT retired, the CHAT did not. Dr. Sarah Chen retired
-# at the cycle-13 genesis (2026-08-10, ADR-153), but @ajm_training_bot is a
-# thread Matthew already has open — so the route now carries to the persona that
-# absorbed the lane (Dr. Max Reyes, `telegram_route_aliases` in
-# config/personas.json) instead of dead-ending at a silent rejection. Run
-# `python3 setup/setup_telegram_bots.py training` to push the /setname rename
-# through BotFather; the token stays live and is NOT revoked.
-ALIAS_BOTS = [
-    ("training", "ajm_training_bot", "Dr. Max Reyes"),
-]
+# Succession routes: the SEAT retired, the CHAT did not.
+#
+# RETIRED 2026-08-12 (ADR-153 amendment). Dr. Sarah Chen retired at the cycle-13
+# genesis and `training` was aliased onto the Performance seat so her bot thread
+# would not dead-end. That alias is now unnecessary: @ajm_training_bot IS the
+# Performance seat's primary bot (key `physical` above), so the thread continues
+# with the coach who holds the lane — via the primary route rather than an alias.
+#
+# This matters beyond tidiness: the primary `telegram_route` is the canonical
+# OUTBOUND route, so a seat reachable only by alias could be texted but could
+# never text first. Max now owns a primary route, so his morning check-ins and
+# event-triggered outbound work.
+#
+# `training` is deliberately left unmapped and fails CLOSED in
+# gateway.resolve_coach, which is correct — there is no separate training seat.
+ALIAS_BOTS: list[tuple[str, str, str]] = []
 
 # Coaches who keep running on the platform — daily cards, narratives, the board —
 # but whom Matthew does not want as a texting contact. Deliberately NOT created:
@@ -106,7 +131,6 @@ ALIAS_BOTS = [
 #     python3 setup/setup_telegram_bots.py glucose
 OPTIONAL_BOTS = [
     ("glucose", "ajm_glucose_bot", "Dr. Amara Patel"),
-    ("labs", "ajm_labs_bot", "Dr. James Okafor"),
 ]
 
 ALL_BOTS = BOTS + OPTIONAL_BOTS + ALIAS_BOTS
