@@ -17,6 +17,8 @@ set -euo pipefail
 RUN_ID="${1:?usage: reject_deployment.sh <run_id> [comment]}"
 COMMENT="${2:-Rejected: stale gated run — a Deploy parked at the gate holds the deploy-group slot (#2467).}"
 REPO="averagejoematt/life-platform"
+# shellcheck source=deploy/lib/deploy_gate_lease.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/deploy_gate_lease.sh"
 
 echo "Pending deployments for run ${RUN_ID}:"
 gh api "repos/${REPO}/actions/runs/${RUN_ID}/pending_deployments" \
@@ -25,6 +27,7 @@ gh api "repos/${REPO}/actions/runs/${RUN_ID}/pending_deployments" \
 ENV_IDS=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/pending_deployments" --jq '[.[].environment.id] | @json')
 if [ "${ENV_IDS}" = "[]" ]; then
   echo "No pending deployments to reject for run ${RUN_ID}."
+  surface_gate_lease_holder "${REPO}" "${RUN_ID}"
   exit 0
 fi
 echo "Rejecting environment_ids=${ENV_IDS} ..."
@@ -34,3 +37,7 @@ gh api "repos/${REPO}/actions/runs/${RUN_ID}/pending_deployments" \
 {"environment_ids": ${ENV_IDS}, "state": "rejected", "comment": "${COMMENT}"}
 EOF
 echo "Rejection submitted — the run concludes, nothing stale deploys, the deploy slot is freed."
+echo "NOTE (#2590): the run will now read \`conclusion: failure\` with \`Deploy\` as its sole red job"
+echo "  (the job never executed, so it has no log). That is NOT a red main —"
+echo "  scripts/check_main_green.py derives the rejection from this run's own"
+echo "  \`…/actions/runs/${RUN_ID}/approvals\` record and reports it as rejected-and-superseded."

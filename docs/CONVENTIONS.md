@@ -360,11 +360,13 @@ regenerated page would be merged-but-not-deployed); and `plan` diffs from
 `${GITHUB_SHA}~1` to the reconciled HEAD, so the merged PR's own changes stay in the
 deploy plan even with a reconcile commit stacked on top.
 
-### 4d. Stranded deploy states — the approval gate, the R8-ST6 Plan-red, the phantom wedge (#1901/#2052)
+### 4d. Stranded deploy states — the approval gate, the R8-ST6 Plan-red, the phantom wedge (#1901/#2052/#2590)
 
 Three pipeline states leave main's deploy path wedged while nothing looks obviously
 broken. `scripts/check_main_green.py` (the /wrap gate) classifies all three explicitly —
-never re-diagnose them as ordinary red/green:
+never re-diagnose them as ordinary red/green. States 4 and 5 are not wedges: they are the
+two ways the *cure* for state 1 gets misread (#2590), and they belong here because that is
+where an operator will be standing when they hit them.
 
 1. **Stranded production approval.** A run that reaches the `production` approval gate
    and is never actioned sits at `status=waiting` indefinitely; because `ci-cd.yml`
@@ -449,6 +451,49 @@ never re-diagnose them as ordinary red/green:
    payload logic: `alert_candidate`/`should_fire_alert`/`build_dispatch_payload`/
    `maybe_alert` in `check_deploy_wedge.py`, tested in `tests/test_deploy_wedge_alert_2149.py`.
 
+4. **Rejected-and-superseded — the #2590 shape (NOT a state to fix; a state to read
+   correctly).** Rejecting a gated run is the *prescribed* action of state 1, and it
+   lands the run as **`conclusion: failure` with `Deploy` as its sole red job** — the
+   job never executed, so `gh run view <id> --log-failed` says "log not found". Read
+   literally that is a red main, so for a while **obeying #2467 made the wrap's own
+   (e2) green-main gate report a falsehood** (five times on 2026-08-11/12:
+   `32734614d`, `b177805f6`, `aad9ae137`, `c78c93369`, `c16c75783`). It self-heals
+   the moment a later run succeeds, so the false-red window is exactly the gap
+   between the rejection and the next successful deploy — in a session that rejects
+   a run per merge and defers the deploy to the end, that is the whole session.
+   Nothing needs cleaning up afterwards; a later success at a newer sha supersedes it.
+
+   `scripts/check_main_green.py` now skips these the way it already skips `cancelled`,
+   but **reports** each one with its sha and the rejecting operator's own reason, so
+   "the lease was actioned" never looks like "the gate is blind". **Derive it from the
+   run's own approval record, never from the job shape**:
+
+   ```bash
+   gh api repos/averagejoematt/life-platform/actions/runs/<run_id>/approvals \
+     --jq '.[] | {state, comment, envs: [.environments[].name]}'
+   # → {"state":"rejected","comment":"Superseded: …","envs":["production"]}
+   ```
+
+   (`…/actions/runs/<id>/deployments` **404s** on this repo — `approvals` is the
+   run-scoped source of truth and is the only thing that carries the reason.) The
+   check is a **conjunction**: rejected AND `Deploy` is the sole failing job. A
+   genuinely broken `Deploy` job has the identical job shape and must still read RED —
+   and two of the five runs above were rejected *and* had a real `test / Unit Tests`
+   failure, so keying on the rejection alone would have declared main green over a
+   real red. Fixtures + both mutation directions: `tests/test_rejected_deployment_2590.py`.
+
+5. **The empty `pending_deployments` ambiguity (#2590).** When a gate action finds
+   nothing to action, that means one of two opposite things and **the run cannot tell
+   you which**: the gate has not opened for it, or an *older* run owns the production
+   lease and is silently queueing it behind (state 1's mechanism, seen from the
+   *victim's* side). Live 2026-08-11: run `31528727429` sat `waiting` while the newer
+   `31529270801` showed `Deploy: pending` with an empty `pending_deployments` — it read
+   as "the gate never opened"; rejecting the holder released it instantly. Both
+   `deploy/approve_deployment.sh` and `deploy/reject_deployment.sh` now call
+   `surface_gate_lease_holder` (`deploy/lib/deploy_gate_lease.sh`) on that branch: it
+   enumerates every `waiting` run with no recency bound and names the holder, or says
+   plainly that nothing holds the lease and points at `check_deploy_wedge.py`.
+
 #### The recurrence ledger — five wedges, four fixes, what each one bought
 
 Kept here so the sixth is diagnosed in minutes instead of re-derived from scratch. Every
@@ -481,12 +526,13 @@ it then needs an AWS write from a runner that holds deploy credentials. Five rec
 were "fixed" blind; the next structural change should be made against measurements from
 the detector, not ahead of them.
 
-All three states are surfaced at wrap time by `check_main_green.py` (a `waiting` run
+All of these are surfaced at wrap time by `check_main_green.py` (a `waiting` run
 older than ~2h is reported loudly with its run id + sha; younger ones ride along as a
 notice; a phantom wedge outranks everything, including a green completed run — while it
-holds, "main GREEN" is a stale fact). Fixture-pinned in
-`tests/test_stranded_deploy_1901.py` and `tests/test_deploy_wedge_2052.py`, the latter
-against real captured API payloads for all three live states.
+holds, "main GREEN" is a stale fact; a rejected-and-superseded run is skipped as a
+verdict but named with its sha and the operator's own reason). Fixture-pinned in
+`tests/test_stranded_deploy_1901.py`, `tests/test_deploy_wedge_2052.py` (real captured
+API payloads for all three live wedge states) and `tests/test_rejected_deployment_2590.py`.
 
 ## 5. The CDK asset-staging trap — a 200 invoke is not proof of a good deploy
 
