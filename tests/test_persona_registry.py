@@ -193,9 +193,14 @@ def test_accessors_resolve_known_coach():
     # Route → persona resolution is registry data, never string surgery.
     assert persona_registry.persona_for_telegram_route("headcoach")[0] == "eli_marsh"
     assert persona_registry.persona_for_telegram_route("pattern")[0] == "pattern_coach"
-    # The retired seat's route survives as a SUCCESSION alias on the persona that
-    # absorbed the lane — the bot chat continues, under the new coach's name.
-    assert persona_registry.persona_for_telegram_route("training")[0] == "physical_coach"
+    # ADR-153 amendment 2026-08-12: the succession alias retired. @ajm_training_bot
+    # is now the Performance seat's PRIMARY route (`physical`), so Max keeps the
+    # thread he absorbed AND can send outbound, which an alias-only seat could not.
+    assert persona_registry.persona_for_telegram_route("physical")[0] == "physical_coach"
+    assert persona_registry.persona_for_telegram_route("training") == (None, None)  # no separate seat: fails closed
+    # Okafor's door, added without a tier change — `telegram_route` grants a bot,
+    # a tier flag does not. He remains `consulting: true`.
+    assert persona_registry.persona_for_telegram_route("labs")[0] == "labs_coach"
     assert persona_registry.persona_for_telegram_route("astrology") == (None, None)  # unclaimed: fails closed
 
 

@@ -617,9 +617,17 @@ def test_headcoach_route_resolves_eli_not_string_surgery():
 
     pid, p = persona_for_telegram_route("headcoach")
     assert pid == "eli_marsh" and p["name"] == "Dr. Eli Marsh"
-    # The retired seat's route is a SUCCESSION alias, not a dead key: the chat
-    # Matthew already has open continues with the coach who absorbed the lane.
-    assert persona_for_telegram_route("training")[0] == "physical_coach"
+    # ADR-153 amendment 2026-08-12: the Performance seat answers on its PRIMARY
+    # route, not a succession alias. That distinction is load-bearing — only the
+    # primary route is used for OUTBOUND, so an alias-only seat could be texted
+    # but could never text first.
+    assert persona_for_telegram_route("physical")[0] == "physical_coach"
+    # `training` is now deliberately unmapped: there is no separate training
+    # seat, so it must fail CLOSED rather than resolve to whoever is nearest.
+    assert persona_for_telegram_route("training") == (None, None)
+    # Okafor got a route without any tier change — a bot is granted by
+    # `telegram_route`, never by a tier flag (he is still `consulting: true`).
+    assert persona_for_telegram_route("labs")[0] == "labs_coach"
     # A route nobody claims still fails closed.
     assert persona_for_telegram_route("astrology") == (None, None)
 

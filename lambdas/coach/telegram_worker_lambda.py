@@ -117,6 +117,24 @@ def _emit_metric(name: str, coach_id: str, value: float = 1) -> None:
         logger.warning("[telegram] metric %s emit failed: %s", name, e)
 
 
+def _persona_is_retired(persona_id: str) -> bool:
+    """Whether `persona_id` names a retired seat. Fail-soft FALSE.
+
+    Deliberately soft: a registry read that fails must not block a live coach
+    from answering. The caller only uses this to refuse a *derived* fallback id,
+    so the worst case of a false negative is the status quo ante, while a false
+    positive would silence a working coach.
+    """
+    try:
+        from coach.persona_registry import personas
+
+        p = (personas(_s3_client(), S3_BUCKET) or {}).get(persona_id) or {}
+        return bool(p.get("retired"))
+    except Exception as e:  # noqa: BLE001 — never block a reply on a registry read
+        logger.warning("[telegram] retired-check unavailable for %s: %s", persona_id, e)
+        return False
+
+
 def _secret_entry(coach_key: str) -> dict:
     """One route's entry in the telegram store ({bot_token, chat_ids}), or {}.
 
@@ -914,7 +932,20 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     # stays as the offline fallback so a registry outage degrades, never renames.
     persona_id, _route_persona = persona_for_telegram_route(coach_id, s3_client=_s3_client(), bucket=S3_BUCKET)
     if not persona_id:
-        persona_id = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
+        # The fallback may never RESURRECT a retired seat. A retired coach's
+        # short_id still satisfies f"{route}_coach", so an unmapped route whose
+        # name matches one would put a retired persona back on the phone in her
+        # own voice — worse than an honest failure, and undetectable from the
+        # reply. Found 2026-08-12 when the `training` succession alias retired
+        # (ADR-153 amendment): the route stopped resolving and the derivation
+        # silently produced `training_coach`, i.e. Dr. Sarah Chen, retired since
+        # the cycle-13 genesis. Refuse instead, and say so.
+        derived = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
+        if _persona_is_retired(derived):
+            _emit_metric("TelegramRetiredSeatRefused", coach_id)
+            logger.error("[telegram] route %r derives the RETIRED persona %r — refusing", coach_id, derived)
+            return {"ok": True, "reason": "route_retired"}
+        persona_id = derived
     # S3 first (fresh config without a redeploy), bundled config/ as the offline
     # fallback — the pair of paths that was MISSING when every conversation ran
     # nameless ("I'm mind_coach") and persona-free. Both failing is an incident:

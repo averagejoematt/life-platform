@@ -682,16 +682,39 @@ def test_a_scheduled_event_is_never_mistaken_for_a_work_order(wired):
 # ── route succession: the training bot continues as Max ──────────────────────
 
 
-def test_the_training_bot_continues_as_the_performance_seat(wired):
-    """Matthew's existing @ajm_training_bot chat was dead-ending at a silent
-    rejection after the seat retired. It now lands in Max Reyes' own partition —
-    one coach, one memory, no special first-message code."""
+def test_the_training_route_refuses_rather_than_resurrecting_a_retired_seat(wired):
+    """ADR-153 amendment 2026-08-12: the `training` succession alias retired —
+    @ajm_training_bot is now the Performance seat's PRIMARY route (`physical`),
+    so Max keeps the thread AND can send outbound, which an alias-only seat
+    could not.
+
+    The load-bearing assertion is what happens to the now-unmapped key. The
+    worker's offline fallback derives f"{route}_coach", and `training_coach` is
+    Dr. Sarah Chen — RETIRED at the cycle-13 genesis. Deriving her would put a
+    retired persona back on the phone in her own voice, which is undetectable
+    from the reply and strictly worse than an honest failure. It must refuse.
+    """
     worker, h = wired
     store = dict(STORE, training={"bot_token": "tok-training", "chat_ids": [4242]})
     import unittest.mock as mock
 
     with mock.patch.object(worker, "_secret_entry", side_effect=lambda key: dict(store.get(key) or {})):
-        worker.lambda_handler({"coach_id": "training", "chat_id": 4242, "text": "squats felt heavy"}, None)
+        out = worker.lambda_handler({"coach_id": "training", "chat_id": 4242, "text": "squats felt heavy"}, None)
+
+    assert out.get("reason") == "route_retired"
+    assert h.turns == [], "a retired seat must not generate a turn"
+    assert not any(p.get("pk") == coach_chat.chat_pk("training_coach") for p in h.table.puts)
+
+
+def test_the_performance_seat_answers_on_its_primary_route(wired):
+    """The other half: @ajm_training_bot's token now lives under `physical`, so
+    the same conversation continues in Max Reyes' own partition."""
+    worker, h = wired
+    store = dict(STORE, physical={"bot_token": "tok-physical", "chat_ids": [4242]})
+    import unittest.mock as mock
+
+    with mock.patch.object(worker, "_secret_entry", side_effect=lambda key: dict(store.get(key) or {})):
+        worker.lambda_handler({"coach_id": "physical", "chat_id": 4242, "text": "squats felt heavy"}, None)
 
     assert h.turns[0]["coach_name"] == "Dr. Max Reyes"
     assert any(p.get("pk") == coach_chat.chat_pk("physical_coach") for p in h.table.puts)
