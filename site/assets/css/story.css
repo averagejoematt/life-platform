@@ -71,7 +71,7 @@ body { overflow-x: hidden; }
 }
 .cta:hover { border-color: var(--ember); }
 .cta:active { border-color: var(--ember); opacity: 0.8; }
-.cta-quiet { color: var(--ink-faint); border-color: var(--rule); }
+.cta-quiet { color: var(--ink-faint); border-color: var(--ink-muted); }
 .cta-quiet:hover { color: var(--ink-muted); }
 
 /* ── #1469 variant A "the loop, drawn live" — the loop stage ──────────────────
@@ -353,10 +353,22 @@ body { overflow-x: hidden; }
 .dx-readmore a:focus-visible, .dx-readfull:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
 
 /* ── PG-03 — per-dispatch subscribe foot + "start from the beginning" ──────── */
+/* Ground is a RAMP step, not --ember-wash (#2592). The wash is a translucent
+   accent tint: composited over --page in light mode it lands at #EDE1D1, a
+   fifth surface DARKER than any ramp step, and the secondary ink register was
+   never tuned for it — --ink-muted measured 4.39:1 and --ember 4.46:1 there,
+   both under the 4.5:1 AA floor (axe color-contrast, 4 nodes, caught by the
+   #1991 light-theme ledger once #2562 put this panel on a statically-rendered
+   page). tests/test_paper_ramp_contrast.py already ENFORCES that --ink /
+   --ink-muted / --ink-faint / --ember all hold >= 4.5:1 on every ramp step in
+   both themes, so a ramp ground is AA by a guarded invariant rather than by
+   luck. The ember identity stays in the 2px top rule and the CTA — which is
+   also what DESIGN_SYSTEM_V5 §1 asks for: surface hierarchy from neutral
+   tonality, never from leaning on the accent. */
 .dx-subscribe {
   margin-top: var(--sp-7); padding: var(--sp-5);
   border: var(--border-hair); border-top: 2px solid var(--ember);
-  border-radius: var(--radius); background: var(--ember-wash);
+  border-radius: var(--radius); background: var(--surface-raised);
   max-width: var(--measure);
 }
 .dx-sub-h { font-family: var(--font-serif); font-size: var(--fs-body-lg); margin: 0; color: var(--ink); }
@@ -760,7 +772,7 @@ body { overflow-x: hidden; }
    reader question to a moderation queue; the board answers a selection in the lab
    notes. Ember-accented like the dispatch subscribe card; calm, never bait. ── */
 .askboard { max-width: var(--measure); margin: var(--sp-5) 0 0; padding: var(--sp-4) var(--sp-5);
-  border: var(--border-hair); border-left: 3px solid var(--ember); border-radius: var(--radius); background: var(--ember-wash); }
+  border: var(--border-hair); border-left: 3px solid var(--ember); border-radius: var(--radius); background: var(--surface-raised); }
 .askboard-k { color: var(--ember); margin: 0; }
 .askboard-lede { margin: var(--sp-2) 0 var(--sp-4); color: var(--ink-muted); line-height: 1.5; }
 .askboard-form { display: grid; gap: var(--sp-3); }

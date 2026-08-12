@@ -220,6 +220,64 @@ def test_ramp_holds_aa_in_both_themes():
     assert not failures, "paper-ramp AA regressions:\n" + "\n".join(failures)
 
 
+def test_subscribe_panel_text_holds_aa_on_its_declared_ground():
+    """#2592 — a text-bearing PANEL must sit on a ramp step, not on an accent wash.
+
+    The regression this guards: `.dx-subscribe` shipped with `background:
+    var(--ember-wash)`. A wash is `color-mix(in oklch, <accent> N%, transparent)` —
+    translucent, so its real ground is the accent composited over whatever it lands
+    on. Over --page in light mode that is #EDE1D1: a fifth surface DARKER than any
+    ramp step, which test_ramp_holds_aa_in_both_themes above never covers. The
+    secondary ink register was never tuned for it, so --ink-muted measured 4.39:1
+    and --ember 4.46:1 — both under AA. It went unseen until #2562 put the panel on
+    a statically-rendered page and the #1991 light-theme axe ledger flagged 4 nodes.
+
+    Both sides are DERIVED from the CSS, never hardcoded: the ground comes from
+    whatever `.dx-subscribe` declares as its background, and the text tokens come
+    from whatever every `.dx-sub-*` child declares as its color. Add a child using
+    --ink-faint, or flip the ground back to a wash, and this reds.
+    """
+    story_css = _strip_comments((TOKENS.parent / "story.css").read_text())
+
+    # story.css rules are flat (no nesting), so a non-greedy body match is exact.
+    # _block_body() above is not reusable here: it skips any block without a custom
+    # property, and a component rule declares standard properties only.
+    def rule_decls(selector):
+        m = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", story_css)
+        assert m, f"story.css: no rule for {selector}"
+        return {d.group(1): d.group(2).strip() for d in re.finditer(r"([\w-]+)\s*:\s*([^;}]+)", m.group(1))}
+
+    ground_expr = rule_decls(".dx-subscribe").get("background")
+    assert ground_expr, "story.css: .dx-subscribe no longer declares a background"
+    ground_token = re.fullmatch(r"var\(\s*(--[\w-]+)\s*\)", ground_expr)
+    assert ground_token, f".dx-subscribe background must be a single design token, got {ground_expr!r}"
+    ground_token = ground_token.group(1)
+    assert ground_token in RAMP_STEPS, (
+        f".dx-subscribe sits on {ground_token} — a text-bearing panel must ground on a "
+        f"ramp step ({', '.join(RAMP_STEPS)}), whose AA is enforced by "
+        f"test_ramp_holds_aa_in_both_themes. Translucent accent tints (--*-wash / "
+        f"--*-soft) composite BELOW the ramp and break the secondary ink register (#2592)."
+    )
+
+    # Every colour the panel's own children paint text with, straight from the CSS.
+    child_colors = {}
+    for m in re.finditer(r"(\.dx-sub-[\w-]+)\s*\{([^}]*)\}", story_css):
+        color = re.search(r"(?<![\w-])color\s*:\s*var\(\s*(--[\w-]+)\s*\)", m.group(2))
+        if color:
+            child_colors[m.group(1)] = color.group(1)
+    assert child_colors, "story.css: found no .dx-sub-* text colours to check"
+
+    dark, light_media, _ = _palettes()
+    failures = []
+    for theme_name, theme in (("dark", {}), ("light", light_media)):
+        bg = _resolve(ground_token, theme, dark)
+        for selector, token in sorted(child_colors.items()):
+            ratio = contrast(_resolve(token, theme, dark), bg)
+            if ratio < AA:
+                failures.append(f"{theme_name}: {selector} ({token}) on {ground_token} = {ratio:.2f}:1 (< {AA}:1)")
+    assert not failures, "subscribe-panel AA regressions:\n" + "\n".join(failures)
+
+
 def test_ramp_stays_tonally_ordered():
     """Dark lifts toward the ink (sunken < page < surface < surface-2 < raised);
     light lifts toward warm white (sunken < surface-2 < page < surface < raised).
