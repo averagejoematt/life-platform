@@ -59,6 +59,10 @@ from typing import Any, cast
 # checker may still override its own default via the STALE_HOURS env var.
 DEFAULT_STALE_HOURS = 48
 
+# #1677: the `inbound_mode` facet's paste-only value. A source carrying it has NO client,
+# NO secret and NO token path in this repo — the owner pastes, or nothing arrives.
+INBOUND_PASTE_ONLY = "paste-only"
+
 # Per-source fields:
 #   label          public board label
 #   checker_label  the name used in freshness emails / alert lines
@@ -102,6 +106,14 @@ DEFAULT_STALE_HOURS = 48
 #                  raw trees (apple_health's HAE datatypes) carries them as a
 #                  `sub_layouts` sub-dict, each with its own prefix/scheme/filename
 #                  (#2278 — a prose `note` is not something a reader can resolve).
+#   inbound_mode   (#1677) how a record can arrive AT ALL. Absent = the normal case
+#                  (a fetch of some kind exists). 'paste-only' = the closed platforms
+#                  (X/Instagram/TikTok): pulling them needs a paid or app-reviewed
+#                  token that is deliberately NOT provisioned, so the repo carries no
+#                  client and no secret for them and the only input is the owner
+#                  pasting a post (lambdas/ingestion/social_paste_inbox.py). Read by
+#                  paste_only_source_ids(); do not infer paste-only from active_api:
+#                  False, which merely means "not yet polling".
 #   provider_reconcile
 #                  True = OPT-IN source-of-truth reconciliation (DI-2/TR-07): a
 #                  daily job diffs the PROVIDER API against stored records and
@@ -679,6 +691,111 @@ SOURCE_REGISTRY = {
             "note": "per-post filename (many posts per day); a per-day feed snapshot (YYYY-MM-DD.json) is also written for audit",
         },
     },
+    # ── #1677 (epic #1668): the CLOSED platforms — X, Instagram, TikTok.
+    #    These three differ from youtube/bluesky/mastodon in kind, not just in degree:
+    #    the open three have a free keyless read API and are waiting only on a handle,
+    #    while these three have NO free read path at all — X needs a paid API tier,
+    #    Instagram and TikTok need Business/Creator Graph tokens behind app review.
+    #    Provisioning any of that is Matthew's money and Matthew's accounts, and the
+    #    owner's 2026-08-12 decision is that it is NOT being provisioned.
+    #
+    #    So each of the three carries `inbound_mode: 'paste-only'` — the load-bearing
+    #    declaration that no client, no secret and no token read exists for it in this
+    #    repo. The ONLY way a record appears is the owner pasting a post through
+    #    lambdas/ingestion/social_paste_inbox.py, which lands it on the same SIMP-2
+    #    write path (same transform, same #{post_id} suffix, same S2 membrane) that a
+    #    fetched post takes. "Registered" here therefore does NOT mean "polling": if a
+    #    future session wants polling, it must flip this facet, which is the review
+    #    moment that decision deserves.
+    #
+    #    freshness/monitored/active_api False for the same reason as the open three —
+    #    a source with no automatic pipe must not appear on a freshness, QA or liveness
+    #    surface, where it would false-page on the owner simply not pasting. Staleness
+    #    here is not a fault; there is nothing to break.
+    "x": {
+        "label": "X",
+        "checker_label": "X posts",
+        "desc": "Inbound social — Matthew's own X posts (public voice), captured by paste",
+        "category": "Inputs",
+        "behavioral": True,  # a paste happens only when he does it
+        "stale_hours": None,
+        "freshness": False,  # no automatic pipe — never on a freshness surface (#1677)
+        "monitored": False,
+        "active_api": False,  # NO API access at all: the X tier is unprovisioned by decision
+        "inbound_mode": INBOUND_PASTE_ONLY,
+        "expected_days": None,
+        "qa_tier": None,
+        "method": "Manual paste (no token) — staged to PASTE# and ingested through the SIMP-2 framework",
+        "metrics": "Posts — the outbound public voice, pasted back in",
+        "posture": "portfolio",
+        # Deliberately NO capture_channel: that facet drives the evening "you forgot to
+        # log" nudges and is reserved for Matthew's three logging channels (#746/#1682).
+        # A paste is opportunistic, not a daily obligation, and must not nag.
+        "catalog": False,
+        # The framework's own per-day raw archive — the same call every SIMP-2 source
+        # makes. There is no per-post raw file here, unlike bluesky/youtube: nothing was
+        # fetched, so the durable record of the paste itself is its staged PASTE# row.
+        "raw_layout": {
+            "prefix": "raw/matthew/x",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            "note": "per-day snapshot of the day's PASTED posts (no fetch, so no per-post raw file)",
+        },
+    },
+    "instagram": {
+        "label": "Instagram",
+        "checker_label": "Instagram posts",
+        "desc": "Inbound social — Matthew's own Instagram posts (public voice), captured by paste",
+        "category": "Inputs",
+        "behavioral": True,
+        "stale_hours": None,
+        "freshness": False,
+        "monitored": False,
+        "active_api": False,  # Graph API needs a Business/Creator token + app review
+        "inbound_mode": INBOUND_PASTE_ONLY,
+        "expected_days": None,
+        "qa_tier": None,
+        "method": "Manual paste (no token) — staged to PASTE# and ingested through the SIMP-2 framework",
+        "metrics": "Posts and reels — the outbound public voice, pasted back in",
+        "posture": "portfolio",
+        "catalog": False,
+        # The framework's own per-day raw archive — the same call every SIMP-2 source
+        # makes. There is no per-post raw file here, unlike bluesky/youtube: nothing was
+        # fetched, so the durable record of the paste itself is its staged PASTE# row.
+        "raw_layout": {
+            "prefix": "raw/matthew/instagram",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            "note": "per-day snapshot of the day's PASTED posts (no fetch, so no per-post raw file)",
+        },
+    },
+    "tiktok": {
+        "label": "TikTok",
+        "checker_label": "TikTok posts",
+        "desc": "Inbound social — Matthew's own TikTok posts (public voice), captured by paste",
+        "category": "Inputs",
+        "behavioral": True,
+        "stale_hours": None,
+        "freshness": False,
+        "monitored": False,
+        "active_api": False,  # Display API needs an approved app + Creator token
+        "inbound_mode": INBOUND_PASTE_ONLY,
+        "expected_days": None,
+        "qa_tier": None,
+        "method": "Manual paste (no token) — staged to PASTE# and ingested through the SIMP-2 framework",
+        "metrics": "Videos — the outbound public voice, pasted back in",
+        "posture": "portfolio",
+        "catalog": False,
+        # The framework's own per-day raw archive — the same call every SIMP-2 source
+        # makes. There is no per-post raw file here, unlike bluesky/youtube: nothing was
+        # fetched, so the durable record of the paste itself is its staged PASTE# row.
+        "raw_layout": {
+            "prefix": "raw/matthew/tiktok",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            "note": "per-day snapshot of the day's PASTED posts (no fetch, so no per-post raw file)",
+        },
+    },
     "weather": {
         "label": "Weather",
         "checker_label": "Weather",
@@ -866,6 +983,19 @@ def active_api_source_ids() -> list:
     """Scheduled API pulls that must attempt at least daily — the silent-auth-rot
     class. Replaces pipeline_health_check.ACTIVE_API_SOURCES."""
     return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("active_api"))
+
+
+def paste_only_source_ids() -> list:
+    """Closed platforms whose ONLY inbound path is a manual paste (#1677, epic #1668).
+
+    `inbound_mode: 'paste-only'` is a load-bearing declaration, not a label: it means the
+    repo contains no client, no secret and no token read for that platform, and that a
+    record can only exist because the owner pasted it (`social_paste_inbox`). Read by the
+    paste ingestion Lambda so the channel set can never drift from the registry; a future
+    session flipping a platform to token-backed polling must change the facet HERE, which
+    is exactly the review moment that decision deserves.
+    """
+    return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("inbound_mode") == INBOUND_PASTE_ONLY)
 
 
 def best_effort_source_ids() -> set:

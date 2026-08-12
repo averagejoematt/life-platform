@@ -274,6 +274,37 @@ def ingestion_mastodon() -> list[iam.PolicyStatement]:
     ) + [_bedrock_statement()]
 
 
+def _closed_social_paste(source: str) -> list[iam.PolicyStatement]:
+    # #1677 (epic #1668): the CLOSED platforms — X, Instagram, TikTok. There is NO
+    # secret here and no secret grant, deliberately: the paid X tier and the IG/TikTok
+    # Graph tokens are not provisioned (owner decision, 2026-08-12), so nothing in this
+    # path reads a credential and the role must not imply one exists. Input is the
+    # owner's paste, staged into the source's own partition (PASTE# sort key) and
+    # ingested through the SIMP-2 framework — hence the ordinary DDB + raw-archive
+    # grants, and nothing else.
+    #
+    # #1673: the fail-closed auto-publish sensitivity gate classifies every origin:human
+    # post at ingestion; its off-topic layer is a Haiku pass via bedrock_client
+    # (ADR-062 — IAM auth, no raw key), so this role needs bedrock:InvokeModel.
+    return _ingestion_base(
+        source,
+        no_secret=True,
+        s3_prefix=f"raw/matthew/{source}/*",
+    ) + [_bedrock_statement()]
+
+
+def ingestion_x() -> list[iam.PolicyStatement]:
+    return _closed_social_paste("x")
+
+
+def ingestion_instagram() -> list[iam.PolicyStatement]:
+    return _closed_social_paste("instagram")
+
+
+def ingestion_tiktok() -> list[iam.PolicyStatement]:
+    return _closed_social_paste("tiktok")
+
+
 def ingestion_withings() -> list[iam.PolicyStatement]:
     # #499: OAuth token refresh writes back to the secret via ingestion_framework's
     # enable_secret_writeback path, which calls secretsmanager.update_secret()
