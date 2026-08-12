@@ -54,7 +54,9 @@ _cdk_stub.aws_iam = _iam_stub
 sys.modules.setdefault("aws_cdk", _cdk_stub)
 sys.modules["aws_cdk.aws_iam"] = _iam_stub
 
+import importlib
 import inspect
+import pathlib
 
 import role_policies as rp
 
@@ -91,6 +93,7 @@ KNOWN_SECRETS = [
     "life-platform/bluesky",  # #1676 (epic #1668): inbound-social Bluesky handle (key `handle`). Keyless public AppView pull needs no token — this secret carries only the owner-supplied handle. Must be created in Secrets Manager before the source goes live (GetSecretValue-only IAM).
     "life-platform/mastodon",  # #1676 (epic #1668): inbound-social Mastodon instance + handle (keys `instance`/`handle`). Keyless public REST pull needs no token — this secret carries only the owner-supplied instance/handle. Must be created in Secrets Manager before the source goes live (GetSecretValue-only IAM).
     "life-platform/digest",  # #1623 (2026-07-26): private milestone-digest recipient list + reply-to — real people's contact details, operator-provisioned, NEVER in git (DATA_GOVERNANCE). Digest runs disarmed (logged no-op) until Matthew creates it.
+    "life-platform/continuity-contacts",  # #1400 (2026-08-10): continuity contacts for the Permanence Contract's dead-man's switch — real people's contact details, owner-provisioned, NEVER in git (DATA_GOVERNANCE). The switch runs disarmed (falls back to the operator address and reports contacts_configured=false) until it exists.
     "life-platform",  # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
     "life-platform/telegram",  # #2364: Telegram coach chat (tokens + allow-list + webhook_secret)
 ]
@@ -115,8 +118,30 @@ TRANSITIONAL_ALLOWLIST = {
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
+def _policy_modules():
+    """Every `role_policies*` module under cdk/stacks, not just the big one.
+
+    #1400 split `operational_permanence()` into `role_policies_permanence.py`
+    because `role_policies.py` sits at its recorded size ceiling. Scanning only
+    the original module would have silently dropped that role's secret ARN out
+    of S1/S2 — a gate that stops covering the thing it was written for. Derived
+    by glob so the next sibling is covered on the day it lands.
+    """
+    mods = [rp]
+    stacks_dir = pathlib.Path(ROOT) / "cdk" / "stacks"
+    for path in sorted(stacks_dir.glob("role_policies_*.py")):
+        mods.append(importlib.import_module(path.stem))
+    return mods
+
+
 def _all_policy_functions():
-    return {name: obj for name, obj in inspect.getmembers(rp, inspect.isfunction) if not name.startswith("_")}
+    found = {}
+    for mod in _policy_modules():
+        for name, obj in inspect.getmembers(mod, inspect.isfunction):
+            if name.startswith("_") or obj.__module__ != mod.__name__:
+                continue
+            found[name] = obj
+    return found
 
 
 def _extract_secret_names_from_policies():
@@ -233,7 +258,7 @@ def test_s4_known_secrets_count_matches_architecture():
     #   (CDK deploy-time env resolution since #815); first RUNTIME reader is the AI-quality
     #   canary, so it now needs registry membership.
     # Total = 22 actual secrets + 1 wildcard = 23.
-    EXPECTED_COUNT = 28  # +1 2026-08-09: life-platform/telegram (#2364)  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
+    EXPECTED_COUNT = 29  # +1 2026-08-10: life-platform/continuity-contacts (#1400)  # +1 2026-08-09: life-platform/telegram (#2364)  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

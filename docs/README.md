@@ -85,6 +85,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [CONTINUITY.md](CONTINUITY.md) | What lives outside `docs/` and how a human reads/exports it |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
+| [PERMANENCE_CONTRACT.md](PERMANENCE_CONTRACT.md) | **The written commitment** — nightly public archive, its admission gate, the continuity clock, and what none of it promises (#1400) |
 | [PROPORTIONALITY.md](PROPORTIONALITY.md) | The complexity-posture ledger — posture, rent, demote trigger per subsystem (ADR-103/144) |
 | [SECURITY.md](SECURITY.md) | Threat model, defense layers, accepted risks |
 | [LICENSES.md](LICENSES.md) | Third-party license inventory (3 binary layers · CDK · dev deps), the LGPL-LAME edge as a written non-issue, repo LICENSE posture + AI-content ownership stance (#1352) |

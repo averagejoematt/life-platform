@@ -38,7 +38,10 @@ from aws_cdk import (
     aws_sqs as sqs,
 )
 
-from stacks import role_policies as rp
+from stacks import (
+    role_policies as rp,
+    role_policies_permanence as rpp,  # #1400 — sibling module; role_policies.py is at its size ceiling
+)
 from stacks.constants import PILLOW_LAYER_ARN, TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
 from stacks.lambda_helpers import create_platform_lambda
 
@@ -217,6 +220,78 @@ class OperationalStack(Stack):
         )
         cdk.CfnOutput(self, "CfLogBucketName", value=cf_log_bucket.bucket_name)
         cdk.CfnOutput(self, "TrafficDigestLambdaArn", value=traffic_digest.function_arn)
+
+        # ── 2d. The Permanence Contract (#1400) — nightly public archive + continuity clock ──
+        # Packages everything the site already publishes into one download at a
+        # stable address, and measures how long the platform has gone without a
+        # signal that requires a living person. Both halves are published to
+        # generated/archive/*, which CloudFront serves at /archive/*.
+        #
+        # cron(0 6 * * ? *) = 06:00 UTC = 11 PM PT — the end of the Pacific day,
+        # after the daily brief (17:00 UTC), the OG cards (18:30 UTC) and the
+        # nightly QA sweep have all landed, so the archive captures a finished
+        # day rather than a half-written one. UTC-fixed, no DST drift.
+        #
+        # 10 minutes / 1 GB: it reads ~250 published objects and fetches ~115
+        # public API routes serially, then gzips ~7 MB in memory. Generous
+        # headroom on purpose — a timed-out archive is a missing promise, and
+        # the run is once a night.
+        permanence = create_platform_lambda(
+            self,
+            "Permanence",
+            function_name="life-platform-permanence",
+            source_file="lambdas/operational/permanence_lambda.py",
+            handler="operational.permanence_lambda.lambda_handler",
+            schedule="cron(0 6 * * ? *)",
+            timeout_seconds=600,
+            memory_mb=1024,
+            environment={
+                "TABLE_NAME": TABLE_NAME,
+                "S3_BUCKET": "matthew-life-platform",
+                "USER_ID": "matthew",
+                "CONTINUITY_CONTACTS_SECRET": "life-platform/continuity-contacts",
+            },
+            custom_policies=rpp.operational_permanence(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+            alarm_name="permanence-errors",
+        )
+        cdk.CfnOutput(self, "PermanenceLambdaArn", value=permanence.function_arn)
+
+        # The contract's own dead-man's switch. Both halves of #1400 fail
+        # SILENTLY: a Lambda that stops running errors nothing, and the archive
+        # simply gets older while its manifest keeps asserting yesterday's
+        # numbers. An error alarm cannot catch that — errors require an
+        # invocation — so every completed run emits ArchiveBuilt=1 and this
+        # fires on two consecutive UTC days without one (treat_missing_data
+        # BREACHING: absence IS the failure). A contract whose own machinery can
+        # go quiet unnoticed is not a contract.
+        #
+        # Lives here rather than in monitoring_stack.py because that file sits at
+        # its recorded size ceiling (tests/test_module_size_guard.py), and this
+        # stack already owns the alarms for the Lambdas it defines.
+        permanence_heartbeat = cloudwatch.Alarm(
+            self,
+            "PermanenceHeartbeat",
+            alarm_name="permanence-heartbeat",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Permanence",
+                metric_name="ArchiveBuilt",
+                period=Duration.seconds(86400),
+                statistic="SampleCount",
+            ),
+            evaluation_periods=2,
+            datapoints_to_alarm=2,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        permanence_heartbeat.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+        permanence_heartbeat.add_ok_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── 3. Canary — every 4 hours
         canary = create_platform_lambda(

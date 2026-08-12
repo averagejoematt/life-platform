@@ -313,6 +313,9 @@
     "lambdas/operational/pip_audit_lambda.py": {
       "function": "life-platform-pip-audit"
     },
+    "lambdas/operational/permanence_lambda.py": {
+      "function": "life-platform-permanence"
+    },
     "lambdas/operational/pipeline_health_check_lambda.py": {
       "function": "pipeline-health-check"
     },
