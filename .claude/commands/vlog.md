@@ -128,5 +128,21 @@ The private studio kit (claude.ai Project prompt for the phone-next-to-the-Luna
 variant, room setups A/B/C, the push-to-talk rationale, Luna one-tap workflow, and the
 voice-mode phone test script) lives in PRIVATE S3:
 `s3://matthew-life-platform/config/studio/VLOG_STUDIO_KIT.md` — never in git while the
-repo is public. AC4 (voice-mode-vs-text decided from an actual phone test) is an owner
-action; until that test, default to setup A with push-to-talk and say so honestly.
+repo is public.
+
+**Voice-mode-vs-text is DECIDED, from a real phone test.** Matthew ran it on the actual
+device on 2026-08-09: voice mode on the phone reached the Life-Platform MCP tools and
+answered correctly from live platform data (recorded on #1571). So the "prime in TEXT,
+interview in VOICE, same chat" protocol in step 0 is confirmed on hardware, not desk
+research, and **setup A (speakerphone + push-to-talk) is the default** — with setup B
+(one earbud, he re-asks each question to camera) as the standing fallback, which needs
+no platform dependency at all. What setup A costs is a format decision, not a rigging
+one: it puts a synthetic second voice on the published artifact, so the diary reads as
+an interview show rather than a personal diary (interacts with #1563 and #1388).
+
+**The phone runs a condensation, and condensations drift.** The claude.ai Project prompt
+inside that kit is hand-condensed FROM this file (CHAT_MODES.md §"claude.ai vs. Claude
+Code" — this file is upstream, always). Nothing in CI can see the kit, because it is
+deliberately not in git. `python3 scripts/check_vlog_prompt_parity.py` is the check:
+it reads the kit from private S3 (read-only) and names which load-bearing rules the
+phone prompt is missing. Run it after any change to this file.

@@ -3,7 +3,7 @@
 > **Status:** foundation doc. The original scope (through "Why this matters beyond the
 > journal itself" below) covers the connector-capability findings `#1480` verified and is
 > unchanged since. `#1479` (chat-mode command library, same epic — `#1476` chat-journey:
-> conversation as the 4th ingestion channel) adds the "The four chat modes" section below
+> conversation as the 4th ingestion channel) adds the "The seven chat modes" section below
 > it, which defines the modes themselves and the command files that implement them.
 
 ## Why this exists
@@ -86,7 +86,7 @@ mode once one exists (`#1479`).
 
 ---
 
-# The four chat modes (#1479)
+# The seven chat modes (#1479)
 
 This section is the follow-through the status note above anticipated — it does not
 change or contradict anything recorded above, it defines what consumes those findings.
@@ -110,8 +110,8 @@ surfaces is generated 1:1 from these filenames).
 | **Milestone interview** | `.claude/commands/interview.md` | The longform biographical deep interview (#1576 — the March-2026 pattern made repeatable). Brief uses the prequel-brief structure and lands in PRIVATE S3 (`raw/matthew/interviews/`) — NEVER in git while the repo is public. Feeds the essay generator (#1566) via its what-to-abstract section only. | Monthly + cycle events (genesis eve, day 30, cycle close) |
 | **Vlog / video diary** | `.claude/commands/vlog.md` | Claude as live interviewer for the Insta360 Luna video diaries (#1571, epic #1564). Zero-setup open — the priming bundle also loads the diary's own memory: previous entry, due on-tape claims, pending coach reactions (#1841). Seven-format library incl. `micro` (the days-1–7 wall floor + 30s bad-day floor, ADR-104 framing; day-30/60/90 rewatch retro). Route-the-takeaways close → Notion `Video Diary` template (`channel: video_diary`, #1572 — the Template select options themselves were only added 2026-07-26, #1840) **+ the TAPE NOTE**: 3–5 verbatim moments the post-production desk (`~/Documents/Claude/vlog/`, outside the repo) string-matches into the whisper SRT for real clip timecodes. Studio kit in private S3 `config/studio/`. | Whenever the Luna comes out |
 
-A fifth command, `.claude/commands/journey-review.md`, is not a capture mode — it's the
-periodic ritual that audits these four for drift (MCP inventory sweep, stale-channel
+One further command, `.claude/commands/journey-review.md`, is not a capture mode — it's the
+periodic ritual that audits these seven for drift (MCP inventory sweep, stale-channel
 check, prompt/config parity against the claude.ai Project prompts). See its own file for
 scope.
 
@@ -191,5 +191,12 @@ never the reverse.** Concretely:
 - Because the condensation is manual and out-of-band, the two surfaces **can drift**.
   `.claude/commands/journey-review.md` is the periodic check for that drift — it doesn't
   fix it (it can't reach the claude.ai side), it flags it so Matthew can re-condense.
+- For `/vlog` specifically that check is now mechanical: **`python3
+  scripts/check_vlog_prompt_parity.py`** (#1571) diffs the load-bearing rules of
+  `.claude/commands/vlog.md` against the condensed Project prompt in the private studio
+  kit and names what the phone is missing. It reads S3 read-only and is owner-run, not a
+  CI gate — the kit is deliberately not in git, so no CI job can see it. Its checklist
+  can't rot: `tests/test_vlog_mode_contract_1571.py` asserts every rule it checks for is
+  still anchored in the mode file.
 - If the two surfaces ever visibly disagree in a live session, the repo file wins — a
   claude.ai Project prompt is never the tiebreaker.
