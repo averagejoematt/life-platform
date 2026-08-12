@@ -1,13 +1,13 @@
-# Handover — 2026-08-11 evening: the three P1s, the gate that answered a scope question, and the owner's four calls (46 → 42)
+# Handover — 2026-08-11→12: the three P1s, the owner's four calls, and an overnight bug bash (46 → 38)
 
 **Session:** autonomous, Opus, no `model:fable` work. Driver + 8 implementer agents.
-**Post-wrap addendum:** the owner returned and cleared all four held items — see the final section. Corpus 44 → 42, and two long-held PRs landed.
+**Post-wrap addenda:** (1) the owner cleared all four held items — corpus 44 → 42, two long-held PRs landed; (2) an overnight bug bash on his say-so took it to **38** (non-fable 21 → **13**). Both are recorded in the final sections.
 **Plan:** `~/.claude/plans/gate-audit-and-the-p1-trio.md` (Acts 0–4 + 6 executed; Act 5 / #2578 not started).
 
 **Build beat:** `2026-08-11-the-gate-that-could-not-fail`
 **Docs:** `docs/CONVENTIONS.md` (§ pre-commit gate — the pinned-formatter rule, #2570); agent PRs carried `docs/PHASE_TAXONOMY.md`, `docs/SCHEMA.md`, `docs/design/COACH_HUMANITY_ROADMAP.md` §7a, `tests/fixtures/coach_sim_replay/README.md`
 **Decisions:** none requiring an ADR — the session applied existing contracts (ADR-104/105 honest numbers, ADR-108 promotion pattern, ADR-125 audience ordering, #2467's gated-run lease, R8-ST6)
-**Main:** ✅ GREEN at `7f228a76` — but it read FAILURE for most of the session, see #2590
+**Main:** ✅ GREEN at `fe53bbe3` (verified after the final tip deploy)
 **Stash/hooks:** hook reinstalled this session (#2570 requires it in every clone); pinned black 26.3.1 + ruff 0.14.14 installed into `.venv-black`
 **Closures:** #2558, #2570, #2584, #2539, #2573, #2587, #2569 — **#2575 remains REOPENED** (its after-number needs tomorrow's regeneration); #2569 was reopened mid-session and then legitimately closed once the gate deployed and the backfill ran
 **CI warnings:** 9 at Act 0, all pre-triaged (3 content-truth → #2575, 7× Lambda config drift → #2468 `gate:owner`, `CONTENT_FILTER_JSON` → #2370)
@@ -232,3 +232,45 @@ Querying EventBridge for the permanence schedule with `contains(Name,'permanence
 - The 851 coach outputs remain eligible-but-unindexed in the recall corpus — `COACH_KIND_DECISIONS[coach_output]` is the one-line switch. Deliberately deferred; deserves its own issue rather than riding on #2347's journal decision. — not-work — an owner scope decision, not queued engineering.
 - A COACH_STANCE.md re-verification stamp is needed: `docs/engines/COACH_STANCE.md` verified 2026-08-10 while `ai_calls.py` / `coach_quality_gate.py` moved 2026-08-11, so `check_doc_index --strict` flags drift on clean main. — not-work — routine doc re-stamp, surfaced by two agents tonight.
 - The accent-wash contrast debt found while fixing #2592: every `--ember-wash` / `--alert-wash` / `--ember-soft` ground sits below 4.5:1 because the light ink ramp runs ~2% above the AA floor. Nothing is failing today. — not-work — latent design-system debt, owner-level call.
+
+---
+
+## Overnight bug bash — five more issues, and two corrections to my own work
+
+The owner went to bed with "keep going, pull in more open non-fable issues." Five agents dispatched: #2592, #2589, #2590, #2574, #2537. **All five landed.**
+
+| PR | Issue | Outcome |
+|---|---|---|
+| #2595 | #2592 | Live a11y red — the `/story/build/` subscribe panel grounded on a translucent `--ember-wash`, compositing to #EDE1D1 and pushing four nodes to 4.38–4.45:1 against a 4.5 floor. Re-grounded on `--surface-raised`, which an existing test already guarantees ≥4.5:1 |
+| #2594 | #2589 | `not_attempted` is now a recorded outcome, guaranteed by `try/finally` so a future early return cannot opt out. `ai_calls.py` **shrank** 2394 → 2385 |
+| #2596 | #2590 | A rejected gated run no longer reads as a red main — and the predicate is a **conjunction**, which turned out to matter enormously |
+| #2593 | #2574 | The Permanence Contract's terms live at `/privacy/#permanence`, generated from the source of truth, with the archive's real size/date/checksum |
+| #2597 | #2537 | The widened balanced-clause detector graded against the panel's own 2,404 tells |
+
+### Two of my own conclusions were wrong, and the agents caught both
+
+**1. `--no-paginate` — my own corrective caused a false finding.** Earlier in the session I hit a pagination trap and wrote down "always pass `--no-paginate`." That is right for a *counting* question and **wrong for an existence** one: CloudWatch returns partial, frequently empty pages carrying a `nextToken`, so `--no-paginate` stops at the first and reports zero. **#2589's headline premise was therefore false — the recall line had been firing all along**, seven per day. Re-measured three ways on the identical window: `--no-paginate` → 0; auto-paginate aggregated → **7**; no filter at all with `--no-paginate` → 4, proving truncation rather than absence. The memory entry is corrected: **aggregate across pages**, and the durable rule is the cross-check, not any flag.
+
+**2. My prime suspect for #2592 was wrong.** I told the agent tonight's coach/recovery change (#2583) was the likely cause, since the timing fit. It ruled that out with evidence — the failing check never reads coach prose, and neither AI pass even executed that day (`ai_vision_status: null`, reader-truth `bedrock_client unavailable`). The real cause was **PR #2562 (#2541)**, merged 18 hours earlier, whose new panel had never been in the DOM during a sweep before.
+
+### The single most valuable finding of the bash
+
+#2590's agent discovered that **two of the five runs I rejected also carried a genuine `test / Unit Tests` failure.** Keying the fix on "was rejected" alone would have declared main green over a real red. The shipped predicate is a conjunction — rejected **and** `Deploy` is the sole failing job.
+
+That was not hypothetical. Chasing a green board, I had dispatched a `deploy_all` recovery run — and it surfaced **two real failures that were mine**: `alarm_count` had drifted 92 → 99 (my own `LifePlatformOperational` deploy added the permanence alarms) and my rewritten handover was missing the `## Residual / next picks` section gate #1340 requires. **My wrap had broken a wrap gate.** Both fixed in `3cb1df0c7`.
+
+### #2537's result, reported honestly
+
+The pre-existing `validate_against_judge_tells` reported **precision 0.915** — true and badly misleading, because **78.3% of conversations carry a symmetry tell**, so it was barely a lift over firing at random. Properly graded, n=120, Wilson CIs:
+
+- widened detector: phi **0.315**, Fisher **p=0.00071**
+- narrow `not_x_but_y` control: phi 0.141, **p=0.199 — cannot reach significance at all**
+- length-controlled partial rho **+0.264** [0.105, 0.411]; the control straddles zero
+
+**Modest, not strong**, and recall is only 0.574 — it misses 40 of 94 flagged conversations. Also corrected the issue's own premise: symmetry is **14.9%** of tells (359/2404), not the 25% quoted throughout.
+
+### Deploys
+
+`/privacy/#permanence` needed the nightly archive to exist or the smoke test would have auto-rolled-back the site. Rather than wait for 06:00Z, I dry-ran `life-platform-permanence` (confirming `notification: null` — no email), then invoked it: **1,284,128 bytes / 360 entries / 115 of 115 API endpoints captured**, all three `/archive/*` URLs now 200.
+
+Final tip deploy `fe53bbe3a`: Deploy + Smoke green, rollback skipped, `recall_for_coach` and `not_attempted` verified live on `daily-brief`. Four superseded gated runs rejected along the way, one of which had stranded **9 hours** and was queueing everything behind it.
