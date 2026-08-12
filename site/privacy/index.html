@@ -69,6 +69,10 @@
     .pl-grid dd { margin: var(--sp-2) 0 0; font-family: var(--font-mono); font-size: var(--fs-body);
       color: var(--ink); overflow-wrap: anywhere; }
     .pl-grid dd[data-absent="1"] { color: var(--ink-faint); }
+    /* The fifth cell is the longest string in the panel and auto-fit never fits
+       five columns in the reading measure — it orphaned into a quarter-width
+       column and wrapped to three lines. Give it the whole row deliberately. */
+    .pl-grid .pl-wide { grid-column: 1 / -1; }
     .pl-sum { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--rule); }
     .pl-sum code { display: block; margin-top: var(--sp-2); font-family: var(--font-mono);
       font-size: var(--fs-small, var(--fs-label)); color: var(--ink-muted); overflow-wrap: anywhere; }
@@ -172,7 +176,7 @@
           <div><dt>download size</dt><dd data-perm="bytes">reading…</dd></div>
           <div><dt>files inside</dt><dd data-perm="entries">reading…</dd></div>
           <div><dt>edition</dt><dd data-perm="version">reading…</dd></div>
-          <div><dt>continuity</dt><dd data-perm="state">reading…</dd></div>
+          <div class="pl-wide"><dt>continuity</dt><dd data-perm="state">reading…</dd></div>
         </dl>
         <p class="pl-sum"><span class="label">sha-256 of the download</span> <code data-perm="sha">reading…</code></p>
         <p class="pl-links"><a href="/archive/latest.tar.gz">download the archive</a> <a href="/archive/manifest.json">the manifest</a> <a href="/archive/continuity.json">the continuity clock</a></p>
@@ -279,43 +283,70 @@
         });
       }
 
-      var missing = [];
+      function plural(n, word){ return n + " " + word + (n === 1 ? "" : "s"); }
+
+      // Two failure classes, kept apart on purpose. "unreadable" is a document
+      // that did not answer; "incomplete" is a document that answered 200 with
+      // a shape this panel cannot state a number from — a half-written nightly.
+      // Both must SAY so: an unexplained absence reads as an empty box, and an
+      // empty box reads as zero.
+      var unreadable = [];
+      var incomplete = [];
+      var mismatch = null;
 
       var manifest = getJSON("/archive/manifest.json").then(function(m){
-        var arc = m && m.archive ? m.archive : {};
-        fill("built", stamp(m && m.generated_at));
-        fill("bytes", mib(arc.bytes));
-        fill("entries", typeof m.entry_count === "number" ? m.entry_count + " files" : null);
-        fill("sha", typeof arc.sha256 === "string" ? arc.sha256 : null);
+        if (!m || typeof m !== "object") throw new Error("manifest: not an object");
+        var arc = (m.archive && typeof m.archive === "object") ? m.archive : {};
+        var built = stamp(m.generated_at);
+        var size = mib(arc.bytes);
+        var count = typeof m.entry_count === "number" ? plural(m.entry_count, "file") : null;
+        var sha = (typeof arc.sha256 === "string" && arc.sha256) ? arc.sha256 : null;
+        fill("built", built);
+        fill("bytes", size);
+        fill("entries", count);
+        fill("sha", sha);
+        if (built === null || size === null || count === null || sha === null) incomplete.push("the manifest");
       }).catch(function(){
         ["built", "bytes", "entries", "sha"].forEach(absent);
-        missing.push("the manifest");
+        unreadable.push("the manifest");
       });
 
       var continuity = getJSON("/archive/continuity.json").then(function(c){
-        var days = (c && typeof c.days_silent === "number") ? c.days_silent : null;
-        var state = (c && typeof c.state === "string") ? c.state : null;
-        if (state === null) { absent("state"); }
+        if (!c || typeof c !== "object") throw new Error("continuity: not an object");
+        var days = typeof c.days_silent === "number" ? c.days_silent : null;
+        var state = typeof c.state === "string" ? c.state : null;
+        if (state === null) { absent("state"); incomplete.push("the continuity clock"); }
         else if (c.measurement_failed || state === "unknown") { fill("state", "not measured on the last run"); }
-        else { fill("state", state + (days === null ? "" : " · " + days + (days === 1 ? " day" : " days") + " since the last signal")); }
+        else { fill("state", state + (days === null ? "" : " · " + plural(days, "day") + " since the last signal")); }
 
-        var live = (c && c.terms && typeof c.terms.version === "string") ? c.terms.version : null;
+        var live = (c.terms && typeof c.terms.version === "string") ? c.terms.version : null;
         var list = document.querySelector(".perm-clauses");
         var built = list ? list.getAttribute("data-built-version") : null;
         fill("version", live);
+        if (live === null && incomplete.indexOf("the continuity clock") === -1) incomplete.push("the continuity clock");
         if (live && built && live !== built) {
-          note("The published edition of these terms is " + live + ", but the clauses on this page were rendered from edition " + built + ". Read the published document as authoritative until this page catches up.");
+          mismatch = "The published edition of these terms is " + live + ", but the clauses on this page were rendered from edition " +
+                     built + ". Read the published document as authoritative until this page catches up.";
         }
       }).catch(function(){
         absent("state");
         absent("version");
-        missing.push("the continuity clock");
+        unreadable.push("the continuity clock");
       });
 
       Promise.all([manifest, continuity]).then(function(){
-        if (!missing.length) return;
-        if (slot("note") && !slot("note").hidden) return;
-        note("Could not read " + missing.join(" or ") + " just now, so those numbers are shown as unavailable rather than guessed. The terms below are unaffected.");
+        // Every reachable state gets its own sentence, and they compose — an
+        // edition mismatch must not swallow the reason four numbers are blank.
+        var lines = [];
+        if (unreadable.length) {
+          lines.push("Could not read " + unreadable.join(" or ") + " just now, so those numbers are shown as unavailable rather than guessed. " +
+                     "The download address above is fixed and does not move, but it may not answer either until the next nightly build.");
+        }
+        if (incomplete.length) {
+          lines.push("The last published copy of " + incomplete.join(" and ") + " did not carry every number this panel states, so the missing ones are left unavailable rather than filled in.");
+        }
+        if (mismatch) lines.push(mismatch);
+        if (lines.length) note(lines.join(" "));
       });
     })();
   </script>

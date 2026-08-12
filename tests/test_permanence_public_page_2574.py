@@ -142,6 +142,18 @@ def test_absent_numbers_are_stated_absent_not_blank(page: str):
     assert 'el.setAttribute("data-absent", "1")' in page
 
 
+def test_a_malformed_two_hundred_is_explained_not_silently_blank(page: str):
+    """Render QA found it: a manifest that answers 200 with a half-written body
+    left four slots reading "not available" with no note. A number that is
+    absent because the document was incomplete must say so as loudly as one
+    absent because the document was missing — otherwise the reader cannot tell
+    a broken build from a build that has not happened."""
+    assert "var incomplete = [];" in page, "the incomplete-document branch is gone"
+    assert "did not carry every number this panel states" in page
+    assert "Could not read " in page
+    assert "var mismatch = null;" in page, "the edition mismatch must compose with the absence notes, not replace them"
+
+
 # ── the generator refuses to write a page it cannot verify ──────────────────
 def test_generator_rejects_a_document_whose_clause_set_disagrees_with_the_code():
     parsed = [{"id": "P1", "title": "Nothing here is for sale", "paragraphs": ["x"]}]
