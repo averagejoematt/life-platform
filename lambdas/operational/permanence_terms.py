@@ -95,19 +95,6 @@ CLAUSES: tuple[dict, ...] = (
     },
     {
         "id": "P5",
-        "kind": POLICY,
-        "title": "You may keep a copy",
-        "text": (
-            "Mirroring the archive, in full and unmodified, is expressly permitted and "
-            "actively encouraged — no permission needed, no attribution required beyond "
-            "leaving the manifest intact. The most durable version of this record is the one "
-            "that exists in more than one place, and that copy is not something this platform "
-            "can make for you."
-        ),
-        "mechanism": None,
-    },
-    {
-        "id": "P6",
         "kind": MECHANISM,
         "title": "Silence is measured out loud",
         "text": (
@@ -119,7 +106,7 @@ CLAUSES: tuple[dict, ...] = (
         "mechanism": "operational.continuity_watch:evaluate",
     },
     {
-        "id": "P7",
+        "id": "P6",
         "kind": MECHANISM,
         "title": "Ninety days of silence freezes the record and raises the alarm",
         "text": (
@@ -133,13 +120,15 @@ CLAUSES: tuple[dict, ...] = (
         "mechanism": "operational.continuity_watch:apply_transition",
     },
     {
-        "id": "P8",
+        "id": "P7",
         "kind": LIMIT,
         "title": "What this contract does not promise",
         "text": (
             "It does not promise the archive outlives the bill: everything here sits in one "
-            "cloud account, and if that account lapses the archive lapses with it. That is "
-            "precisely why P5 exists. It does not promise a third-party mirror — no automatic "
+            "cloud account, and if that account lapses the archive lapses with it. This "
+            "edition grants no mirroring rights, so that single point of failure is not "
+            "mitigated by anything written here. It does not promise a third-party mirror — "
+            "no automatic "
             "copy is made to any host outside this account, and any claim that one exists "
             "would be false. It does not promise the archive is complete: audio, artwork, and "
             "the site's presentation layer are excluded, and the manifest names every "
@@ -152,7 +141,7 @@ CLAUSES: tuple[dict, ...] = (
         "mechanism": None,
     },
     {
-        "id": "P9",
+        "id": "P8",
         "kind": MECHANISM,
         "title": "The terms are versioned, and amendments are append-only",
         "text": (

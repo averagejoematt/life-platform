@@ -66,21 +66,14 @@ SHA-256, the checksum of the archive as a whole, the moment it was built, and �
 same document — a list of what was deliberately left out and why. You do not have to
 trust the description; you can check it.
 
-### P5 · You may keep a copy
-
-Mirroring the archive, in full and unmodified, is expressly permitted and actively
-encouraged — no permission needed, no attribution required beyond leaving the manifest
-intact. The most durable version of this record is the one that exists in more than
-one place, and that copy is not something this platform can make for you.
-
-### P6 · Silence is measured out loud
+### P5 · Silence is measured out loud
 
 The platform watches for its own silence: the number of days since the last signal
 from any source that only produces data when a living person is doing something. That
 number, and the state it puts the contract in, are published in the same place as the
 archive, every night, whether the news is good or not.
 
-### P7 · Ninety days of silence freezes the record and raises the alarm
+### P6 · Ninety days of silence freezes the record and raises the alarm
 
 At 30 days of silence the contract enters a notice state, at 60 a warning state, and
 at 90 the switch trips: the archive stops being overwritten and is sealed as a final,
@@ -89,11 +82,12 @@ continuity contacts are told where the record is and how to check it. Any new si
 from any watched source resets the clock — the switch is a measurement, and it is
 reversible.
 
-### P8 · What this contract does not promise
+### P7 · What this contract does not promise
 
 It does not promise the archive outlives the bill: everything here sits in one cloud
-account, and if that account lapses the archive lapses with it. That is precisely why
-P5 exists. It does not promise a third-party mirror — no automatic copy is made to any
+account, and if that account lapses the archive lapses with it. This edition grants no
+mirroring rights, so that single point of failure is not mitigated by anything written
+here. It does not promise a third-party mirror — no automatic copy is made to any
 host outside this account, and any claim that one exists would be false. It does not
 promise the archive is complete: audio, artwork, and the site's presentation layer are
 excluded, and the manifest names every exclusion. It does not promise the switch
@@ -102,7 +96,7 @@ failure, or a vendor lockout can also produce — that is why the first two thre
 notify rather than act. And it does not promise to publish anything currently private:
 the archive is a repackaging of the public surface, never a widening of it.
 
-### P9 · The terms are versioned, and amendments are append-only
+### P8 · The terms are versioned, and amendments are append-only
 
 This contract carries a version and a dated amendment history. Clauses are added or
 superseded, never quietly rewritten, and the published version number tells you which
@@ -128,11 +122,10 @@ edition you are reading.
 | P2 | mechanism | `lambdas/operational/public_archive.py::build_archive`, run nightly by `lambdas/operational/permanence_lambda.py`. |
 | P3 | mechanism | `lambdas/operational/public_archive_registry.py` — the admission registry, gated by `tests/test_public_archive_privacy_gate_1400.py`. |
 | P4 | mechanism | `lambdas/operational/public_archive.py::build_manifest`. |
-| P5 | policy | No mechanism — a permission grant, not a capability. |
-| P6 | mechanism | `lambdas/operational/continuity_watch.py::evaluate`. |
-| P7 | mechanism | `lambdas/operational/continuity_watch.py::apply_transition`, plus the freeze/seal branch in the handler. |
-| P8 | limit | No mechanism by definition — this clause exists to name what the mechanisms cannot do. |
-| P9 | mechanism | `lambdas/operational/permanence_terms.py::public_terms` + this document's amendment table. |
+| P5 | mechanism | `lambdas/operational/continuity_watch.py::evaluate`. |
+| P6 | mechanism | `lambdas/operational/continuity_watch.py::apply_transition`, plus the freeze/seal branch in the handler. |
+| P7 | limit | No mechanism by definition — this clause exists to name what the mechanisms cannot do. |
+| P8 | mechanism | `lambdas/operational/permanence_terms.py::public_terms` + this document's amendment table. |
 
 ### The admission rule, in full
 
