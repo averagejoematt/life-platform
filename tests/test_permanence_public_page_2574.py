@@ -154,6 +154,16 @@ def test_a_malformed_two_hundred_is_explained_not_silently_blank(page: str):
     assert "var mismatch = null;" in page, "the edition mismatch must compose with the absence notes, not replace them"
 
 
+def test_the_download_hedge_is_gated_on_the_manifest_having_failed(page: str):
+    """If only the continuity clock is unreadable, the panel has already
+    published this archive's build time, size and checksum — warning that the
+    download "may not answer" would contradict evidence the page is showing on
+    the same screen. The hedge belongs to the manifest's failure alone."""
+    assert 'unreadable.indexOf("the manifest") !== -1' in page, "the download hedge is no longer gated on the manifest failing"
+    hedge = "The download address above is fixed and does not move"
+    assert page.count(hedge) == 1, "the hedge appears outside its guard"
+
+
 # ── the generator refuses to write a page it cannot verify ──────────────────
 def test_generator_rejects_a_document_whose_clause_set_disagrees_with_the_code():
     parsed = [{"id": "P1", "title": "Nothing here is for sale", "paragraphs": ["x"]}]

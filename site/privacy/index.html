@@ -339,8 +339,15 @@
         // edition mismatch must not swallow the reason four numbers are blank.
         var lines = [];
         if (unreadable.length) {
-          lines.push("Could not read " + unreadable.join(" or ") + " just now, so those numbers are shown as unavailable rather than guessed. " +
-                     "The download address above is fixed and does not move, but it may not answer either until the next nightly build.");
+          var line = "Could not read " + unreadable.join(" or ") + " just now, so those numbers are shown as unavailable rather than guessed.";
+          // Hedge about the download ONLY when the manifest is what failed. If
+          // the manifest answered, this panel has just published the archive's
+          // build time, size and checksum — warning that the download may not
+          // answer would contradict evidence the page is itself showing.
+          if (unreadable.indexOf("the manifest") !== -1) {
+            line += " The download address above is fixed and does not move, but it may not answer either until the next nightly build.";
+          }
+          lines.push(line);
         }
         if (incomplete.length) {
           lines.push("The last published copy of " + incomplete.join(" and ") + " did not carry every number this panel states, so the missing ones are left unavailable rather than filled in.");
