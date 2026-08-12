@@ -218,3 +218,17 @@ The same gate that withheld **60 of 60** hours earlier now withholds **0 of 60**
 ### One more instance of the night's discipline lesson
 
 Querying EventBridge for the permanence schedule with `contains(Name,'permanence')` returned nothing — the rule is `...PermanenceSchedule...` and JMESPath `contains` is case-sensitive. **Fifth instance of the same error family in one session**, but the first one caught immediately, because the habit of re-querying a different way is now reflex. The rule exists and is ENABLED.
+
+---
+
+## Residual / next picks
+
+- #2575 — one measurement after the ~17:0xZ coach regeneration confirms `failed_content_truth` drops to 0, then it closes. Cheapest close in the corpus.
+- #2588 — `docs/LICENSES.md` declares two stale tool pins, and #2581's widened guard now makes every dependabot bump touch that file. Decide which of the three options governs it.
+- #2578 — the gate-audit epic, not started. First slice is enumerating the gate inventory *from source* and reporting coverage with `n`.
+- #2541 — the fork-me starter template (box 2). Its front-door half shipped via #2562; publication of a new public repo is an owner act.
+- #1374 — materially unblocked by #2586's calibration matrix, but AC2/AC3 still need their own verification pass.
+- #2576 / #2577 — dependabot PRs deliberately unmerged; they collide with #2588's widened pin guard. Sequence them after #2588.
+- The 851 coach outputs remain eligible-but-unindexed in the recall corpus — `COACH_KIND_DECISIONS[coach_output]` is the one-line switch. Deliberately deferred; deserves its own issue rather than riding on #2347's journal decision. — not-work — an owner scope decision, not queued engineering.
+- A COACH_STANCE.md re-verification stamp is needed: `docs/engines/COACH_STANCE.md` verified 2026-08-10 while `ai_calls.py` / `coach_quality_gate.py` moved 2026-08-11, so `check_doc_index --strict` flags drift on clean main. — not-work — routine doc re-stamp, surfaced by two agents tonight.
+- The accent-wash contrast debt found while fixing #2592: every `--ember-wash` / `--alert-wash` / `--ember-soft` ground sits below 4.5:1 because the light ink ramp runs ~2% above the AA floor. Nothing is failing today. — not-work — latent design-system debt, owner-level call.
