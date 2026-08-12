@@ -1,6 +1,7 @@
-# Handover — 2026-08-11 evening: the three P1s, and the gate that answered a scope question (46 → 44)
+# Handover — 2026-08-11 evening: the three P1s, the gate that answered a scope question, and the owner's four calls (46 → 42)
 
 **Session:** autonomous, Opus, no `model:fable` work. Driver + 8 implementer agents.
+**Post-wrap addendum:** the owner returned and cleared all four held items — see the final section. Corpus 44 → 42, and two long-held PRs landed.
 **Plan:** `~/.claude/plans/gate-audit-and-the-p1-trio.md` (Acts 0–4 + 6 executed; Act 5 / #2578 not started).
 
 **Build beat:** `2026-08-11-the-gate-that-could-not-fail`
@@ -179,3 +180,41 @@ pk=COACHSIM#scoreboard → LIMITATIONS   RUN#2026-08-10   latest
 4. **Ask the owner about `metrics.json`** (see #2537) — one answer either unblocks it at $0 or costs $3.73.
 5. **#2578 was not started.** If attempted, the first slice remains: enumerate the gate inventory *from source* and report coverage with `n`. Tonight added a third and fourth measured instance to its thesis — #2573 (blocking but rubric-blind) and #2590 (a gate whose correct use makes another gate report a falsehood).
 6. **The owner residuals are unchanged:** PR #2552 + #2572 (cdk + P5 ratification), BotFather ×3, `CONTENT_FILTER_JSON`, and #2468's `cdk deploy` — which, note, is `model:fable`.
+
+---
+
+## Post-wrap addendum — the owner cleared all four held items
+
+The owner returned after the wrap and said "do 1-4" on the four items that had been left for him. Two were mine to execute, one I answered by looking rather than asking, and two were genuine owner decisions I put to him rather than assume.
+
+**1. PR #2552 (#2494 voice notes) — merged and deployed.** It was `CONFLICTING` (main had moved nine commits), so it needed a rebase first; both conflicts were doc-sync literals, resolved to main's side and left for the reconcile bot. `cdk_deploy.sh LifePlatformServe` — the guard **blocked the first attempt on a stale checkout**, correctly, because the reconcile bot had pushed while I worked; synced and re-ran rather than overriding. Verified live: the role now holds `GetSecretValue` on **both** `life-platform/telegram` and `life-platform/google-tts`, `synthesize` is present in `coach/coach_voice.py`, and the `google-tts` secret exists (created 2026-06-13). CDK also held the changeset unexecuted the first time because it was security-sensitive with no TTY — the IAM diff was exactly the single expected grant, reviewed, then executed via the wrapper's documented `-- --require-approval never` pass-through.
+
+**2. PR #2572 (#1400 Permanence Contract) — merged WITHOUT clause P5.** Put to the owner as a ratification with the verbatim clause text and the scope bound by P8. **He declined the grant and asked for the mechanism without it.**
+
+Cutting it was not a deletion. The limits clause read *"That is precisely why P5 exists"* as the mitigation for the single-cloud-account risk; with P5 gone that pointed at nothing, so it now reads *"This edition grants no mirroring rights, so that single point of failure is not mitigated by anything written here."* Removing a grant while leaving prose that advertises it would have been worse than either choice. P6–P9 renumbered to P5–P8 in both the module and the doc, §4's clause table re-rowed, no version bump (first edition, not an amendment — and the amendment summary still describes exactly what ships). Gate test passes 15, full permanence suite 120.
+
+Deployed `LifePlatformOperational` then `LifePlatformWeb` in R8-ST6 order. Verified live: `'Silence is measured out loud'` present, `apply_transition` present, and **`'You may keep a copy'` ABSENT** — the cut verified as a negative. Schedule `cron(0 6 * * ? *)` ENABLED. **Worth knowing: cutting P5 withholds permission, it does not prohibit mirroring** — default copyright applies instead of an explicit licence. **#2574 is now startable** and will render a seven-clause contract.
+
+**3. #2537's corpus — found, not asked about.** The 2026-08-10 `metrics.json` was recoverable from a session scratchpad. Verified as the right run against this issue's own baseline: **120 cells, 77 majority-AI = 64.2%, 2,404 tells, 536 replies**. Copied to `~/Documents/Claude/coach-sim-corpus-2026-08-10/` (outside the repo — it carries the AUTHORITATIVE FACTS block verbatim and the repo is public) and pinned by sha256 manifest onto `COACHSIM#scoreboard/RUN#2026-08-10`. Cost $0; the alternative was a $3.73 re-run.
+
+The replay also produced the numbers #2537's items 2 and 4 were blocked on: **`not_x_but_y` = 9** (the old narrow detector — this is the "fires 9 times platform-wide" figure the issue worried about) versus **`balanced_clause_replies` = 82** for the widened one, across 536 replies. Side finding: the seeded baseline had been *transcribed* from the issue table (0.77/0.2/3.1) while the measured replay gives 0.771/0.205/3.12 — so the first trend readout called three metrics "worse" when nothing had regressed. The stored baseline is now measured, so future deltas are real.
+
+**4. #2347 — decided, executed, and CLOSED.** The owner chose **`allude`** tier (`quote` and `leave-private` both offered and declined), then confirmed **all 60** entries after being shown the theme distribution — including that 10 are `anxiety_stress` and 7 are `relationships`, which is disclosure about his mental state and family life on dated entries. I surfaced that before the decision rather than after, and I did not write a single marker until he confirmed scope.
+
+```
+consent:  60 private → 60 allude   (revert manifest at ~/Documents/Claude/journal-consent-backup-2026-08-12.json)
+corpus :  19 rows (19 chronicle, 0 journal)  →  79 rows (19 chronicle, 60 journal)
+cost   :  $0.0006
+```
+
+The same gate that withheld **60 of 60** hours earlier now withholds **0 of 60** — same code, different input, which is the proof it reads consent rather than assuming it. Verified independently after the fact: every stored journal snippet is a descriptor (`"journal entry (journal) — theme: personal_growth. Allude tier: no verbatim text was cleared for public use."`), and a 5-word-run check of every snippet against **every** diary body found **0** matches.
+
+**Still deliberately open:** the 851 coach outputs remain eligible and unindexed. That is `COACH_KIND_DECISIONS[coach_output]`, a one-line change, and it deserves its own issue rather than being smuggled into a journal decision.
+
+### Final arithmetic
+
+**46 → 42** (non-fable 21 → 17). Nine closed (#2558, #2570, #2584, #2539, #2573, #2587, #2569, #2494, #1400, #2347 — ten counting #2347), five filed. The 39–42 target was met at the bottom of its band, but only because the owner returned; the autonomous portion landed at 44.
+
+### One more instance of the night's discipline lesson
+
+Querying EventBridge for the permanence schedule with `contains(Name,'permanence')` returned nothing — the rule is `...PermanenceSchedule...` and JMESPath `contains` is case-sensitive. **Fifth instance of the same error family in one session**, but the first one caught immediately, because the habit of re-querying a different way is now reflex. The rule exists and is ENABLED.
