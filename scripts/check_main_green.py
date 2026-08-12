@@ -54,6 +54,28 @@ A phantom deploy wedge outranks every other verdict INCLUDING green: while it
 holds, no deploy can start, so the last completed run's success is a stale
 fact about a pipeline that is no longer able to ship.
 
+#2590 adds the FOURTH non-verdict state — the one created by obeying #2467:
+
+  * **Rejected-and-superseded** — a gated run whose `production` deployment was
+    REJECTED (the prescribed action for a run whose sha is already an ancestor
+    of main) concludes `failure` with `Deploy` as the sole red job, because the
+    job never executed. Read literally that is a red main, so following #2467
+    made the wrap's own (e2) gate report a falsehood — five times on
+    2026-08-11/12 (32734614d, b177805f6, aad9ae137, c78c93369, c16c75783).
+    It self-heals only when a later run succeeds, so in a session that rejects
+    several runs and defers the deploy to the end, the false-red window is the
+    whole session.
+    Derivation: the run's OWN approval record —
+    `GET /repos/{o}/{r}/actions/runs/{id}/approvals` → `[{state: "rejected"}]`
+    (the `…/deployments` endpoint 404s on this repo; `approvals` is the
+    run-scoped source of truth and carries the operator's reason). NOT from
+    "Deploy failed with no log" — a genuinely broken Deploy job has the same job
+    shape and MUST still read red. The job shape is only the second half of the
+    conjunction: rejected AND `Deploy` is the sole failing job.
+    Such a run is skipped the same way a cancelled one is, but — unlike
+    cancelled — it is REPORTED, with its sha and the rejection reason, so the
+    operator sees the lease was actioned rather than the gate being blind.
+
 Cancelled runs are skipped (superseded pushes carry no signal); the newest
 run that actually finished is the completed-run verdict.
 
@@ -70,6 +92,12 @@ from datetime import datetime, timezone
 # A run parked at the production approval gate is normal right after a merge
 # (the approval is manual by design) — it becomes an incident when it ages.
 STRANDED_WAIT_HOURS = 2.0
+
+# How many consecutive `failure` runs to probe for the rejected shape before
+# giving up and treating the next one as the verdict (#2590). A merge session
+# that rejects a run per merge stacks several in a row; an unbounded walk would
+# turn one gate check into dozens of API calls.
+REJECTION_PROBE_LIMIT = 8
 
 # Verdict kinds (module constants so tests and consumers share the vocabulary).
 GREEN = "green"
@@ -96,16 +124,21 @@ def _age_hours(run: dict, now: datetime) -> float | None:
     return (now - created).total_seconds() / 3600.0
 
 
-def latest_completed_run(runs: list[dict]) -> dict | None:
-    """Newest non-cancelled completed run (the completed-run verdict).
+def latest_completed_run(runs: list[dict], rejected_ids: object = None) -> dict | None:
+    """Newest non-cancelled, non-rejected completed run (the completed-run verdict).
 
     Pure — unit-tested offline. `runs` is newest-first, as `gh run list`
     returns them. Cancelled runs are superseded pushes, not verdicts; skip.
+    `rejected_ids` (#2590) is the set of run ids whose `failure` is a REJECTED
+    production deployment rather than a broken pipeline — also not a verdict.
     """
+    skip = set(rejected_ids or ())
     for r in runs:
         if r.get("status") != "completed":
             continue
         if r.get("conclusion") == "cancelled":
+            continue
+        if r.get("databaseId") in skip:
             continue
         return r
     return None
@@ -155,11 +188,83 @@ def is_plan_red_deploy_skipped(jobs: list[dict]) -> bool:
     return plan_failed and deploy_skipped and not other_failed
 
 
+def _deploy_is_sole_failure(jobs: list[dict]) -> bool:
+    """True iff `Deploy` failed and no other job did (skips are not failures)."""
+    deploy_failed = other_failed = False
+    for j in jobs:
+        concl = j.get("conclusion")
+        if j.get("name") == "Deploy":
+            deploy_failed = deploy_failed or concl == "failure"
+        elif concl == "failure":
+            other_failed = True
+    return deploy_failed and not other_failed
+
+
+def is_deploy_rejection(jobs: list[dict] | None, approvals: list[dict] | None) -> bool:
+    """True iff this run's `failure` is a REJECTED production deployment (#2590).
+
+    The load-bearing half is the FIRST clause: the verdict is derived from the
+    run's own approval record (`…/actions/runs/{id}/approvals`), never from the
+    job shape alone. A genuinely broken `Deploy` job presents with the identical
+    job shape (sole red, and often no log if it died in setup) — it is
+    `approved` (or has no approval record at all) and must still read RED.
+
+    The job-shape clause is the second half of a conjunction, not a fallback: a
+    run that was rejected AND had something else genuinely fail is a real red,
+    because the rejection is then not the whole story.
+    """
+    states = {(a or {}).get("state") for a in (approvals or [])}
+    if "rejected" not in states or "approved" in states:
+        return False
+    return _deploy_is_sole_failure(jobs or [])
+
+
+def rejection_reason(approvals: list[dict] | None) -> str:
+    """The operator's own one-line reason from the rejecting approval record."""
+    for a in approvals or []:
+        if (a or {}).get("state") == "rejected":
+            comment = (a.get("comment") or "").strip()
+            if comment:
+                return comment.splitlines()[0]
+    return "no reason recorded"
+
+
+def scan_rejections(runs: list[dict], probe, max_probes: int = REJECTION_PROBE_LIMIT) -> tuple[list[dict], list[dict] | None]:
+    """Walk newest-first, classifying each `failure` run as rejected or real.
+
+    Pure by injection — `probe(run) -> (jobs, approvals)` is the only impure
+    part and is faked in tests. Returns
+    `(rejected, verdict_jobs)` where `rejected` is `[{"run", "reason"}, …]` in
+    newest-first order and `verdict_jobs` is the job list of the run that ends
+    the walk (needed downstream to split ordinary red from the R8-ST6 shape).
+
+    A probe that fails (returns `(None, None)`) yields `is_deploy_rejection`
+    False — i.e. it degrades to "ordinary red", never to a false green.
+    """
+    rejected: list[dict] = []
+    probes = 0
+    for r in runs:
+        if r.get("status") != "completed" or r.get("conclusion") == "cancelled":
+            continue
+        if r.get("conclusion") != "failure":
+            return rejected, None
+        if probes >= max_probes:
+            return rejected, None
+        probes += 1
+        jobs, approvals = probe(r)
+        if is_deploy_rejection(jobs, approvals):
+            rejected.append({"run": r, "reason": rejection_reason(approvals)})
+            continue
+        return rejected, jobs
+    return rejected, None
+
+
 def classify_pipeline(
     runs: list[dict],
     latest_failure_jobs: list[dict] | None = None,
     now: datetime | None = None,
     deploy_wedge: dict | None = None,
+    rejected: list[dict] | None = None,
 ) -> dict:
     """Classify main's pipeline state. Pure — fixture-tested offline (#1901/#2052).
 
@@ -186,7 +291,8 @@ def classify_pipeline(
 
     wedged = [v for v in (deploy_wedge or {}).get("verdicts", []) if v.get("kind") == "phantom-wedge"]
 
-    completed = latest_completed_run(runs)
+    rejected = rejected or []
+    completed = latest_completed_run(runs, rejected_ids={(e.get("run") or {}).get("databaseId") for e in rejected})
     if wedged:
         kind = STRANDED_DEPLOY_WEDGE
     elif overdue:
@@ -207,6 +313,7 @@ def classify_pipeline(
         "waiting": waiting,
         "overdue_waiting": overdue,
         "wedged": wedged,
+        "rejected": rejected,
         # An ordinary red can STILL have a stranded deploy path (Plan red +
         # Deploy skipped alongside another failure, e.g. live 2026-08-02).
         "deploy_also_stranded": kind == RED and plan_failed and deploy_skipped,
@@ -219,12 +326,30 @@ def _fmt_run(r: dict, now: datetime) -> str:
     return f"run {r.get('databaseId')} sha {(r.get('headSha') or '')[:8]} (waiting {age_s})"
 
 
+def _rejection_notices(state: dict) -> list[str]:
+    """Rejected-and-superseded runs are SKIPPED but never SWALLOWED (#2590).
+
+    The operator has to be able to tell "the gate is blind to a red" from "the
+    lease was actioned", so every skipped run is named with its sha and the
+    reason the rejecting operator typed.
+    """
+    lines = []
+    for entry in state.get("rejected") or []:
+        r = entry.get("run") or {}
+        lines.append(
+            f"ℹ️  run {r.get('databaseId')} sha {(r.get('headSha') or '')[:8]} — production deployment REJECTED "
+            f"and superseded (#2467 lease actioned), not a red main: {entry.get('reason')}"
+        )
+    return lines
+
+
 def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
     """(exit_code, message) for a classified pipeline state. Pure."""
     now = now or datetime.now(timezone.utc)
     kind = state["kind"]
     sha8 = (state.get("sha") or "")[:8]
     lines: list[str] = []
+    notices = _rejection_notices(state)
 
     if kind == STRANDED_DEPLOY_WEDGE:
         lines.append("🛑 PHANTOM DEPLOY WEDGE (#2052 class) — main's deploy path is dead; a green completed run is a stale fact:")
@@ -244,7 +369,7 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
             "   diff, so change detection would otherwise deploy nothing). Do NOT salt the\n"
             "   concurrency group: three salts failed across recurrences 1-3 (CONVENTIONS §4d)."
         )
-        return 1, "\n".join(lines)
+        return 1, "\n".join(lines + notices)
 
     if kind == STRANDED_APPROVAL:
         lines.append("🛑 STRANDED PRODUCTION APPROVAL (#1901 class) — main is NOT green and NOT ordinarily red:")
@@ -259,7 +384,7 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
             "   on Matthew's say-so). Do NOT cancel the waiting run: a cancelled run STRANDS its\n"
             "   deploy → recover with a `deploy_all=true` workflow_dispatch of ci-cd.yml."
         )
-        return 1, "\n".join(lines)
+        return 1, "\n".join(lines + notices)
 
     if kind == STRANDED_PLAN:
         lines.append(
@@ -285,6 +410,8 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
                 "   `bash deploy/cdk_deploy.sh <Stack>`, then a `deploy_all=true` dispatch)."
             )
 
+    lines.extend(notices)
+
     # Young waiting runs ride along as a notice on any verdict.
     for r in state["waiting"]:
         if r in state["overdue_waiting"]:
@@ -295,6 +422,9 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
         )
 
     return (0 if kind == GREEN else 1), "\n".join(lines)
+
+
+REPO = "averagejoematt/life-platform"
 
 
 def _gh_json(args: list[str]):
@@ -323,14 +453,26 @@ def main() -> int:
         print(f"⚠️  check_main_green: could not read run list ({e}) — decode manually (gh run list --branch main)")
         return 1
 
-    # Jobs are only needed to split ordinary red from the R8-ST6 stranded-Plan shape.
-    jobs = None
-    completed = latest_completed_run(runs)
-    if completed is not None and completed.get("conclusion") == "failure" and completed.get("databaseId"):
+    # #2590: walk the failures newest-first, splitting REJECTED production
+    # deployments (not verdicts) from real reds. The jobs of the run that ends
+    # the walk are also what splits ordinary red from the R8-ST6 stranded-Plan
+    # shape, so one probe serves both.
+    def _probe(run: dict) -> tuple[list[dict] | None, list[dict] | None]:
+        run_id = run.get("databaseId")
+        if not run_id:
+            return None, None
+        jobs = approvals = None
         try:
-            jobs = _gh_json(["run", "view", str(completed["databaseId"]), "--json", "jobs"]).get("jobs")
-        except Exception as e:
-            print(f"⚠️  check_main_green: could not read jobs for run {completed['databaseId']} ({e}) — treating as ordinary red")
+            jobs = _gh_json(["run", "view", str(run_id), "--json", "jobs"]).get("jobs")
+        except Exception as e:  # noqa: BLE001 - degrade to ordinary red, never to a false green
+            print(f"⚠️  check_main_green: could not read jobs for run {run_id} ({e}) — treating as ordinary red")
+        try:
+            approvals = _gh_json(["api", f"repos/{REPO}/actions/runs/{run_id}/approvals"])
+        except Exception as e:  # noqa: BLE001
+            print(f"⚠️  check_main_green: could not read approvals for run {run_id} ({e}) — treating as ordinary red")
+        return jobs, approvals
+
+    rejected, jobs = scan_rejections(runs, _probe)
 
     # #2052: the phantom deploy wedge needs per-run JOB state, which `gh run list`
     # does not carry. Best-effort — a detector failure must never turn a readable
@@ -346,7 +488,7 @@ def main() -> int:
             f"⚠️  check_main_green: deploy-wedge detection unavailable ({e}) — run scripts/check_deploy_wedge.py by hand if a deploy looks stuck."
         )
 
-    state = classify_pipeline(runs, latest_failure_jobs=jobs, deploy_wedge=wedge)
+    state = classify_pipeline(runs, latest_failure_jobs=jobs, deploy_wedge=wedge, rejected=rejected)
     code, message = render(state)
     print(message)
     if code == 0:
