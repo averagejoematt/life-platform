@@ -230,13 +230,14 @@ _HISTORICAL_FILES = ("tests/test_ci_pin_consistency.py", "tests/test_formatter_p
 # that added this derivation (#2570 is a formatter-toolchain fix). Keyed by
 # (path, tool) so a version bump doesn't silently re-arm them; each needs a reason.
 # An entry here is a debt, not an exemption — delete it by fixing the file.
-_KNOWN_STALE_DECLARATIONS = {
-    ("docs/LICENSES.md", "playwright"): "license table lags requirements-dev.txt (1.61.0 vs 1.62.0) — pre-existing, not #2570's to fix",
-    (
-        "docs/LICENSES.md",
-        "hypothesis",
-    ): "license table lags requirements-dev.txt (6.161.2 vs 6.165.0) — pre-existing, and dependabot moves this pin",
-}
+#
+# Currently EMPTY. #2570 opened it with two docs/LICENSES.md rows; #2588 paid that
+# debt the way the ledger intends — by fixing the file, not by aging the entry.
+# The resolution was to stop declaring versions in the licence inventory at all
+# (docs/LICENSES.md §6.1): auditing the table found 6 of its 13 version rows stale
+# and this guard could only ever see 7 of the 13, so exactness there was a fact
+# nothing could keep true. The mechanism stays for the next genuinely-deferred row.
+_KNOWN_STALE_DECLARATIONS: dict = {}
 
 # The code that RESOLVES a pinned tool at runtime must derive the version, never
 # carry a second copy of it (#2570). Derived from the tracked tree the same way as
@@ -323,6 +324,48 @@ def test_known_stale_declarations_are_still_real():
             text = f.read()
         rx = rx_cache.setdefault(tool, re.compile(rf"\b{re.escape(tool)}==[0-9]"))
         assert rx.search(text), f"_KNOWN_STALE_DECLARATIONS entry ({rel}, {tool}) no longer applies — delete it"
+
+
+# --- docs/LICENSES.md declares no versions at all (#2588) ----------------------
+# The licence inventory was the first thing the derived surface above caught, and
+# fixing the two rows it saw would have left four equally-stale rows it structurally
+# cannot see (flake8, pip-audit, aws-cdk-lib, constructs, garth, garminconnect are
+# outside _GATED_TOOLS). Measured 2026-08-12: 6 of 13 version rows stale, 18 days
+# after the file was written. The decision (docs/LICENSES.md §6.1) is that the table
+# annotates LICENCES over packages and never carries a second copy of a pin. This
+# guard makes that structural rather than a convention someone has to remember —
+# and it removes the file from every future dependabot bump's blast radius.
+_LICENSES_DOC = os.path.join(_REPO, "docs", "LICENSES.md")
+_ANY_PIN_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9_.\-]*)==([0-9][0-9A-Za-z.+\-]*)")
+
+
+def _licenses_doc_pins(text):
+    return [f"{name}=={ver}" for name, ver in _ANY_PIN_RE.findall(text)]
+
+
+def test_licenses_doc_declares_no_patch_exact_pins():
+    with open(_LICENSES_DOC, encoding="utf-8") as f:
+        text = f.read()
+    # Non-vacuous: the table must still NAME the packages it annotates, or this
+    # test is guarding an empty document (#1189 lesson).
+    for pkg in ("hypothesis", "playwright", "aws-cdk-lib", "garth", "black"):
+        assert f"`{pkg}`" in text, f"docs/LICENSES.md no longer names {pkg} — the inventory lost a row, not just its version"
+    pins = _licenses_doc_pins(text)
+    assert not pins, (
+        "docs/LICENSES.md declares patch-exact pins again: "
+        f"{sorted(set(pins))}. Per its own §6.1 this table annotates licences over "
+        "packages; the version of record is the authoritative pin file. Re-adding a "
+        "version re-opens the drift #2588 measured (6 of 13 rows stale in 18 days) and "
+        "puts this doc back in the path of every dependabot bump."
+    )
+
+
+def test_licenses_doc_pin_guard_fires_on_a_synthetic_pin():
+    """Prove-red, same pattern as the two synthetic-divergence tests above."""
+    assert _licenses_doc_pins("| `hypothesis==6.165.0` | Property-based tests |") == ["hypothesis==6.165.0"]
+    # Prose that merely mentions a version is not a declaration and must stay allowed —
+    # §6.1's own reasoning quotes the stale numbers it replaced.
+    assert _licenses_doc_pins("`hypothesis` (6.161.2 vs 6.165.0) — stale") == []
 
 
 def test_pin_readers_hardcode_no_version():
