@@ -13,7 +13,8 @@ Strategy:
   - Convention: Lambdas write to raw/matthew/{source}/ and IAM allows raw/matthew/{source}/*
   - Exceptions are documented in ci/lambda_s3_paths.json
   - This test verifies:
-    S1  Every _ingestion_base call in role_policies.py either uses the convention
+    S1  Every _ingestion_base call in the role_policies family (#2604 — the facade plus
+        its `role_policies_*.py` siblings, globbed) either uses the convention
         OR has an explicit s3_prefix that matches an entry in lambda_s3_paths.json
     S2  Every exception in lambda_s3_paths.json has evidence in the Lambda source
         (the Lambda actually writes to the declared prefix, not somewhere else)
@@ -30,6 +31,7 @@ import json
 import os
 import re
 import sys
+from glob import glob
 
 import pytest
 
@@ -37,7 +39,11 @@ import pytest
 pytestmark = pytest.mark.deploy_critical
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-ROLE_POLICIES_PATH = os.path.join(ROOT, "cdk", "stacks", "role_policies.py")
+# #2604: role_policies.py is a facade over cohesive `role_policies_*.py` siblings, so the
+# `_ingestion_base(...)` calls this linter reads no longer all live in one file. Derive the
+# FAMILY by glob — hand-listing it is how a gate stops covering the thing it was written
+# for (the #1400 sibling was invisible to two IAM linters for exactly that reason).
+ROLE_POLICIES_FAMILY = sorted(glob(os.path.join(ROOT, "cdk", "stacks", "role_policies*.py")))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 MANIFEST_PATH = os.path.join(ROOT, "ci", "lambda_s3_paths.json")
 
@@ -54,10 +60,10 @@ def _load_manifest():
         return json.load(f)
 
 
-def _extract_ingestion_base_calls(src):
+def _extract_ingestion_base_calls(src, where="role_policies.py"):
     """
-    Extract all _ingestion_base(source_name, ...) calls from role_policies.py.
-    Returns list of dicts: {source, s3_prefix_override, line}
+    Extract all _ingestion_base(source_name, ...) calls from one policy module.
+    Returns list of dicts: {source, s3_prefix, line, where}
     """
     results = []
     pattern = re.compile(
@@ -73,9 +79,17 @@ def _extract_ingestion_base_calls(src):
         prefix_m = re.search(r's3_prefix\s*=\s*["\']([^"\']+)["\']', args_body)
         s3_prefix = prefix_m.group(1) if prefix_m else None
 
-        results.append({"source": source, "s3_prefix": s3_prefix, "line": line})
+        results.append({"source": source, "s3_prefix": s3_prefix, "line": line, "where": where})
 
     return results
+
+
+def _family_ingestion_base_calls():
+    """Every `_ingestion_base(...)` call across the whole role_policies family."""
+    calls = []
+    for path in ROLE_POLICIES_FAMILY:
+        calls.extend(_extract_ingestion_base_calls(_read(path), os.path.basename(path)))
+    return calls
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -87,8 +101,10 @@ def test_s1_all_s3_prefixes_are_convention_or_documented():
     exceptions = manifest.get("exceptions", {})
     convention = manifest.get("convention", {})
 
-    src = _read(ROLE_POLICIES_PATH)
-    calls = _extract_ingestion_base_calls(src)
+    calls = _family_ingestion_base_calls()
+    assert calls, "no _ingestion_base(...) calls found across %s — the scan went blind" % [
+        os.path.basename(p) for p in ROLE_POLICIES_FAMILY
+    ]
 
     failures = []
     convention_template = convention.get("default_iam_template", "raw/matthew/{source}/*")
@@ -97,6 +113,7 @@ def test_s1_all_s3_prefixes_are_convention_or_documented():
         source = call["source"]
         s3_prefix = call["s3_prefix"]
         line = call["line"]
+        where = call["where"]
 
         if s3_prefix is None:
             # Using default convention — fine
@@ -110,7 +127,7 @@ def test_s1_all_s3_prefixes_are_convention_or_documented():
         # Has explicit non-convention override — must be in exceptions manifest
         if source not in exceptions:
             failures.append(
-                f"role_policies.py:{line} — _ingestion_base('{source}') has s3_prefix='{s3_prefix}' "
+                f"{where}:{line} — _ingestion_base('{source}') has s3_prefix='{s3_prefix}' "
                 f"but '{source}' is not in ci/lambda_s3_paths.json exceptions.\n"
                 f"    Add an entry to ci/lambda_s3_paths.json documenting why this deviates from convention."
             )
@@ -118,9 +135,9 @@ def test_s1_all_s3_prefixes_are_convention_or_documented():
             expected_iam = exceptions[source].get("iam_prefix", "")
             if s3_prefix != expected_iam:
                 failures.append(
-                    f"role_policies.py:{line} — _ingestion_base('{source}') s3_prefix='{s3_prefix}' "
+                    f"{where}:{line} — _ingestion_base('{source}') s3_prefix='{s3_prefix}' "
                     f"doesn't match manifest entry '{expected_iam}'.\n"
-                    f"    Update either role_policies.py or ci/lambda_s3_paths.json."
+                    f"    Update either {where} or ci/lambda_s3_paths.json."
                 )
 
     assert not failures, f"S1 FAIL: {len(failures)} undocumented S3 prefix deviation(s):\n" + "\n".join(f"  - {f}" for f in failures)
@@ -192,13 +209,15 @@ def test_s3_exceptions_dont_use_convention_prefix():
 def test_s4_no_hardcoded_matthew_in_iam_comments():
     """S4: Canary for copy-paste errors — s3_prefix values with 'matthew' must
     match the convention pattern raw/matthew/{source}/*."""
-    src = _read(ROLE_POLICIES_PATH)
-    for m in re.finditer(r's3_prefix\s*=\s*["\']([^"\']*matthew[^"\']*)["\']', src):
-        prefix = m.group(1)
-        line = src[: m.start()].count("\n") + 1
-        if not re.match(r"^raw/matthew/\w+/\*$", prefix):
+    for path in ROLE_POLICIES_FAMILY:
+        src = _read(path)
+        for m in re.finditer(r's3_prefix\s*=\s*["\']([^"\']*matthew[^"\']*)["\']', src):
+            prefix = m.group(1)
+            line = src[: m.start()].count("\n") + 1
+            if re.match(r"^raw/matthew/\w+/\*$", prefix):
+                continue
             pytest.fail(
-                f"role_policies.py:{line} — s3_prefix='{prefix}' contains 'matthew' but "
+                f"{os.path.basename(path)}:{line} — s3_prefix='{prefix}' contains 'matthew' but "
                 f"doesn't match the convention pattern 'raw/matthew/{{source}}/*'.\n"
                 f"    Correct format: 'raw/matthew/my_source/*'"
             )

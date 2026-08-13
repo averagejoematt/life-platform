@@ -6,6 +6,7 @@ nothing, an unchanged digest sends nothing (content-hash dedup), the email
 carries no open tracking, and the kill switch is honored.
 """
 
+import glob
 import json
 import os
 import sys
@@ -119,7 +120,8 @@ def test_cdk_wiring_exists():
     stack = open(os.path.join(_REPO, "cdk/stacks/email_stack.py")).read()
     assert 'function_name="between-chronicle"' in stack
     assert "cron(0 17 ? * SUN *)" in stack
-    policies = open(os.path.join(_REPO, "cdk/stacks/role_policies.py")).read()
+    # #2604: role_policies.py is a facade over role_policies_*.py siblings — read the family.
+    policies = "".join(open(p).read() for p in sorted(glob.glob(os.path.join(_REPO, "cdk/stacks/role_policies*.py"))))
     assert "def email_between_chronicle" in policies
     lm = json.load(open(os.path.join(_REPO, "ci/lambda_map.json")))
     assert lm["lambdas"]["lambdas/emails/between_chronicle_lambda.py"]["function"] == "between-chronicle"

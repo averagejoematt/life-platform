@@ -47,6 +47,10 @@ ROOT = Path(__file__).resolve().parent.parent
 BUDGET_GUARD_PATH = ROOT / "lambdas" / "ai" / "budget_guard.py"
 CDK_STACKS_DIR = ROOT / "cdk" / "stacks"
 ROLE_POLICIES_PATH = CDK_STACKS_DIR / "role_policies.py"
+# #2604: role_policies.py is a facade over cohesive `role_policies_*.py` siblings. The
+# `_secret_arn("…")` literals live in the siblings now, so the grant scan reads the FAMILY
+# — a hand-pinned single filename is how this check would silently start returning nothing.
+ROLE_POLICIES_FAMILY = sorted(CDK_STACKS_DIR.glob("role_policies*.py"))
 SYNC_META_PATH = ROOT / "deploy" / "sync_doc_metadata.py"
 ARCHITECTURE_PATH = ROOT / "docs" / "ARCHITECTURE.md"
 INGESTION_STACK_PATH = CDK_STACKS_DIR / "ingestion_stack.py"
@@ -183,16 +187,21 @@ def cdk_function_names(stacks_dir: Path = CDK_STACKS_DIR) -> set:
 _SECRET_ARN_RE = re.compile(r'_secret_arn\(\s*["\']([^"\']+)["\']')
 
 
-def cdk_granted_secrets(path: Path = ROLE_POLICIES_PATH) -> set:
+def cdk_granted_secrets(paths: list = None) -> set:
     """Secret names a live IAM role is granted access to (`_secret_arn("…")` literals).
 
     A secret that a deployed role reads cannot honestly be documented as deleted — that
     is either a doc lie or a dangling grant, and both want a human.
+
+    Reads the whole `role_policies*.py` family (#2604), not just the facade.
     """
-    try:
-        return set(_SECRET_ARN_RE.findall(path.read_text(encoding="utf-8")))
-    except OSError:
-        return set()
+    granted: set = set()
+    for path in paths if paths is not None else ROLE_POLICIES_FAMILY:
+        try:
+            granted |= set(_SECRET_ARN_RE.findall(Path(path).read_text(encoding="utf-8")))
+        except OSError:
+            continue
+    return granted
 
 
 _SECRET_LITERAL_RE = re.compile(r'"secret_count":\s*(\d+),\s*#\s*live-verified\s*(\d{4}-\d{2}-\d{2})')

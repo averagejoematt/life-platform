@@ -15,7 +15,10 @@ from fnmatch import fnmatch
 from glob import glob
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_ROLES = os.path.join(_REPO, "cdk", "stacks", "role_policies.py")
+# #2604: role_policies.py is a facade; site_api()/site_api_ai() now live in the
+# role_policies_serve.py sibling. Locate the definition across the FAMILY rather than
+# pinning one filename, so the next split cannot make this canary go quietly blind.
+_ROLE_FAMILY = sorted(glob(os.path.join(_REPO, "cdk", "stacks", "role_policies*.py")))
 _WEB = os.path.join(_REPO, "lambdas", "web")
 # #2515: the social module is a facade + `site_api_social_*.py` siblings that hold the
 # handler bodies. The canary counts the FAMILY — globbed, never hand-listed — so the
@@ -28,9 +31,18 @@ def _read(p):
         return f.read()
 
 
+def _role_src(marker):
+    """Source of the `role_policies*.py` family member that contains `marker`."""
+    for path in _ROLE_FAMILY:
+        text = _read(path)
+        if marker in text:
+            return text
+    raise AssertionError(f"{marker!r} not found in any of {[os.path.basename(p) for p in _ROLE_FAMILY]}")
+
+
 def _site_api_leadingkeys():
     """Extract the LeadingKeys patterns from role_policies.site_api()'s write statement."""
-    src = _read(_ROLES)
+    src = _role_src("def site_api(")
     body = src[src.index("def site_api(") : src.index("def site_api_ai(")]
     block = re.search(r'DynamoDBWrite.*?dynamodb:LeadingKeys"\s*:\s*\[(.*?)\]', body, re.DOTALL)
     assert block, "site_api() DynamoDBWrite LeadingKeys block not found"
@@ -87,7 +99,7 @@ _AI_WRITTEN_KEYS = [
 
 def _site_api_ai_leadingkeys():
     """Union of LeadingKeys patterns across site_api_ai()'s write statements."""
-    src = _read(_ROLES)
+    src = _role_src("def site_api_ai(")
     start = src.index("def site_api_ai(")
     nxt = src.find("\ndef ", start + 1)
     body = src[start : nxt if nxt > 0 else len(src)]
@@ -120,7 +132,7 @@ def test_ai_write_call_site_canary():
 def test_ai_interaction_write_is_putitem_only():
     """The COACH#* write grant must stay PutItem-only — the public lambda must
     never gain the ability to mutate STANCE#/COMPRESSED#/OUTPUT# in place."""
-    src = _read(_ROLES)
+    src = _role_src('sid="DynamoDBCoachInteractionWrite"')
     start = src.index('sid="DynamoDBCoachInteractionWrite"')
     block = src[start : start + 600]
     m = re.search(r"actions=\[(.*?)\]", block, re.DOTALL)

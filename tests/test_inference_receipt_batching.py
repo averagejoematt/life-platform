@@ -23,6 +23,7 @@ import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from glob import glob
 from pathlib import Path
 
 import pytest
@@ -304,8 +305,17 @@ def test_iam_grants_get_metric_data():
     raises AccessDenied and the endpoint 503s — so the code and the policy must land
     together (an undeployed IAM change strands later CI deploys)."""
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open(os.path.join(repo, "cdk", "stacks", "role_policies.py"), encoding="utf-8") as f:
-        src = f.read()
+    # #2604: site_api()'s statements moved to the role_policies_serve.py sibling behind the
+    # role_policies.py facade — scan the family so the pin follows the policy, not the file.
+    src = next(
+        (
+            t
+            for t in (open(p, encoding="utf-8").read() for p in sorted(glob(os.path.join(repo, "cdk", "stacks", "role_policies*.py"))))
+            if 'sid="InferenceReceiptMetrics"' in t
+        ),
+        None,
+    )
+    assert src is not None, "#1911: no role_policies*.py declares sid=InferenceReceiptMetrics"
     start = src.index('sid="InferenceReceiptMetrics"')
     block = src[start : start + 400]
     assert "cloudwatch:GetMetricData" in block, "#1911: site_api() must grant cloudwatch:GetMetricData"

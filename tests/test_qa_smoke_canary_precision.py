@@ -20,6 +20,7 @@ ALARM rate a nightly, queryable qa-smoke line:
 All offline — fake S3, no AWS.
 """
 
+import glob
 import io
 import json
 import os
@@ -39,7 +40,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from operational import qa_smoke_lambda as qa  # noqa: E402
 
-ROLE_POLICIES = os.path.join(os.path.dirname(__file__), "..", "cdk", "stacks", "role_policies.py")
+# #2604: the policy bodies live in `role_policies_*.py` siblings behind a facade —
+ROLE_POLICIES_FAMILY = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "..", "cdk", "stacks", "role_policies*.py")))
 
 
 class _NoSuchKey(Exception):
@@ -171,7 +173,7 @@ def test_lambda_handler_runs_the_precision_check():
 def test_qa_smoke_role_grants_the_canary_log_read():
     # The code path is fail-soft without it, but the LINE only exists once this
     # grant deploys — keep repo IAM and the reader in lockstep.
-    with open(ROLE_POLICIES) as f:
-        src = f.read()
+    src = next((open(p).read() for p in ROLE_POLICIES_FAMILY if "def operational_qa_smoke" in open(p).read()), None)
+    assert src is not None, "operational_qa_smoke() not found in any role_policies*.py"
     qa_policy = src.split("def operational_qa_smoke", 1)[1].split("\ndef ", 1)[0]
     assert '"ai-canary-log/*"' in qa_policy

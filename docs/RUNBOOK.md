@@ -69,7 +69,7 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 | Hand-rolled MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail (`No module named 'reading'`) | `bash deploy/deploy_lambda.sh life-platform-mcp` — since #781 it stages the mcp-shaped full bundle |
 | `aws s3 sync --delete s3://matthew-life-platform/` | Deletes 35K+ objects (ADR-032) | Always use `sync_site_to_s3.sh` |
 | Change Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit CDK stack code instead |
-| Add Lambda to CDK, forget `role_policies.py` | `AccessDenied` on first run | Add IAM policy to role_policies.py |
+| Add Lambda to CDK, forget its IAM policy | `AccessDenied` on first run | Add a policy function to the right `cdk/stacks/role_policies_<domain>.py` sibling + one re-export line in the `role_policies.py` facade (#2604) |
 | Use DST-aware cron in EventBridge | Schedule drifts 1 hour twice yearly | All crons must be fixed UTC |
 | Change pipeline schedule ordering | Compute reads yesterday's data; brief reads stale compute | Ingestion → Compute → Brief ordering is strict |
 | Secret scheduled for deletion goes unnoticed | Data pipeline silently breaks when 7-day recovery window expires | `pipeline-health-check` Lambda probes all secrets daily. Check status page. |
@@ -1162,7 +1162,7 @@ aws lambda invoke --function-name withings-data-ingestion --payload '{}' /tmp/te
 
 ### Code & Infrastructure
 - [ ] **Lambda**: Write `lambdas/<source>_lambda.py`. Use `ingestion_framework.py` base if possible (new sources should always use the framework — see ADR-019). Add graceful handling for missing secrets (return 200, not 500, before OAuth is set up).
-- [ ] **CDK IAM**: Add `ingestion_<source>()` policy function in `cdk/stacks/role_policies.py` with least-privilege DDB/S3/secret permissions
+- [ ] **CDK IAM**: Add `ingestion_<source>()` policy function in `cdk/stacks/role_policies_ingestion.py` (#2604 — `role_policies.py` is a re-export facade over per-domain siblings) with least-privilege DDB/S3/secret permissions, then add it to the facade's `from stacks.role_policies_ingestion import (...)` list
 - [ ] **CDK Stack**: Wire Lambda in `cdk/stacks/ingestion_stack.py` with correct handler, schedule, and IAM
 - [ ] **Secret**: Create `life-platform/<source>` in Secrets Manager (use platform CMK: `alias/life-platform-dynamodb`). Add row to INFRASTRUCTURE.md Secrets table.
 - [ ] **Deploy CDK**: `source cdk/.venv/bin/activate && npx cdk deploy LifePlatformIngestion`

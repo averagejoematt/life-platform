@@ -22,7 +22,7 @@ broader → Bucket B (PR for review). If unsure, downgrade to B.
 
 | Pattern | Detect | Fix template | File(s) |
 |---|---|---|---|
-| **Missing IAM grant** (a Lambda calls an AWS API its role lacks) | log `AccessDenied`/`not authorized to perform`; cross-ref boto3 call vs role | add the missing action/resource to the role's statement | `cdk/stacks/role_policies.py` (+ `cdk deploy` the stack) |
+| **Missing IAM grant** (a Lambda calls an AWS API its role lacks) | log `AccessDenied`/`not authorized to perform`; cross-ref boto3 call vs role | add the missing action/resource to the role's statement | the matching `cdk/stacks/role_policies_<domain>.py` sibling + the `role_policies.py` facade re-export (#2604) (+ `cdk deploy` the stack) |
 | **lambda_map drift** (unmapped `*_lambda.py`, wrong function name) | CI coverage check fails; `ResourceNotFoundException` in deploy | add/correct the `.lambdas` entry | `ci/lambda_map.json` |
 | **Alarm threshold miscalibration** (chronic false-fire at normal levels) | alarm fires daily at steady-state value | raise threshold above observed normal + comment | `cdk/stacks/monitoring_stack.py` |
 | **Freshness/QA source miscalibration** (sporadic source flagged stale; dead source still required) | source event-driven (weigh-ins) or dead (last write ≫ threshold) | `SOURCE_STALE_HOURS` override, or move required→optional, or comment out a dead source | `lambdas/emails/freshness_checker_lambda.py`, `lambdas/operational/qa_smoke_lambda.py` |
