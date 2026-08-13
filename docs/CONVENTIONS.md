@@ -739,6 +739,20 @@ AI powered down.** Four layers, each with a named owner-mechanism:
      drift (the 2026-07-27 double-red). `--advisory` demotes drift to a loud
      "would RED CI under --strict" report; on a shallow clone the drift half skips
      with a note (run it from a full clone for CI parity — Docs CI uses fetch-depth: 0).
+     **Two things #2619 changed about that gate.** (i) *No exemption by omission* — an
+     engine doc missing the `**Sources of truth:**` line or the `**Verified:**` stamp is
+     invisible to the drift gate, and that used to be a silent skip, so being incomplete
+     was the cheapest way out. It now FAILS unless the filename is in `ENGINE_DOC_EXEMPT`
+     (top of `check_doc_index.py`) with a written reason, which is printed on every run.
+     One entry today: `CHARACTER_MATH_AUDIT_2026-07.md`, a frozen point-in-time audit
+     record. (ii) *The failure says how to clear it* — the strict failure now prints the
+     re-verification procedure (read the diff → decide material or not → re-derive the
+     line citations → bump the stamp WITH a note). **The stamp is a claim that the doc
+     matches live source on that date, not a date field: never bump it alone.** Every run
+     also prints a headroom report — the gated docs whose Verified date equals their
+     newest source's commit date, so the next commit to that source reds the gate. That
+     is accepted and visible by decision, not a bug to pre-empt by stamping docs you have
+     not read (the #2610 shape in a different gate).
 3. **Process gates.** The wrap skill's step (e) is a hard gate — every session ends
    with `**Docs:** <pages>` or `**Docs:** none needed — <reason>` in the handover,
    checkers green. The deploy skill prompts the same at deploy time. (A PR-time
