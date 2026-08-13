@@ -351,6 +351,10 @@ export function renderCalibration(d) {
     return (
       _sealBlock(d && d.prereg_seal) +
       empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.") +
+      // The judge panel measures the GRADER, not Matthew's forecast ledger, so an
+      // empty ledger is no reason to hide it — and it is the one moment the page
+      // has nothing else on it. Same argument the seal above already makes.
+      _judgeBlock() +
       _OPEN_ARTIFACT_LINE
     );
 
@@ -420,7 +424,9 @@ function _judgeBlock() {
   if (!keys.length)
     return sec(
       "Calibrating the grader",
-      empty("The blocking quality gate that decides whether a coach's draft ships has not been re-measured against the labeled corpus yet. No figure is shown rather than a stale one — run <code>python3 tests/golden_brief_eval.py --judge-calibration --publish</code>."),
+      // Plain text only: empty() HTML-escapes its argument, so markup here would
+      // render as literal tags to the reader.
+      empty("The blocking quality gate that decides whether a coach's draft ships has not been re-measured against the labeled corpus yet. No figure is shown rather than a stale one — the panel fills back in when the calibration harness is next run and republished."),
     );
   const rows = keys
     .map((k) => {
@@ -437,7 +443,9 @@ function _judgeBlock() {
   return sec(
     "Calibrating the grader — the gate that blocks a coach's draft",
     `<p class="rd-prose">Everything above grades the coaches' <em>forecasts</em>. This grades the <em>grader</em>: the blocking quality gate every coach narrative must pass before it ships. It was replayed against ${esc(String(j.corpus_n))} hand-labeled coach outputs${j.measured_at ? ` on ${esc(j.measured_at)}` : ""} — known-good ones it should pass, fault-injected ones it should catch.</p>` +
-      `<table class="rd-tbl"><thead><tr><th>what was measured</th><th>n</th><th>rate</th><th>95% CI</th></tr></thead><tbody>${rows}</tbody></table>` +
+      // "hits / n", not "n": the cell is a fraction, and a column headed "n" over
+      // "29/30" invites the reader to take 29 as the denominator.
+      `<table class="rd-tbl"><thead><tr><th>what was measured</th><th>hits / n</th><th>rate</th><th>95% CI</th></tr></thead><tbody>${rows}</tbody></table>` +
       margin +
       `<p class="rd-prose">Read these with:</p><ul class="rd-tierlist">${caveats}</ul>` +
       `<p class="rd-archive">Full record — every case, every score, the margin analysis: <a href="/data/judge_calibration.json">/data/judge_calibration.json</a>.</p>`,

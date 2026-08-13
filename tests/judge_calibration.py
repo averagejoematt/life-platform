@@ -872,8 +872,10 @@ def publication_record(report):
             "generation produces. This does not generalise to field failure modes.",
             "The positives were authored to be obviously clean, so 'agrees with good work' measures the easy "
             "half of the job and says nothing about borderline drafts.",
-            "A point-in-time measurement of one model version, not a running average. See the re-evaluation "
-            "cadence in tests/fixtures/golden_briefs/README.md.",
+            # No bare repo path here: this string is rendered to a public reader, and
+            # an unbreakable path token clipped its own tail at 375px (render-QA).
+            "A point-in-time measurement of one model version, not a running average. It is re-run whenever the "
+            "rubric, the threshold or the judge model changes, and quarterly otherwise, so drift is caught.",
         ],
         "margin_verdict": (report.get("margin_analysis") or {}).get("verdict"),
     }

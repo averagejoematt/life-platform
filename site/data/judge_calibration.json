@@ -77,7 +77,7 @@
     "These are the COMBINED gate's rates, not the LLM judge's own discrimination: 12 of the 15 blocking decisions came from a deterministic arithmetic check that runs before the model.",
     "The negatives are hand-authored faults of known classes, not a sample of the defects real generation produces. This does not generalise to field failure modes.",
     "The positives were authored to be obviously clean, so 'agrees with good work' measures the easy half of the job and says nothing about borderline drafts.",
-    "A point-in-time measurement of one model version, not a running average. See the re-evaluation cadence in tests/fixtures/golden_briefs/README.md."
+    "A point-in-time measurement of one model version, not a running average. It is re-run whenever the rubric, the threshold or the judge model changes, and quarterly otherwise, so drift is caught."
   ],
   "schema": "judge_calibration/1",
   "separability": {
