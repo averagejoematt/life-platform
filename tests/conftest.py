@@ -230,6 +230,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_recall_consent_2587.py",
         "test_coach_his_people_2488.py",  # #2488: the his-people sk must stay unreachable from the whole coach perimeter
         "test_leak_token_sweep.py",
+        # #2578: the gate census. Its verdict is a sweep of the whole repo tree (CI
+        # workflows, guard entrypoints, registries, qa-smoke checks) and its floors
+        # are blindness detectors — a derivation that returns [] must red BEFORE the
+        # merge, not after, which is the entire point of this list.
+        "test_gate_census_2578.py",
         "test_csp_native_embeds_1678.py",
         "test_archive_handover.py",  # a dated handover committed to main (#1650)
         # #2570: the CQ-01 pin guard stopped hand-listing the workflow files and now
