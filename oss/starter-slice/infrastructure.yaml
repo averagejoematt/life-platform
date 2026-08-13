@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  starter-slice: the two pieces of storage the pipeline needs -- a private bucket
+  for raw API responses and an on-demand table for normalized daily records.
+  Nothing here is public, and nothing here runs on a schedule: this template
+  creates storage, not compute. Both resources are billed; see the README's cost
+  section before deploying.
+
+Resources:
+  RawBucket:
+    Type: AWS::S3::Bucket
+    # No BucketName: CloudFormation generates a unique one for YOUR account, so
+    # nobody has to invent a globally-unique name to get started.
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+
+  MetricsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      # On-demand: you pay per request, not per provisioned hour. A slice that
+      # ingests fourteen rows a day costs a rounding error; a provisioned table
+      # left running does not.
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+Outputs:
+  BucketName:
+    Description: export as SLICE_BUCKET
+    Value: !Ref RawBucket
+  TableName:
+    Description: export as SLICE_TABLE
+    Value: !Ref MetricsTable

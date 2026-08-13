@@ -1,0 +1,6 @@
+# The slice's own output. Never commit collected readings — the first habit worth
+# keeping when the source stops being the weather.
+.slice-data/
+out/
+__pycache__/
+*.pyc

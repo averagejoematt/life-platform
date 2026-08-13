@@ -23,6 +23,7 @@ The rules that make that real:
 | package | what it is | gates |
 | --- | --- | --- |
 | [`calibration-core/`](calibration-core/) | The forecast grader behind [/method/calibration](https://averagejoematt.com/method/calibration/) — Brier, reliability curve, skill vs. base rate — plus the browser port that powers [/method/grade-your-coach](https://averagejoematt.com/method/grade-your-coach/). (#1396) | `tests/test_calibration_core_parity.py`, `tests/js/calibration_core.test.mjs` |
+| [`starter-slice/`](starter-slice/) | The fork-me starter template: one public source → S3 → DynamoDB → one chart, runnable offline with no AWS account, with the cost note **generated** from the published [stack manifest](https://averagejoematt.com/data/stack.json) rather than retyped. (#2541) | `tests/test_starter_slice.py` (forbidden-literal sweep, standalone-import scan, cost drift, and the template's own suite in a subprocess) |
 
 Publishing a package outward is an owner step (`gh repo create` + a push of the
 subdirectory's contents); nothing in CI does it automatically.
