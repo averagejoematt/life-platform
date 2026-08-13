@@ -35,15 +35,25 @@ dedup = _load("dedup_source_records")
 # ── build_post_verify_hooks: the #1092 hook sequence ──────────────────────────
 
 
-def test_default_hooks_are_prologue_fix_only():
-    # Byte-compat guarantee: with no new flags, the ONLY behavior change is the
-    # issue-sanctioned default-on fix_prologue hook.
+def test_the_hook_builder_is_re_exported_from_the_pipeline():
+    # #2612 split build_post_verify_hooks into deploy/restart_hooks.py because
+    # restart_pipeline.py sat 7 lines under the 1200-line module-size ceiling. The
+    # public entrypoint must not have moved — every caller still reads it here.
+    hooks_mod = _load("restart_hooks")
+    assert pipeline.build_post_verify_hooks is hooks_mod.build_post_verify_hooks
+
+
+def test_default_hooks_are_prologue_fix_and_predict_week_seed():
+    # The two default-ON hooks. predict-the-week's re-seed (#2612) is default-ON
+    # because the pipeline's OWN step 2d deletes the subject on every --apply and
+    # nothing else ever rewrites it — leaving the re-seed attended is what left
+    # cycle 13's genesis week dark.
     hooks = pipeline.build_post_verify_hooks()
-    assert [n for n, _ in hooks] == ["fix_prologue_cycle_and_subscribe_ttl"]
+    assert [n for n, _ in hooks] == ["fix_prologue_cycle_and_subscribe_ttl", "seed_predict_week_subject"]
 
 
 def test_skip_prologue_fix_empties_the_default():
-    assert pipeline.build_post_verify_hooks(skip_prologue_fix=True) == []
+    assert pipeline.build_post_verify_hooks(skip_prologue_fix=True, skip_predict_week_seed=True) == []
 
 
 def test_full_hook_sequence_and_order():
@@ -53,7 +63,40 @@ def test_full_hook_sequence_and_order():
         "seed_genesis_preregistration",  # (b) — opt-in --with-preregistration
         "dedup_eightsleep",  # (c) — one pass per --dedup-source, in order
         "dedup_whoop",
+        "seed_predict_week_subject",  # (d) — LAST: derives from the freeze (b) re-lands
     ]
+
+
+# ── hook (d): the predict-the-week re-seed (#2612) ────────────────────────────
+
+
+def test_predict_week_seed_runs_after_the_preregistration_seed():
+    # Ordering is load-bearing, not cosmetic: the subject's every number comes from
+    # the frozen pre-registration, so seeding it before the freeze is re-landed can
+    # only produce a SKIP.
+    names = [n for n, _ in pipeline.build_post_verify_hooks(with_preregistration=True)]
+    assert names.index("seed_predict_week_subject") > names.index("seed_genesis_preregistration")
+
+
+def test_predict_week_seed_carries_if_frozen_so_a_missing_freeze_cannot_abort_the_reset():
+    ((_, cmd),) = [h for h in pipeline.build_post_verify_hooks() if h[0] == "seed_predict_week_subject"]
+    assert "--if-frozen" in cmd, "without --if-frozen a reset whose freeze is not re-landed aborts at its last hook"
+    assert "--apply" in cmd
+
+
+def test_predict_week_seed_pins_the_genesis_never_the_wall_clock():
+    # #1952: week_id must derive from the target genesis date. A pipeline run on any
+    # other day must NOT let the builder fall back to a wall-clock-adjacent default.
+    ((_, cmd),) = [h for h in pipeline.build_post_verify_hooks(genesis="2026-08-10") if h[0] == "seed_predict_week_subject"]
+    assert cmd[cmd.index("--genesis") + 1] == "2026-08-10"
+
+
+def test_predict_week_seed_is_skippable_and_the_skip_is_the_only_way_to_drop_it():
+    # Mutation-proof: the hook disappears ONLY under its own flag. Flipping the
+    # other flags must never silently drop it — that is exactly the hole #2612 hit.
+    assert [n for n, _ in pipeline.build_post_verify_hooks(skip_predict_week_seed=True)] == ["fix_prologue_cycle_and_subscribe_ttl"]
+    for kwargs in ({}, {"skip_prologue_fix": True}, {"with_preregistration": True}, {"dedup_sources": ["whoop"]}):
+        assert "seed_predict_week_subject" in [n for n, _ in pipeline.build_post_verify_hooks(**kwargs)], kwargs
 
 
 def test_hook_commands_are_run_step_compatible():

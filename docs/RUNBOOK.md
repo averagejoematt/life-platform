@@ -1460,11 +1460,21 @@ an omission):
   `tests/test_prereg_hash_stamp.py` reds CI if the committed frozen file ever stops matching its
   committed stamp. Stamps are never backdated — when a stamp postdates its freeze, both moments
   are recorded and the public seal states both.
-- Genesis-eve engagement, attended (#1378): `build_genesis_predict_week.py --apply` (predict-the-week
-  subjects derived from the frozen hypotheses' own test_specs, hash-stamped for provenance;
-  `week_id` = the upload week, so re-run each Monday it should stay live) and
-  `send_prereg_lock_email.py --apply` (the one "predictions lock tonight" subscriber email —
-  refuses to send on any Pacific date but genesis eve).
+- Genesis-eve engagement: `send_prereg_lock_email.py --apply` stays **attended** (the one
+  "predictions lock tonight" subscriber email — refuses to send on any Pacific date but genesis eve).
+  `build_genesis_predict_week.py --apply` is **no longer attended** — since #2612 it runs as
+  post-verify hook (d) of `restart_pipeline.py` (`--skip-predict-week-seed` to opt out). Step 2d of
+  the same pipeline deletes `site/config/current_challenge.json` on every `--apply` and nothing else
+  ever rewrites it, so leaving the re-seed to an operator left the cockpit's predict-the-week widget
+  dark for the whole genesis week of cycle 11 (#1952, wrong `week_id`) and again of cycle 13 (#2612,
+  never seeded). Subjects derive from the frozen hypotheses' own test_specs and are hash-stamped for
+  provenance; `week_id` is the **genesis** ISO week, derived from the genesis date and never the
+  wall clock (#1952). It is safe to run before or during that week — the #1198 guard serves it only
+  while it is the current Pacific ISO week.
+  - **Weekly re-seeds after the genesis week are still a standing manual step** — no lambda writes
+    this artifact. The nightly qa-smoke `predict_week:freshness` check is what tells you it went
+    dark: re-run `python3 deploy/build_genesis_predict_week.py --apply` (or seed a fresh weekly
+    subject) to clear it.
 - `deploy/restart_verify.py` — the **post-genesis Monday** health check (asserts `day_n >= 1`,
   a genesis weigh-in, a post-genesis character sheet); folding it would structurally fail at
   reset time. Run it Monday morning. Check 16 (#2104) covers the **slow-regen narrative

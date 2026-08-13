@@ -151,6 +151,31 @@ def build_challenge(frozen: dict, stamp: dict, genesis: str = None) -> dict:
     return challenge
 
 
+def load_and_build(genesis_arg: str = None) -> dict:
+    """Read the freeze, verify its seal, and build the challenge payload.
+
+    Every precondition failure raises SystemExit with a human reason — no freeze on
+    disk, an unreadable freeze, a broken/absent SHA-256 seal, a freeze whose own
+    genesis disagrees with the requested one, or a freeze from which no subject can
+    be derived. The CALLER decides whether that aborts (attended run) or degrades to
+    a loud SKIP (`--if-frozen`, the reset-pipeline hook).
+    """
+    if not genesis_prereg_stamp.FROZEN_PATH.exists():
+        raise SystemExit(f"no frozen pre-registration at {genesis_prereg_stamp.FROZEN_PATH} — nothing to derive a subject from.")
+    try:
+        frozen = json.loads(genesis_prereg_stamp.FROZEN_PATH.read_text())
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"frozen pre-registration unreadable ({genesis_prereg_stamp.FROZEN_PATH}): {e}")
+    stamp = genesis_prereg_stamp.require_valid_stamp(frozen)
+    genesis = (genesis_arg or "").strip() or None
+    if not genesis and not (frozen.get("genesis") or "").strip():
+        sys.path.insert(0, str(REPO_ROOT))
+        from lambdas.common.constants import EXPERIMENT_START_DATE  # noqa: E402
+
+        genesis = EXPERIMENT_START_DATE
+    return build_challenge(frozen, stamp, genesis=genesis)
+
+
 def main():
     ap = argparse.ArgumentParser(description="Emit/upload the genesis-week predict-the-week subject from the frozen pre-registration")
     ap.add_argument("--apply", action="store_true", help="upload to S3 (default: dry-run print)")
@@ -160,17 +185,26 @@ def main():
         help="Experiment Day 1 (YYYY-MM-DD). Default: the frozen pre-registration's own genesis, "
         "falling back to lambdas.common.constants.EXPERIMENT_START_DATE. week_id is the ISO week of THIS date, never the run time (#1952).",
     )
+    ap.add_argument(
+        "--if-frozen",
+        action="store_true",
+        help="#2612: degrade every precondition failure (no freeze / bad seal / genesis mismatch / no derivable subject) "
+        "to a LOUD SKIP with exit 0 instead of aborting. For the reset-pipeline hook, where the freeze for the incoming "
+        "genesis may not have been re-landed yet and a hard abort would kill the reset's last steps.",
+    )
     args = ap.parse_args()
 
-    frozen = json.loads(genesis_prereg_stamp.FROZEN_PATH.read_text())
-    stamp = genesis_prereg_stamp.require_valid_stamp(frozen)
-    genesis = args.genesis
-    if not genesis and not (frozen.get("genesis") or "").strip():
-        sys.path.insert(0, str(REPO_ROOT))
-        from lambdas.common.constants import EXPERIMENT_START_DATE  # noqa: E402
-
-        genesis = EXPERIMENT_START_DATE
-    challenge = build_challenge(frozen, stamp, genesis=genesis)
+    try:
+        challenge = load_and_build(args.genesis)
+    except SystemExit as e:
+        if not args.if_frozen:
+            raise
+        print(f"SKIP (--if-frozen): {e}")
+        print(
+            "      predict-the-week stays fail-closed (dark) until a subject is seeded. Re-run WITHOUT --if-frozen once the "
+            "pre-registration for this genesis is frozen and stamped:  python3 deploy/build_genesis_predict_week.py --apply"
+        )
+        return 0
     payload = json.dumps(challenge, indent=2) + "\n"
     print(payload)
 

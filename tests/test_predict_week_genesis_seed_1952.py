@@ -177,3 +177,83 @@ def test_evaluate_detail_names_the_regression_when_dark_in_genesis_week():
     ok, detail = bgpw.evaluate_predict_week_state(GENESIS, date(2026, 7, 29), False)
     assert not ok
     assert "1952" in detail and "2026-W31" in detail
+
+
+# ── 6. --if-frozen: the reset-hook posture (#2612) ──────────────────────────
+#
+# Cycle 13 went dark for its whole genesis week because restart_pipeline step 2d
+# DELETES site/config/current_challenge.json on every --apply while re-seeding it
+# was an attended printed next-step. The re-seed is now post-verify hook (d), and
+# it carries --if-frozen so a reset whose pre-registration has not been re-landed
+# SKIPS loudly (exit 0) instead of aborting the pipeline's final hooks. The
+# degradation must be exactly that: skip on a precondition failure, never on
+# anything else, and never a silent one.
+
+
+def _run_main(monkeypatch, argv, frozen_path=None, stamp=None):
+    """Drive main() with argv, optionally repointing the freeze at a temp path."""
+    monkeypatch.setattr(sys, "argv", ["build_genesis_predict_week.py"] + argv)
+    if frozen_path is not None:
+        monkeypatch.setattr(bgpw.genesis_prereg_stamp, "FROZEN_PATH", frozen_path)
+    monkeypatch.setattr(bgpw.genesis_prereg_stamp, "require_valid_stamp", lambda frozen=None: (stamp or _stamp()))
+    return bgpw.main()
+
+
+def test_if_frozen_skips_loudly_when_no_freeze_exists(monkeypatch, tmp_path, capsys):
+    rc = _run_main(monkeypatch, ["--if-frozen", "--apply"], frozen_path=tmp_path / "absent.json")
+    out = capsys.readouterr().out
+    assert rc == 0, "a missing freeze must not abort the reset's last hooks"
+    assert "SKIP (--if-frozen)" in out and "no frozen pre-registration" in out
+    assert "build_genesis_predict_week.py --apply" in out, "a skip that does not name its remedy is a silent skip"
+
+
+def test_if_frozen_skips_when_the_freeze_covers_a_DIFFERENT_genesis(monkeypatch, tmp_path, capsys):
+    # The live reset shape: the outgoing cycle's freeze is still on disk when the
+    # incoming genesis is seeded. build_challenge refuses the mismatch; --if-frozen
+    # must turn that refusal into a skip, not an abort.
+    import json
+
+    p = tmp_path / "frozen.json"
+    p.write_text(json.dumps(_frozen(genesis="2026-07-27")))
+    monkeypatch.setattr(sys, "argv", ["x", "--genesis", "2026-08-10", "--if-frozen", "--apply"])
+    monkeypatch.setattr(bgpw.genesis_prereg_stamp, "FROZEN_PATH", p)
+    monkeypatch.setattr(bgpw.genesis_prereg_stamp, "require_valid_stamp", lambda frozen=None: _stamp())
+    rc = bgpw.main()
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "SKIP (--if-frozen)" in out and "2026-07-27" in out
+
+
+def test_WITHOUT_if_frozen_a_missing_freeze_still_hard_aborts(monkeypatch, tmp_path):
+    # Mutation-proof on the degradation itself: the attended path is unchanged, so
+    # a hand-run seed can never silently produce nothing.
+    with pytest.raises(SystemExit):
+        _run_main(monkeypatch, ["--apply"], frozen_path=tmp_path / "absent.json")
+
+
+def test_if_frozen_still_seeds_when_the_freeze_is_good(monkeypatch, tmp_path, capsys):
+    # The flag must not become a blanket "do nothing": with a valid freeze the
+    # payload is built and the upload path is reached.
+    import json
+
+    p = tmp_path / "frozen.json"
+    p.write_text(json.dumps(_frozen(genesis="2026-08-10")))
+    wrote = {}
+
+    class _S3:
+        def put_object(self, **kw):
+            wrote.update(kw)
+
+    monkeypatch.setattr(sys, "argv", ["x", "--genesis", "2026-08-10", "--if-frozen", "--apply"])
+    monkeypatch.setattr(bgpw.genesis_prereg_stamp, "FROZEN_PATH", p)
+    monkeypatch.setattr(bgpw.genesis_prereg_stamp, "require_valid_stamp", lambda frozen=None: _stamp())
+    import boto3
+
+    monkeypatch.setattr(boto3, "client", lambda *a, **k: _S3())
+    rc = bgpw.main()
+    assert rc == 0
+    assert wrote["Key"] == bgpw.CHALLENGE_KEY
+    payload = json.loads(wrote["Body"].decode())
+    assert payload["week_id"] == "2026-W33", "genesis 2026-08-10 is ISO week 2026-W33"
+    assert payload["predict_metrics"], "a seeded subject with no metrics is still a dark widget"
+    assert "SKIP" not in capsys.readouterr().out
