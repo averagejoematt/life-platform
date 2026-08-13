@@ -11,7 +11,8 @@ A PR is merged only if ALL hold:
   1. mode == auto (SSM /life-platform/remediation-mode) and budget tier < 3
   2. every changed file matches the ALLOWLIST (specific templates, not "any small diff")
   3. no changed file matches the DENYLIST (bedrock_client, budget_guard, auth/secrets,
-     deploy scripts, workflows, the agent's own code, core/budget infra)
+     deploy scripts, workflows, the agent's own code, core/budget infra, and the
+     `cdk/stacks/role_policies*` IAM family — #2611, see the note above the ALLOWLIST)
   4. diff is bounded (<= MAX_LINES, no new non-test files)
   5. lint + the offline unit-test subset pass on the PR branch (GITHUB_TOKEN PRs do
      NOT trigger ci-cd.yml, so we run the checks here BEFORE merging; CI re-runs them
@@ -54,8 +55,32 @@ MAX_PER_DAY = 3
 
 # Specific change templates that are safe to auto-merge (the classes fixed this week).
 # A file must match one of these prefixes to be eligible — narrow on purpose.
+#
+# ── Why IAM (`cdk/stacks/role_policies*.py`) is NOT here (#2611, decided 2026-08-13) ──
+# It used to be: a single entry `cdk/stacks/role_policies.py` carried the missing-IAM-grant
+# template. #2604 split that module into per-domain siblings behind a re-export facade, so
+# the entry stopped matching where the policies actually live and the gate began failing
+# closed. That was discovered, not decided — so the decision is recorded here rather than
+# repaired by widening the list.
+#
+# The decision is **ADR-129's `shadow` → `auto` re-promotion owns this grant** (option 4 of
+# #2611). Restoring it is not a rename: the entry covered ONE file, and the family is now
+# EIGHT (`role_policies.py` + `_base/_ingestion/_compute/_email/_operational/_serve/
+# _permanence`). Handing an unattended gate eight IAM files is a change in trust posture,
+# and the agent has been in `shadow` since 2026-07-06 (ADR-129) with a numeric
+# 10-consecutive-clean-run bar and an explicit operator SSM flip already standing between
+# it and self-merging anything. That flip is the right place to price IAM, not a refactor's
+# follow-up. Until then IAM auto-fix is a permanently human-reviewed class: the agent still
+# diagnoses it and still opens the PR (Bucket B / `needs-review`, per
+# `docs/REMEDIATION_TAXONOMY.md`) — a human merges it.
+#
+# The facade was removed from the ALLOWLIST too, so the unattended IAM surface is 1 → 0, not
+# 1 → 8. Leaving it would have been worse than useless: `role_policies.py` is still a live
+# .py module, so a policy function defined *in the facade* would have auto-merged, while the
+# sibling edit the agent actually wants is held. The family is denied by PREFIX in
+# DENYLIST_SUBSTR below — derived, so a ninth sibling is covered the day it is created.
+# Hand-listing is what broke this (#2608 had to repair six other exact-path matchers).
 ALLOWLIST = (
-    "cdk/stacks/role_policies.py",  # missing-IAM grant
     "ci/lambda_map.json",  # deploy-map drift / unmapped Lambda
     "cdk/stacks/monitoring_stack.py",  # alarm recalibration / stale-clear
     "lambdas/emails/freshness_checker_lambda.py",  # source list / SOURCE_STALE_HOURS
@@ -77,7 +102,22 @@ DENYLIST_SUBSTR = (
     "cdk/app.py",
     "cdk/stacks/core_stack.py",
     "remediation/",
+    # The whole IAM policy family, by prefix — #2611, see the note above the ALLOWLIST.
+    # Deliberately NOT bare "role_policies": that would also deny `tests/test_role_policies.py`,
+    # which is a legitimate accompanying test update under the `tests/` allowlist entry.
+    "cdk/stacks/role_policies",
 )
+
+# Denials that are a *governance decision* rather than a self-evident hazard. Without this,
+# a held IAM PR reads only "denylisted path: cdk/stacks/role_policies_serve.py" and the next
+# reader cannot tell a decision from an oversight — which is exactly how #2611 arose.
+DENYLIST_REASONS = {
+    "cdk/stacks/role_policies": (
+        "IAM policy family — automated merge authority over IAM is deliberately withheld (#2611). "
+        "It is priced with the `shadow` → `auto` re-promotion (ADR-129), not restored by a refactor. "
+        "Merge this by hand after review."
+    ),
+}
 
 _ssm = boto3.client("ssm", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
@@ -114,8 +154,10 @@ def eligible(files):
     """Return (ok, reason). Every file must be allowlisted and none denylisted."""
     for f in files:
         path = f["path"]
-        if any(s in path for s in DENYLIST_SUBSTR):
-            return False, f"denylisted path: {path}"
+        hit = next((s for s in DENYLIST_SUBSTR if s in path), None)
+        if hit is not None:
+            why = DENYLIST_REASONS.get(hit)
+            return False, f"denylisted path: {path}" + (f" — {why}" if why else "")
         # Exact match for file entries; prefix match only for directory entries
         # ("tests/") — bare startswith let "role_policies.py.bak" ride through.
         if not any(path == p or (p.endswith("/") and path.startswith(p)) for p in ALLOWLIST):

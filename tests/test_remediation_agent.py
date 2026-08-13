@@ -11,7 +11,10 @@ Two things matter here:
 """
 
 import os
+import pathlib
 import sys
+
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "test")
@@ -127,6 +130,66 @@ def test_automerge_denylist_blocks_bedrock_and_prompts():
     # denylist substrings catch the highest-risk content/AI surfaces.
     for sub in ("bedrock_client", "budget_guard"):
         assert sub in automerge.DENYLIST_SUBSTR
+
+
+# ── #2611: IAM is not an auto-mergeable class, and the guard is DERIVED ──────
+#
+# The decision (recorded next to the ALLOWLIST in remediation/automerge.py) is that
+# automated merge authority over IAM is withheld until the ADR-129 `shadow` → `auto`
+# re-promotion prices it. These tests enumerate the role_policies family from disk
+# rather than hand-listing it, so a ninth sibling is covered the day it is created —
+# hand-listing is what went stale in the #2604 split (#2608 repaired six other
+# exact-path matchers for the same reason).
+
+_ROLE_POLICIES_FAMILY = sorted("cdk/stacks/" + p.name for p in pathlib.Path(_REPO, "cdk", "stacks").glob("role_policies*.py"))
+
+
+def test_role_policies_family_is_nonempty():
+    """Mutation canary: if the glob ever finds nothing, the guards below pass vacuously."""
+    assert len(_ROLE_POLICIES_FAMILY) >= 2, f"expected the facade + siblings, got {_ROLE_POLICIES_FAMILY}"
+    assert "cdk/stacks/role_policies.py" in _ROLE_POLICIES_FAMILY
+
+
+def test_no_role_policies_file_is_auto_mergeable():
+    """Every member of the family — facade included — is held, with a legible reason."""
+    for path in _ROLE_POLICIES_FAMILY:
+        ok, reason = automerge.eligible([{"path": path, "additions": 3, "deletions": 0}])
+        assert not ok, f"{path} is auto-mergeable — #2611 says IAM waits for the ADR-129 promotion"
+        assert "denylisted path" in reason, reason
+        # A bare "denylisted path: …" reads as an oversight; the decision must be legible.
+        assert "#2611" in reason and "ADR-129" in reason, f"held reason is not legible: {reason}"
+
+
+def test_role_policies_denial_survives_a_mixed_pr():
+    """A sibling smuggled in alongside genuinely allowlisted files is still held."""
+    ok, reason = automerge.eligible(
+        [
+            {"path": "tests/test_role_policies.py", "additions": 4, "deletions": 0},
+            {"path": "cdk/stacks/role_policies_serve.py", "additions": 3, "deletions": 0},
+        ]
+    )
+    assert not ok
+    assert "role_policies_serve.py" in reason
+
+
+def test_the_iam_denial_is_load_bearing(monkeypatch):
+    """Mutation proof: drop the #2611 entry and the same PR would merge.
+
+    Without this, the two tests above could be passing on the pre-#2611 "not on
+    allowlist" behaviour rather than on the deliberate denial.
+    """
+    files = [{"path": "cdk/stacks/role_policies_serve.py", "additions": 3, "deletions": 0}]
+    monkeypatch.setattr(automerge, "DENYLIST_SUBSTR", tuple(s for s in automerge.DENYLIST_SUBSTR if "role_policies" not in s))
+    monkeypatch.setattr(automerge, "ALLOWLIST", automerge.ALLOWLIST + ("cdk/stacks/role_policies_serve.py",))
+    ok, reason = automerge.eligible(files)
+    assert ok, f"mutation did not restore eligibility — the guards above prove nothing ({reason})"
+
+
+def test_test_role_policies_py_is_still_an_allowed_companion():
+    """The denial is prefixed to `cdk/stacks/` on purpose — a bare `role_policies`
+    substring would also deny the accompanying test update, which IS allowlisted."""
+    ok, reason = automerge.eligible([{"path": "tests/test_role_policies.py", "additions": 4, "deletions": 0}])
+    assert ok, reason
 
 
 # ── #396: report-first skeleton, ack ledger, earn-or-shadow ─────────────────
