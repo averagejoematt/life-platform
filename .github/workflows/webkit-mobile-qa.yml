@@ -106,8 +106,10 @@ jobs:
           python -m pip install --upgrade pip
           # Same pinned Playwright as the enforced ci-cd.yml gate (CQ-01 class:
           # a different version here would make a red mean "engine version",
-          # not "iOS Safari breakage") — test_webkit_weekly_qa.py enforces.
-          python -m pip install playwright==1.62.0
+          # not "iOS Safari breakage"). Both read the ONE pin in requirements-dev.txt
+          # (#2609) — test_webkit_weekly_qa.py enforces that they share the source.
+          PINS=$(python3 scripts/ci_pins.py playwright)
+          python -m pip install $PINS
           python -m playwright install --with-deps webkit
 
       - name: Run WebKit mobile sweep (deterministic only — no AI, $0)

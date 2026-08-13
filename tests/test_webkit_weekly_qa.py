@@ -133,12 +133,26 @@ def test_workflow_artifact_upload_cannot_flip_the_verdict():
 def test_workflow_playwright_pin_matches_ci_gate():
     """CQ-01 class: the WebKit run must drive the SAME pinned Playwright as the
     enforced ci-cd.yml gate, or a red here can mean 'different engine version',
-    not 'iOS Safari breakage'."""
+    not 'iOS Safari breakage'.
 
-    def pins(path):
+    #2609 made that structural rather than comparative: neither file carries a version
+    any more — both resolve playwright from requirements-dev.txt via scripts/ci_pins.py.
+    Equality between two literals is replaced by identity of one source, which is
+    strictly stronger, so the assertions below are about the resolver call plus the
+    absence of a second copy.
+    """
+
+    def resolves_playwright(path):
         with open(path, encoding="utf-8") as f:
-            return set(re.findall(r"\bplaywright==([0-9][0-9A-Za-z.\-]*)", f.read()))
+            return [args for args in re.findall(r"ci_pins\.py([^)\n]*)", f.read()) if "playwright" in args.split()]
 
-    wk, ci = pins(_WORKFLOW), pins(_CI_CD)
-    assert wk, "webkit-mobile-qa.yml does not pin playwright"
-    assert wk <= ci, f"playwright pin drifted: webkit-mobile-qa={sorted(wk)} vs ci-cd.yml={sorted(ci)}"
+    def literals(path):
+        with open(path, encoding="utf-8") as f:
+            return sorted(set(re.findall(r"\bplaywright==([0-9][0-9A-Za-z.\-]*)", f.read())))
+
+    assert resolves_playwright(_WORKFLOW), "webkit-mobile-qa.yml no longer resolves playwright from requirements-dev.txt (#2609)"
+    assert resolves_playwright(_CI_CD), "ci-cd.yml no longer resolves playwright from requirements-dev.txt (#2609)"
+    for path, name in ((_WORKFLOW, "webkit-mobile-qa.yml"), (_CI_CD, "ci-cd.yml")):
+        assert not literals(
+            path
+        ), f"{name} hardcodes a playwright version again ({literals(path)}) — resolve it instead, or the two can drift (#2609)"

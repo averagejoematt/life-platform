@@ -336,7 +336,11 @@ jobs:
           python-cache: 'pip'
 
       - name: Install test dependencies
-        run: pip install pytest==9.1.1 boto3==1.43.62 botocore==1.43.62 hypothesis==6.165.0  # hypothesis: property tests (#1664) collected in this lane; pinned to match requirements-dev.txt (CQ-01, #1963)
+        # hypothesis: property tests (#1664) are collected in this lane. Versions are
+        # READ from requirements-dev.txt, never copied here (CQ-01, #2609).
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis)
+          pip install $PINS
 
       - name: Run deploy-critical test lane
         run: |
@@ -921,7 +925,8 @@ jobs:
       - name: Install Playwright + Chromium
         run: |
           python -m pip install --upgrade pip
-          python -m pip install playwright==1.62.0
+          PINS=$(python3 scripts/ci_pins.py playwright)   # version from requirements-dev.txt (CQ-01, #2609)
+          python -m pip install $PINS
           python -m playwright install --with-deps chromium
 
       - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
