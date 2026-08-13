@@ -100,9 +100,19 @@ def ingestion_paused_sources(path: Path = SOURCE_REGISTRY_PATH) -> dict:
     except (OSError, SyntaxError):
         return {}
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
+        # BOTH assignment forms. `SOURCE_REGISTRY = {...}` is an ast.Assign, but
+        # `SOURCE_REGISTRY: dict[str, dict[str, Any]] = {...}` is an ast.AnnAssign —
+        # a different node type entirely. #1677 added that annotation (a `**` splice
+        # widened the inferred value type and reddened mypy), and this walk silently
+        # stopped matching: it fell through to `{}` and the paused-source gate went
+        # blind rather than red. Matching only one form is how a type annotation
+        # elsewhere disarms a checker here.
+        if isinstance(node, ast.AnnAssign):
+            names = [node.target.id] if isinstance(node.target, ast.Name) else []
+        elif isinstance(node, ast.Assign):
+            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        else:
             continue
-        names = [t.id for t in node.targets if isinstance(t, ast.Name)]
         if "SOURCE_REGISTRY" not in names or not isinstance(node.value, ast.Dict):
             continue
         out = {}

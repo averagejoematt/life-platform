@@ -46,6 +46,34 @@ def _scratch(tmp_path, text, name="scratch.md"):
 
 
 # ── ground truth is really discovered (a vacuous discoverer disables everything) ──
+def test_paused_discovery_survives_both_assignment_forms(ops, tmp_path):
+    """Guard the SET of assignment forms, not the one the file happens to use today.
+
+    #1677 annotated `SOURCE_REGISTRY: dict[str, dict[str, Any]] = {...}` to settle a
+    mypy widening. That turns the node from `ast.Assign` into `ast.AnnAssign`, and the
+    walk matched only the former — so it returned `{}` and the paused-source gate went
+    BLIND rather than red. A checker that silently finds nothing is worse than one that
+    fails: `assert 'garmin' in {}` was the only reason anyone noticed.
+
+    Both forms must discover the same paused set, and a `**` splice (also #1677) must
+    not break the walk either.
+    """
+    body = '"paused_one": {"label": "One", "paused": True},\n' '    "live_one": {"label": "Two"},\n'
+    forms = {
+        "plain": f"SOURCE_REGISTRY = {{\n    {body}}}\n",
+        "annotated": f"SOURCE_REGISTRY: dict[str, dict[str, object]] = {{\n    {body}}}\n",
+        "annotated_with_splice": ("EXTRA = {}\n" f"SOURCE_REGISTRY: dict[str, dict[str, object]] = {{\n    {body}    **EXTRA,\n}}\n"),
+    }
+    found = {}
+    for name, src in forms.items():
+        f = tmp_path / f"{name}.py"
+        f.write_text(src, encoding="utf-8")
+        found[name] = ops.ingestion_paused_sources(f)
+
+    for name, got in found.items():
+        assert got == {"paused_one": "One"}, f"{name} form discovered {got!r}"
+
+
 def test_paused_sources_discovered_from_registry(ops):
     paused = ops.ingestion_paused_sources()
     # garmin is the only source paused per ADR-074 at time of writing; the assertion
