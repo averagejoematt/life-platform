@@ -119,14 +119,13 @@ BASELINE = {
     # stale entry in would have licensed it to regrow 8x unpoliced, which is exactly the
     # hole this ratchet closes; test_baseline_has_no_stale_entries now forces the prune.
     # wednesday_chronicle_lambda.py (2975) split into chronicle_* helpers + a <1,200-line facade (#1654) — pruned.
-    # 3211 → 3275 (#2364): two new per-Lambda policy entries (telegram_webhook,
-    # telegram_worker). This file is the least-privilege registry — one entry per
-    # Lambda by design — so new-Lambda growth is its nature; what the ratchet
-    # polices here is growth WITHOUT a new Lambda.
-    # 3275 → 3291 (#2469): two scoped statements on the existing telegram_worker role
-    # (config/* s3:GetObject + PutMetricData) — a least-privilege grant has to live in
-    # its role's own entry, so this is policy substance, not sprawl.
-    "cdk/stacks/role_policies.py": 3291,
+    # role_policies.py (3291, i.e. AT its number — zero headroom, which is what #2604 was
+    # filed for: the next Lambda that needed a role could not get one) drained to a
+    # ~170-line facade. The statements now live in cohesive per-domain siblings —
+    # role_policies_{base,ingestion,compute,email,operational,serve}.py, each well under
+    # the ceiling — re-exported unchanged, IAM proven byte-identical statement-by-statement.
+    # The pure-subset ratchet forces the entry's removal rather than leaving it to licence
+    # a regrow to 3291.
     # site_api_observatory.py drained to a ~150-line facade by #1654 slice 3 — the handler
     # logic now lives in cohesive web/site_api_{nutrition,meals,training,physical,mind}.py
     # (each well under the ceiling). The pure-subset ratchet allows removing a shrunk entry.

@@ -20,8 +20,10 @@ Or directly: python3 tests/test_role_policies.py
 v1.0.0 — 2026-03-11
 """
 
+import importlib
 import inspect
 import os
+import pathlib
 import sys
 import types
 
@@ -100,11 +102,29 @@ WILDCARD_RESOURCE_ALLOWLIST = {
 
 
 def _all_policy_functions():
-    """Return {name: fn} for every public function in role_policies."""
-    return {name: obj for name, obj in inspect.getmembers(rp, inspect.isfunction) if not name.startswith("_")}
+    """Return {name: fn} for every public function in the whole `role_policies*` family.
+
+    Not just `role_policies` itself. #1400 put `operational_permanence()` in a sibling
+    module and this linter — the static IAM policy gate — never saw it: a real role,
+    unlinted, for months. #2604 then split the rest of the file the same way. Deriving
+    the module set by glob (the shape `tests/test_iam_secrets_consistency.py` already
+    uses) means the next sibling is covered the day it lands, whether or not anyone
+    remembers to re-export it through the facade.
+    """
+    found = {}
+    for path in sorted(pathlib.Path(CDK_STACKS).glob("role_policies*.py")):
+        mod = importlib.import_module(path.stem)
+        for name, obj in inspect.getmembers(mod, inspect.isfunction):
+            if name.startswith("_"):
+                continue
+            found[name] = obj
+    return found
 
 
 ALL_FUNCTIONS = _all_policy_functions()
+# Prove the sweep is alive rather than quietly empty: one policy from the facade's own
+# domain siblings and the #1400 sibling that used to be invisible here.
+assert "site_api" in ALL_FUNCTIONS and "operational_permanence" in ALL_FUNCTIONS, sorted(ALL_FUNCTIONS)
 
 
 def _actions(stmts):

@@ -28,6 +28,7 @@ pre-#1452 green report (no qa_level section) before the implementation landed.
 import os
 import re
 import sys
+from glob import glob
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
@@ -144,11 +145,16 @@ def test_collect_green_report_is_fail_soft_on_the_dial(monkeypatch):
 
 
 def test_traffic_digest_role_grants_the_qa_level_read():
-    path = os.path.join(_REPO, "cdk", "stacks", "role_policies.py")
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    m = re.search(r"def operational_traffic_digest.*?(?=\ndef )", text, flags=re.S)
-    assert m, "operational_traffic_digest() missing from role_policies.py"
+    # #2604: the operational roles live in role_policies_operational.py behind the
+    # role_policies.py facade — glob the family so the text pin follows the policy.
+    family = sorted(glob(os.path.join(_REPO, "cdk", "stacks", "role_policies*.py")))
+    m = None
+    for path in family:
+        with open(path, encoding="utf-8") as f:
+            m = re.search(r"def operational_traffic_digest.*?(?=\ndef )", f.read(), flags=re.S)
+        if m:
+            break
+    assert m, "operational_traffic_digest() missing from every cdk/stacks/role_policies*.py"
     assert "parameter/life-platform/qa-level" in m.group(
         0
     ), "traffic-digest role lacks the ssm:GetParameter grant on /life-platform/qa-level (#1452)"
