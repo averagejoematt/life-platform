@@ -31,12 +31,17 @@ updates:
       dev-tooling:
         patterns: ["*"]
     ignore:
-      # The formatters/linters are version-pinned in BOTH requirements-dev.txt
-      # AND inline in ci-cd.yml (the format gate installs exact versions). A black
-      # or ruff bump that reformats code is a deliberate "reformat the whole repo +
-      # move both pins in lockstep" event, NOT a routine auto-bump — left to
-      # Dependabot it silently drifts `make format` from CI and red-walls the next
-      # push. So ignore ruff/black minor+major here; patch bumps still flow.
+      # A black or ruff bump that REFORMATS code is a deliberate "reformat the whole
+      # repo" event, not a routine auto-bump: the format gate is blocking, so the bump
+      # and the reformat have to land together or the next push is red-walled. So
+      # ignore ruff/black minor+major here; patch bumps still flow.
+      #
+      # NB the old second half of this rationale ("pinned in BOTH requirements-dev.txt
+      # AND inline in ci-cd.yml … silently drifts `make format` from CI") is obsolete
+      # since #2609: there is no second copy any more. Every workflow resolves its
+      # versions from requirements-dev.txt via scripts/ci_pins.py, so a bump moves the
+      # local gate and CI in lockstep by construction. The reformat-coupling reason
+      # above is the one that still holds.
       - dependency-name: "ruff"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "black"
