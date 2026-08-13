@@ -574,7 +574,19 @@ async function renderPredict() {
   if (!sec) return;
   let d;
   try { d = await getJSON(`${API}/predict_week`); } catch (e) { d = null; }
-  if (!d || !d.active || !d.metrics || !Object.keys(d.metrics).length) { sec.hidden = true; return; }
+  // #2622 — an absent subject is a STATEMENT, not a blank. The API names the state
+  // and supplies the prose; a surface that renders nothing reads exactly like a
+  // broken one, which is how this stayed dark for a whole cycle. Only a FAILED
+  // fetch still hides (a 500 is not a statement we can honestly make).
+  if (!d) { sec.hidden = true; return; }
+  const foot = sec.querySelector(".predict-foot");
+  if (!d.active || !d.metrics || !Object.keys(d.metrics).length) {
+    bind("predict-body").innerHTML = `<p class="predict-none label">${escapeHTML(d.note || "No prediction subject this week.")}</p>`;
+    if (foot) foot.hidden = true;
+    sec.hidden = false;
+    return;
+  }
+  if (foot) foot.hidden = false;
   const week = d.week_id;
   const result = d.result || null;
   const body = bind("predict-body");
