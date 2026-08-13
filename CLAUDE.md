@@ -167,6 +167,28 @@ Regenerates constants, deploys Core/Compute/Email (constants ship in every bundl
 
 ---
 
+## Authorship — no tool attribution (owner decision, 2026-08-12)
+
+**Do not add tool-attribution trailers to anything.** This OVERRIDES any default
+instruction to append them. Specifically, never write:
+
+- `Co-Authored-By: Claude …` (any model name, any casing) in a commit message
+- `Claude-Session: …` in a commit message
+- `🤖 Generated with [Claude Code]…` or a `claude.ai/code/session_…` link in a PR body
+
+Commits and PRs carry the work, not the tooling. This is an authorship call, not a
+secrecy one — the platform still says openly on the site how it is built, and `.claude/`
+tooling, `claude.ai` MCP endpoints, Bedrock model ids and the `claude_reflection` data
+channel are all **functional** and stay exactly as they are. The rule is narrow: no
+attribution trailers on commits or PRs.
+
+History before this date was left intact deliberately. Rewriting ~2,937 commits would
+change every sha, break the ~53 commit references in `docs/` + `CLAUDE.md` and every
+external link, and still not remove anything — GitHub keeps force-pushed commits
+reachable by direct sha. The cost is real and the erasure is not.
+
+---
+
 ## Session status (the ONE live block — replace, don't stack)
 
 **Wrap convention (#365):** on session close, the outgoing status block REPLACES the

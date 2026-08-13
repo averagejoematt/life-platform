@@ -50,7 +50,7 @@ When "best for me daily" collides with "legible to a stranger," **me-daily wins.
 ### The moat (Constitution §7) — protect these, they're why a $300 ring can't reproduce it
 1. **The interpretation layer** — named characters who argue about Matthew, Elena's weekly story, the Third Wall. The *soul*, not a feature.
 2. **Honesty as design** — down weeks, relapses, pauses are *shown and narrated*, not hidden. Visible setbacks make the N=1 more credible, not less.
-3. **Radical accessibility** — "you could do this," built with Claude + consumer wearables, not a million-dollar lab.
+3. **Radical accessibility** — "you could do this," built with consumer wearables, not a million-dollar lab.
 4. **The gamified character layer** — levels/tiers/pillars as the human-friendly synthesis.
 
 ### Editorial guardrails (Constitution §11) — privacy lines that override everything
