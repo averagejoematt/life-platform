@@ -51,7 +51,7 @@ import json
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import boto3
@@ -76,6 +76,7 @@ from web import (
     site_api_social_membrane as _membrane,
 )
 from web.site_api_common import (
+    EXPERIMENT_START,  # #2622 — the live genesis; a challenge from an earlier cycle never rolls forward
     PT,
     S3_REGION,
     STATUS_CACHE_TTL,
@@ -545,22 +546,56 @@ def _current_iso_week() -> str:
     return f"{iso[0]}-W{iso[1]:02d}"
 
 
-def _predict_subject():
-    """The current week's prediction subject from current_challenge.json, or None.
+def _iso_week_of(d) -> str:
+    """The ISO week id ('2026-W33') of a plain calendar date. Same formula as
+    deploy/build_genesis_predict_week.genesis_iso_week — zero-padded, so the ids
+    also compare correctly as strings (2026-W52 < 2027-W01)."""
+    iso = d.isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
 
-    Returns {"week_id", "metrics": {key: label}, "result": {...}|None} when the
-    weekly challenge defines a `predict_metrics` list AND its week_id is the
-    current ISO week; None otherwise, so the feature fails *closed* — the widget
-    doesn't render and POSTs are rejected when there's no active subject. Read
-    fresh (no module cache) so a new Monday challenge is picked up without waiting
-    for a cold start.
+
+def _pt_today():
+    """Today as a plain date in Pacific Time — the reader's clock (#2414)."""
+    return datetime.now(PT).date()
+
+
+def _predict_subject_state():
+    """(subject|None, state) for the current week. `state` explains an absence.
+
+    #2622 — the subject ROLLS OVER on the reader's Monday without anyone running
+    anything. current_challenge.json used to be a per-WEEK artifact that a human
+    had to re-seed every Monday; nothing ever did, so the widget went dark every
+    week (cycle 13) or served a wrong week_id (cycle 11, #1952). The artifact is
+    now read as a per-CYCLE one: its `predict_metrics` are the frozen
+    pre-registration's own levers (deploy/build_genesis_predict_week.py derives
+    them from the freeze's test_specs), which are the subject for every week of
+    the cycle — so the reader stamps the CURRENT Pacific ISO week onto them
+    instead of demanding the stored stamp already say it.
+
+    That is also why there is no EventBridge seeder: the week boundary is
+    evaluated at read time in America/Los_Angeles, so no fixed-UTC cron has to
+    approximate a Pacific Monday and DST cannot drift it (a cron correct in PDT
+    is an hour wrong in PST, twice a year — the cycle-11 wrong-week class).
+
+    The #1198 guard is not weakened, it is enforced by construction:
+      * the served week_id IS the current PT ISO week — it can never lag;
+      * a challenge from an EARLIER cycle (week_id before the genesis week of the
+        live EXPERIMENT_START_DATE — exactly what a reset leaves behind) is
+        refused, not rolled forward;
+      * `result` is a measured outcome that belongs to the week it was measured
+        in, so it is dropped on a rolled week and only ever served verbatim.
+
+    States: "live" (stored stamp is already this week), "rolled" (this cycle's
+    subject stamped onto this week), "pre_start" (genesis hasn't arrived — dark
+    is correct, #931), "no_subject" (nothing seeded / previous cycle / unusable).
+    Read fresh (no module cache) so a re-seed is picked up without a cold start.
     """
     try:
         s3 = boto3.client("s3", region_name=S3_REGION)
         bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
         data = json.loads(s3.get_object(Bucket=bucket, Key="site/config/current_challenge.json")["Body"].read())
     except Exception:
-        return None
+        return None, "no_subject"
     metrics = data.get("predict_metrics") or []
     week_id = (data.get("week_id") or data.get("id") or "").strip()
     mmap = {}
@@ -569,19 +604,32 @@ def _predict_subject():
         if k:
             mmap[k] = m.get("label") or k
     if not week_id or not mmap:
-        return None
-    # #1198 — fail closed on a stale week. current_challenge.json is a MANUAL,
-    # per-week S3 artifact (no lambda writes it); if a Monday passes without a
-    # re-seed, or a cycle reset leaves the outgoing cycle's frozen week live, its
-    # week_id lags the real ISO week. Serving it would solicit predictions on a
-    # window that already closed — votes land in a VOTES#predict_week bucket that
-    # can never be revealed. Refuse: callers already treat None as "no active
-    # subject" (the widget self-hides, POSTs 404).
+        return None, "no_subject"
     current = _current_iso_week()
-    if week_id != current:
-        logger.warning("[predict_week] stale subject week_id=%r != current ISO week %r; failing closed", week_id, current)
-        return None
-    return {"week_id": week_id, "metrics": mmap, "result": data.get("result")}
+    if week_id == current:
+        return {"week_id": week_id, "metrics": mmap, "result": data.get("result")}, "live"
+    # Roll forward — but only inside the cycle this subject was derived for.
+    try:
+        genesis = date.fromisoformat(EXPERIMENT_START)
+    except (TypeError, ValueError):
+        logger.warning("[predict_week] no usable EXPERIMENT_START_DATE=%r; refusing to roll a subject forward", EXPERIMENT_START)
+        return None, "no_subject"
+    today = _pt_today()
+    if today < genesis:
+        return None, "pre_start"
+    if week_id < _iso_week_of(genesis):
+        logger.warning(
+            "[predict_week] subject week_id=%r predates the live genesis week %r — a previous cycle's challenge; failing closed (#1198)",
+            week_id,
+            _iso_week_of(genesis),
+        )
+        return None, "no_subject"
+    return {"week_id": current, "metrics": mmap, "result": None, "derived_from": week_id}, "rolled"
+
+
+def _predict_subject():
+    """The current week's prediction subject, or None. See _predict_subject_state."""
+    return _predict_subject_state()[0]
 
 
 def _handle_predict_week(event: dict) -> dict:

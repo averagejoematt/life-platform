@@ -2387,10 +2387,17 @@ def test_the_current_iso_week_id_uses_the_iso_year_not_the_calendar_year(monkeyp
 
 def test_the_prediction_widget_is_inactive_when_no_subject_is_configured(monkeypatch):
     wire(monkeypatch, s3=FakeS3())
-    assert ok_body(social.handle_predict_week_tally(get())) == {
-        **{k: v for k, v in ok_body(social.handle_predict_week_tally(get())).items() if k == "_meta"},
+    body = ok_body(social.handle_predict_week_tally(get()))
+    assert body == {
+        **{k: v for k, v in body.items() if k == "_meta"},
         "active": False,
+        # #2622: an absent subject is a STATEMENT — the state is named and the
+        # reader-facing prose ships with it, so the widget never renders a blank.
+        "state": body["state"],
+        "note": body["note"],
     }
+    assert body["state"] in ("no_subject", "pre_start")
+    assert body["note"].strip()
 
 
 def test_a_stale_prediction_week_fails_closed_rather_than_soliciting_dead_votes(monkeypatch):

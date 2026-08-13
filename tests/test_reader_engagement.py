@@ -89,9 +89,12 @@ def test_predict_week_rejects_bad_inputs(monkeypatch):
 
 
 def test_predict_week_tally_inactive(monkeypatch):
-    monkeypatch.setattr(social, "_predict_subject", lambda: None)
+    # The GET leg reads _predict_subject_state (subject + WHY it is absent, #2622).
+    monkeypatch.setattr(social, "_predict_subject_state", lambda: (None, "no_subject"))
     r = social.handle_predict_week_tally(_event(qs={}))
-    assert json.loads(r["body"])["active"] is False
+    body = json.loads(r["body"])
+    assert body["active"] is False
+    assert body["state"] == "no_subject" and body["note"].strip()
 
 
 # ── _predict_subject: the #1198 stale-week fail-closed guard ──────────────────

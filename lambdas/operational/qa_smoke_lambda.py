@@ -378,11 +378,12 @@ from operational.qa_check_reader_truth import (  # noqa: F401,E402
 # CHECK 9 — Predict-the-week freshness (#1198)
 # ---------------------------------------------------------------------------
 # The cockpit's predict-the-week widget solicits votes on "this week." Its subject
-# is a MANUAL, per-week S3 artifact (site/config/current_challenge.json) that no
-# lambda refreshes — if a Monday passes without a re-seed, or a cycle reset leaves
-# the outgoing cycle's week live, the widget keeps taking bets on a window that
-# already closed (votes land in a bucket that can never be revealed). The site-api
-# now fails closed on that mismatch (_predict_subject), so /api/predict_week must
+# is a per-CYCLE S3 artifact (site/config/current_challenge.json) that the reader
+# re-stamps with the current Pacific ISO week on every read (#2622) — so a passing
+# Monday no longer darkens it, but a cycle reset that leaves the OUTGOING cycle's
+# challenge live still must not take bets on a window that already closed (votes
+# land in a bucket that can never be revealed). The site-api fails closed on that
+# mismatch (_predict_subject_state), so /api/predict_week must
 # report active:false the moment the subject goes stale. This nightly tripwire
 # catches a REGRESSION of that guard: if the API ever returns active:true with a
 # week_id that isn't the current PT ISO week, fail loudly — it fires the Monday a

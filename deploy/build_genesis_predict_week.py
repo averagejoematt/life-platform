@@ -8,8 +8,14 @@ pre-registered hypotheses' deterministic test_specs (the levers and outcomes the
 freeze itself names: e.g. the kcal adherence line, the daily-step floor), stamps the
 challenge with the freeze's SHA-256 for provenance, and emits the exact
 `site/config/current_challenge.json` payload the predict-the-week widget reads
-(lambdas/web/site_api_social._predict_subject — week_id must be the CURRENT Pacific
-ISO week or the widget fails closed, #1198).
+(lambdas/web/site_api_social._predict_subject_state).
+
+This is a per-CYCLE seed, not a weekly one (#2622). The reader stamps the current
+Pacific ISO week onto these subjects itself, so the widget rolls over every Monday
+with nothing running — but only within the cycle this challenge was derived for: a
+challenge whose week_id predates the live genesis week is refused, never rolled
+(#1198 unweakened). Seeding a week_id that is not yet current is therefore safe and
+expected; seeding one from a previous cycle serves nothing.
 
 week_id is the GENESIS week (#1952): the ISO week containing experiment Day 1,
 derived from `--genesis` / the frozen record's own `genesis` /
@@ -80,8 +86,8 @@ def evaluate_predict_week_state(genesis: str, today_pt: date, active) -> tuple:
     - today before genesis -> the pre-start countdown: dark is CORRECT (#931), pass.
     - today inside the genesis ISO week -> the opening-week hook must be live:
       active must be true, else FAIL (the exact cycle-11 dark-week regression).
-    - after the genesis week -> pass: weekly re-seeds are a standing manual step,
-      outside the reset verifier's scope.
+    - after the genesis week -> pass: the reader rolls the subject week to week on
+      its own (#2622), and a later week is outside the reset verifier's scope.
     """
     week = genesis_iso_week(genesis)
     t_iso = today_pt.isocalendar()
@@ -95,7 +101,7 @@ def evaluate_predict_week_state(genesis: str, today_pt: date, active) -> tuple:
         if active:
             return True, f"genesis week {week} and the challenge is live"
         return False, f"genesis week {week} but /api/predict_week is dark (active:false) — the opening-week hook is hidden (#1952)"
-    return True, f"genesis week {week} has ended (today is {today_week}) — weekly re-seeding is outside the reset verifier"
+    return True, f"genesis week {week} has ended (today is {today_week}) — the reader rolls the subject weekly from here (#2622)"
 
 
 def derive_predict_metrics(frozen: dict, cap: int = 2) -> list:
@@ -211,8 +217,9 @@ def main():
     if not args.apply:
         print(f"DRY RUN — nothing uploaded. Re-run with --apply to write s3://{S3_BUCKET}/{CHALLENGE_KEY}")
         print(
-            f"NB: week_id {challenge['week_id']} is the GENESIS week (#1952) — safe to upload any time before or during it; "
-            "the widget serves it only while that week is the current Pacific ISO week (#1198)."
+            f"NB: week_id {challenge['week_id']} is the GENESIS week (#1952) — safe to upload any time before or during it. "
+            "From that week on the reader re-stamps these subjects with the current Pacific ISO week every Monday (#2622), "
+            "so this is a once-per-cycle seed; a challenge from an EARLIER cycle is refused, never rolled (#1198)."
         )
         return 0
 

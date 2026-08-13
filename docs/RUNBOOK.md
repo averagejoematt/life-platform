@@ -1471,10 +1471,18 @@ an omission):
   provenance; `week_id` is the **genesis** ISO week, derived from the genesis date and never the
   wall clock (#1952). It is safe to run before or during that week — the #1198 guard serves it only
   while it is the current Pacific ISO week.
-  - **Weekly re-seeds after the genesis week are still a standing manual step** — no lambda writes
-    this artifact. The nightly qa-smoke `predict_week:freshness` check is what tells you it went
-    dark: re-run `python3 deploy/build_genesis_predict_week.py --apply` (or seed a fresh weekly
-    subject) to clear it.
+  - **Weekly re-seeds are no longer a step at all** (#2622). The artifact is read as a per-CYCLE
+    one: `site_api_social._predict_subject_state` stamps the CURRENT Pacific ISO week onto the
+    stored subjects, so the week rolls over on the reader's Monday with nothing running. There is
+    deliberately **no EventBridge seeder** — a cron must be UTC-fixed while the boundary is Pacific
+    midnight (07:00Z in PDT, 08:00Z in PST), and picking either hour reproduces cycle 11's
+    wrong-week failure for half the year. The #1198 guard is unweakened: the served `week_id` is
+    the current week by construction, a challenge stamped **before the live genesis week** (what a
+    reset leaves behind) is refused rather than rolled, and a measured `result` is never carried
+    into a week it does not describe. Seed once per cycle — which hook (d) already does.
+  - When there is genuinely no subject, `/api/predict_week` returns `active:false` **plus a named
+    `state` and reader-facing `note`**, and the cockpit prints it. A dark week is a statement now,
+    not a blank — the nightly qa-smoke `predict_week:freshness` check still escalates it.
 - `deploy/restart_verify.py` — the **post-genesis Monday** health check (asserts `day_n >= 1`,
   a genesis weigh-in, a post-genesis character sheet); folding it would structurally fail at
   reset time. Run it Monday morning. Check 16 (#2104) covers the **slow-regen narrative

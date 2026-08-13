@@ -412,6 +412,17 @@ def _handle_ritual_log(event: dict, *, _g) -> dict:
     )
 
 
+# #2622 — an absent subject is a STATEMENT, not a blank. Every state
+# _predict_subject_state can return carries reader-facing prose, so the widget can
+# say why there is nothing to bet on. A surface that renders nothing is
+# indistinguishable from a broken surface — which is precisely how predict-the-week
+# stayed dark for a whole cycle without anyone noticing (#2612).
+PREDICT_ABSENCE_NOTES = {
+    "pre_start": "Predictions open on Day 1 — the board is not on the record yet.",
+    "no_subject": "No prediction subject this week. The pre-registered levers are re-seeded when the next cycle's freeze lands.",
+}
+
+
 def _predict_tallies(week_id, metric, *, _g):
     """Aggregate {up,down,flat: count} for one week+metric from VOTES#predict_week."""
     # Facade state injected via `_g` (the delegator's globals()) — the same
@@ -506,20 +517,23 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
 def handle_predict_week_tally(event: dict, *, _g) -> dict:
     """GET /api/predict_week — read-only reader-consensus tallies for the week.
 
-    Returns {"active": False} when there's no prediction subject (the widget then
-    hides). Otherwise returns the metrics, per-metric tallies, and the actual
-    outcome (`result`) once Matthew sets it on the challenge — so the front-end can
-    show "readers said UP 64% · it actually went DOWN."
+    Returns {"active": False} plus a NAMED state and a reader-facing note when
+    there's no prediction subject (#2622 — the widget says so instead of rendering
+    nothing; a blank surface is indistinguishable from a broken one, which is how
+    a whole dark cycle went unnoticed). Otherwise returns the metrics, per-metric
+    tallies, and the actual outcome (`result`) once Matthew sets it on the
+    challenge — so the front-end can show "readers said UP 64% · it actually went
+    DOWN."
     """
     # Facade state injected via `_g` (the delegator's globals()) — the same
     # module object the tests patch (see web/site_api_social.py's header).
     _error = _g["_error"]
     _ok = _g["_ok"]
-    _predict_subject = _g["_predict_subject"]
-    subj = _predict_subject()
+    subj, state = _g["_predict_subject_state"]()
     if subj is None:
         # 300s (#2289 class rule): unmetered public read → every response edge-cached.
-        return _ok({"active": False}, cache_seconds=300)
+        note = PREDICT_ABSENCE_NOTES.get(state) or PREDICT_ABSENCE_NOTES["no_subject"]
+        return _ok({"active": False, "state": state, "note": note}, cache_seconds=300)
     qs = (event.get("queryStringParameters") or {}) or {}
     metric = (qs.get("metric") or "").strip().lower()
     if metric and metric not in subj["metrics"]:

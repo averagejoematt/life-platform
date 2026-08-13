@@ -211,6 +211,8 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .predict-actual { color: var(--ink); }            /* the outcome — neutral ink, never red */
 .predict-hit { color: var(--ember); }
 .predict-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
+/* #2622 — the honest absence: no subject this week is a stated fact, not a blank. */
+.predict-none { color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
 @media (max-width: 480px) { .predict-vote { flex-direction: column; } .predict-btn { flex: none; } }
 
 /* The Cohort Strip (#1394, epic #1366) — anonymous weekly distribution, Matthew's
