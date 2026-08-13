@@ -528,6 +528,26 @@ def sleep_detail(*, _g) -> dict:
             f"sleep_trend rows are keyed by WAKE date (the same convention as as_of_date), not night_of — "
             f"the row dated {latest_date} is the night of {_night_of}, the same night described above."
         ),
+        # #2613: the OTHER half of the trend's frame, and the one that was missing.
+        # #2344 named the row DATE's convention; `sleep_start` is a raw UTC instant
+        # from Whoop, sitting in a payload whose every other date is a Pacific
+        # calendar date. Nothing said so. Measured: the genesis-dated row published
+        # `sleep_start: <date>T05:05:46Z` — 22:05 the PREVIOUS Pacific evening — and
+        # three consecutive nightly reader-truth runs read that Z-timestamp as a
+        # local date, could not reconcile it with the wake-date rule trend_note had
+        # just taught them, and raised a high "pre-genesis row" contradiction (#2613).
+        # The data was right every time; the payload simply never named the frame.
+        # Same #1968 principle as `divergence` above: a figure that does not name its
+        # frame is unreconcilable, and an unreconcilable figure reads as a lie.
+        "trend_sleep_start_tz": "UTC",
+        "trend_sleep_start_note": (
+            "sleep_trend[].sleep_start is a UTC instant (trailing Z); every DATE in this payload "
+            "(date, as_of_date, night_of) is a Pacific calendar date. A bedtime of 05:05Z is 22:05 the "
+            "previous Pacific evening, so a row's sleep_start normally reads one calendar day earlier than "
+            "its wake date. The earliest row is dated at the cycle start because trailing windows clamp to "
+            "genesis (ADR-077), and its bedtime therefore falls the evening before Day 1 — the wake-date "
+            "frame being correct, not a pre-cycle reading."
+        ),
     }
 
     all_bed = bed_times_weekday + bed_times_weekend

@@ -30,6 +30,16 @@ BEFORE genesis (an ADR-077 clamp breach) — is now caught by `phase_plausibilit
 which is arithmetic and so can never be budget-paused. R6 checks the row's own `date`;
 the clause exempts the NIGHT behind a genesis-dated row. Disjoint halves, per ADR-105.
 
+THE CLAUSE DOES NOT SILENCE THE FINDING, AND THESE TESTS DO NOT PRETEND IT DOES.
+Measured 2026-08-13 at the real call site: 3/3 runs raised it before any change, 3/3
+with the clause, 4/5 with the clause AND the in-payload disclosure. The model
+re-derives the accusation from the payload's own `trend_note`, quoting it approvingly
+in the sentence that flags it. So the tests below pin two things that ARE true — the
+ruling is recorded, and the deterministic layer is correct and mutation-proven — and
+deliberately assert nothing about the LLM going quiet. The durable fix is to retire
+this class from the LLM the way #1922 retired `impossible_number`; that needs its own
+issue. See the MEASURED block in reader_truth_qa.py.
+
 NB this file deliberately does NOT sweep the source tree, so it stays out of the
 `tests/conftest.py` post-merge-only registry: it is a unit suite over two modules.
 """
@@ -208,6 +218,40 @@ def test_r6_tolerates_non_date_date_values():
     """Live payloads carry `date: null` and free-text dates; neither may crash or red."""
     payload = {"a": {"date": None}, "b": {"date": "not-a-date"}, "c": {"date": 20260810}}
     assert pp._pre_genesis_row_findings("/api/sleep_detail", payload, GENESIS) == []
+
+
+# ── the surface half: the trend's timestamp must name its frame (#1968) ──────
+
+
+def test_the_payload_declares_sleep_start_as_utc():
+    """The real gap #2613 exposed, independent of whether the LLM ever goes quiet.
+
+    #2344 named the trend ROW DATE's convention; `sleep_start` stayed a bare UTC
+    instant in a payload whose every other date is Pacific. A figure that does not
+    name its frame is unreconcilable (#1968) — which is why three nightly runs read
+    `…T05:05:46Z` as a local date and could not square it with the wake-date rule.
+    """
+    import inspect
+
+    from web import site_api_sleep
+
+    src = inspect.getsource(site_api_sleep)
+    assert '"trend_sleep_start_tz": "UTC"' in src, "the trend's timestamp frame must be declared, not inferred"
+    assert "trend_sleep_start_note" in src
+    # It must say the two things a reader needs: the tz split, and why the first row looks early.
+    assert "is a Pacific calendar date" in src
+    assert "the evening before Day 1" in src
+
+
+def test_the_2344_row_date_disclosure_survives():
+    """The new note extends the #2344 seam; it must not have displaced it."""
+    import inspect
+
+    from web import site_api_sleep
+
+    src = inspect.getsource(site_api_sleep)
+    assert '"trend_date_convention": "wake_date"' in src
+    assert "trend_note" in src
 
 
 # ── the neighbouring rule must not have been loosened ────────────────────────

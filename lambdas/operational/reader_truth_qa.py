@@ -238,6 +238,31 @@ def _phase_line(phase):
 # Per ADR-105 the deterministic layer leads; the prose clause only exempts what that
 # layer has already cleared. R6 checks the row's own `date`; the clause exempts the
 # NIGHT behind a genesis-dated row. They cover disjoint halves of the same question.
+#
+# ── MEASURED, AND IT IS NOT ENOUGH. Read this before trusting the clause. ─────
+# The clause above is the RULING, and it is recorded because the ledger is how this
+# module records rulings. It is NOT a working suppression, and the numbers say so.
+# Measured 2026-08-13 against the live surface set at the real call site (Haiku, the
+# nightly's own batching):
+#     before any change ................ 3 of 3 runs raised the high finding
+#     + this clause .................... 3 of 3 runs still raised it
+#     + the payload disclosure too ..... 4 of 5 runs still raised it
+# (the 5-run batch also drifted onto two OTHER already-ruled clauses — the Home
+# design copy and the "··" glyph — which is its own signal about prose clauses.)
+#
+# The model does not miss the clause; it re-derives the accusation FROM the payload's
+# own `trend_note`, quoting it approvingly in the same sentence that flags it. A
+# false-positive class that survives both a rubric clause and an explicit in-payload
+# disclosure is not a wording problem, and widening the prose further is the exact
+# failure mode #2613 was told to avoid.
+#
+# THE REAL FIX, NOT DONE HERE: retire this class from the LLM the way #1922 retired
+# `impossible_number` after the model mis-graded `weight_delta_window_days: 5` six
+# times with six different rationales. The deterministic half already owns the
+# answerable question (R6 above), so the LLM is adjudicating something code has
+# already decided — precisely the ADR-105 inversion #1922 corrected. That is a
+# scoped change to the category set and the two passes' division of labour, and it
+# needs its own issue rather than being smuggled in behind a clause edit.
 
 _PROMPT_HEADER = """You are a meticulous editorial truth reviewer for a public "measured life" \
 experiment site. Below is the RENDERED TEXT of {k} of its surfaces (page prose and/or API payloads — \
