@@ -112,6 +112,13 @@ SHAPES: dict[str, dict[str, str]] = {
         "Belongs in the census because 'armed' is what a green board implies",
         "detectable": "yes",
     },
+    "stale-exemption": {
+        "seed": "found by this census, 2026-08-13",
+        "story": "an allowlist/denylist/size-baseline entry naming a path that no longer "
+        "exists — the exemption outlived its subject, so the gate is carrying a "
+        "hole nobody is standing in",
+        "detectable": "yes",
+    },
     "unreferenced-entrypoint": {
         "seed": "memory: 'Read the deploy-critical lane BY NAME' (red-mained 08-10)",
         "story": "a guard script exists and works, and nothing runs it — an unregistered " "job prints nothing, and absent != pass",
@@ -300,11 +307,16 @@ def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], d
     gates: list[Gate] = []
     counters = {"candidates": 0, "no_nonzero_exit": 0, "shell_unscreened": 0}
 
-    workflow_text = " ".join(_read(p) for p in (root / ".github").rglob("*.yml"))
-    makefile = _read(root / "Makefile")
-    test_text = " ".join(_read(p) for p in (root / "tests").glob("*.py"))
-    hooks_text = " ".join(_read(p) for p in (root / ".git" / "hooks").glob("*")) if (root / ".git" / "hooks").is_dir() else ""
-    referenced_corpus = workflow_text + makefile + test_text + hooks_text
+    # The reference corpus is EVERY tracked non-doc file plus the git hooks. A narrower
+    # corpus is how the first version of this detector produced 2 false positives out of
+    # 3: `check_css_tokens.py` is run by `tests/test_css_tokens.py` (which imports the
+    # module by STEM, not filename) and `verify_oidc_iam.py` by `deploy/drift_sentinel.py`
+    # (a directory the corpus did not include). A caller-detector that does not read all
+    # the callers is the same defect this census exists to find.
+    hooks = list((root / ".git" / "hooks").glob("*")) if (root / ".git" / "hooks").is_dir() else []
+    referenced_corpus = "\n".join(
+        _read(p) for p in files + hooks if p.suffix in {".py", ".yml", ".yaml", ".sh", ".toml", ".cfg", ""} or p.name == "Makefile"
+    )
 
     for path in files:
         rel = path.relative_to(root).as_posix()
@@ -344,7 +356,11 @@ def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], d
             )
             continue
         flags = _static_source_flags(text)
-        if path.name not in referenced_corpus and rel not in referenced_corpus:
+        # Count references excluding the file's own text; match the module STEM as well
+        # as the filename, since a python caller imports `check_css_tokens`, not
+        # `check_css_tokens.py`.
+        others = referenced_corpus.replace(text, "")
+        if path.name not in others and rel not in others and re.search(rf"\b{re.escape(path.stem)}\b", others) is None:
             flags.append("unreferenced-entrypoint")
         gates.append(
             Gate(
@@ -422,14 +438,27 @@ def discover_registry_gates(root: Path, files: list[Path]) -> tuple[list[Gate], 
             # would multiply a single lead into N and make the histogram a lie about
             # how many distinct leads exist.
             module_flags = _static_source_flags(corpus_by_file[path])
+            # Exemption DATA (allowlists, denylists, size baselines) and behavioural
+            # registries fail differently, and conflating them is how the first run of
+            # this detector reported 39 `declared-unwired` hits that were mostly a
+            # filename in a size BASELINE — an entry that legitimately appears exactly
+            # once. Exemption entries get the shape that actually applies to them:
+            # a stale exemption, i.e. an exempted path that no longer exists.
+            is_exemption_data = bool(re.search(r"ALLOWLIST|DENYLIST|BASELINE|_EXEMPT", name))
             for entry in entries:
                 counters["entries"] += 1
                 flags: list[str] = []
-                # #2564's shape: an entry name that appears nowhere but its own
-                # registry and the test that reads the registry.
-                mentions = all_source.count(f'"{entry}"') + all_source.count(f"'{entry}'")
-                if mentions <= 1:
-                    flags.append("declared-unwired")
+                if is_exemption_data:
+                    if "/" in entry and Path(entry).suffix and not (root / entry).exists():
+                        flags.append("stale-exemption")
+                        counters["stale_exemptions"] = counters.get("stale_exemptions", 0) + 1
+                    mentions = -1
+                else:
+                    # #2564's shape: an entry name that appears nowhere but its own
+                    # registry and the test that reads the registry.
+                    mentions = all_source.count(f'"{entry}"') + all_source.count(f"'{entry}'")
+                    if mentions <= 1:
+                        flags.append("declared-unwired")
                 gates.append(
                     Gate(
                         id=f"registry::{rel}::{name}::{entry}",
@@ -666,14 +695,18 @@ def render_report(census: dict[str, Any]) -> str:
     add("")
 
     add("-- risk flags (leads for adjudication, NOT defects) " + "-" * 26)
-    hist: dict[str, int] = {}
+    # Every DETECTABLE shape is printed, zeros included. A shape that simply vanishes
+    # from the report when it finds nothing is indistinguishable from a shape whose
+    # detector died — the exact confusion this census exists to end. The zeros are only
+    # meaningful because each detector has a planted-positive proof in
+    # tests/test_gate_census_2578.py.
+    hist: dict[str, int] = {k: 0 for k, v in census["shapes"].items() if v["detectable"] != "no"}
     for g in screened:
         for f in g["risk_flags"]:
             hist[f] = hist.get(f, 0) + 1
-    for f, c in sorted(hist.items(), key=lambda kv: -kv[1]):
-        add(f"  {f:<28} n = {c}")
-    if not hist:
-        add("  (none)")
+    for f, c in sorted(hist.items(), key=lambda kv: (-kv[1], kv[0])):
+        suffix = "   (detector proven live by a planted positive; zero here is a real result)" if c == 0 else ""
+        add(f"  {f:<28} n = {c}{suffix}")
     add("")
 
     add("-- why gates could not be screened " + "-" * 43)

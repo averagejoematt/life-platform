@@ -128,6 +128,66 @@ class TestStaticSourceFlags:
         assert "swallowed-exit" in gc._static_source_flags("run_gate() || true\n")
 
 
+# ── 3b. exemption data vs. behavioural registries ────────────────────────────
+def _synthetic_repo(tmp_path: Path, rel: str, body: str) -> Path:
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(textwrap.dedent(body), encoding="utf-8")
+    return tmp_path
+
+
+class TestExemptionDataIsNotJudgedAsWiring:
+    """The first run of `declared-unwired` reported 39 hits, mostly a filename inside a
+    size BASELINE — an entry that legitimately appears exactly once. Exemption data and
+    behavioural registries fail differently and must be screened differently."""
+
+    SRC = """
+        BASELINE = {'lambdas/gone.py': 1200, 'scripts/reg.py': 900}
+        GATE_CLASSES = {'orphan_class': {}}
+        """
+
+    def _gates(self, tmp_path):
+        root = _synthetic_repo(tmp_path, "scripts/reg.py", self.SRC)
+        files = [root / "scripts" / "reg.py"]
+        gates, counters = gc.discover_registry_gates(root, files)
+        return {g.name: g for g in gates}, counters
+
+    def test_a_baseline_entry_is_not_called_unwired(self, tmp_path):
+        gates, _ = self._gates(tmp_path)
+        assert "declared-unwired" not in gates["BASELINE[scripts/reg.py]"].risk_flags
+
+    def test_a_baseline_entry_whose_file_vanished_is_flagged_stale(self, tmp_path):
+        """The planted positive that makes a census-wide `stale-exemption n = 0` mean
+        something. Without this proof, zero is indistinguishable from a dead detector —
+        which is the vacuous-empty shape, in the instrument built to find it."""
+        gates, counters = self._gates(tmp_path)
+        assert "stale-exemption" in gates["BASELINE[lambdas/gone.py]"].risk_flags
+        assert counters["stale_exemptions"] == 1
+
+    def test_an_existing_exempted_path_is_clean(self, tmp_path):
+        gates, _ = self._gates(tmp_path)
+        assert gates["BASELINE[scripts/reg.py]"].risk_flags == []
+
+    def test_a_behavioural_registry_entry_nothing_references_is_flagged(self, tmp_path):
+        """#2564's shape survives the narrowing."""
+        gates, _ = self._gates(tmp_path)
+        assert "declared-unwired" in gates["GATE_CLASSES[orphan_class]"].risk_flags
+
+
+def test_a_guard_script_its_own_caller_imports_by_stem_is_not_called_unreferenced(tmp_path):
+    """Two of the first three `unreferenced-entrypoint` hits were false: a python caller
+    imports `check_css_tokens`, not `check_css_tokens.py`, and the corpus skipped
+    `deploy/`. A caller-detector that does not read all the callers is the same defect
+    this census exists to find."""
+    root = _synthetic_repo(tmp_path, "scripts/check_thing.py", "import sys\nsys.exit(1)\n")
+    _synthetic_repo(tmp_path, "deploy/runner.py", "from check_thing import main\n")
+    _synthetic_repo(tmp_path, "scripts/check_lonely.py", "import sys\nsys.exit(1)\n")
+    files = [root / "scripts" / "check_thing.py", root / "deploy" / "runner.py", root / "scripts" / "check_lonely.py"]
+    gates = {g.name: g for g in gc.discover_guard_scripts(root, files)[0]}
+    assert "unreferenced-entrypoint" not in gates["scripts/check_thing.py"].risk_flags
+    assert "unreferenced-entrypoint" in gates["scripts/check_lonely.py"].risk_flags, "the detector no longer detects anything"
+
+
 # ── 4. the CI extractor, against a synthetic workflow ────────────────────────
 def _write_workflow(tmp_path: Path, body: str) -> Path:
     wf = tmp_path / ".github" / "workflows"
