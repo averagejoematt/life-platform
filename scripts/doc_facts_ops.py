@@ -46,10 +46,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 BUDGET_GUARD_PATH = ROOT / "lambdas" / "ai" / "budget_guard.py"
 CDK_STACKS_DIR = ROOT / "cdk" / "stacks"
-ROLE_POLICIES_PATH = CDK_STACKS_DIR / "role_policies.py"
 # #2604: role_policies.py is a facade over cohesive `role_policies_*.py` siblings. The
 # `_secret_arn("…")` literals live in the siblings now, so the grant scan reads the FAMILY
 # — a hand-pinned single filename is how this check would silently start returning nothing.
+# (#2611: the leftover `ROLE_POLICIES_PATH = … / "role_policies.py"` constant was removed —
+# nothing read it, and leaving the pin here is how the next reader reaches for it again.)
 ROLE_POLICIES_FAMILY = sorted(CDK_STACKS_DIR.glob("role_policies*.py"))
 SYNC_META_PATH = ROOT / "deploy" / "sync_doc_metadata.py"
 ARCHITECTURE_PATH = ROOT / "docs" / "ARCHITECTURE.md"
