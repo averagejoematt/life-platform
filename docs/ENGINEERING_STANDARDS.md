@@ -63,6 +63,33 @@ public platform's stated postures*," not "A for a 50-engineer org."
   legibility, may exceed the ceiling *if it carries a top-of-file comment naming the exception* —
   which registers it with the module-size guard.
 - Enforced by the **module-size ratchet guard** (below).
+- **Accepted debt has a per-file number, and headroom is EARNED, never granted (#2610).**
+  Files already over the ceiling carry a maximum line count in
+  `tests/test_module_size_guard.BASELINE`. Re-baselining those at *measured* (2026-08-09)
+  left most of them at **zero headroom** — any added line reds CI, and the standing rule is
+  never to raise a baseline, so the next person to touch the file refactors it for everyone
+  who touched it before. That is not hypothetical: **#1677** hit `role_policies.py` at
+  3291/3291 and reverted three IAM policies and a feature rather than refactor a file it had
+  not come to work on; **#2612** hit `restart_pipeline.py` at 1193/1200 mid-change. The
+  policy, decided in #2610:
+  1. **No blanket re-baseline with headroom.** Raising every number at once is "raise the
+     baseline" with extra steps and spends the ratchet's credibility in one commit.
+  2. **Extract worst-first**, on the seams the codebase already recognises — facade plus
+     cohesive siblings (#1400, #1654, #2604, #2221). The **terminal cure is dropping back
+     under the 1,200 ceiling** so the entry is pruned outright. A baseline entry is debt,
+     not a home.
+  3. **A PR that extracts N lines from a baselined file may bank up to N/5 as headroom** and
+     must hand the rest back by lowering the number. Nothing else may raise a number. This
+     is what stops an extraction landing the file straight back at zero — which is exactly
+     how the current set got there — without licensing growth.
+  4. **The red instructs.** A baselined file that reds by a routine-sized amount was FULL;
+     the gate says so and names the extraction precedent, instead of printing a number the
+     reader has to interpret.
+  - The zero-headroom set is **never hand-listed** — it moves every week. Print it:
+    `python3 scripts/module_size_headroom.py` (add `--zero`, or `--json`). The tightest rows
+    are the extraction queue.
+  - The same failure shape exists in the engine-doc gate (**#2619**) — same decision applies
+    there when it is picked up; it is not fixed by this policy note.
 
 ### 3. Naming & aesthetics (D3)
 - **Python:** `snake_case` modules/functions/vars, `PascalCase` classes, `UPPER_SNAKE` constants.
