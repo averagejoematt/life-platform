@@ -16,6 +16,7 @@ split as `assess_hero_weight` and the `reader_truth_qa` helper.
 """
 
 import re
+from datetime import date as _date
 
 # Rounding and a same-day reweigh, not a cycle-old figure. The live gap was 3.5 lb.
 CROSS_SURFACE_WEIGHT_TOL_LBS = 1.5
@@ -208,9 +209,79 @@ def vitals_cited_in(prose: str) -> dict:
     return out
 
 
+# ── #2575: a FROZEN artifact vs a LIVE surface is not a comparison ──────────────
+#
+# #2583 fixed the real two-producer defect. What survived it was measured on
+# 2026-08-12 and is the check's own: the coach narrative is frozen at ~17:0xZ, the
+# cockpit is read hours later, and `vitals_resolver` serves the latest **FINALIZED**
+# whoop morning — a record that is routinely unscored at 17:00Z and scored by
+# midnight. Measured: coach cited recovery 54 / HRV 41.1 / RHR 56 (DATE#2026-08-11,
+# the newest finalized reading at 17:02:59Z); the cockpit now serves 30 / 30.9 / 60
+# (DATE#2026-08-12, finalized later). Neither surface was ever wrong. As written the
+# check could not pass on any day a recovery finalizes after the brief — most days —
+# and a gate that fires on correct output is a gate people learn to ignore (#1985).
+#
+# The fix is NOT a wider tolerance. Widening would blind the check to exactly the
+# 8-point recovery gap #2575 was opened for. Instead the coach record now carries
+# `published_vitals` (coach/published_vitals.py) — the Spine's own answer at the
+# instant the narrative shipped — and a coach's prose is judged against THAT when the
+# only thing separating the two surfaces is the finalization window.
+#
+# Bounded, so it cannot become an escape hatch:
+#   * the stamp is used ONLY when it is STRICTLY OLDER than the cockpit's reading
+#     (same as-of ⇒ nothing to reconcile ⇒ the cockpit stays the judge, so on any day
+#     the coach speaks after finalization this is byte-for-byte the old behaviour);
+#   * and no more than VITALS_ASOF_MAX_LAG_DAYS behind it. One morning is the whole
+#     legitimate gap. Two is a coach reading a different, lagging producer — the
+#     original #2575 defect — and that still FAILs against the cockpit;
+#   * an unstamped coach is judged against the cockpit exactly as before, so the check
+#     can never go dark by a stamp failing to be written.
+VITALS_ASOF_MAX_LAG_DAYS = 1
+
+# The stamp field each metric's value and provenance date live under. recovery/HRV/RHR
+# share one date — they are three columns of ONE whoop morning (#1369).
+_STAMP_VALUE_FIELD = {"recovery": "recovery_pct", "hrv": "hrv_ms", "rhr": "rhr_bpm", "sleep": "sleep_hours"}
+_STAMP_ASOF_FIELD = {"recovery": "recovery_as_of", "hrv": "recovery_as_of", "rhr": "recovery_as_of", "sleep": "sleep_as_of"}
+
+
+def _iso_day(value):
+    """``date`` from a YYYY-MM-DD(-ish) string, or None. No clock is read."""
+    try:
+        return _date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def publication_baseline(vitals, coach, metric):
+    """What ``metric`` should be judged against for this coach: (value, provenance).
+
+    Returns ``(None, None)`` when the cockpit has no reading for the metric. Otherwise
+    the cockpit's value, unless the coach carries a `published_vitals` stamp that is
+    strictly older than the cockpit's reading and within VITALS_ASOF_MAX_LAG_DAYS of it
+    — the finalization window — in which case the frozen value it shipped with wins.
+    """
+    field = _VITALS_TRUTH_FIELD[metric]
+    try:
+        live = float(vitals.get(field))
+    except (TypeError, ValueError):
+        return None, None
+
+    stamp = (coach or {}).get("published_vitals")
+    if not isinstance(stamp, dict):
+        return live, "cockpit"
+    date_key = _STAMP_ASOF_FIELD[metric]
+    stamped_day, live_day = _iso_day(stamp.get(date_key)), _iso_day(vitals.get(date_key))
+    if stamped_day is None or live_day is None or not (0 < (live_day - stamped_day).days <= VITALS_ASOF_MAX_LAG_DAYS):
+        return live, "cockpit"  # same morning, ahead of the cockpit, or too far behind it
+    try:
+        return float(stamp[_STAMP_VALUE_FIELD[metric]]), f"as published {stamped_day.isoformat()}"
+    except (KeyError, TypeError, ValueError):
+        return live, "cockpit"
+
+
 def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
     """Every recovery / HRV / resting-HR / sleep figure a coach asserts as current
-    must match the cockpit's.
+    must match the reading that surface was published against.
 
     Returns (ok, message). Absence is a clean pass (ADR-104) on BOTH sides: a null
     cockpit field has nothing to contradict, and a coach that cites nothing is silent,
@@ -242,12 +313,17 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
             if metric not in truth:
                 continue
             unit = _VITALS_UNIT[metric]
+            baseline, provenance = publication_baseline(vitals, c, metric)
+            if baseline is None:
+                continue
             for cited in values:
-                if abs(cited - truth[metric]) > tol[metric]:
-                    disagreements.append(f"{name} cites {metric} {cited:g}{unit} vs cockpit {truth[metric]:g}{unit}")
+                if abs(cited - baseline) > tol[metric]:
+                    disagreements.append(f"{name} cites {metric} {cited:g}{unit} vs {provenance} {baseline:g}{unit}")
 
     if disagreements:
-        return False, "coach-cited vitals disagree with the cockpit — " + "; ".join(sorted(set(disagreements))[:4])
+        return False, "coach-cited vitals disagree with the reading they were published against — " + "; ".join(
+            sorted(set(disagreements))[:4]
+        )
     return True, "coach narratives agree with the cockpit vitals (" + ", ".join(f"{k} {v:g}" for k, v in sorted(truth.items())) + ")"
 
 
