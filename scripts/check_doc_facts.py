@@ -445,10 +445,19 @@ def _registry_source_count() -> int | None:
     except SyntaxError:
         return None
     for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for tgt in node.targets:
-                if isinstance(tgt, ast.Name) and tgt.id == "SOURCE_REGISTRY" and isinstance(node.value, ast.Dict):
-                    return len(node.value.keys)
+        # Both forms: `X = {...}` is ast.Assign, `X: T = {...}` is ast.AnnAssign.
+        # #1677 annotated SOURCE_REGISTRY and this walk silently returned None —
+        # a discovery that finds nothing reads as "no data", not as "I broke".
+        if isinstance(node, ast.AnnAssign):
+            tgts = [node.target]
+        elif isinstance(node, ast.Assign):
+            tgts = list(node.targets)
+        else:
+            continue
+        for tgt in tgts:
+            if isinstance(tgt, ast.Name) and tgt.id == "SOURCE_REGISTRY" and isinstance(node.value, ast.Dict):
+                # A `**SPLICE` entry contributes a None key; count real string keys only.
+                return sum(1 for k in node.value.keys if isinstance(k, ast.Constant))
     return None
 
 
