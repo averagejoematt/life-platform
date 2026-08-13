@@ -57,6 +57,33 @@ A file shrinking below its recorded count does not auto-tighten the entry (that 
 every line-removal PR edit this registry). Tightening a number after a real shrink is
 welcome and always allowed — it is the ratchet doing its job.
 
+ZERO HEADROOM AND THE EARNED-HEADROOM RULE (2026-08-13, #2610):
+
+Re-baselining at measured had a consequence nobody chose per file: **16 of these 25 entries
+sit at exactly their number**, so ANY added line reds the gate, and the standing rule is
+never to raise a baseline. Twice in three days the wall fell on someone who had not come
+to work on that file — #1677 (``role_policies.py`` 3291/3291) reverted three IAM policies
+and dropped a feature rather than refactor, and #2612 hit ``restart_pipeline.py`` at
+1193/1200. #2604 then fixed ``role_policies.py`` the honest way, by extraction.
+
+The policy decided in #2610 (reasoned in docs/ENGINEERING_STANDARDS.md §2):
+
+  1. **No blanket re-baseline with headroom.** Raising 16 numbers at once is "raise the
+     baseline" with extra steps and it spends the ratchet's whole credibility in one commit.
+  2. **Extract worst-first, on the seams the codebase already recognises** — the facade +
+     cohesive-siblings shape of #1400/#1654/#2604. The terminal cure is dropping under the
+     ceiling so the entry is PRUNED; an entry is debt, not a home.
+  3. **Headroom is EARNED, never granted.** A PR that extracts N lines out of a baselined
+     file may keep up to N/5 of them as headroom and must hand the rest back. Nothing else
+     may raise a number. This is what stops an extraction from landing the file straight
+     back at zero (which is how these 16 got here) without licensing growth.
+  4. **The red says what to do.** A baselined file that reds by a routine-sized amount was
+     FULL: the message names extraction and the #2604 precedent instead of printing a
+     number the reader then has to interpret. See ``_FULL_OVERAGE_LINES`` below.
+
+``scripts/module_size_headroom.py`` prints the live headroom table from source — that is the
+worst-first queue, and it is never hand-listed anywhere because it moves every week.
+
 Scope = git-tracked ``*.py`` under the first-party source roots (``lambdas/``, ``mcp/``,
 ``scripts/``, ``deploy/``, ``cdk/``) — matching what ENGINEERING_STANDARDS §2 scopes.
 ``tests/`` is out of scope (test files legitimately run long), as is build output
@@ -189,7 +216,16 @@ BASELINE = {
     "lambdas/intelligence/intelligence_common.py": 1744,
     "lambdas/coach/coach_history_summarizer.py": 1731,
     "lambdas/coach/coach_prediction_evaluator.py": 1638,
-    "cdk/stacks/monitoring_stack.py": 1623,
+    # 2026-08-13 (#2610): 1623 → 1382. This file was at 1623/1623 — zero headroom — and
+    # adding an alarm is the most routine change it ever takes, so it was the next
+    # role_policies.py. Both CloudWatch DASHBOARDS (311 lines, pure composition, not one
+    # alarm among them) moved to the cohesive sibling cdk/stacks/monitoring_dashboards.py;
+    # the synthesized LifePlatformMonitoring template is byte-identical (63 alarms, 2
+    # dashboards, 71 resources, every logical id and property equal). 301 lines came out;
+    # 60 of them (a fifth — the earned-headroom rule) are banked so the extraction does not
+    # land the file straight back at zero, and 241 are handed back to the ratchet.
+    # Measured 1322. The terminal cure is still getting under 1200 and pruning this line.
+    "cdk/stacks/monitoring_stack.py": 1382,
     # 2026-08-09 (#2420): 1556 → 1637. The +81 is the ADR-104 grounding gate for the
     # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
     # census matches SURFACES by module, so extracting the gate would unclassify the
@@ -214,6 +250,61 @@ BASELINE = {
     "lambdas/coach/coach_state_updater.py": 1233,
     "mcp/tools_hevy_routine.py": 1218,
 }
+
+# ── #2610: make the red legible ─────────────────────────────────────────────────────────
+# A baselined file with ZERO headroom reds on any addition at all, so its overage is the
+# size of an ordinary edit. A file that still had headroom can only red by consuming ALL of
+# it first, which takes a large addition. That difference is the only signal available from
+# a single checkout (the pre-change size is not knowable here — a shallow CI clone cannot be
+# asked, see the shallow-clone-git-gates rule), and it is enough to pick the right advice:
+#
+#   overage <= _FULL_OVERAGE_LINES  ->  "this file is FULL, extract" (the #2610 failure mode)
+#   overage >  _FULL_OVERAGE_LINES  ->  the ordinary "your change is big" error
+#
+# Both verdicts forbid raising the number; they differ in what they tell you to do instead.
+_FULL_OVERAGE_LINES = 40
+
+_FULL_ADVICE = (
+    "This file is FULL — it is at (or within a routine edit of) its recorded ceiling, so "
+    "ANY addition reds this gate. Do NOT raise the number.\n"
+    "  Extract a cohesive sibling module beside it and pay for your lines out of what you "
+    "removed. Precedents: cdk/stacks/role_policies.py 3291 -> 165 via per-domain siblings "
+    "(#2604), cdk/stacks/monitoring_dashboards.py out of monitoring_stack.py (#2610), "
+    "lambdas/emails/weekly_digest_extractors.py out of weekly_digest_lambda.py (#2221).\n"
+    "  You may bank up to a FIFTH of the lines you extract as headroom (the earned-headroom "
+    "rule, #2610) and must hand the rest back. Run "
+    "`python3 scripts/module_size_headroom.py` to see the live table."
+)
+
+_ORDINARY_ADVICE = (
+    "These are accepted DEBT, not a licence to grow. Put the new code in a cohesive helper "
+    "module beside it (that is #1654's whole shape), or — if the growth is genuinely "
+    "unavoidable — raise this file's number and say why in the commit message. Do not raise "
+    "it reflexively to clear a red gate."
+)
+
+
+def _growth_verdict(cap, n):
+    """Which advice a baselined file's growth earns: ``"full"`` or ``"over"``.
+
+    Pure, so the two messages are mutation-provable without writing to the tree.
+    """
+    return "full" if (n - cap) <= _FULL_OVERAGE_LINES else "over"
+
+
+def _growth_report(over):
+    """Render the failure text for ``[(rel, cap, n), ...]``, splitting the two verdicts."""
+    full = [t for t in over if _growth_verdict(t[1], t[2]) == "full"]
+    ordinary = [t for t in over if _growth_verdict(t[1], t[2]) == "over"]
+    parts = ["Baselined file(s) grew past their recorded ceiling (#1665, enforcing since 2026-08-09):"]
+    if full:
+        parts.append("\n".join(f"  {rel}: {n} lines, baseline {cap} (+{n - cap}) — FULL" for rel, cap, n in full))
+        parts.append(_FULL_ADVICE)
+    if ordinary:
+        parts.append("\n".join(f"  {rel}: {n} lines, baseline {cap} (+{n - cap})" for rel, cap, n in ordinary))
+        parts.append(_ORDINARY_ADVICE)
+    return "\n\n".join(parts)
+
 
 _REGISTER_HINT = (
     "To register a genuine generated file or registry/dispatch table that must exceed the "
@@ -322,14 +413,24 @@ def test_baselined_files_do_not_grow():
     lines while this file reported green.
     """
     over = _grown()
-    assert not over, (
-        "Baselined file(s) grew past their recorded ceiling (#1665, enforcing since 2026-08-09):\n"
-        + "\n".join(f"  {rel}: {n} lines, baseline {cap} (+{n - cap})" for rel, cap, n in over)
-        + "\n\nThese are accepted DEBT, not a licence to grow. Put the new code in a cohesive "
-        "helper module beside it (that is #1654's whole shape), or — if the growth is genuinely "
-        "unavoidable — raise this file's number and say why in the commit message. Do not raise "
-        "it reflexively to clear a red gate."
-    )
+    assert not over, _growth_report(over)
+
+
+def headroom_table():
+    """``[(rel, cap, lines, headroom), ...]`` for every live BASELINE entry, tightest first.
+
+    #2610's "enumerate the zero-headroom set FROM SOURCE" — the set moves every week, so no
+    document may hand-list it. ``scripts/module_size_headroom.py`` renders this; the
+    tightest rows are the worst-first extraction queue.
+    """
+    rows = []
+    for rel, cap in BASELINE.items():
+        path = os.path.join(_REPO, rel)
+        if not os.path.isfile(path):
+            continue  # moved/deleted — the subset semantics; never a failure
+        n = _line_count(rel)
+        rows.append((rel, cap, n, cap - n))
+    return sorted(rows, key=lambda r: (r[3], r[0]))
 
 
 def test_baseline_has_no_stale_entries():
@@ -407,6 +508,57 @@ def test_exception_regex_needs_a_reason():
     assert _EXCEPTION_RE.search("# module-size-exception: generated by v4_build_x.py")
     assert not _EXCEPTION_RE.search("# module-size-exception:")
     assert not _EXCEPTION_RE.search("# module-size-exception:    ")
+
+
+def test_full_file_red_says_extract_not_a_number():
+    """#2610: a zero-headroom file reds on a routine addition — the red must INSTRUCT.
+
+    The exact failure that cost #1677 three IAM policies: role_policies.py was 3291/3291
+    and a 7-line addition was indistinguishable, in the gate's own output, from "you wrote
+    a 400-line module". One of those has an obvious fix; the other reads as a wall.
+    """
+    assert _growth_verdict(3291, 3298) == "full"
+    msg = _growth_report([("cdk/stacks/role_policies.py", 3291, 3298)])
+    assert "FULL" in msg
+    assert "#2604" in msg  # the precedent, by number
+    assert "extract" in msg.lower()
+    assert "Do NOT raise the number" in msg
+    assert _ORDINARY_ADVICE not in msg
+
+
+def test_merely_over_baseline_still_gets_the_ordinary_error():
+    """A file that had real headroom and blew through it is the ordinary case, unchanged."""
+    assert _growth_verdict(2104, 2400) == "over"
+    msg = _growth_report([("lambdas/content/html_builder.py", 2104, 2400)])
+    assert "+296" in msg
+    assert _ORDINARY_ADVICE in msg
+    assert "FULL" not in msg
+
+
+def test_both_verdicts_can_appear_in_one_red():
+    """A PR that trips both kinds gets both instructions, each against its own files."""
+    msg = _growth_report([("a/full.py", 1200, 1205), ("b/big.py", 1200, 1600)])
+    assert "a/full.py: 1205 lines, baseline 1200 (+5) — FULL" in msg
+    assert "b/big.py: 1600 lines, baseline 1200 (+400)" in msg
+    assert _FULL_ADVICE in msg and _ORDINARY_ADVICE in msg
+
+
+def test_headroom_census_is_derived_from_source():
+    """#2610's enumeration must come from the tree, never a hand-typed table.
+
+    This asserts the census helper agrees with the registry + the real files. It does NOT
+    assert a zero-headroom COUNT — that number moves every week, which is exactly why the
+    issue asked for it to be derived. ``scripts/module_size_headroom.py`` prints it.
+    """
+    rows = headroom_table()
+    live = {rel: cap for rel, cap in BASELINE.items() if os.path.isfile(os.path.join(_REPO, rel))}
+    assert {r[0] for r in rows} == set(live)
+    for rel, cap, n, room in rows:
+        assert cap == live[rel]
+        assert n == _line_count(rel)
+        assert room == cap - n
+    # The ratchet's own invariant, restated from the census: nothing may sit above its cap.
+    assert [r for r in rows if r[3] < 0] == []
 
 
 def test_generated_header_exempts():
