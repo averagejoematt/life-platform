@@ -79,6 +79,7 @@ import json
 import math
 import os
 import sys
+from datetime import datetime, timezone
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
@@ -615,11 +616,326 @@ def run(call_haiku=None, check_budget=True):
         return report
 
     report["verdict"] = MEASURED
+    report["measured_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     report["matrix"] = confusion_matrix(results)
     report["threshold_attribution"] = threshold_attribution(results, gate.PASS_SCORE_THRESHOLD)
     report["threshold_sweep"] = threshold_sweep(results, gate.PASS_SCORE_THRESHOLD)
+    report["separability"] = separability(results, gate.PASS_SCORE_THRESHOLD)
+    report["margin_analysis"] = margin_analysis(results, gate.PASS_SCORE_THRESHOLD)
     report["cannot_support"] = _cannot_support(report["matrix"], report["threshold_attribution"])
+    report["publication_record"] = publication_record(report)
     return report
+
+
+# ── AC3: is a per-decision error margin estimable at all? ────────────────────
+MARGIN_ESTIMABLE = "ESTIMABLE"
+MARGIN_NOT_ESTIMABLE = "NOT_ESTIMABLE"
+
+# A margin band is a claim about the region AROUND the decision boundary: "inside
+# ±BOUNDARY_HALF_WIDTH of the threshold the judge's verdict is not trustworthy
+# enough to hard-block." Fitting that claim requires labeled cases living there.
+BOUNDARY_HALF_WIDTH = 15
+# Same floor the rates use. A band fitted to fewer than this many boundary-region
+# cases is a made-up margin wearing a statistic — #1374's own words.
+MIN_BOUNDARY_CASES = THIN_DENOMINATOR_N
+
+
+def margin_analysis(results, threshold):
+    """Can #1374's acceptance item 3 (margin-aware gating) be built from this corpus?
+
+    "Verdicts inside the judge's known error margin don't hard-block" needs a
+    *known error margin*, and an error margin is a property of the region around
+    the decision boundary. This asks three deterministic questions of the actual
+    scores — no LLM, no new spend:
+
+      1. **Is the boundary region populated?** How many labeled cases score within
+         ±BOUNDARY_HALF_WIDTH of the threshold? A band fitted where there is no
+         labeled data is fitted to nothing.
+      2. **Are the judge's observed errors boundary errors?** If every
+         misclassification sits far from the threshold, a band around the
+         threshold is provably not the mechanism that would have prevented any of
+         them — it would change the gate's behaviour without touching a single
+         known failure.
+      3. **What would a band leak?** For the widest band the observed errors could
+         justify, how many labeled DEFECTS fall inside it — and what is the 95%
+         upper bound on that share? Zero observed leaks out of a small n is not
+         zero leakage; the Wilson upper bound is the honest number.
+
+    Returns a verdict plus the evidence for it. This function deliberately cannot
+    return a margin width: it either reports one the data supports, or refuses.
+    """
+    usable = [r for r in results if r["usable"]]
+    scored = [r for r in usable if isinstance(r.get("score"), (int, float))]
+    if not scored:
+        return {"verdict": MARGIN_NOT_ESTIMABLE, "reasons": ["no usable case carried a numeric score"]}
+
+    good = sorted(r["score"] for r in scored if r["label"] == LABEL_GOOD)
+    bad = sorted(r["score"] for r in scored if r["label"] == LABEL_DEFECTIVE)
+
+    lo_edge, hi_edge = threshold - BOUNDARY_HALF_WIDTH, threshold + BOUNDARY_HALF_WIDTH
+    in_band = [r for r in scored if lo_edge <= r["score"] <= hi_edge]
+
+    # The observed empty interval straddling the threshold: nothing scored between
+    # the highest sub-threshold case and the lowest at-or-above one.
+    below = [s for s in good + bad if s < threshold]
+    at_or_above = [s for s in good + bad if s >= threshold]
+    gap_lo = max(below) if below else None
+    gap_hi = min(at_or_above) if at_or_above else None
+
+    # Every case the judge got wrong, and how far from the boundary it happened.
+    errors = [
+        {
+            "id": r["id"],
+            "label": r["label"],
+            "score": r["score"],
+            "judge_passed": r["judge_passed"],
+            "distance_from_threshold": abs(r["score"] - threshold),
+            "kind": ("false_flag_on_good_work" if r["label"] == LABEL_GOOD else "missed_defect"),
+        }
+        for r in scored
+        if (r["label"] == LABEL_GOOD) != bool(r["judge_passed"])
+    ]
+    errors.sort(key=lambda e: e["distance_from_threshold"])
+    errors_in_band = [e for e in errors if e["distance_from_threshold"] <= BOUNDARY_HALF_WIDTH]
+
+    # The most generous band the observed errors could motivate: wide enough to
+    # rescue the closest false flag on good work. Anything wider is unmotivated;
+    # anything narrower rescues nothing. Then measure what it would let through.
+    false_flags = [e for e in errors if e["kind"] == "false_flag_on_good_work"]
+    candidate = None
+    if false_flags:
+        floor_score = min(e["score"] for e in false_flags)
+        leaked = [r for r in scored if r["label"] == LABEL_DEFECTIVE and floor_score <= r["score"] < threshold]
+        leak = rate(len(leaked), len(bad))
+        hi = (leak["ci95_wilson"] or (None, None))[1]
+        candidate = {
+            "band": [floor_score, threshold],
+            "motivation": "the lowest-scoring false flag on genuinely good work — the narrowest band that rescues it",
+            "goldens_rescued": sum(1 for r in scored if r["label"] == LABEL_GOOD and floor_score <= r["score"] < threshold),
+            "defects_released_observed": len(leaked),
+            "defect_leakage_rate": leak,
+            "leakage_upper_bound_95": hi,
+            "note": (
+                f"{len(leaked)} of {len(bad)} labeled defects score inside this band. Zero observed leaks is "
+                f"NOT zero leakage: the 95% upper bound on the leaked share is {hi} — up to "
+                f"{round((hi or 0) * 100)}% of defects could land inside a band this gate would stop hard-blocking."
+            ),
+        }
+
+    reasons = []
+    if len(in_band) < MIN_BOUNDARY_CASES:
+        reasons.append(
+            f"The boundary region is empty. {len(in_band)} of {len(scored)} labeled cases score within "
+            f"±{BOUNDARY_HALF_WIDTH} of the threshold ({lo_edge}–{hi_edge}); the floor is {MIN_BOUNDARY_CASES}. "
+            f"Observed scores straddle the threshold with a {(gap_hi - gap_lo) if (gap_lo is not None and gap_hi is not None) else '?'}"
+            f"-point hole in between (nothing between {gap_lo} and {gap_hi}). A margin width fitted here is fitted to no data."
+        )
+    if errors and not errors_in_band:
+        nearest = errors[0]
+        reasons.append(
+            f"None of the judge's {len(errors)} observed errors is a boundary error. The nearest "
+            f"({nearest['id']}, {nearest['kind']}, score {nearest['score']}) sits {nearest['distance_from_threshold']} "
+            f"points from the threshold. A band around the threshold would therefore change the gate's behaviour "
+            f"without preventing a single failure this corpus has ever seen."
+        )
+    if candidate:
+        reasons.append(
+            f"The only band the evidence motivates is {candidate['band']}, fitted to "
+            f"n={candidate['goldens_rescued']} rescued golden(s) — an overfit by inspection. "
+            f"{candidate['note']} A gate that stops hard-blocking a band which may contain a fifth of all "
+            "defects is not a safer gate."
+        )
+    # The corpus is polar by construction: goldens were authored to be obviously
+    # clean and canaries to carry an obvious fault. Neither class was sampled from
+    # the borderline drafts a margin exists to protect. Say it even if the counts
+    # above ever improve.
+    reasons.append(
+        "Both classes are polar BY CONSTRUCTION — the goldens were hand-authored to be obviously publishable "
+        "and the canaries to carry an obvious injected fault. Neither was sampled from the borderline drafts a "
+        "margin exists to protect, so no amount of re-running this corpus populates the boundary region."
+    )
+
+    return {
+        "verdict": MARGIN_ESTIMABLE if not (len(in_band) < MIN_BOUNDARY_CASES or (errors and not errors_in_band)) else MARGIN_NOT_ESTIMABLE,
+        "threshold": threshold,
+        "boundary_half_width": BOUNDARY_HALF_WIDTH,
+        "min_boundary_cases": MIN_BOUNDARY_CASES,
+        "n_scored": len(scored),
+        "n_within_boundary_band": len(in_band),
+        "empty_interval_straddling_threshold": [gap_lo, gap_hi],
+        "score_range_good": [good[0], good[-1]] if good else None,
+        "score_range_defective": [bad[0], bad[-1]] if bad else None,
+        "errors": errors,
+        "n_errors_within_boundary_band": len(errors_in_band),
+        "candidate_band": candidate,
+        "reasons": reasons,
+        "what_would_change_this": (
+            f"Labeled BORDERLINE drafts — at least {MIN_BOUNDARY_CASES} coach outputs whose true quality is "
+            f"genuinely arguable, scored by the judge, with Matthew's pass/fail label. Real held drafts are the "
+            f"natural source: they are borderline by definition. They are not retained today "
+            f"(coach_quality_gate performs no put_item), so this needs a retention change first, not another run."
+        ),
+    }
+
+
+def separability(results, threshold):
+    """Is there ANY threshold value that separates the two labeled classes?
+
+    The threshold-sweep table shows how counts move; this answers the question the
+    table implies. If the worst-scoring golden sits below the best-scoring canary,
+    no single cut point can be both fully sensitive and fully specific, and the
+    cost of catching the last defect is stated in goldens held rather than left
+    for the reader to add up.
+    """
+    usable = [r for r in results if r["usable"] and isinstance(r.get("score"), (int, float))]
+    good = [r["score"] for r in usable if r["label"] == LABEL_GOOD]
+    bad = [r["score"] for r in usable if r["label"] == LABEL_DEFECTIVE]
+    if not good or not bad:
+        return None
+    survivor = max((r for r in usable if r["label"] == LABEL_DEFECTIVE and r["judge_passed"]), key=lambda r: r["score"], default=None)
+    out = {
+        "worst_golden": min(good),
+        "best_canary": max(bad),
+        "separable_by_any_threshold": min(good) > max(bad),
+    }
+    if survivor is not None:
+        cost = sum(1 for s in good if s <= survivor["score"])
+        out["highest_scoring_missed_defect"] = {"id": survivor["id"], "score": survivor["score"]}
+        out["goldens_that_would_be_held_to_catch_it"] = cost
+        out["n_good"] = len(good)
+        out["note"] = (
+            f"Catching {survivor['id']} (score {survivor['score']}) requires a threshold above it, which would "
+            f"also hold {cost} of {len(good)} genuinely good drafts. PASS_SCORE_THRESHOLD has no setting that "
+            f"buys this defect back at an acceptable price — the fix is rubric coverage, not tuning."
+        )
+    return out
+
+
+def publication_record(report):
+    """The ONLY figures cleared for publication, with the caveats that must ship
+    alongside them (#1374 acceptance item 2).
+
+    This exists so no one has to re-derive "which of these numbers is safe to put
+    on a public page". It refuses rather than degrades: any rate whose denominator
+    is under the thin floor is dropped from `figures` and named in `withheld`, so
+    a bare point estimate off a small n cannot escape through this door. That is
+    the exact error that started this issue.
+    """
+    if report.get("verdict") != MEASURED:
+        return {"publishable": False, "withheld": [f"verdict is {report.get('verdict')} — no matrix was measured"], "figures": {}}
+
+    m = report["matrix"]
+    ta = report.get("threshold_attribution") or {}
+    figures, withheld = {}, []
+    for key, source, what in (
+        (
+            "agrees_with_good_work",
+            m["sensitivity_agrees_with_good_work"],
+            "how often the gate lets genuinely publishable coach output through",
+        ),
+        (
+            "catches_induced_defects",
+            m["specificity_catches_defects"],
+            "how often the gate blocks output carrying a deliberately injected fault",
+        ),
+    ):
+        if source["thin"] or not source["denominator"]:
+            withheld.append(f"{key}: {source.get('note') or 'no denominator'}")
+            continue
+        lo, hi = source["ci95_wilson"]
+        figures[key] = {
+            "what": what,
+            "numerator": source["numerator"],
+            "denominator": source["denominator"],
+            "point": source["point"],
+            "ci95_wilson": [lo, hi],
+            "plain": f"{source['numerator']} of {source['denominator']} (95% CI {lo:.3f}–{hi:.3f})",
+        }
+
+    n_det = ta.get("by_deterministic_number_grounding") or 0
+    return {
+        "publishable": bool(figures),
+        "measured_at": report.get("measured_at"),
+        "instrument": "the BLOCKING coach quality gate (ADR-108) as it actually ships: deterministic number-grounding prepass + LLM judge",
+        "corpus": report["corpus"],
+        "convention": m["convention"],
+        "figures": figures,
+        "withheld": withheld,
+        # Non-negotiable. Every one of these is a way the figures above could be
+        # misread as stronger than they are; a renderer that drops them is
+        # publishing a number without its instrument.
+        "must_ship_with": [
+            "These are the COMBINED gate's rates, not the LLM judge's own discrimination: "
+            f"{n_det} of the {ta.get('n_fail_decisions', 0)} blocking decisions came from a deterministic "
+            "arithmetic check that runs before the model.",
+            "The negatives are hand-authored faults of known classes, not a sample of the defects real "
+            "generation produces. This does not generalise to field failure modes.",
+            "The positives were authored to be obviously clean, so 'agrees with good work' measures the easy "
+            "half of the job and says nothing about borderline drafts.",
+            # No bare repo path here: this string is rendered to a public reader, and
+            # an unbreakable path token clipped its own tail at 375px (render-QA).
+            "A point-in-time measurement of one model version, not a running average. It is re-run whenever the "
+            "rubric, the threshold or the judge model changes, and quarterly otherwise, so drift is caught.",
+        ],
+        "margin_verdict": (report.get("margin_analysis") or {}).get("verdict"),
+    }
+
+
+SITE_ARTIFACT_PATH = os.path.join(_REPO, "site", "data", "judge_calibration.json")
+
+
+def site_artifact(report):
+    """The reader-facing artifact for /method/calibration/ (#1374 acceptance item 2).
+
+    Deliberately a thin projection of `publication_record` — the honesty rules live
+    in one place and the renderer gets no chance to re-decide them. Returns None
+    when nothing is cleared, so a failed or thin run publishes NOTHING rather than
+    a degraded panel.
+    """
+    pub = report.get("publication_record") or {}
+    if not pub.get("publishable"):
+        return None
+    m = report["matrix"]
+    ma = report.get("margin_analysis") or {}
+    sep = report.get("separability") or {}
+    return {
+        "schema": "judge_calibration/1",
+        "generated_by": "tests/judge_calibration.py (python3 tests/golden_brief_eval.py --judge-calibration --publish)",
+        "measured_at": pub.get("measured_at"),
+        "instrument": pub["instrument"],
+        "convention": pub["convention"],
+        "corpus": pub["corpus"],
+        "cells": m["cells"],
+        "figures": pub["figures"],
+        "withheld": pub["withheld"],
+        "must_ship_with": pub["must_ship_with"],
+        "margin": {
+            "verdict": ma.get("verdict"),
+            "n_within_boundary_band": ma.get("n_within_boundary_band"),
+            "boundary_half_width": ma.get("boundary_half_width"),
+            "empty_interval": ma.get("empty_interval_straddling_threshold"),
+            "errors": ma.get("errors"),
+            "reasons": ma.get("reasons"),
+            "what_would_change_this": ma.get("what_would_change_this"),
+        },
+        "separability": sep,
+    }
+
+
+def write_site_artifact(report, path=SITE_ARTIFACT_PATH):
+    """Write the artifact, or REMOVE nothing and report the refusal.
+
+    Never truncates an existing published artifact on a bad run: a calibration
+    page showing last quarter's honest numbers beats one showing this run's
+    failure to measure.
+    """
+    art = site_artifact(report)
+    if art is None:
+        return {"written": False, "path": path, "reason": f"nothing cleared for publication (verdict={report.get('verdict')})"}
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(art, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    return {"written": True, "path": path, "figures": sorted(art["figures"])}
 
 
 def _cannot_support(matrix, attribution=None):
@@ -746,6 +1062,40 @@ def text_report(report):
         )
         if ta.get("note"):
             lines.append(f"   ! {ta['note']}")
+    sep = report.get("separability") or {}
+    if sep.get("note"):
+        lines.append(
+            f"\nSeparability: worst golden {sep['worst_golden']}, best canary {sep['best_canary']} — "
+            f"{'separable' if sep['separable_by_any_threshold'] else 'NO threshold separates the classes'}."
+        )
+        lines.append(f"   ! {sep['note']}")
+
+    ma = report.get("margin_analysis") or {}
+    if ma:
+        lines.append(f"\nMargin-aware gating (#1374 acceptance item 3): {ma['verdict']}")
+        lines.append(
+            f"  {ma['n_within_boundary_band']}/{ma['n_scored']} labeled cases within ±{ma['boundary_half_width']} of "
+            f"the threshold (floor {ma['min_boundary_cases']}); nothing scored between "
+            f"{ma['empty_interval_straddling_threshold'][0]} and {ma['empty_interval_straddling_threshold'][1]}."
+        )
+        for e in ma.get("errors") or []:
+            lines.append(
+                f"   · error {e['id']}: {e['kind']} at score {e['score']} — {e['distance_from_threshold']} points from the threshold"
+            )
+        for r in ma.get("reasons") or []:
+            lines.append(f"   ! {r}")
+        lines.append(f"   → What would change this: {ma['what_would_change_this']}")
+
+    pub = report.get("publication_record") or {}
+    if pub:
+        lines.append(f"\nCleared for publication: {'yes' if pub.get('publishable') else 'NO'}")
+        for k, f in (pub.get("figures") or {}).items():
+            lines.append(f"   ✓ {k}: {f['plain']} — {f['what']}")
+        for w in pub.get("withheld") or []:
+            lines.append(f"   ✗ WITHHELD {w}")
+        for c in pub.get("must_ship_with") or []:
+            lines.append(f"   ~ must ship with: {c}")
+
     lines.append("\nWhat this matrix CANNOT support:")
     lines += [f"   ! {s}" for s in report["cannot_support"]]
     lines.append("\nFidelity gaps (this replay is not production):")

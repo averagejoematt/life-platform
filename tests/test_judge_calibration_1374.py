@@ -79,6 +79,15 @@ def _all_pass_judge():
     return _stub(lambda msg: 95)
 
 
+_BAD_TEXTS = tuple(c["output_text"] for c in _CASES if c["label"] == jc.LABEL_DEFECTIVE)
+
+
+def _is_golden(user_message):
+    """True when the assembled prompt carries none of the defective outputs — the
+    stubs' only way to tell which case they are scoring."""
+    return not any(t in user_message for t in _BAD_TEXTS)
+
+
 # ── the corpus is real, labeled, and two-class ───────────────────────────────
 def test_corpus_is_not_empty_and_carries_both_classes():
     cases = jc.labeled_cases()
@@ -566,3 +575,157 @@ def test_the_deterministic_verdict_is_unchanged_by_this_story():
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AC3 — margin-aware gating: can an error margin be estimated at all? (#1374)
+#
+# The refusal these tests protect is the whole point. "Verdicts inside the
+# judge's known error margin don't hard-block" needs a KNOWN error margin, and
+# on a corpus whose two classes are polar by construction there is no labeled
+# data anywhere near the decision boundary to fit one to. A harness that emitted
+# a margin here would be manufacturing the exact kind of number #1374 exists to
+# stop. So the contract is: refuse, and say precisely what would change it.
+# ═══════════════════════════════════════════════════════════════════════════
+def test_the_polar_corpus_cannot_support_a_margin():
+    r = jc.run(call_haiku=_perfect_judge(), check_budget=False)
+    ma = r["margin_analysis"]
+    assert ma["verdict"] == jc.MARGIN_NOT_ESTIMABLE
+    assert ma["n_within_boundary_band"] < ma["min_boundary_cases"]
+    assert any("boundary region is empty" in x for x in ma["reasons"])
+    # A refusal without a route out is just a shrug.
+    assert "borderline" in ma["what_would_change_this"].lower()
+
+
+def test_a_populated_boundary_region_flips_the_margin_verdict():
+    """Mutation-proof, and the one that makes the refusal falsifiable: feed the
+    SAME corpus through a judge that scores everything into the boundary band and
+    the harness stops refusing. So NOT_ESTIMABLE is a property of where the scores
+    landed, not a hardcoded verdict."""
+    boundary = _stub(lambda msg: 62 if not any(c["output_text"] in msg for c in _CASES if c["label"] == jc.LABEL_DEFECTIVE) else 58)
+    ma = jc.run(call_haiku=boundary, check_budget=False)["margin_analysis"]
+    assert ma["n_within_boundary_band"] == N_ALL
+    assert ma["verdict"] == jc.MARGIN_ESTIMABLE
+
+
+def test_the_margin_locates_every_judge_error_and_its_distance_from_the_boundary():
+    """A margin band is a claim about the boundary; if the judge's actual errors are
+    nowhere near it, the band provably fixes nothing. Pin that the errors are found
+    and measured rather than asserted."""
+    leaked_case = next(c for c in _CASES if c["label"] == jc.LABEL_DEFECTIVE and c["expect_checks"] == ["anti_pattern"])
+    judge = _stub(lambda msg: 95 if leaked_case["output_text"] in msg else (90 if _is_golden(msg) else 10))
+    ma = jc.run(call_haiku=judge, check_budget=False)["margin_analysis"]
+    errs = {e["id"]: e for e in ma["errors"]}
+    assert leaked_case["id"] in errs, errs
+    assert errs[leaked_case["id"]]["kind"] == "missed_defect"
+    assert errs[leaked_case["id"]]["distance_from_threshold"] == 95 - 60
+    assert ma["n_errors_within_boundary_band"] == 0
+    assert any("is a boundary error" in x for x in ma["reasons"])
+
+
+def test_the_candidate_band_reports_its_leakage_as_an_upper_bound_not_a_zero():
+    """Zero observed leaks out of a finite n is not zero leakage. The band that
+    rescues a false-flagged golden must carry the 95% upper bound on how many real
+    defects could sit inside it — otherwise '0 defects leaked' reads as a safety
+    guarantee it is not."""
+    golden = next(c for c in _CASES if c["label"] == jc.LABEL_GOOD)
+    judge = _stub(lambda msg: 45 if golden["output_text"] in msg else (90 if _is_golden(msg) else 10))
+    ma = jc.run(call_haiku=judge, check_budget=False)["margin_analysis"]
+    band = ma["candidate_band"]
+    assert band["band"] == [45, 60]
+    assert band["goldens_rescued"] == 1
+    assert band["defects_released_observed"] == 0
+    assert band["leakage_upper_bound_95"] > 0.0, "a zero point estimate must not publish a zero bound"
+    assert band["defect_leakage_rate"]["denominator"] == N_BAD
+
+
+def test_separability_prices_the_last_uncaught_defect_in_goldens_held():
+    """The threshold sweep shows counts moving; this states the trade in the unit
+    that matters. If the surviving canary outscores good work, no threshold buys it
+    back — which is the evidence that the fix is rubric coverage, not tuning."""
+    leaked_case = next(c for c in _CASES if c["label"] == jc.LABEL_DEFECTIVE and c["expect_checks"] == ["anti_pattern"])
+    judge = _stub(lambda msg: 95 if leaked_case["output_text"] in msg else (90 if _is_golden(msg) else 10))
+    sep = jc.run(call_haiku=judge, check_budget=False)["separability"]
+    assert sep["separable_by_any_threshold"] is False
+    assert sep["highest_scoring_missed_defect"]["id"] == leaked_case["id"]
+    # Every golden scores 90, the survivor 95 — catching it costs all of them.
+    assert sep["goldens_that_would_be_held_to_catch_it"] == N_GOOD
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AC2 — publication. The door a number walks through to reach a public page.
+# ═══════════════════════════════════════════════════════════════════════════
+def test_the_publication_record_carries_n_and_an_interval_on_every_figure():
+    pub = jc.run(call_haiku=_perfect_judge(), check_budget=False)["publication_record"]
+    assert pub["publishable"] is True
+    assert pub["figures"], "a measured run with non-thin denominators must clear something"
+    for key, f in pub["figures"].items():
+        assert f["denominator"] >= jc.THIN_DENOMINATOR_N, key
+        assert len(f["ci95_wilson"]) == 2, key
+        assert str(f["denominator"]) in f["plain"] and "CI" in f["plain"], f["plain"]
+
+
+def test_a_thin_denominator_is_withheld_from_publication_not_softened():
+    """The exact error that started this issue: a bare specificity off a small
+    denominator reaching a public page. The door must close, not narrow."""
+    r = jc.run(call_haiku=_perfect_judge(), check_budget=False)
+    # Shrink the negatives below the floor, leaving everything else measured.
+    r["matrix"]["specificity_catches_defects"] = jc.rate(3, 4)
+    pub = r["publication_record"] = jc.publication_record(r)
+    assert "catches_induced_defects" not in pub["figures"]
+    assert any("catches_induced_defects" in w for w in pub["withheld"])
+    # And the artifact the site renders inherits the refusal — one honesty rule,
+    # one place, no chance for the renderer to re-decide it.
+    assert jc.site_artifact(r)["figures"].keys() == pub["figures"].keys()
+
+
+def test_an_unmeasured_run_publishes_nothing_at_all():
+    for verdict in (jc.NOT_RUN, jc.ERROR):
+        pub = jc.publication_record({"verdict": verdict})
+        assert pub["publishable"] is False and pub["figures"] == {}
+        assert jc.site_artifact({"verdict": verdict, "publication_record": pub}) is None
+
+
+def test_the_artifact_cannot_ship_a_figure_without_its_caveats():
+    """`must_ship_with` is not decoration: it is what stops the combined gate's
+    rates being quoted as the LLM judge's own discrimination."""
+    art = jc.site_artifact(jc.run(call_haiku=_perfect_judge(), check_budget=False))
+    assert art["schema"] == "judge_calibration/1"
+    assert len(art["must_ship_with"]) >= 3
+    joined = " ".join(art["must_ship_with"]).lower()
+    assert "not the llm judge's own discrimination" in joined
+    assert "hand-authored" in joined
+    assert art["margin"]["verdict"] == jc.MARGIN_NOT_ESTIMABLE
+
+
+def test_write_site_artifact_refuses_rather_than_truncating_a_good_one(tmp_path):
+    """A bad run must never blank the published page. Last quarter's honest numbers
+    beat this run's failure to measure."""
+    p = tmp_path / "judge_calibration.json"
+    p.write_text('{"kept": true}', encoding="utf-8")
+    out = jc.write_site_artifact({"verdict": jc.NOT_RUN}, path=str(p))
+    assert out["written"] is False and "nothing cleared" in out["reason"]
+    assert json.loads(p.read_text(encoding="utf-8")) == {"kept": True}
+
+
+def test_write_site_artifact_round_trips(tmp_path):
+    p = tmp_path / "judge_calibration.json"
+    r = jc.run(call_haiku=_perfect_judge(), check_budget=False)
+    assert jc.write_site_artifact(r, path=str(p))["written"] is True
+    assert json.loads(p.read_text(encoding="utf-8")) == jc.site_artifact(r)
+
+
+def test_the_published_artifact_in_the_repo_matches_the_harness_contract():
+    """The committed artifact the site renders is a real harness output, not a
+    hand-written file that drifted from the schema."""
+    path = jc.SITE_ARTIFACT_PATH
+    if not os.path.exists(path):
+        pytest.skip("no artifact published yet")
+    with open(path, encoding="utf-8") as fh:
+        art = json.load(fh)
+    assert art["schema"] == "judge_calibration/1"
+    assert art["corpus"]["n_total"] == N_ALL, "the published artifact is stale — re-run --publish"
+    for key, f in art["figures"].items():
+        assert f["denominator"] >= jc.THIN_DENOMINATOR_N, key
+        assert f["ci95_wilson"][0] < f["ci95_wilson"][1], key
+    assert art["must_ship_with"]

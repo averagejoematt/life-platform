@@ -404,7 +404,12 @@ def main(argv=None):
     ap.add_argument(
         "--judge-calibration",
         action="store_true",
-        help="calibrate the LLM QUALITY GATE judge against the 35 labeled fixtures (#1374; Bedrock spend)",
+        help="calibrate the LLM QUALITY GATE judge against the labeled fixtures (#1374; Bedrock spend)",
+    )
+    ap.add_argument(
+        "--publish",
+        action="store_true",
+        help="with --judge-calibration: write the reader-facing artifact to site/data/judge_calibration.json (#1374 AC2)",
     )
     args = ap.parse_args(argv)
 
@@ -418,7 +423,12 @@ def main(argv=None):
         import judge_calibration as jc
 
         creport = jc.run()
+        if args.publish:
+            creport["published"] = jc.write_site_artifact(creport)
         print(json.dumps(creport, indent=2, default=str) if args.json else jc.text_report(creport))
+        if args.publish and not args.json:
+            p = creport["published"]
+            print(f"\nPublish: {'wrote ' + p['path'] if p['written'] else 'REFUSED — ' + p['reason']}")
         return 1 if creport["verdict"] == jc.ERROR else 0
 
     report = run(judge=args.judge)

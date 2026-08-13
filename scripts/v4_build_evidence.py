@@ -933,8 +933,42 @@ OG_CARD_BY_SLUG = {
 }
 
 
+JUDGE_CAL_ARTIFACT = Path(__file__).resolve().parent.parent / "site" / "data" / "judge_calibration.json"
+
+
+def judge_calibration_block() -> str:
+    """#1374 AC2 — the quality-gate judge's own sensitivity/specificity, inlined.
+
+    Read from the artifact `tests/judge_calibration.py --publish` writes, so the
+    published figures cannot be hand-typed here and drift from the measurement.
+    Inlined into the shell rather than fetched because the evidence pages navigate
+    between topics client-side: a topic-scoped fetch would leave the panel empty on
+    every arrival except a cold load of /method/calibration/ itself.
+
+    A COMPACT projection — the full record (per-error scores, the margin analysis,
+    the separability finding) stays at /data/judge_calibration.json, which the panel
+    links to. Absent artifact ⇒ empty string ⇒ the panel renders its honest
+    "not measured" state, never a stale hardcoded number.
+    """
+    try:
+        art = json.loads(JUDGE_CAL_ARTIFACT.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    compact = {
+        "measured_at": art.get("measured_at"),
+        "instrument": art.get("instrument"),
+        "corpus_n": (art.get("corpus") or {}).get("n_total"),
+        "figures": art.get("figures") or {},
+        "must_ship_with": art.get("must_ship_with") or [],
+        "margin_verdict": (art.get("margin") or {}).get("verdict"),
+        "margin_reason": ((art.get("margin") or {}).get("reasons") or [""])[0],
+    }
+    return f"\nwindow.__JUDGE_CALIBRATION__ = {json.dumps(compact)};"
+
+
 def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof: str = "", og: dict | None = None) -> str:
     reg = json.dumps(registry_json(pillar["groups"]))
+    judge_cal = judge_calibration_block() if any(s.get("slug") == "calibration" for s in registry_json(pillar["groups"])) else ""
     og_image = f"https://averagejoematt.com/assets/images/{OG_CARD_BY_SLUG.get(start_slug, 'og-home.png')}"
     # #1395: the door HUBS carry a data-driven OG override (a dated, falsifiable number
     # in the title/description) + a <noscript> static core; the topic shells keep the
@@ -998,7 +1032,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
   </main>
   {footer_for(pillar["nav_key"])}
   <script>window.__EVIDENCE_REGISTRY__ = {reg}; window.__START_SLUG__ = {json.dumps(start_slug)};
-window.__ARCHIVE_BASE__ = {json.dumps(pillar["base"])}; window.__ARCHIVE_DOOR__ = {json.dumps(pillar["door"])}; window.__ARCHIVE_TITLE__ = {json.dumps(pillar["title"])};</script>
+window.__ARCHIVE_BASE__ = {json.dumps(pillar["base"])}; window.__ARCHIVE_DOOR__ = {json.dumps(pillar["door"])}; window.__ARCHIVE_TITLE__ = {json.dumps(pillar["title"])};{judge_cal}</script>
   {MOTION_SCRIPT}
   <script type="module" src="/assets/js/evidence.js"></script>
 </body>
