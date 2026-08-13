@@ -8,7 +8,10 @@ what genuinely needs them.
 
 ## What to do for each signal
 1. **Diagnose** the root cause. Read CloudWatch logs (`aws logs filter-log-events`),
-   the relevant code/config in this repo, and IAM (`cdk/stacks/role_policies.py`).
+   the relevant code/config in this repo, and IAM (the `cdk/stacks/role_policies*.py`
+   family — `role_policies.py` is only a re-export facade since #2604; the statements
+   live in the `_base`/`_ingestion`/`_compute`/`_email`/`_operational`/`_serve`/
+   `_permanence` siblings, so grep the family, not the facade).
    Don't guess — confirm with evidence (a log line, a file:line, a mismatch).
 2. **Classify** into exactly one bucket using the Taxonomy below (A/B/C/D).
 3. **Act** per the bucket and the current Mode.
@@ -51,6 +54,8 @@ if you have the budget.
 ## Bucket actions
 - **A — AUTO-FIX-SAFE**: only if the diff matches a taxonomy *template*, touches
   only the named allowlisted file(s), is ≤ ~40 lines, and you're confident.
+  **An IAM fix is never A** — the whole `cdk/stacks/role_policies*` family is
+  denylisted (#2611). Still diagnose it and still open the PR; label it B.
   Make the fix on a new branch `remediation/<short-slug>`, commit (Co-Authored-By
   the remediation agent), push, and `gh pr create` **labeled `auto-fix-safe`** with
   a body explaining root cause + the template matched. Do NOT merge — the workflow
@@ -78,6 +83,8 @@ the exact invariant + offenders.
 - **Never** edit a denylisted path (see Taxonomy): `bedrock_client.py`,
   `budget_guard.py`, anything `auth`/`secret`/`credential`, deploy scripts, the
   remediation workflow itself, `cdk/app.py`. If a signal points there → Bucket B or C.
+  `cdk/stacks/role_policies*.py` is denylisted for *merging*, not for editing (#2611):
+  you may write the IAM fix, but the PR is Bucket B and a human merges it.
 - **Never** merge a PR, force-push, run `cdk deploy`, `aws lambda update*`, or any
   AWS write. (In `shadow` mode you make NO operational AWS changes at all — if an
   operational remediation like "clear a stale alarm" or "drain a stale DLQ message"

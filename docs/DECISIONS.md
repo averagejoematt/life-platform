@@ -2031,8 +2031,8 @@ A separate post-agent workflow step (`remediation/automerge.py`) is the **only**
 
 1. SSM `/life-platform/remediation-mode == auto` AND budget tier < 3.
 2. Every changed file matches the ALLOWLIST (specific change templates, not "any small diff"):
-   `cdk/stacks/role_policies.py`, `ci/lambda_map.json`, `cdk/stacks/monitoring_stack.py`, `lambdas/emails/freshness_checker_lambda.py`, `lambdas/operational/qa_smoke_lambda.py`, `tests/`.
-3. No file matches the DENYLIST: substrings `bedrock_client`, `budget_guard`, `secret`, `credential`, `auth`, `deploy/`, `setup_github_oidc`, `setup_remediation_role`, `.github/workflows/`, `cdk/app.py`, `cdk/stacks/core_stack.py`, `remediation/`.
+   `ci/lambda_map.json`, `cdk/stacks/monitoring_stack.py`, `lambdas/emails/freshness_checker_lambda.py`, `lambdas/operational/qa_smoke_lambda.py`, `tests/`. (IAM was the sixth entry until 2026-08-13 — see the amendment below.)
+3. No file matches the DENYLIST: substrings `bedrock_client`, `budget_guard`, `secret`, `credential`, `auth`, `deploy/`, `setup_github_oidc`, `setup_remediation_role`, `.github/workflows/`, `cdk/app.py`, `cdk/stacks/core_stack.py`, `remediation/`, `cdk/stacks/role_policies`.
 4. Diff ≤ 60 lines, no new non-test top-level files.
 5. `flake8 --select=E9,F63,F7,F82` + the offline unit-test subset (`test_role_policies`, `test_lambda_handlers`, `test_layer_version_consistency`, `test_iam_secrets_consistency`, `test_shared_modules`) pass on the PR branch — **because GITHUB_TOKEN PRs don't trigger `ci-cd.yml`**, so CI-green can't be checked via `gh pr checks`. The gate runs the checks itself before merging; CI re-runs them on main after merge.
 6. Per-day merge cap (3) not reached.
@@ -2050,6 +2050,21 @@ If a PR fails any check, it stays open with a `🤖 auto-merge gate held` commen
 - Lint + unit-tests gate every merge, so a syntactically broken or consistency-violating "fix" can't reach main.
 - Production deploy stays human-approved → no auto-deploy to prod without a click.
 - Every gate decision logged to S3 with the diff (`remediation-log/automerge/YYYY/MM/DD/`), giving a complete audit trail.
+
+### Amendment 2026-08-13 (#2611) — IAM leaves the ALLOWLIST; the grant is priced with the `shadow` → `auto` promotion
+
+Rule 2's first entry was `cdk/stacks/role_policies.py`, carrying the missing-IAM-grant template. **#2604 split that module into per-domain siblings behind a re-export facade**, so the exact-path entry stopped matching where policies actually live and the gate began failing closed on every IAM auto-fix. That was *discovered*, not decided.
+
+**The decision is that ADR-129's `shadow` → `auto` re-promotion owns this grant, not a refactor's follow-up.** Restoring the old capability would not be a rename: one file has become eight (`role_policies.py` plus `_base/_ingestion/_compute/_email/_operational/_serve/_permanence`), and handing an unattended gate eight IAM files is a change in trust posture. ADR-129 already stands a numeric 10-consecutive-clean-run bar and an explicit operator SSM flip between the agent and self-merging anything; IAM belongs in that conversation.
+
+Concretely:
+
+- **The facade came off the ALLOWLIST too — the unattended IAM surface is 1 → 0, not 1 → 8.** Leaving it would have been worse than useless: `role_policies.py` is a live module, so a policy function written *into the facade* would have auto-merged while the sibling edit the agent actually wants was held.
+- **The family is denied by PREFIX** (`cdk/stacks/role_policies` in `DENYLIST_SUBSTR`) — derived, so a ninth sibling is covered the day it is created. Deliberately not the bare substring `role_policies`, which would also deny `tests/test_role_policies.py`, a legitimate companion under the `tests/` allowlist entry.
+- **The held reason is legible.** `DENYLIST_REASONS` attaches the decision to the denial, so a held IAM PR says why it is held rather than reading like an oversight.
+- **Missing-IAM-grant moves Bucket A → Bucket B** in `docs/REMEDIATION_TAXONOMY.md`. The agent still diagnoses IAM and still opens the PR; it labels it `needs-review` and a human merges. Nothing about the platform's IAM correctness gates changes — `tests/test_role_policies.py` and the rest still run.
+
+**Revisit trigger:** the operator's `shadow` → `auto` flip. Whoever runs that promotion decides, in the same act, whether the agent may merge IAM — and if the answer is yes, the entry that comes back must be a `cdk/stacks/role_policies*.py` glob, never a hand-list.
 
 **Scope note (ADR-136, 2026-07-18).** "No auto-deploy to prod without a click" describes the **Lambda/CDK deploy path** (`ci-cd.yml`'s `Deploy` job, `environment: production`) only. The static site (`site/**`) deploys automatically on merge with no approval gate — a separate, deliberately chosen posture with its own compensating controls (smoke + visual/AI-QA + auto-rollback). See ADR-136.
 
