@@ -97,11 +97,26 @@ def test_site_deploy_uses_same_pinned_actions_as_ci_cd():
 
 def test_site_deploy_playwright_pin_matches_ci_cd():
     """visual-qa steps are mirrored across ci-cd.yml / visual-qa.yml / site-deploy.yml —
-    the Playwright pin must not drift between the copies (CQ-01 class)."""
-    site_pins = set(re.findall(r"playwright==([0-9][0-9A-Za-z.\-]*)", _read(_SITE_DEPLOY)))
-    ci_pins = set(re.findall(r"playwright==([0-9][0-9A-Za-z.\-]*)", _read(_CI_CD)))
-    assert site_pins, "playwright not pinned in site-deploy.yml"
-    assert site_pins <= ci_pins, f"playwright pin drifted: site-deploy={sorted(site_pins)} vs ci-cd={sorted(ci_pins)}"
+    the Playwright version must not drift between the copies (CQ-01 class).
+
+    #2609 removed the drift rather than comparing it: no workflow carries a version any
+    more, all three resolve playwright from requirements-dev.txt via scripts/ci_pins.py.
+    So the assertion is identity of source plus the absence of a re-introduced literal,
+    which is strictly stronger than the old set-subset comparison.
+    """
+
+    def resolves_playwright(path):
+        return [args for args in re.findall(r"ci_pins\.py([^)\n]*)", _read(path)) if "playwright" in args.split()]
+
+    def literals(path):
+        return sorted(set(re.findall(r"playwright==([0-9][0-9A-Za-z.\-]*)", _read(path))))
+
+    assert resolves_playwright(_SITE_DEPLOY), "site-deploy.yml no longer resolves playwright from requirements-dev.txt (#2609)"
+    assert resolves_playwright(_CI_CD), "ci-cd.yml no longer resolves playwright from requirements-dev.txt (#2609)"
+    for path, name in ((_SITE_DEPLOY, "site-deploy.yml"), (_CI_CD, "ci-cd.yml")):
+        assert not literals(
+            path
+        ), f"{name} hardcodes a playwright version again ({literals(path)}) — resolve it instead, or the copies can drift (#2609)"
 
 
 def test_ci_cd_no_longer_owns_the_site_deploy():
