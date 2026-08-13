@@ -1,0 +1,8 @@
+{
+ "_note": "#2632 suppression list for scripts/verify_bundle_boot.py --compare. ONLY probe-environment gaps belong here: a dependency that reaches the Lambda from a LAYER and therefore can never be in the bundle. NOT a place to park a real bundle-shape failure. Every entry is printed on every run. Adding one is a reviewed diff; justify it in the PR.",
+ "_note_pillow": "Pillow ships as a Lambda layer, never in the code bundle. These four modules import PIL at module scope, so they fail the probe in any environment without Pillow installed - which is the pre-merge lane (it installs pytest/boto3/botocore/black/hypothesis/pyyaml/mypy/ruff and nothing else). On a workstation with Pillow the probe reports 0/397 and these show up as 'now import cleanly'.",
+ "web.card_engine": "ModuleNotFoundError: No module named 'PIL'",
+ "web.og_coach_cards": "ModuleNotFoundError: No module named 'PIL'",
+ "web.og_image_lambda": "ModuleNotFoundError: No module named 'PIL'",
+ "web.portrait_raster": "ModuleNotFoundError: No module named 'PIL'"
+}

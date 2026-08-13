@@ -231,16 +231,57 @@ def zip_dir(src_dir, zip_path):
     return zip_path
 
 
+def verify_boot(out_dir, shape):
+    """Import every module out of the bundle we just staged (#2632).
+
+    WHY HERE. scripts/verify_bundle_boot.py existed since #1653 and was wired to
+    nothing — the census that found it (#2631) flagged it `unreferenced-entrypoint`.
+    This is the right call site because the staged bundle *exists* at this moment:
+    the gate reads the real artifact instead of rebuilding a copy of it, and it
+    runs before the first AWS mutation in every deploy script (all `set -e`).
+
+    It is in main(), NOT in stage_tree()/stage_mcp(), on purpose. CDK imports those
+    two directly at synth time and must not pay for a boot probe on every synth —
+    and CDK's asset is checked by CI's own pre-merge run of the same script.
+
+    Measured cost: 4.0-4.8s (397 modules tree / 436 mcp) — negligible next to the
+    S3 upload and update-function-code calls that follow.
+
+    Escape hatch: SKIP_BUNDLE_BOOT_CHECK=1, or --no-verify-boot. Both print why.
+    """
+    if os.environ.get("SKIP_BUNDLE_BOOT_CHECK"):
+        print("⏭️  bundle-boot check SKIPPED (SKIP_BUNDLE_BOOT_CHECK is set) — the bundle is NOT proven to import")
+        return 0
+    sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
+    import verify_bundle_boot
+
+    print("🔎 Bundle-boot gate (#2632): importing every staged module with Lambda's sys.path …")
+    return verify_bundle_boot.gate_staged_bundle(out_dir, shape=shape)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", required=True, help="staging directory (recreated fresh)")
     ap.add_argument("--mcp", action="store_true", help="stage the MCP bundle shape")
     ap.add_argument("--zip", dest="zip_path", help="also produce a zip at this path")
+    ap.add_argument(
+        "--no-verify-boot",
+        action="store_true",
+        help="skip the #2632 bundle-boot gate (the bundle is then NOT proven to import)",
+    )
     args = ap.parse_args()
 
     out = stage_mcp(args.out) if args.mcp else stage_tree(args.out)
     n_files = sum(len(f) for _, _, f in os.walk(out))
     print(f"✅ Staged {'mcp' if args.mcp else 'tree'} bundle: {n_files} files → {out}")
+
+    # Before the zip, so a bundle that cannot boot never becomes a deployable artifact.
+    if args.no_verify_boot:
+        print("⏭️  bundle-boot check SKIPPED (--no-verify-boot) — the bundle is NOT proven to import")
+    elif verify_boot(out, "mcp" if args.mcp else "tree") != 0:
+        print("❌ Refusing to package a bundle that cannot boot. Fix the import above, or see #2632.", file=sys.stderr)
+        sys.exit(1)
+
     try:
         with open(os.path.join(out, BUILD_INFO_NAME), encoding="utf-8") as f:
             bi = json.load(f)
