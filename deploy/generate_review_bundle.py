@@ -211,9 +211,13 @@ def build_bundle():
     sections.append(read_file(CDK_DIR / "stacks" / "lambda_helpers.py", max_lines=MAX_CODE_LINES))
     sections.append("```\n\n")
 
-    # role_policies.py (first 80 lines — the security contract)
-    sections.append("### cdk/stacks/role_policies.py (first 80 lines)\n```python\n")
+    # The IAM security contract. #2604 split role_policies.py into per-domain siblings, so
+    # the facade's head is a module map and the actual statements start in _base + ingestion.
+    sections.append("### cdk/stacks/role_policies.py (the facade — module map + re-exports)\n```python\n")
     sections.append(read_file(CDK_DIR / "stacks" / "role_policies.py", max_lines=MAX_CODE_LINES))
+    sections.append("```\n\n")
+    sections.append("### cdk/stacks/role_policies_base.py (shared ARNs + statement helpers)\n```python\n")
+    sections.append(read_file(CDK_DIR / "stacks" / "role_policies_base.py", max_lines=MAX_CODE_LINES))
     sections.append("```\n\n")
 
     # CI/CD pipeline (include full content — most commonly re-flagged item)

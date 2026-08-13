@@ -370,7 +370,7 @@ Active role categories (approx counts):
 - **Coach Intelligence roles (8):** DDB read/write on COACH#/ENSEMBLE#/NARRATIVE# partitions, S3 read on config/coaches/*, ai-keys
 - **Operational roles (14+):** scoped per function
 - **Site API role:** DDB primarily read-only (`GetItem, Query`) + limited `PutItem` for interactive features (votes, follows, checkins), `kms:Decrypt`, S3 `site/config/*`, Secrets read (`site-api-ai-key` only) — **NO Scan**
-- **`dynamodb:Scan` is granted, deliberately, to exactly three operational roles** (`cdk/stacks/role_policies.py`): `life-platform-data-export` and `life-platform-data-reconciliation` (whole-table reads are their job) and `life-platform-delete-user-data` (it must find every item belonging to a user). No serving, ingest, compute or coach role has it. The un-audited fallback branch in `lambda_helpers.py` also lists Scan, but no deployed function reaches it — every function passes either `custom_policies=` or an explicit `role=`.
+- **`dynamodb:Scan` is granted, deliberately, to exactly three operational roles** (`cdk/stacks/role_policies_operational.py`, re-exported by the `role_policies.py` facade): `life-platform-data-export` and `life-platform-data-reconciliation` (whole-table reads are their job) and `life-platform-delete-user-data` (it must find every item belonging to a user). No serving, ingest, compute or coach role has it. The un-audited fallback branch in `lambda_helpers.py` also lists Scan, but no deployed function reaches it — every function passes either `custom_policies=` or an explicit `role=`.
 - No role has cross-account permissions
 
 ---

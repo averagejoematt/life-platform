@@ -1,7 +1,7 @@
 # Secrets Map — central reference for source → secret mapping
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-02
-> **Sources of truth:** `aws secretsmanager list-secrets --region us-west-2` (inventory) · `grep -rln "life-platform/<name>" lambdas/ mcp/ cdk/` (consumers) · `cdk/stacks/role_policies.py` (IAM grants)
+> **Sources of truth:** `aws secretsmanager list-secrets --region us-west-2` (inventory) · `grep -rln "life-platform/<name>" lambdas/ mcp/ cdk/` (consumers) · `cdk/stacks/role_policies*.py` (IAM grants — the facade plus its per-domain siblings, #2604)
 
 **Reconciled against AWS Secrets Manager on 2026-08-02** (#1957 — re-read live via
 `python3 deploy/sync_doc_metadata.py --refresh-secrets`, which also rewrites the
