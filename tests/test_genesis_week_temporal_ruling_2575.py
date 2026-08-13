@@ -67,15 +67,33 @@ def test_the_design_copy_clause_is_no_longer_pre_start_scoped():
     )
 
 
-def test_the_wake_date_frame_clause_exists_and_is_scoped():
-    """(b) The new clause — and the scope that keeps it from being a blanket suppression."""
+def test_the_wake_date_frame_clause_survives_for_PAGE_PROSE():
+    """(b) The clause, as #2613's retirement left it.
+
+    The clause still exists, because HTML pages are still the LLM's: no deterministic
+    rule reads a night narrated in page prose. What left it is the JSON half — on the
+    four code-swept API payloads the whole pre-cycle-date question is now
+    phase_plausibility's (R6/R7), so the rubric no longer names `night_of`, no longer
+    argues about a surface's payload, and no longer carries the two residual promises.
+    Those promises did not evaporate; they became code, asserted just below.
+    """
     rubric = _rubric()
-    assert "night_of" in rubric and "the day BEFORE the cycle start" in rubric
-    # Scoped: exactly one night, on a surface dated at or after genesis.
-    assert "on a surface dated on or after the cycle start" in rubric
-    # Not blanket: the two things that stay flaggable are named in the same clause.
-    assert "precedes the cycle start by MORE than one day" in rubric
-    assert "pre-cycle measurement" in rubric
+    assert "the day BEFORE the cycle start" in rubric
+    assert "on a page dated on or after the cycle start" in rubric
+
+
+def test_the_clauses_two_residual_promises_are_now_CODE():
+    """#2613: "still flag a night that precedes the cycle start by MORE than one day"
+    left the rubric and became R7 — which, unlike a prose clause, cannot be argued with.
+
+    Day 1's own payload is the fixture: `night_of` one day before genesis passes (the
+    #1923 frame), two days before reds.
+    """
+    genesis = DAY_1_PHASE["start_date"]
+    assert pp.check_payload("/api/sleep_detail", SLEEP_DETAIL_DAY1, 1, strict=True, start_date=genesis) == []
+    two_days_early = dict(SLEEP_DETAIL_DAY1, night_of="2026-08-08")
+    bad = pp.check_payload("/api/sleep_detail", two_days_early, 1, strict=True, start_date=genesis)
+    assert len(bad) == 1 and bad[0]["severity"] == "high" and "names a night before" in bad[0]["note"]
 
 
 def test_the_deterministic_layer_already_passes_the_disputed_payload():

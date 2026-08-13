@@ -14,6 +14,7 @@ import logging
 import os
 import urllib.request
 
+from operational import reader_truth_qa
 from operational.qa_check import CONTENT_TRUTH, Check, summarize_findings
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,10 @@ READER_TRUTH_APIS = [
 # #1937: /api/journey, /api/glucose, /api/sleep_detail joined once their
 # handlers anchored "today" in Pacific (matching vitals' contract — clamped to
 # genesis, no legitimate prior-cycle narration).
-STRICT_PLAUSIBILITY_APIS = {"/api/vitals", "/api/journey", "/api/glucose", "/api/sleep_detail"}
+# #2613: DERIVED, not restated. This is the same set whose pre-cycle-date question
+# the LLM rubric no longer adjudicates, so the two passes' division of labour is one
+# list — adding a strict payload here can never leave the rubric still judging it.
+STRICT_PLAUSIBILITY_APIS = reader_truth_qa.CODE_OWNED_TEMPORAL_SURFACES
 
 # #1985: FROZEN story artifacts — documents whose text is deliberately preserved
 # as filed. They are allowed to quote a superseded figure; they are not allowed

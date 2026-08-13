@@ -20,6 +20,17 @@ audience_violation, and prose-level temporal_contradiction in human sentences
 (word-numbers — "seven days of an experiment", #1897 — remain the LLM's, since
 "seven" is not arithmetic until something parses it).
 
+#2613 EXTENDS THAT LINE FROM NUMBERS TO DATES, on the same argument and after the
+same kind of measurement. On the four STRICT live payloads this module sweeps, the
+pre-cycle-DATE question is now owned here in full — R6 (a dated row may not predate
+the cycle start) and R7 (a night-scoped field may reach genesis-1 and no further) —
+and the LLM rubric no longer adjudicates it (reader_truth_qa.CODE_OWNED_TEMPORAL_SURFACES).
+Two rules deciding one question is strictly worse than the deterministic one alone:
+the LLM raised the same false pre-genesis accusation against a CORRECT wake-date frame
+in 3/3 runs before a rubric clause, 3/3 after it, and 4/5 with an in-payload disclosure
+as well. Everything else stays with the LLM — HTML pages, the narrative /api/coaches
+payload, and every non-date temporal question on the strict payloads themselves.
+
 Findings are emitted in reader_truth's canonical shape
 ({"page", "category", "severity", "note"}) so both passes route through one
 reporting path in qa_smoke's Reader Truth check (partition content_truth,
@@ -28,6 +39,7 @@ ADR-147 — a finding here never reverts a deploy).
 
 import json
 import re
+from datetime import date, timedelta
 
 from web.window_registry import INTENSIVE, REGISTRY, window_days
 
@@ -61,6 +73,63 @@ _DAY_CLAIM_KEYS = {"day_n", "experiment_day", "cycle_day"}
 # with no legitimate prior-cycle narration, while a narrative payload (/api/coaches)
 # may legitimately carry rows dated in a labeled earlier cycle.
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# ── R7 (#2613, the retirement): a night-scoped date may reach genesis-1, no further ──
+#
+# R6's sibling, and the reason retiring the pre-cycle-date class from the LLM rubric is
+# not a coverage cut. The rubric's genesis clauses did not only exempt — they carried two
+# explicit RESIDUAL promises: "still flag a night that precedes the cycle start by MORE
+# than one day", and "a row whose night precedes the cycle start by more than one day".
+# Those promises are transferred here verbatim rather than deleted with the clause.
+#
+# The one-day allowance IS the #1923 wake-date frame: sleep/recovery figures are keyed to
+# the MORNING they were recorded against, so the night behind Day 1's morning is
+# necessarily the evening before Day 1. Two days before is not a frame, it is a leak.
+#
+# `sleep_start` is a UTC instant, so its date part is compared, not its clock time — a PT
+# bedtime on the evening of genesis-1 lands on genesis in UTC, and the one-day floor
+# absorbs the other direction. Bare ISO dates (`night_of`) compare directly.
+_NIGHT_DATE_KEY_RE = re.compile(r"(?:^|_)(?:night_of|sleep_start)$")
+_ISO_DATE_PREFIX_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
+
+
+def _night_floor(start_date):
+    """The earliest night a live surface may legitimately name: the cycle start minus one."""
+    return (date.fromisoformat(start_date) - timedelta(days=1)).isoformat()
+
+
+def _pre_genesis_night_findings(page, payload, start_date):
+    """R7 — a night-scoped date field may name the night before genesis, never earlier."""
+    floor = _night_floor(start_date)
+    findings = []
+    for obj_path, obj in _objects(payload):
+        if not isinstance(obj, dict):
+            continue
+        # A row R6 has already red-flagged is not reported twice: R6 owns that row, and
+        # its bedtime is necessarily early too. One defect, one finding.
+        own_date = obj.get("date")
+        if isinstance(own_date, str) and _ISO_DATE_RE.match(own_date) and own_date < start_date:
+            continue
+        for key, value in obj.items():
+            if not isinstance(value, str) or not _NIGHT_DATE_KEY_RE.search(key):
+                continue
+            m = _ISO_DATE_PREFIX_RE.match(value)
+            if not m or m.group(1) >= floor:
+                continue
+            path = f"{obj_path}.{key}" if obj_path else key
+            findings.append(
+                {
+                    "page": page,
+                    "category": "temporal_contradiction",
+                    "severity": "high",
+                    "note": (
+                        f"{path} = {value} names a night before {floor} — a wake-date-keyed figure may reach the "
+                        f"evening before the cycle start {start_date} (#1923) and no further, so a night two or "
+                        f"more days early is a pre-cycle measurement presented as this cycle's (#2613)"
+                    ),
+                }
+            )
+    return findings
 
 
 def _pre_genesis_row_findings(page, payload, start_date):
@@ -209,9 +278,9 @@ def check_payload(page, payload, day_n, strict=False, start_date=None):
         page: the surface path, used verbatim in findings (reader_truth shape).
         payload: the parsed JSON object.
         day_n: 1-indexed current experiment day (reader_truth_qa.phase_context).
-        strict: also apply the bare "Day N" prose rule to string values, and R6.
-        start_date: the cycle start (phase_context's `start_date`), for R6. Omitted
-            => R6 is skipped: a rule with no genesis to compare against must not
+        strict: also apply the bare "Day N" prose rule to string values, and R6/R7.
+        start_date: the cycle start (phase_context's `start_date`), for R6/R7. Omitted
+            => both are skipped: a rule with no genesis to compare against must not
             guess one (the same fail-soft posture as the rest of this module).
 
     Returns a list of {"page", "category", "severity", "note"} findings.
@@ -223,11 +292,12 @@ def check_payload(page, payload, day_n, strict=False, start_date=None):
     # R5 runs FIRST and outside the pre-start guard: it asks whether a figure names its
     # night, which is not a question about the experiment day (see the block above).
     findings = _night_label_findings(page, payload)
-    # R6 (#2613) is likewise phase-independent — "before genesis" is a date comparison,
-    # not a day count — so it runs outside the pre-start guard too. A FUTURE genesis
-    # (#931/#939) is precisely when a stale prior-cycle row is most likely to leak.
+    # R6/R7 (#2613) are likewise phase-independent — "before genesis" is a date
+    # comparison, not a day count — so they run outside the pre-start guard too. A FUTURE
+    # genesis (#931/#939) is precisely when a stale prior-cycle row is most likely to leak.
     if strict and start_date:
         findings.extend(_pre_genesis_row_findings(page, payload, start_date))
+        findings.extend(_pre_genesis_night_findings(page, payload, start_date))
     if not day_n or day_n < 1:
         return findings
     for path, key, value in _walk(payload):

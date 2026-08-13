@@ -93,6 +93,42 @@ CATEGORIES = (
 
 SEVERITIES = ("low", "med", "high")
 
+# #2613: the surfaces whose PRE-CYCLE-DATE question is owned by code, not by the
+# rubric. These are exactly the payloads qa_check_reader_truth sweeps STRICTLY
+# through phase_plausibility (R6: no row dated before the cycle start; R7: no
+# night-scoped field reaching further back than genesis-1), which imports this set
+# rather than keeping its own copy — one list, so the two passes' division of
+# labour cannot drift apart silently.
+CODE_OWNED_TEMPORAL_SURFACES = frozenset(
+    {
+        "/api/vitals",
+        "/api/journey",
+        "/api/glucose",
+        "/api/sleep_detail",
+    }
+)
+
+# An ISO date cited as evidence inside a model's note (not a phrase match — the
+# comparison below is a date comparison).
+_NOTE_ISO_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+
+
+def is_code_owned_temporal(finding, start_date):
+    """True when `finding` is the pre-cycle-date class phase_plausibility R6/R7 owns.
+
+    Three structural conditions, all required: the finding is a temporal_contradiction,
+    it is against a payload the deterministic pass sweeps strictly, and its own cited
+    evidence includes a date at or before the cycle start. A finding on an HTML page,
+    on /api/coaches, or one citing only in-cycle dates (a summary disagreeing with a
+    trend row, two surfaces disagreeing about today) is NOT this class and survives.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    if finding.get("page") not in CODE_OWNED_TEMPORAL_SURFACES:
+        return False
+    return any(d <= start_date for d in _NOTE_ISO_DATE_RE.findall(finding.get("note") or ""))
+
+
 # Batch 4-6 surfaces per call so the duplicated-narrative check sees pages
 # side-by-side (a single-page call structurally cannot catch duplication).
 DEFAULT_BATCH_SIZE = 5
@@ -239,30 +275,54 @@ def _phase_line(phase):
 # layer has already cleared. R6 checks the row's own `date`; the clause exempts the
 # NIGHT behind a genesis-dated row. They cover disjoint halves of the same question.
 #
-# ── MEASURED, AND IT IS NOT ENOUGH. Read this before trusting the clause. ─────
-# The clause above is the RULING, and it is recorded because the ledger is how this
-# module records rulings. It is NOT a working suppression, and the numbers say so.
-# Measured 2026-08-13 against the live surface set at the real call site (Haiku, the
-# nightly's own batching):
+# ── THE CLAUSE DID NOT WORK, SO THE CLASS IS RETIRED (#2613, 2026-08-13) ──────
+# Measured against the live surface set at the real call site (Haiku, the nightly's
+# own batching), the ruling above did NOT silence the finding:
 #     before any change ................ 3 of 3 runs raised the high finding
-#     + this clause .................... 3 of 3 runs still raised it
+#     + the ruling clause .............. 3 of 3 runs still raised it
 #     + the payload disclosure too ..... 4 of 5 runs still raised it
-# (the 5-run batch also drifted onto two OTHER already-ruled clauses — the Home
-# design copy and the "··" glyph — which is its own signal about prose clauses.)
-#
+#     + this branch's own re-baseline .. 3 of 6 runs (same code, wider n)
 # The model does not miss the clause; it re-derives the accusation FROM the payload's
 # own `trend_note`, quoting it approvingly in the same sentence that flags it. A
 # false-positive class that survives both a rubric clause and an explicit in-payload
-# disclosure is not a wording problem, and widening the prose further is the exact
+# disclosure is not a wording problem, and widening the prose further was the exact
 # failure mode #2613 was told to avoid.
 #
-# THE REAL FIX, NOT DONE HERE: retire this class from the LLM the way #1922 retired
-# `impossible_number` after the model mis-graded `weight_delta_window_days: 5` six
-# times with six different rationales. The deterministic half already owns the
-# answerable question (R6 above), so the LLM is adjudicating something code has
-# already decided — precisely the ADR-105 inversion #1922 corrected. That is a
-# scoped change to the category set and the two passes' division of labour, and it
-# needs its own issue rather than being smuggled in behind a clause edit.
+# So the class is RETIRED from the LLM, exactly as #1922 retired `impossible_number`
+# after the model mis-graded `weight_delta_window_days: 5` six times with six
+# different rationales. #1922's line was "numbers in a strict payload are code's";
+# this extends it to "and so are the DATES". Per ADR-105 the deterministic layer
+# leads, and R6/R7 have already decided this question — arithmetic, run identically
+# every time, never budget-paused — so an LLM verdict on the same question is not a
+# second opinion, it is a competing one, and the measured record says it is the
+# unreliable one.
+#
+# HOW THE RETIREMENT IS ENFORCED — and why prose alone could not do it. #1922 could
+# retire a whole CATEGORY (drop it from CATEGORIES, drop its name from the prompt).
+# Here the category survives: prose temporal contradictions are still the LLM's. What
+# is retired is one LOCUS × one CLASS — pre-cycle DATES on the four code-swept strict
+# payloads — so the prompt states the division (below) AND `assess_prose` drops any
+# finding that still comes back in it (`is_code_owned_temporal`). The drop is
+# structural, not a phrase match: the page must be a code-swept payload and the note
+# must cite an ISO date at or before the cycle start. Every drop is printed.
+#
+# WHAT IS *NOT* RETIRED, stated so the reduction is legible:
+#   · HTML pages keep the whole class — R6/R7 read JSON payloads only, so nothing
+#     code-owned covers a pre-genesis date narrated in page prose. The wake-date
+#     exemption below stays for exactly that reader.
+#   · /api/coaches keeps it too — it is swept non-strict (it may narrate a labeled
+#     prior cycle), so R6/R7 never run there and the LLM remains the only check.
+#   · On the strict payloads, every NON-date temporal question stays with the LLM: a
+#     summary and a trend row disagreeing about the same night, two surfaces
+#     disagreeing about what day it is, word-number spans ("three weeks") in a string
+#     value. None of those cite a pre-genesis date, so none are dropped.
+#   · The residue genuinely lost: a pre-cycle date on a strict payload in a key R6/R7
+#     do not read (neither a row `date` nor a night field) — e.g. a stale
+#     `last_weighin_date`. R6/R7 were NOT widened to every ISO-valued key on
+#     speculation: a baseline/anchor date may legitimately predate genesis (the
+#     restart pipeline's `--override-weight-lbs` case), and inventing a rule for an
+#     unobserved shape is how a check earns its next false positive. Named here
+#     rather than retired silently; file it if it is ever observed.
 
 _PROMPT_HEADER = """You are a meticulous editorial truth reviewer for a public "measured life" \
 experiment site. Below is the RENDERED TEXT of {k} of its surfaces (page prose and/or API payloads — \
@@ -277,7 +337,11 @@ FLAG findings in exactly these three categories (with severity low|med|high):
 past three weeks" early in the experiment, "seven days of an experiment" on Day 1 (word-numbers \
 count), a day number or date inconsistent with the phase above, or two surfaces disagreeing about \
 what day it is. Judge sentences, not bare JSON numerics — numeric window/span/day FIELDS are \
-checked deterministically by code before you run and are not your concern.
+checked deterministically by code before you run and are not your concern. NEITHER ARE THE DATES \
+IN AN /api/… PAYLOAD: every date and timestamp in those payloads is compared against the cycle \
+start by code on this same run, so do not reason about whether one of them falls before the \
+experiment began — that verdict is already made and is not yours. Judge the human-readable \
+sentences there instead.
 2. "duplicated_narrative" — the SAME substantive narrative paragraph (or a near-identical one) \
 appearing on two or more of the surfaces below. Shared navigation, footers, taglines, and short \
 labels do NOT count — only real narrative/analysis prose.
@@ -302,20 +366,10 @@ running — "starts at the Day-1 weigh-in", "tap any day", "the week ahead", sec
 instruments that currently read "··". Habitual-present descriptions of the design are correct in \
 EVERY phase — before Day 1, ON Day 1, and after; flag only prose asserting that specific \
 measurements or progress ALREADY happened when the phase makes that impossible;
-- a sleep/recovery/HRV/RHR figure whose `night_of` (or narrated night) is the day BEFORE the cycle \
-start, on a surface dated on or after the cycle start. These metrics are keyed to the MORNING they \
-were recorded against, so the night behind Day 1's morning is necessarily the night before Day 1 — \
-that is the frame being correct, not two surfaces disagreeing about the date. Still flag a night \
-that precedes the cycle start by MORE than one day, and still flag a pre-cycle measurement \
-presented as this cycle's progress;
-- the same wake-date frame in a dated SERIES: the earliest row of a wake-date-keyed array \
-(`sleep_trend`) dated exactly the cycle start, whose `sleep_start` bedtime therefore falls on \
-the EVENING BEFORE the cycle start. Series clamp to genesis and key by wake date, so the first \
-row of a cycle always describes the night before Day 1 — and it stays in the payload for the \
-first 30 days, not just Day 1. The payload's own `figure_scope` / `trend_note` convention notes \
-are the site DISCLOSING this frame, never evidence against it. Still flag a row whose own \
-`date` is BEFORE the cycle start (a clamp breach, also checked in code), and a row whose night \
-precedes the cycle start by more than one day;
+- a sleep/recovery/HRV/RHR figure whose narrated night is the day BEFORE the cycle start, on a \
+page dated on or after the cycle start. These metrics are keyed to the MORNING they were recorded \
+against, so the night behind Day 1's morning is necessarily the night before Day 1 — that is the \
+frame being correct, not two surfaces disagreeing about the date;
 - story/archive/chronicle content clearly dated before the current cycle;
 - the same header/nav/footer chrome appearing on every page;
 - API field names or JSON structure — judge only human-readable narrative values inside them;
@@ -428,8 +482,19 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
             text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
             for raw in parse_verdict(text).get("findings", []):
                 f = _normalize_finding(raw, batch_paths)
-                if f:
-                    findings.append(f)
+                if not f:
+                    continue
+                # #2613: the retirement, enforced. The deterministic pass graded this
+                # payload's dates against the cycle start on this same run and cannot
+                # be budget-paused, so a competing LLM verdict on that question is
+                # discarded — printed, never silently swallowed.
+                if is_code_owned_temporal(f, phase["start_date"]):
+                    print(
+                        f"  ↩ reader-truth: dropped a code-owned pre-cycle-date finding on {f['page']} "
+                        f"(phase_plausibility R6/R7 owns this, #2613): {f['note'][:120]}"
+                    )
+                    continue
+                findings.append(f)
         except Exception as e:
             errors.append(f"batch [{', '.join(str(p.get('path')) for p in batch)}]: {str(e)[:140]}")
     return findings, errors

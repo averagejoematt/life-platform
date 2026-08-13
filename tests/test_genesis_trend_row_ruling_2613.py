@@ -119,43 +119,41 @@ def _rubric():
 # ── the clause ────────────────────────────────────────────────────────────────
 
 
-def test_the_series_clause_exists_and_names_the_trend_locus():
-    """The gap #2613 found: the #2575 clause reached the scalar `night_of` only."""
+def test_the_series_clause_was_RETIRED_not_reworded():
+    """SUPERSEDED by the #2613 follow-up, and superseded is not the same as failed.
+
+    The clause this file originally pinned did the job a clause can do — it recorded the
+    ruling — and did not do the job it could not: 3/3 runs still raised the finding with
+    it, 4/5 with an in-payload disclosure too, 3/6 on a wider re-baseline. So the whole
+    pre-cycle-date class left the rubric for phase_plausibility R6/R7, exactly as #1922
+    moved `impossible_number`. What must NOT happen is the clause quietly growing back:
+    a prose exemption for this class is a measured non-fix, and re-adding one would
+    reinstate a second, unreliable adjudicator of a question code already answers.
+
+    The retirement's own coverage is pinned in tests/test_llm_temporal_retirement_2613.py.
+    """
     rubric = _rubric()
-    assert "sleep_trend" in rubric, "the clause must name the array the finding actually cites"
-    assert "the EVENING BEFORE the cycle start" in rubric
-    assert "the first row of a cycle always describes the" in rubric
+    assert "sleep_trend" not in rubric
+    assert "trend_note" not in rubric
+    assert "clamp breach" not in rubric
+    # The rubric must instead hand the class over explicitly, naming the locus.
+    assert "not yours" in rubric and "/api/" in rubric
 
 
-def test_the_clause_is_written_for_the_recurrence_not_for_day_1():
-    """#2583's clause went quiet after Day 1; this one must cover the whole clamp window."""
-    rubric = _rubric()
-    assert "first 30 days" in rubric, (
-        "the row is present for as long as the window stays clamped to genesis — a Day-1-scoped "
-        "clause leaves 29 more nights of noise, which is how #2613 got filed at Day 3"
-    )
-    # Keyed off the cycle start, never a calendar literal from the month it was written.
-    assert "2026-08" not in rubric
+def test_the_ruling_is_still_keyed_off_the_cycle_start_not_a_calendar_literal():
+    """#2583's clause went quiet after Day 1; nothing that replaced it may pin a month."""
+    assert "2026-08" not in _rubric()
+    # And the deterministic owner is a date comparison, so it does not weaken as the
+    # cycle ages past the 30-day clamp window that carries the genesis-dated row.
+    late = pp.check_payload("/api/sleep_detail", {"sleep_trend": [_trend_row(-1)]}, day_n=300, strict=True, start_date=GENESIS)
+    assert len(late) == 1 and late[0]["severity"] == "high"
 
 
-def test_the_disclosure_notes_are_not_evidence_against_the_frame():
-    """#2344's `trend_note` is what taught the model the rule it built the accusation from."""
-    rubric = _rubric()
-    assert "figure_scope" in rubric and "trend_note" in rubric
-    assert "DISCLOSING this frame, never evidence against it" in rubric
-
-
-def test_the_clause_is_scoped_not_a_blanket_suppression():
-    rubric = _rubric()
-    assert "`date` is BEFORE the cycle start" in rubric
-    assert "precedes the cycle start by more than one day" in rubric
-
-
-def test_the_2575_scalar_clause_survives_the_widening():
-    """The new clause is additive — the ruling it extends must not be displaced."""
+def test_the_2575_page_prose_clause_survives_the_retirement():
+    """HTML pages keep the class — no deterministic rule reads a night narrated in prose."""
     rubric = _rubric()
     assert "the day BEFORE the cycle start" in rubric
-    assert "on a surface dated on or after the cycle start" in rubric
+    assert "on a page dated on or after the cycle start" in rubric
 
 
 # ── the deterministic premise (ADR-105: code leads, the clause only exempts) ──
