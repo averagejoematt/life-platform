@@ -71,9 +71,11 @@ from operational.qa_check import (  # noqa: E402,F401
     PARTITIONS,
     QA_SMOKE_EMF_NAMESPACE,
     Check,
+    detail_log_lines,  # #2620: the overflow log lines for a check that had to truncate
     emf_summary_line,
     run_isolated,
     split_warns,
+    summarize_findings,
 )
 
 # #1665: the AWS-surface sweeps (S3 freshness, score sanity, Lambda secrets,
@@ -1072,12 +1074,24 @@ def lambda_handler(event, context):
         # #1921: the partition rides every FAIL line. Which side a failure landed
         # on is the whole question when a rollback did (or did not) fire, and
         # reconstructing it later from the check name is guesswork.
+        # #2620: a check whose summary had to CUT text prints that text here, one
+        # full line each, immediately beneath its own summary line. The summary
+        # stays as scannable as it is today; the detail sits under it, tagged
+        # `[QA] DETAIL` so Logs Insights can filter it in or out. Notes are capped
+        # at 300 chars upstream and the per-check line count at qa_check's
+        # DETAIL_LINE_CAP, so a night WITH findings costs ~10 KB of ingest at
+        # worst and a clean night — the overwhelming majority — costs nothing.
+        # Not in the email: the failure mail stays a summary, deliberately.
         for c in fails:
             print(f"[QA] FAIL [{c.partition}] {c.category} / {c.name}: {c.message}")
+            for line in detail_log_lines(c):
+                print(line)
         for c in warns:
             # #1958: the chronic tag rides every WARN line so Logs Insights can
             # tell a recurring timing warn from a novel one without the metric.
             print(f"[QA] WARN [{c.partition}]{' [chronic]' if c.chronic else ''} {c.category} / {c.name}: {c.message}")
+            for line in detail_log_lines(c):
+                print(line)
 
         # #1920: a POSITIVE EXECUTION RECEIPT. Check.pause() sets passed=True and
         # printed nothing, so a paused check and a passing one were byte-identical

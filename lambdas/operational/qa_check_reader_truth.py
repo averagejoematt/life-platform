@@ -14,7 +14,7 @@ import logging
 import os
 import urllib.request
 
-from operational.qa_check import CONTENT_TRUTH, Check
+from operational.qa_check import CONTENT_TRUTH, Check, summarize_findings
 
 logger = logging.getLogger(__name__)
 
@@ -123,10 +123,9 @@ def _check_phase_plausibility(surfaces):
         for w in warnings:
             checks.append(Check("reader_truth:plausibility", "Reader Truth", CONTENT_TRUTH).warn(f"{w} — NOT checked"))
         if findings:
-            det.fail(
-                f"{len(findings)} phase-impossible claim(s) at {day} (deterministic): "
-                + "; ".join(f"{f['page']} [{f['category']}] {f['note'][:90]}" for f in findings[:4])
-            )
+            # #2620: same summary, plus the untruncated note beneath it.
+            summary, detail_lines = summarize_findings(findings)
+            det.fail(f"{len(findings)} phase-impossible claim(s) at {day} (deterministic): {summary}").with_details(detail_lines)
         else:
             det.ok(f"{len(payloads)} API payload(s) phase-plausible at {day} (deterministic, no AI)")
         checks.append(det)
@@ -161,10 +160,14 @@ def _check_frozen_artifacts(surfaces):
         baseline = float(constants.EXPERIMENT_BASELINE_WEIGHT_LBS)
         findings = weight_truth_qa.assess_frozen_artifact_weights(pages, baseline)
         if findings:
+            # #2620: these findings carry `detail`, not `note`, and no severity —
+            # summarize_findings is shape-tolerant so this path gets the same
+            # recoverability without inventing fields for it.
+            summary, detail_lines = summarize_findings(findings, key="detail", width=110, inline=3)
             det.fail(
                 f"{len(findings)} frozen artifact(s) quote a superseded weight with no editor's note "
-                f"(baseline {baseline} lbs): " + "; ".join(f"{f['page']} — {f['detail'][:110]}" for f in findings[:3])
-            )
+                f"(baseline {baseline} lbs): {summary}"
+            ).with_details(detail_lines)
         else:
             det.ok(f"{len(pages)} frozen artifact(s) reconcile against {baseline} lbs (deterministic, no AI)")
         return [det]
@@ -232,15 +235,18 @@ def check_reader_truth():
     for err in errors:
         checks.append(Check("reader_truth:batch", "Reader Truth", CONTENT_TRUTH).warn(f"AI batch error (fail-soft): {err}"))
 
-    def _fmt(f):
-        return f"{f['page']} [{f['category']}] {f['note'][:90]}"
-
+    # #2620: BOTH severities get the detail treatment, not just the failing one.
+    # The low/med path is the one nobody reproduces by hand — a warn that cannot
+    # be read is a warn that is never triaged, which is how a low finding stays
+    # low forever. Same helper, same guarantees, one call each.
     highs = [f for f in findings if f["severity"] == "high"]
     lower = [f for f in findings if f["severity"] != "high"]
     if highs:
-        verdict.fail(f"{len(highs)} high truth finding(s) at {day}: " + "; ".join(_fmt(f) for f in highs[:4]))
+        summary, detail_lines = summarize_findings(highs)
+        verdict.fail(f"{len(highs)} high truth finding(s) at {day}: {summary}").with_details(detail_lines)
     elif lower:
-        verdict.warn(f"{len(lower)} low/med truth finding(s) at {day}: " + "; ".join(_fmt(f) for f in lower[:4]))
+        summary, detail_lines = summarize_findings(lower)
+        verdict.warn(f"{len(lower)} low/med truth finding(s) at {day}: {summary}").with_details(detail_lines)
     elif errors:
         verdict.warn(f"no verdict at {day} — all {len(errors)} AI batch(es) errored (fail-soft)")
     else:
