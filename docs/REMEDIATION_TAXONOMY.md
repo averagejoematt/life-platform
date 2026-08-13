@@ -22,7 +22,6 @@ broader → Bucket B (PR for review). If unsure, downgrade to B.
 
 | Pattern | Detect | Fix template | File(s) |
 |---|---|---|---|
-| **Missing IAM grant** (a Lambda calls an AWS API its role lacks) | log `AccessDenied`/`not authorized to perform`; cross-ref boto3 call vs role | add the missing action/resource to the role's statement | the matching `cdk/stacks/role_policies_<domain>.py` sibling + the `role_policies.py` facade re-export (#2604) (+ `cdk deploy` the stack) |
 | **lambda_map drift** (unmapped `*_lambda.py`, wrong function name) | CI coverage check fails; `ResourceNotFoundException` in deploy | add/correct the `.lambdas` entry | `ci/lambda_map.json` |
 | **Alarm threshold miscalibration** (chronic false-fire at normal levels) | alarm fires daily at steady-state value | raise threshold above observed normal + comment | `cdk/stacks/monitoring_stack.py` |
 | **Freshness/QA source miscalibration** (sporadic source flagged stale; dead source still required) | source event-driven (weigh-ins) or dead (last write ≫ threshold) | `SOURCE_STALE_HOURS` override, or move required→optional, or comment out a dead source | `lambdas/emails/freshness_checker_lambda.py`, `lambdas/operational/qa_smoke_lambda.py` |
@@ -30,9 +29,22 @@ broader → Bucket B (PR for review). If unsure, downgrade to B.
 | **Swallowed-config crash** (`'str' has no attribute 'get'` on a mixed config) | traceback in logs, swallowed by outer handler | add `isinstance` guard | the offending Lambda |
 | **CI dead glob / stale path** (a check matches 0 files post-restructure) | check passes vacuously; `ls` of the glob = 0 | switch to recursive `find`/`**` | `.github/workflows/ci-cd.yml`, `tests/*` |
 
+**Missing IAM grant moved to Bucket B on 2026-08-13 (#2611).** It was the first row of
+this table. The template itself is unchanged and still worth the agent's diagnosis —
+detect `AccessDenied`/`not authorized to perform` in the logs, cross-ref the boto3 call
+against the role, add the missing action/resource to the matching
+`cdk/stacks/role_policies_<domain>.py` sibling plus the `role_policies.py` facade
+re-export (#2604), and note that the stack needs a `cdk deploy`. What changed is the
+**merge authority**, not the diagnosis: the whole `cdk/stacks/role_policies*` family is
+on the auto-merge DENYLIST, so label the PR `needs-review`, not `auto-fix-safe`. Whether
+the agent may ever merge IAM unattended is decided with the `shadow` → `auto`
+re-promotion (ADR-129), which already carries its own 10-consecutive-clean-run bar and an
+explicit operator SSM flip. See the note above the ALLOWLIST in `remediation/automerge.py`.
+
 ## Bucket B — FIX-VIA-PR (open a PR; human merges, never auto)
 
 Anything that changes **behavior**, not just config/permissions:
+- **Missing IAM grant** — an IAM change is exactly the class worth a human glance (#2611).
 - Lambda business logic, retries, data transforms.
 - AI/coach **prompts**, model choice, `max_tokens`, caching structure.
 - DynamoDB schema / access patterns, new GSIs.

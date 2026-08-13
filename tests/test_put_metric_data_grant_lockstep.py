@@ -32,7 +32,9 @@ shape of all four incidents.
 
 import ast
 import glob
+import importlib
 import os
+import pathlib
 import re
 import sys
 import types
@@ -60,6 +62,21 @@ sys.modules.setdefault("aws_cdk.aws_iam", _iam_stub)
 
 import role_policies as rp  # noqa: E402
 
+# #2611: resolve policy functions across the WHOLE `role_policies*` family, not just the
+# facade. `role_policies.py` re-exports the #2604 domain siblings but deliberately does NOT
+# re-export `role_policies_permanence.operational_permanence` (#1400) — a bare
+# `getattr(rp, ...)` reports that role as "no grant" rather than as "not found". Derived by
+# glob so a ninth sibling is covered the day it lands.
+_POLICY_MODULES = [rp] + [importlib.import_module(p.stem) for p in sorted(pathlib.Path(_REPO, "cdk", "stacks").glob("role_policies_*.py"))]
+
+
+def _resolve_policy_fn(fn_name: str):
+    for mod in _POLICY_MODULES:
+        fn = getattr(mod, fn_name, None)
+        if fn is not None:
+            return fn
+    return None
+
 
 def _statement_actions(stmt):
     """Actions from a built statement — works for the stub AND real CDK."""
@@ -75,7 +92,7 @@ def _statement_actions(stmt):
 
 
 def _rp_grants_put_metric_data(fn_name: str) -> bool:
-    fn = getattr(rp, fn_name, None)
+    fn = _resolve_policy_fn(fn_name)
     if fn is None:
         return False
     try:
@@ -87,31 +104,66 @@ def _rp_grants_put_metric_data(fn_name: str) -> bool:
     return any("cloudwatch:PutMetricData" in _statement_actions(s) for s in stmts)
 
 
+def _policy_aliases(tree) -> set:
+    """Local names this stack module binds to a `role_policies*` module.
+
+    #2611: this used to be the hardcoded literal `"rp"`. `operational_stack.py` imports
+    `role_policies_permanence as rpp` (#1400), so the Permanence Lambda's `custom_policies`
+    resolved to the empty set and sat outside the lockstep. It failed loud rather than
+    silent (the resolver guard below catches an emitting handler with no resolved role), but
+    the alias set is derived from the module's own imports now — a stack that imports a
+    #2604 sibling under any name is covered without editing this file.
+    """
+    aliases = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            for a in node.names:
+                if a.name.startswith("role_policies"):
+                    aliases.add(a.asname or a.name)
+        elif isinstance(node, ast.Import):
+            for a in node.names:
+                mod = a.name.rsplit(".", 1)[-1]
+                if mod.startswith("role_policies"):
+                    aliases.add(a.asname or mod)
+    return aliases
+
+
+# Wired handlers that actually pass a `custom_policies=` kwarg. A Lambda may legitimately
+# be wired without one (it just rides the base role), so the #2611 alias guard below scopes
+# to this set rather than to every wired handler.
+HAS_CUSTOM_POLICIES: set = set()
+
+
 def _build_source_to_rp_map() -> dict:
     """source_file → set(role_policies fn names) from every create_platform_lambda."""
     mapping: dict[str, set] = {}
     for stack in glob.glob(os.path.join(_REPO, "cdk", "stacks", "*.py")):
         with open(stack, encoding="utf-8") as f:
             tree = ast.parse(f.read())
+        aliases = _policy_aliases(tree)
         for node in ast.walk(tree):
             if not (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "create_platform_lambda"):
                 continue
             source_file = None
             rp_fns: set = set()
+            has_custom_policies = False
             for kw in node.keywords:
                 if kw.arg == "source_file" and isinstance(kw.value, ast.Constant):
                     source_file = kw.value.value
                 if kw.arg == "custom_policies":
+                    has_custom_policies = True
                     for call in ast.walk(kw.value):
                         if (
                             isinstance(call, ast.Call)
                             and isinstance(call.func, ast.Attribute)
                             and isinstance(call.func.value, ast.Name)
-                            and call.func.value.id == "rp"
+                            and call.func.value.id in aliases
                         ):
                             rp_fns.add(call.func.attr)
             if source_file:
                 mapping.setdefault(source_file, set()).update(rp_fns)
+                if has_custom_policies:
+                    HAS_CUSTOM_POLICIES.add(source_file)
     return mapping
 
 
@@ -162,3 +214,34 @@ def test_gate_is_non_vacuous():
     evaluator = "lambdas/coach/coach_prediction_evaluator.py"
     assert evaluator in _EMITTER_HANDLERS, f"{evaluator} not detected as an emitting handler — the #1196 subject must be in scope"
     assert "compute_coach_prediction_evaluator" in _EMITTER_HANDLERS[evaluator]
+
+
+def test_every_wired_lambda_resolves_its_policy_alias():
+    """#2611: the resolver must cover EVERY wired handler, not only the emitting ones.
+
+    `_EMITTER_HANDLERS` filters to handlers that call put_metric_data today, so a stack
+    importing a `role_policies*` sibling under a non-`rp` alias stayed invisible until the
+    day its handler started emitting. Assert the whole wired set resolves, so the alias
+    blindness is caught when it is introduced rather than when it finally matters.
+    """
+    assert HAS_CUSTOM_POLICIES, "no create_platform_lambda passes custom_policies — the scan broke"
+    unresolved = sorted(sf for sf in HAS_CUSTOM_POLICIES if not _SOURCE_TO_RP.get(sf))
+    assert not unresolved, (
+        "These create_platform_lambda calls pass custom_policies that did not resolve to any "
+        "`role_policies*` module alias — extend _policy_aliases:\n  " + "\n  ".join(unresolved)
+    )
+
+
+def test_the_non_rp_alias_is_actually_exercised():
+    """Mutation canary: prove the derived-alias code path has a live subject.
+
+    If every stack ever settles on the bare `rp` alias, `_policy_aliases` becomes
+    indistinguishable from the old hardcoded literal and this guard should be re-read
+    rather than silently kept.
+    """
+    permanence = "lambdas/operational/permanence_lambda.py"
+    assert permanence in _SOURCE_TO_RP, f"{permanence} is no longer wired — re-check the #2611 alias guard"
+    assert _SOURCE_TO_RP[permanence] == {"operational_permanence"}, _SOURCE_TO_RP[permanence]
+    # …and the function it names resolves off the sibling, not the facade.
+    assert getattr(rp, "operational_permanence", None) is None, "the facade now re-exports it — simplify _resolve_policy_fn"
+    assert _resolve_policy_fn("operational_permanence") is not None
