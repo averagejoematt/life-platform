@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "starter-slice"
+version = "1.0.0"
+description = "One source, one bucket, one table, one chart — the smallest honest slice of a personal-data pipeline on AWS."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+keywords = ["quantified-self", "aws", "dynamodb", "s3", "etl", "starter-template"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+# Deliberately empty. The local path is standard library only; boto3 is imported
+# lazily and is needed only by the AWS backend.
+dependencies = []
+
+[project.optional-dependencies]
+aws = ["boto3>=1.34"]
+dev = ["pytest>=7"]
+
+[project.urls]
+"The architecture this is cut from" = "https://averagejoematt.com/story/build/"
+"The stack manifest" = "https://averagejoematt.com/data/stack.json"
+
+[tool.setuptools]
+packages = ["starter_slice"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 140
