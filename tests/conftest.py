@@ -230,6 +230,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_recall_consent_2587.py",
         "test_coach_his_people_2488.py",  # #2488: the his-people sk must stay unreachable from the whole coach perimeter
         "test_leak_token_sweep.py",
+        # #2541: the starter template's forbidden-literal sweep. `oss/starter-slice/` is
+        # built to be COPIED OUT and published, so a leaked owner name, account id or
+        # bucket must red before the merge, not after — post-merge is already too late
+        # for an artifact whose next step is someone else's `git push`.
+        "test_starter_slice.py",
         # #2578: the gate census. Its verdict is a sweep of the whole repo tree (CI
         # workflows, guard entrypoints, registries, qa-smoke checks) and its floors
         # are blindness detectors — a derivation that returns [] must red BEFORE the
