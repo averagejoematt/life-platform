@@ -297,3 +297,115 @@ def test_report_renders_with_n_on_every_coverage_line(real_census):
     for required in ("gates found", "statically screened", "could NOT be screened", "verdict proven can-fail"):
         assert required in text, f"the coverage report dropped the '{required}' line"
     assert text.count("n = ") >= 10
+
+
+# ── 4. slice 2: the verdict layer must not become a hand-list of claims ──────
+#
+# The whole point of `PROVEN_CAN_FAIL` is that it is NOT a table of assertions — each
+# entry cites a mutation someone ran. Nothing in a test file can re-run a mutation
+# against live CI, so these tests defend the two things that CAN rot without anyone
+# noticing, both of which are instances of the epic's own taxonomy:
+#
+#   (a) a verdict silently attaching to the WRONG gate. A CI-step id is positional
+#       (`ci::<wf>::<job>::<index>`), so inserting one step into ci-lint.yml slides
+#       every later id. A stale proof re-attaching to whatever now sits at that index
+#       is the cross-gate-falsehood shape (#2590) with a friendlier face — so the
+#       collector refuses on a name mismatch, and that refusal is mutation-proved here.
+#   (b) the record losing the field that makes it re-runnable. A verdict without a
+#       command and an observed exit status is the reasoning this slice exists to
+#       replace.
+
+
+def test_every_recorded_proof_carries_a_rerunnable_record():
+    """A proof must name the command, the mutation, what was observed, and when."""
+    assert gc.PROVEN_CAN_FAIL, "PROVEN_CAN_FAIL is empty — slice 2 records verdicts"
+    for gid, proof in gc.PROVEN_CAN_FAIL.items():
+        assert isinstance(proof, gc.Proof), f"{gid}: verdicts are Proof records, not free prose"
+        for fld in ("gate_name", "command", "mutation", "observed", "proved_on"):
+            assert getattr(proof, fld).strip(), f"{gid}: proof field '{fld}' is empty — the record is not re-runnable"
+        # An `observed` that never mentions an outcome is a claim, not an observation.
+        assert any(tok in proof.observed.lower() for tok in ("exit", "failed", "fail")), f"{gid}: `observed` records no outcome"
+
+
+def test_no_recorded_proof_is_stale_against_the_live_census(real_census):
+    """The id a proof was recorded against must still be the gate it was recorded for.
+
+    This is the assertion that would have caught a slice-1 id shift. It fires on BOTH
+    halves: an id matching nothing, and an id matching a gate whose name has changed.
+    """
+    assert not real_census["orphan_proofs"], (
+        "recorded verdict(s) no longer match the gate at their id — a positional CI-step "
+        "id has shifted, or a gate was renamed. Re-run the mutation against the CURRENT "
+        f"gate before re-pointing the proof:\n{real_census['orphan_proofs']}"
+    )
+    assert not real_census[
+        "unattached_attempts"
+    ], f"ATTEMPTED_UNPROVEN names gate id(s) the sweep no longer finds: {real_census['unattached_attempts']}"
+
+
+def test_a_shifted_id_refuses_its_proof_rather_than_re_attaching(monkeypatch):
+    """Mutation proof of the refusal itself — the planted positive for (a) above.
+
+    Point a real gate id at a proof recorded under a DIFFERENT gate name and the
+    collector must report it as stale, not silently stamp `can-fail (proven)` on it.
+    """
+    victim = "structural::test_lambdas_packaging_guard.py"
+    forged = gc.Proof(
+        gate_name="some other gate that used to live at this id",
+        command="irrelevant",
+        mutation="irrelevant",
+        observed="exit 1",
+        scope="",
+        proved_on="2026-01-01",
+    )
+    monkeypatch.setattr(gc, "PROVEN_CAN_FAIL", {victim: forged})
+    census = gc.build_census(families=("structural",))
+    assert [o["id"] for o in census["orphan_proofs"]] == [victim]
+    gate = next(g for g in census["gates"] if g["id"] == victim)
+    assert gate["verdict"] == "unproven", "a name-mismatched proof was re-attached — the stale-proof guard is dark"
+
+
+def test_the_verdict_counts_add_up_and_are_reported(real_census):
+    """No silent caps: proven + attempted + unproven must equal the population, and all
+    three numbers must appear in the human report."""
+    gates = real_census["gates"]
+    proven = [g for g in gates if g["verdict"] == "can-fail (proven)"]
+    attempted = [g for g in gates if g["verdict"] == "attempted-unproven"]
+    unproven = [g for g in gates if g["verdict"] == "unproven"]
+    assert len(proven) + len(attempted) + len(unproven) == len(gates)
+    assert (
+        3 <= len(proven) <= 40
+    ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
+    assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
+    text = gc.render_report(real_census)
+    assert "VERDICTS: proven able to fail" in text
+    assert "ATTEMPTED and NOT proved" in text
+    assert f"n = {len(proven)}" in text and f"n = {len(attempted)}" in text
+
+
+def test_at_least_one_verdict_is_on_a_blocking_ci_gate(real_census):
+    """Cheap gates are easy to prove; the acceptance bar is a high-consequence one.
+
+    A verdict set made only of pytest files would say nothing about whether the board
+    being green means anything — the board is CI.
+    """
+    proven_ci = [g for g in real_census["gates"] if g["verdict"] == "can-fail (proven)" and g["family"] == "ci-step"]
+    assert proven_ci, "no CI-step gate carries a proven verdict — the verdict set is all cheap gates"
+
+
+def test_scope_is_recorded_as_a_field_not_folded_into_prose():
+    """Three of the six proofs found a gate that fires only for a narrow class. `scope`
+    must stay its own field: folding it into `observed` is how 'can-fail' quietly starts
+    reading as 'fully armed'."""
+    scoped = [gid for gid, p in gc.PROVEN_CAN_FAIL.items() if p.scope.strip()]
+    assert scoped, "no proof records a scope — implausible; scope narrowing is the common case"
+    for gid in scoped:
+        assert len(gc.PROVEN_CAN_FAIL[gid].scope) > 40, f"{gid}: `scope` is too terse to tell a reader what green excludes"
+
+
+def test_attempted_unproven_entries_say_why():
+    """An honest 'could not prove' is only useful with the reason attached."""
+    assert gc.ATTEMPTED_UNPROVEN, "the attempted-and-unproved record is empty"
+    for gid, note in gc.ATTEMPTED_UNPROVEN.items():
+        assert len(note) > 120, f"{gid}: 'could not prove' with no reason is the same silence it replaces"
+        assert "PROVED" in note.upper() or "ATTEMPTED" in note.upper(), f"{gid}: the note must state its own status"

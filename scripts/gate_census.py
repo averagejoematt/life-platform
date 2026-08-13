@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""scripts/gate_census.py — #2578 slice 1: derive the armed-gate inventory FROM SOURCE.
+"""scripts/gate_census.py — #2578: derive the armed-gate inventory FROM SOURCE, and
+record which of those gates has been WATCHED failing.
 
 WHY THIS IS A SCRIPT AND NOT A MARKDOWN TABLE
 ---------------------------------------------
@@ -9,13 +10,24 @@ measured instances in four days (#2564, #2573, #2590, #2589, the AnnAssign blind
 systematically asks a gate to prove it can fail. The first thing that has to stop being
 guesswork is *how many gates there are*. This module is that count, derived.
 
-WHAT THIS SLICE IS AND IS NOT
------------------------------
-This is a **census**, not a verdict sheet. It answers "how many gates exist, how many
-were screened, and which ones could not be" — with n on every line. It does NOT claim
-any gate is proven able to fail; that is the epic's next slice, and the `verdict` field
-on every record is therefore ``unproven`` unless a mutation proof has been recorded in
-``PROVEN_CAN_FAIL`` below.
+WHAT THIS IS AND IS NOT
+-----------------------
+Two things, kept strictly apart:
+
+  * **The census** (slice 1) — "how many gates exist, how many were screened, which
+    could not be", with n on every line. Its detectors are syntactic; a risk flag is a
+    LEAD requiring adjudication, never a defect, and the report says so.
+  * **The verdicts** (slice 2) — the small set of gates that were made to fail ON
+    PURPOSE and watched failing, recorded in ``PROVEN_CAN_FAIL`` with the command, the
+    mutation and the observed exit status. A gate is never promoted to `can-fail` by
+    reading it; reasoning that a gate *would* fail is precisely what produced the six
+    dark gates this epic exists for.
+
+Everything else reports ``unproven``, and the header prints that number too — 6 proven
+against 421 found is the honest state, and rounding it up is the failure mode.
+``ATTEMPTED_UNPROVEN`` carries the gates that were tried and could NOT be proved, with
+the reason: an honest "could not prove" is a result, and skipping it silently is how an
+untested assumption survives.
 
 A risk flag here is a **lead requiring adjudication**, never a defect. The detectors are
 syntactic. They are wrong in both directions and the report says so.
@@ -144,11 +156,220 @@ class Gate:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Recorded mutation proofs. This is the ONLY thing in the file that is hand-written,
-# and deliberately so: a verdict must cite the mutation that produced it. Every gate
-# not named here reports `unproven`, which is the honest default for slice 1.
+# Recorded mutation proofs (#2578 slice 2). This and ATTEMPTED_UNPROVEN below are the
+# ONLY hand-written things in the file, and deliberately so: a verdict must cite the
+# mutation that produced it. Every gate named in neither reports `unproven`, which
+# stays the honest default.
+#
+# THE BAR, and why it is this high
+# --------------------------------
+# A gate is `can-fail (proven)` ONLY when the defect it exists to catch was introduced
+# on purpose and the gate was WATCHED failing. Reasoning that it *would* fail is not a
+# verdict — that reasoning is exactly what produced six dark gates in four days (#2564,
+# #2573, #2590, #2589, the AnnAssign instance, #2619). Every record below carries the
+# command a future reader re-runs, the mutation, and the observed exit status.
+#
+# SCOPE IS PART OF THE VERDICT
+# ----------------------------
+# Three of the six proofs found a gate that fires for a narrow class and is silent
+# outside it. That is not a defect and not a pass — it is the answer to "what does
+# green here actually mean", which is the question the epic asks. A verdict that
+# recorded only `can-fail` and dropped `scope` would be the same green-board illusion
+# in a new file, so `scope` is a required field, and `""` means "no narrowing found".
 # ─────────────────────────────────────────────────────────────────────────────
-PROVEN_CAN_FAIL: dict[str, str] = {}
+
+
+@dataclass(frozen=True)
+class Proof:
+    """One mutation proof. `command` + `mutation` must be enough to re-run it."""
+
+    gate_name: str  # the census `name` at proof time — a shifted id must not silently re-attach
+    command: str  # what was run, verbatim enough to re-run
+    mutation: str  # the defect introduced on purpose
+    observed: str  # what was watched happening (exit codes, both directions)
+    scope: str  # the narrowing found, or "" for none
+    proved_on: str  # ISO date, so a stale proof is visible as stale
+
+
+PROVEN_CAN_FAIL: dict[str, Proof] = {
+    # ── high-consequence: the blocking privacy step on the push-to-main path ──────
+    "ci::ci-lint.yml::lint::15": Proof(
+        gate_name="lint / Content-policy scan (ENFORCED —",
+        command=(
+            "CONTENT_FILTER_JSON=<fixture> python3 scripts/content_policy_scan.py" " && python3 deploy/pii_surface_guard.py --tracked"
+        ),
+        mutation=(
+            "planted the fixture vocabulary's one keyword twice: in a new site/ HTML file "
+            "(the content_policy_scan arm) and in a new git-tracked config/*.json "
+            "(the pii_surface_guard --tracked repo-hygiene arm). Fixture vocabulary "
+            "injected via CONTENT_FILTER_JSON so the proof never reads, and never echoes, "
+            "the real off-repo vocabulary (#2370)."
+        ),
+        observed=(
+            "ARMED: content_policy_scan exit 1 ('FAIL — 1 violation(s)', keyword masked); "
+            "pii_surface_guard exit 1 ('1 violation(s) on the tracked config/seed JSON "
+            "surface'). Clean-tree baseline 0/0. Reverted: 0/0."
+        ),
+        scope=(
+            "BOTH halves are no-ops when no content-filter channel source resolves. Re-run "
+            "with `env -u CONTENT_FILTER_JSON AWS_ACCESS_KEY_ID=x AWS_SHARED_CREDENTIALS_FILE=/dev/null "
+            "AWS_CONFIG_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true`: the IDENTICAL planted "
+            "keyword yields exit 0 from both commands, content_policy_scan emitting "
+            "'::warning title=content-policy-scan skipped::' and pii_surface_guard "
+            "'repo-hygiene arm SKIPPED'. This is designed (#2370 fail-visible, not "
+            "fail-closed, so a public fork cannot red-wall) — but it means this gate's green "
+            "is only load-bearing while the CONTENT_FILTER_JSON repo secret is present. "
+            "Also: the CI step runs ONLY the --tracked arm, so pii_surface_guard's always-on "
+            "structural arms (SSN / card-like / non-allowlisted email) never run in ci-lint; "
+            "those reach the tree through scan_site() on the deploy path."
+        ),
+        proved_on="2026-08-13",
+    ),
+    # ── high-consequence: the blocking type gate (ADR-107 tier 2) ────────────────
+    "ci::ci-lint.yml::lint::7": Proof(
+        gate_name="lint / Mypy gate (ENFORCED — clean-module set, ADR-080)",
+        command="python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)   # 435 files",
+        mutation=(
+            "appended to lambdas/common/auth_breaker.py (a clean-set module), one error code "
+            "at a time: (a) `def p() -> int: return _undefined_symbol` [name-defined]; "
+            "(b) `s = 'x'; return s.no_such_attr` [attr-defined]; "
+            "(c) `def p(x: int) -> str: return x` [return-value]."
+        ),
+        observed=(
+            "(a) exit 1 — 'Name \"_census_undefined_symbol_2578\" is not defined [name-defined]'. "
+            '(b) exit 1 — \'"str" has no attribute "no_such_attr_2578" [attr-defined]\'. '
+            "(c) exit 0 — SILENT. Clean baseline 0, reverted 0."
+        ),
+        scope=(
+            "mypy.ini's `disable_error_code = assignment, arg-type, return-value, operator` "
+            "means the single most intuitive type defect — returning the wrong type from an "
+            "annotated function — passes this gate green. The disable list is documented and "
+            "deliberate (#1656 tranches, measured counts in mypy.ini), so this is scope, not "
+            "rot; recorded here because 'mypy is green' reads as 'types are checked' and the "
+            "four disabled codes are 367 of the measured findings."
+        ),
+        proved_on="2026-08-13",
+    ),
+    # ── the named lead from slice 1 ──────────────────────────────────────────────
+    "ci::ci-lint.yml::lint::3": Proof(
+        gate_name="lint / Run flake8",
+        command=(
+            "flake8 lambdas/ --count --show-source --statistics || true; "
+            "flake8 mcp/ --count --show-source --statistics || true; "
+            "flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics"
+        ),
+        mutation=(
+            "two new files under lambdas/common/, one at a time: (a) a reference to an "
+            "undefined name [F821]; (b) `import json` left unused [F401] plus `if 1 == None:` "
+            "[E711]."
+        ),
+        observed=(
+            "(a) step exit 1, F821 reported by the enforcing third line. "
+            "(b) step exit 0 — while `flake8 <that file>` on its own exits 1 and prints both "
+            "F401 and E711. Clean baseline 0, reverted 0."
+        ),
+        scope=(
+            "can fail for E9/F63/F7/F82 ONLY. The two full-tree runs are wrapped in `|| true`, "
+            "so every style and unused-import finding in lambdas/ and mcp/ is advisory in CI. "
+            "The in-file comment says so ('Fail on syntax errors and undefined names; pass on "
+            "style warnings'), i.e. deliberate — but it is narrower than CLAUDE.md's stated "
+            "`flake8 lambdas/ mcp/` reflex, and black+ruff (both fully enforcing) are what "
+            "actually hold style."
+        ),
+        proved_on="2026-08-13",
+    ),
+    "ci::ci-lint.yml::lint::5": Proof(
+        gate_name="lint / Format gate (black — ENFORCED, config in pyproject.toml)",
+        command="black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/   # black==26.3.1, the CI pin",
+        mutation="a new lambdas/common/ file written with non-black spacing (`def probe( a,b ):`, 2-space indent).",
+        observed=(
+            "exit 1, 'would reformat …/_census_probe.py — 1 file would be reformatted, 1458 "
+            "unchanged'. Baseline 0 (1458 unchanged). Reverted 0."
+        ),
+        scope=(
+            "the proof MUST use the pinned black. Homebrew black 25.9.0 (what the pre-commit "
+            "hook runs, #2570) is a different formatter from the pinned 26.3.1 this gate runs; "
+            "a verdict taken with the unpinned binary would be a verdict on a different gate."
+        ),
+        proved_on="2026-08-13",
+    ),
+    # ── two structural guards the census flagged `vacuous-empty` (precision data) ─
+    "structural::test_module_size_guard.py": Proof(
+        gate_name="test_module_size_guard.py",
+        command="python3 -m pytest tests/test_module_size_guard.py -q",
+        mutation=(
+            "both arms, separately, with BASELINE never edited: (a) a new git-tracked 1,300-line "
+            "lambdas/common/ file with no baseline entry and no exception comment; (b) 40 comment "
+            "lines appended to lambdas/emails/daily_brief_lambda.py, an existing BASELINE entry "
+            "(file restored from a byte copy, not from git, so the proof works on a dirty tree)."
+        ),
+        observed=(
+            "(a) exit 1, `test_no_new_oversize_module` FAILED. (b) exit 1, 2 failed / 15 passed "
+            "(`test_headroom_census_is_derived_from_source` among them) — the per-file ratchet "
+            "fires. Baseline 17 passed; reverted 17 passed."
+        ),
+        scope=(
+            "git-tracked files only: the same 1,300-line file left UNTRACKED passes (17 passed). "
+            "Correct by design — the guard polices committed source — but it means a local "
+            "pre-commit run before `git add` cannot see the file it is about to admit."
+        ),
+        proved_on="2026-08-13",
+    ),
+    "structural::test_lambdas_packaging_guard.py": Proof(
+        gate_name="test_lambdas_packaging_guard.py",
+        command="python3 -m pytest tests/test_lambdas_packaging_guard.py -q",
+        mutation=(
+            "both ratchets: (a) `git add -N lambdas/_census_probe.py` — a loose module at the "
+            "root; (b) `git mv lambdas/coach/__init__.py lambdas/coach/_init_moved.py`."
+        ),
+        observed=(
+            "(a) exit 1, `test_no_loose_python_modules_at_the_lambdas_root` FAILED. "
+            "(b) exit 1, `test_every_lambdas_package_has_an_init` FAILED. Baseline 3 passed; "
+            "reverted 3 passed."
+        ),
+        scope="",
+        proved_on="2026-08-13",
+    ),
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gates ATTEMPTED and NOT proved. A first-class result, not an omission: the whole
+# failure mode this epic exists for is an enforcement point everyone assumes works.
+# "I could not make it fail" recorded with the reason is a lead; skipping it silently
+# is how the assumption survives. Nothing here is a claim that the gate is dark.
+# ─────────────────────────────────────────────────────────────────────────────
+ATTEMPTED_UNPROVEN: dict[str, str] = {
+    "ci::ci-lint.yml::lint::10": (
+        "Secret scan (gitleaks) — NOT PROVED. `gitleaks` is not installed on this machine and "
+        "the gate's semantics are the ACTION's, not a binary's: gitleaks-action scans the "
+        "pushed-commit RANGE on a push event and silently no-ops on workflow_dispatch (the "
+        "#1336 follow-up comment in the workflow says so). Neither the range behaviour nor the "
+        "dispatch no-op is reproducible locally, so any local exit code would be a verdict on a "
+        "different gate. Needs a scratch repo + a real push event — slice 3."
+    ),
+    "qa::lambdas/operational/qa_smoke_lambda.py::check_hero_weight_arithmetic": (
+        "NOT PROVED, and the attempt found a lead. The check is a live-site fetch wrapped around "
+        "a pure assessor, `assess_hero_weight(journey)`, so the assessor is the mutable part. "
+        "Importing it offline needs a chain of runtime env vars discovered one KeyError at a "
+        "time (S3_BUCKET -> EMAIL_RECIPIENT -> ...); with S3_BUCKET/DDB_TABLE/AWS_REGION/"
+        "EMAIL_RECIPIENT/EMAIL_SENDER/SITE_BASE_URL set it imports. But BOTH an arithmetically "
+        "consistent payload {start 200, current 190, lost 10} and a deliberately inconsistent "
+        "one {start 200, current 190, lost 42} returned the SAME (True, 'pre-start / no weigh-in "
+        "— no weight claim to reconcile'): a pre-start branch short-circuits ahead of the "
+        "arithmetic. Either my payload keys are wrong or the pre-start guard swallows the check "
+        "during the cycle-13 pre-genesis window (the #931/#939 countdown state, and the "
+        "'genesis-week present-None' class). Not filed as a defect — I could not distinguish "
+        "the two inside the time-box. It is the first thing slice 3 should re-measure, and it "
+        "is why NONE of the 21 qa-smoke checks carry a verdict here."
+    ),
+    "guard::deploy/check_deploy_drift.py": (
+        "NOT ATTEMPTED as a mutation, deliberately. The defect this guard exists to catch is "
+        "divergence between the CDK tree and DEPLOYED AWS state; introducing it means mutating "
+        "live infrastructure, which #2578's guardrail and this worktree's brief both forbid. "
+        "A verdict needs a stubbed CloudFormation client, i.e. a harness — slice 3."
+    ),
+}
 
 
 def log(msg: str) -> None:
@@ -615,12 +836,48 @@ def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -
         gates += g
         counters["structural"] = c
 
+    # A verdict attaches by id, and a CI-step id is positional (`::<job>::<index>`), so
+    # inserting one step into a workflow silently slides every later id onto a DIFFERENT
+    # gate. The recorded `gate_name` is the cross-check: a proof whose name no longer
+    # matches the gate at that id is REFUSED, not re-attached. Mismatches and ids that
+    # match nothing are surfaced on the census (`orphan_proofs`) and asserted in
+    # tests/test_gate_census_2578.py — a stale verdict is the failure this epic is about.
+    matched: set[str] = set()
+    mismatched: list[dict[str, str]] = []
     for gate in gates:
-        if gate.id in PROVEN_CAN_FAIL:
-            gate.verdict = "can-fail (proven)"
-            gate.evidence = PROVEN_CAN_FAIL[gate.id]
+        proof = PROVEN_CAN_FAIL.get(gate.id)
+        if proof is None:
+            continue
+        if proof.gate_name != gate.name:
+            mismatched.append({"id": gate.id, "recorded_name": proof.gate_name, "current_name": gate.name})
+            continue
+        matched.add(gate.id)
+        gate.verdict = "can-fail (proven)"
+        gate.evidence = f"{proof.mutation} -> {proof.observed}"
+        gate.detail["proof"] = asdict(proof)
+    for gate in gates:
+        note = ATTEMPTED_UNPROVEN.get(gate.id)
+        if note:
+            gate.verdict = "attempted-unproven"
+            gate.evidence = note
+    # On a BOUNDED run (--family) a proof for a dropped family is out of scope, not an
+    # orphan. Reporting it as one would train the reader to ignore the line.
+    full_run = not dropped
+    orphans = (
+        [
+            {"id": gid, "recorded_name": PROVEN_CAN_FAIL[gid].gate_name, "current_name": "<no gate at this id>"}
+            for gid in PROVEN_CAN_FAIL
+            if gid not in matched and not any(m["id"] == gid for m in mismatched)
+        ]
+        if full_run
+        else []
+    )
+    unattached_attempts = sorted(set(ATTEMPTED_UNPROVEN) - {g.id for g in gates}) if full_run else []
 
     return {
+        "orphan_proofs": orphans + mismatched,
+        "unattached_attempts": unattached_attempts,
+        "attempted_unproven": ATTEMPTED_UNPROVEN,
         "shapes": SHAPES,
         "families_run": list(families),
         "families_dropped": dropped,
@@ -663,6 +920,20 @@ def annassign_exposure(root: Path, files: list[Path]) -> dict[str, Any]:
     }
 
 
+def _wrap(text: str, width: int = 88, indent: str = " " * 16) -> str:
+    """Soft-wrap a proof field so a long `observed` stays readable in a terminal."""
+    words, out, cur = text.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > width:
+            out.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        out.append(cur)
+    return f"\n{indent}".join(out)
+
+
 def render_report(census: dict[str, Any]) -> str:
     gates = census["gates"]
     n = len(gates)
@@ -670,19 +941,58 @@ def render_report(census: dict[str, Any]) -> str:
     unscreened = [g for g in gates if not g["screened"]]
     flagged = [g for g in screened if g["risk_flags"]]
     proven = [g for g in gates if g["verdict"] == "can-fail (proven)"]
+    attempted = [g for g in gates if g["verdict"] == "attempted-unproven"]
+    orphan_proofs = census.get("orphan_proofs") or []
+    unattached = census.get("unattached_attempts") or []
 
     lines: list[str] = []
     add = lines.append
     add("=" * 78)
-    add("GATE CENSUS — #2578 slice 1 (inventory + static screen; NOT verdicts)")
+    add("GATE CENSUS — #2578 (slice 1 inventory + static screen; slice 2 mutation verdicts)")
     add("=" * 78)
     add("")
     add(f"gates found                  n = {n}")
     add(f"  statically screened        n = {len(screened)}  ({len(screened) / n:.0%})" if n else "  (none)")
     add(f"  could NOT be screened      n = {len(unscreened)}")
     add(f"  carrying >=1 risk flag     n = {len(flagged)}")
-    add(f"  verdict proven can-fail    n = {len(proven)}   <- slice 1 ships the census, not the proofs")
+    add(f"  verdict proven can-fail    n = {len(proven)}   <- each cites the mutation that produced it")
+    add(f"  attempted, NOT proved      n = {len(attempted)}   <- recorded with the reason, never skipped")
+    add(f"  no verdict attempted       n = {n - len(proven) - len(attempted)}")
     add("")
+
+    add("-- VERDICTS: proven able to fail (mutation introduced, failure watched) " + "-" * 6)
+    if not proven:
+        add("  (none recorded — PROVEN_CAN_FAIL is empty)")
+    for g in sorted(proven, key=lambda x: x["id"]):
+        p = g["detail"].get("proof") or {}
+        add(f"  {g['id']}")
+        add(f"      gate      {g['name']}  [{g['source']}]")
+        add(f"      command   {p.get('command', '')}")
+        add(f"      mutation  {_wrap(p.get('mutation', ''))}")
+        add(f"      observed  {_wrap(p.get('observed', ''))}")
+        add(f"      scope     {_wrap(p.get('scope') or 'none found — the gate fires for the whole class it names')}")
+        add(f"      proved    {p.get('proved_on', '')}")
+    add("")
+
+    add("-- ATTEMPTED and NOT proved (a first-class result, not an omission) " + "-" * 10)
+    if not attempted:
+        add("  (none)")
+    for g in sorted(attempted, key=lambda x: x["id"]):
+        add(f"  {g['id']}")
+        add(f"      {_wrap(g['evidence'], indent=' ' * 6)}")
+    for gid in unattached:
+        add(f"  {gid}   [no gate matches this id in the current sweep]")
+        add(f"      {_wrap(ATTEMPTED_UNPROVEN[gid], indent=' ' * 6)}")
+    add("")
+
+    if orphan_proofs:
+        add("-- !! STALE PROOFS: recorded verdict no longer matches the gate at that id " + "-" * 3)
+        add("   A CI-step id is positional. These verdicts are REFUSED, not re-attached.")
+        for o in orphan_proofs:
+            add(f"  {o['id']}")
+            add(f"      recorded gate: {o['recorded_name']}")
+            add(f"      gate now here: {o['current_name']}")
+        add("")
 
     add("-- by family " + "-" * 64)
     fam: dict[str, list[dict]] = {}
