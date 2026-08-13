@@ -273,6 +273,16 @@ def test_the_served_week_is_the_current_week_by_construction(live):
         assert subj["week_id"] == social._current_iso_week() == "2026-W34", stamped
 
 
+def test_a_malformed_stamp_is_refused_not_rolled(live):
+    """The cycle check is a STRING comparison, so a junk stamp must be rejected
+    before it — 'garbage' sorts above every real week id and would otherwise read
+    as this cycle's and roll forward."""
+    live.set_clock(_at(2026, 8, 17, 9, 0))
+    for junk in ("garbage", "2026-W3", "W33", "2026_W33", "2026-w33", "next week"):
+        live.set_artifact(dict(CHALLENGE, week_id=junk))
+        assert social._predict_subject_state() == (None, "no_subject"), junk
+
+
 def test_a_future_stamp_is_pulled_back_to_the_current_week(live):
     """A subject stamped for a week that has not arrived must not solicit bets on
     that future window — it is served as THIS week's subject or not at all."""

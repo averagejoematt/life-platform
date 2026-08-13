@@ -546,6 +546,10 @@ def _current_iso_week() -> str:
     return f"{iso[0]}-W{iso[1]:02d}"
 
 
+# A well-formed ISO week id. Enforced before any week_id comparison (#2622).
+_ISO_WEEK_RE = re.compile(r"\d{4}-W\d{2}")
+
+
 def _iso_week_of(d) -> str:
     """The ISO week id ('2026-W33') of a plain calendar date. Same formula as
     deploy/build_genesis_predict_week.genesis_iso_week — zero-padded, so the ids
@@ -603,7 +607,10 @@ def _predict_subject_state():
         k = (m.get("key") or "").strip().lower()
         if k:
             mmap[k] = m.get("label") or k
-    if not week_id or not mmap:
+    # The stamp is compared as a string (zero-padded ISO ids order correctly), so a
+    # MALFORMED one must be rejected before that comparison, not after: "garbage"
+    # sorts above every real week id and would otherwise read as this cycle's.
+    if not mmap or not _ISO_WEEK_RE.fullmatch(week_id):
         return None, "no_subject"
     current = _current_iso_week()
     if week_id == current:
