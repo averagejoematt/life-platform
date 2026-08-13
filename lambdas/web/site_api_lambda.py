@@ -899,6 +899,13 @@ def lambda_handler(event, context):
                             if len(_cd_sk_parts) >= 2 and _cd_sk_parts[1]:
                                 _cd_asof = _cd_sk_parts[1]
                         coach_entry["analysis_generated_at"] = _cd_asof
+                        # #2575: the cockpit's reading AT PUBLICATION, frozen with the
+                        # narrative (coach/published_vitals.py). Absent on records
+                        # written before that stamp shipped — the nightly cross-surface
+                        # check treats absence as "compare against live", not as a pass.
+                        _cd_pub_vitals = _cd_out_item.get("published_vitals")
+                        if isinstance(_cd_pub_vitals, dict) and _cd_pub_vitals:
+                            coach_entry["published_vitals"] = _cd_pub_vitals
                         # Count predictions
                         preds = _cd_out_item.get("predictions", [])
                         if isinstance(preds, list):

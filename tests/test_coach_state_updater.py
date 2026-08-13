@@ -46,10 +46,19 @@ from common import retry_utils  # noqa: E402
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _queries_a_source_partition(condition):
+    """True when a boto3 key condition pins a `USER#…#SOURCE#…` pk (#2575)."""
+    try:
+        values = condition.get_expression()["values"]
+    except (AttributeError, KeyError, TypeError):
+        return False
+    return any(isinstance(v, str) and v.startswith("USER#") and "#SOURCE#" in v or _queries_a_source_partition(v) for v in values)
+
+
 class FakeTable:
     """DynamoDB Table stand-in: records writes, serves canned reads, paginates finitely."""
 
-    def __init__(self, items=None, query_pages=None, liveness_pages=None, begins_pages=None, fail=()):
+    def __init__(self, items=None, query_pages=None, liveness_pages=None, begins_pages=None, vitals_pages=None, fail=()):
         self.puts = []
         self.updates = []
         self.get_calls = []
@@ -61,6 +70,7 @@ class FakeTable:
         # KeyConditionExpression; _query_begins_with passes a boto3 condition object.
         self._liveness_pages = None if liveness_pages is None else list(liveness_pages)
         self._begins_pages = None if begins_pages is None else list(begins_pages)
+        self._vitals_pages = list(vitals_pages or [])  # #2575: the Truth-Spine stamp's SOURCE# reads
         self._fail = set(fail)  # any of {"get", "put", "query", "update"}
 
     def get_item(self, Key):  # noqa: N803 — boto3's kwarg name
@@ -81,6 +91,13 @@ class FakeTable:
         if "query" in self._fail:
             raise RuntimeError("simulated query failure")
         is_liveness = isinstance(kwargs.get("KeyConditionExpression"), str)
+        # #2575: the Truth-Spine stamp reads SOURCE# partitions from this same table.
+        # Route those to their own (empty by default) queue — routing by shape, exactly
+        # as the liveness read already is. Without it the Spine's whoop/garmin reads
+        # DRAIN the COACH# pages, and the state assertions fail on a queue that ran out
+        # rather than on anything the handler did.
+        if not is_liveness and _queries_a_source_partition(kwargs.get("KeyConditionExpression")):
+            return self._vitals_pages.pop(0) if self._vitals_pages else {"Items": []}
         queue = self._liveness_pages if is_liveness else self._begins_pages
         if queue is None:
             queue = self._pages
@@ -943,6 +960,46 @@ class TestHandlerEndToEnd:
         monkeypatch.setattr(su, "table", t)
         monkeypatch.setattr(su, "_call_haiku", lambda **k: self._extraction_with_everything())
         return t
+
+    def test_the_output_record_freezes_the_cockpits_reading_at_publication(self, monkeypatch):
+        """#2575: `published_vitals` must reach the OUTPUT# row through the real handler.
+
+        The nightly `cross_surface:vitals` check compares a coach's prose against this
+        stamp; without it the comparison is a frozen artifact against a surface that
+        has moved on. Absence of the stamp is a silent revert to that, so it is proved
+        end-to-end here, not only at the helper.
+        """
+        t = self._wire(monkeypatch)
+        t._vitals_pages = [{"Items": [{"sk": "DATE#2026-06-30", "recovery_score": 54, "hrv": 41.07, "resting_heart_rate": 56}]}]
+        monkeypatch.setattr(su, "_cw", FakeCloudWatch())
+        su.lambda_handler(
+            {
+                "coach_id": "sleep_coach",
+                "output_text": "para one\n\npara two",
+                "output_type": "weekly_email",
+                "generation_date": "2026-06-30",
+            },
+            None,
+        )
+        stamp = next(p for p in t.puts if p["sk"] == "OUTPUT#2026-06-30#weekly_email")["published_vitals"]
+        assert float(stamp["recovery_pct"]) == 54 and float(stamp["hrv_ms"]) == 41.07 and float(stamp["rhr_bpm"]) == 56
+        assert stamp["recovery_as_of"] == "2026-06-30"
+
+    def test_a_dark_spine_writes_no_stamp_rather_than_an_empty_one(self, monkeypatch):
+        """An empty stamp reads as "the cockpit had no reading" — the check must instead
+        see "not stamped" and fall back to the live comparison."""
+        t = self._wire(monkeypatch)  # vitals_pages defaults to empty -> Spine finds nothing
+        monkeypatch.setattr(su, "_cw", FakeCloudWatch())
+        su.lambda_handler(
+            {
+                "coach_id": "sleep_coach",
+                "output_text": "para one\n\npara two",
+                "output_type": "weekly_email",
+                "generation_date": "2026-06-30",
+            },
+            None,
+        )
+        assert "published_vitals" not in next(p for p in t.puts if p["sk"].startswith("OUTPUT#"))
 
     def test_one_run_writes_every_state_partition(self, monkeypatch):
         t = self._wire(monkeypatch)

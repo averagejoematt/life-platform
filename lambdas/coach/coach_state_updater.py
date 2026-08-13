@@ -11,10 +11,6 @@ decision classes, anti-pattern violations), then writes results to DynamoDB:
   - Updated THREAD# records for threads referenced (bump reference_count)
   - TRACE# reasoning trace record (returned to caller)
   - RELATIONSHIP#state update — deterministic rapport arc, no LLM (#536)
-
-Phase 2 target: sleep_coach (Dr. Lisa Park).
-
-v1.0.0 — 2026-04-06 (Coach Intelligence Phase 2)
 """
 
 import json
@@ -27,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
-from coach import coach_derived_prose  # #2418: the derived reader-prose SET — blob / regen / hold / read
+from coach import coach_derived_prose, published_vitals  # #2418 derived reader-prose SET; #2575 publication-time vitals stamp
 from coach.reading_date_fidelity import guard_derived_summary  # #2343
 from coach.relationship_engine import compute_relationship_update  # #536
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
@@ -587,6 +583,8 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
         "word_count": word_count,
         "created_at": now_iso,
     }
+    # #2575: freeze what the cockpit served AT PUBLICATION (fail-soft no-op) — see coach/published_vitals.py.
+    published_vitals.stamp_published_vitals(item, table, f"USER#{USER_ID}#SOURCE#")
     if extraction.get("derived_prose_held"):
         item["derived_prose_held"] = True  # #2418: a grounding HOLD, not an empty extraction
 
