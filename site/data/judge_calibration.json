@@ -1,0 +1,96 @@
+{
+  "cells": {
+    "canary_failed_tn": 14,
+    "canary_passed_fp": 1,
+    "golden_failed_fn": 1,
+    "golden_passed_tp": 29
+  },
+  "convention": "positive = output is genuinely publishable (golden); negative = output carries an induced defect (canary)",
+  "corpus": {
+    "n_defective_canary": 15,
+    "n_good_golden": 30,
+    "n_total": 45,
+    "source": "tests/fixtures/golden_briefs/{golden,canaries}.json"
+  },
+  "figures": {
+    "agrees_with_good_work": {
+      "ci95_wilson": [
+        0.8333,
+        0.9941
+      ],
+      "denominator": 30,
+      "numerator": 29,
+      "plain": "29 of 30 (95% CI 0.833\u20130.994)",
+      "point": 0.9667,
+      "what": "how often the gate lets genuinely publishable coach output through"
+    },
+    "catches_induced_defects": {
+      "ci95_wilson": [
+        0.7018,
+        0.9881
+      ],
+      "denominator": 15,
+      "numerator": 14,
+      "plain": "14 of 15 (95% CI 0.702\u20130.988)",
+      "point": 0.9333,
+      "what": "how often the gate blocks output carrying a deliberately injected fault"
+    }
+  },
+  "generated_by": "tests/judge_calibration.py (python3 tests/golden_brief_eval.py --judge-calibration --publish)",
+  "instrument": "the BLOCKING coach quality gate (ADR-108) as it actually ships: deterministic number-grounding prepass + LLM judge",
+  "margin": {
+    "boundary_half_width": 15,
+    "empty_interval": [
+      42,
+      82
+    ],
+    "errors": [
+      {
+        "distance_from_threshold": 18,
+        "id": "training_01",
+        "judge_passed": false,
+        "kind": "false_flag_on_good_work",
+        "label": "good",
+        "score": 42
+      },
+      {
+        "distance_from_threshold": 32,
+        "id": "canary_vendor_leak",
+        "judge_passed": true,
+        "kind": "missed_defect",
+        "label": "defective",
+        "score": 92
+      }
+    ],
+    "n_within_boundary_band": 0,
+    "reasons": [
+      "The boundary region is empty. 0 of 45 labeled cases score within \u00b115 of the threshold (45\u201375); the floor is 10. Observed scores straddle the threshold with a 40-point hole in between (nothing between 42 and 82). A margin width fitted here is fitted to no data.",
+      "None of the judge's 2 observed errors is a boundary error. The nearest (training_01, false_flag_on_good_work, score 42) sits 18 points from the threshold. A band around the threshold would therefore change the gate's behaviour without preventing a single failure this corpus has ever seen.",
+      "The only band the evidence motivates is [42, 60], fitted to n=1 rescued golden(s) \u2014 an overfit by inspection. 0 of 15 labeled defects score inside this band. Zero observed leaks is NOT zero leakage: the 95% upper bound on the leaked share is 0.2039 \u2014 up to 20% of defects could land inside a band this gate would stop hard-blocking. A gate that stops hard-blocking a band which may contain a fifth of all defects is not a safer gate.",
+      "Both classes are polar BY CONSTRUCTION \u2014 the goldens were hand-authored to be obviously publishable and the canaries to carry an obvious injected fault. Neither was sampled from the borderline drafts a margin exists to protect, so no amount of re-running this corpus populates the boundary region."
+    ],
+    "verdict": "NOT_ESTIMABLE",
+    "what_would_change_this": "Labeled BORDERLINE drafts \u2014 at least 10 coach outputs whose true quality is genuinely arguable, scored by the judge, with Matthew's pass/fail label. Real held drafts are the natural source: they are borderline by definition. They are not retained today (coach_quality_gate performs no put_item), so this needs a retention change first, not another run."
+  },
+  "measured_at": "2026-08-13",
+  "must_ship_with": [
+    "These are the COMBINED gate's rates, not the LLM judge's own discrimination: 12 of the 15 blocking decisions came from a deterministic arithmetic check that runs before the model.",
+    "The negatives are hand-authored faults of known classes, not a sample of the defects real generation produces. This does not generalise to field failure modes.",
+    "The positives were authored to be obviously clean, so 'agrees with good work' measures the easy half of the job and says nothing about borderline drafts.",
+    "A point-in-time measurement of one model version, not a running average. See the re-evaluation cadence in tests/fixtures/golden_briefs/README.md."
+  ],
+  "schema": "judge_calibration/1",
+  "separability": {
+    "best_canary": 92,
+    "goldens_that_would_be_held_to_catch_it": 30,
+    "highest_scoring_missed_defect": {
+      "id": "canary_vendor_leak",
+      "score": 92
+    },
+    "n_good": 30,
+    "note": "Catching canary_vendor_leak (score 92) requires a threshold above it, which would also hold 30 of 30 genuinely good drafts. PASS_SCORE_THRESHOLD has no setting that buys this defect back at an acceptable price \u2014 the fix is rubric coverage, not tuning.",
+    "separable_by_any_threshold": false,
+    "worst_golden": 42
+  },
+  "withheld": []
+}

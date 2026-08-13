@@ -399,7 +399,49 @@ export function renderCalibration(d) {
     `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
   );
   const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
-  return _sealBlock(d && d.prereg_seal) + pair + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
+  return _sealBlock(d && d.prereg_seal) + pair + relTbl + board + hypLine + _judgeBlock() + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
+}
+
+// #1374 — calibrating the GRADER, not the forecasts. Everything above scores the
+// coaches' predictions; this scores the instrument that decides whether a coach's
+// draft is allowed to ship at all (the blocking ADR-108 quality gate). A verdict
+// published without the judge's own error rates is an instrument reading with no
+// calibration certificate.
+//
+// The data is inlined by scripts/v4_build_evidence.py from the artifact the
+// harness writes, so nothing here is hand-typed. Two rules this renderer must
+// never break: (1) never print a point estimate without its n and interval;
+// (2) never drop `must_ship_with` — those caveats are the difference between a
+// measurement and a boast.
+function _judgeBlock() {
+  const j = (typeof window !== "undefined" && window.__JUDGE_CALIBRATION__) || null;
+  const figures = (j && j.figures) || {};
+  const keys = Object.keys(figures);
+  if (!keys.length)
+    return sec(
+      "Calibrating the grader",
+      empty("The blocking quality gate that decides whether a coach's draft ships has not been re-measured against the labeled corpus yet. No figure is shown rather than a stale one — run <code>python3 tests/golden_brief_eval.py --judge-calibration --publish</code>."),
+    );
+  const rows = keys
+    .map((k) => {
+      const f = figures[k];
+      const [lo, hi] = f.ci95_wilson || [];
+      return `<tr><td class="rd-name">${esc(f.what || k)}</td><td class="num">${esc(String(f.numerator))}/${esc(String(f.denominator))}</td><td class="num">${fmt(f.point * 100)}%</td><td class="num rd-range">${lo != null ? fmt(lo * 100) + "–" + fmt(hi * 100) + "%" : "—"}</td></tr>`;
+    })
+    .join("");
+  const caveats = (j.must_ship_with || []).map((c) => `<li>${esc(c)}</li>`).join("");
+  const margin =
+    j.margin_verdict === "NOT_ESTIMABLE"
+      ? `<p class="rd-prose"><strong>What is deliberately not built:</strong> gating does <em>not</em> soften near the pass mark. ${esc(j.margin_reason || "")} A margin fitted to no data is a made-up number wearing a statistic, so the gate keeps its hard regenerate-or-hold behaviour until borderline drafts are labeled.</p>`
+      : "";
+  return sec(
+    "Calibrating the grader — the gate that blocks a coach's draft",
+    `<p class="rd-prose">Everything above grades the coaches' <em>forecasts</em>. This grades the <em>grader</em>: the blocking quality gate every coach narrative must pass before it ships. It was replayed against ${esc(String(j.corpus_n))} hand-labeled coach outputs${j.measured_at ? ` on ${esc(j.measured_at)}` : ""} — known-good ones it should pass, fault-injected ones it should catch.</p>` +
+      `<table class="rd-tbl"><thead><tr><th>what was measured</th><th>n</th><th>rate</th><th>95% CI</th></tr></thead><tbody>${rows}</tbody></table>` +
+      margin +
+      `<p class="rd-prose">Read these with:</p><ul class="rd-tierlist">${caveats}</ul>` +
+      `<p class="rd-archive">Full record — every case, every score, the margin analysis: <a href="/data/judge_calibration.json">/data/judge_calibration.json</a>.</p>`,
+  );
 }
 
 export function renderPredictions(d) {
