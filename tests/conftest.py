@@ -235,6 +235,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # are blindness detectors — a derivation that returns [] must red BEFORE the
         # merge, not after, which is the entire point of this list.
         "test_gate_census_2578.py",
+        # #2632: the bundle-boot gate's WIRING. The gate itself is a pre-merge step and
+        # a deploy-path step; this file is what stops the call site vanishing again, and
+        # the removal it guards against is invisible in any diff that does not touch it.
+        "test_bundle_boot_wiring_2632.py",
         "test_csp_native_embeds_1678.py",
         "test_archive_handover.py",  # a dated handover committed to main (#1650)
         # #2570: the CQ-01 pin guard stopped hand-listing the workflow files and now

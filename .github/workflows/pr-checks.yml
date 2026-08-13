@@ -119,3 +119,17 @@ jobs:
       - name: Lint gate (ruff — same command + pin as ci-lint.yml)
         if: always()
         run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+      # #2632. THE ONE CLASS EVERY GATE ABOVE IS STRUCTURALLY BLIND TO. tests/conftest.py
+      # puts lambdas/ AND each subpackage on sys.path so flat-name imports keep resolving,
+      # so a stale `import ai_calls` left behind by a packaging move passes collection,
+      # passes the premerge lane, passes mypy — and raises ImportError on the Lambda. This
+      # step stages the real bundle and imports all 397 modules in a subprocess whose only
+      # first-party sys.path entry is the bundle root, which is what /var/task actually is.
+      # Same script also runs on the deploy path (deploy/build_bundle.py, default-ON);
+      # this copy is the pre-merge early warning so the failure reaches a human first.
+      # Measured 4.0s in exactly this lane's dependency set. --compare suppresses the 4
+      # Pillow-from-a-layer modules this lane cannot import; see the baseline file.
+      - name: Bundle-boot gate (every module imports out of a STAGED bundle)
+        if: always()
+        run: python3 scripts/verify_bundle_boot.py --compare deploy/bundle_boot_baseline.json
