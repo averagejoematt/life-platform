@@ -4,6 +4,7 @@
 > **Method:** 2-lens deep read of `lambdas/character_engine.py` (v1.3.0) + `lambdas/compute/character_sheet_lambda.py` + `config/character_sheet.json`, plus a 420-day simulation harness driving the real engine (`scripts/character_sim_year.py`), followed by independent adversarial verification — every number below was reproduced twice (finder + verifier) against the live config.
 > **Question asked:** is growth AND retraction defensible over a year-plus, multi-cycle project, across the pillars?
 > **Companions:** `docs/engines/CHARACTER.md` (the formulas), `docs/specs/SPEC_CHARACTER_ENGINE_v1.1.0.md`, `docs/reviews/REVIEW_CHARACTER_LEVELING_2026-03-30.md` (F-01…F-15), ADR-104 (behavioral absence), #913/#919 (atrophy/debt/up-gate).
+> **Gate status (#2619):** deliberately EXEMPT from the #973 engine-doc source-drift gate, listed with its reason in `ENGINE_DOC_EXEMPT` (`scripts/check_doc_index.py`) and printed on every gate run. This page carries neither a Verified stamp nor a Sources-of-truth line **on purpose** (both written unhyphenated elsewhere — spelled this way here so this sentence is not itself parsed as one): it is a frozen record of what the math was on 2026-07-11 (engine v1.5.0 / config v1.4.0), so re-verifying it against today's source would destroy the record. Living claims about the engine as it stands today belong in `CHARACTER.md`, which IS gated. Before #2619 this page was *silently skipped* — exemption by incompleteness; it is now an explicit, written decision.
 
 ## Verdict table
 
