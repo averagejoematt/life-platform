@@ -186,7 +186,12 @@ def test_prompt_truncates_oversized_prose():
     # Overhead allowance = rubric + footer, not prose. 4000 → 5000 on 2026-08-09:
     # the DO-NOT-flag ledger grew the two pre-start clauses ("··" honest-absence
     # glyph + habitual-present design copy, the cycle-13 false-positive class).
-    assert len(prompt) < rtq.MAX_PROSE_CHARS + 5000
+    # 5000 → 6000 on 2026-08-13 (#2613): the wake-date ruling widened from the
+    # scalar `night_of` to the dated SERIES, the clause class that had been
+    # re-failing nightly at Day 3. ~660 chars ≈ 165 Haiku tokens per batch, twice
+    # a night — the ledger IS the rule in this module, so it is allowed to grow;
+    # this bound exists to keep it from growing UNNOTICED, not to freeze it.
+    assert len(prompt) < rtq.MAX_PROSE_CHARS + 6000
 
 
 def test_batching_four_to_six_surfaces_per_call():

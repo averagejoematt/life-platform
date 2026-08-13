@@ -199,6 +199,45 @@ def _phase_line(phase):
 # after genesis. A pre-genesis night on a surface claiming any OTHER day, a
 # pre-genesis MEASUREMENT presented as this cycle's, or prose asserting history that
 # genesis makes impossible all stay flaggable at full severity.
+#
+# ── 2026-08-13 (#2613): the SAME ruling, one locus wider — the trend SERIES ────
+# The clause above was written against the scalar `night_of`, and that is exactly how
+# far it reached. Three consecutive nightlies (2026-08-12 and twice on 2026-08-13)
+# published a high finding on /api/sleep_detail at **Day 3**, which #2583's Day-1
+# genesis clause cannot cover. The log line truncates each finding at 90 chars
+# (qa_check_reader_truth._fmt), so all three read as different defects; reproduced
+# untruncated at the real call site, they are one finding with three phrasings:
+#
+#   "sleep_trend contains a row dated 2026-08-10 with sleep_start timestamp
+#    2026-08-10T05:05:46.420Z. Per the figure_scope documentation, trend rows are
+#    keyed by WAKE date, so this row represents the night of 2026-08-09. However,
+#    the experiment started on 2026-08-10 (Day 1); data from the night of 2026-0…"
+#
+# The three truncated tails — "but the e…", "but the sleep_s…", "with the 202…" —
+# are "the experiment started", "the sleep_start timestamp", and "the 2026-08-10
+# row". Same claim each night.
+#
+# THE RULING: the surface is correct; the check is under-scoped. The trend is clamped
+# to genesis (ADR-077) and keyed by WAKE date (#1923), so its EARLIEST row is dated
+# exactly the cycle start and its bedtime necessarily falls the evening before Day 1.
+# The payload already declares the convention in three places (`frame`,
+# `figure_scope.trend_date_convention`, and a `trend_note` sentence) — and #2344's
+# trend_note is what taught the model the wake-date rule it then used to build the
+# accusation.
+#
+# IT RECURS ON EVERY CYCLE RESET, AND NOT ONLY ON DAY 1 — that is the finding worth
+# more than this instance. The trend window is `_experiment_date(30)` clamped to
+# genesis, so the genesis-dated first row sits in the payload for the FIRST 30 DAYS of
+# every cycle, then ages out on its own. A Day-1-scoped clause (#2583's shape) would
+# have gone quiet on Day 2 and left 29 more nights of noise; the clause below is
+# written for the recurrence, keyed off "the cycle start", never a 2026-08 date.
+#
+# WHY THIS WIDENING IS SAFE. The defect it resembles — a row genuinely dated before
+# genesis, i.e. an ADR-077 clamp breach — is now caught deterministically by
+# phase_plausibility R6 (#2613), which is arithmetic and therefore never budget-paused.
+# Per ADR-105 the deterministic layer leads; the prose clause only exempts what that
+# layer has already cleared. R6 checks the row's own `date`; the clause exempts the
+# NIGHT behind a genesis-dated row. They cover disjoint halves of the same question.
 
 _PROMPT_HEADER = """You are a meticulous editorial truth reviewer for a public "measured life" \
 experiment site. Below is the RENDERED TEXT of {k} of its surfaces (page prose and/or API payloads — \
@@ -244,6 +283,14 @@ were recorded against, so the night behind Day 1's morning is necessarily the ni
 that is the frame being correct, not two surfaces disagreeing about the date. Still flag a night \
 that precedes the cycle start by MORE than one day, and still flag a pre-cycle measurement \
 presented as this cycle's progress;
+- the same wake-date frame in a dated SERIES: the earliest row of a wake-date-keyed array \
+(`sleep_trend`) dated exactly the cycle start, whose `sleep_start` bedtime therefore falls on \
+the EVENING BEFORE the cycle start. Series clamp to genesis and key by wake date, so the first \
+row of a cycle always describes the night before Day 1 — and it stays in the payload for the \
+first 30 days, not just Day 1. The payload's own `figure_scope` / `trend_note` convention notes \
+are the site DISCLOSING this frame, never evidence against it. Still flag a row whose own \
+`date` is BEFORE the cycle start (a clamp breach, also checked in code), and a row whose night \
+precedes the cycle start by more than one day;
 - story/archive/chronicle content clearly dated before the current cycle;
 - the same header/nav/footer chrome appearing on every page;
 - API field names or JSON structure — judge only human-readable narrative values inside them;

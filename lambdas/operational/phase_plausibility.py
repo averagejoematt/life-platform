@@ -41,6 +41,59 @@ _SPAN_DECL_RE = re.compile(r"(?:^|_)(?:window_days|actual_days)$")
 # Numeric keys that claim the current experiment day outright.
 _DAY_CLAIM_KEYS = {"day_n", "experiment_day", "cycle_day"}
 
+# ── R6 (#2613): a dated series row may not predate the cycle start ───────────
+#
+# The deterministic half of the #2613 ruling, and the reason that ruling is safe.
+# ADR-077 clamps every trailing window to genesis ("clamped, not hidden"), so on a
+# STRICT payload a row dated before the cycle start is a clamp breach — arithmetic,
+# not judgment. Existing rules did not ask this: R1-R4 read numeric fields and R5
+# deliberately SKIPS a row carrying its own `date` key (a dated row inside a dated
+# series is scoped by its key), so no rule looked at the date itself.
+#
+# It exists because #2613 widens the LLM's wake-date clause to cover the earliest
+# TREND ROW, not just the scalar `night_of`. A widened prose exemption can mask the
+# real defect it resembles, so the real defect is now caught by code that cannot be
+# budget-paused (the #1920/#1927 dark-window lesson). The exemption covers a row
+# dated exactly genesis whose NIGHT is genesis-1; this rule still reds a row whose
+# own DATE is before genesis.
+#
+# strict=True only, and for R4's documented reason: strict surfaces are clamped
+# with no legitimate prior-cycle narration, while a narrative payload (/api/coaches)
+# may legitimately carry rows dated in a labeled earlier cycle.
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _pre_genesis_row_findings(page, payload, start_date):
+    """R6 — no row in a dated series on a strict live payload predates the cycle start.
+
+    Scope is the row's OWN `date` key. A timestamp *inside* a genesis-dated row
+    (`sleep_start`) is deliberately NOT checked: sleep rows are wake-date keyed
+    (#1923), so the first row of every cycle legitimately begins on the evening
+    before Day 1. That is the artefact #2613 exempts, and conflating it with a
+    genuinely pre-genesis row is exactly the mistake this rule guards against.
+    """
+    findings = []
+    for path, obj in _objects(payload):
+        if not isinstance(obj, dict):
+            continue
+        d = obj.get("date")
+        if not isinstance(d, str) or not _ISO_DATE_RE.match(d) or d >= start_date:
+            continue
+        findings.append(
+            {
+                "page": page,
+                "category": "temporal_contradiction",
+                "severity": "high",
+                "note": (
+                    f"{path or '<root>'}.date = {d} predates the cycle start {start_date} — every trailing window "
+                    f"on a live surface is clamped to genesis (ADR-077), so a prior-cycle row reaching a live "
+                    f"series is a clamp breach, not a short window (#2613)"
+                ),
+            }
+        )
+    return findings
+
+
 # "Day N" claims inside string values (e.g. window_disclosure prose). Only
 # applied to payloads swept with strict=True: on a strict surface (vitals) no
 # prior-cycle narration exists, so a Day number beyond today's is impossible
@@ -149,14 +202,17 @@ def _is_number(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
-def check_payload(page, payload, day_n, strict=False):
+def check_payload(page, payload, day_n, strict=False, start_date=None):
     """Deterministic phase-plausibility findings for one live JSON payload.
 
     Args:
         page: the surface path, used verbatim in findings (reader_truth shape).
         payload: the parsed JSON object.
         day_n: 1-indexed current experiment day (reader_truth_qa.phase_context).
-        strict: also apply the bare "Day N" prose rule to string values.
+        strict: also apply the bare "Day N" prose rule to string values, and R6.
+        start_date: the cycle start (phase_context's `start_date`), for R6. Omitted
+            => R6 is skipped: a rule with no genesis to compare against must not
+            guess one (the same fail-soft posture as the rest of this module).
 
     Returns a list of {"page", "category", "severity", "note"} findings.
     Pre-start (day_n == 0) returns only R5 — the phase rules R1–R4 have nothing to
@@ -167,6 +223,11 @@ def check_payload(page, payload, day_n, strict=False):
     # R5 runs FIRST and outside the pre-start guard: it asks whether a figure names its
     # night, which is not a question about the experiment day (see the block above).
     findings = _night_label_findings(page, payload)
+    # R6 (#2613) is likewise phase-independent — "before genesis" is a date comparison,
+    # not a day count — so it runs outside the pre-start guard too. A FUTURE genesis
+    # (#931/#939) is precisely when a stale prior-cycle row is most likely to leak.
+    if strict and start_date:
+        findings.extend(_pre_genesis_row_findings(page, payload, start_date))
     if not day_n or day_n < 1:
         return findings
     for path, key, value in _walk(payload):
@@ -238,7 +299,8 @@ def sweep_payloads(payloads, today_iso=None):
     """
     from operational.reader_truth_qa import phase_context
 
-    day_n = phase_context(today_iso)["day_n"]
+    phase = phase_context(today_iso)
+    day_n = phase["day_n"]
     findings, warnings = [], []
     for p in payloads:
         try:
@@ -246,5 +308,13 @@ def sweep_payloads(payloads, today_iso=None):
         except (ValueError, KeyError) as e:
             warnings.append(f"{p.get('path', '?')} — not checkable ({str(e)[:80]})")
             continue
-        findings.extend(check_payload(p.get("path", "?"), payload, day_n, strict=bool(p.get("strict"))))
+        findings.extend(
+            check_payload(
+                p.get("path", "?"),
+                payload,
+                day_n,
+                strict=bool(p.get("strict")),
+                start_date=phase["start_date"],  # R6 (#2613)
+            )
+        )
     return findings, warnings
