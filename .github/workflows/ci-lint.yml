@@ -59,7 +59,9 @@ jobs:
         # unchanged: any red gate still fails the job (each step's own non-zero exit),
         # which still skips test-critical → plan → deploy.
         if: always()
-        run: pip install black==26.3.1 ruff==0.14.14
+        run: |
+          PINS=$(python3 scripts/ci_pins.py black ruff)   # versions from requirements-dev.txt (CQ-01, #2609)
+          pip install $PINS
 
       - name: Format gate (black — ENFORCED, config in pyproject.toml)
         if: always()
@@ -72,7 +74,8 @@ jobs:
       - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
         if: always()
         run: |
-          pip install mypy==2.3.0  # MUST equal requirements-dev.txt (CQ-01, #1963)
+          PINS=$(python3 scripts/ci_pins.py mypy)   # version from requirements-dev.txt (CQ-01, #1963/#2609)
+          pip install $PINS
           echo "::group::Mypy on the first-party clean surface (#1656)"
           # Authoritative list: tests/mypy_clean_set.py (single source of truth,
           # also consumed by tests/test_mypy_clean_modules.py so the two can't

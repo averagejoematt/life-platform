@@ -97,11 +97,18 @@ def test_the_two_lanes_install_the_same_dependencies():
     miss reached main on 2026-08-08."""
 
     def _pins(text):
+        """The package NAMES a lane installs.
+
+        #2609 removed the literal `tool==version` from both lanes — the versions now
+        come from requirements-dev.txt via scripts/ci_pins.py, so the workflow line is
+        a list of bare names. This parses that list; the property being guarded (equal
+        dependency SETS across the two lanes) is name-level and unchanged.
+        """
         for line in text.splitlines():
-            if "pip install pytest" in line:
-                body = line.split("pip install", 1)[1].split("#", 1)[0]
-                return {p.split("==")[0].strip() for p in body.split() if p.strip()}
-        raise AssertionError("no `pip install pytest…` step found")
+            if "ci_pins.py" in line and "pytest" in line:
+                body = line.split("ci_pins.py", 1)[1].split(")", 1)[0]
+                return {p.split("==")[0].strip() for p in body.split() if p.strip() and not p.startswith("-")}
+        raise AssertionError("no `ci_pins.py …pytest…` install step found (#2609: the lanes resolve pins from requirements-dev.txt)")
 
     pre = _pins(_text())
     post = _pins(CI_TEST.read_text(encoding="utf-8"))
@@ -209,7 +216,12 @@ def test_the_lane_installs_mypy_so_its_own_gate_cannot_be_vacuous():
     """tests/test_mypy_clean_modules.py carries `skipif(not _mypy_available())`. In a lane
     without mypy installed that test reports green while checking nothing — the exact
     shape of the coverage gate that could never fail (#2259)."""
-    assert "mypy==" in _text(), "pr-checks.yml stopped installing mypy — test_mypy_clean_modules.py silently degrades to a skip"
+    # #2609: the lane resolves versions from requirements-dev.txt, so the tell is the
+    # package NAME in the ci_pins.py call, not a literal `mypy==`. The property is
+    # identical — mypy must be installed in this lane or its gate is a silent skip.
+    text = _text()
+    installed = {n for line in text.splitlines() if "ci_pins.py" in line for n in line.split("ci_pins.py", 1)[1].split(")", 1)[0].split()}
+    assert "mypy" in installed, "pr-checks.yml stopped installing mypy — test_mypy_clean_modules.py silently degrades to a skip"
 
 
 def test_the_ruff_gate_runs_pre_merge():

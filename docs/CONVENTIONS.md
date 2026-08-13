@@ -166,15 +166,32 @@ black --check .
 python3 -m ruff check .
 python3 -m pytest tests/test_mypy_clean_modules.py     # the mypy-clean module set
 ```
-CI pins specific tool versions — read them from CI rather than quoting here
-(`grep -E 'black==|ruff==|mypy==' .github/workflows/*.yml requirements-dev.txt`).
-Grep the **whole workflows directory**, not one file: the #1655 extraction moved the
-lint pins out of `ci-cd.yml` into `ci-lint.yml`, and a single-file grep silently shows
-only the `requirements-dev.txt` half — exactly the half the next sentence tells you
-not to trust. Note `requirements-dev.txt` can drift from the CI pin; match the **CI**
-version when they disagree. (`tests/test_ci_pin_consistency.py` runs this command
-verbatim from this page and reds if it stops surfacing the CI-side pins, so a future
-workflow reshuffle can't blind it again.)
+CI pins specific tool versions. **Since #2609 there is exactly ONE place they are
+written down — `requirements-dev.txt`** — so read them from there and never quote a
+number here: `grep -E 'black==|ruff==|mypy==' requirements-dev.txt`. The workflows no
+longer carry a second copy; each install step names the packages it needs and resolves
+the versions at run time:
+
+```yaml
+- name: Install lane dependencies
+  run: |
+    PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore black hypothesis pyyaml mypy ruff)
+    pip install $PINS
+```
+
+To see which lane installs what: `grep -rn 'ci_pins.py' .github/workflows/`.
+An unknown package name is a hard error from `scripts/ci_pins.py`, never a silently
+unpinned install. **This is what makes a Dependabot dev-tooling bump land green with
+no hand-edit** — before #2609 the bot changed `requirements-dev.txt` and the CQ-01
+guard correctly failed until a human hand-edited 28 literal declarations across 8
+workflow files, so bumps got deferred and the pins rotted. The prior advice here
+("grep the whole workflows directory; match the *CI* version when they disagree") was
+right for a two-copy world and is now obsolete: two copies cannot disagree when there
+is one copy. `tests/test_ci_pin_consistency.py` runs the command above verbatim from
+this page, fails if any workflow re-introduces a literal pin, and fails if a workflow
+asks the resolver for a package `requirements-dev.txt` does not pin. **Bumping an
+action SHA (`uses: owner/action@<sha>`) is a separate problem** — different Dependabot
+ecosystem, different pin syntax, no second copy — and is untouched by this.
 
 **The CDK toolchain is pinned both directions too (#814, R22-MOD-01).** Before this
 fix, `ci-cd.yml`'s `npm install -g aws-cdk` had no version (always latest CLI) and

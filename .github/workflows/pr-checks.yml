@@ -70,7 +70,10 @@ jobs:
       # ci-test.yml's install step (minus pytest-cov, which only the coverage job needs);
       # tests/test_premerge_lane.py asserts the two stay in sync.
       - name: Install lane dependencies
-        run: pip install pytest==9.1.1 boto3==1.43.62 botocore==1.43.62 black==26.3.1 hypothesis==6.165.0 pyyaml==6.0.3 mypy==2.3.0 ruff==0.14.14  # pinned to match requirements-dev.txt + ci-test.yml + ci-lint.yml (CQ-01, #2058, #2258)
+        # Versions are READ from requirements-dev.txt, never copied here (CQ-01, #2609).
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore black hypothesis pyyaml mypy ruff)
+          pip install $PINS
 
       # `if: always()` from here down — the #749 lesson, applied to this lane. Sequential
       # gates mean the FIRST red masks every gate after it, so an agent fixes black,

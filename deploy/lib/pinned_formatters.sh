@@ -2,7 +2,8 @@
 # deploy/lib/pinned_formatters.sh — resolve black/ruff at the version CI pins.
 #
 # WHY THIS EXISTS (#2570). CI's format gate installs an exact pair of versions
-# (`.github/workflows/ci-lint.yml`: `pip install black==… ruff==…`). The
+# (`.github/workflows/ci-lint.yml`, which since #2609 RESOLVES them from
+# `requirements-dev.txt` via `scripts/ci_pins.py` rather than copying them). The
 # pre-commit hook and deploy/agent_commit.sh used to resolve those tools off bare
 # `PATH`. On 2026-08-11 that PATH black was 25.9.0 while CI pinned 26.3.1, and the
 # two DISAGREE on real files (lambdas/ai/ai_calls.py): the hook refused a commit
@@ -149,8 +150,8 @@ resolve_pinned_formatter() {
 
   {
     echo "[pinned-formatters] ❌ no ${tool} at the pinned version ${want} could be found."
-    echo "[pinned-formatters]    The pin is declared in $(_pf_requirements_file) and must equal CI's"
-    echo "[pinned-formatters]    (.github/workflows/ci-lint.yml). Using a different ${tool} is NOT safe:"
+    echo "[pinned-formatters]    The pin is declared in $(_pf_requirements_file), which is the ONE"
+    echo "[pinned-formatters]    place CI reads it from too (#2609). Using a different ${tool} is NOT safe:"
     echo "[pinned-formatters]    black 25.9.0 and 26.3.1 disagree on real files in this repo (#2570), so a"
     echo "[pinned-formatters]    local pass can red CI and a local 'fix' can red CI the other way."
     if [ -n "${report}" ]; then

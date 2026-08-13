@@ -33,6 +33,29 @@ new place that writes a pin is covered the moment it exists rather than the mome
 someone remembers this file. The resolution half of #2570 — which black binary the
 pre-commit hook actually EXECUTES, versus the version declared here — is a
 different question and lives in tests/test_formatter_pin_resolution.py.
+
+Resolved #2609 — the class, not the instance. Every extension above kept the same
+shape: TWO copies of a version (requirements-dev.txt + a literal in a workflow) and a
+guard demanding they agree. Only one copy had an automated bumper, so every Dependabot
+dev-tooling PR was born red and stayed red until a human hand-edited the other side —
+28 declarations across 8 workflow files, measured from source, not the 8 the failure
+log happened to name. Deferring bumps to avoid that hand-edit rots the pins, which is
+the thing Dependabot exists to prevent. The fix deletes the second copy: workflows now
+say WHICH packages they need and read the versions from requirements-dev.txt via
+scripts/ci_pins.py. Two copies cannot disagree when there is one copy.
+
+The guard's teeth move accordingly, and both directions are mutation-proved below:
+  * a workflow that re-introduces a literal `tool==version` fails
+    (test_no_workflow_carries_a_second_copy_of_a_pin) — a second copy is the defect
+    now, even when it happens to agree today;
+  * a workflow that asks the resolver for a package requirements-dev.txt does not pin
+    fails (test_every_resolver_argument_is_pinned) — the silent-miss mode, where a
+    rename leaves a gate running an unpinned tool;
+  * the tree-wide agreement guard (#2570) is unchanged and still covers every OTHER
+    place a version could be written down.
+Action-SHA bumps (`uses: owner/action@<sha>`) are a genuinely separate problem — a
+different Dependabot ecosystem, a different pin syntax, and no second copy — and are
+deliberately out of scope here.
 """
 
 import os
@@ -40,16 +63,30 @@ import re
 import subprocess
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# The enforced tool pins live across the orchestrator + the reusable lint/test
-# workflows since #1655 split ci-cd.yml (black/ruff moved to ci-lint.yml), plus the
-# two advisory/scheduled workflows that install the same tools independently
-# (#2058: pr-checks.yml, fresh-eyes.yml — previously outside this guard's scope).
-# Read the whole surface so the drift-guard follows the literal wherever it lives.
-_CI_FILES = [
-    os.path.join(_REPO, ".github", "workflows", f) for f in ("ci-cd.yml", "ci-lint.yml", "ci-test.yml", "pr-checks.yml", "fresh-eyes.yml")
-]
-_CI = _CI_FILES[0]  # kept for messages/back-compat
 _REQ = os.path.join(_REPO, "requirements-dev.txt")
+# The resolver every CI install goes through (#2609). Repo-relative: it is invoked
+# from the workflow's checkout root.
+_RESOLVER_SCRIPT = "scripts/ci_pins.py"
+
+
+def _tracked_files():
+    out = subprocess.run(["git", "-C", _REPO, "ls-files", "-z"], capture_output=True, text=True, check=True).stdout
+    return [p for p in out.split("\0") if p]
+
+
+def _workflow_files():
+    """Every tracked workflow, DERIVED (#2609 acceptance).
+
+    _CI_FILES used to be a hand-list of five, which is how #2058's blind spot happened
+    (pr-checks.yml/fresh-eyes.yml installed the same tools from outside the guard) and
+    how the #2609 blast radius got undercounted (site-deploy/visual-qa/v4-gate/
+    webkit-mobile-qa each pin playwright). A workflow is in scope the moment it exists.
+    """
+    return [p for p in _tracked_files() if p.startswith(".github/workflows/") and p.endswith((".yml", ".yaml"))]
+
+
+_CI_FILES = [os.path.join(_REPO, p) for p in _workflow_files()]
+_CI = _CI_FILES[0] if _CI_FILES else os.path.join(_REPO, ".github", "workflows", "ci-cd.yml")
 
 
 def _ci_gate_text():
@@ -193,25 +230,184 @@ def test_doc_pin_discovery_commands_surface_every_promised_pin():
 
 
 def test_doc_lint_pin_grep_surfaces_the_ci_side():
-    """The #2006 blindness class: the lint-tool grep must show the pins from a
-    workflow file, not just requirements-dev.txt — 'read the CI pin' must be
-    executable, not archaeology."""
+    """The #2006 blindness class, restated for the one-copy world (#2609).
+
+    #2006's defect was that the documented command showed only the requirements-dev.txt
+    half while the ENFORCED version lived in a workflow the grep didn't cover — 'read
+    the CI pin' was archaeology. Since #2609 the enforced version and the local one are
+    the same string in the same file, so the requirement inverts: the documented
+    command must surface it, AND the page must say how CI gets there, or the reader is
+    back to archaeology by a different route.
+    """
     lint_cmds = [(p, c) for p, c in _doc_pin_commands() if "mypy==" in p]
     assert lint_cmds, "no black/ruff/mypy pin-discovery command found in CONVENTIONS.md"
     for pattern, cmd in lint_cmds:
         proc = subprocess.run(cmd, shell=True, cwd=_REPO, capture_output=True, text=True)  # noqa: S602 repo-authored doc command
         assert proc.returncode == 0, f"documented pin-discovery command failed: {cmd}\n{proc.stderr}"
-        workflow_lines = [ln for ln in proc.stdout.splitlines() if ".github/workflows/" in ln]
+        assert "requirements-dev.txt" in cmd, f"the documented lint-pin command must read the file of record: {cmd}"
         for tool in ("black==", "ruff==", "mypy=="):
-            assert any(tool in ln for ln in workflow_lines), (
-                f"'{tool[:-2]}' CI pin not surfaced from .github/workflows/ by the documented command — "
+            assert tool in proc.stdout, (
+                f"'{tool[:-2]}' pin not surfaced from requirements-dev.txt by the documented command — "
                 f"the doc's grep is blinded again (#2006 regression): {cmd}"
             )
+    with open(_DOC, encoding="utf-8") as f:
+        doc = f.read()
+    assert _RESOLVER_SCRIPT in doc, (
+        f"CONVENTIONS.md §4 no longer names {_RESOLVER_SCRIPT}. With no literal pin in the "
+        "workflows, a reader who is not told how CI resolves its versions cannot answer "
+        "'what version does the gate run?' from the page — the #2006 failure, relocated."
+    )
 
 
 def test_dev_pins_match_ci_gate():
-    mismatches = _pin_mismatches(_ci_gate_text(), _GATED_TOOLS)
+    """Any gated tool a workflow STILL hardcodes must equal requirements-dev.txt.
+
+    Post-#2609 the workflows carry no literals, so this runs over an empty set and its
+    teeth live in the two tests below — but it stays, and stays exact, because the
+    moment someone re-introduces a literal (a new workflow copied from an old one, a
+    revert) it is the check that catches a wrong one. `_pin_mismatches` is proved to
+    fire by test_guard_fires_on_synthetic_divergence_for_a_newly_covered_tool above.
+    """
+    ci_text = _ci_gate_text()
+    still_literal = tuple(t for t in _GATED_TOOLS if re.search(rf"\b{re.escape(t)}==[0-9]", ci_text))
+    mismatches = _pin_mismatches(ci_text, still_literal)
     assert not mismatches, "dev tooling pins drifted from the enforced CI gate (CQ-01):\n" + "\n".join(mismatches)
+
+
+# --- #2609: one copy, read at install time -------------------------------------
+# The pin-parity class dies by deleting the second copy rather than automating the
+# hand-edit that kept it in sync. These are the teeth that replace the literal
+# comparison, and both are factored so a synthetic input can prove them red.
+
+
+def _resolver_arguments(text):
+    """Every package name passed to scripts/ci_pins.py in `text`, in order.
+
+    Parses the shell call form the workflows use:
+        PINS=$(python3 scripts/ci_pins.py black ruff)   # trailing comment
+    Stops at the closing paren so a trailing comment is never mistaken for a package,
+    and drops flags so `--requirements <path>` cannot be read as two packages.
+    """
+    names = []
+    for m in re.finditer(re.escape(_RESOLVER_SCRIPT) + r"([^)\n]*)", text):
+        skip_next = False
+        for tok in m.group(1).split():
+            if skip_next:
+                skip_next = False
+                continue
+            if tok.startswith("-"):
+                skip_next = "=" not in tok  # `--requirements PATH` consumes its value
+                continue
+            names.append(tok)
+    return names
+
+
+def _second_copy_declarations(texts_by_path, tools=_GATED_TOOLS):
+    """{path: [literal, ...]} for any file that hardcodes a gated tool's version."""
+    rx = re.compile(r"\b(%s)==([0-9][0-9A-Za-z.+\-]*)" % "|".join(re.escape(t) for t in tools))
+    return {path: [f"{t}=={v}" for t, v in rx.findall(text)] for path, text in texts_by_path.items() if rx.search(text)}
+
+
+def _unpinned_resolver_arguments(texts_by_path, known_pins):
+    """[(path, name), ...] for every resolver argument the pin file does not pin."""
+    known = {_normalize_pin_name(n) for n in known_pins}
+    return [
+        (path, name)
+        for path, text in sorted(texts_by_path.items())
+        for name in _resolver_arguments(text)
+        if _normalize_pin_name(name) not in known
+    ]
+
+
+def _normalize_pin_name(name):
+    """PEP 503 normalization — must agree with scripts/ci_pins.py::normalize."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _workflow_texts():
+    out = {}
+    for rel in _workflow_files():
+        with open(os.path.join(_REPO, rel), encoding="utf-8") as f:
+            out[rel] = f.read()
+    return out
+
+
+def test_no_workflow_carries_a_second_copy_of_a_pin():
+    """Direction 1 of the #2609 teeth. A literal `tool==version` in a workflow is the
+    defect itself — not only when it disagrees today, but because it WILL disagree the
+    next time Dependabot bumps requirements-dev.txt, and that bump then arrives red."""
+    offenders = _second_copy_declarations(_workflow_texts())
+    assert not offenders, (
+        "workflow(s) hardcode a tool version again (#2609). The version of record is "
+        f"requirements-dev.txt; install via `PINS=$(python3 {_RESOLVER_SCRIPT} <names>)` so a "
+        "Dependabot bump lands green with no hand-edit:\n  " + "\n  ".join(f"{p}: {sorted(set(v))}" for p, v in sorted(offenders.items()))
+    )
+
+
+def test_second_copy_guard_fires_on_a_synthetic_literal():
+    """Prove-red for direction 1, same pattern as the other synthetic proofs here."""
+    offenders = _second_copy_declarations({".github/workflows/fake.yml": "run: pip install black==0.0.1-synthetic\n"})
+    assert offenders, "the second-copy guard failed to fire on a synthetic hardcoded pin — regression"
+    assert "black==0.0.1-synthetic" in next(iter(offenders.values()))
+    # And it must NOT fire on the resolver form, or the fix is unshippable.
+    assert not _second_copy_declarations({"x.yml": f"PINS=$(python3 {_RESOLVER_SCRIPT} black ruff)\n"})
+
+
+def test_every_resolver_argument_is_pinned():
+    """Direction 2 of the #2609 teeth — the silent-miss mode.
+
+    A resolver call naming a package requirements-dev.txt does not pin would install
+    nothing for it. scripts/ci_pins.py exits non-zero at runtime, but that is a red CI
+    run on main; catching it here makes it a red on the PR that renamed the pin."""
+    bad = _unpinned_resolver_arguments(_workflow_texts(), _requirements_dev_pinned_tools())
+    assert not bad, (
+        "workflow(s) ask scripts/ci_pins.py for a package requirements-dev.txt does not pin " f"— the install would fail at runtime: {bad}"
+    )
+
+
+def test_resolver_argument_guard_fires_on_a_synthetic_unknown_package():
+    """Prove-red for direction 2."""
+    text = {"x.yml": f"PINS=$(python3 {_RESOLVER_SCRIPT} pytest not-a-real-package)"}
+    bad = _unpinned_resolver_arguments(text, {"pytest"})
+    assert bad == [("x.yml", "not-a-real-package")], bad
+    # Normalization must hold in both directions, or `pytest_cov` vs `pytest-cov`
+    # would read as a missing pin and this guard would cry wolf.
+    assert not _unpinned_resolver_arguments({"x.yml": f"{_RESOLVER_SCRIPT} pytest_cov"}, {"pytest-cov"})
+    # Flags are arguments, not packages.
+    assert not _unpinned_resolver_arguments({"x.yml": f"{_RESOLVER_SCRIPT} --requirements other.txt pytest"}, {"pytest"})
+
+
+def test_the_resolver_surface_is_not_vacuous():
+    """A derivation that finds nothing passes forever (#1189 lesson, applied again).
+
+    Every gated tool must actually be resolved by at least one workflow — otherwise a
+    workflow could quietly drop its install step and every test above stays green.
+    """
+    resolved = {_normalize_pin_name(n) for text in _workflow_texts().values() for n in _resolver_arguments(text)}
+    missing = sorted(t for t in _GATED_TOOLS if _normalize_pin_name(t) not in resolved)
+    assert not missing, f"no workflow resolves {missing} through {_RESOLVER_SCRIPT} — its CI install vanished or went back to a literal"
+    assert os.path.exists(os.path.join(_REPO, _RESOLVER_SCRIPT)), f"{_RESOLVER_SCRIPT} is missing — every CI install step would fail"
+
+
+def test_the_resolver_reads_the_same_pin_file_the_guard_does():
+    """The resolver must resolve against requirements-dev.txt itself, not a copy of it,
+    and must fail loudly on an unknown name rather than silently installing nothing."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("ci_pins", os.path.join(_REPO, _RESOLVER_SCRIPT))
+    ci_pins = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ci_pins)
+    assert os.path.abspath(ci_pins.DEFAULT_REQUIREMENTS) == os.path.abspath(_REQ)
+    for tool in _GATED_TOOLS:
+        (resolved,) = ci_pins.resolve([tool])
+        expected = _versions(_REQ, tool)
+        assert resolved.split("==")[1] in expected, f"{tool}: resolver returned {resolved}, requirements-dev.txt pins {expected}"
+    try:
+        ci_pins.resolve(["definitely-not-pinned"])
+    except LookupError as exc:
+        assert "definitely-not-pinned" in str(exc)
+    else:
+        raise AssertionError("the resolver silently accepted an unpinned package — a CI gate would run unpinned")
 
 
 # --- The declaration surface, DERIVED rather than hand-listed (#2570) ----------
@@ -243,11 +439,6 @@ _KNOWN_STALE_DECLARATIONS: dict = {}
 # carry a second copy of it (#2570). Derived from the tracked tree the same way as
 # everything else: any tracked shell file that sources or is the resolver.
 _RESOLVER = os.path.join("deploy", "lib", "pinned_formatters.sh")
-
-
-def _tracked_files():
-    out = subprocess.run(["git", "-C", _REPO, "ls-files", "-z"], capture_output=True, text=True, check=True).stdout
-    return [p for p in out.split("\0") if p]
 
 
 def _declaration_sites(tools=_GATED_TOOLS):
@@ -288,7 +479,10 @@ def test_declaration_derivation_is_not_vacuous():
         paths = sorted({p for ps in sites[tool].values() for p in ps})
         assert paths, f"derived zero declaration sites for {tool} — the derivation is broken, not the tree"
         assert "requirements-dev.txt" in paths, f"{tool} is no longer pinned in requirements-dev.txt (the resolver reads it)"
-        assert any(p.startswith(".github/workflows/") for p in paths), f"{tool} is no longer pinned in any CI workflow"
+    # Since #2609 the workflows deliberately declare NO version — they resolve it. The
+    # "CI actually installs this tool" half of the old assertion is now
+    # test_the_resolver_surface_is_not_vacuous, which checks the resolver call instead
+    # of a literal. Asserting a workflow literal here would forbid the fix.
 
 
 def test_every_declared_pin_agrees_tree_wide():
