@@ -197,11 +197,26 @@ def test_the_most_corroborated_id_sorts_first():
 # ── --show: token without chat id is a warning, not a neutral dash ────────────
 
 
+def _row(out: str, key: str) -> str:
+    return next(line for line in out.splitlines() if line.strip().startswith(key + " "))
+
+
 def test_show_flags_a_token_without_a_chat_id_as_unable_to_text_first(capsys):
     tg.show({"labs": {"bot_token": TOKEN}})
     out = capsys.readouterr().out
-    assert "cannot text first" in out
-    assert "labs" in out
+    # Asserted on the ROW, not merely on the page: the summary alone would let the
+    # per-bot dash keep reading as "not configured yet" while you scan the table.
+    assert "cannot text first" in _row(out, "labs")
+    assert "! 1 bot(s) can be texted but cannot text first" in out
+    assert TOKEN not in out
+
+
+def test_show_flags_an_optional_bot_the_same_way(capsys):
+    # The optional bots print through a second loop with its own trailing note;
+    # a warning that only landed on the primary loop would miss half the roster.
+    tg.show({"glucose": {"bot_token": TOKEN}})
+    out = capsys.readouterr().out
+    assert "cannot text first" in _row(out, "glucose")
     assert TOKEN not in out
 
 
