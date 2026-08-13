@@ -20,7 +20,9 @@ WHAT IT DOES PER BOT
      than by Dr. Webb answering in Dr. Park's voice a week from now.
   3. Calls ``getUpdates`` to discover your numeric chat id, if you have already sent
      the bot a message. The chat id is not a secret — it is the allow-list entry that
-     stops a stranger who finds the bot from interrogating your health data.
+     stops a stranger who finds the bot from interrogating your health data. It is
+     also what gates OUTBOUND: a bot with a token and no chat id can be texted but
+     can never text first, so the morning check-in and the event sweep stay dark.
   4. Merges into ONE secret, ``life-platform/telegram``. One secret rather than one
      per bot: it matches the ``life-platform/<source>`` convention every other
      integration uses, needs a single IAM grant and a single cached read, and costs
@@ -46,6 +48,36 @@ first five untouched. Re-entering a token for an existing bot updates just that 
 TIP: message each bot once from your phone ("hi") BEFORE running this, and it will
 find every chat id automatically. Telegram only retains recent updates, so a bot you
 messaged weeks ago may need one fresh message.
+
+ORDER MATTERS, AND THE SECOND STEP DISABLES PART OF THIS ONE (#2600).
+
+    1. python3 setup/setup_telegram_bots.py [key ...]        # this script
+    2. python3 setup/register_telegram_webhooks.py --url ...  # then webhooks
+
+Telegram delivers updates to ``getUpdates`` OR to a registered webhook, never both.
+So the moment step 2 has run for a bot, step 3 above stops working for it forever:
+``getUpdates`` answers ``409 Conflict: can't use getUpdates method while webhook is
+active``. That is not a transient error and no amount of messaging the bot clears it.
+
+Adding a coach AFTER webhooks exist is therefore normal, not an error — and this
+script handles it rather than reporting it as your mistake. When discovery is blocked
+by a live webhook it says so, and offers the chat id already proven on your other
+bots: a PRIVATE chat's ``chat.id`` IS your Telegram user id, the same number for
+every bot you talk to, so an id proven on one private bot is correct for all of them.
+(Group chats — the board — carry a negative id that is the GROUP, not you; those are
+never offered for adoption.) Decline the offer and it prompts for a typed id instead.
+Either way the new bot ends up outbound-capable with no hand-edit of the secret; then
+re-run step 2 to register the new bot's webhook.
+
+WHY NOT JUST deleteWebhook -> getUpdates -> setWebhook INSIDE THIS SCRIPT? It was the
+obvious option and it was rejected. It is a destructive mutation of a live serving
+path with a real failure window: a crash, a timeout or a Ctrl-C between the delete
+and the re-register leaves that coach unable to receive messages at all, and the
+re-register has to faithfully restore a URL, a secret_token and allowed_updates that
+this script does not own (register_telegram_webhooks.py does). Adoption reads nothing
+from Telegram and breaks nothing, so it is the default. If you ever do want the
+delete/re-register dance, run it deliberately through register_telegram_webhooks.py,
+which owns those values.
 """
 
 from __future__ import annotations
@@ -164,18 +196,136 @@ def verify(token: str) -> tuple[bool, str]:
     return True, f"@{me.get('username', '?')} — {me.get('first_name', '?')}"
 
 
-def discover_chat_ids(token: str) -> list:
-    """Chat ids that have messaged this bot recently. Not secret; the allow-list."""
+def discover_chat_ids(token: str) -> tuple[list, str | None]:
+    """Chat ids that have messaged this bot recently. Not secret; the allow-list.
+
+    Returns ``(ids, reason)``. ``reason`` is None when Telegram ANSWERED — an empty
+    list then genuinely means "nobody has messaged this bot". When Telegram refused,
+    ``reason`` carries its own ``description`` (#2600).
+
+    That distinction is the whole bug this signature exists to kill: the old version
+    returned a bare ``[]`` for both, so ``409 can't use getUpdates method while
+    webhook is active`` rendered as "send the bot a message, then re-run" — advice
+    that can never succeed, printed forever, blaming the operator for a state the
+    sibling script created.
+    """
     r = _api(token, "getUpdates")
     if not r.get("ok"):
-        return []
+        code = r.get("error_code")
+        return [], (r.get("description") or (f"error_code {code}" if code else "getUpdates was refused"))
     ids = []
     for upd in r.get("result") or []:
         for key in ("message", "edited_message", "channel_post", "my_chat_member"):
             chat = ((upd.get(key) or {}).get("chat")) or {}
             if chat.get("id") is not None and chat["id"] not in ids:
                 ids.append(chat["id"])
-    return ids
+    return ids, None
+
+
+def is_webhook_conflict(reason: str | None) -> bool:
+    """Is this getUpdates refusal the "a webhook owns the updates" 409?
+
+    Matched on Telegram's own wording rather than on the bare 409, because 409 is
+    also "terminated by other getUpdates request" — a different problem with
+    different advice, which must keep falling through to the generic branch.
+    """
+    d = (reason or "").lower()
+    return "webhook is active" in d or "can't use getupdates" in d
+
+
+def other_bot_chat_ids(payload: dict, exclude: str) -> list:
+    """Private chat ids already proven on the OTHER bots in this store.
+
+    A private chat's ``chat.id`` IS the user's Telegram id — the same number for
+    every bot they talk to — so an id proven by ``getUpdates`` on one private bot
+    is the correct id for a bot whose own discovery a webhook has blocked.
+
+    NEGATIVE ids are excluded: those are groups/supergroups (the board), where the
+    id identifies the ROOM and carries none of that equivalence. Ranked by how many
+    bots agree, so the owner's own id sorts above a one-off.
+    """
+    counts: dict[int, int] = {}
+    for key, entry in payload.items():
+        if key == exclude or not isinstance(entry, dict):
+            continue
+        for chat_id in dict.fromkeys(entry.get("chat_ids") or []):
+            try:
+                cid = int(chat_id)
+            except (TypeError, ValueError):
+                continue
+            if cid > 0:
+                counts[cid] = counts.get(cid, 0) + 1
+    return [cid for cid, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
+def _ask(prompt: str) -> str:
+    """One line of typed input. Never used for a token — tokens go through getpass."""
+    try:
+        return input(prompt).strip()
+    except EOFError:
+        return ""
+
+
+def _adopt_chat_ids(key: str, payload: dict) -> list:
+    """Recover a chat id for a bot whose getUpdates is walled off by a webhook."""
+    print("      A private chat's id IS your Telegram user id — the same number for every")
+    print("      bot you talk to — so an id already proven on another bot is this bot's too.")
+    candidates = other_bot_chat_ids(payload, exclude=key)
+    if candidates:
+        answer = _ask(f"      use chat id(s) {_fmt_ids(candidates)} from your other bots? [Y/n] ").lower()
+        if answer in ("", "y", "yes"):
+            return candidates
+    typed = _ask("      chat id (digits — @userinfobot will tell you yours; ENTER to skip): ")
+    if not typed:
+        print("    · skipped — this bot cannot text first until it has a chat id")
+        return []
+    try:
+        return [int(typed)]
+    except ValueError:
+        print(f"    ✗ {typed!r} is not a number — no chat id recorded for this bot")
+        return []
+
+
+def resolve_chat_ids(key: str, token: str, existing: dict, payload: dict) -> list:
+    """Chat ids to ADD for this bot. Prints exactly one outcome; never prints a token.
+
+    Three outcomes, deliberately distinguishable (#2600):
+      * Telegram answered with updates  -> the ids, minus what is already stored.
+      * Telegram answered with nothing  -> the original "send the bot a message"
+        advice, which in that case is still true and still works.
+      * Telegram refused because a webhook owns the updates -> say so, and offer the
+        path that works instead of the one that cannot.
+    """
+    known = list(existing.get("chat_ids") or [])
+    found, reason = discover_chat_ids(token)
+
+    if found:
+        fresh = [c for c in found if c not in known]
+        if not fresh:
+            print(f"    · chat id(s) unchanged: {_fmt_ids(known)}")
+        return fresh
+
+    if reason is None:
+        if known:
+            print(f"    · keeping known chat id(s): {_fmt_ids(known)}")
+        else:
+            print("    · no chat id yet — send the bot a message, then re-run for this key")
+        return []
+
+    if not is_webhook_conflict(reason):
+        print(f"    ! chat-id discovery failed: {reason}")
+        if known:
+            print(f"    · keeping known chat id(s): {_fmt_ids(known)}")
+        return []
+
+    print("    ! getUpdates is blocked: this bot already has a webhook registered, and")
+    print("      Telegram serves one or the other — never both. Messaging the bot will")
+    print("      NOT help; the updates go to the webhook.")
+    print(f"      Telegram said: {reason}")
+    if known:
+        print(f"    · keeping known chat id(s): {_fmt_ids(known)}")
+        return []
+    return _adopt_chat_ids(key, payload)
 
 
 def load_secret(client) -> dict:
@@ -200,7 +350,7 @@ def save_secret(client, payload: dict) -> None:
         )
 
 
-def _safe_ids(entry: dict) -> str:
+def _fmt_ids(ids) -> str:
     """Chat ids for display, coerced through int().
 
     Two jobs in one: chat ids are numeric by Telegram's contract, so int() is
@@ -208,7 +358,23 @@ def _safe_ids(entry: dict) -> str:
     text even if the stored entry were corrupted, which is what lets a static
     analyzer (and a reader) verify this script never prints a token.
     """
-    return ", ".join(str(int(c)) for c in (entry.get("chat_ids") or [])) or "—"
+    return ", ".join(str(int(c)) for c in (ids or [])) or "—"
+
+
+def _safe_ids(entry: dict) -> str:
+    """One entry's chat ids for display. Sanitized by _fmt_ids."""
+    return _fmt_ids(entry.get("chat_ids"))
+
+
+def _outbound_dead(payload: dict) -> list:
+    """Keys holding a token but no chat id — reachable, but unable to text first.
+
+    Flagged as a WARNING rather than shown as a neutral dash (#2600): a dash reads
+    as "not configured yet", but this combination is a live half-configured coach.
+    It answers when spoken to, so it looks healthy from the phone, while the morning
+    check-in and the event-triggered sweep it is supposed to start never fire.
+    """
+    return [k for k, _u, _w in ALL_BOTS if (payload.get(k) or {}).get("bot_token") and not ((payload.get(k) or {}).get("chat_ids") or [])]
 
 
 def show(payload: dict) -> None:
@@ -218,13 +384,20 @@ def show(payload: dict) -> None:
     for key, username, who in BOTS:
         e = payload.get(key) or {}
         tok = "set" if bool(e.get("bot_token")) else "—"
-        print(f"  {key:11s} {tok:8s} {_safe_ids(e):22s} {username} ({who})")
+        flag = "  ! no chat id — cannot text first" if tok == "set" and not (e.get("chat_ids") or []) else ""
+        print(f"  {key:11s} {tok:8s} {_safe_ids(e):22s} {username} ({who}){flag}")
     for key, username, who in OPTIONAL_BOTS:
         e = payload.get(key) or {}
         state = "set" if bool(e.get("bot_token")) else "—"
-        print(f"  {key:11s} {state:8s} {_safe_ids(e):22s} {username} ({who})  · not created by choice")
+        flag = "  ! no chat id — cannot text first" if state == "set" and not (e.get("chat_ids") or []) else "  · not created by choice"
+        print(f"  {key:11s} {state:8s} {_safe_ids(e):22s} {username} ({who}){flag}")
     missing = [k for k in KEYS if not (payload.get(k) or {}).get("bot_token")]
     print(f"\n  {len(KEYS) - len(missing)}/{len(KEYS)} configured" + (f" — still to do: {', '.join(missing)}" if missing else " — all set"))
+    dead = _outbound_dead(payload)
+    if dead:
+        print(f"\n  ! {len(dead)} bot(s) can be texted but cannot text first — no chat id: {', '.join(dead)}")
+        print("    outbound (the morning check-in, the event sweep) stays dark for these.")
+        print(f"    fix: python3 setup/setup_telegram_bots.py {dead[0]}  — ENTER at the token prompt keeps the stored token.")
 
 
 def main() -> int:
@@ -251,7 +424,8 @@ def main() -> int:
         return 2
 
     print("Paste each bot token from @BotFather. Input is hidden. Press ENTER alone to skip a bot.")
-    print("Tip: message each bot once from your phone first and the chat id is found automatically.\n")
+    print("Tip: message each bot once from your phone first and the chat id is found automatically.")
+    print("Already registered webhooks? getUpdates is blocked for those bots — this will say so and offer the id your other bots proved.\n")
 
     changed = 0
     for key, username, who in ALL_BOTS:
@@ -266,13 +440,12 @@ def main() -> int:
             # allow-list without re-pasting anything. A bot with no token is skipped.
             stored = existing.get("bot_token")
             if stored:
-                found = discover_chat_ids(stored)
-                fresh = [c for c in found if c not in (existing.get("chat_ids") or [])]
+                fresh = resolve_chat_ids(key, stored, existing, payload)
                 if fresh:
-                    existing["chat_ids"] = list(existing.get("chat_ids") or []) + fresh
+                    existing["chat_ids"] = list(dict.fromkeys(list(existing.get("chat_ids") or []) + fresh))
                     payload[key] = existing
                     changed += 1
-                    print(f"    ✓ token kept; new chat id(s): {', '.join(str(int(c)) for c in fresh)}\n")
+                    print(f"    ✓ token kept; chat id(s): {_fmt_ids(existing['chat_ids'])}\n")
                     continue
             print("    skipped\n")
             continue
@@ -286,15 +459,11 @@ def main() -> int:
             print(f"    ! heads up: that is not @{username}. If you meant a different coach, re-run for the right key.")
 
         entry = dict(existing, bot_token=token)
-        found = discover_chat_ids(token)
-        if found:
-            merged = list(dict.fromkeys(list(existing.get("chat_ids") or []) + found))
+        fresh = resolve_chat_ids(key, token, existing, payload)
+        if fresh:
+            merged = list(dict.fromkeys(list(existing.get("chat_ids") or []) + fresh))
             entry["chat_ids"] = merged
-            print(f"    ✓ chat id(s): {', '.join(str(int(c)) for c in merged)}")
-        elif existing.get("chat_ids"):
-            print(f"    · keeping known chat id(s): {', '.join(str(int(c)) for c in existing['chat_ids'])}")
-        else:
-            print("    · no chat id yet — send the bot a message, then re-run for this key")
+            print(f"    ✓ chat id(s): {_fmt_ids(merged)}")
         payload[key] = entry
         changed += 1
         print()

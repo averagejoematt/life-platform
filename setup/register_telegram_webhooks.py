@@ -21,6 +21,27 @@ a new bot added later picks up the existing webhook_secret.
 Also sets ``allowed_updates=["message"]`` — the platform only acts on plain new
 messages (edits are deliberately not turns), so Telegram shouldn't even deliver
 the rest.
+
+THIS SCRIPT PERMANENTLY DISABLES getUpdates FOR EVERY BOT IT REGISTERS (#2600).
+
+Telegram delivers updates to ``getUpdates`` OR to a registered webhook, never both.
+Registering here is therefore a ONE-WAY door for the sibling script's chat-id
+discovery: from this point on ``setup/setup_telegram_bots.py`` gets
+``409 Conflict: can't use getUpdates method while webhook is active`` for these
+bots, and no amount of messaging them will change that.
+
+So the order is: configure tokens and chat ids FIRST, register SECOND.
+
+    1. python3 setup/setup_telegram_bots.py [key ...]
+    2. python3 setup/register_telegram_webhooks.py --url <function-url>
+
+Adding a coach later is still fine — run (1) for the new key and it will detect the
+409, explain it, and offer the chat id your other bots already proved (a private
+chat's id is your Telegram user id, identical across bots), then run (2) again to
+register the newcomer's webhook. What is NOT fine is hand-editing the secret, and
+what this script deliberately does not do is call ``deleteWebhook`` to hand the
+updates back: that is a live serving path, and a crash between the delete and the
+re-register leaves a coach unable to receive anything at all.
 """
 
 from __future__ import annotations
