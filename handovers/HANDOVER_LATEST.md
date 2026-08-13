@@ -1,4 +1,4 @@
-# Handover — 2026-08-11→12: the three P1s, the owner's four calls, and an overnight bug bash (46 → 38)
+# Handover — 2026-08-11→13: the three P1s, the owner's calls, and the day the gates were audited (46 → 33)
 
 **Session:** autonomous, Opus, no `model:fable` work. Driver + 8 implementer agents.
 **Post-wrap addenda:** (1) the owner cleared all four held items — corpus 44 → 42, two long-held PRs landed; (2) an overnight bug bash on his say-so took it to **38** (non-fable 21 → **13**). Both are recorded in the final sections.
@@ -223,6 +223,17 @@ Querying EventBridge for the permanence schedule with `contains(Name,'permanence
 
 ## Residual / next picks
 
+- #2578 — the gate-audit epic: census done (421 gates, 0 verdicts), slice 2 in flight.
+- #2632 — `verify_bundle_boot.py` wired to nothing; in flight.
+- #2634 — a coach's prose cites an HRV its own `published_vitals` stamp does not record. The first real finding the fixed `cross_surface:vitals` check surfaced.
+- #2541 — starter scaffold in flight; **publication is an owner act** and stays unmet.
+- #1374 — AC2 shipped; AC3 refused with evidence (0 of 45 cases within ±15 of the threshold). Needs ≥10 borderline drafts, which is a **retention** change, not another run.
+- #1738 → #1739/#1740/#1737 — four issues behind one five-minute listen. The three renders are on the owner's Desktop.
+- #1571 — two five-minute owner jobs: re-condense the phone Project prompt, tick the §3 test log.
+- #1677 — paste fallback shipped; token provisioning deliberately deferred.
+- Deploy-gate ergonomics keep generating stranded-approval alerts; #2590 fixed the reporting half only. — not-work — a standing operational cost, not a queued item.
+- 24 `model:fable` issues unlock Saturday 2026-08-15; the queue roughly triples. — not-work — a scheduled event, not a task.
+
 - #2575 — one measurement after the ~17:0xZ coach regeneration confirms `failed_content_truth` drops to 0, then it closes. Cheapest close in the corpus.
 - #2588 — `docs/LICENSES.md` declares two stale tool pins, and #2581's widened guard now makes every dependabot bump touch that file. Decide which of the three options governs it.
 - #2578 — the gate-audit epic, not started. First slice is enumerating the gate inventory *from source* and reporting coverage with `n`.
@@ -274,3 +285,54 @@ The pre-existing `validate_against_judge_tells` reported **precision 0.915** —
 `/privacy/#permanence` needed the nightly archive to exist or the smoke test would have auto-rolled-back the site. Rather than wait for 06:00Z, I dry-ran `life-platform-permanence` (confirming `notification: null` — no email), then invoked it: **1,284,128 bytes / 360 entries / 115 of 115 API endpoints captured**, all three `/archive/*` URLs now 200.
 
 Final tip deploy `fe53bbe3a`: Deploy + Smoke green, rollback skipped, `recall_for_coach` and `not_attempted` verified live on `daily-brief`. Four superseded gated runs rejected along the way, one of which had stranded **9 hours** and was queueing everything behind it.
+
+---
+
+## 2026-08-13 — the gates turned out to be the story
+
+Sixteen more closed. **46 → 33 overall, non-fable 21 → 9.** The day started as backlog paydown and became a gate audit, because chasing main's red found the gates themselves were the defect.
+
+### The finding that reframed the day: three gates, one type annotation
+
+#1677 annotated `SOURCE_REGISTRY: dict[str, dict[str, Any]] = {...}` to settle a mypy widening. `ast.AnnAssign` is a different node type from `ast.Assign`, so **three AST-walking gates stopped finding the registry, returned empty, and PASSED**:
+
+- `ingestion_paused_sources` → `{}` — the paused-source gate went blind
+- `_registry_source_count` → `None` — the og-card count
+- **`test_wiki_checkers`'s deliberately INDEPENDENT cross-check had copied the same walk.** Both sides agreed on `None` and read green. *Two wrongs agreeing is the worst failure a cross-check has.*
+
+Bisected to `5a4731b85`, all three fixed, mutation-proven, and a test now guards the **set** of assignment forms — because the first pass fixed one and CI immediately red on the second. Written to memory as `reference_ast_walk_annassign_blindness`.
+
+### #2578's first slice, and it justified itself immediately
+
+`scripts/gate_census.py` derives enforcement points from five independent sources: **421 gates, 375 screened, 92 risk-flagged, 0 proven can-fail.** On its first real run it found **`verify_bundle_boot.py` — the check memory calls "the real gate" — wired to nothing** (#2632, now being fixed). Its author also reported that **two of its three crispest hits were false positives**, fixed the causes, and left the remaining precision stated as unknown rather than shipping a clean number.
+
+Also found: `ci-lint.yml` swallows flake8's status twice (`|| true`) — only `--select=E9,F63,F7,F82` enforces. **Deliberate** (the comment says so), but it means style violations are advisory, which is narrower than the reflex implies.
+
+### The best single idea came from an agent, not the brief
+
+#2610 was briefed to decide a policy. It added the rule that makes the policy survivable: **headroom is EARNED, never granted** — a PR extracting N lines may bank at most **N/5** and must hand the rest back. Without it, an extraction lands the file straight back at zero, *which is how the current 15 got there*. `monitoring_stack.py` 1623 → 1322, banked 60 of 301. Alarm set proven identical (99 → 99, 63 alarms both sides).
+
+### Agents corrected me, repeatedly, and were right every time
+
+- **`--no-paginate` was MY corrective and it was the bug.** It truncates at the first page. #2589's premise was false — the recall line had been firing 7×/day all along. Memory corrected: aggregate across pages; the cross-check saves you, not any flag.
+- I briefed #1571 to *build* the vlog mode. It already existed on main since 2026-07-26 and `/vlog` was in my own skills list. The agent measured first, rebuilt nothing, and found the real defect: the phone Project prompt had drifted, missing the day-number risk curve and the #1845 Goodhart rule.
+- I said #2588 would unblock both dependabot PRs. It doesn't — `LICENSES` appears **zero times** in #2576's failure. The real blocker is workflow pins (#2609, since fixed).
+- I called option (1) "truest" for #2575. An agent proved it **impossible**: nothing records when a whoop row became scored, so an as-of replay returns a number the coach never had.
+- #2611's family is **8** files not 6; #2619's zero-headroom set is **4** not 3; #2610's is **15** not 17. Every hand-count I made was wrong.
+
+### The negation trap fired three more times
+
+*"This PR does **not** close #1677"*, *"Please do not close #1374"* — GitHub matches `close #N` and ignores the negation. Caught all three before merge. **#1677 and #1374 are open because of that check**, both on genuinely unmet boxes.
+
+### Deploy ergonomics are now the recurring cost
+
+Three stranded-approval alerts in ~24h (#2601, #2621, #2630). Pattern is identical: a merge lands, its run parks at the gate, everything queues behind it. One sat **11.8h**. The tell that an older run holds the lease is a newer run showing `Deploy: pending` with an **empty** `pending_deployments`. #2590 fixed the *reporting* half; the ergonomic half is unchanged and keeps generating alerts.
+
+### Owner-facing outcomes
+
+- **All 10 Telegram bots wired** — tokens, chat ids, webhooks. Found the registrations were *inverted*: Okafor's bot routed to Max, Max's bot to a retired-seat refusal.
+- **Okafor got the longevity door** (ADR-153 amendment) — a bot is granted by `telegram_route`, not a tier flag. The `@ajm_longevity_bot` handle finally describes its owner.
+- **851 coach outputs indexed** — corpus 19 → 935 rows for $0.0094.
+- **Clause P5 cut** at the owner's direction; the limits clause rewritten so it stops pointing at a clause that no longer exists.
+- **Predict-the-week is live** and now rolls itself weekly.
+- **Tool-attribution trailers stopped**, and the "built with Claude" lines removed — including one on the live site my first grep had truncated out of view.
