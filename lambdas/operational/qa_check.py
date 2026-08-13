@@ -16,6 +16,7 @@ Re-exported from qa_smoke_lambda, so `qa_smoke_lambda.Check`,
 `.emf_summary_line`, `.PARTITIONS` and friends remain valid public entrypoints.
 """
 
+import hashlib
 import json
 
 # ── #1921: the two questions this sweep answers ──────────────────────────────
@@ -70,6 +71,13 @@ class Check:
         self.paused = False  # intentionally-paused surface: shown ⏸, not a fault
         self.chronic = False  # #1958: known-recurring timing warn — reported, never alarmed
         self.message = ""
+        # #2620: overflow for text the one-line `message` had to cut. The message
+        # is the scannable summary and stays exactly as short as it is today; each
+        # entry here is one additional LOG line the handler prints beneath it (see
+        # qa_smoke_lambda's `_print_details`). Deliberately NOT in the failure
+        # email and NOT in any metric — an email that carries every full finding
+        # stops being read, and the recovery path that was missing was the log.
+        self.details = []
 
     def ok(self, msg=""):
         self.passed = True
@@ -113,6 +121,116 @@ class Check:
         self.paused = True
         self.message = msg
         return self
+
+    def with_details(self, lines):
+        """#2620: attach overflow log lines. Chainable, so a call site reads
+        `det.fail(summary).with_details(details)` — the verdict and the text it
+        had to cut are set in ONE expression and cannot drift apart."""
+        self.details = [str(line) for line in (lines or [])]
+        return self
+
+
+# ── #2620: findings that survive their own summary line ──────────────────────
+# A finding used to be formatted as `f"{page} [{cat}] {note[:90]}"` and that was
+# the ONLY place its text ever went. Three consequences, all observed on #2613:
+#
+#   1. Two thirds of a 289-char note was discarded at generation time. The only
+#      way back to it was re-running the live call site by hand.
+#   2. Three nightly runs cut the SAME finding at three different points, so one
+#      problem read as three. Nothing in the line said which finding it was.
+#   3. `findings[:4]` dropped the fifth finding entirely, with no count saying so.
+#
+# The fix is deliberately the cheapest one that closes all three (issue option
+# (a)): the summary line is unchanged in shape and length, and every finding —
+# including the ones past the inline cap — also gets ONE full-text log line
+# underneath. Notes are already capped at 300 chars upstream
+# (reader_truth_qa._normalize_finding), and DETAIL_LINE_CAP bounds a pathological
+# run, so the worst case this adds is ~10 KB of CloudWatch ingest on a night with
+# findings and exactly ZERO bytes on a clean night (the common case).
+SNIPPET_CHARS = 90  # the inline summary budget, unchanged from #1096
+INLINE_FINDINGS = 4  # how many findings ride the summary line, unchanged
+DETAIL_LINE_CAP = 25  # bound the overflow on a pathological run
+
+
+def finding_group(finding):
+    """A short, RUN-INVARIANT id for a finding: 6 hex chars over page+category.
+
+    Deliberately NOT hashed over the note. The note is LLM-generated prose that
+    is reworded every night, which is exactly why #2613's three runs read as
+    three problems — the words moved, the problem did not. page+category is the
+    part that holds still, so the same defect carries the same id across runs and
+    an operator can see at a glance that last night's finding is tonight's.
+    """
+    page = str((finding or {}).get("page") or "?")
+    category = str((finding or {}).get("category") or "-")
+    # sha256, not sha1 — this is a display label, not a security boundary, but
+    # ruff's S324 is right that there is no reason to reach for a broken digest.
+    return hashlib.sha256(f"{page}|{category}".encode("utf-8")).hexdigest()[:6]
+
+
+def _dedupe(findings, key):
+    """Collapse byte-identical findings within ONE run, keeping order + a count."""
+    seen, out = {}, []
+    for f in findings or []:
+        f = f or {}
+        ident = (str(f.get("page") or ""), str(f.get("category") or ""), str(f.get("severity") or ""), str(f.get(key) or ""))
+        if ident in seen:
+            seen[ident][1] += 1
+            continue
+        entry = [f, 1]
+        seen[ident] = entry
+        out.append(entry)
+    return out
+
+
+def summarize_findings(findings, key="note", width=SNIPPET_CHARS, inline=INLINE_FINDINGS, cap=DETAIL_LINE_CAP):
+    """→ (inline_summary, detail_lines) for a list of finding dicts.
+
+    `inline_summary` is the scannable one-liner that goes in the Check message.
+    `detail_lines` carry the UNTRUNCATED text of every finding, one per line, for
+    the handler to print beneath it. Truncation in the summary is marked
+    `…[+N chars]` — an explicit statement that text was removed, where a bare `…`
+    read as prose (and, on a note that happened to end mid-sentence, as the
+    model's own ellipsis).
+
+    Shape-tolerant on purpose: `key` names the text field ("note" for the LLM and
+    plausibility passes, "detail" for the frozen-artifact pass), and severity may
+    be absent — the frozen-artifact findings carry no severity and must not need
+    one invented for them.
+    """
+    entries = _dedupe(findings, key)
+    parts, details = [], []
+    for f, count in entries[:inline]:
+        text = str(f.get(key) or "")
+        snippet = text if len(text) <= width else f"{text[:width]}…[+{len(text) - width} chars]"
+        dupes = f" ×{count}" if count > 1 else ""
+        parts.append(f"{f.get('page') or '?'} [{f.get('category') or '-'}·{finding_group(f)}]{dupes} {snippet}")
+    if len(entries) > inline:
+        parts.append(f"(+{len(entries) - inline} more finding(s), all listed below)")
+    for f, count in entries[:cap]:
+        text = str(f.get(key) or "")
+        sev = f.get("severity")
+        sev_part = f"/{sev}" if sev else ""
+        dupes = f" ×{count}" if count > 1 else ""
+        details.append(
+            f"finding {finding_group(f)} · {f.get('page') or '?'} [{f.get('category') or '-'}{sev_part}]{dupes} "
+            f"— full {key} ({len(text)} chars): {text}"
+        )
+    if len(entries) > cap:
+        details.append(f"({len(entries) - cap} further finding(s) not detailed — detail cap {cap}/run, #2620)")
+    return "; ".join(parts), details
+
+
+def detail_log_lines(check):
+    """The `[QA] DETAIL …` log lines for one check, formatted but not printed.
+
+    Lives here with the rest of the run's reporting vocabulary (and beside
+    emf_summary_line, which is the same shape: format here, emit in the handler)
+    so the emission contract is unit-testable without invoking the Lambda — the
+    thing that sends mail. A check with nothing truncated yields NO lines, which
+    is why a clean nightly costs zero extra CloudWatch ingest.
+    """
+    return [f"[QA] DETAIL [{check.partition}] {check.category} / {check.name}: {d}" for d in (getattr(check, "details", None) or ())]
 
 
 # ---------------------------------------------------------------------------
