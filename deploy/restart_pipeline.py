@@ -74,10 +74,9 @@ Steps (each can be skipped with --skip-<name>):
        c. dedup_source_records.py --source <name> per --dedup-source (repeatable) —
           raw-timeseries duplicate DATE# rows (the eightsleep UTC-rollover class).
        d. build_genesis_predict_week.py --genesis <target> --if-frozen --apply —
-          default ON (#2612). Re-seeds the predict-the-week subject that step 2d
-          just deleted; --skip-predict-week-seed to skip. Runs last because it
-          derives from the freeze hook (b) re-lands, and SKIPS loudly (exit 0)
-          when that freeze does not cover this genesis.
+          default ON (#2612): re-seeds the predict-the-week subject step 2d just
+          deleted. Last, because it derives from the freeze (b) re-lands; SKIPs
+          loudly when that freeze does not cover this genesis. --skip-predict-week-seed.
    14. --close-cycle: append one line to docs/restart/RESET_LOG.md
 
 DELIBERATELY NOT FOLDED (#1092 — each exclusion verified, not an omission):
@@ -87,18 +86,13 @@ DELIBERATELY NOT FOLDED (#1092 — each exclusion verified, not an omission):
   - genesis_prereg_stamp.py --apply, send_prereg_lock_email.py --apply (#1378) —
     public S3/SES surfaces on the attended posture; printed as labeled next steps
     (the email is eve-only and refuses to send on any other Pacific date).
-    build_genesis_predict_week.py --apply was on this list and came OFF it
-    2026-08-13 (#2612), recorded rather than quietly changed: the exclusion was
-    the one attended step whose absence the pipeline itself CAUSES (step 2d deletes
-    the subject every --apply; no lambda ever rewrites it), and two cycles proved
-    the attended posture does not hold — cycle 11 seeded the wrong week (#1952) and
-    cycle 13 never seeded at all, leaving the flagship reader hook dark for its
-    whole genesis week while the nightly (non-gating) qa-smoke said so into a warn
-    list. The step is also the weakest candidate for attendance on its own merits:
-    it is deterministic, derives every number from the SHA-256-verified freeze,
-    refuses to emit an empty or presentation-rule-violating payload, and is
-    trivially reversible (delete one S3 key). The genuinely attended steps — the
-    permanent public AI artifact and the one-shot SES send — stay attended.
+    build_genesis_predict_week.py --apply came OFF this list 2026-08-13 (#2612) —
+    recorded, not quietly changed. It was the one attended step whose absence the
+    pipeline itself CAUSES (step 2d deletes the subject; no lambda rewrites it), and
+    two cycles proved the posture does not hold: cycle 11 seeded the wrong week
+    (#1952), cycle 13 never seeded at all. It is also deterministic, freeze-derived
+    and reversible by deleting one S3 key. Full write-up: docs/INCIDENT_LOG.md
+    2026-08-13. The AI artifact and the one-shot SES send stay attended.
   - deploy/restart_verify.py — the POST-genesis Monday health check (asserts
     day_n >= 1, a genesis weigh-in, a post-genesis character sheet); folding it
     would structurally fail at reset time. Run it Monday morning.
@@ -124,12 +118,16 @@ import boto3
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+sys.path.insert(0, str(REPO_ROOT / "deploy"))  # #2612: importable when loaded by path (tests) as well as run as a script
 
 # ADR-077 registry — the single source of truth for what each pk family means.
 # READ-ONLY here (#1233 owns phase_taxonomy.py): the census preflight classifies a
 # representative of every live pk family through classify() and never mutates it.
 # prereg_voids: the #1199/#1978 grade-or-void ledger, shared with reconcile_prereg_voids.py.
+# restart_hooks: the #1092 post-verify hook sequence, split out at #2612 (this module
+# sits against the 1200-line ceiling); re-exported so the public entrypoint never moved.
 from experiment import phase_taxonomy as taxonomy, prereg_voids  # noqa: E402
+from restart_hooks import build_post_verify_hooks  # noqa: E402,F401
 
 REGION = "us-west-2"
 TABLE = "life-platform"
@@ -741,47 +739,6 @@ def build_sub_scripts(
     return sub_scripts
 
 
-def build_post_verify_hooks(
-    with_preregistration: bool = False,
-    dedup_sources: list[str] | None = None,
-    skip_prologue_fix: bool = False,
-    skip_predict_week_seed: bool = False,
-    genesis: str | None = None,
-) -> list[tuple[str, list[str]]]:
-    """The #1092 post-verify hook sequence — the former manual Sunday-queue steps.
-
-    Ordering constraint (verified): fix_prologue_cycle_and_subscribe_ttl reads SSM
-    /life-platform/experiment-cycle, so it must run AFTER bump_cycle_ssm (which fires
-    right after the intelligence wipe) — every post-verify position satisfies that.
-    fix_prologue is default-ON (issue-sanctioned change to default behavior); the
-    dedup/prereg hooks only run when their flags are passed, keeping the pipeline
-    byte-compatible when the new flags are absent.
-
-    Hook (d), predict-the-week re-seed (#2612, default-ON): step 2d
-    (clear_predict_week_subject) DELETES site/config/current_challenge.json on every
-    --apply, and nothing else writes it — no lambda, no wipe. Re-seeding it was an
-    attended printed next-step, so the pipeline reliably created a hole it did not
-    close: cycle 13 (genesis 2026-08-10) went dark for the whole genesis week, the
-    same class as the cycle-11 dark week (#1952). It runs AFTER
-    seed_genesis_preregistration because the subject derives from that freeze, and
-    it carries --if-frozen so a reset whose freeze has not been re-landed SKIPS
-    loudly (exit 0) instead of aborting the pipeline's final hooks.
-    """
-    hooks: list[tuple[str, list[str]]] = []
-    if not skip_prologue_fix:
-        hooks.append(("fix_prologue_cycle_and_subscribe_ttl", ["python3", "deploy/fix_prologue_cycle_and_subscribe_ttl.py", "--apply"]))
-    if with_preregistration:
-        hooks.append(("seed_genesis_preregistration", ["python3", "deploy/seed_genesis_preregistration.py", "--apply"]))
-    for src in dedup_sources or []:
-        hooks.append((f"dedup_{src}", ["python3", "deploy/dedup_source_records.py", "--source", src, "--apply"]))
-    if not skip_predict_week_seed:
-        cmd = ["python3", "deploy/build_genesis_predict_week.py"]
-        if genesis:
-            cmd += ["--genesis", genesis]
-        hooks.append(("seed_predict_week_subject", cmd + ["--if-frozen", "--apply"]))
-    return hooks
-
-
 def run_step(name: str, cmd: list[str], apply: bool, log: list[str]) -> int:
     print(f"\n──[ {name} ]──")
     print(f"    $ {' '.join(cmd)}")
@@ -1206,16 +1163,10 @@ def main():
     print("     python3 deploy/genesis_prereg_stamp.py --apply              # #1378: publish the frozen file + its SHA-256 stamp publicly")
     print("                                                                 #   (the seeder stamps at freeze time; this uploads the copy)")
     print("  •  GENESIS-EVE engagement, attended (#1378):")
-    if args.skip_predict_week_seed:
-        print(
-            "     python3 deploy/build_genesis_predict_week.py --apply        # NOT run (--skip-predict-week-seed): step 2d deleted the"
-            " subject, so predict-the-week is DARK until this runs (#2612; week_id = the GENESIS ISO week, #1952)"
-        )
-    else:
-        print(
-            "     (predict-the-week re-seed ran as post-verify hook (d) — #2612. If it printed 'SKIP (--if-frozen)', the freeze does not"
-            " cover this genesis yet: re-run python3 deploy/build_genesis_predict_week.py --apply after freezing.)"
-        )
+    print(
+        "     python3 deploy/build_genesis_predict_week.py --apply        # #2612: ran as post-verify hook (d) unless it printed"
+        " 'SKIP (--if-frozen)' or --skip-predict-week-seed was passed — in either case predict-the-week is DARK until you run this."
+    )
     print(
         '     python3 deploy/send_prereg_lock_email.py --apply            # the one "predictions lock tonight" email (eve-only; refuses late)'
     )

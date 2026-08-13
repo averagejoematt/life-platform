@@ -35,6 +35,14 @@ dedup = _load("dedup_source_records")
 # ── build_post_verify_hooks: the #1092 hook sequence ──────────────────────────
 
 
+def test_the_hook_builder_is_re_exported_from_the_pipeline():
+    # #2612 split build_post_verify_hooks into deploy/restart_hooks.py because
+    # restart_pipeline.py sat 7 lines under the 1200-line module-size ceiling. The
+    # public entrypoint must not have moved — every caller still reads it here.
+    hooks_mod = _load("restart_hooks")
+    assert pipeline.build_post_verify_hooks is hooks_mod.build_post_verify_hooks
+
+
 def test_default_hooks_are_prologue_fix_and_predict_week_seed():
     # The two default-ON hooks. predict-the-week's re-seed (#2612) is default-ON
     # because the pipeline's OWN step 2d deletes the subject on every --apply and
