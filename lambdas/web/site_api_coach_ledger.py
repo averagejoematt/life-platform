@@ -317,9 +317,15 @@ def _fetch_prediction_partition(coach_pk, *, _g):
     return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
 
 
-def _parallel_fetch(jobs):
+def _parallel_fetch(jobs, *, failures=None):
     """Run {key: thunk} concurrently; a failed job logs and yields [] (the same
-    shaped-empty degradation the old sequential per-coach try/except gave)."""
+    shaped-empty degradation the old sequential per-coach try/except gave).
+
+    #2658: pass a list as ``failures`` to also learn WHICH jobs degraded. A caller
+    rendering an honest-numbers surface needs that, because "every partition read
+    failed" and "there is genuinely no data" are indistinguishable from the return
+    value alone — both are all-empty. Callers that omit it are unaffected.
+    """
     out = {}
     if not jobs:
         return out
@@ -331,6 +337,8 @@ def _parallel_fetch(jobs):
             except Exception as _e:
                 logger.warning(f"[coach-partition-fetch] {key}: {_e}")
                 out[key] = []
+                if failures is not None:
+                    failures.append(key)
     return out
 
 
@@ -550,14 +558,25 @@ def handle_predictions(event, *, _g):
     _current_cycle = _g["_current_cycle"]
     _fetch_prediction_partition = _g["_fetch_prediction_partition"]
     _parallel_fetch = _g["_parallel_fetch"]
-    # #1980: computed first (never raises) so the seal still renders on the
-    # exception fallback below — see handle_calibration for the same pattern.
+    # #1980: computed first (never raises) so the seal is always available to the
+    # success payload below — see handle_calibration for the same pattern. NB since
+    # #2658 the exception path returns `_error`, not a seal-bearing 200.
     seal = prereg_seal_meta()
     try:
         qs = event.get("queryStringParameters") or {}
         status_filter = qs.get("status", "all")
         coach_filter = qs.get("coach_id", "")
-        limit = min(int(qs.get("limit", "50")), 200)
+        # #2658: `int()` on an unvalidated param raised straight into the handler-wide
+        # `except` below, which answered 200 with an empty ledger — a swallowed error
+        # rendered as "the coaches have made no predictions" (ADR-104). Reject the bad
+        # input the way the sibling `coach_id` check three lines down already does.
+        try:
+            limit = int(str(qs.get("limit", "50")).strip())
+        except (TypeError, ValueError):
+            return _error(400, "Invalid limit — expected an integer")
+        # A negative limit reached `all_predictions[:limit]`, which slices from the TAIL:
+        # `limit=-5` silently dropped the five most recent calls and still answered 200.
+        limit = max(1, min(limit, 200))
 
         _pred_coach_names = dict(_CALIB_COACH_NAMES)  # registry-derived; retired bylines stay real on history
         _pred_coach_ids = list(_pred_coach_names.keys())
@@ -569,9 +588,23 @@ def handle_predictions(event, *, _g):
         scan_coaches = [coach_filter] if coach_filter else _pred_coach_ids
         # #1527: fetch every scanned coach's partition concurrently up front —
         # the loop below stays purely computational.
+        _fetch_failures: list = []
         fetched = _parallel_fetch(
-            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
+            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches},
+            failures=_fetch_failures,
         )
+        # #2658: `_parallel_fetch` catches each partition error individually, so a total
+        # outage never reached the handler-wide guard below — it produced a fully zeroed
+        # scorecard at HTTP 200, which is the exact "absence rendered as zero" this issue
+        # is about. Every partition failing is a failure; say so.
+        if _fetch_failures and len(_fetch_failures) == len(scan_coaches):
+            raise RuntimeError(f"all {len(scan_coaches)} coach partition reads failed: {sorted(_fetch_failures)}")
+        if _fetch_failures:
+            # Partial degradation still understates the totals. It is logged at error so
+            # it is visible in CloudWatch rather than inferred from a quiet warning.
+            logger.error(
+                f"[/api/predictions] degraded — {len(_fetch_failures)} of {len(scan_coaches)} partitions failed: {sorted(_fetch_failures)}"
+            )
         all_predictions = []
         by_coach = {}
         # The real graded calls live in PREDICTION# records (status set by the daily
@@ -694,5 +727,13 @@ def handle_predictions(event, *, _g):
             cache_seconds=300,
         )
     except Exception as _e:
-        logger.warning(f"[/api/predictions] {_e}")
-        return _ok({"overall": {}, "by_coach": {}, "predictions": [], "prereg_seal": seal}, cache_seconds=60)
+        # #2658: this used to answer 200 with an all-empty ledger, so a genuine failure
+        # was indistinguishable from "no predictions yet" — an ADR-104 honest-numbers
+        # violation on a reader-facing surface. A failure now says so.
+        #
+        # #1980 requires the seal to survive this path ("an upstream failure must not
+        # blank the seal along with it"). That contract and an honest status code are
+        # not in tension, so the seal rides along on the error envelope rather than
+        # either one being given up.
+        logger.error(f"[/api/predictions] {_e}", exc_info=True)
+        return _error(500, "Prediction ledger temporarily unavailable", prereg_seal=seal)
