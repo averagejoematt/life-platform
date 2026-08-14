@@ -460,12 +460,23 @@ def wire(monkeypatch, *, table=None, s3=None, secrets=None):
     return table, s3, secrets
 
 
-def post(body, ip="203.0.113.7", **event_extra) -> dict:
-    return {"body": json.dumps(body) if not isinstance(body, str) else body, "headers": {"x-forwarded-for": ip}, **event_extra}
+# #1221: identity comes from CloudFront-Viewer-Address (`address:port`), NOT from
+# X-Forwarded-For — measured live 2026-08-14, the client controls that header's last
+# hop on this distribution. These fixtures carry the port so the stripping path is
+# exercised the way the real header arrives. Pass `xff=` to simulate a forged chain,
+# which must never move the derived identity.
+def post(body, ip="203.0.113.7", xff=None, **event_extra) -> dict:
+    headers = {"cloudfront-viewer-address": f"{ip}:12345"}
+    if xff is not None:
+        headers["x-forwarded-for"] = xff
+    return {"body": json.dumps(body) if not isinstance(body, str) else body, "headers": headers, **event_extra}
 
 
-def get(params=None, ip="203.0.113.7") -> dict:
-    return {"queryStringParameters": params or {}, "headers": {"x-forwarded-for": ip}}
+def get(params=None, ip="203.0.113.7", xff=None) -> dict:
+    headers = {"cloudfront-viewer-address": f"{ip}:12345"}
+    if xff is not None:
+        headers["x-forwarded-for"] = xff
+    return {"queryStringParameters": params or {}, "headers": headers}
 
 
 def body_of(resp: dict) -> dict:
@@ -869,11 +880,19 @@ def test_a_nudge_from_a_different_ip_is_independent(monkeypatch):
 
 
 def test_the_client_cannot_forge_its_own_rate_limit_identity(monkeypatch):
-    """`extract_client_ip` takes the LAST X-Forwarded-For hop — the one CloudFront
-    appends. A client that prepends fake hops must still share one budget."""
+    """#1221 (reopened, then fixed properly): identity ignores X-Forwarded-For entirely.
+
+    The previous version of this test asserted the LAST hop was taken, "the one
+    CloudFront appends". Measured against the live edge on 2026-08-14, CloudFront
+    forwards the client's header unchanged here — so the last hop is the CALLER's
+    value and rotating it bought a fresh rate-limit bucket. The property that actually
+    holds is stronger and infrastructure-independent: the header cannot move the
+    identity from any position, so two requests that differ only in their forged chain
+    share one budget.
+    """
     wire(monkeypatch)
-    social._handle_nudge(post({"category": "watching"}, ip="1.1.1.1, 203.0.113.7"))
-    resp = social._handle_nudge(post({"category": "watching"}, ip="2.2.2.2, 203.0.113.7"))
+    social._handle_nudge(post({"category": "watching"}, ip="203.0.113.7", xff="1.1.1.1"))
+    resp = social._handle_nudge(post({"category": "watching"}, ip="203.0.113.7", xff="2.2.2.2, 9.9.9.9"))
     assert resp["statusCode"] == 429
 
 

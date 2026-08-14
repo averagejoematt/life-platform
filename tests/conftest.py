@@ -197,6 +197,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_mypy_clean_modules.py",  # tier-2 types (real only when mypy is installed — the lane installs it)
         "test_handler_type_hints.py",
         # ── registries a new module must join (none discoverable from the module) ──
+        "test_rate_limit_identity_1221.py",  # #1221: AST sweep — no handler may derive its own client identity
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_chat_behavioral_gate_2564.py",  # #2564: every build_grounder call site supplies available_logs

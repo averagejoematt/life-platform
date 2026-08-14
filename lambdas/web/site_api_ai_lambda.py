@@ -37,6 +37,7 @@ from ai.ai_context import (
     wrap_untrusted_reader_text,
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
+from common.client_ip import client_ip_is_trusted, extract_client_ip  # #1221: the ONE rate-limit identity
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 / #946 / #1085 / #2109
 from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
@@ -1205,16 +1206,24 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     return _error(404, "Not found")
 
 
+def _rate_limit_identity(event: dict) -> str:
+    """#1221: the ONE rate-limit identity — this module was the last of seven keying
+    on the raw edge address, and the only one that spends Bedrock. `extract_client_ip`
+    ignores the client-controlled `X-Forwarded-For`; until the origin request policy
+    forwarding `CloudFront-Viewer-Address` is attached it falls back to the coarser but
+    un-forgeable edge address, which is worth saying out loud rather than degrading
+    silently."""
+    if not client_ip_is_trusted(event):
+        logger.warning("[rate-limit] CloudFront-Viewer-Address absent — coarse edge fallback (#1221)")
+    return extract_client_ip(event)
+
+
 def _handle_ask(event: dict) -> dict:
     """POST /api/ask — AI Q&A with health data context."""
     _paused = _ai_paused_response()
     if _paused:
         return _paused
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _rate_limit_identity(event)
     try:
         _body = json.loads(event.get("body") or "{}")
         question = (_body.get("question") or "").strip()[:500]
@@ -1431,11 +1440,7 @@ def _handle_explain(event: dict) -> dict:
     _paused = _ai_paused_response()
     if _paused:
         return _paused
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _rate_limit_identity(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -1529,11 +1534,7 @@ def _handle_board_ask(event: dict) -> dict:
     _paused = _ai_paused_response()
     if _paused:
         return _paused
-    source_ip = (
-        event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
+    source_ip = _rate_limit_identity(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     # Phase 2.1: DDB-backed rate limit (was in-memory dict — didn't survive
     # warm-container distribution). Each board_ask costs ~6 Haiku calls,
