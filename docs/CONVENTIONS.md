@@ -880,6 +880,38 @@ and the pinned venv needs *both* tools installed
 (`.venv-black/bin/pip install -q $(grep -E '^(black|ruff)==' requirements-dev.txt)`) or the
 resolver falls through to whatever `PATH` happens to carry.
 
+### 9a. A gate that can fail is not yet a gate that guards — the fixture must be the wire (#1221, 2026-08-14)
+
+#2578 set the bar "prove every armed gate can fail." That bar is necessary and **not
+sufficient**, and the counter-example is measured, not hypothetical.
+
+`tests/test_client_ip_extraction.py` guards the rate-limit identity for every IP-gated
+write on the site API. It is green (10/10). It is **non-vacuous** — its author wrote
+`test_non_vacuity_old_leftmost_logic_would_have_failed` specifically to prove the old
+leftmost-hop logic fails it. It passes #2578's bar honestly. And it guards nothing: its
+fixture hand-builds `X-Forwarded-For: "evil-spoof, 203.0.113.9"`, encoding the assumption
+that CloudFront appends a trustworthy last hop. On this distribution `/api/*` carries
+`OriginRequestPolicyId: null`, so the last hop is **the client's value**. #1221 was filed,
+"fixed" by flipping first-hop→last-hop, closed, and guarded by a test that verifies the
+function does what its author intended in a universe the wire does not share. The defect
+its own title describes never went away.
+
+**The rule.** For any gate whose subject is a request, a response, an event envelope, or
+anything else that crosses a network or service boundary:
+
+- **Mutation-proving is necessary, not sufficient.** Ask the second question: *is the
+  fixture the wire?* A synthetic envelope you wrote yourself proves the parser, never the
+  contract.
+- **Assert against a captured real envelope** (or an integration probe against the live
+  edge) wherever the input's shape is decided by infrastructure you do not control in the
+  test. Where that is impractical, the fixture carries a comment naming the assumption it
+  encodes and what would invalidate it.
+- **A closed security issue whose guard is a unit test on a synthetic input is not
+  closed** — it is deferred until something exercises the wire.
+
+Related classes already in this file: §4d (a green badge over a run that never deployed),
+§6 (checkout freshness vs live-code drift). Same family: the instrument agreed with itself.
+
 ---
 
 ## Facts that drift: run the command, never quote a number
