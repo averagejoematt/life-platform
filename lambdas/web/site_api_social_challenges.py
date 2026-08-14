@@ -67,6 +67,7 @@ def _handle_challenge_vote(event: dict, *, _g) -> dict:
     _envelope = _g["_envelope"]
     _error = _g["_error"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
@@ -80,7 +81,15 @@ def _handle_challenge_vote(event: dict, *, _g) -> dict:
     except Exception:
         return _error(400, "Invalid JSON body")
 
-    catalog_id = (body.get("catalog_id") or "").strip().lower()
+    # #2679: a well-formed non-object body (`"a-string"`, `[1,2]`, `7`) reached
+    # `body.get` and raised out of the handler as a 502.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
+
+    # #2679: type-guarded — `(body.get(k) or "").strip()` raised on any non-string
+    # value. The default cap leaves the >80 check below as the thing that rejects a
+    # long id, rather than truncating it into a valid one.
+    catalog_id = _sanitise_text(body.get("catalog_id")).lower()
     if not catalog_id or len(catalog_id) > 80:
         return _error(400, "catalog_id is required (max 80 chars)")
 
@@ -146,6 +155,7 @@ def _handle_challenge_follow(event: dict, *, _g) -> dict:
     _envelope = _g["_envelope"]
     _error = _g["_error"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
@@ -159,8 +169,12 @@ def _handle_challenge_follow(event: dict, *, _g) -> dict:
     except Exception:
         return _error(400, "Invalid JSON body")
 
-    email = (body.get("email") or "").strip().lower()
-    catalog_id = (body.get("catalog_id") or "").strip().lower()
+    # #2679 — see _handle_challenge_vote.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
+
+    email = _sanitise_text(body.get("email")).lower()
+    catalog_id = _sanitise_text(body.get("catalog_id")).lower()
 
     if not email or "@" not in email or len(email) > 200:
         return _error(400, "Valid email is required")
@@ -456,6 +470,7 @@ def _handle_challenge_checkin(event: dict, *, _g) -> dict:
     _ok = _g["_ok"]
     _rate_check = _g["_rate_check"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
@@ -468,13 +483,17 @@ def _handle_challenge_checkin(event: dict, *, _g) -> dict:
     except (json.JSONDecodeError, TypeError):
         return _error(400, "Invalid JSON body")
 
-    challenge_id = (body.get("challenge_id") or "").strip()
+    # #2679 — see _handle_challenge_vote.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
+
+    challenge_id = _sanitise_text(body.get("challenge_id"))
     completed = body.get("completed")
     # #2238: the note is free text from an anonymous stranger that ends up on the
     # public GET /api/challenges payload. HTML-strip it (sibling capture doors do
     # the same) and refuse blocked-vice vocabulary outright, as _handle_board_question does.
     note = _sanitise_note(body.get("note"), _g=_g)
-    date_str = (body.get("date") or "").strip()
+    date_str = _sanitise_text(body.get("date"))
 
     if not challenge_id:
         return _error(400, "challenge_id required")

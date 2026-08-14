@@ -282,6 +282,11 @@ def _handle_cohort_submit(event: dict, *, _g) -> dict:
         body = json.loads(event.get("body") or "{}")
     except (json.JSONDecodeError, TypeError):
         return _error(400, "Invalid JSON body")
+    # #2679: this door's `value` handling is already fully type-guarded, but a
+    # well-formed non-object body (`"a-string"`, `[1,2]`, `7`) still reached
+    # `body.get` and raised out of the handler as a 502.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
 
     raw = body.get("value")
     if isinstance(raw, bool) or raw is None:
