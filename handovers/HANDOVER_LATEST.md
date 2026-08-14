@@ -221,9 +221,26 @@ Querying EventBridge for the permanence schedule with `contains(Name,'permanence
 
 ---
 
+## The wrap itself found three true positives
+
+Two alarms had been red for days, uncited. Both were real, and clearing the gate is what surfaced them:
+
+- **#2642 — 67 GB of noncurrent S3 versions.** The alarm said 74.3 GB; a full recursive listing said 7.2 GB. Not a metric error: versioning is Enabled and the alarm counts `StandardStorage`, which includes old versions. Thirteen lifecycle rules exist; **`site/` and `deploys/` have no `NoncurrentVersionExpiration`.** `deploys/` *looks* covered — it has a 30-day rule — but that expires **current** versions only, so every superseded `latest.zip`/`previous.zip` persists forever. Unbounded, and it grows fastest on the busiest days.
+- **#2643 — Eight Sleep has an interior gap at 2026-08-09.** A hole *behind* the high-water mark, so every freshness check reads OK while trailing windows are quietly short a night.
+
+And the standing-warning gate found the one I had gotten wrong:
+
+- **#2644 (P1) — `CONTENT_FILTER_JSON` never reaches the scan.** I set the secret at the previous wrap and reported the gate armed. It was not. `ci-lint.yml` is a **reusable** workflow, and reusable workflows do not inherit secrets — `ci-cd.yml` passes only `build_sha`. The call site's own comment asserts *"Offline (no AWS / secrets), so nothing beyond build_sha is passed"*, which was true when #1655 extracted it and false once #2370 gave that job a secret to need. Every visible signal said armed: secret present, `env:` line present, step running. **This is #2564's shape — declared armed, structurally dark — and it fooled me for a full day.**
+
+---
+
 ## Residual / next picks
 
-- #2578 — the gate-audit epic: census done (421 gates, 0 verdicts), slice 2 in flight.
+- #2578 — the gate-audit epic: census live at **425 gates, 6 proven can-fail, 3 attempted-unproven, 416 untouched**. Slice 3 targets are named: 16 unscreened shell gates, the 21 qa-smoke checks, and two census-blind ci-lint steps (#2639).
+- #2644 — **P1**: the content-policy gate has always been dark; a reusable workflow drops the secret.
+- #2642 / #2643 — the two true-positive alarms found at wrap, both now cited.
+- #2638 — mypy's blocking gate is blind to four error codes; #1656 ("empty the disable list") is CLOSED with the list non-empty.
+- #2640 — `check_hero_weight_arithmetic` returns the same verdict for `lost 10` and `lost 42`.
 - #2632 — `verify_bundle_boot.py` wired to nothing; in flight.
 - #2634 — a coach's prose cites an HRV its own `published_vitals` stamp does not record. The first real finding the fixed `cross_surface:vitals` check surfaced.
 - #2541 — starter scaffold in flight; **publication is an owner act** and stays unmet.

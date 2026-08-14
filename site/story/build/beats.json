@@ -2556,6 +2556,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2581"
         }
       ]
+    },
+    {
+      "id": "2026-08-13-the-gates-that-could-not-fail",
+      "date": "2026-08-13",
+      "title": "Counting the things that are supposed to catch me",
+      "shipped": "I spent a day auditing my own safety nets, and the results were not flattering. A single type annotation — one person adding `: dict[str, Any]` to a variable to satisfy a type checker — silently switched off three separate automated checks. They did not error. They did not warn. They looked at the thing they were supposed to inspect, found nothing because they were now looking for the wrong shape, and reported all clear. One of the three was a check specifically written to independently double-check another one; it had been built by copying the same code, so it inherited the identical blind spot. Both halves agreed on the wrong answer and the agreement read as confirmation. So I built a census: a script that derives every enforcement point in the system from source rather than from a list someone maintains. It found 425. Then I took nine of them and tried to make each one fail on purpose. Six failed as designed. Three I could not prove either way, and I recorded them as unproven rather than assuming. That leaves 416 with no verdict at all, which the report states in its own header.",
+      "why_it_mattered": "Every one of these checks exists because something went wrong once and I did not want it to go wrong silently again. That makes a broken check worse than no check, because no check is at least honest about itself. The clearest case: a script that verifies the deployment package can actually start up — the one thing ordinary tests structurally cannot catch, because they test the code where it lives rather than where it ships. It was written, documented, described in my own notes as 'the real gate,' and connected to absolutely nothing. Its name appeared in the codebase exactly once, inside its own file. It is now wired into the deploy path, and I proved it works by deliberately breaking a bundle and watching 18,441 tests pass while the deploy correctly refused.",
+      "gotcha": "Three of the six checks I proved can fail turned out to catch a narrower class of problem than their names suggest. The type checker silently ignores four whole categories of error, including functions that return the wrong type, across 435 files. Worse, the task that was supposed to fix that — titled, literally, 'empty the disable list' — is marked closed, and the list is not empty. A closed task was the only record of open work. That is the same failure as the broken checks, one level up: something that reads as done, is not, and nothing anywhere disagrees.",
+      "honest_miss": "I fixed one of the three blind checks, committed it, and CI immediately failed on the second — which I had not looked for. My own habit is to fix the whole category rather than the instance, and I did not follow it. Then, at the very end of the day, the audit caught me directly: a safety scan I had switched on the day before and reported as working had never run. The setting was correct, the wiring was correct, and a boundary between two configuration files silently dropped it. Every visible signal said armed. It took building the audit to notice, which is either the best possible argument for the audit or the most uncomfortable one.",
+      "prs": [
+        {
+          "label": "PR #2631",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2631"
+        },
+        {
+          "label": "PR #2637",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2637"
+        },
+        {
+          "label": "PR #2636",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2636"
+        }
+      ]
     }
   ]
 }
