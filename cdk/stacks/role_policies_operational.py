@@ -766,6 +766,21 @@ def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
                 actions=["s3:PutObject"],
                 resources=_s3("ai-canary-log/*"),
             ),
+            iam.PolicyStatement(
+                # #2655: the canary derives its blocked-term probe set from the
+                # ER-06 content-filter vocabulary. #2503 (2026-08-09) moved that
+                # vocabulary off-repo behind content_filter_channel, which reads
+                # env -> gitignored local file -> S3. This role had s3:PutObject
+                # to its audit prefix and NO GetObject anywhere, so every run
+                # since 2026-08-10 raised ContentFilterUnavailable before the
+                # first probe. _from_s3_boto swallows the AccessDenied, so the
+                # failure presented as "no source available" rather than
+                # "permission denied" — and with no DLQ the three retries
+                # vanished. Scoped to the one object it actually reads.
+                sid="S3ConfigRead",
+                actions=["s3:GetObject"],
+                resources=_s3("config/content_filter.json"),
+            ),
             _bedrock_statement(),
             iam.PolicyStatement(
                 sid="BudgetTierRead",
