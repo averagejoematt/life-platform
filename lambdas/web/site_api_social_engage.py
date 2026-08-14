@@ -136,6 +136,7 @@ def _handle_nudge(event: dict, *, _g) -> dict:
     _nudge_counts = _g["_nudge_counts"]
     _rate_check = _g["_rate_check"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
     json = _g["json"]
@@ -145,8 +146,15 @@ def _handle_nudge(event: dict, *, _g) -> dict:
         body = json.loads(event.get("body") or "{}")
     except Exception:
         return _error(400, "Invalid JSON body")
+    # #2679: `json.loads` happily returns a str/list/int for a well-formed but
+    # non-object body, and `body.get` then raises straight out of the handler as a 502.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
 
-    category = (body.get("category") or "").strip().lower()
+    # #2679: `(body.get(k) or "").strip()` raises AttributeError on any non-string
+    # value. `_sanitise_text` is the module's own type guard and was already doing
+    # this correctly for /api/experiment_suggest.
+    category = _sanitise_text(body.get("category")).lower()
     if category not in NUDGE_CATEGORIES:
         return _error(400, f"Invalid category. Must be one of: {sorted(NUDGE_CATEGORIES)}")
 
@@ -188,6 +196,7 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
     _is_blocked_vice = _g["_is_blocked_vice"]
     _rate_check = _g["_rate_check"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     boto3 = _g["boto3"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
@@ -195,7 +204,6 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
     json = _g["json"]
     logger = _g["logger"]
     os = _g["os"]
-    re = _g["re"]
     timezone = _g["timezone"]
     source_ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
@@ -211,11 +219,16 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
         body = json.loads(event.get("body") or "{}")
     except Exception:
         return _error(400, "Invalid JSON")
+    # #2679 — see _handle_nudge: a well-formed non-object body reached `body.get` as a 502.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
 
-    metric_a = re.sub(r"<[^>]+>", "", (body.get("metric_a") or "").strip())[:100]
-    metric_b = re.sub(r"<[^>]+>", "", (body.get("metric_b") or "").strip())[:100]
-    finding = re.sub(r"<[^>]+>", "", (body.get("finding") or "").strip())[:500]
-    email = re.sub(r"<[^>]+>", "", (body.get("email") or "").strip())[:254]
+    # #2679: these were the inline form of `_sanitise_text` (HTML-strip + cap) minus
+    # its type guard, so a non-string value raised on `.strip()`. Same treatment, same caps.
+    metric_a = _sanitise_text(body.get("metric_a"), 100)
+    metric_b = _sanitise_text(body.get("metric_b"), 100)
+    finding = _sanitise_text(body.get("finding"), 500)
+    email = _sanitise_text(body.get("email"), 254)
 
     if not metric_a or not metric_b:
         return _error(400, "Both metric_a and metric_b are required.")
@@ -456,6 +469,7 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
     _error = _g["_error"]
     _predict_subject = _g["_predict_subject"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
@@ -468,14 +482,18 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
         body = json.loads(event.get("body") or "{}")
     except Exception:
         return _error(400, "Invalid JSON body")
+    # #2679 — see _handle_nudge: a well-formed non-object body reached `body.get` as a 502.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
 
     subj = _predict_subject()
     if subj is None:
         return _error(404, "No active prediction this week")
 
-    week_id = (body.get("week_id") or "").strip()
-    metric = (body.get("metric") or "").strip().lower()
-    choice = (body.get("choice") or "").strip().lower()
+    # #2679: type-guarded extraction — a non-string value used to raise on `.strip()`.
+    week_id = _sanitise_text(body.get("week_id"))
+    metric = _sanitise_text(body.get("metric")).lower()
+    choice = _sanitise_text(body.get("choice")).lower()
     if week_id != subj["week_id"]:
         return _error(409, "That prediction window has closed")
     if metric not in subj["metrics"]:
@@ -573,6 +591,7 @@ def _handle_board_question(event: dict, *, _g) -> dict:
     _is_blocked_vice = _g["_is_blocked_vice"]
     _rate_check = _g["_rate_check"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     boto3 = _g["boto3"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
@@ -580,7 +599,6 @@ def _handle_board_question(event: dict, *, _g) -> dict:
     json = _g["json"]
     logger = _g["logger"]
     os = _g["os"]
-    re = _g["re"]
     timezone = _g["timezone"]
     source_ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
@@ -596,9 +614,13 @@ def _handle_board_question(event: dict, *, _g) -> dict:
         body = json.loads(event.get("body") or "{}")
     except Exception:
         return _error(400, "Invalid JSON")
+    # #2679 — see _handle_nudge: a well-formed non-object body reached `body.get` as a 502.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
 
-    question = re.sub(r"<[^>]+>", "", (body.get("question") or "").strip())[:500]
-    email = re.sub(r"<[^>]+>", "", (body.get("email") or "").strip())[:254]
+    # #2679: was the inline form of `_sanitise_text` minus its type guard. Same caps.
+    question = _sanitise_text(body.get("question"), 500)
+    email = _sanitise_text(body.get("email"), 254)
     if not question or len(question) < 10:
         return _error(400, "Question must be at least 10 characters.")
     if email and "@" not in email:

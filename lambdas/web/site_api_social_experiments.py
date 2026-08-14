@@ -188,6 +188,7 @@ def _handle_experiment_vote(event: dict, *, _g) -> dict:
     _envelope = _g["_envelope"]
     _error = _g["_error"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     _valid_library_ids = _g["_valid_library_ids"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
@@ -202,7 +203,15 @@ def _handle_experiment_vote(event: dict, *, _g) -> dict:
     except Exception:
         return _error(400, "Invalid JSON body")
 
-    library_id = (body.get("library_id") or "").strip().lower()
+    # #2679: a well-formed non-object body (`"a-string"`, `[1,2]`, `7`) reached
+    # `body.get` and raised out of the handler as a 502.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
+
+    # #2679: type-guarded — `(body.get(k) or "").strip()` raised on any non-string
+    # value. The default 500 cap is deliberate: it leaves the >80 check below the
+    # thing that rejects a long id, rather than silently truncating it into a valid one.
+    library_id = _sanitise_text(body.get("library_id")).lower()
     if not library_id or len(library_id) > 80:
         return _error(400, "library_id is required (max 80 chars)")
     valid_ids = _valid_library_ids()
@@ -267,6 +276,7 @@ def _handle_experiment_follow(event: dict, *, _g) -> dict:
     _envelope = _g["_envelope"]
     _error = _g["_error"]
     _rate_limited = _g["_rate_limited"]
+    _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
@@ -280,8 +290,12 @@ def _handle_experiment_follow(event: dict, *, _g) -> dict:
     except Exception:
         return _error(400, "Invalid JSON body")
 
-    email = (body.get("email") or "").strip().lower()
-    library_id = (body.get("library_id") or "").strip().lower()
+    # #2679 — see _handle_experiment_vote.
+    if not isinstance(body, dict):
+        return _error(400, "Body must be a JSON object")
+
+    email = _sanitise_text(body.get("email")).lower()
+    library_id = _sanitise_text(body.get("library_id")).lower()
 
     if not email or "@" not in email or len(email) > 200:
         return _error(400, "Valid email is required")
