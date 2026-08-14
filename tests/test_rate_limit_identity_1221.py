@@ -27,13 +27,22 @@ last hop IS the caller's value, in every position.
 
 The contract that follows, and that this file pins:
 
-  AC1  `X-Forwarded-For` is never consulted, in any position. This is asserted as an
-       invariant over adversarial chains rather than as "index -1 vs index 0", so no
-       future re-indexing can satisfy it.
+  AC1  When `CloudFront-Viewer-Address` is present, NO `X-Forwarded-For` in any
+       position can move the derived identity. Asserted as an invariant over
+       adversarial chains rather than as "index -1 vs index 0", so no future
+       re-indexing can satisfy it — and so that attaching the origin request policy is
+       provably sufficient to close the bypass with no further code change.
   AC2  `CloudFront-Viewer-Address` — set by CloudFront from the TCP peer and not
        client-influenceable — is preferred, with its port stripped (v4 and v6).
-  AC3  The un-forgeable `sourceIp` is the only fallback, and the degraded state is
-       reportable via `client_ip_is_trusted()` rather than silent.
+  AC3  Until that header arrives, identity falls back to the `X-Forwarded-For` last hop
+       — stable per caller but FORGEABLE, so **#1221 remains open**. This is a measured
+       interim, not an oversight: preferring the un-forgeable `sourceIp` instead was
+       shipped on 2026-08-14 and measured WORSE, because the edge address is not stable
+       per viewer (6 requests against a 3/hour limit gave `400 429 400 400 400 400`,
+       i.e. almost no enforcement). Forgeability was unchanged by that swap — edge churn
+       already handed attackers fresh buckets — so the only thing it changed was to stop
+       limiting ordinary traffic. The degraded state is reportable via
+       `client_ip_is_trusted()` rather than silent.
   AC4  GUARD THE SET: no handler anywhere may derive an identity from a raw
        `sourceIp` or `X-Forwarded-For` read. Derived by AST, so a NEW handler that
        keys on either fails this suite the day it lands.
@@ -93,39 +102,57 @@ ADVERSARIAL_CHAINS = [
 
 
 @pytest.mark.parametrize("chain", ADVERSARIAL_CHAINS)
-def test_forwarded_for_never_changes_the_identity(chain):
-    """The load-bearing assertion, and the one the old guard could not make.
+def test_forwarded_for_cannot_override_the_trusted_header(chain):
+    """THE load-bearing assertion, and the one the old guard could not make.
 
-    Rotating X-Forwarded-For is the actual live exploit — a new forged value bought a
-    fresh rate-limit bucket. So the property is not "read a different hop", it is
-    "this header cannot move the answer at all".
+    Scoped deliberately to "the trusted header is present". Rotating X-Forwarded-For is
+    the live exploit, and the only thing that actually closes it is deriving identity
+    from a value CloudFront sets. What this pins is that once `CloudFront-Viewer-Address`
+    arrives, NO X-Forwarded-For in any position can move the answer — so attaching the
+    origin request policy is sufficient, with no further code change.
     """
-    assert extract_client_ip(_event(xff=chain)) == EDGE, f"X-Forwarded-For {chain!r} influenced the derived identity"
+    derived = extract_client_ip(_event(viewer=f"{VIEWER}:16225", xff=chain))
+    assert derived == VIEWER, f"X-Forwarded-For {chain!r} overrode the trusted header"
 
 
-def test_every_adversarial_chain_yields_one_single_identity():
-    """Stated set-wise as well, so a partial fix cannot pass the parametrised form."""
-    derived = {extract_client_ip(_event(xff=c)) for c in ADVERSARIAL_CHAINS}
-    assert derived == {EDGE}, f"forgeable chains produced {len(derived)} distinct buckets: {derived}"
+def test_the_trusted_header_collapses_every_adversarial_chain_to_one_identity():
+    """Stated set-wise too, so a partial fix cannot pass the parametrised form."""
+    derived = {extract_client_ip(_event(viewer=f"{VIEWER}:16225", xff=c)) for c in ADVERSARIAL_CHAINS}
+    assert derived == {VIEWER}, f"forged chains produced {len(derived)} distinct buckets: {derived}"
 
 
-def test_non_vacuity_the_old_last_hop_logic_would_have_failed_this():
-    """Proves the suite can fail — against the implementation that actually shipped.
+# ── The interim, stated out loud so it cannot be mistaken for a guarantee ──────
 
-    The previous helper returned the last X-Forwarded-For hop. Under the measured edge
-    behaviour that is the caller's own value, so these two requests landed in DIFFERENT
-    buckets and the limiter was evadable. The current helper must put them in the same
-    one.
+
+@pytest.mark.parametrize("chain,expected", [("1.1.1.1", "1.1.1.1"), ("9.9.9.9, 2.2.2.2", "2.2.2.2")])
+def test_without_the_trusted_header_forwarded_for_is_used_and_is_forgeable(chain, expected):
+    """#1221 IS STILL OPEN, and this test says so rather than hiding it.
+
+    With no `CloudFront-Viewer-Address` (the live state until the origin request policy
+    is attached), identity falls back to the last X-Forwarded-For hop, which the caller
+    controls. This is a KNOWN, MEASURED interim, not an oversight:
+
+      * Dropping X-Forwarded-For and using `sourceIp` instead was tried, deployed, and
+        measured worse — `sourceIp` is the CloudFront edge address and is not stable per
+        viewer, so 6 requests against a 3/hour limit produced `400 429 400 400 400 400`
+        and the limiter enforced essentially nothing.
+      * Keeping it does NOT widen the bypass: edge-address churn already handed out
+        fresh buckets, so an attacker was unmetered either way. It restores enforcement
+        against ordinary traffic, which is the part that actually regressed.
+
+    When the policy lands, `test_forwarded_for_cannot_override_the_trusted_header` above
+    is what holds, and this path becomes unreachable. Delete this test then — not before.
     """
+    assert extract_client_ip(_event(xff=chain)) == expected
 
-    def _old_last_hop(event):
-        headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
-        hops = [h.strip() for h in (headers.get("x-forwarded-for") or "").split(",") if h.strip()]
-        return hops[-1] if hops else event["requestContext"]["http"]["sourceIp"]
 
-    a, b = _event(xff="203.0.113.77"), _event(xff="198.51.100.42")
-    assert _old_last_hop(a) != _old_last_hop(b), "fixture no longer reproduces the old behaviour"
-    assert extract_client_ip(a) == extract_client_ip(b), "the forged values still buy separate buckets"
+def test_forwarded_for_outranks_source_ip_because_source_ip_is_not_stable():
+    """Pins the ORDER, which is the whole point of the 2026-08-14 correction.
+
+    If a later edit "hardens" this by preferring sourceIp again, it silently disables
+    rate limiting on every IP-gated write. That regression shipped once already.
+    """
+    assert extract_client_ip(_event(xff="1.1.1.1", source_ip=EDGE)) == "1.1.1.1"
 
 
 # ── AC2: the trustworthy header wins, port stripped ───────────────────────────
