@@ -67,6 +67,18 @@ def vitals(date: str | None = None, *, _g) -> dict:
 
     if date and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
         return _error(400, "date must be YYYY-MM-DD")
+    if date:
+        # The regex above validates SHAPE only: 2026-02-30, 2026-13-45 and 0001-01-01
+        # all match it. Calendar-validate BEFORE the string clamp below — otherwise an
+        # impossible date either sorts under today and reaches the unguarded strptime
+        # (2026-02-30 -> ValueError -> 502) or survives it and overflows the timedelta
+        # arithmetic (0001-01-01 -> OverflowError -> 502). Both were reachable
+        # unauthenticated over HTTP.
+        try:
+            _probe = datetime.strptime(date, "%Y-%m-%d")
+            _probe.replace(tzinfo=timezone.utc) - timedelta(days=30)
+        except (ValueError, OverflowError):
+            return _error(400, "date must be a real calendar date")
     ip = bool(date)  # ADR-058: include pilot/prior-cycle records only when time-travelling
     # #1922: the site's day frame is PACIFIC (every user-facing date on the site
     # is PT). Anchoring this handler's "today" in UTC made the payload claim

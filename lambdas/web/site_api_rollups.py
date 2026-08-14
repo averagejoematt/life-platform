@@ -112,7 +112,16 @@ def changes_since(qs: dict = None, *, _g) -> dict:
 
     # #2414: the window's date labels are reader-facing — render both ends in the
     # Pacific frame (the epoch instant itself is frame-free).
-    since_dt = datetime.fromtimestamp(since_ts, tz=timezone.utc).astimezone(PT)
+    #
+    # fromtimestamp() must share the int()'s guard above, not sit outside it: an
+    # in-range integer can still be out of range as an epoch (ts=99999999999999,
+    # ts=-99999999999), which raises ValueError/OverflowError/OSError depending on
+    # platform and returned an unauthenticated 502 rather than the 400 the ts=abc
+    # path already returns.
+    try:
+        since_dt = datetime.fromtimestamp(since_ts, tz=timezone.utc).astimezone(PT)
+    except (ValueError, OverflowError, OSError):
+        return _error(400, "Invalid ts parameter")
     now = datetime.now(PT)
     days_ago = max(1, (now - since_dt).days)
     # Cap lookback to 30 days
