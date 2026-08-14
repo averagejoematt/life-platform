@@ -912,6 +912,18 @@ anything else that crosses a network or service boundary:
 Related classes already in this file: §4d (a green badge over a run that never deployed),
 §6 (checkout freshness vs live-code drift). Same family: the instrument agreed with itself.
 
+**Resolution (2026-08-14).** `tests/test_client_ip_extraction.py` was retired rather than
+repaired — 6 of its 10 tests asserted the false contract directly, so there was nothing
+to keep. Its replacement, `tests/test_rate_limit_identity_1221.py`, states the contract
+the way this section demands: it asserts that `X-Forwarded-For` **cannot move the
+answer in any position**, rather than asserting a hop index, and it records the live
+measurement that establishes why (three runs against `/api/submit_finding`, in the
+file's docstring). An index assertion is a claim about infrastructure; an invariant
+over adversarial inputs is a claim about the code, and only the second is a thing a
+unit test is entitled to make. The `sourceIp` half of the same lesson is guarded
+set-wise by an AST walk, so the next handler that derives its own identity fails on
+the day it lands instead of a month later.
+
 ---
 
 ## Facts that drift: run the command, never quote a number
