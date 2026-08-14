@@ -468,12 +468,29 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
 def email_between_chronicle() -> list[iam.PolicyStatement]:
     """#398 between-chronicle note: reads already-computed DDB records
     (what_changed + predictions + stances + subscribers), writes ONLY its
-    content-hash dedup marker, SES send. Zero AI — no bedrock, no ai-keys."""
+    content-hash dedup marker, SES send. Zero AI — no bedrock, no ai-keys.
+
+    #2654: it ALSO needs the ER-06 content-filter vocabulary. `_scrub()` calls
+    privacy_guard.scrub on every narrative field of the outbound email, and that
+    resolves through content_filter_channel.blocked_keywords(require=True) —
+    deliberately fail-CLOSED so a screen can never scan with an empty vocabulary
+    and report a pass. #2503 moved the vocabulary off-repo to env / a gitignored
+    local file / S3; this role had none of the three, so the raise was caught by
+    _scrub's `except Exception` and the email shipped UNSCRUBBED while logging
+    success. Granting the S3 leg is what makes the fail-closed design reachable."""
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            # Scoped to the single object rather than the house-standard
+            # `config/*` — this is a privacy-screen input on a role that also
+            # holds ses:SendEmail, so the blast radius is worth the tighter grant.
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=_s3("config/content_filter.json"),
         ),
         iam.PolicyStatement(
             sid="KMS",
