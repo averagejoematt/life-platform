@@ -38,11 +38,38 @@ and cannot be influenced by the client. It reaches the origin only when an origi
 request policy forwarding it is attached to the ``/api/*`` cache behaviours — an
 **owner-run infrastructure change** that is the other half of #1221.
 
-Until that policy is attached this falls back to ``requestContext…sourceIp`` (the
-CloudFront edge address for the API-Gateway/Function-URL path). That is coarser —
-readers sharing a POP can collapse into one bucket — but it is NOT client-forgeable,
-which is the property a rate limiter actually needs. ``client_ip_is_trusted()`` reports
-which source was used so the degraded window is observable rather than silent.
+WHY ``X-Forwarded-For`` IS STILL THE SECOND CHOICE (2026-08-14, measured)
+------------------------------------------------------------------------
+
+The first cut of this fix dropped ``X-Forwarded-For`` entirely and fell straight back
+to ``requestContext…sourceIp``, on the reasoning that it is coarser but un-forgeable.
+Deployed and re-measured, that was **worse**, because ``sourceIp`` is the CloudFront
+*edge* address and it is not stable per viewer:
+
+    no XFF header, 6 requests, limit 3/hour  ->  400 429 400 400 400 400
+
+One 429 in six means the identity was changing between requests, so nearly every
+request got a fresh bucket and the limiter stopped enforcing anything. The same signal
+was already in #1221's body and was misread: ``site_api_ai_lambda``, keying on raw
+``sourceIp``, produced *17 consecutive POSTs -> 0 x HTTP 429*. That was not a broken
+limiter; it was ``sourceIp`` failing to be an identity at all.
+
+So the order below is deliberate, and each step is the best available:
+
+1. ``CloudFront-Viewer-Address`` — stable AND un-forgeable. The real fix. A forged
+   ``X-Forwarded-For`` can never override it; that is the property this module exists
+   to guarantee, and it is what makes the origin-request-policy change sufficient.
+2. ``X-Forwarded-For`` last hop — **stable for real callers, forgeable by an attacker.**
+   This is the pre-#1221 behaviour, kept ONLY as the interim. It enforces correctly
+   against ordinary traffic, which the ``sourceIp`` fallback does not.
+3. ``sourceIp`` — last resort when no header is present at all.
+
+**The #1221 bypass is therefore still open until the origin request policy lands, and
+that is a known, measured, deliberate interim rather than an oversight.** Step 2 is not
+a regression to delete casually: removing it does not close the bypass (edge-address
+churn hands out fresh buckets anyway) and it does break enforcement against real users.
+``client_ip_is_trusted()`` reports whether step 1 was used, so the degraded window is
+observable rather than silent.
 """
 
 _VIEWER_ADDRESS_HEADER = "cloudfront-viewer-address"
@@ -113,15 +140,28 @@ def client_ip_is_trusted(event: dict) -> bool:
 
 
 def extract_client_ip(event: dict, default: str = "unknown") -> str:
-    """Return a rate-limiting identity the caller cannot choose.
+    """Return the best available rate-limiting identity.
 
-    Order: ``CloudFront-Viewer-Address`` (trustworthy, per-viewer) → ``sourceIp``
-    (coarser, still un-forgeable) → ``default``.
+    Order: ``CloudFront-Viewer-Address`` (stable + un-forgeable) → ``X-Forwarded-For``
+    last hop (stable for real callers, forgeable — the documented #1221 interim) →
+    ``requestContext…sourceIp`` (unstable; last resort) → ``default``.
 
-    ``X-Forwarded-For`` is deliberately NOT consulted in any position. See the module
-    docstring for the live measurement showing the client controls its last hop here.
+    The load-bearing guarantee: **a forged ``X-Forwarded-For`` can never override
+    ``CloudFront-Viewer-Address``.** Once the origin request policy forwards that
+    header, step 2 becomes unreachable and the bypass closes with no code change.
+    See the module docstring for why step 2 outranks ``sourceIp`` (measured).
     """
-    viewer = _strip_port(_headers(event).get(_VIEWER_ADDRESS_HEADER) or "")
+    headers = _headers(event)
+
+    viewer = _strip_port(headers.get(_VIEWER_ADDRESS_HEADER) or "")
     if viewer:
         return viewer
+
+    # #1221 interim — forgeable, and knowingly so. It is kept above `sourceIp` because
+    # it is the only remaining value that is STABLE per caller, and an unstable
+    # identity does not rate-limit anyone at all (measured 2026-08-14).
+    hops = [hop.strip() for hop in (headers.get("x-forwarded-for") or "").split(",") if hop.strip()]
+    if hops:
+        return hops[-1]
+
     return _source_ip(event) or default
