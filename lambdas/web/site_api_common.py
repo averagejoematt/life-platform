@@ -145,7 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 15172,
+    "test_count": 15181,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -622,7 +622,15 @@ def _ok(data: dict, cache_seconds: int = 300) -> dict:
     }
 
 
-def _error(status: int, message: str) -> dict:
+def _error(status: int, message: str, **extra) -> dict:
+    """The one error envelope (#2221).
+
+    ``extra`` carries additional top-level body fields. Added for #2658, where an
+    honest 5xx had to keep shipping the prereg seal that #1980 requires on the
+    failure path ("an upstream failure must not blank the seal along with it") —
+    the status code and the seal are not in tension, so neither has to be given up.
+    Keep it to context the caller already holds; it is not a data-fetch escape hatch.
+    """
     rid = get_request_id()
     return {
         "statusCode": status,
@@ -631,6 +639,7 @@ def _error(status: int, message: str) -> dict:
             {
                 "error": message,
                 **({"request_id": rid} if rid else {}),
+                **extra,
             }
         ),
     }

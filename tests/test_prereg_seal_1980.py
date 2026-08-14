@@ -184,11 +184,12 @@ def test_handle_predictions_carries_the_seal(monkeypatch):
     assert data["prereg_seal"]["artifact_url"] == real["public_artifact_url"]
 
 
-def _boom_parallel_fetch(jobs):
+def _boom_parallel_fetch(jobs, **_kw):
     # _parallel_fetch itself swallows per-job exceptions (shaped-empty
     # degradation by design), so to reach handle_calibration/handle_predictions'
     # OWN top-level except we must fail the call they make directly, not a job
     # inside it.
+    # **_kw absorbs the `failures=` collector handle_predictions passes since #2658.
     raise RuntimeError("simulated fetch-layer outage")
 
 
@@ -207,15 +208,26 @@ def test_handle_calibration_carries_the_seal_on_the_exception_fallback(monkeypat
 
 
 def test_handle_predictions_carries_the_seal_on_the_exception_fallback(monkeypatch):
+    """#1980's contract, re-pinned across #2658's status-code change.
+
+    The seal requirement is unchanged and still asserted: an upstream failure must
+    not blank it. What changed is the envelope it rides in — this path used to answer
+    HTTP 200 with an all-empty ledger, which #2658 identified as an ADR-104 violation
+    (a swallowed error rendered as "the coaches have made no predictions"). It is now
+    a 500 that still carries the seal, so both contracts hold at once.
+    """
     _reset_seal_cache(monkeypatch)
     real = _real_stamp()
     monkeypatch.setattr(
         common, "_load_s3_json", lambda key, name: dict(real) if key == common._prereg_stamp_key(common.EXPERIMENT_START) else {}
     )
     monkeypatch.setattr(api, "_parallel_fetch", _boom_parallel_fetch)
-    data = _body(api.handle_predictions({}))
-    assert data["overall"] == {}
+    resp = api.handle_predictions({})
+    assert resp["statusCode"] == 500, "#2658: a failure must not render as an empty ledger at 200"
+    # Not `_body()` — that helper asserts 200, which is precisely what changed here.
+    data = json.loads(resp["body"])
     assert data["prereg_seal"]["sha256"] == real["sha256"]
+    assert "overall" not in data, "the zeroed-ledger payload must not ship on a failure"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
