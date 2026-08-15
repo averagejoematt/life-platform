@@ -9,11 +9,14 @@ Both consumers read this list so they can never drift:
   * the ci-lint.yml "Mypy gate" step: ``python -m mypy --config-file mypy.ini
     $(python tests/mypy_clean_set.py)``
 
-Scope note (the OTHER #1656 axis, still open): mypy.ini's ``disable_error_code`` list
-still carries four structural codes — assignment / arg-type / return-value / operator —
-and ``check_untyped_defs``/``warn_return_any`` are still False. "Clean" here means
-"clean under the CURRENT mypy.ini". Emptying those is a separate, measured tranche
-(census in the #1656 PR body); it is guarded up-only by
+Scope note (#2638, open — NOT #1656, which is closed with the list non-empty): mypy.ini's
+``disable_error_code`` list still carries four structural codes — assignment / arg-type /
+return-value / operator — and ``check_untyped_defs``/``warn_return_any`` are still False.
+"Clean" here means "clean under the CURRENT mypy.ini", which is a real but narrower claim
+than "mypy strict". The cost of emptying the list is MEASURED rather than estimated —
+415 errors over this set as of 2026-08-15, itemised per code in mypy.ini and recomputable
+with ``python3 scripts/mypy_disable_cost.py`` — so the tranche is a decision someone can
+make from a number. Guarded up-only by
 ``tests/test_mypy_clean_modules.py::test_global_disable_list_only_shrinks``.
 """
 
