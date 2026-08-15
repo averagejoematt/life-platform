@@ -720,10 +720,27 @@ def test_the_performance_seat_answers_on_its_primary_route(wired):
     assert any(p.get("pk") == coach_chat.chat_pk("physical_coach") for p in h.table.puts)
 
 
-def test_the_webhook_routes_the_training_path(wired):
+def test_the_webhook_does_not_route_the_training_path(wired):
+    """SUPERSEDED BY ADR-153's 2026-08-12 amendment, enforced here by #2677.
+
+    This asserted `ROUTING["training"] == "training"` under the 08-10 succession-alias
+    amendment. The 08-12 amendment reversed it: `@ajm_training_bot` became the Performance
+    seat's PRIMARY route (key `physical`), because a seat reachable only by alias can be
+    texted but can never text FIRST — Max's morning check-ins and event-triggered outbound
+    would have stayed dark. The ADR states the consequence plainly: "`training` is now
+    deliberately unmapped and fails CLOSED in gateway.resolve_coach."
+
+    The amendment updated the ADR, config/personas.json and the setup roster. It missed
+    the ROUTING key, its comment, and this assertion — which is why the key survived two
+    days past the decision that killed it.
+    """
+    from coach import telegram_gateway as gw
     from web import telegram_webhook_lambda as hook
 
-    assert hook.ROUTING["training"] == "training"
+    assert "training" not in hook.ROUTING
+    with pytest.raises(gw.Rejected):
+        gw.resolve_coach("training", hook.ROUTING)
+    assert hook.ROUTING["physical"] == "physical", "the Performance seat keeps its primary route"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
