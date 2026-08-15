@@ -1,69 +1,89 @@
-# Handover — 2026-08-15 (overnight): five things were quietly not working, and a green pipeline was hiding them
+# Handover — 2026-08-15 (evening): the instruments were the defect
 
-**Session:** interactive, Opus. Driver only, no subagents (the brief forbade them).
-**Driver:** work the ranked non-fable `Now` queue as a straight drain, seeded from `scripts/backlog_next.py`, in printed rank order by each issue's own STORED score. Standing discipline block: every fix ships with a regression test **watched failing** against unfixed code; read `CONVENTIONS.md` §9a before any test crossing a service boundary; assume the filed scope is smaller than the defect and derive the affected set from source; **re-run the live probe AFTER deploying**; never write a closing keyword next to an issue number unless you mean it. Explicit do-not-touch: #2680 and #1221's remaining half (one CloudFront migration, owner present), #2468, `model:fable`. Mid-session the owner extended it to "work as many as you can through the night."
+**Session:** interactive, Opus. Driver only, no subagents.
+**Driver:** the approved plan `~/.claude/plans/joyful-whistling-scott.md` — work the ranked non-fable queue to the **evidence bar, closure count as output not target**. Batches: the 9-issue MCP tool surface, the site-api honesty class, gate-honesty chores. Standing discipline: a regression test **watched failing** against unfixed code, a **live probe after deploy**, `partial` with unmet boxes named rather than a close, assume the filed scope is smaller than the defect, never raise a module-size baseline. Mid-session the owner extended it twice — first to two issues found while verifying, then to "take care of those non-fable items as much as makes sense".
 
-**Build beat:** `2026-08-15-the-green-pipeline-that-was-hiding-five-things`
-**Docs:** `.claude/commands/wrap.md` (orphan-gate grep — see gotcha 7) · `docs/engines/COACH_STANCE.md` (re-verified — four `ai_calls.py` spans drifted a uniform +10 from my own additive change; AST-re-derived, new verify entry rather than a rewrite of the prior dated ones) · `docs/INCIDENT_LOG.md` (+1 P3 row, `Last updated:` bumped)
-**Decisions:** none needed — the session applied existing contracts (ADR-104 honest numbers, ADR-099 filing + closure, ADR-125 budget bands, §9a fixture-is-the-wire). The one genuine governance question raised — what `published_vitals` should *mean* — is deliberately left to Matthew on #2634 rather than decided unilaterally.
-**Main:** stranded — R8-ST6 Plan-red at `ed98d082` (#1901 class). The **cause** is cleared: the owner ran `cdk deploy LifePlatformOperational` at 16:33Z and `cdk diff` now shows **zero** remaining IAM changes, so the next Plan should pass. But the **state** is not: I first wrote that this wrap commit's own run would be the recovery — it is not, because `ci-cd.yml`'s push filter covers `lambdas/** cdk/** tests/** ci/** config/** .github/workflows/**` and a docs/handover/beats commit matches none of them, so no CI/CD run fires. **Recovery is a `deploy_all=true` `workflow_dispatch` of ci-cd.yml** (the gate's own decode), or the next code-touching push. Re-run `check_main_green.py` after either.
+**Build beat:** `2026-08-15-the-instruments-were-the-defect`
+**Docs:** `docs/RUNBOOK.md` (the dropbox role-grant row named a secret deleted 2026-05-17) · `docs/alarm_citations.json` (+1 entry, #2734) · `mypy.ini` + `tests/mypy_clean_set.py` (measured disable-list cost + owner moved off a closed issue)
+**Decisions:** none needed — the session applied existing contracts (ADR-104 honest numbers, ADR-105 rigor, ADR-099 filing/closure, ADR-125 budget bands, ADR-153's own amendments). The one governance-shaped question raised — what should answer Grand Rounds — is deliberately left to Matthew on #2719 rather than decided unilaterally.
+**Main:** green (`6b486bfc`) — verified by `check_main_green.py`. A fresh `deploy_all=true` dispatch (run `31908196662`, sha `c83725f8`) is in flight and **awaits Matthew's production approval**; two older gated runs were REJECTED, not left waiting (see gotcha 5).
 **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢
-**Closures:** #2644, #2649, #2655, #2659, #2672, #2673, #2688 commented (all `realized`, each with live post-deploy evidence)
-**Incidents:** 1 row added — the code-deploy pipeline stranded ~14h by the R8-ST6 IAM gate firing *correctly* on the canary-DLQ grant; every deploy that night went around it via the per-function path
-**Backlog:** Now live at 15 actionable; no stale `Later` issues
-**Alarms:** 0 uncited — every alarm red >72h cites an incident row or issue
-**CI warnings:** none to triage — the latest completed main run isn't green (that's the stranded state above, `check_main_green.py`'s job, not this gate's)
+**Closures:** 19 commented with live evidence (#2650, #2651, #2653, #2660–#2666, #2671, #2676, #2677, #2681, #2682, #2686, #2698, #2715, #2724). Four carry an honest `partial` naming unmet boxes: #2638, #2639, #2652, #2719.
+**Incidents:** 1 row — my own #2639 test reddened the deploy-critical lane and skipped `Deploy` (see gotcha 1)
+**Backlog:** Now live at 10 actionable; no stale `Later` issues; 2 filed this session (#2715, #2719) plus #2734 from the wrap's own alarm gate
+**Alarms:** 1 red >72h, now cited — `budget-tier-sustained-7d` → #2734
+**CI warnings:** 4, all one class — CDK config drift only an owner-run `cdk deploy` can ship (Operational is #2694, Email is #2669; Compute and Ingestion carry drift from earlier sessions and clear with the same deploy). Deliberate no-action this session: `cdk deploy` is owner-gated.
 
 ---
 
-## What shipped — 14 PRs, all merged AND deployed
+## What shipped — 21 PRs, all merged AND deployed
 
 | PR | Issue | What |
 |---|---|---|
-| #2693 | #2655 | config-channel errors name their cause (denial vs absence) + canary DLQ |
-| #2695, #2699 | #2644 | `CONTENT_FILTER_JSON` actually reaches the scan; standing guard over every reusable-workflow call |
-| #2696 | #2688 | type guards on all four AI body-parsing sites |
-| #2697 | #2681 | follow doors reject the ids their vote siblings reject |
-| #2700 | #2659 | schema-driven numeric bounds at the MCP tool boundary |
-| #2701 | #2649 | literal-drift gate fails on substance, not the calendar |
-| #2702 | #2651 | I16 derives its windows from the source registry |
-| #2703, #2704 | #2673 | cockpit distinguishes "request failed" from "hasn't computed" |
-| #2706 | #2668 | IC-3 token cap sized against measured output; fails loudly |
-| #2707 | #2705 | a failed recall index records WHY, and not at INFO |
-| #2709 | #2672 | scope switch is a navigation, not a silent mutation |
+| #2710 | #2666 | error suggestions name tools that exist — **2 dead names, 4 sites**, not the 1 filed |
+| #2711 | #2660, #2664 | a supplied MCP argument is applied or refused — **27 declared enums, none enforced** |
+| #2712 | #2663 | `days` filtered on **category names**, not dates |
+| #2713 | #2662 | an unknown source no longer reads as "everything is fresh" |
+| #2714 | #2671 | `get_sources` agrees with the domain tools — the 4th source was **`dexa`**, not `strava` |
+| #2716 | #2661 | zone-2 adherence divides by the weeks asked about |
+| #2717 | #2665 | the reading shelf returns books, not identifiers |
+| #2718 | #2677 | the telegram router outlived the ADR that killed its route |
+| #2720 | #2715 | a paused-by-design source no longer turns the verdict **red** |
+| #2721 | #2719 | a route with no persona refuses instead of answering nameless |
+| #2722 | #2682 | `experiment_suggest` keys on content — a double-click costs one review |
+| #2723 | #2686 | a 200 from inside an `except` says it is a fallback — all 14 sites |
+| #2725 | #2650 | the QA audit's budget bands derive from the runtime's own table |
+| #2726 | #2639 | the gate census had the blind spot it exists to find — **20 gates, not 2** |
+| #2727 | #2638 | the mypy disable list is priced (**415**), not implied-empty |
+| #2728 | #2652 | API coverage counts against the live route table |
+| #2729 | #2698 | a follow address is recorded unverified, and nothing may mail it |
+| #2730 | #2653 | a docstring must not name a secret nothing can read |
+| #2731 | #2676 | a narrative figure names the metric it came from |
+| #2732 | — | hotfix: my own census test reddened the deploy lane |
+| #2733 | #2640 | the hero-weight check was armed; it could not say it checked nothing |
 
-**Deployed:** `life-platform-site-api`, `site-api-ai`, `ai-quality-canary`, `mcp`, `daily-brief`, `chronicle-approve` (per-function, `deploy_lambda.sh` / `deploy_site_api.sh`) + two `site/**` auto-deploys. Site smoke **241/0** at both ends. Visual QA 2 passed / 0 failed.
+**Deployed** per-function: `life-platform-mcp`, `life-platform-site-api`, `telegram-webhook`, `telegram-coach-worker`, `life-platform-qa-smoke`, `dropbox-poll`. Site smoke **241/0** at both ends. Doc literals in sync, zero open PRs, tree clean.
 
 ## The through-line
 
-None of these were broken features. All were **working code that discarded the reason it failed** — the safety net did its job and threw away the one detail that made the failure actionable. So most fixes did not change *what happens* on failure; they changed *what gets said about it*, and were deliberately careful not to escalate the ordinary (a paused budget, an idempotent no-op, an empty-text skip all stay quiet — each pinned by a test, because a channel that shouts about everything is exactly as useless as one that says nothing).
+Last session's was "working code that discarded the reason it failed". This one is narrower and worse: **four of the defects were in the instruments built to catch that class.**
+
+- `qa_audit` reported the AI CI gates budget-dark; #1927 moved them out of band 1 months ago, and `/qa` tells the operator to read that line first (#2650)
+- `gate_census` — the instrument whose whole purpose is finding blind spots — had one (#2639)
+- `qa_audit` reported "0 endpoints uncovered" because its denominator was the registry, not the router; two live 502s sat inside the 82 it could not see (#2652)
+- `mypy.ini`'s residual pointed at a **closed** issue, so a reader concluded the disable list was empty (#2638)
+
+And the hero-weight check (#2640) reported **green when it had examined nothing** — a green from a check that checked nothing is indistinguishable from a green from a check that checked something and liked it.
+
+**The filed scope was smaller than the defect in every single issue worked, again.** 1 dead suggestion → 2. 1 coerced enum → 27 declared and none enforced. 2 missed CI gates → 20. 6 handlers to fix → all 14, uniformly. `strava` → `dexa`. That is now two consecutive sessions; treat the issue body as the *lower* bound and derive the set from source before writing a line of fix.
 
 ## Gotchas — read these before the next session
 
-1. **A fix can ship completely green and do nothing.** #2703 passed 4 unit tests, full CI, the deploy and the visual-QA gates. The live page was unchanged. The deployed file provably contained the change — `load()` fetches through `Promise.allSettled`, which **discards the rejection**, so the tagged error never reached the catch. My tests extracted the *shipped* `getJSON` and ran it under node: real code, honestly exercised, **wrong code path**. §9a in a new costume — extracting real source is necessary and not sufficient if you extract the wrong real source. Only the post-deploy browser probe caught it (#2704 fixed it properly).
-2. **The filed scope was smaller than the defect in every single issue worked.** #2688 said three doors returning 500; the wire showed **two** failure modes and a fourth site (the 502s escaped the handler entirely, hitting the *Lambda* error metric). #2659 said "six tools"; the registry says **16 relative-window args**. #2651's test hardcoded 5 sources and a flat window against **6 infrastructure sources with their own thresholds**.
-3. **Module-size guards fired four separate times.** `mcp/registry.py` (2424), `lambdas/ai/ai_calls.py` (2396), `site_api_ai_lambda.py` (1991) are all at ceiling. Never raise a baseline — extract a sibling and pay for the lines (#2649 shrank `sync_doc_metadata.py` 1807 → 1780 that way). Watch `ruff`'s isort silently re-expanding an import block (+2 lines) and undoing the saving.
-4. **Never `--amend` after a blocked pre-commit.** The hook rejected a commit, so HEAD was still main's tip — the `--amend` rewrote *that*. Reset to `origin/main --soft` and recommit.
-5. **`gh issue comment --body` with backticks runs command substitution.** Half a closure comment's inline code was silently eaten. Use `--body-file`.
-6. **My own wrong turns, both caught by existing guards.** Built a fix for #2634 on the wrong diagnosis — read a coach's dated citation as honest and loosened the check, which **broke 6 tests in `test_cross_surface_vitals_asof_2575.py`** that exist precisely to stop that loophole. Reverted whole; the old tests were right. And queried `LifePlatform/QA` instead of `LifePlatform/QaSmoke`, got zero datapoints, and nearly published "the metric is dead."
+1. **My own new test reddened the deploy lane and skipped `Deploy`.** `test_gate_census_error_bars_2639.py` builds the census at **import** time, which pulls in PyYAML; `gate_census` imports it lazily precisely so the module stays importable without it, and a module-level build defeats that. The deploy-critical lane installs a minimal dependency set. Caught by the `deploy_all` run, not by me. Fixed in #2732 with `pytest.importorskip` — and checked that the gate still runs in the full `test / Unit Tests` lane, because a guard that skips everywhere is the "cannot fail" pattern that file exists to measure.
+2. **`agent_commit.sh` restored a file I did not EXPLICITLY name, and I nearly shipped nine call sites without their function signature.** I passed the directory `lambdas/web/`; the script restores any doc-literal file not named individually, so `site_api_common.py` — carrying `_ok`'s new `degraded=` parameter — was reverted out of the commit. Every degraded path would have raised `TypeError` **inside its own except**, turning a degraded 200 into a 502. Caught only by re-running the suite AFTER the commit. **A directory argument is not a name.**
+3. **A measurement that aborts silently reports zero.** All four mypy codes measured as **0 errors** — 436 filenames overflowed the shell's argv, mypy aborted with `File name too long`, and `grep -c` counted an empty run. A clean, plausible "this costs nothing to enable" that would have justified exactly the wrong decision. The real answer is **415**. `scripts/mypy_disable_cost.py` now uses an `@response` file and **raises** when mypy gives no summary line.
+4. **I built the wrong fix for #2677 first and an existing test caught it.** I added back a `telegram_route_aliases` entry, believing ADR-153's data had never been written. `tests/test_persona_registry.py` pins `persona_for_telegram_route("training") == (None, None)` precisely because the **2026-08-12 amendment reversed the 08-10 one**. The alias was retired for a load-bearing reason — the primary route is the canonical OUTBOUND route, so an alias-only seat can be texted but can never text first. Read for a *later* amendment before "restoring" anything an ADR describes.
+5. **A gated run pinned to a stale sha must be REJECTED, not approved.** Two `deploy_all` runs aged at the production gate; both were 13–16 commits behind main, so approving either would have rolled back everything already deployed per-function. `approve_deployment.sh`'s own header says to reject in exactly that case — but the auto-filed wedge alert (#2724) recommends *approve* unconditionally. Its advice has no ancestry check.
+6. **My first three telegram probes proved nothing.** They used a wrong secret token, so all three died at gate 1 (secret check) and never reached routing. The discriminating probe is a **correct** secret with an **unauthorized chat id**: `resolve_coach` runs before `authorize_chat`, so the rejection *reason* in the log distinguishes the two gates — and the worker is never invoked, so nothing is sent.
+7. **Module-size guards fired 3× more** (`registry.py` 2424, `tools_lifestyle.py` 1829, `site_api_ai_lambda.py` 1991). All paid for in-file: a description that duplicated the enum beside it, a comment folded from three lines to two, a generator rejoined. **Never raise a baseline.**
+8. **`ALLOW_DOC_LITERALS=1`** is the sanctioned escape when a genuine content edit touches `site_api_common.py`, `docs/`, `CLAUDE.md` or `.claude/README.md`.
 
-7. **The wrap's own memory orphan-gate was crying wolf 98 times.** Its grep checks only
-   `MEMORY.md` and `project_shipped_archive.md`, but the ~55-entry review-discipline set is
-   rolled up in `INDEX_review_discipline.md` — so every wrap saw ~98 `ORPHAN:` lines with a
-   true count of **zero**. Fixed in `.claude/commands/wrap.md` (added `INDEX_*.md`). Same class
-   as everything else this session: a gate nobody can act on is a gate nobody reads.
+## Where I pushed back rather than complying
 
-## Fleet drift worth naming
+Recorded because each is a place the acceptance box was wrong, not the code:
 
-Everything merged was deployed **per-function** (the 6 Lambdas listed above), because the pipeline was stranded. Two of this session's changes are to **shared bundle modules** — `lambdas/privacy/content_filter_channel.py` (#2655) and `lambdas/ai/ai_calls.py` (#2668) — which ship inside *every* Lambda's bundle. So the rest of the fleet still runs the previous copies until a fleet deploy. Nothing is broken by that (the old code works, just with worse diagnostics), but it means a `deploy_all=true` dispatch is worth doing for the diagnostics to be uniform, not only to clear the badge.
+- **#2653 box 2** wanted `grep -rn 'life-platform/dropbox' docs/` to return nothing. It cannot: three docs record the secret as **deleted, with dates**. Scrubbing accurate history to satisfy a grep makes the docs less honest. A test now pins that those rows **stay**.
+- **#2683** was confirmed CloudFront-side (`Server: AmazonS3`, `X-Cache: Error from cloudfront`) — the excluded distribution work — and stopped rather than half-done. Labelled `gate:owner`.
+- **#2639 boxes 2–3, #2652 box 3, #2638 boxes 2–3** all ask for *adjudication* — reading 38 workflow steps, writing 69 route reasons, fixing 415 type errors. Each shipped the mechanism and left a **named, finite, printed queue** instead of asserting it away. `partial`, with the residual counted.
 
 ## Residual queue / next picks
 
-- Approved plan for the next session is written: `~/.claude/plans/joyful-whistling-scott.md` — autonomous non-fable drain, **evidence bar not closure count**, batches: the 9-issue MCP tool surface, the site-api honesty class, gate-honesty chores. not-work — a plan file, not a backlog item.
-- **#2634** — diagnosed by measurement (both coaches' prose is exactly one morning behind their own stamp; the stamp is taken at *write* time while the narrative was produced earlier). The fix changes what `published_vitals` *means* — a design call for Matthew.
-- **#2670** — blocked on #2634 and #2705's nightly re-confirm; do NOT widen a threshold to buy a green alarm over two real failures.
-- **#2668** — box 3 is a 3-day observation. Check `aws logs filter-log-events --log-group-name /aws/lambda/daily-brief --filter-pattern '"IC-3 analysis pass failed"'` → expect zero. Never invoke the brief; it sends real mail.
-- **#2694** — 13 scheduled operational Lambdas still have no DLQ (`cost-governor` sharpest). Needs an owner `cdk deploy`.
-- **#2698**, **#2708** — the two contract-change splits (confirm-opt-in; recall's four-way `None`). Both are features, not logging fixes.
-- **#2680 / #1221** — still one ~20-behaviour CloudFront migration off legacy `forwarded_values`; owner present. not-work this session by explicit instruction.
-- not-work — after this wrap's CI/CD run completes, re-run `python3 scripts/check_main_green.py` to confirm the stranded state cleared.
+- **#2734** — filed by the wrap's own alarm gate: projected month-end **$230.58 against a $135 ceiling** that reverts to $85/$100 on 2026-09-01. Tier pinned at 1 since Aug 5. The tier being 1 not 3 is **correct** (N-08 caps projection one tier above actual mtd) — the finding is that the slowest early-warning has been lit 3 days with nobody obligated to answer.
+- **#2694, #2669** — the batched owner `cdk deploy` list, and the cause of all 4 CI warnings: `cd cdk && npx cdk deploy LifePlatformOperational LifePlatformEmail LifePlatformCompute LifePlatformIngestion`
+- **#2719** — the board bot's routing is a Grand Rounds design call under epic #2363; the refusal half shipped
+- **#2638, #2639, #2652** — mechanisms shipped, residuals named and printed; each needs human adjudication
+- **#2634, #2668, #2670, #2705** — multi-day observations and a `published_vitals` semantics call
+- **#2674, #2692** — the two I deliberately did not start at depth: #2674 needs browser measurement + screenshots, #2692 needs `--durations` off a real CI run
+- **#2642, #2643** — stay excluded (destructive S3 / data write)
+- **#2680, #1221, #1571, #1738, #1677, #2683** — `gate:owner`
+- not-work — re-run `python3 scripts/check_main_green.py` once run `31908196662` is approved and completes; it is what levels `lambdas/ingestion/source_state.py` (a shared bundle module changed by #2715) across the fleet. Only 6 Lambdas got it per-function, so `ai-expert-analyzer` and `pipeline-health-check` — the two consumers #2715 deliberately changes — still run the old copy.

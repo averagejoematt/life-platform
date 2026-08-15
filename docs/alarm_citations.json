@@ -2,35 +2,35 @@
   "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Add an entry the same session a new long-red alarm is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live.",
   "freshness-interior-gap": {
     "citation": "#2643",
-    "note": "Eight Sleep missing 2026-08-09 \u2014 an interior gap behind the high-water mark, so freshness reads OK while trailing windows are short a night. True positive, found at the 2026-08-13 wrap."
+    "note": "Eight Sleep missing 2026-08-09 — an interior gap behind the high-water mark, so freshness reads OK while trailing windows are short a night. True positive, found at the 2026-08-13 wrap."
   },
   "ingest-auth-unhealthy-24h": {
     "citation": "#1934",
-    "note": "Whoop OAuth 401, auth breaker latched since 2026-08-01 12:00Z. Needs Matthew's interactive re-auth (setup/setup_whoop_auth.py --backfill) \u2014 gate:owner, cannot be automated."
+    "note": "Whoop OAuth 401, auth breaker latched since 2026-08-01 12:00Z. Needs Matthew's interactive re-auth (setup/setup_whoop_auth.py --backfill) — gate:owner, cannot be automated."
   },
   "ingest-auth-unhealthy-whoop": {
     "citation": "#1934",
-    "note": "Same event as ingest-liveness-unhealthy below \u2014 whoop's third credential loss, latched 2026-08-04T00:00Z; clears on the owner re-auth (owner-list item 1, HANDOVER_LATEST 2026-08-06)."
+    "note": "Same event as ingest-liveness-unhealthy below — whoop's third credential loss, latched 2026-08-04T00:00Z; clears on the owner re-auth (owner-list item 1, HANDOVER_LATEST 2026-08-06)."
   },
   "ingest-consecutive-failures-whoop": {
     "citation": "#1934",
-    "note": "Same event \u2014 the hourly ConsecutiveFailures counter on the latched whoop breaker; clears on the owner re-auth + backfill."
+    "note": "Same event — the hourly ConsecutiveFailures counter on the latched whoop breaker; clears on the owner re-auth + backfill."
   },
   "ingest-liveness-unhealthy": {
     "citation": "#1934",
-    "note": "Whoop's THIRD credential loss: breaker latched 2026-08-04T00:00Z ('refresh 400, unchanged refresh_token' \u2014 the post-#2076 classifier reading it correctly), ConsecutiveFailures climbing hourly, no data since 08-03. Same owner re-auth path as the citation (setup_whoop_auth.py --backfill + delete the AUTH_FAILURE marker row, #2085). Owner-list item 1 on HANDOVER_LATEST 2026-08-06; a fourth loss makes the rotation root-cause its own issue."
+    "note": "Whoop's THIRD credential loss: breaker latched 2026-08-04T00:00Z ('refresh 400, unchanged refresh_token' — the post-#2076 classifier reading it correctly), ConsecutiveFailures climbing hourly, no data since 08-03. Same owner re-auth path as the citation (setup_whoop_auth.py --backfill + delete the AUTH_FAILURE marker row, #2085). Owner-list item 1 on HANDOVER_LATEST 2026-08-06; a fourth loss makes the rotation root-cause its own issue."
   },
   "life-platform-dlq-depth-warning": {
     "citation": "#2069",
-    "note": "Same underlying cause and same message set as life-platform-ingestion-dlq-messages above (duplicate alarm on the identical AWS/SQS ApproximateNumberOfMessagesVisible metric/dimension, routed to the digest topic instead of urgent) \u2014 ALARM since 2026-08-03T12:04:56Z, confirmed fired correctly."
+    "note": "Same underlying cause and same message set as life-platform-ingestion-dlq-messages above (duplicate alarm on the identical AWS/SQS ApproximateNumberOfMessagesVisible metric/dimension, routed to the digest topic instead of urgent) — ALARM since 2026-08-03T12:04:56Z, confirmed fired correctly."
   },
   "life-platform-ingestion-dlq-messages": {
     "citation": "#2069",
-    "note": "ALARM since 2026-08-03T12:04:26Z (verified via describe-alarm-history) \u2014 the whoop-data-ingestion EventBridge events that failed every hour from 12:00Z onward (first a 502 on the token endpoint, then repeated 'genuine auth failure' 400s the pre-fix breaker classifier never recognized) land here. The alarm + its urgent SNS route ('life-platform-alerts') worked correctly the whole time \u2014 remediation-dispatcher logged 'dispatched urgent_alarm' at 12:04:59Z \u2014 this was never a missing-machinery gap. Messages clear once #2069's classifier/rotation fix is deployed AND the credential is interactively re-authorized (owner action, concurrent with this filing) restores clean hourly runs; until then they are an accounted-for, expected byproduct of the known root cause, not a separate incident."
+    "note": "ALARM since 2026-08-03T12:04:26Z (verified via describe-alarm-history) — the whoop-data-ingestion EventBridge events that failed every hour from 12:00Z onward (first a 502 on the token endpoint, then repeated 'genuine auth failure' 400s the pre-fix breaker classifier never recognized) land here. The alarm + its urgent SNS route ('life-platform-alerts') worked correctly the whole time — remediation-dispatcher logged 'dispatched urgent_alarm' at 12:04:59Z — this was never a missing-machinery gap. Messages clear once #2069's classifier/rotation fix is deployed AND the credential is interactively re-authorized (owner action, concurrent with this filing) restores clean hourly runs; until then they are an accounted-for, expected byproduct of the known root cause, not a separate incident."
   },
   "life-platform-s3-bucket-size-high": {
     "citation": "#2642",
-    "note": "74.3 GB StandardStorage vs 7.2 GB of live objects \u2014 ~67 GB of noncurrent versions. deploys/ and site/ have no NoncurrentVersionExpiration. True positive, found at the 2026-08-13 wrap."
+    "note": "74.3 GB StandardStorage vs 7.2 GB of live objects — ~67 GB of noncurrent versions. deploys/ and site/ have no NoncurrentVersionExpiration. True positive, found at the 2026-08-13 wrap."
   },
   "qa-paused-by-budget": {
     "citation": "#1927",
@@ -38,18 +38,22 @@
   },
   "qa-smoke-failures": {
     "citation": "#1934 + #1968",
-    "note": "#2104's findings are fixed (closed 2026-08-05) but the alarm never got its 2 green nights \u2014 the 2026-08-05 scheduled run failed 2 content_truth with NEW causes: (1) whoop freshness (no DATE#2026-08-04 row) \u2014 the auth breaker re-latched 2026-08-04T00:00Z with 'refresh 400, unchanged refresh_token' (third credential loss; same owner re-auth path as #1934, carried on the owner list); (2) reader_truth high findings that are evidence, not new work: /api/sleep_detail claims total_sleep_hours with no night label while the whoop-based trend rows sit null during the outage (the #1968 class, evidence commented there), and Home's static 'sixteen prior climbs' lifetime count needs Matthew's factual call (owner list). Clears when whoop re-auths + the two reader_truth items are addressed + 2 green scheduled nights."
+    "note": "#2104's findings are fixed (closed 2026-08-05) but the alarm never got its 2 green nights — the 2026-08-05 scheduled run failed 2 content_truth with NEW causes: (1) whoop freshness (no DATE#2026-08-04 row) — the auth breaker re-latched 2026-08-04T00:00Z with 'refresh 400, unchanged refresh_token' (third credential loss; same owner re-auth path as #1934, carried on the owner list); (2) reader_truth high findings that are evidence, not new work: /api/sleep_detail claims total_sleep_hours with no night label while the whoop-based trend rows sit null during the outage (the #1968 class, evidence commented there), and Home's static 'sixteen prior climbs' lifetime count needs Matthew's factual call (owner list). Clears when whoop re-auths + the two reader_truth items are addressed + 2 green scheduled nights."
   },
   "qa-smoke-warnings": {
     "citation": "#2378",
-    "note": "#1958's chronic split deployed 2026-08-02 (ChronicWarnCount live) but the residual ALARMED set \u2014 4 optional-metric nulls (sleep/hrv/glucose/hydration), the #1956 canary grant gap, the #1970 phase-stamp gap \u2014 still floored WarnCount at 5-8 nightly, so the alarm stayed structurally red. #2378 reclassifies those chronic; after its deploy WarnCount should drop to the genuine-signal set (character:receipt_replay + reader_truth verdicts). If still red a week after the #2378 deploy, the survivors are real findings \u2014 file them, don't re-cite."
+    "note": "#1958's chronic split deployed 2026-08-02 (ChronicWarnCount live) but the residual ALARMED set — 4 optional-metric nulls (sleep/hrv/glucose/hydration), the #1956 canary grant gap, the #1970 phase-stamp gap — still floored WarnCount at 5-8 nightly, so the alarm stayed structurally red. #2378 reclassifies those chronic; after its deploy WarnCount should drop to the genuine-signal set (character:receipt_replay + reader_truth verdicts). If still red a week after the #2378 deploy, the survivors are real findings — file them, don't re-cite."
   },
   "slo-source-freshness": {
-    "citation": "incident 2026-08-08 \u2014 measured, no code defect (see note)",
+    "citation": "incident 2026-08-08 — measured, no code defect (see note)",
     "note": "Red since 2026-08-05. MEASURED live 2026-08-08 against each source's own stale_hours in ingestion/source_registry.py, not inherited from a prior handover: food_delivery 133d (thr 14), measurements 132d (thr 60), macrofactor 45d (thr 4), strava 5d (thr 2), supplements 5d (thr 2), garmin 54d but PAUSED by ADR-074. Every one is a manual-drop or behavioural source with no writer running - i.e. the alarm is telling the truth and there is no code defect to fix. Kept RED on purpose: suppressing it would make the freshness SLO unable to report the condition it exists for. Re-measure before carrying this note forward; the set changes as Matthew drops files."
   },
   "token-alarm-genesis-window-active": {
     "citation": "#2116",
-    "note": "NOT A FAULT \u2014 by design. This is a boolean gauge sub-alarm carrying NO SNS action of its own (cdk/stacks/monitoring_stack.py, the TokenAlarmGenesisWindowActive block). ALARM means literally 'we are inside the genesis window', which the two composite alarms combine with the token-threshold breach so a genesis-week breach is digested rather than paged (#2116, after #1961's post-genesis rebuild pages). Cycle 13's genesis is 2026-08-10, so red since 2026-08-07 is the correct state. Expected to return to OK when the window closes; treat_missing_data=NOT_BREACHING so a stale gauge can never silently suppress a real page. If it is still ALARM well after the genesis window ends, THAT is the finding \u2014 file it, don't re-cite."
+    "note": "NOT A FAULT — by design. This is a boolean gauge sub-alarm carrying NO SNS action of its own (cdk/stacks/monitoring_stack.py, the TokenAlarmGenesisWindowActive block). ALARM means literally 'we are inside the genesis window', which the two composite alarms combine with the token-threshold breach so a genesis-week breach is digested rather than paged (#2116, after #1961's post-genesis rebuild pages). Cycle 13's genesis is 2026-08-10, so red since 2026-08-07 is the correct state. Expected to return to OK when the window closes; treat_missing_data=NOT_BREACHING so a stale gauge can never silently suppress a real page. If it is still ALARM well after the genesis window ends, THAT is the finding — file it, don't re-cite."
+  },
+  "budget-tier-sustained-7d": {
+    "citation": "#2734",
+    "note": "Working as designed and saying something true: it can only fire when the tier NEVER returned to 0 across a full week, so it announces that band 1 has become the default operating state. Measured 2026-08-15: tier pinned at 1 since Aug 5, mtd $93.65, projected $230.58 against a $135 ceiling that auto-reverts to $85/$100 on 2026-09-01. The tier being 1 rather than 3 is CORRECT — _decide_tier caps the projection one tier above actual mtd (N-08). Remove this entry when the alarm clears."
   }
 }
