@@ -2606,6 +2606,45 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2691"
         }
       ]
+    },
+    {
+      "id": "2026-08-15-the-green-pipeline-that-was-hiding-five-things",
+      "date": "2026-08-15",
+      "title": "Five things were quietly not working. Every signal said green.",
+      "shipped": "An overnight pass through the bug queue: fourteen pull requests merged and deployed, seven issues closed. The through-line was not broken features — it was working code that threw away the reason it failed. A CI secret never reached the scan that needed it, so a content check had been reporting a clean run against an empty word list. The AI-quality canary had failed every run for four days behind a message that reads the same whether the config is missing or you are simply not allowed to read it. The daily brief's reasoning pass had been dead for ten of twelve days, logged as a warning, with the error count sitting at zero. A published week never made it into the searchable archive, so \"when did I feel like this before?\" answered with silence rather than a gap. And the cockpit told you your score hadn't computed yet when what actually happened was that the request failed.",
+      "why_it_mattered": "A system that fails loudly gets fixed in an hour. A system that fails quietly gets fixed in four days — if someone happens to look. Every one of these had a safety net doing exactly what it was designed to do, and every one of them discarded the one detail that would have made the failure actionable: why. Failing softly is usually right; publishing a week should not depend on a search index succeeding. Failing silently never is. So the fixes mostly did not change what happens on failure — they changed what gets said about it, and were careful not to escalate the ordinary. A paused budget or a skipped weigh-in stays quiet, because a channel that shouts about everything is exactly as useless as one that says nothing.",
+      "gotcha": "One fix shipped completely green — four passing tests, full CI, a successful deploy, and the automated visual QA — and did nothing at all. The deployed file provably contained the change; it just never ran. The data was fetched through a helper that quietly discards failures before the error could reach the code that reads it, so the fix sat on a path the page never took. The tests were not fake: they exercised real shipped code. They exercised the wrong real shipped code. It was caught by re-opening the site with the network forced to fail and reading what the page actually said — the only check in the entire chain that looked at the product instead of the pipeline.",
+      "honest_miss": "Two of my own errors, both caught before they mattered. Building a fix for the wrong diagnosis: a coach's prose cited a heart-rate number that disagreed with the record, I read one case as an honest dated comparison, and loosened the check to allow it — which broke six existing tests that exist precisely to stop that loophole. The old tests were right and the change was reverted whole. And a metric query against the wrong namespace returned nothing, which looked exactly like a dead alarm; the metric was reporting fine, I was asking the wrong question. Both are the same mistake as the five above, pointed inward — an absence of evidence read as evidence of absence.",
+      "prs": [
+        {
+          "label": "PR #2693",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2693"
+        },
+        {
+          "label": "PR #2695",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2695"
+        },
+        {
+          "label": "PR #2696",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2696"
+        },
+        {
+          "label": "PR #2704",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2704"
+        },
+        {
+          "label": "PR #2706",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2706"
+        },
+        {
+          "label": "PR #2707",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2707"
+        },
+        {
+          "label": "PR #2709",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2709"
+        }
+      ]
     }
   ]
 }

@@ -82,14 +82,18 @@ NOT git-tracked and is a separate step from the commit in (f).
   (e.g. `## Active Work`), pointing at the topic file. Don't let a topic file exist
   un-indexed.
 - **Orphan/broken-link gate (#1259) — run this every wrap; it must print nothing.**
-  A topic file reachable from neither `MEMORY.md` nor `project_shipped_archive.md` is
-  invisible to every future session (repo CI can't own this — the memory dir is outside
+  A topic file reachable from none of `MEMORY.md`, `project_shipped_archive.md` or an
+  `INDEX_*.md` roll-up is invisible to every future session (repo CI can't own this — the memory dir is outside
   the repo). Index any `ORPHAN:` line before closing (c):
   ```bash
   cd ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/
   for f in *.md; do [ "$f" = MEMORY.md ] && continue; base="${f%.md}"; \
-    grep -qF "$base" MEMORY.md project_shipped_archive.md || echo "ORPHAN: $f"; done
+    grep -qF "$base" MEMORY.md project_shipped_archive.md INDEX_*.md || echo "ORPHAN: $f"; done
   ```
+  (2026-08-15: the grep omitted `INDEX_*.md` and so reported **98 false orphans** every
+  wrap — the ~55-entry review-discipline set is rolled up in `INDEX_review_discipline.md`,
+  which `MEMORY.md` points at rather than listing inline. A gate that cries wolf 98 times
+  is one nobody reads; true orphan count was zero.)
   (Match the basename, not `$f` — an index entry may reference a topic as a `[[wikilink]]`
   without the `.md`, and a naive `.md` grep would false-flag it.)
 - **Body-follows-index rule (#1342)** — when a `MEMORY.md` index line is corrected (a stale
