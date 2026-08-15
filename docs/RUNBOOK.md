@@ -458,7 +458,7 @@ Each Lambda has its own dedicated IAM role scoped to exactly what it needs:
 | lambda-anomaly-detector-role | anomaly-detector | life-platform/anthropic (Haiku for hypothesis) |
 | lambda-notion-ingestion-role | notion-journal-ingestion | life-platform/notion only |
 | lambda-journal-enrichment-role | journal-enrichment | life-platform/anthropic only |
-| lambda-dropbox-poll-role | dropbox-poll | life-platform/dropbox only |
+| lambda-dropbox-poll-role | dropbox-poll | `life-platform/ingestion-keys` only (the bundle; the dedicated `life-platform/dropbox` was deleted 2026-05-17 — #2653) |
 | lambda-health-auto-export-role | health-auto-export-webhook | life-platform/health-auto-export only |
 | lambda-freshness-checker-role | life-platform-freshness-checker | None |
 | lambda-daily-brief-role | daily-brief | life-platform/ai-keys |
