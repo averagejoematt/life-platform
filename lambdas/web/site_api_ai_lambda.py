@@ -732,11 +732,10 @@ def _ask_build_prompt(ctx: dict) -> str:
     pillars_str = ""
     if "pillars" in ctx:
         pillars_str = "\n".join(
-            f"    {n}: level {p['level']:.0f}, score {p['raw_score']:.1f}, tier {p['tier']}" for n, p in ctx["pillars"].items()
+            f"    {n} pillar: level {p['level']:.0f}, score {p['raw_score']:.1f}, tier {p['tier']}" for n, p in ctx["pillars"].items()
         )
-    # #387: hand the model what Python already worked out — drivers, trends,
-    # significant correlations, presence — so "what drove it?" gets the
-    # platform's computed read instead of "I can't tell you".
+    # #387: hand the model what Python already worked out — drivers, trends, significant
+    # correlations, presence — so "what drove it?" gets the platform's computed read.
     reads_block = _ask_reads_block(ctx.get("reads") or {})
     reads_section = f"\nCOMPUTED READS (precomputed by the platform's analysis pipeline):\n{reads_block}\n" if reads_block else ""
     archive_section = ctx.get("archive_block") or ""  # #2348: "" ⇒ the prompt is byte-identical to the pre-retrieval one
@@ -749,7 +748,7 @@ CURRENT DATA:
   Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', EXPERIMENT_BASELINE_WEIGHT_LBS)}, goal {ctx.get('goal_weight', 185)})
   HRV: {ctx.get('hrv_ms', '?')} ms
   RHR: {ctx.get('rhr_bpm', '?')} bpm
-  Recovery: {ctx.get('recovery_pct', '?')}%
+  Whoop recovery score: {ctx.get('recovery_pct', '?')}% (whole-body readiness from HRV/RHR/sleep — NOT a pillar score, and NOT specific to any pillar)
   Sleep: {ctx.get('sleep_hours', '?')} hours
   Character level: {ctx.get('character_level', '?')} (tier: {ctx.get('character_tier', '?')})
   T0 habit streak: {ctx.get('tier0_streak', '?')} days
@@ -762,6 +761,7 @@ RULES:
 - Be specific: "HRV is 54ms" not "HRV is moderate."
 - N=1 data. Note this for comparative claims.
 - NO ARITHMETIC: you narrate precomputed values — never sum, average, project, or derive a number yourself. Every number you cite must appear verbatim in the data above.
+- NAME THE METRIC THE NUMBER CAME FROM (#2676). The Whoop recovery score and the pillar scores are DIFFERENT NUMBERS measuring different things — never fuse a pillar's name onto the recovery figure ("metabolic recovery is 62%" when 62% is the whole-body recovery score is a wrong statement, not a paraphrase). If you want to talk about a pillar, cite that pillar's own score; if you want to talk about recovery, call it the recovery score. Where both are wanted, give them as two separately labelled figures.
 - "What drove X?" questions: answer from the COMPUTED READS (mode factors, momentum, improving/declining metrics, correlations) with correlative framing and a small-sample caveat. If no computed read covers the question, say the platform hasn't computed a driver read for that yet. NEVER ask the reader to supply or track Matthew's data — the platform already tracks it; readers don't have it.
 - CORRELATIVE ONLY, NEVER CAUSAL: say "X tracks with Y" or "X coincided with Y," never "X causes/caused Y" or "X will improve Y." Patterns are leads, not proof.
 - LABEL CONFIDENCE HONESTLY: flag thin evidence ("preliminary — only a few weeks of data," "small sample, low confidence") and never present a pattern as established. When the experiment was recently re-anchored, the data is early by design — say so.
@@ -889,7 +889,7 @@ def _board_facts_block(ctx: dict = None) -> str:
     if ctx.get("weight_lbs") is not None:
         lines.append(f"weight: {ctx['weight_lbs']:.1f} lb")
     if ctx.get("recovery_pct") is not None:
-        lines.append(f"recovery: {ctx['recovery_pct']:.0f}%")
+        lines.append(f"whoop recovery score: {ctx['recovery_pct']:.0f}%")
     if ctx.get("hrv_ms") is not None:
         lines.append(f"HRV: {ctx['hrv_ms']:.1f} ms")
     if ctx.get("rhr_bpm") is not None:
