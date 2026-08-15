@@ -1275,11 +1275,24 @@ def test_freshness_unparseable_date_in_the_sort_key(freshness_table):
     assert out["status"] != "green"
 
 
-def test_freshness_unknown_source_keys_are_ignored_not_fabricated(freshness_table):
+def test_freshness_unknown_source_keys_are_refused_not_fabricated(freshness_table):
+    """SUPERSEDED BY #2662 — the anti-fabrication half stands, the silence half does not.
+
+    This test used to assert that `["whoop", "not_a_source"]` returned whoop fresh and
+    nothing stale. The no-fabrication half of that is still the ruling and is still
+    asserted below: an unknown key must never produce an invented row.
+
+    What #2662 overturned is the other half. Dropping the name meant the call answered
+    `status: green` over a set that was NOT the set the caller asked about, so a typo or
+    a registry rename read as "everything is fresh" — from the one tool whose job is
+    answering "are we OK?". The verdict is a claim about a set; if the set is wrong, the
+    verdict is wrong, not partial. See tests/test_mcp_freshness_unknown_source_2662.py.
+    """
     freshness_table({_src_pk("whoop"): [_date_row("whoop", "2026-08-08")]})
     out = tl.tool_get_freshness_status({"sources": ["whoop", "not_a_source"]})
-    assert {r["source"] for r in out["fresh_sources"]} == {"whoop"}
-    assert out["stale_sources"] == []
+    assert "error" in out and "not_a_source" in out["error"]
+    assert out.get("status") != "green"
+    assert "fresh_sources" not in out and "stale_sources" not in out, "nothing may be fabricated for an unknown key"
 
 
 def test_freshness_defaults_to_the_full_registry_source_set(freshness_table):

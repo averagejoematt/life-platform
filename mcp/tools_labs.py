@@ -55,6 +55,7 @@ from common.pacific_time import PACIFIC
 from mcp.config import logger, table
 from mcp.helpers import _linear_regression
 from mcp.labs_helpers import _draw_date_of, _genome_context_for_biomarkers, _measured_value, _query_all_lab_draws
+from mcp.utils import mcp_error
 
 # One year, used for BOTH `slope_per_year` and the 1-year projection. They used to
 # disagree (365.25 vs 365), so `latest + slope_per_year` never reconciled with
@@ -731,11 +732,40 @@ def tool_get_freshness_status(args):
     SOURCES = mcp_sources()
     SOURCE_STALE_HOURS = stale_hours_overrides(SOURCES)
 
+    # #2662: an unrecognised source name used to be dropped here by the `if s in SOURCES`
+    # filter, and the tool then answered green over what was LEFT. Asking about
+    # ["whoop", "not_a_real_source"] returned status green / fresh_count 1 / stale_count 0
+    # — a typo'd or renamed source read as "everything is fresh", from the one tool whose
+    # entire job is answering "are we OK?". This is exactly the class `_unreadable` below
+    # was written to close ("a source we could not read is a NOT-OK answer, never a silent
+    # omission"); the unknown-name path simply sat one line above it and was missed.
+    #
+    # The valid set is derived from `mcp_sources()` — the same registry the evaluation
+    # uses — so a source added or renamed there is accepted or rejected correctly on the
+    # same commit, with no second list to keep in sync.
     requested = args.get("sources") if args else None
-    if requested:
-        keys = [s for s in requested if s in SOURCES]
-    else:
-        keys = list(SOURCES.keys())
+    if requested is not None and not isinstance(requested, list):
+        return mcp_error(
+            f"'sources' must be a list of source keys, got {type(requested).__name__}.",
+            error_code="MISSING_ARG",
+            suggestions=[f"Valid sources: {sorted(SOURCES)}", "Omit 'sources' entirely to check them all."],
+        )
+    if requested is not None:
+        unknown = [s for s in requested if s not in SOURCES]
+        if unknown:
+            return mcp_error(
+                f"Unrecognised source name(s): {sorted(unknown)}. Nothing was evaluated — "
+                f"a freshness verdict over the sources that happened to be spelled correctly would be misleading.",
+                error_code="SOURCE_UNAVAIL",
+                suggestions=[f"Valid sources: {sorted(SOURCES)}", "Omit 'sources' entirely to check them all."],
+            )
+        if not requested:
+            return mcp_error(
+                "'sources' was an empty list — no source was named, so there is nothing to report on.",
+                error_code="MISSING_ARG",
+                suggestions=["Omit 'sources' entirely to check them all.", f"Valid sources: {sorted(SOURCES)}"],
+            )
+    keys = list(requested) if requested else list(SOURCES.keys())
 
     today = datetime.now(timezone.utc).date()
     per_source = []
@@ -925,6 +955,9 @@ def tool_get_freshness_status(args):
     return {
         "status": overall,
         "checked_at": datetime.now(timezone.utc).isoformat(),
+        # #2662: name the set the verdict covers. `status: green` over an unstated subset
+        # is the shape that made the dropped-name bug invisible — the answer looked total.
+        "evaluated_sources": keys,
         "stale_count": stale_count,
         "unreadable_count": unreadable_count,
         "fresh_count": len(fresh_sources),
