@@ -205,13 +205,26 @@ jobs:
           # Do not remove this line, and do not add another unguarded pipe below it.
           set -o pipefail
           echo "::group::Coverage report + gate"
+          # #2692: --durations=25 so the NEXT run can answer "which tests" rather than
+          # only "how long". The wall-clock budget has now been breached four times and
+          # every diagnosis so far has been local, where the suite behaves differently
+          # from this runner — the local/CI gap is half of what the issue asks to
+          # explain, and it cannot be closed from a laptop. This is display-only: no
+          # selection, no threshold, no gate behaviour changes.
+          #
+          # tail widened 100 -> 160 with it. The durations block prints in pytest's
+          # terminal summary alongside the (long) coverage table, so at -100 the very
+          # lines this flag exists to produce were the ones most likely to be cut —
+          # a measurement that silently truncates reports nothing, which is the
+          # failure mode this repo keeps re-learning.
           python3 -m pytest tests/ \
               --ignore=tests/test_integration_aws.py \
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
               --cov-fail-under=74 \
-              -q 2>&1 | tail -100
+              --durations=25 \
+              -q 2>&1 | tail -160
           echo "::endgroup::"
 
       - name: Coverage regression gate + drift warnings (ratchet, #1206/#1349/#1658)
