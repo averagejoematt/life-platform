@@ -36,7 +36,9 @@ from common.numeric import floats_to_decimal  # bundled shared module: canonical
 logger = logging.getLogger(__name__)
 
 # ── In-memory cache (survives Lambda warm starts) ──
-_config_cache = {"data": None, "ts": 0}
+# dict[str, Any] — heterogeneous by design (the config dict + an int timestamp);
+# unannotated, mypy joins them and every read reads as the wrong type (#2638).
+_config_cache: dict[str, Any] = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
 ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
@@ -79,8 +81,16 @@ def load_character_config(
     bucket: str,
     force_refresh: bool = False,
     user_id: str = "matthew",
-) -> dict[str, Any]:
-    """Load character_sheet.json from S3 with warm-container caching."""
+) -> Optional[dict[str, Any]]:
+    """Load character_sheet.json from S3 with warm-container caching.
+
+    Returns None when S3 is unreadable AND there is no warm cache to fall back on.
+    That is deliberate and already handled: `character_sheet_lambda` does
+    `if not config: raise RuntimeError(...)` so the async failure lands in the DLQ
+    with an Errors metric, rather than a dict that reads as success — and
+    `tests/test_character_sheet_lambda.py` pins that RuntimeError. Only the
+    annotation was wrong (#2638), never the contract.
+    """
     now = time.time()
     if not force_refresh and _config_cache["data"] and (now - _config_cache["ts"]) < _CONFIG_TTL_S:
         return _config_cache["data"]
@@ -2079,7 +2089,7 @@ def compute_character_sheet(
 # ==============================================================================
 
 
-def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[str, Any]) -> None:
+def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[str, Any]) -> dict[str, Any]:
     """Write a character_sheet record to DynamoDB.
     Phase 3.3 (2026-05-16): tags with run_id + computed_at via compute_metadata.
     ADR-058 (2026-05-25): pre-genesis dates are tagged phase='pilot' so the

@@ -57,6 +57,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import boto3
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
@@ -262,7 +263,7 @@ def derive_mcp_bearer_token(api_key: str) -> str:
     return f"lp_{sig}"
 
 
-def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
+def check_mcp(canary_ts: str) -> tuple[Optional[bool], str, float]:
     """
     Send a lightweight MCP ping to the Function URL.
     Uses the tools/list method (low cost, no data read) to verify Lambda is alive.
@@ -336,7 +337,7 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
 # ── Check 4: Anthropic API reachability (reentry sweep, 2026-05-03) ─────────
 
 
-def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
+def check_anthropic(canary_ts: str) -> tuple[Optional[bool], str, float]:
     """Make a tiny (max_tokens=1) Bedrock call to verify Claude inference is live.
 
     ADR-062 (2026-05-27): migrated from direct Anthropic API to Bedrock. This

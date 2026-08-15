@@ -245,7 +245,9 @@ _CORRELATION_AS_CAUSATION = [
 # canonical facts (same authoritative record the coaches are grounded on).
 # Fail-soft + cached: any error (no creds in CI, missing table, missing helper)
 # yields {} and the validator behaves exactly as before.
-_AUTO_CTX_CACHE = {"ctx": None, "ts": 0.0}
+# dict[str, Any] — heterogeneous by design (a context dict + a float timestamp);
+# unannotated, mypy joins them to `float | None` (#2638).
+_AUTO_CTX_CACHE: dict[str, Any] = {"ctx": None, "ts": 0.0}
 _AUTO_CTX_TTL_S = 300.0
 
 

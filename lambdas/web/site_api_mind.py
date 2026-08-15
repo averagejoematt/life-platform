@@ -10,6 +10,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 """
 
 from datetime import datetime, timedelta
+from typing import cast
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
@@ -54,7 +55,7 @@ def journal_analysis(*, _g) -> dict:
     total = len(items)
     top_themes = sorted(
         [{"theme": k, "count": v, "pct": round(v / max(total, 1) * 100)} for k, v in theme_counts.items()],
-        key=lambda x: x["count"],
+        key=lambda x: cast(int, x["count"]),
         reverse=True,
     )[:8]
 

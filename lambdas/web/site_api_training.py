@@ -12,7 +12,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 import json
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import with_phase_filter  # ADR-058
@@ -583,7 +583,7 @@ def training_overview(*, _g) -> dict:
             {"week": k, "workouts": v["workouts"], "minutes": round(v["minutes"]), "z2_min": round(v["z2_min"])}
             for k, v in week_buckets.items()
         ],
-        key=lambda x: x["week"],
+        key=lambda x: cast(str, x["week"]),
     )[
         -12:
     ]  # last 12 weeks
@@ -845,7 +845,7 @@ def strength_deep_dive(*, _g) -> dict:
         if d >= d30:
             session_days[dt.strftime("%a")] += 1
 
-    volume_trend = sorted([{"week": k, "volume_lbs": round(v)} for k, v in weekly_volume.items()], key=lambda x: x["week"])[-12:]
+    volume_trend = sorted([{"week": k, "volume_lbs": round(v)} for k, v in weekly_volume.items()], key=lambda x: cast(str, x["week"]))[-12:]
 
     top_exercises = [{"name": n, "frequency": c} for n, c in exercise_freq.most_common(10)]
 

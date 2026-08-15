@@ -32,6 +32,7 @@ import re
 import urllib.parse
 import urllib.request
 from decimal import Decimal
+from typing import Any
 
 import boto3
 from common.pacific_time import pacific_date_of
@@ -124,7 +125,7 @@ def authenticate(secret_data):
     return {"instance": instance, "handle": handle}
 
 
-def _get_json(url: str) -> dict:
+def _get_json(url: str) -> Any:
     req = urllib.request.Request(url, headers={"User-Agent": "life-platform/1.0", "Accept": "application/json"})
     with urlopen_with_retry(req, timeout=15) as resp:
         return json.loads(resp.read().decode("utf-8"))

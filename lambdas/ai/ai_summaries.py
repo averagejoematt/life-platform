@@ -80,7 +80,7 @@ def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[st
     }
 
 
-def build_food_summary(data: dict[str, Any]) -> dict[str, Any]:
+def build_food_summary(data: dict[str, Any]) -> str:
     mf = data.get("macrofactor") or {}
     food_log = mf.get("food_log", [])
     if not food_log:
@@ -95,7 +95,7 @@ def build_food_summary(data: dict[str, Any]) -> dict[str, Any]:
     return "\n".join(meals)
 
 
-def build_activity_summary(data: dict[str, Any]) -> dict[str, Any]:
+def build_activity_summary(data: dict[str, Any]) -> str:
     """Extract activity details from Strava."""
     strava = data.get("strava") or {}
     activities = strava.get("activities", [])
@@ -120,7 +120,7 @@ def build_activity_summary(data: dict[str, Any]) -> dict[str, Any]:
     return "\n".join(lines)
 
 
-def build_workout_summary(data: dict[str, Any]) -> dict[str, Any]:
+def build_workout_summary(data: dict[str, Any]) -> str:
     """v2.2: Extract exercise-level detail from MacroFactor workouts."""
     mf_workouts = data.get("mf_workouts")
     if not mf_workouts:

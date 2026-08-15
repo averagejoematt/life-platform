@@ -51,6 +51,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
+from typing import Any
 
 import boto3
 
@@ -210,7 +211,10 @@ _HARD_STOP_TIER = 3
 # _FEATURE_CUTOFF in tests/test_budget_guard_ladder.py.
 CI_GATE_FEATURES = ("reader_truth_qa", "visual_ai_qa")
 
-_cache = {"tier": 0, "ts": 0.0}
+# dict[str, Any]: the values are heterogeneous (int tier + float timestamp), and
+# without the annotation mypy joins them to `float`, so `return _cache["tier"]`
+# reads as returning a float from `-> int` (#2638).
+_cache: dict[str, Any] = {"tier": 0, "ts": 0.0}
 _ssm = None
 
 
