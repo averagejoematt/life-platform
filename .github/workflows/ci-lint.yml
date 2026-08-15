@@ -11,6 +11,20 @@ on:
         description: 'The reconciled tree SHA to check out (#1173).'
         required: true
         type: string
+    secrets:
+      # #2644: a reusable workflow does NOT inherit the caller's secrets. Declaring
+      # the requirement HERE (rather than relying on the caller to remember) is what
+      # makes the contract readable from the side that consumes it. Without this
+      # block the content-policy scan resolved an empty string and SKIPPED on every
+      # main-pipeline run since #2370 — while the secret existed, the env line was
+      # present, and the step ran. Declared armed, structurally dark.
+      CONTENT_FILTER_JSON:
+        description: >-
+          Blocked-category vocabulary (ER-06 off-repo channel, #2370) that arms the
+          content-policy + PII repo-hygiene scans. Optional: absent it, the scans
+          SKIP with a ::warning:: rather than red-walling forked-PR CI, which cannot
+          be given secrets at all.
+        required: false
 
 # Reusable workflows do NOT inherit the caller's permissions — declare our own.
 permissions:

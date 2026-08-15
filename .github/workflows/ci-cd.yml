@@ -296,12 +296,19 @@ jobs:
   lint:
     # #1655: extracted verbatim to the reusable workflow .github/workflows/ci-lint.yml
     # (same steps, same gates, same pinned SHAs). #1173: gate on reconcile and pass its
-    # build_sha so the doc-drift + wiki gates see the reconciled tree. Offline (no AWS /
-    # secrets), so nothing beyond build_sha is passed.
+    # build_sha so the doc-drift + wiki gates see the reconciled tree.
+    #
+    # #2644: this call is offline (no AWS) but NOT secret-free — the content-policy
+    # scan needs CONTENT_FILTER_JSON, and a reusable workflow inherits nothing. It is
+    # passed explicitly rather than via `secrets: inherit`, which would hand ci-lint
+    # every secret the repo holds — a wider grant than one scan needs.
+    # tests/test_reusable_workflow_secrets.py enforces this for every such call.
     needs: reconcile
     uses: ./.github/workflows/ci-lint.yml
     with:
       build_sha: ${{ needs.reconcile.outputs.build_sha }}
+    secrets:
+      CONTENT_FILTER_JSON: ${{ secrets.CONTENT_FILTER_JSON }}
 
   # ════════════════════════════════════════════════════════════════
   # Job 2a: Deploy-critical test lane (#416, ADR-117) — GATES the chain
@@ -359,7 +366,11 @@ jobs:
     # #1655: extracted verbatim to the reusable workflow .github/workflows/ci-test.yml
     # (same steps, same pinned SHAs). NON-GATING for deploy (#416/ADR-117): only
     # notify-failure `needs` this call, so a red here flags main but never skips
-    # plan → deploy → visual-QA. Offline (no AWS / secrets) — only build_sha is passed.
+    # plan → deploy → visual-QA. This call genuinely needs no secrets — verified,
+    # not assumed: ci-test.yml references none (#2644). If a step there ever gains
+    # one, it must be declared under workflow_call.secrets and passed HERE; a
+    # reusable workflow inherits nothing. tests/test_reusable_workflow_secrets.py
+    # fails the day that stops being true.
     needs: [reconcile, lint]   # #1173: reconcile listed to read build_sha
     uses: ./.github/workflows/ci-test.yml
     with:
