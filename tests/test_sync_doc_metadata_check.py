@@ -44,7 +44,7 @@ def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
     monkeypatch.setattr(sync, "PLATFORM_FACTS", {**sync.PLATFORM_FACTS, "widget_count": widget_count})
     monkeypatch.setattr(sync, "_apply_auto_discovered", lambda facts: facts)  # no real AST/CDK discovery
     monkeypatch.setattr(sync, "_sync_platform_stats", lambda facts, dry_run: [])  # no real site_api_common.py
-    monkeypatch.setattr(sync, "_sync_alarm_inventory", lambda dry_run: [])  # no real docs/MONITORING.md or cdk/stacks
+    monkeypatch.setattr(sync._alarm_inv, "sync", lambda dry_run, by_stack: [])  # no real docs/MONITORING.md or cdk/stacks
     return doc
 
 
@@ -150,7 +150,7 @@ def test_render_alarm_inventory_round_trips_the_name_set():
 
     by_stack = sync._auto_discover_alarm_names_by_stack()
     assert by_stack is not None
-    block = sync._render_alarm_inventory(by_stack)
+    block = sync._alarm_inv.render(by_stack)
     rendered = re.findall(r"^- `([^`]+)`$", block, re.MULTILINE)
     assert sorted(rendered) == sorted(sync._auto_discover_alarm_names())
     assert len(rendered) == len(set(rendered)), "a name was rendered more than once"
@@ -159,15 +159,14 @@ def test_render_alarm_inventory_round_trips_the_name_set():
 def test_sync_alarm_inventory_fills_markers_and_is_idempotent(tmp_path, monkeypatch):
     """--apply writes the block between the markers; a second pass is a no-op."""
     fake = {"monitoring_stack": ["alpha-alarm", "beta-alarm"], "serve_stack": ["gamma-alarm"]}
-    monkeypatch.setattr(sync, "_auto_discover_alarm_names_by_stack", lambda: fake)
     doc = tmp_path / "MONITORING.md"
     doc.write_text(
-        f"# Monitoring\n\n{sync._ALARM_INV_BEGIN}\nstale placeholder\n{sync._ALARM_INV_END}\n\n## Next\n",
+        f"# Monitoring\n\n{sync._alarm_inv.ALARM_INV_BEGIN}\nstale placeholder\n{sync._alarm_inv.ALARM_INV_END}\n\n## Next\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(sync, "_MONITORING_PATH", doc)
+    monkeypatch.setattr(sync._alarm_inv, "MONITORING_PATH", doc)
 
-    first = sync._sync_alarm_inventory(dry_run=False)
+    first = sync._alarm_inv.sync(dry_run=False, by_stack=fake)
     assert any(c.startswith("  ~") for c in first)
     text = doc.read_text(encoding="utf-8")
     for n in ("alpha-alarm", "beta-alarm", "gamma-alarm"):
@@ -175,17 +174,16 @@ def test_sync_alarm_inventory_fills_markers_and_is_idempotent(tmp_path, monkeypa
     assert "stale placeholder" not in text
     assert text.startswith("# Monitoring") and text.rstrip().endswith("## Next")  # content outside markers preserved
 
-    assert sync._sync_alarm_inventory(dry_run=False) == [], "second apply must be a clean no-op"
+    assert sync._alarm_inv.sync(dry_run=False, by_stack=fake) == [], "second apply must be a clean no-op"
 
 
 def test_sync_alarm_inventory_flags_missing_markers(tmp_path, monkeypatch):
     """A MONITORING.md with no marker pair is drift the gate must report."""
-    monkeypatch.setattr(sync, "_auto_discover_alarm_names_by_stack", lambda: {"serve_stack": ["gamma-alarm"]})
     doc = tmp_path / "MONITORING.md"
     doc.write_text("# Monitoring\n\nno markers here\n", encoding="utf-8")
-    monkeypatch.setattr(sync, "_MONITORING_PATH", doc)
+    monkeypatch.setattr(sync._alarm_inv, "MONITORING_PATH", doc)
 
-    result = sync._sync_alarm_inventory(dry_run=True)
+    result = sync._alarm_inv.sync(dry_run=True, by_stack={"serve_stack": ["gamma-alarm"]})
     assert result and result[0].startswith("  !")
 
 

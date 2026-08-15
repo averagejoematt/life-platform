@@ -210,7 +210,7 @@ BASELINE = {
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1898,
     "deploy/archive/onetime/daily_brief_lambda.py": 1881,
     "lambdas/ingestion/health_auto_export_lambda.py": 1779,
-    "deploy/sync_doc_metadata.py": 1807,
+    "deploy/sync_doc_metadata.py": 1780,  # #2649: shrank — alarm inventory extracted to deploy/doc_alarm_inventory.py
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
     "lambdas/intelligence/intelligence_common.py": 1744,
