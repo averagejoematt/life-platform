@@ -586,7 +586,12 @@ class TestTrainingSnapshot:
         table.add("apple_health", TODAY, steps=Decimal("9000"))
         data = az.gather_data_for_expert("training")
         assert data["step_source"] == "apple_health" and data["avg_daily_steps"] == 9000
-        assert data["movement_source_state"]["garmin"] == source_state.STATE_STALE
+        # #2715: garmin is paused by design (ADR-074), so the resolver now labels it
+        # `paused` rather than `stale`. The DI-1.4 guarantee this test exists for is
+        # unchanged and asserted above — the gate is `== "live"`, and both values are
+        # non-live, so Apple Health still supplies the steps. What moved is the WORD, and
+        # `paused` is the more honest one: nothing is broken, the cron was withdrawn.
+        assert data["movement_source_state"]["garmin"] == source_state.STATE_PAUSED
 
     def test_a_rate_limit_marker_is_reported_as_rate_limited_not_as_rest(self, table):
         table.add_raw(az.USER_PREFIX + "garmin", source_state.RATE_LIMIT_MARKER_SK["garmin"], hit_at="now")

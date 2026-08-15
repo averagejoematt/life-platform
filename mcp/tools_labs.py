@@ -771,6 +771,7 @@ def tool_get_freshness_status(args):
     per_source = []
     stale_count = 0
     unreadable_count = 0
+    paused_count = 0  # #2715: off-by-design, reported but never counted stale
 
     def _unreadable(src, reason, threshold_days):
         """A source we could not read is a NOT-OK answer, never a silent omission.
@@ -840,7 +841,25 @@ def tool_get_freshness_status(args):
             continue
         age_days = (today - d).days
         is_stale = age_days >= threshold_days
-        if is_stale:
+        state = resolve_source_state(src, d.isoformat(), today.isoformat(), rate_limited=_rl)
+        # #2715: a source that is OFF BY DESIGN is not a staleness finding. The registry
+        # says so in as many words — "paused: intentionally off — shown as 'paused', never
+        # counted stale" — but this tool asks `mcp_sources()`, which deliberately INCLUDES
+        # paused sources, and then counted them like any other. garmin (ADR-074, no
+        # EventBridge rule) was 61 days old, so `stale_count` hit 1 and `max_age_stale`
+        # exceeded 14, which put the whole verdict at RED for a condition nobody will ever
+        # fix. The one tool whose job is "are we OK?" answered red permanently, which is
+        # the fastest way to make the answer go unread.
+        #
+        # Paused rows are still REPORTED — the failure this must not become is the source
+        # disappearing (see `_unreadable` above). They get their own bucket and their own
+        # count, and they are excluded from the escalation tiers and from `stale_count`.
+        # Note `state` decides this, not the age: freshness wins inside
+        # resolve_source_state, so a paused source that starts producing reads `live` and
+        # is counted normally again with no code change.
+        if state == "paused":
+            paused_count += 1
+        elif is_stale:
             stale_count += 1
         per_source.append(
             {
@@ -849,8 +868,8 @@ def tool_get_freshness_status(args):
                 "last_date": d.isoformat(),
                 "age_days": age_days,
                 "threshold_days": int(threshold_days),
-                "status": "stale" if is_stale else "fresh",
-                "source_state": resolve_source_state(src, d.isoformat(), today.isoformat(), rate_limited=_rl),
+                "status": "paused" if state == "paused" else ("stale" if is_stale else "fresh"),
+                "source_state": state,
             }
         )
 
@@ -872,6 +891,8 @@ def tool_get_freshness_status(args):
     # it, because the one thing it must never do is disappear from the answer.
     stale_sources = [s for s in per_source if s.get("status") in ("stale", "no_data", "unreadable")]
     fresh_sources = [s for s in per_source if s.get("status") == "fresh"]
+    # #2715: its own bucket — visible, and outside the needs-attention set.
+    paused_sources = [s for s in per_source if s.get("status") == "paused"]
 
     # ── MacroFactor format-drift (meal-grouping guard) ──
     # The diary export carries per-food timestamps (entries_count > 0); the daily-
@@ -961,8 +982,10 @@ def tool_get_freshness_status(args):
         "stale_count": stale_count,
         "unreadable_count": unreadable_count,
         "fresh_count": len(fresh_sources),
+        "paused_count": paused_count,
         "stale_sources": stale_sources,
         "fresh_sources": fresh_sources,
+        "paused_sources": paused_sources,
         "interior_gaps": interior_gaps,
         "interior_gap_count": interior_gap_count,
         "macrofactor_format_drift": macro_drift,
@@ -976,6 +999,9 @@ def tool_get_freshness_status(args):
         "context": (
             "Status tiers: green (all fresh) / yellow (1 stale <7d) / orange (mixed) / red (3+ stale OR any >14d). "
             "stale_count counts every source not confirmed fresh — stale, no_data and unreadable alike; "
-            "unreadable_count is the subset we could not read at all, and is never reported as green."
+            "unreadable_count is the subset we could not read at all, and is never reported as green. "
+            "paused_count is OFF-BY-DESIGN (no live cron, e.g. garmin per ADR-074): reported, never counted "
+            "stale, and never escalates the verdict — a paused source that starts producing reads fresh again "
+            "with no code change (#2715)."
         ),
     }

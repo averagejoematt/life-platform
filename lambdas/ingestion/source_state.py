@@ -51,9 +51,33 @@ def _gap_days(latest_date, today):
         return None
 
 
+def _registry_paused():
+    """Sources the REGISTRY marks paused. Fail-soft: an unreadable registry is not a pause.
+
+    #2715: this module and `source_registry` each held half of the same fact and never
+    met. `DECLARED_PAUSED_SOURCES` above is empty on purpose and its own comment says why
+    — "garmin's pause is registry-driven (source_registry paused=True, ADR-074), not
+    declared here" — while the registry's `paused` facet says, equally plainly,
+    "intentionally off — shown as 'paused', never counted stale". Both were true, and
+    nothing read both, so `resolve_source_state` answered `stale` for a source that is off
+    by design and `get_freshness_status` turned the whole verdict RED for it.
+
+    Imported lazily: `source_registry` is a large module and this one is imported by
+    handlers that only want the constants. Failure returns an empty set — labelling a
+    source paused when we cannot confirm it would suppress a real outage, which is the
+    error that matters here (and is exactly what #496/C-3 hit with Strava).
+    """
+    try:
+        from ingestion.source_registry import SOURCE_REGISTRY
+
+        return {k for k, v in SOURCE_REGISTRY.items() if v.get("paused")}
+    except Exception:  # noqa: BLE001 — never let a registry read decide a source is broken
+        return set()
+
+
 def is_paused(source):
-    """True if the source is declared off-by-design (no live cron)."""
-    return source in DECLARED_PAUSED_SOURCES
+    """True if the source is off-by-design (no live cron), by declaration or registry."""
+    return source in DECLARED_PAUSED_SOURCES or source in _registry_paused()
 
 
 def resolve_source_state(source, latest_date, today, *, rate_limited=False, stale_days=DEFAULT_STALE_DAYS):
@@ -74,7 +98,13 @@ def resolve_source_state(source, latest_date, today, *, rate_limited=False, stal
         return STATE_LIVE
     if rate_limited:
         return STATE_RATE_LIMITED
-    if source in DECLARED_PAUSED_SOURCES:
+    # #2715: `is_paused` now reads the registry's `paused` facet as well as the declared
+    # set. Before, this asked only the declared set — which is empty by design — so garmin,
+    # paused by ADR-074 with no EventBridge rule, resolved `stale` and pushed
+    # get_freshness_status's whole verdict to RED. The order is unchanged and matters:
+    # freshness still wins, so a paused source that starts producing again reads `live`
+    # with no code change, and a rate-limit marker still outranks the paused label.
+    if is_paused(source):
         return STATE_PAUSED
     return STATE_STALE
 

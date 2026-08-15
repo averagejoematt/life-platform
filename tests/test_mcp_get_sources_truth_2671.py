@@ -217,17 +217,18 @@ def test_an_empty_partition_is_still_reported_absent(sources):
 def test_a_paused_source_is_labelled_paused_not_absent(sources):
     """Acceptance box 4 — and the layer this needed, which is not where it looks.
 
-    `resolve_source_state` alone answers `stale` for garmin. Its DECLARED_PAUSED_SOURCES
-    is deliberately EMPTY, and its own comment says why: garmin's pause is registry-driven
-    (source_registry `paused=True`, ADR-074), not declared there. So the `paused` facet has
-    to be read from the registry, which is what the issue's fourth box actually asks for.
+    When this was written, `resolve_source_state` alone answered `stale` for garmin, so
+    get_sources layered the registry facet over it. #2715 then fixed that at the ROOT — the
+    resolver reads the facet — and the layer came out. The preconditions below assert the
+    post-#2715 world, so if the root fix is ever reverted this fails rather than silently
+    returning to a stale label.
     """
     from ingestion.source_registry import qa_paused
     from ingestion.source_state import DECLARED_PAUSED_SOURCES, resolve_source_state
 
     assert "garmin" not in DECLARED_PAUSED_SOURCES, "precondition: the declared list is empty by design"
     assert "garmin" in {k for k, _ in qa_paused()}, "precondition: garmin is registry-paused (ADR-074)"
-    assert resolve_source_state("garmin", "2026-06-15", "2026-08-15") == "stale", "precondition: the bare call says stale"
+    assert resolve_source_state("garmin", "2026-06-15", "2026-08-15") == "paused", "#2715: the resolver reads the facet"
 
     row = tools_data.tool_get_sources({})["garmin"]
     assert row["available"] is True, "paused is not absent — the data is still on file"

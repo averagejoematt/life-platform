@@ -60,19 +60,15 @@ def tool_get_sources(_args):
     the partition.
 
     `state` is `resolve_source_state`, the same call `get_freshness_status` makes, so the
-    two tools cannot drift on what "live"/"stale"/"rate_limited" mean — LAYERED over the
-    registry's own `paused` facet, which `resolve_source_state` does not read. Its
-    `DECLARED_PAUSED_SOURCES` is deliberately empty and its comment says so: garmin's
-    pause is registry-driven (ADR-074), not declared there. Without the layer, a source
-    that is intentionally off reports `stale`, which the registry explicitly forbids
-    ("intentionally off — shown as 'paused', never counted stale"). Freshness still wins:
-    a paused source that starts producing again reads `live`, so re-enabling is visible
-    without a code change.
+    two tools cannot drift on what live/paused/stale/rate_limited mean. #2671 originally
+    layered the registry's `paused` facet on top of it here, because the resolver read only
+    `DECLARED_PAUSED_SOURCES` — empty by design — and so answered `stale` for a source that
+    is off by design. #2715 fixed that at the root: the resolver now reads the facet, and
+    the layer is gone. Freshness still wins, so a paused source that starts producing again
+    reads `live` with no code change.
     """
-    from ingestion.source_registry import qa_paused
-    from ingestion.source_state import STATE_LIVE, has_rate_limit_marker, resolve_source_state
+    from ingestion.source_state import has_rate_limit_marker, resolve_source_state
 
-    paused_ids = {k for k, _ in qa_paused()}
     today = datetime.now(timezone.utc).date().isoformat()
     result = {}
     for source in SOURCES:
@@ -87,8 +83,6 @@ def tool_get_sources(_args):
         newest = table.query(**edge_kwargs, ScanIndexForward=False)
         last = _date_of(newest["Items"])
         state = resolve_source_state(source, last, today, rate_limited=has_rate_limit_marker(table, "matthew", source))
-        if state != STATE_LIVE and source in paused_ids:
-            state = "paused"
         result[source] = {
             "available": bool(newest["Items"]),
             "first_date": _date_of(oldest["Items"]),

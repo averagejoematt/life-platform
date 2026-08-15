@@ -1305,9 +1305,16 @@ def test_freshness_defaults_to_the_full_registry_source_set(freshness_table):
 
 def test_freshness_escalation_tiers_are_hand_derived(freshness_table):
     # Three stale sources -> red (stale_count >= 3), regardless of age.
-    rows = {_src_pk(s): [_date_row(s, "2026-07-01")] for s in ("whoop", "strava", "garmin")}
+    #
+    # #2715: the third source used to be `garmin`, which is paused by design (ADR-074) and
+    # no longer counts toward stale_count — so the case would have silently degraded to a
+    # 2-source test of a >=3 threshold, i.e. it would have stopped exercising the tier it
+    # is named after. Swapped for `eightsleep`, a live source, so the assertion still means
+    # what it says. The paused-source behaviour has its own coverage in
+    # tests/test_paused_is_not_stale_2715.py.
+    rows = {_src_pk(s): [_date_row(s, "2026-07-01")] for s in ("whoop", "strava", "eightsleep")}
     freshness_table(rows)
-    out = tl.tool_get_freshness_status({"sources": ["whoop", "strava", "garmin"]})
+    out = tl.tool_get_freshness_status({"sources": ["whoop", "strava", "eightsleep"]})
     # 2026-07-01 -> 2026-08-08 = 30 + 8 = 38 days; all three exceed their thresholds.
     assert all(r["age_days"] == 38 for r in out["stale_sources"])
     assert out["stale_count"] == 3
