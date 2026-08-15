@@ -87,6 +87,42 @@ def _abandoned_shelf() -> list:
     return items.get("abandoned", [])
 
 
+# #2665: raw GSI2 key attributes. They are storage plumbing — the index's own copy of the
+# partition/sort key — and carrying them into a tool response invites a caller to reason
+# about them as data. `statusChangedAt` is the same instant as GSI2SK and is the one that
+# means something, so it is what stays.
+_INDEX_KEY_ATTRS = ("GSI2PK", "GSI2SK", "GSI1PK", "GSI1SK")
+
+
+def _shelf_entry(state: dict) -> dict:
+    """A shelf row a human can read: the book's own facts joined onto its reading state.
+
+    #2665: `current_and_queue` returns READING_STATE items, which carry `bookId` and the
+    GSI2 key attributes and nothing else — no title, no author. The caller could not name
+    a single book on the shelf without a second lookup per row, and `get_reading_shelf` is
+    the tool you call precisely BECAUSE you do not know what is on the shelf.
+
+    The public site never had this problem: `site_api_reading._public_shelf_item` has
+    always joined `get_book(bookId)` onto the state. The operator tool was the surface
+    that skipped the join — the reader on averagejoematt.com could read the shelf and
+    Matthew, through his own MCP tools, could not.
+
+    This is the PRIVATE surface, so it returns the full book record rather than the public
+    allowlist projection. ADR-104: a state row whose book record is missing says so
+    (`book_record_missing`) instead of quietly rendering an empty title, because a blank
+    title and a broken join are not the same fact.
+    """
+    book_id = state.get("bookId") or ""
+    book = (reading_store.get_book(book_id) or {}) if book_id else {}
+    entry = {k: v for k, v in state.items() if k not in _INDEX_KEY_ATTRS}
+    entry["title"] = book.get("title")
+    entry["author"] = book.get("author")
+    entry["book"] = book or None
+    if not book:
+        entry["book_record_missing"] = True
+    return entry
+
+
 def _input_streak(sessions: list) -> int:
     """Consecutive days with a reading session, counting back from today."""
     days = {s.get("date") for s in sessions if s.get("date")}
@@ -165,13 +201,16 @@ def _candidates_from_queue() -> list:
 def tool_get_reading_shelf(args):
     """The shelf: currently-reading, the queue, finished, and the 'set down' shelf."""
     cq = reading_store.current_and_queue(statuses=("reading", "want"))
-    return {
+    shelves = {
         "reading": cq.get("reading", []),
         "queue": cq.get("want", []),
         "finished": reading_store.finished(),
         "set_down": _abandoned_shelf(),
-        "as_of": _today(),
     }
+    out = {name: [_shelf_entry(s) for s in rows] for name, rows in shelves.items()}
+    out["counts"] = {name: len(rows) for name, rows in out.items()}
+    out["as_of"] = _today()
+    return out
 
 
 def tool_get_reading_recommendation(args):
