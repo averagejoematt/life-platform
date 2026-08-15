@@ -43,6 +43,7 @@ v1.1.0 — 2026-03-15 (R12: +I11 data-reconciliation check, manual-only doc)
 import json
 import os
 import sys
+import textwrap
 
 import pytest
 
@@ -1017,59 +1018,80 @@ def test_i15_reserved_concurrency_guard():
 
 @pytest.mark.integration
 def test_i16_recent_ingest_records_exist():
-    """I16: at least 2 ingestion sources have today-or-yesterday DATE# records.
+    """I16: no INFRASTRUCTURE source has breached its OWN declared staleness window.
 
-    Post-genesis, the system should ingest withings + whoop + macrofactor +
-    todoist + notion daily. Allow 24h slop so an early-morning run before all
-    ingestions complete doesn't flake.
+    #2651. This test used to hardcode `["withings", "whoop", "macrofactor",
+    "todoist", "notion"]` and a flat 2-day window, and required >=2 of them to have
+    a record. Both halves were wrong:
 
-    Known behavioral flake (2026-05-27 observation): of the 5 sources, only
-    whoop is fully passive — the rest depend on user action (stepping on
-    Withings, logging food in MacroFactor, completing/creating Todoist
-    tasks, writing in Notion). On low-activity days this test correctly
-    fails with `Found: ['whoop@...']` (1 source < 2 required). This is
-    NOT a code regression — the platform is faithfully reporting that
-    you haven't been logging. Self-resolves on the first day with any
-    real user activity.
+      * The window was not each source's own contract. Measured 2026-08-14,
+        `withings` (age ~77h against its declared 168h threshold) and `todoist`
+        (~53h against 72h) were BOTH FRESH by their own registry facets, and the
+        test failed on them anyway.
+      * Three of the five were BEHAVIORAL sources — weigh-ins, food logs, Todoist
+        tasks. Their silence means the human did not log, not that ingestion broke.
+        The old docstring said so out loud ("This is NOT a code regression — the
+        platform is faithfully reporting that you haven't been logging"), which is
+        an admission that the assertion was measuring the wrong thing. A gate that
+        reds on honest data teaches people to ignore it.
+
+    CLAUDE.md forbids hand-stating a source's cadence (#2003) precisely for this;
+    the rule was guarded for `docs/` but not for `tests/`. So nothing here is
+    hand-listed: the source set, the per-source threshold and the
+    behavioral/paused exclusions are all read from
+    `lambdas/ingestion/source_registry.py`.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
     from common.constants import EXPERIMENT_START_DATE
+    from ingestion import source_registry as reg
 
     genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
-    today = datetime.now(timezone.utc).date()
-    if today < genesis:
-        pytest.skip(f"I16 SKIP: pre-genesis (today={today}, genesis={genesis})")
+    now = datetime.now(timezone.utc)
+    if now.date() < genesis:
+        pytest.skip(f"I16 SKIP: pre-genesis (today={now.date()}, genesis={genesis})")
+
+    # Infrastructure sources only: monitored, not paused, not behavioral. A
+    # behavioral source's staleness is a logging lapse and never pages (see the
+    # registry's own header) — asserting on it here would re-introduce the flake.
+    behavioral = reg.behavioral_source_keys()
+    overrides = reg.stale_hours_overrides()
+    monitored = {k: v for k, v in reg._active_monitored().items() if k not in behavioral}
+    assert monitored, "derived no infrastructure sources — the registry accessors moved (#2651)"
 
     ddb = boto3.client("dynamodb", region_name=REGION)
-    sources_to_check = ["withings", "whoop", "macrofactor", "todoist", "notion"]
-    yesterday = (today - timedelta(days=1)).isoformat()
-    today_iso = today.isoformat()
-
-    found = []
-    for source in sources_to_check:
-        pk = f"USER#matthew#SOURCE#{source}"
-        for sk in (f"DATE#{today_iso}", f"DATE#{yesterday}"):
-            try:
-                resp = ddb.get_item(
-                    TableName=TABLE_NAME,
-                    Key={"pk": {"S": pk}, "sk": {"S": sk}},
-                )
-                if "Item" in resp:
-                    found.append(f"{source}@{sk[5:]}")
-                    break
-            except Exception:
-                pass
-
-    if len(found) < 2:
-        pytest.fail(
-            f"I16 FAIL: fewer than 2 sources have recent DATE# records. "
-            f"Found: {found or 'NONE'}\n"
-            f"Expected ≥2 from {sources_to_check} for {today_iso} or {yesterday}."
+    breached, checked = [], []
+    for source in sorted(monitored):
+        stale_hours = overrides.get(source, reg.DEFAULT_STALE_HOURS)
+        resp = ddb.query(
+            TableName=TABLE_NAME,
+            KeyConditionExpression="pk = :p AND begins_with(sk, :s)",
+            ExpressionAttributeValues={":p": {"S": f"USER#matthew#SOURCE#{source}"}, ":s": {"S": "DATE#"}},
+            ScanIndexForward=False,
+            Limit=1,
+            ProjectionExpression="sk",
         )
+        items = resp.get("Items") or []
+        if not items:
+            breached.append(f"{source}: NO DATE# records at all (threshold {stale_hours}h)")
+            continue
+        latest = items[0]["sk"]["S"][len("DATE#") :]
+        try:
+            age_h = (now - datetime.strptime(latest, "%Y-%m-%d").replace(tzinfo=timezone.utc)).total_seconds() / 3600
+        except ValueError:
+            breached.append(f"{source}: unparseable sort key {latest!r}")
+            continue
+        checked.append(f"{source}@{latest} ({age_h:.0f}h/{stale_hours}h)")
+        # The record is stamped with a DATE, so "today's record" is 0h old at 00:00Z
+        # and 24h old just before midnight. Allow one day of stamp granularity on top
+        # of the declared threshold rather than re-deriving a cadence here.
+        if age_h > stale_hours + 24:
+            breached.append(f"{source}: latest {latest} is {age_h:.0f}h old, threshold {stale_hours}h (+24h grace)")
+
+    assert not breached, "I16 FAIL — source(s) past their OWN declared stale_hours:\n  " + "\n  ".join(breached) + f"\n\nChecked: {checked}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1707,3 +1729,44 @@ if __name__ == "__main__":
         cwd=ROOT,
     )
     sys.exit(result.returncode)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #2651 — the ingest-liveness gate must stay registry-derived
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_i16_derives_its_windows_from_the_registry_not_from_literals():
+    """I16 must never re-acquire a hand-typed source list or staleness window.
+
+    CLAUDE.md forbids hand-stating a source's cadence (#2003) because those
+    literals rot: the previous I16 hardcoded five sources and a flat 2-day window,
+    and by 2026-08-14 it failed on `withings` (~77h against its OWN declared 168h)
+    and `todoist` (~53h against 72h) — both fresh by their own contract.
+
+    Deliberately scoped to THIS function rather than all of `tests/`. A repo-wide
+    scan was measured first: hand-listing >=3 registry keys hits 38 sites and a
+    staleness-vocabulary scan hits 39, and nearly all are legitimate — fixtures,
+    or comments citing a registry value to explain a threshold. A gate that fires
+    on those is noise, and noise is what #2649 was about. So this asserts the one
+    contract that actually rotted.
+    """
+    import ast
+    import inspect
+
+    src = inspect.getsource(test_i16_recent_ingest_records_exist)
+    tree = ast.parse(textwrap.dedent(src))
+
+    sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    from ingestion.source_registry import SOURCE_REGISTRY
+
+    keys = set(SOURCE_REGISTRY)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+            named = [e.value for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str) and e.value in keys]
+            assert not named, f"I16 hand-lists source key(s) {named} — derive them from source_registry instead (#2003/#2651)"
+
+    assert "source_registry" in src, "I16 no longer reads the registry — its windows are hand-typed again (#2651)"
+    assert (
+        "stale_hours_overrides" in src and "behavioral_source_keys" in src
+    ), "I16 must derive BOTH the per-source threshold and the behavioral exclusion from the registry (#2651)"
