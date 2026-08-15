@@ -92,14 +92,19 @@ _CW_NAMESPACE = "LifePlatform/AI"
 _BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
 
 
-def _emit_failure_metric():
-    """Emit API failure metric to CloudWatch (P1.8)."""
+def _emit_failure_metric(metric_name: str = "AnthropicAPIFailure"):
+    """Emit a failure metric to CloudWatch (P1.8).
+
+    #2668: named, so a pass failing for its OWN reason gets its own series — an
+    IC-3 truncation returned 200 and would corrupt the AnthropicAPIFailure metric
+    that `slo-ai-coaching-success` keys on.
+    """
     try:
         _cw.put_metric_data(
             Namespace=_CW_NAMESPACE,
             MetricData=[
                 {
-                    "MetricName": "AnthropicAPIFailure",
+                    "MetricName": metric_name,
                     "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
                     "Value": 1,
                     "Unit": "Count",
@@ -157,11 +162,12 @@ Output this exact JSON structure:
 {{"key_patterns": ["specific data observation 1", "specific data observation 2"], "likely_connection": "habit/metric X correlates with metric Y result — note this is a pattern, not proven causation", "challenge": "One reason this analysis might be wrong or misleading — e.g. confounding factor, insufficient data, correlation ≠ causation, or the obvious insight hiding a subtler one", "priority": "single most important coaching focus for today", "tone": "celebrate|challenge|support"}}"""
 
     try:
-        # 2026-05-03: bumped 200 → 600. IC-3 JSON has 5 fields (key_patterns
-        # array + likely_connection + challenge + priority + tone). 200 was
-        # truncating mid-string ("Unterminated string starting at... char 670"
-        # in daily-brief logs). 600 gives ample headroom.
-        raw = call_anthropic(prompt, api_key, max_tokens=600, model=AI_MODEL_HAIKU)
+        # 2026-05-03: 200 → 600 for this same truncation class. #2668 (2026-08-15):
+        # 600 rotted the same way — 13 straight daily-brief failures, all
+        # "Unterminated string", cut between chars 1754 and 2277 (the measurements
+        # are in tests/test_ic3_truncation_2668.py). Sized against that observed
+        # ceiling, not the next round number: 1500 tok ≈ 6000 chars ≈ 2.6× it.
+        raw = call_anthropic(prompt, api_key, max_tokens=1500, model=AI_MODEL_HAIKU)
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
@@ -169,7 +175,11 @@ Output this exact JSON structure:
             raw = raw[:-3]
         return json.loads(raw.strip())
     except Exception as e:
-        print("[WARN] IC-3 analysis pass failed: " + str(e))
+        # #2668: ERROR + a keyable metric. This ran dead 10 of 12 days with Errors
+        # flat at 0.0 — `_format_analysis(None)` returns "", so Pass 2 silently
+        # loses its whole analysis block and the brief still reads healthy.
+        print("[ERROR] IC-3 analysis pass failed: " + str(e))
+        _emit_failure_metric("IC3AnalysisFailure")
         return None
 
 
