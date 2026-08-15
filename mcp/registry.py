@@ -1381,7 +1381,7 @@ TOOLS = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "days": {"type": "integer", "description": "How many days back to scan (default 90)."},
+                    "days": {"type": "integer", "minimum": 1, "maximum": 365, "description": "Days back to scan (default 90)."},
                 },
                 "required": [],
             },
