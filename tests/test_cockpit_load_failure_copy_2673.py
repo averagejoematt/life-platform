@@ -117,3 +117,43 @@ console.log(JSON.stringify({{ failed, empty }}));
     assert "hasn't computed yet" in r["empty"], r["empty"]
     assert "hasn't computed yet" not in r["failed"], f"a failed request still claims the score wasn't computed: {r['failed']!r}"
     assert "couldn't load" in r["failed"], r["failed"]
+
+
+# ── The path that actually runs ───────────────────────────────────────────────
+# The first three tests above exercised getJSON, and they were green while the
+# LIVE page still rendered the wrong copy. The reason is this boundary: load()
+# fetches the snapshot through `Promise.allSettled`, which DISCARDS the rejection
+# (`snap.status === "fulfilled" ? snap.value : null`). The tagged error never
+# reached the catch; an untagged `new Error("character sheet unavailable")` did.
+#
+# Caught only by re-running the forced-failure probe against the DEPLOYED asset —
+# unit tests, CI, and the deploy were all green over it.
+
+
+def _allsettled_block() -> str:
+    src = open(_COCKPIT_JS, encoding="utf-8").read()
+    m = re.search(r"if \(!character \|\| charBody\.error \|\| !pillarList\.length\) \{.*?\n    \}", src, re.S)
+    assert m, "the empty-state throw moved — update this extraction"
+    return m.group(0)
+
+
+def test_a_rejected_snapshot_survives_the_allsettled_boundary():
+    """A failed request must still be a failed request after allSettled ate it."""
+    js = f"""
+const out = {{}};
+function decide(snap, charBody, character, pillarList) {{
+  try {{
+    {_allsettled_block()}
+  }} catch (e) {{ return !!e.transport; }}
+  return null;
+}}
+console.log(JSON.stringify({{
+  rejected_transport: decide({{ status: "rejected", reason: {{ transport: true }} }}, null, null, []),
+  body_carries_error:  decide({{ status: "fulfilled" }}, {{ error: "boom" }}, null, []),
+  clean_but_uncomputed: decide({{ status: "fulfilled" }}, {{}}, null, []),
+}}));
+"""
+    r = _run(js)
+    assert r["rejected_transport"] is True, "a rejected snapshot did not survive allSettled as a transport failure (#2673)"
+    assert r["body_carries_error"] is True, "a body carrying {error} is a failed request, not an uncomputed score"
+    assert r["clean_but_uncomputed"] is False, "a clean 200 with no sheet must stay 'hasn't computed yet'"

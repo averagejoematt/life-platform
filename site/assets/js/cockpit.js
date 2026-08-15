@@ -1484,7 +1484,18 @@ async function load(dateStr) {
 
     // No real sheet today (uncomputed / pre-experiment / error) → calm empty state,
     // never misleading zeros.
-    if (!character || charBody.error || !pillarList.length) throw new Error("character sheet unavailable");
+    //
+    // #2673: allSettled DISCARDS the rejection above (`snap.status === "fulfilled"
+    // ? snap.value : null`), so a failed request arrived here indistinguishable from
+    // an uncomputed one and the untagged `new Error` below always rendered "hasn't
+    // computed yet". Carry the distinction across the allSettled boundary by hand:
+    // a rejected snapshot, or a body that carries {error}, is a FAILED REQUEST —
+    // only a clean 200 with no sheet is genuinely "not computed yet".
+    if (!character || charBody.error || !pillarList.length) {
+      const err = new Error("character sheet unavailable");
+      err.transport = (snap.status === "rejected" && !!snap.reason?.transport) || !!charBody?.error;
+      throw err;
+    }
 
     renderHub(character);
     renderReadinessScore(snapV?.readiness);  // RQA-04 — stored readiness score + components
