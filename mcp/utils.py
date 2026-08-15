@@ -139,7 +139,7 @@ def mcp_error(
 
     Examples:
         return mcp_error("No Whoop data found", "NO_DATA",
-                         ["Try a shorter date range", "Check get_data_freshness"])
+                         ["Try a shorter date range", "Check get_freshness_status"])
 
         return mcp_error("DynamoDB query failed", "INTERNAL", detail=str(e))
     """
@@ -161,7 +161,7 @@ def _default_suggestions(error_code: str) -> list[str]:
     _DEFAULTS = {
         "NO_DATA": [
             "Try a shorter or different date range.",
-            "Call get_data_freshness to check when this source last updated.",
+            "Call get_freshness_status to check when this source last updated.",
         ],
         "DATE_RANGE": [
             "Use YYYY-MM-DD format for both start_date and end_date.",
@@ -172,16 +172,16 @@ def _default_suggestions(error_code: str) -> list[str]:
             "Check the tool's required arguments and retry.",
         ],
         "SOURCE_UNAVAIL": [
-            "Call get_data_freshness to see which sources are current.",
+            "Call get_freshness_status to see which sources are current.",
             "This source may not have data for the requested date.",
         ],
         "PARTIAL_DATA": [
             "Some fields may be missing — interpret available data with caution.",
-            "Call get_data_freshness to see if the source is fully ingested.",
+            "Call get_freshness_status to see if the source is fully ingested.",
         ],
         "QUERY_TOO_BROAD": [
             "Split the request into smaller date windows (e.g. 90-day chunks).",
-            "Use get_longitudinal_summary for multi-year overviews instead.",
+            "Use find_days to locate the specific days that matter, instead of scanning the whole span.",
         ],
         "INTERNAL": [
             "Retry the request — this may be a transient error.",

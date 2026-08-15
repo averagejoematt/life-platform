@@ -289,6 +289,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_wayfinding.py",
         "test_wiring_coverage.py",
         "test_xfail_hygiene.py",
+        # #2666: derives the MCP error-suggestion strings and the TOOLS dict by AST
+        # sweep, and fails when a suggestion names a tool that is not registered —
+        # a repo-shape ratchet whose verdict depends only on source, not on data.
+        "test_mcp_suggestion_tool_names_2666.py",
         # the derivation guard itself — its own docstring/synthetic-fixture text
         # mentions the three sweep idioms, so it self-matches; it belongs pre-merge
         # regardless (it IS the structural gate this whole entry is about).
