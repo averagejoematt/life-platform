@@ -43,7 +43,16 @@ re-embed, so re-running the hook on an already-indexed week is free and writes n
 
 from __future__ import annotations
 
+import logging
+
 from ai import recall_consent as rc, semantic_recall as sr
+
+logger = logging.getLogger(__name__)
+
+# #2705: every FAILED below used to discard its exception. The freshness guard then
+# reported THAT an installment was missing while nothing recorded WHY — 2026-08-11
+# sat unindexed for four days and the cause had to be reverse-engineered from a bare
+# `[recall] index 2026-08-11: failed` logged at INFO. Fail-soft is right; silent is not.
 
 # Status strings returned by the indexing entry points. Callers log these; the two
 # that mean "the corpus changed" are INDEXED (a row was embedded + written) and
@@ -241,7 +250,8 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
                 return UNCHANGED
             try:
                 refresh_metadata(table, sk, drift)
-            except Exception:  # noqa: BLE001 — a failed repair is a fault the freshness guard keeps reporting
+            except Exception as e:  # noqa: BLE001 — a failed repair is a fault the freshness guard keeps reporting
+                logger.error("[recall] metadata repair FAILED for %s %s: %s", doc.get("kind"), doc.get("date"), e)
                 return FAILED
             return REPAIRED
 
@@ -280,7 +290,8 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
                 embedded_at=now,
             )
         )
-    except Exception:  # noqa: BLE001 — indexing is never load-bearing; the freshness guard reports the gap
+    except Exception as e:  # noqa: BLE001 — indexing is never load-bearing; the freshness guard reports the gap
+        logger.error("[recall] embed/write FAILED for %s %s: %s", doc.get("kind"), doc.get("date"), e)
         return FAILED
     return INDEXED
 
@@ -338,7 +349,8 @@ def index_chronicle_installment(table, chronicle_pk: str, date_str: str, *, sk: 
     try:
         resp = table.query(KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").begins_with("DATE#"))
         items = list(resp.get("Items", []))
-    except Exception:  # noqa: BLE001 — indexing must never block a publish
+    except Exception as e:  # noqa: BLE001 — indexing must never block a publish
+        logger.error("[recall] chronicle partition read FAILED for %s: %s", date_str, e)
         return FAILED
 
     item = next((i for i in items if str(i.get("sk", "")) == target_sk), None)
