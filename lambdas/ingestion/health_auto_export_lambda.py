@@ -8,7 +8,8 @@ glucose readings, but handles any configured HealthKit metrics.
 Architecture:
   Health Auto Export (iOS) → Lambda Function URL → this Lambda → DynamoDB + S3
 
-Auth: Bearer token stored in Secrets Manager (life-platform/health-auto-export).
+Auth: Bearer token stored in Secrets Manager (life-platform/ingestion-keys — the
+bundle; a dedicated `life-platform/health-auto-export` secret has never existed).
 
 Data flow:
   1. Validate bearer token from Authorization header

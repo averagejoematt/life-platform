@@ -13,7 +13,12 @@ v1.0.0 — Initial release
 Environment variables:
   TABLE_NAME          — DynamoDB table (default: life-platform)
   S3_BUCKET           — S3 bucket (default: matthew-life-platform)
-  SECRET_NAME         — Secrets Manager key (default: life-platform/dropbox)
+  SECRET_NAME         — Secrets Manager key (default: life-platform/ingestion-keys,
+                        dropbox fields). The dedicated `life-platform/dropbox` was DELETED
+                        2026-05-17 when the consumer migrated to the bundle (COST-B); this
+                        docstring outlived it and named a secret nothing could read
+                        (#2653). The role grants the bundle, not the old id — see
+                        cdk/stacks/role_policies_ingestion.py::ingestion_dropbox.
 """
 
 import base64
