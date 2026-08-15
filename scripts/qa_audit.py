@@ -49,7 +49,7 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
-for _p in (os.path.join(_REPO, "tests"), _HERE, os.path.join(_REPO, "lambdas")):
+for _p in (os.path.join(_REPO, "tests"), _HERE, os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "deploy")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -185,6 +185,68 @@ def smoke_checked_endpoints():
     return sorted(checked)
 
 
+# #2652: routes deliberately NOT swept, each with a written reason. The rule the issue sets
+# is that the uncovered count is 0 OR every exception carries a reason — so an exception is
+# DATA here, not a comment, and `live_api_coverage()` subtracts it.
+#
+# Only the mechanically defensible class is listed: a write door cannot be swept by a status
+# probe, because a GET against it is a 405 and a POST against it would mutate Matthew's data
+# on every deploy. Everything else stays in the residual on purpose — an exception nobody
+# wrote a reason for is the grandfathering this issue is about.
+OUT_OF_SCOPE_ROUTES = {
+    "write_doors": (
+        "POST-only write doors: a GET is a 405 and a POST would mutate real data on every deploy "
+        "sweep. Their behaviour is covered by unit tests over the handler, not by a status probe. "
+        "Derived from the router's own declared methods, never hand-listed."
+    ),
+}
+
+
+def live_api_coverage():
+    """Coverage against the LIVE ROUTE TABLE — the denominator this issue is about.
+
+    #2652: `uncovered_section` measured manifest-declared api_deps against the smoke sweep,
+    so its denominator was the REGISTRY. A route that was never registered could not appear
+    as uncovered, and 82 pre-existing routes were invisible — `qa_audit` reported "0
+    endpoints uncovered" while two live 502s (#2656, #2657) sat inside the uncovered set.
+    The classic guard-the-instance error, in the instrument that reports coverage.
+
+    `surface-drift.yml` blocks only NEW unregistered routes (it is diff-only), which is
+    exactly why the 82 were grandfathered: nothing ever looked at the standing set.
+
+    The denominator is `endpoint_registry.discover_endpoint_records()` — the same AST walk
+    `sync_doc_metadata` uses for the published endpoint count, so the two cannot disagree.
+    Returns None when that walk is unavailable, so the report can say "not derived" instead
+    of printing a coverage percentage computed from nothing.
+    """
+    try:
+        import endpoint_registry
+
+        records = endpoint_registry.discover_endpoint_records()
+    except Exception:  # noqa: BLE001 — an audit must not die because a helper moved
+        return None
+    if not records:
+        return None
+
+    live = {p: r for p, r in records.items() if p.startswith("/api/")}
+    swept = set(smoke_checked_endpoints()) | set(qa_manifest.api_dep_endpoints())
+    write_doors = sorted(p for p, r in live.items() if r.methods and set(r.methods) <= {"POST"})
+    uncovered = sorted(p for p in live if p not in swept and p not in write_doors)
+    return {
+        "live_routes": len(live),
+        "swept": sorted(p for p in live if p in swept),
+        "out_of_scope": {"write_doors": write_doors, "reason": OUT_OF_SCOPE_ROUTES["write_doors"]},
+        "uncovered": uncovered,
+        "uncovered_count": len(uncovered),
+        "note": (
+            "denominator = the live site-api route table (endpoint_registry.discover_endpoint_records), "
+            "NOT the manifest — a route that was never registered must still be able to read as uncovered "
+            "(#2652). Every name in `uncovered` is a route nothing sweeps; each needs a manifest entry or a "
+            "written out-of-scope reason. UNADJUDICATED until then: this list is the queue, not a verdict."
+        ),
+    }
+
+
 def uncovered_section():
     no_visual = sorted(p["path"] for p in qa_manifest.MANIFEST if not p.get("visual") and not p.get("visual_variants"))
     # #1586: the declared universe is every api_dep the manifest names (not just
@@ -197,6 +259,7 @@ def uncovered_section():
         "no_visual_def": no_visual,
         "api_deps_declared": len(declared),
         "api_deps_unchecked": [d for d in declared if d not in checked],
+        "live_api_coverage": live_api_coverage(),
         "note": (
             "api_deps_unchecked = manifest-declared endpoints the smoke JSON-health sweep (#1586, deploy/"
             "smoke_test_site.sh's 'Manifest api_deps' section) does not cover — empty on a healthy repo; a "
@@ -397,6 +460,24 @@ def render(audit):
     for d in unc["api_deps_unchecked"]:
         L.append(f"  api dep never status-checked by smoke: {d}")
     L.append(f"  ({unc['note']})")
+    L.append("")
+    # #2652: the denominator that matters. The block above measures manifest-declared deps
+    # against the smoke sweep — a registry denominator, which cannot see a route that was
+    # never registered. This one counts against the LIVE ROUTE TABLE.
+    cov = unc.get("live_api_coverage")
+    if cov is None:
+        L.append("LIVE /api COVERAGE — NOT DERIVED (endpoint_registry unavailable); no coverage claim is made")
+    else:
+        L.append(
+            f"LIVE /api COVERAGE — {len(cov['swept'])} swept · {len(cov['out_of_scope']['write_doors'])} out of scope "
+            f"· {cov['uncovered_count']} UNCOVERED of {cov['live_routes']} live routes"
+        )
+        L.append(f"  out of scope — write doors: {cov['out_of_scope']['reason']}")
+        for r in cov["out_of_scope"]["write_doors"]:
+            L.append(f"    out of scope: {r}")
+        for r in cov["uncovered"]:
+            L.append(f"  UNCOVERED (no sweep, no written reason): {r}")
+        L.append(f"  ({cov['note']})")
     L.append("")
     L.append("SILENT-SKIP STATES")
     for s in audit["silent_skips"]:
