@@ -581,7 +581,12 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_ai_quality_canary(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            # #2655: EventBridge invokes this asynchronously, so a raising handler
+            # retries twice and is then DROPPED. From 2026-08-10 to 08-14 every run
+            # failed that way and the only trace was three tracebacks in CloudWatch.
+            # Same instrument as #809/ADR-116: terminal async failures land in the
+            # DLQ digest instead of evaporating.
+            dlq=local_dlq,
             alerts_topic=None,
         )
 
