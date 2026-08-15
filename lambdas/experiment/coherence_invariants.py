@@ -119,7 +119,20 @@ def check_prediction_health(
 #   Input: list of {name, stored, expected, tol}. tol is absolute.
 # ─────────────────────────────────────────────────────────────────────────────
 def check_computed_coherence(checks) -> Finding:
+    """#2736 — an EMPTY check set is a WARN, never OK. This invariant reported
+    `ok / "0 computed metrics agree with their components"` on 11 of 11 retained
+    days because its adapter read field names the record has never used; zero
+    checks produced zero offenders, and zero offenders read as healthy. A green
+    from a check that examined nothing is indistinguishable from a green from a
+    check that examined something and liked it (#2640). WARN, so the digest says
+    so without tripping `coherence-overall` (only ALARM does).
+    """
     f = Finding("computed_coherence", value=0.0)
+    if not checks:
+        f.status = WARN
+        f.value = 1.0
+        f.detail = "no computed metrics could be checked — the adapter found nothing to compare (examined 0, not verified 0)"
+        return f
     offenders = []
     for c in checks:
         stored, expected = c.get("stored"), c.get("expected")
@@ -310,9 +323,40 @@ def _is_blank(v) -> bool:
     return v is None or v == 0 or v == 0.0 or v == "" or v == [] or v == {}
 
 
-def check_endpoint_shape(name, payload, spec, *, experiment_age_days=None) -> Finding:
+def _quiet_phrase(q) -> str:
+    """'MacroFactor quiet 52d (last 2026-06-24)' — the source and how long, never
+    a bare 'behavioural'. A measured absence has to state what is absent."""
+    label = q.get("label") or q.get("key") or "source"
+    days, last = q.get("days"), q.get("last_date")
+    bits = f"{label} quiet"
+    if days is not None:
+        bits += f" {days}d"
+    if last:
+        bits += f" (last {last})"
+    return bits
+
+
+def check_endpoint_shape(name, payload, spec, *, experiment_age_days=None, quiet_sources=None) -> Finding:
     """`experiment_age_days`: days since EXPERIMENT_START_DATE, or None if the
-    caller couldn't determine it (falls back to the original, ungated behavior)."""
+    caller couldn't determine it (falls back to the original, ungated behavior).
+
+    `quiet_sources` (#2735): the endpoint's BEHAVIOURAL backing sources that are
+    currently silent, as [{key, label, last_date, days}] — the caller derives them
+    from `source_registry` facets (this module stays pure: no boto3, no clock).
+
+    An empty payload whose backing source is `behavioral: True` and quiet is a
+    CORRECT REST STATE, not a degenerate payload: MacroFactor logging nothing
+    because Matthew logged nothing is the same non-event the #2326 decision block
+    already ruled must never page. Before this, it ALARMed — and since
+    `coherence-overall` only trips on ALARM, a skipped week of food logging
+    saturated the one alarm on the board still carrying information, permanently
+    (an alarm stuck red can never transition OK->ALARM again).
+
+    It reports WARN rather than OK deliberately: silence about an absence is the
+    #2640 pattern (a green that examined nothing reads exactly like a green that
+    examined something and liked it). WARN names the source and the duration and
+    does not trip the alarm.
+    """
     f = Finding(f"endpoint_shape:{name}", value=0.0)
     problems = []
     if not isinstance(payload, dict):
@@ -326,13 +370,24 @@ def check_endpoint_shape(name, payload, spec, *, experiment_age_days=None) -> Fi
     in_grace = experiment_age_days is not None and 0 <= experiment_age_days < POST_RESET_GRACE_DAYS
     nd = spec.get("non_degenerate", [])
     degenerate = bool(nd) and all(_is_blank(_dig(payload, p)) for p in nd)
-    if degenerate and not in_grace:
+    quiet = [q for q in (quiet_sources or []) if q]
+    # Grace wins over the behavioural read only because it is the cheaper claim;
+    # both are "empty is expected here", and the detail says which one applied.
+    explained = degenerate and not in_grace and bool(quiet)
+    if degenerate and not in_grace and not quiet:
         problems.append(f"all of {nd} are blank/zero (degenerate payload)")
     f.value = float(len(problems))
     if problems:
         f.status = ALARM
         f.offenders = problems
         f.detail = f"{name}: " + "; ".join(problems[:4])
+    elif explained:
+        # A `required` key missing is still ALARM above — this branch is only
+        # reached when the shape is intact and merely EMPTY.
+        f.status = WARN
+        f.value = 1.0
+        f.offenders = [_quiet_phrase(q) for q in quiet]
+        f.detail = f"{name}: empty, explained by behavioural silence — " + "; ".join(f.offenders[:4])
     elif degenerate and in_grace:
         f.detail = f"{name}: shape ok (post-reset day {experiment_age_days}, empty board expected)"
     else:
