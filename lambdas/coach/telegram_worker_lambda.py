@@ -135,6 +135,32 @@ def _persona_is_retired(persona_id: str) -> bool:
         return False
 
 
+def _persona_known(persona_id: str):
+    """True / False / None — does this persona exist? None means WE COULD NOT TELL.
+
+    #2719: the three-valued return is the whole point. `False` (registry read fine, no
+    such persona) is a permanent misconfiguration and the caller refuses. `None` (registry
+    unreadable, or readable but empty — which is what a failed S3 read plus a missing
+    local file looks like) is a transient condition, and the caller must fall through to
+    the old degraded-but-answering behaviour, because darking a live coach on a registry
+    hiccup is a worse failure than the one this guard exists to fix.
+
+    Distinguishing the two is why this is not `bool(personas().get(pid))`: that expression
+    answers False for both, and would have turned every registry outage into total silence
+    across all ten bots.
+    """
+    try:
+        from coach.persona_registry import personas
+
+        registry = personas(_s3_client(), S3_BUCKET) or {}
+        if not registry:
+            return None
+        return persona_id in registry
+    except Exception as e:  # noqa: BLE001 — never block a reply on a registry read
+        logger.warning("[telegram] persona-existence check unavailable for %s: %s", persona_id, e)
+        return None
+
+
 def _secret_entry(coach_key: str) -> dict:
     """One route's entry in the telegram store ({bot_token, chat_ids}), or {}.
 
@@ -945,6 +971,28 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
             _emit_metric("TelegramRetiredSeatRefused", coach_id)
             logger.error("[telegram] route %r derives the RETIRED persona %r — refusing", coach_id, derived)
             return {"ok": True, "reason": "route_retired"}
+        # #2719: the retired check catches a derived id that names a RETIRED seat. It does
+        # not catch one that names NO seat, and that is the live `board` case: @ajm_board_bot
+        # is provisioned with a chat id, no persona carries telegram_route "board", and the
+        # derived `board_coach` does not exist either — so this fell through to _assemble,
+        # which emitted TelegramPersonaMissing and answered as "Matthew's board coach". A
+        # nameless coach with no persona block and no voice spec is worse than silence: it
+        # is a reply Matthew cannot tell apart from a real one.
+        #
+        # The distinction that keeps this from darking a working coach is REGISTRY
+        # READABLE vs PERSONA ABSENT. _persona_known returns None when the registry could
+        # not be read at all, and the fail-soft below treats that exactly as before — a
+        # registry hiccup must never stop a live coach from answering, which is the same
+        # reasoning _persona_is_retired documents. Only a confirmed absence refuses.
+        if _persona_known(derived) is False:
+            _emit_metric("TelegramUnmappedRouteRefused", coach_id)
+            logger.error(
+                "[telegram] route %r resolves to no persona and derives %r, which is not in the registry — refusing "
+                "rather than answering as a nameless coach",
+                coach_id,
+                derived,
+            )
+            return {"ok": True, "reason": "route_unmapped"}
         persona_id = derived
     # S3 first (fresh config without a redeploy), bundled config/ as the offline
     # fallback — the pair of paths that was MISSING when every conversation ran
