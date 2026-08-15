@@ -141,17 +141,51 @@ def tool_get_zone2_breakdown(args):
                 }
             )
 
+    # #2661: BACKFILL EVERY CALENDAR WEEK IN THE WINDOW. `weekly` is a defaultdict keyed
+    # by activity, so a week with no qualifying activity simply did not exist — and
+    # `n_weeks = len(weekly_sorted)` then divided by ACTIVE weeks. A missed week vanished
+    # from the denominator instead of lowering the rate, which is the opposite of what an
+    # adherence number is for: 150 minutes in one week out of thirteen reported
+    # `avg_weekly_zone_2_min: 150` and `target_hit_rate_pct: 100`. Measured live on
+    # 2026-08-15, a 2026-05-18..08-15 window (13 calendar weeks, 1 qualifying activity)
+    # reported `weeks_analyzed: 1`.
+    #
+    # ADR-105: the denominator is now the weeks the caller asked about. The first and
+    # last may be partial — the window rarely starts on a Monday — so `partial_weeks`
+    # says which, rather than quietly rounding either way.
+    _win_start = datetime.strptime(start_date, "%Y-%m-%d")
+    _win_end = datetime.strptime(end_date, "%Y-%m-%d")
+    calendar_weeks = []
+    _cur = _win_start - timedelta(days=_win_start.weekday())  # Monday of the first week
+    while _cur <= _win_end:
+        calendar_weeks.append(_cur.strftime("%Y-%m-%d"))
+        _cur += timedelta(days=7)
+    for _wk in calendar_weeks:
+        weekly[_wk]  # noqa: B018 — defaultdict touch; materialises the zero template
+    partial_weeks = sorted(
+        {
+            wk
+            for wk in (calendar_weeks[0], calendar_weeks[-1])
+            if not (_win_start <= datetime.strptime(wk, "%Y-%m-%d") and datetime.strptime(wk, "%Y-%m-%d") + timedelta(days=6) <= _win_end)
+        }
+    )
+
+    # A target of zero or less makes "did I meet it?" unanswerable, not universally true.
+    # `z2 >= 0` is True for every week including the empty ones, so the old code reported
+    # a 100% hit rate for a target nobody set.
+    target_is_meaningful = weekly_target_min > 0
+
     weekly_sorted = []
     for wk in sorted(weekly.keys()):
         w = weekly[wk]
         z2 = w["zone_2_min"]
-        pct_target = round(100 * z2 / weekly_target_min, 0) if weekly_target_min > 0 else None
+        pct_target = round(100 * z2 / weekly_target_min, 0) if target_is_meaningful else None
         weekly_sorted.append(
             {
                 "week_start": wk,
                 "zone_2_minutes": round(z2, 1),
                 "target_pct": pct_target,
-                "target_met": z2 >= weekly_target_min,
+                "target_met": (z2 >= weekly_target_min) if target_is_meaningful else None,
                 "zone_1_min": round(w["zone_1_min"], 1),
                 "zone_3_min": round(w["zone_3_min"], 1),
                 "zone_4_min": round(w["zone_4_min"], 1),
@@ -217,19 +251,33 @@ def tool_get_zone2_breakdown(args):
         }
 
     # ── Summary ──────────────────────────────────────────────────────────────
-    n_weeks = len(weekly_sorted)
+    n_weeks = len(weekly_sorted)  # #2661: calendar weeks in the window, not active weeks
+    active_weeks = sum(1 for w in weekly_sorted if w["activity_count"] > 0)
     avg_z2_weekly = round(sum(z2_weekly_vals) / n_weeks, 1) if n_weeks > 0 else 0
-    weeks_meeting_target = sum(1 for w in weekly_sorted if w["target_met"])
+    weeks_meeting_target = sum(1 for w in weekly_sorted if w["target_met"]) if target_is_meaningful else None
 
     summary = {
         "period": {"start_date": start_date, "end_date": end_date},
         "weeks_analyzed": n_weeks,
+        # ADR-105: state n and what it counted. `weeks_analyzed` is the denominator every
+        # rate below divides by; `active_weeks` is how many of them had any qualifying
+        # activity. When they differ, the gap IS the adherence story.
+        "denominator": "calendar weeks in the requested window",
+        "active_weeks": active_weeks,
+        "zero_activity_weeks": n_weeks - active_weeks,
+        "partial_weeks": partial_weeks,
         "total_activities": len(all_activities),
         "zone_2_activities": zone_counts.get("zone_2", 0),
         "avg_weekly_zone_2_min": avg_z2_weekly,
         "weekly_target_min": weekly_target_min,
         "weeks_meeting_target": weeks_meeting_target,
-        "target_hit_rate_pct": round(100 * weeks_meeting_target / n_weeks, 0) if n_weeks > 0 else 0,
+        "target_hit_rate_pct": (round(100 * weeks_meeting_target / n_weeks, 0) if (target_is_meaningful and n_weeks > 0) else None),
+        "target_applicable": target_is_meaningful,
+        "target_note": (
+            None
+            if target_is_meaningful
+            else f"weekly_target_minutes={weekly_target_min} — a hit rate against a non-positive target is not defined, so none is reported."
+        ),
         "total_zone_2_min": round(zone_totals.get("zone_2", 0), 1),
         "max_hr_used": max_hr,
         "zone_2_hr_range": f"{zone_hr_ranges['zone_2']['hr_low']:.0f}-{zone_hr_ranges['zone_2']['hr_high']:.0f} bpm",
@@ -238,7 +286,11 @@ def tool_get_zone2_breakdown(args):
     # ── Alerts + recommendations ─────────────────────────────────────────────
     alerts = []
 
-    if avg_z2_weekly < weekly_target_min * 0.5:
+    # #2661: a non-positive target makes "shortfall" meaningless too — the deficit text
+    # would read "0 min target (-N min shortfall)". No target, no verdict about it.
+    if not target_is_meaningful:
+        pass
+    elif avg_z2_weekly < weekly_target_min * 0.5:
         deficit = round(weekly_target_min - avg_z2_weekly, 0)
         alerts.append(
             f"Zone 2 deficit: averaging {avg_z2_weekly} min/week vs {weekly_target_min} min target "
