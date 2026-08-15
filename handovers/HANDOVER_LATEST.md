@@ -6,7 +6,7 @@
 **Build beat:** `2026-08-15-the-green-pipeline-that-was-hiding-five-things`
 **Docs:** `.claude/commands/wrap.md` (orphan-gate grep — see gotcha 7) · `docs/engines/COACH_STANCE.md` (re-verified — four `ai_calls.py` spans drifted a uniform +10 from my own additive change; AST-re-derived, new verify entry rather than a rewrite of the prior dated ones) · `docs/INCIDENT_LOG.md` (+1 P3 row, `Last updated:` bumped)
 **Decisions:** none needed — the session applied existing contracts (ADR-104 honest numbers, ADR-099 filing + closure, ADR-125 budget bands, §9a fixture-is-the-wire). The one genuine governance question raised — what `published_vitals` should *mean* — is deliberately left to Matthew on #2634 rather than decided unilaterally.
-**Main:** stranded — R8-ST6 Plan-red at `ed98d082` (#1901 class), and **already resolved by the owner's `cdk deploy LifePlatformOperational` at 16:33Z**; `cdk diff` now shows **zero** remaining IAM changes, so this wrap commit's own CI/CD run is the recovery. Re-run `check_main_green.py` after it completes.
+**Main:** stranded — R8-ST6 Plan-red at `ed98d082` (#1901 class). The **cause** is cleared: the owner ran `cdk deploy LifePlatformOperational` at 16:33Z and `cdk diff` now shows **zero** remaining IAM changes, so the next Plan should pass. But the **state** is not: I first wrote that this wrap commit's own run would be the recovery — it is not, because `ci-cd.yml`'s push filter covers `lambdas/** cdk/** tests/** ci/** config/** .github/workflows/**` and a docs/handover/beats commit matches none of them, so no CI/CD run fires. **Recovery is a `deploy_all=true` `workflow_dispatch` of ci-cd.yml** (the gate's own decode), or the next code-touching push. Re-run `check_main_green.py` after either.
 **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢
 **Closures:** #2644, #2649, #2655, #2659, #2672, #2673, #2688 commented (all `realized`, each with live post-deploy evidence)
 **Incidents:** 1 row added — the code-deploy pipeline stranded ~14h by the R8-ST6 IAM gate firing *correctly* on the canary-DLQ grant; every deploy that night went around it via the per-function path
@@ -52,6 +52,10 @@ None of these were broken features. All were **working code that discarded the r
    rolled up in `INDEX_review_discipline.md` — so every wrap saw ~98 `ORPHAN:` lines with a
    true count of **zero**. Fixed in `.claude/commands/wrap.md` (added `INDEX_*.md`). Same class
    as everything else this session: a gate nobody can act on is a gate nobody reads.
+
+## Fleet drift worth naming
+
+Everything merged was deployed **per-function** (the 6 Lambdas listed above), because the pipeline was stranded. Two of this session's changes are to **shared bundle modules** — `lambdas/privacy/content_filter_channel.py` (#2655) and `lambdas/ai/ai_calls.py` (#2668) — which ship inside *every* Lambda's bundle. So the rest of the fleet still runs the previous copies until a fleet deploy. Nothing is broken by that (the old code works, just with worse diagnostics), but it means a `deploy_all=true` dispatch is worth doing for the diagnostics to be uniform, not only to clear the badge.
 
 ## Residual queue / next picks
 
