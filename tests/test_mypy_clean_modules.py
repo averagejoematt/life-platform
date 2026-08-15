@@ -39,7 +39,7 @@ _MYPY_INI = ROOT / "mypy.ini"
 # gate and is caught here. To empty a code, remove it from mypy.ini AND from this
 # set in the same PR. Kept in lockstep with mypy.ini's documented "still disabled"
 # note. Currently: 4 structural codes (see mypy.ini for why each remains).
-GLOBAL_DISABLE_BASELINE = {"assignment", "arg-type", "return-value", "operator"}
+GLOBAL_DISABLE_BASELINE = {"assignment", "arg-type", "operator"}
 
 
 def _mypy_global_disabled_codes() -> set[str]:

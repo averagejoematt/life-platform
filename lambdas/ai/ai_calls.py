@@ -464,7 +464,7 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources, available_log
 
 def call_training_nutrition_coach(
     data: dict[str, Any], profile: dict[str, Any], api_key: str = "", shared_system: Optional[str] = None
-) -> str:
+) -> dict[str, Any]:
     """AI call: Training coach + Nutritionist combined. (P2+P3+P5 aware)
     Phase 3.8: optional shared_system reused across 4 daily-brief calls (cached)."""
     data_summary = build_data_summary(data, profile)

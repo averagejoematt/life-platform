@@ -21,7 +21,13 @@ from typing import Any, Iterable, Optional, Union
 
 # Public type aliases used across this module.
 Numeric = Union[int, float]
-ScoreTuple = tuple[Optional[int], dict[str, Any]]
+# #2638: `Optional[Numeric]`, not `Optional[int]`. Every scorer returns
+# `clamp(...)`, which is `Numeric -> Numeric` — so a score is an int only when the
+# value handed to clamp happened to be one, and several paths hand it a float
+# (`sum(parts) / sum(weights)` before rounding, the ratio scorers, the registry's
+# weighted mean). The old alias described a narrower contract than any scorer has
+# ever honoured; nothing about the returned VALUES changes here.
+ScoreTuple = tuple[Optional[Numeric], dict[str, Any]]
 
 
 # ==============================================================================
@@ -459,7 +465,9 @@ def grade_colour(grade: str) -> str:
     return "#dc2626"
 
 
-def compute_day_grade(data: dict[str, Any], profile: dict[str, Any]) -> tuple[Optional[int], str, dict[str, Any]]:
+def compute_day_grade(
+    data: dict[str, Any], profile: dict[str, Any]
+) -> tuple[Optional[Numeric], str, dict[str, Any], dict[str, dict[str, Any]]]:
     """Run all component scorers and compute weighted day grade.
 
     Returns: (total_score, letter_grade, component_scores, component_details)

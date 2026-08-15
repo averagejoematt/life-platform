@@ -10,7 +10,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from web.site_api_common import (
     PT,
@@ -387,7 +387,7 @@ def food_delivery_overview(*, _g) -> dict:
         logger.warning(f"[food_delivery_overview] Failed: {e}")
         return _error(503, "Food delivery data temporarily unavailable.")
 
-    weekly_trend = sorted([{"week": k, "orders": v} for k, v in weekly_counts.items()], key=lambda x: x["week"])
+    weekly_trend = sorted([{"week": k, "orders": v} for k, v in weekly_counts.items()], key=lambda x: cast(str, x["week"]))
 
     return _ok(
         {
