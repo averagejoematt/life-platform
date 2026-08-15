@@ -130,7 +130,12 @@ def test_facts_block_formats_only_present_keys(monkeypatch):
     ai = _roster()
     monkeypatch.setattr(ai, "_ask_fetch_context", lambda: {"weight_lbs": 300.7, "recovery_pct": 64.0})
     out = ai._board_facts_block()
-    assert "weight: 300.7 lb" in out and "recovery: 64%" in out
+    # #2676: the recovery figure now names the metric it came from. It sat one line above a
+    # pillar called "metabolic" in the ask prompt, and a bare "recovery: 64%" is what let a
+    # narrative write "metabolic recovery is 64%" — a verbatim-correct number under a false
+    # label. The contract this test pins (present keys only, absent keys never fabricated)
+    # is unchanged and still asserted below.
+    assert "weight: 300.7 lb" in out and "whoop recovery score: 64%" in out
     assert "HRV" not in out  # absent keys never fabricate
     monkeypatch.setattr(ai, "_ask_fetch_context", lambda: {})
     assert ai._board_facts_block() == "no current data available"
