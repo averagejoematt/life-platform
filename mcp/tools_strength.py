@@ -89,7 +89,7 @@ def tool_get_muscle_volume(args):
             latest_ingested = _hw_items[0]["sk"].split("DATE#", 1)[1][:10]
     except Exception as _e:  # noqa: BLE001
         logger.warning("muscle_volume completeness high-water query failed: %s", _e)
-    completeness = assess_volume_completeness(aggregated_dates, latest_ingested, end_date)
+    completeness = assess_volume_completeness(aggregated_dates, latest_ingested, end_date, start_date)
 
     return {
         "date_range": {"start": start_date, "end": end_date},

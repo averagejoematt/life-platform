@@ -496,7 +496,7 @@ TOOLS = {
                 "properties": {
                     "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
                     "end_date": {"type": "string", "description": "End date YYYY-MM-DD."},
-                    "period": {"type": "string", "description": "Aggregation period: 'week' (default) or 'month'."},
+                    "period": {"type": "string", "enum": ["week", "month"], "description": "Aggregation period. Default 'week'."},
                 },
                 "required": [],
             },
@@ -707,7 +707,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "status_filter": {"type": "string", "description": "Filter by status: 'open', 'acted', or 'resolved'. Omit for all."},
-                    "limit": {"type": "integer", "description": "Max results to return (default: 50)."},
+                    "limit": {"type": "integer", "minimum": 1, "description": "Max results to return (default: 50)."},
                 },
                 "required": [],
             },
@@ -1486,8 +1486,8 @@ TOOLS = {
                     "channel": {
                         "type": "string",
                         "enum": ["journal", "video_diary", "solo_recording"],
-                        "description": "Capture channel the line came from (journal | video_diary | solo_recording). Default journal. "
-                        "#1806: any other value is coerced to 'journal' server-side.",
+                        "coerce_outside_enum": True,  # #2664: the one sanctioned opt-out from boundary enum enforcement
+                        "description": "Capture channel the line came from. Default journal; any other value coerces to journal server-side (#1806).",
                     },
                     "sk": {"type": "string", "description": "Exact record sk (from list) — alternative selector for unmark."},
                 },
