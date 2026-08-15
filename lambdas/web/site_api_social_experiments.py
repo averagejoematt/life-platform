@@ -555,19 +555,42 @@ def _handle_experiment_suggest(event: dict, *, _g) -> dict:
         return _error(400, "Idea must be at least 10 characters")
     if _is_blocked_vice(idea) or _is_blocked_vice(source):
         return _error(400, "That suggestion can't be submitted.")
+    # #2682: the sort key was a wall-clock timestamp, so an identical retry — a
+    # double-click, a client retry, a flaky network — created a SECOND moderation row for
+    # the same submission, and Matthew paid for it by reviewing the same idea twice.
+    # Both sibling capture doors already derive their id from the content
+    # (`_handle_submit_finding`, `_handle_board_question` in site_api_social_engage.py,
+    # both `sha256(f"{ip_hash}:{content}")[:12]`); this one was the outlier.
+    #
+    # The write is CONDITIONAL rather than a plain overwrite, and that matters beyond
+    # tidiness: an unconditional put on the same key would reset `created_at` and — worse
+    # — stamp `status: "pending"` back over a moderation decision Matthew had already
+    # made. A retry must be a no-op on an existing row, not a silent un-approval.
+    suggestion_id = hashlib.sha256(f"{ip_hash}:{idea}:{source}".encode()).hexdigest()[:12]
+    now = datetime.now(timezone.utc).isoformat()
     try:
-        table.put_item(
-            Item={
-                "pk": "USER#matthew#SOURCE#experiment_suggestions",
-                "sk": f"SUGGEST#{datetime.now(timezone.utc).isoformat()}",
-                "idea": idea,
-                "source": source,
-                "status": "pending",
-                "submitted_by": "reader",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-        return _envelope(200, {"status": "received"})
+        duplicate = False
+        try:
+            table.put_item(
+                Item={
+                    "pk": "USER#matthew#SOURCE#experiment_suggestions",
+                    "sk": f"SUGGEST#{suggestion_id}",
+                    "suggestion_id": suggestion_id,
+                    "idea": idea,
+                    "source": source,
+                    "status": "pending",
+                    "submitted_by": "reader",
+                    "created_at": now,
+                },
+                ConditionExpression="attribute_not_exists(sk)",
+            )
+        except Exception as e:
+            if "ConditionalCheckFailedException" not in str(e):
+                raise
+            duplicate = True
+        # The id is returned either way — a caller that cannot see the id cannot tell an
+        # accepted retry from a new submission, which is the same opacity in a new place.
+        return _envelope(200, {"status": "received", "id": suggestion_id, "duplicate": duplicate})
     except Exception as e:
         logger.error(f"[site_api] experiment_suggest failed: {e}")
         return _error(500, "Failed to submit suggestion")

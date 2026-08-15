@@ -2344,9 +2344,15 @@ def test_an_unavailable_signing_secret_degrades_to_503_rather_than_500(monkeypat
 
 def test_a_reader_suggestion_is_stored_pending_and_marked_as_reader_submitted(monkeypatch):
     table, _s3, _sec = wire(monkeypatch)
-    assert ok_body(social._handle_experiment_suggest(post({"idea": "try a 10-day creatine loading phase"}))) == {"status": "received"}
+    # #2682: the response now also carries the content-derived `id` and a `duplicate` flag,
+    # so a caller can tell an accepted retry from a new submission. The contract this test
+    # exists for is unchanged and still asserted below.
+    body = ok_body(social._handle_experiment_suggest(post({"idea": "try a 10-day creatine loading phase"})))
+    assert body["status"] == "received"
+    assert body["duplicate"] is False and len(body["id"]) == 12
     stored = table.puts[0]
     assert stored["status"] == "pending" and stored["submitted_by"] == "reader"
+    assert stored["sk"] == f"SUGGEST#{body['id']}", "the key is the content id, not a timestamp"
 
 
 def test_a_suggestion_shorter_than_ten_characters_is_refused(monkeypatch):
