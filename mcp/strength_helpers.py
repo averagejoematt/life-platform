@@ -86,7 +86,7 @@ def is_bodyweight(name: str) -> bool:
     return any(kw in nl for kw in _BODYWEIGHT_EXERCISES)
 
 
-def assess_volume_completeness(aggregated_dates, latest_ingested_date, end_date):
+def assess_volume_completeness(aggregated_dates, latest_ingested_date, end_date, start_date=None):
     """Did the volume aggregation include the latest ingested Hevy session?
 
     The night-before authoring bug (B2a, 2026-06-21): get_muscle_volume read a
@@ -98,6 +98,7 @@ def assess_volume_completeness(aggregated_dates, latest_ingested_date, end_date)
       aggregated_dates      — workout dates actually folded into the volume math
       latest_ingested_date  — newest DATE# in the Hevy partition (high-water mark)
       end_date              — the analysis window end
+      start_date            — the analysis window start (#2664; None = unbounded)
 
     Returns a dict the tool surfaces as `completeness`. `includes_latest` is True
     when the aggregation reached the newest in-window ingested session; when False,
@@ -121,7 +122,34 @@ def assess_volume_completeness(aggregated_dates, latest_ingested_date, end_date)
     # at the tail of the window are legitimate — never flag those as stale. The genuine
     # bug is: the partition's newest session falls in-window yet the aggregation missed
     # it (the night-before undercount).
-    within_window = end_date is None or latest_ingested_date <= end_date
+    #
+    # #2664: "within window" tested only the END. A window that starts AFTER the last
+    # session (`2026-08-01..2026-08-15` against a partition whose newest session is
+    # 2026-06-25) therefore took the in-window branch, reported `stale: true`, and told
+    # the caller "a more recent IN-WINDOW session is ingested (2026-06-25) … do not
+    # author off this read until it clears" — about a date six weeks before the window
+    # opened. Nothing was missing; there was simply no training in August. That is a
+    # false gate on a true statement, and it never clears.
+    #
+    # When the high-water mark predates the window, every ingested session does, so the
+    # window provably contains zero sessions and an empty aggregation is exactly right
+    # (ADR-104: absence is data, not a defect). Only the >end case stays conservative —
+    # there the newest session says nothing about whether the window itself had any.
+    before_window = start_date is not None and latest_ingested_date < start_date
+    within_window = not before_window and (end_date is None or latest_ingested_date <= end_date)
+
+    if before_window:
+        return {
+            "data_current_through": data_current_through,
+            "latest_ingested": latest_ingested_date,
+            "includes_latest": True,
+            "stale": False,
+            "note": (
+                f"No Hevy sessions in the requested window — the most recent session on file "
+                f"({latest_ingested_date}) predates it. Zero volume here is real, not missing data."
+            ),
+        }
+
     if within_window:
         includes_latest = data_current_through is not None and data_current_through >= latest_ingested_date
     else:

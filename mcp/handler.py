@@ -155,6 +155,18 @@ def handle_tools_call(params):
 # fewer is meaningless for every one of them.
 _RELATIVE_WINDOW_ARGS = frozenset({"days", "weeks", "lookback_days", "days_back", "window_days"})
 
+# #2660: argument names that mean "how many results to return". Same shape as the
+# relative-window floor above and the same reason: `limit` is declared on 11 tools
+# and only two of them (`get_workouts`, `list_available_tools`) declare a minimum,
+# so relying on per-schema declarations leaves the 12th unguarded the day it lands.
+# A request for zero-or-fewer results is meaningless for every one of them.
+#
+# `count` is deliberately NOT here. It reads like a sibling and is not one:
+# `log_evening_intake`'s `count` is a measurement whose valid range is 0-4, so a
+# floor of 1 would reject a truthful "zero drinks last night". Only names that
+# unambiguously mean "size of the returned page" belong in this set.
+_RESULT_COUNT_ARGS = frozenset({"limit", "top_n", "max_results", "page_size"})
+
 
 def _validate_tool_args(name: str, arguments: dict) -> str | None:
     """Validate tool arguments against the tool's JSON schema inputSchema.
@@ -222,12 +234,51 @@ def _validate_tool_args(name: str, arguments: dict) -> str | None:
         if not prop or isinstance(arg_val, bool) or not isinstance(arg_val, (int, float)):
             continue
         lo, hi = prop.get("minimum"), prop.get("maximum")
-        if lo is None and arg_name in _RELATIVE_WINDOW_ARGS:
+        if lo is None and (arg_name in _RELATIVE_WINDOW_ARGS or arg_name in _RESULT_COUNT_ARGS):
             lo = 1
         if lo is not None and arg_val < lo:
             return f"Argument '{arg_name}' must be at least {lo} (got {arg_val})"
         if hi is not None and arg_val > hi:
             return f"Argument '{arg_name}' must be at most {hi} (got {arg_val})"
+
+    # 2c. #2664: enforce the schema's own `enum` where declared. Without this, a tool
+    # that documents a closed set of values still received whatever the caller sent —
+    # `get_muscle_volume(period="bogus")` silently became "month" and then narrated the
+    # answer as the period that was asked for. A coerced enum is strictly worse than an
+    # error, because nothing downstream can tell the answer apart from a right one.
+    #
+    # The issue named ONE argument. The registry declares 27, on 26 tools, and not one
+    # of them was enforced here. Roughly half re-check the value themselves and return a
+    # clean error (`get_nutrition`, `get_training`, `manage_reading`, `find_days`, …);
+    # the rest either coerce to a default or, worse, filter on the bad value and return
+    # an empty result — `get_predictions(status="confimed")` answered "no predictions",
+    # which is indistinguishable from the truthful answer.
+    #
+    # MATCHING IS CASE- AND WHITESPACE-INSENSITIVE FOR STRINGS, and that is load-bearing,
+    # not politeness. Every tool that re-checks does it after `.strip().lower()`, so
+    # `view=" Summary "` works today on eight tools. A strict boundary check would have
+    # broken all of them — a validation guard causing exactly the class of silent
+    # breakage it exists to prevent. The value is NOT rewritten, only compared; the
+    # tools keep doing their own normalisation.
+    # An argument may opt OUT of enforcement by declaring `coerce_outside_enum` in its
+    # own schema. Exactly one does: `mark_journal_quote.channel`, where #1806 chose
+    # coercion over refusal on purpose — the channel is metadata beside the quote, and a
+    # bad channel must not discard an otherwise-good, taboo-clean mark. Both halves of
+    # that reasoning survive here: the taboo string still never reaches DynamoDB, because
+    # the tool's own allowlist collapses it before the write. The opt-out is declared in
+    # the schema rather than listed in this file so it stays visible to the caller
+    # reading the tool definition, and so a second one cannot be added invisibly.
+    for arg_name, arg_val in arguments.items():
+        prop = properties.get(arg_name) or {}
+        allowed = prop.get("enum")
+        if not allowed or prop.get("coerce_outside_enum"):
+            continue
+        if isinstance(arg_val, str):
+            if arg_val.strip().lower() in {str(a).strip().lower() for a in allowed}:
+                continue
+        elif arg_val in allowed:
+            continue
+        return f"Argument '{arg_name}' must be one of {list(allowed)} (got {arg_val!r})"
 
     # 3. Sanity check: reject suspiciously large string values (prompt injection guard)
     MAX_STRING_LEN = 2000

@@ -298,7 +298,7 @@ def tool_get_insights(args):
     Returns newest-first. Flags items open >14 days.
     """
     status_filter = args.get("status_filter")  # None = all
-    limit = int(args.get("limit") or 50)
+    limit = 50 if args.get("limit") is None else max(1, int(args["limit"]))  # #2660: `or 50` read a supplied 0 as absent
     today = datetime.now(timezone.utc).date()
 
     from mcp.core import _apply_phase_filter  # ADR-058
