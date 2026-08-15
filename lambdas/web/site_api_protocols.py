@@ -384,7 +384,7 @@ def protocols(*, _g) -> dict:
         if _protocols_cache is None:
             _protocols_cache = _load_s3_json("site/config/protocols.json", "protocols")
         protocols = _protocols_cache.get("protocols", [])
-        return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
+        return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600, degraded=e)
 
 
 def domains() -> dict:

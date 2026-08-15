@@ -599,9 +599,32 @@ def _request_id_headers() -> dict:
     return {}
 
 
-def _ok(data: dict, cache_seconds: int = 300) -> dict:
-    """Return a successful API response with caching headers."""
+def _ok(data: dict, cache_seconds: int = 300, degraded: object = None) -> dict:
+    """Return a successful API response with caching headers.
+
+    #2686: `degraded` is how a 200 returned from inside an `except` says so. Fourteen
+    handlers in this package answer 200 with a fallback payload when their read fails —
+    often the right call, because a partial page beats a broken one — but the payload
+    alone cannot carry the distinction. `{"coaches": [], "count": 0}` reads exactly the
+    same whether the roster is genuinely empty or DynamoDB timed out, and a reader (or a
+    chart, or the fork-me starter slice) cannot tell a measurement from a failure. That is
+    the ADR-104 violation #2658 fixed on one endpoint.
+
+    The marker goes in `_meta`, NOT in the payload, and that is deliberate: it changes no
+    field any client already reads, so nothing has to be re-taught, while
+    `_meta.degraded.reason` is there for anything that wants to check. The failure text is
+    truncated — an exception string is not a public surface, and a stack-shaped message in
+    a cached CDN response is a small information leak with no reader value.
+    """
     rid = get_request_id()
+    meta = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "cache_seconds": cache_seconds,
+        **({"request_id": rid} if rid else {}),
+    }
+    if degraded:
+        _reason = f"{type(degraded).__name__}: {degraded}" if isinstance(degraded, BaseException) else str(degraded)
+        meta["degraded"] = {"reason": _reason[:160]}
     return {
         "statusCode": 200,
         "headers": {
@@ -609,16 +632,7 @@ def _ok(data: dict, cache_seconds: int = 300) -> dict:
             **_request_id_headers(),
             "Cache-Control": f"public, max-age={cache_seconds}, s-maxage={cache_seconds}",
         },
-        "body": json.dumps(
-            {
-                "_meta": {
-                    "generated_at": datetime.now(timezone.utc).isoformat(),
-                    "cache_seconds": cache_seconds,
-                    **({"request_id": rid} if rid else {}),
-                },
-                **data,
-            }
-        ),
+        "body": json.dumps({"_meta": meta, **data}),
     }
 
 

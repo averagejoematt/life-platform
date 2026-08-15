@@ -579,7 +579,7 @@ def handle_coaches(event, *, _g):
         return _ok({"coaches": coaches, "count": len(coaches), "disclosure": _DISCLOSURE}, cache_seconds=300)
     except Exception as _e:
         logger.warning(f"[/api/coaches] {_e}")
-        return _ok({"coaches": [], "count": 0}, cache_seconds=60)
+        return _ok({"coaches": [], "count": 0}, cache_seconds=60, degraded=_e)
 
 
 def handle_coach(event, *, _g):
@@ -672,4 +672,4 @@ def handle_coach(event, *, _g):
         )
     except Exception as _e:
         logger.warning(f"[/api/coach] {_e}")
-        return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60)
+        return _ok({"persona_id": None, "stance": {}, "report_card": {}}, cache_seconds=60, degraded=_e)
