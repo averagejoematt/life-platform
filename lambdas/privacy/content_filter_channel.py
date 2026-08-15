@@ -25,12 +25,15 @@ Pure stdlib at import; boto3 is imported lazily only if the S3 path is reached.
 """
 
 import json
+import logging
 import os
 import subprocess  # nosec B404 — fixed argv, no shell (aws CLI fallback below)
 import time
 from typing import Any, Dict, List, Optional
 
 from common import repo_config
+
+logger = logging.getLogger(__name__)
 
 # S3 home of the runtime config (the object itself is private; the bucket serves it
 # to the Lambdas that already consume it today).
@@ -39,8 +42,23 @@ S3_KEY = "config/content_filter.json"
 ENV_VAR = "CONTENT_FILTER_JSON"
 LOCAL_BASENAME = "content_filter.local.json"
 
+# S3 error codes that mean the object is genuinely NOT THERE — an expected,
+# quiet "this channel has nothing for you". Every OTHER code (AccessDenied,
+# InvalidAccessKeyId, ExpiredToken, …) means the channel exists but we were
+# turned away: a misconfiguration that must be loud, not absorbed into the same
+# "unavailable" silence (#2655 — a missing GetObject grant read as "not
+# configured" for 4 days while the AI-quality canary failed 100%).
+#
+# Codes captured from the live S3 wire on 2026-08-15 (us-west-2, boto3):
+#   get_object(matthew-life-platform, config/<absent>) -> NoSuchKey    HTTP 404
+#   get_object(<bucket in another account>, x)         -> AccessDenied HTTP 403
+#   get_object(<nonexistent bucket>, x)                -> NoSuchBucket HTTP 404
+_ABSENT_ERROR_CODES = frozenset({"NoSuchKey", "NoSuchBucket", "404"})
+
 _CACHE_TTL_SECONDS = 900  # matches the platform's 15-min config cache convention
 _MISS_TTL_SECONDS = 60  # an unavailable channel is re-probed quickly, not pinned
+
+_channel_errors: List[str] = []
 
 _cache: Optional[Dict[str, Any]] = None
 _cache_at: float = 0.0
@@ -54,10 +72,24 @@ class ContentFilterUnavailable(RuntimeError):
 
 def reset_cache() -> None:
     """Test hook: forget any cached vocabulary (env/local/S3)."""
-    global _cache, _cache_at, _cache_is_miss
+    global _cache, _cache_at, _cache_is_miss, _channel_errors
     _cache = None
     _cache_at = 0.0
     _cache_is_miss = False
+    _channel_errors = []
+
+
+def _note_channel_error(reason: str) -> None:
+    """Record WHY a channel could not serve, so an unavailable vocabulary reports a
+    cause instead of an undifferentiated silence."""
+    if reason and reason not in _channel_errors:
+        _channel_errors.append(reason)
+
+
+def last_channel_errors() -> List[str]:
+    """The reasons the most recent resolution attempt failed, newest attempt only.
+    Diagnostic surface for callers that want to report the cause."""
+    return list(_channel_errors)
 
 
 def _validate(data: Any) -> Optional[Dict[str, Any]]:
@@ -100,14 +132,45 @@ def _from_s3_boto(bucket: str) -> Optional[Dict[str, Any]]:
     try:
         import boto3  # noqa: PLC0415 — lazy: keeps this module import-safe offline
     except ImportError:
+        _note_channel_error("boto3 not installed")
         return None
     try:
         region = os.environ.get("S3_REGION") or os.environ.get("AWS_REGION") or "us-west-2"
         s3 = boto3.client("s3", region_name=region)
         resp = s3.get_object(Bucket=bucket, Key=S3_KEY)
         return _validate(json.loads(resp["Body"].read()))
-    except Exception:  # noqa: BLE001 — any S3/auth failure just means "source unavailable"
+    except Exception as e:  # noqa: BLE001 — classified below; the channel still degrades to None
+        _note_channel_error(_classify_s3_error(e))
         return None
+
+
+def _classify_s3_error(e: Exception) -> str:
+    """Reduce an S3 failure to a short, non-secret reason string, and LOG the
+    ones that mean misconfiguration rather than absence.
+
+    Never echoes the object body or any vocabulary — only the error code.
+    """
+    code = ""
+    response = getattr(e, "response", None)
+    if isinstance(response, dict):
+        code = str(response.get("Error", {}).get("Code", "") or "")
+    if not code:
+        # NoCredentialsError, EndpointConnectionError, JSON/validation failures —
+        # no error code to read, so classify by type.
+        code = type(e).__name__
+    reason = f"s3:{code}"
+    if code not in _ABSENT_ERROR_CODES:
+        # A denial/credential/endpoint failure is an operational defect. Say so at
+        # ERROR so it is visible without reading a traceback, and so the next
+        # missing grant is diagnosed in one log line instead of four days.
+        logger.error(
+            "content-filter: S3 channel FAILED (not absent) reading s3://%s/%s: %s — "
+            "this is a configuration/permission failure, not a missing config",
+            _bucket(),
+            S3_KEY,
+            reason,
+        )
+    return reason
 
 
 def _from_s3_cli(bucket: str) -> Optional[Dict[str, Any]]:
@@ -121,9 +184,21 @@ def _from_s3_cli(bucket: str) -> Optional[Dict[str, Any]]:
             check=False,
         )
         if out.returncode != 0 or not out.stdout:
+            # The CLI prints the reason to stderr; keep only a short, non-secret tail.
+            stderr = (out.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+            detail = stderr[-1][:200] if stderr else f"exit {out.returncode}, empty stdout"
+            _note_channel_error(f"aws-cli:{detail}")
+            if "AccessDenied" in detail or "Forbidden" in detail:
+                logger.error(
+                    "content-filter: aws-CLI channel DENIED reading s3://%s/%s: %s",
+                    bucket,
+                    S3_KEY,
+                    detail,
+                )
             return None
         return _validate(json.loads(out.stdout.decode("utf-8")))
-    except (OSError, ValueError, subprocess.SubprocessError):
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
+        _note_channel_error(f"aws-cli:{type(e).__name__}")
         return None
 
 
@@ -133,15 +208,16 @@ def load(require: bool = False) -> Optional[Dict[str, Any]]:
     require=True is the fail-closed form: raises ContentFilterUnavailable instead
     of returning None. The error message deliberately never echoes vocabulary.
     """
-    global _cache, _cache_at, _cache_is_miss
+    global _cache, _cache_at, _cache_is_miss, _channel_errors
     now = time.monotonic()
     if _cache is not None and (now - _cache_at) < _CACHE_TTL_SECONDS:
         return _cache
     if _cache is None and _cache_is_miss and (now - _cache_at) < _MISS_TTL_SECONDS:
         if require:
-            raise ContentFilterUnavailable(_UNAVAILABLE_MSG)
+            raise ContentFilterUnavailable(_unavailable_msg())
         return None
 
+    _channel_errors = []  # a fresh resolution reports its OWN causes, not a stale one's
     data = _from_env() or _from_local_file()
     if data is None:
         bucket = _bucket()
@@ -151,7 +227,7 @@ def load(require: bool = False) -> Optional[Dict[str, Any]]:
     _cache_at = now
     _cache_is_miss = data is None
     if data is None and require:
-        raise ContentFilterUnavailable(_UNAVAILABLE_MSG)
+        raise ContentFilterUnavailable(_unavailable_msg())
     return data
 
 
@@ -160,6 +236,19 @@ _UNAVAILABLE_MSG = (
     f"(env {ENV_VAR}, config/{LOCAL_BASENAME}, s3://<bucket>/{S3_KEY}) — "
     "failing closed. See config/content_filter.example.json for the shape."
 )
+
+
+def _unavailable_msg() -> str:
+    """The fail-closed message, with the CAUSE appended when one was recorded.
+
+    "unavailable from every channel source" is true of a never-configured
+    environment and of a revoked IAM grant alike; only the second is an incident.
+    Naming the cause is what separates them at 3am (#2655). Error codes only —
+    never any vocabulary.
+    """
+    if not _channel_errors:
+        return _UNAVAILABLE_MSG
+    return f"{_UNAVAILABLE_MSG} Channel errors: {', '.join(_channel_errors)}."
 
 
 def blocked_keywords(require: bool = False) -> List[str]:
