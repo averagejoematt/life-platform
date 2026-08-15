@@ -1250,8 +1250,16 @@ def test_the_vote_allowlist_is_case_insensitive_because_the_id_is_lowercased(mon
 FOLLOW = {"email": "reader@example.com", "library_id": "post-dinner-walk"}
 
 
+def _many_experiments_s3(count: int) -> FakeS3:
+    """#2681: the follow door now validates its id against the library, so a
+    rate-limit test that needs N distinct follows needs N distinct REAL ids."""
+    library = json.loads(json.dumps(LIBRARY))
+    library["experiments"] = [{"id": f"exp-{i}", "name": f"Experiment {i}", "pillar": "food"} for i in range(count)]
+    return _library_s3(library=library)
+
+
 def test_a_follow_records_interest_without_publishing_the_address(monkeypatch):
-    table, _s3, _sec = wire(monkeypatch)
+    table, _s3, _sec = wire(monkeypatch, s3=_library_s3())
     resp = social._handle_experiment_follow(post(FOLLOW))
     assert ok_body(resp) == {"followed": True, "library_id": "post-dinner-walk"}
     assert "reader@example.com" not in resp["body"]
@@ -1265,7 +1273,7 @@ def _hash16(text: str) -> str:
 
 
 def test_following_the_same_experiment_twice_is_idempotent_not_an_error(monkeypatch):
-    wire(monkeypatch)
+    wire(monkeypatch, s3=_library_s3())
     social._handle_experiment_follow(post(FOLLOW))
     assert ok_body(social._handle_experiment_follow(post(FOLLOW)))["already_following"] is True
 
@@ -1277,7 +1285,7 @@ def test_a_follow_with_a_bad_address_or_missing_id_is_rejected(body, monkeypatch
 
 
 def test_the_follow_limit_allows_the_ten_follows_it_advertises(monkeypatch):
-    wire(monkeypatch)
+    wire(monkeypatch, s3=_many_experiments_s3(10))
     statuses = [social._handle_experiment_follow(post({**FOLLOW, "library_id": f"exp-{i}"}))["statusCode"] for i in range(10)]
     assert statuses.count(200) == 10, f"only {statuses.count(200)} of the advertised 10 follows were accepted"
 
@@ -1285,7 +1293,7 @@ def test_the_follow_limit_allows_the_ten_follows_it_advertises(monkeypatch):
 def test_the_eleventh_follow_in_an_hour_is_refused(monkeypatch):
     """Whatever the exact boundary, the limiter must eventually fire — pinned so a
     refactor cannot remove it entirely."""
-    wire(monkeypatch)
+    wire(monkeypatch, s3=_many_experiments_s3(11))
     statuses = [social._handle_experiment_follow(post({**FOLLOW, "library_id": f"exp-{i}"}))["statusCode"] for i in range(11)]
     assert 429 in statuses
 
@@ -1596,7 +1604,7 @@ def test_a_repeat_challenge_vote_within_24_hours_is_refused(monkeypatch):
 
 
 def test_a_challenge_follow_is_stored_and_deduped(monkeypatch):
-    wire(monkeypatch)
+    wire(monkeypatch, s3=_catalog_s3())
     first = ok_body(social._handle_challenge_follow(post({"email": "r@x.com", "catalog_id": "cold-shower-finish"})))
     second = ok_body(social._handle_challenge_follow(post({"email": "r@x.com", "catalog_id": "cold-shower-finish"})))
     assert first["followed"] is True and second["already_following"] is True
@@ -1988,9 +1996,11 @@ def test_a_cohort_submission_that_cannot_be_persisted_reports_failure(monkeypatc
 
 def test_a_follow_that_cannot_be_persisted_reports_failure(monkeypatch):
     table = FakeSocialTable([], fail={"put_item"})
-    wire(monkeypatch, table=table)
+    # #2681: both doors now validate the id first, so reaching the PERSIST failure
+    # requires ids that actually exist — otherwise this asserts the 400, not the 500.
+    wire(monkeypatch, table=table, s3=_library_s3(extra={CATALOG_SITE_KEY: CATALOG, CATALOG_ROOT_KEY: CATALOG}))
     assert social._handle_experiment_follow(post(FOLLOW))["statusCode"] == 500
-    assert social._handle_challenge_follow(post({"email": "r@x.com", "catalog_id": "c1"}))["statusCode"] == 500
+    assert social._handle_challenge_follow(post({"email": "r@x.com", "catalog_id": "cold-shower-finish"}))["statusCode"] == 500
 
 
 def test_a_checkin_that_cannot_be_read_or_written_reports_a_database_error(monkeypatch):
@@ -3210,3 +3220,81 @@ def test_the_current_challenge_banner_is_absent_rather_than_a_fake_day_zero(monk
     resp = social.handle_current_challenge()
     assert ok_body(resp)["current_challenge"] is None
     assert resp["headers"]["Cache-Control"] == "public, max-age=300, s-maxage=300"
+
+
+# ── #2681: the follow doors must agree with their vote siblings ───────────────
+
+
+def _vote_follow_pairs():
+    """Every `/api/<thing>_vote` that has a sibling `/api/<thing>_follow`.
+
+    Derived from the live route table, never hand-listed (acceptance box 2), so a
+    third vote/follow pair added later is covered here the day it lands.
+    """
+    from web import site_api_lambda as L
+
+    routes = set(L._SIMPLE_ROUTES) | set(getattr(L, "ROUTES", {}) or {})
+    pairs = []
+    for route in sorted(routes):
+        if route.endswith("_vote"):
+            sibling = route[: -len("_vote")] + "_follow"
+            if sibling in routes:
+                pairs.append((route, sibling))
+    return pairs
+
+
+VOTE_FOLLOW_PAIRS = _vote_follow_pairs()
+
+# One id present in BOTH the library and the catalog fixtures, so a single body can
+# drive either door without hand-mapping which id field each one reads.
+_SHARED_VALID_ID = "post-dinner-walk"
+
+
+def _both_catalogs_s3() -> FakeS3:
+    library = json.loads(json.dumps(LIBRARY))
+    catalog = json.loads(json.dumps(CATALOG))
+    catalog["challenges"].append(
+        {"id": _SHARED_VALID_ID, "name": "Post-dinner walk", "status": "available", "category": "food", "duration_days": 7}
+    )
+    return _library_s3(library=library, extra={CATALOG_SITE_KEY: catalog, CATALOG_ROOT_KEY: catalog})
+
+
+def test_there_is_a_vote_follow_pair_to_compare():
+    """Non-vacuity: a derivation that found nothing would make the comparison below
+    silently assert over an empty set."""
+    assert VOTE_FOLLOW_PAIRS, "derived no vote/follow pairs from the route table"
+
+
+@pytest.mark.parametrize("vote_route,follow_route", VOTE_FOLLOW_PAIRS)
+@pytest.mark.parametrize(
+    "candidate_id",
+    [_SHARED_VALID_ID, "no-such-experiment", "../../etc/passwd", "' OR 1=1 --"],
+)
+def test_vote_and_follow_doors_agree_on_which_ids_they_accept(monkeypatch, vote_route, follow_route, candidate_id):
+    """#2681: `/api/*_follow` returned 200 for ids its `/api/*_vote` sibling rejected.
+
+    Because the follow sort key is `EMAIL#<hash>#<KIND>#<id>`, arbitrary address × id
+    pairs minted unbounded distinct rows — the exact abuse the vote door's "an attacker
+    can mint arbitrary VOTES rows" comment already guarded against.
+
+    The assertion is on ACCEPTANCE, not on the status code: the two doors legitimately
+    differ (experiment rejects 400, challenge rejects 404). What must never differ is
+    whether a given id gets through.
+    """
+    # Both id fields are sent; each door reads only its own, so no hand-mapping.
+    body = {"email": "reader@example.com", "library_id": candidate_id, "catalog_id": candidate_id}
+
+    wire(monkeypatch, s3=_both_catalogs_s3())
+    vote_status = getattr(social, "_handle_" + vote_route.rsplit("/", 1)[-1])(post(body))["statusCode"]
+
+    wire(monkeypatch, s3=_both_catalogs_s3())
+    follow_table = social.table
+    follow_status = getattr(social, "_handle_" + follow_route.rsplit("/", 1)[-1])(post(body))["statusCode"]
+
+    assert (vote_status == 200) == (
+        follow_status == 200
+    ), f"{vote_route} -> {vote_status} but {follow_route} -> {follow_status} for id {candidate_id!r}"
+
+    # And the row itself: an id the vote door rejects must mint NO follow row.
+    if vote_status != 200:
+        assert follow_table.store == {}, f"{follow_route} wrote a row for rejected id {candidate_id!r}: {follow_table.store}"
