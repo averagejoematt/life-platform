@@ -21,7 +21,6 @@ import re
 from pathlib import Path
 
 import pytest
-import yaml
 
 WORKFLOW_DIR = Path(__file__).resolve().parents[1] / ".github" / "workflows"
 
@@ -35,9 +34,18 @@ _ALWAYS_AVAILABLE = {"GITHUB_TOKEN"}
 _SECRET_REF = re.compile(r"\$\{\{[^}]*?secrets\.([A-Za-z_][A-Za-z0-9_]*)")
 
 
+def _yaml():
+    """PyYAML is absent from CI's minimal deploy-critical lane, which still COLLECTS
+    every test module — so a module-level `import yaml` fails that lane's collection
+    and skips the deploy (#2644 did exactly that on main). Imported lazily and
+    skipped-if-missing, per tests/test_site_deploy_workflow.py. The Unit Tests lane
+    does install pyyaml, so this guard really runs in CI."""
+    return pytest.importorskip("yaml")
+
+
 def _load(path: Path):
     # `on:` is parsed by PyYAML 1.1 rules as the boolean True — hence the lookup below.
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    return _yaml().safe_load(path.read_text(encoding="utf-8"))
 
 
 def _referenced_secrets(path: Path):
@@ -75,43 +83,43 @@ def _reusable_calls():
     return out
 
 
-CALLS = _reusable_calls()
-CALL_IDS = [f"{c.name}:{j}->{k.name}" for c, j, k, _ in CALLS]
-
-
 def test_there_is_something_to_guard():
-    """Non-vacuity: if the discovery walk silently found nothing, every assertion
+    """Non-vacuity: if the discovery walk silently found nothing, both assertions
     below would pass while checking exactly zero call sites."""
-    assert CALLS, "found no local reusable-workflow calls — the walk is broken, not the repo"
+    assert _reusable_calls(), "found no local reusable-workflow calls — the walk is broken, not the repo"
 
 
-@pytest.mark.parametrize("caller,job,callee,spec", CALLS, ids=CALL_IDS)
-def test_callee_declares_every_secret_it_uses(caller, job, callee, spec):
+def test_callee_declares_every_secret_it_uses():
     """The requirement must be stated where it is consumed."""
-    assert callee.exists(), f"{caller.name}:{job} calls missing workflow {callee}"
-    used = _referenced_secrets(callee)
-    declared = _declared_secrets(_load(callee))
-    missing = used - declared
-    assert not missing, (
-        f"{callee.name} references {sorted(missing)} but does not declare them under "
-        f"on.workflow_call.secrets — inside a reusable workflow these resolve to '' "
-        f"and the step silently does nothing (#2644)."
-    )
+    problems = []
+    for caller, job, callee, _spec in _reusable_calls():
+        assert callee.exists(), f"{caller.name}:{job} calls missing workflow {callee}"
+        missing = _referenced_secrets(callee) - _declared_secrets(_load(callee))
+        if missing:
+            problems.append(
+                f"{callee.name} references {sorted(missing)} but does not declare them under "
+                f"on.workflow_call.secrets — inside a reusable workflow these resolve to '' "
+                f"and the step silently does nothing (called by {caller.name}:{job})."
+            )
+    assert not problems, "\n".join(problems)
 
 
-@pytest.mark.parametrize("caller,job,callee,spec", CALLS, ids=CALL_IDS)
-def test_call_site_passes_every_secret_the_callee_uses(caller, job, callee, spec):
+def test_call_site_passes_every_secret_the_callee_uses():
     """And it must actually be handed over. This is the half #2644 was missing."""
-    used = _referenced_secrets(callee)
-    if not used:
-        return
-    passed = spec.get("secrets")
-    if passed == "inherit":
-        return
-    passed_names = set(passed.keys()) if isinstance(passed, dict) else set()
-    missing = used - passed_names
-    assert not missing, (
-        f"{caller.name}:{job} calls {callee.name}, which needs {sorted(used)}, but the "
-        f"call site passes {sorted(passed_names) or 'nothing'}. A reusable workflow "
-        f"inherits NO secrets — pass them explicitly (#2644)."
-    )
+    problems = []
+    for caller, job, callee, spec in _reusable_calls():
+        used = _referenced_secrets(callee)
+        if not used:
+            continue
+        passed = spec.get("secrets")
+        if passed == "inherit":
+            continue
+        passed_names = set(passed.keys()) if isinstance(passed, dict) else set()
+        missing = used - passed_names
+        if missing:
+            problems.append(
+                f"{caller.name}:{job} calls {callee.name}, which needs {sorted(used)}, but the "
+                f"call site passes {sorted(passed_names) or 'nothing'}. A reusable workflow "
+                f"inherits NO secrets — pass them explicitly."
+            )
+    assert not problems, "\n".join(problems)
