@@ -230,12 +230,31 @@ def _gather_facts_and_narratives():
 
 
 def _gather_computed_checks():
-    """Cheap internal-coherence checks that need no engine: a stored grade letter
-    must match its own numeric score band. Catches a grade/score desync."""
+    """Cheap internal-coherence checks that need no engine: a stored value must
+    agree with what its OWN sibling fields imply. Catches a stored/derived desync.
+
+    #2736 — this adapter read `score` and `grade`; the record has stored
+    `total_score` and `letter_grade` since the OLDEST row in the partition
+    (DATE#2023-07-23). The guard was therefore never true, `checks` was always
+    `[]`, and an empty list has no offenders — so invariant 2 reported OK, daily,
+    having examined nothing, for the life of the file. Field names below are taken
+    from a live item, not from a fixture.
+
+    Coverage against what the compute Lambdas actually store (checked 2026-08-15):
+      · day_grade      — COVERED (letter vs its own score band)
+      · character_sheet — COVERED (tier vs its own level, via the engine's get_tier,
+                          so the band table is never re-typed here)
+      · adaptive_mode  — not covered: `mode_label` is chosen by a policy, not derived
+                          from `component_scores`, so there is no arithmetic identity
+                          to assert without duplicating the policy
+      · readiness      — not covered: no `SOURCE#readiness` partition exists
+      · character_receipt — not covered: it already carries `replay_verified`, its own
+                          stronger self-check; asserting it here would be a second copy
+    """
     checks = []
     dg = _latest("day_grade")
-    score = dg.get("score") if isinstance(dg, dict) else None
-    letter = (dg or {}).get("grade")
+    score = dg.get("total_score") if isinstance(dg, dict) else None
+    letter = (dg or {}).get("letter_grade")
     if score is not None and letter:
         try:
             score = float(score)
@@ -246,6 +265,25 @@ def _gather_computed_checks():
             checks.append({"name": "day_grade_letter_vs_score", "stored": ord(str(letter)[0].upper()), "expected": ord(expected), "tol": 0})
         except (ValueError, StopIteration):
             pass
+    cs = _latest("character_sheet")
+    level = cs.get("character_level") if isinstance(cs, dict) else None
+    tier = (cs or {}).get("character_tier")
+    if level is not None and tier:
+        try:
+            from health.character_engine import get_tier
+
+            expected_tier = str((get_tier(int(float(level))) or {}).get("name") or "")
+            if expected_tier:
+                checks.append(
+                    {
+                        "name": "character_tier_vs_level",
+                        "stored": float(str(tier).strip().lower() == expected_tier.strip().lower()),
+                        "expected": 1.0,
+                        "tol": 0,
+                    }
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("coherence: character tier check unavailable: %s", e)
     return checks
 
 
@@ -271,17 +309,94 @@ def _experiment_age_days():
 
 
 def _gather_endpoint_specs():
-    """Key endpoints + the non-degenerate shape each must satisfy."""
+    """Key endpoints + the non-degenerate shape each must satisfy.
+
+    `behavioral_sources` (#2735) names the sources whose SILENCE would legitimately
+    empty this endpoint. It is a per-endpoint fact (only the endpoint's author knows
+    what feeds it) — but whether a named source actually counts as behavioural is
+    NOT asserted here: `_quiet_behavioral_sources` intersects these keys with
+    `source_registry.behavioral_source_keys()`, so a source reclassified to
+    infrastructure stops excusing an empty payload without anyone editing this list.
+
+    All four specs were checked against live payloads (2026-08-15), not presumed:
+      · nutrition_overview — macrofactor. The whole non_degenerate set is nutrition
+        logging, so a logging lapse empties it completely. This is the live case.
+      · vitals           — withings backs the weight_* fields, but non_degenerate is
+        the whole `vitals` object and whoop (infrastructure) keeps hrv/rhr populated,
+        so a skipped weigh-in alone can never degenerate it. Listed anyway: correct
+        today by accident of the spec's breadth, and free to name.
+      · predictions, coaching_dashboard — intelligence-layer outputs with no
+        behavioural writer. Deliberately empty: an empty board there IS the outage.
+    """
     return [
-        ("predictions", "/api/predictions", {"required": ["overall.total"], "non_degenerate": ["overall.total", "predictions"]}),
+        (
+            "predictions",
+            "/api/predictions",
+            {"required": ["overall.total"], "non_degenerate": ["overall.total", "predictions"], "behavioral_sources": []},
+        ),
         (
             "nutrition_overview",
             "/api/nutrition_overview",
-            {"required": ["nutrition"], "non_degenerate": ["nutrition.avg_calories", "nutrition.days_logged"]},
+            {
+                "required": ["nutrition"],
+                "non_degenerate": ["nutrition.avg_calories", "nutrition.days_logged"],
+                "behavioral_sources": ["macrofactor"],
+            },
         ),
-        ("coaching_dashboard", "/api/coaching-dashboard", {"required": ["coaches"], "non_degenerate": ["coaches"]}),
-        ("vitals", "/api/vitals", {"required": ["vitals"], "non_degenerate": ["vitals"]}),
+        (
+            "coaching_dashboard",
+            "/api/coaching-dashboard",
+            {"required": ["coaches"], "non_degenerate": ["coaches"], "behavioral_sources": []},
+        ),
+        ("vitals", "/api/vitals", {"required": ["vitals"], "non_degenerate": ["vitals"], "behavioral_sources": ["withings"]}),
     ]
+
+
+def _quiet_behavioral_sources(keys):
+    """[{key,label,last_date,days}] for each named source that is BOTH classified
+    behavioural in the registry AND silent past its own `stale_hours` cadence.
+
+    Both halves are derived, never hand-typed: `behavioral_source_keys()` owns the
+    classification and the `stale_hours` facet owns the threshold. #2326 is explicit
+    that these facets are canonical and must not be re-stated or re-tuned here.
+    Fail-soft: if the registry or DDB can't be read we return nothing, which restores
+    the old ALARM behaviour rather than silently excusing an empty payload.
+    """
+    if not keys:
+        return []
+    try:
+        from ingestion.source_registry import QUIET_NOTICE_MIN_DAYS, SOURCE_REGISTRY, behavioral_source_keys
+
+        behavioral = behavioral_source_keys()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("coherence: source registry unavailable, no behavioural excuse: %s", e)
+        return []
+    out = []
+    today = datetime.now(timezone.utc).date()
+    for key in keys:
+        if key not in behavioral:
+            continue
+        facets = SOURCE_REGISTRY.get(key) or {}
+        try:
+            latest = _latest(key)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("coherence: latest(%s) failed: %s", key, e)
+            continue
+        sk = str((latest or {}).get("sk") or "")
+        if not sk.startswith("DATE#"):
+            continue
+        last_date = sk[5:15]
+        try:
+            days = (today - datetime.strptime(last_date, "%Y-%m-%d").date()).days
+        except (ValueError, TypeError):
+            continue
+        stale_hours = facets.get("stale_hours")
+        # No stale_hours facet (strava) means no declared cadence — fall back to the
+        # registry's own quiet floor rather than inventing a number here.
+        threshold_days = (float(stale_hours) / 24.0) if stale_hours else float(QUIET_NOTICE_MIN_DAYS)
+        if days > threshold_days:
+            out.append({"key": key, "label": facets.get("label") or key, "last_date": last_date, "days": days})
+    return out
 
 
 def _gather_counts():
@@ -417,7 +532,8 @@ def run_checks():
         if payload is None:
             f = ci.Finding(f"endpoint_shape:{name}", ci.WARN, 1.0, f"{name}: endpoint unreachable")
         else:
-            f = ci.check_endpoint_shape(name, payload, spec, experiment_age_days=age_days)
+            quiet = _quiet_behavioral_sources(spec.get("behavioral_sources"))
+            f = ci.check_endpoint_shape(name, payload, spec, experiment_age_days=age_days, quiet_sources=quiet)
         findings.append(f)
 
     findings.append(ci.check_count_agreement(_gather_counts()))

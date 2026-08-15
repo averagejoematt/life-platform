@@ -37,6 +37,39 @@ def _pin_continuity(monkeypatch, genesis="2026-06-08", today="2026-07-01", surfa
     monkeypatch.setattr(sentinel, "_gather_experiment_continuity", lambda: (genesis, today, list(surfaced)))
 
 
+def _pin_computed_checks(monkeypatch):
+    """Drive the REAL `_gather_computed_checks` over records in LIVE shape (#2736).
+
+    These three tests previously did `monkeypatch.setattr(sentinel,
+    "_gather_computed_checks", lambda: [])` — substituting the exact broken return
+    value of the function under test, which is why the suite stayed green for the
+    life of the file while invariant 2 never executed a single check. The adapter
+    read `score`/`grade`; the record has stored `total_score`/`letter_grade` since
+    the oldest row in the partition. Only `_latest` (the DDB read) is stubbed here;
+    the field names below are copied from live items, so a future rename breaks
+    this test instead of silently emptying the invariant.
+    """
+    live = {
+        "day_grade": {"sk": "DATE#2026-08-14", "date": "2026-08-14", "total_score": 39, "letter_grade": "F"},
+        "character_sheet": {"sk": "DATE#2026-08-14", "date": "2026-08-14", "character_level": 1, "character_tier": "Foundation"},
+    }
+    monkeypatch.setattr(sentinel, "_latest", lambda source: live.get(source, {}))
+
+
+def test_gather_computed_checks_reads_the_real_record_shape(monkeypatch):
+    """The #2736 regression: the adapter must produce checks from a live-shaped
+    record. Pre-fix this returned [] and invariant 2 reported a vacuous OK."""
+    _pin_computed_checks(monkeypatch)
+    checks = sentinel._gather_computed_checks()
+    assert checks, "adapter found nothing to check against a live-shaped record"
+    names = {c["name"] for c in checks}
+    assert "day_grade_letter_vs_score" in names
+    # and the invariant grades them rather than reporting an empty-set green
+    f = sentinel.ci.check_computed_coherence(checks)
+    assert f.status == sentinel.ci.OK
+    assert "0 computed metrics" not in f.detail
+
+
 def _patch_bad_state(monkeypatch):
     _pin_continuity(monkeypatch)
     # C-3 signature: many closed predictions, none decided.
@@ -55,7 +88,7 @@ def _patch_bad_state(monkeypatch):
             ["expert:training", "expert:nutrition"],
         ),
     )
-    monkeypatch.setattr(sentinel, "_gather_computed_checks", lambda: [])
+    _pin_computed_checks(monkeypatch)
     monkeypatch.setattr(sentinel, "_gather_endpoint_specs", lambda: [])  # skip HTTP
     monkeypatch.setattr(sentinel, "_gather_counts", lambda: [])
     monkeypatch.setattr(sentinel, "_semantic_pass", lambda facts, narr: None)
@@ -148,7 +181,7 @@ def _patch_empty_post_reset_board(monkeypatch, age_days):
     (never None), so only the non_degenerate gate is in play."""
     monkeypatch.setattr(sentinel, "_gather_predictions", lambda: [])
     monkeypatch.setattr(sentinel, "_gather_facts_and_narratives", lambda: ({}, [], []))
-    monkeypatch.setattr(sentinel, "_gather_computed_checks", lambda: [])
+    _pin_computed_checks(monkeypatch)
     monkeypatch.setattr(sentinel, "_gather_counts", lambda: [])
     monkeypatch.setattr(sentinel, "_semantic_pass", lambda facts, narr: None)
     monkeypatch.setattr(sentinel, "_experiment_age_days", lambda: age_days)
@@ -201,7 +234,7 @@ def test_healthy_state_is_ok(monkeypatch):
         "_gather_facts_and_narratives",
         lambda: ({"recovery_pct": 30, "hrv_ms": 25.2}, ["Recovery was 30% today; HRV 25 ms."], ["expert:sleep"]),
     )
-    monkeypatch.setattr(sentinel, "_gather_computed_checks", lambda: [])
+    _pin_computed_checks(monkeypatch)
     monkeypatch.setattr(sentinel, "_gather_endpoint_specs", lambda: [])
     monkeypatch.setattr(sentinel, "_gather_counts", lambda: [])
     monkeypatch.setattr(sentinel, "_semantic_pass", lambda facts, narr: None)
