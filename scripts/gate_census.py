@@ -431,7 +431,12 @@ def _module_level_bindings(tree: ast.Module) -> list[tuple[str, ast.expr | None,
 # ─────────────────────────────────────────────────────────────────────────────
 _GATE_VERB = re.compile(
     r"\b(pytest|flake8|black|ruff|mypy|gitleaks|codeql|check_[a-z_]+\.py|"
-    r"[a-z_]*_guard\.py|[a-z_]*_gate\.py|verify_[a-z_]+|smoke_test|audit|"
+    # #2746: `[a-z_]*_eval\.py` — the golden-brief/golden-surface harnesses are gates
+    # by function and were invisible to every clause above, so the step named
+    # "Deterministic verdict (gating, free)" sat in `steps_nongate` while advertising
+    # itself as gating. Found by adjudicating #2639's residual, which is what that
+    # residual is for. Same widen-the-derivation fix as #2639's own, one verb over.
+    r"[a-z_]*_guard\.py|[a-z_]*_gate\.py|[a-z_]*_eval\.py|verify_[a-z_]+|smoke_test|audit|"
     r"--strict|--check|npx cdk diff|visual_qa|reader_truth|doc_index|playwright)\b",
     re.I,
 )

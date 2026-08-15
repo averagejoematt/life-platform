@@ -61,6 +61,13 @@ jobs:
 
       - name: Deterministic verdict (gating, free)
         run: |
+          # #2746: WITHOUT this the step could not fail. GitHub's default shell is
+          # `bash -e {0}` and `-e` does NOT imply pipefail, so `harness | tee` exited
+          # with tee's status (always 0) — and the step's last command is a `head`,
+          # which discarded even that. A step whose name says "gating" reported green
+          # on every possible harness regression. Identical to the bug ci-test.yml
+          # already fixed and documents beside its coverage gate.
+          set -o pipefail
           echo "::group::Golden-brief deterministic harness"
           python3 tests/golden_brief_eval.py | tee /tmp/golden.txt
           echo "::endgroup::"

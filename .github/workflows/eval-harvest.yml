@@ -60,6 +60,9 @@ jobs:
 
       - name: Harvest + validate candidates (deterministic)
         run: |
+          # #2746: same swallow as the golden-brief gating step — a failed harvest
+          # would otherwise produce an empty candidate set and a green run.
+          set -o pipefail
           python3 scripts/harvest_eval_fixtures.py --days 35 --out /tmp/eval_fixture_candidates.json | tee /tmp/harvest.txt
           head -2 /tmp/harvest.txt >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
