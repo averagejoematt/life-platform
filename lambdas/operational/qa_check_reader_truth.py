@@ -15,7 +15,7 @@ import os
 import urllib.request
 
 from operational import reader_truth_qa
-from operational.qa_check import CONTENT_TRUTH, Check, summarize_findings
+from operational.qa_check import CONTENT_TRUTH, Check, finding_group, summarize_findings
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +179,46 @@ def _check_frozen_artifacts(surfaces):
         return [det.warn(f"frozen-artifact check errored — skipped this run (fail-soft): {str(e)[:120]}")]
 
 
+def _confirm_high_findings(highs, surfaces):
+    """Second opinion on the same surfaces; only findings in BOTH passes may FAIL.
+
+    → (confirmed, unconfirmed, note_or_None)
+
+    Identity is `finding_group` (page|category), which is run-invariant BY DESIGN —
+    its docstring is explicit that the note is reworded every night and the id
+    deliberately excludes it, which is what makes cross-run matching meaningful here.
+
+    COST is bounded on purpose: this runs ONLY when the first pass produced a high,
+    i.e. only on the nights that would otherwise have FAILed. A clean night pays
+    nothing, so the nightly Bedrock bill is unchanged in the common case — which
+    matters while #2734 has month-end projected above the ceiling.
+
+    FAIL-CLOSED. If the confirmation pass itself errors we return every high as
+    confirmed. A second opinion that cannot be obtained must never be the reason a
+    genuine finding is downgraded — the failure direction has to preserve the old
+    behaviour, not silence it.
+    """
+    try:
+        from ai import bedrock_client
+
+        from operational import reader_truth_qa
+
+        again, _errs = reader_truth_qa.assess_prose(surfaces, bedrock_client.invoke)
+    except Exception as e:  # noqa: BLE001
+        return highs, [], f"confirmation pass unavailable, treating all highs as confirmed (fail-closed): {str(e)[:120]}"
+    second = {finding_group(f) for f in again if (f or {}).get("severity") == "high"}
+    confirmed = [f for f in highs if finding_group(f) in second]
+    unconfirmed = [f for f in highs if finding_group(f) not in second]
+    note = None
+    if unconfirmed:
+        ids = ", ".join(sorted({finding_group(f) for f in unconfirmed}))
+        note = (
+            f"{len(unconfirmed)} high finding(s) did not reproduce on a second pass and were demoted to WARN "
+            f"(#2741 — measured 2/8 flake on identical content): {ids}"
+        )
+    return confirmed, unconfirmed, note
+
+
 def check_reader_truth():
     checks = []
     verdict = Check("reader_truth:verdict", "Reader Truth", CONTENT_TRUTH)
@@ -245,9 +285,25 @@ def check_reader_truth():
     # low forever. Same helper, same guarantees, one call each.
     highs = [f for f in findings if f["severity"] == "high"]
     lower = [f for f in findings if f["severity"] != "high"]
+
+    # #2741: a `high` is what makes this a FAIL, and a FAIL is what reddens
+    # qa-smoke-failures — so a single non-deterministic call must not be the whole
+    # basis for it. Measured 2026-08-15: the same durable-design-copy finding
+    # appeared in 2 of 8 runs against byte-identical content, at two different
+    # severities (low/med, then high) with two different rationales. `high` maps
+    # to fail() below, so the alarm's FAIL boundary was a coin flip.
+    if highs:
+        highs, unconfirmed, conf_note = _confirm_high_findings(highs, surfaces)
+        if conf_note:
+            checks.append(Check("reader_truth:confirm", "Reader Truth", CONTENT_TRUTH).warn(conf_note))
+        # An unconfirmed high is NOT dropped — flaky is not the same as absent, and
+        # silently discarding it would be the #2640 pattern this file exists to police.
+        # It is demoted to the WARN bucket, still named, still carrying its detail.
+        lower = lower + unconfirmed
+
     if highs:
         summary, detail_lines = summarize_findings(highs)
-        verdict.fail(f"{len(highs)} high truth finding(s) at {day}: {summary}").with_details(detail_lines)
+        verdict.fail(f"{len(highs)} high truth finding(s) at {day}, confirmed on a second pass: {summary}").with_details(detail_lines)
     elif lower:
         summary, detail_lines = summarize_findings(lower)
         verdict.warn(f"{len(lower)} low/med truth finding(s) at {day}: {summary}").with_details(detail_lines)
