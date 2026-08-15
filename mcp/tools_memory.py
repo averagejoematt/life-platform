@@ -45,6 +45,12 @@ def _get_user_id():
 
 MEMORY_SOURCE = "platform_memory"
 
+# #2663: page cap for the category census. The window can no longer be pushed into the
+# key condition (the sk's date is its LAST segment, not its first), so the partition is
+# read whole and filtered after. Bounded so a runaway partition cannot hang the tool —
+# `scan_exhausted` in the response says plainly when the cap was the stopping condition.
+_MEMORY_MAX_PAGES = 20
+
 # Canonical sanctioned set — derived from the code registry (#1482), never a
 # second hand-maintained list. Aliases (failure_pattern → failure_patterns,
 # episodic_wins → what_worked) are normalized on write/read.
@@ -252,45 +258,62 @@ def tool_list_memory_categories(args: dict) -> dict:
     Returns:
         {"categories": [{"category": "...", "count": N, "latest_date": "..."}], "total_records": N}
     """
-    days = args.get("days", 90)
+    days = min(max(1, int(args.get("days", 90))), 365)
 
     table = _get_table()
-    days = min(max(1, int(days)), 365)
-
     today = datetime.now(timezone.utc).date()
     start = (today - timedelta(days=days)).isoformat()
 
+    # #2663: `days` was applied to the WRONG SEGMENT of the sort key. The sk is
+    # `MEMORY#<category>#<date>` (see _memory_sk), but the query ranged
+    # `BETWEEN "MEMORY#<start-date>" AND "MEMORY#~"` — comparing a date string against
+    # CATEGORY NAMES. Lexically every category ('b'…'w') sorts above any 'YYYY-…' and
+    # below '~', so the range matched the entire partition no matter what `days` said,
+    # and a 1-day window returned records from May. The argument was not decorative, as
+    # filed — it was a filter silently evaluated against the wrong thing, which is worse:
+    # it would also have EXCLUDED a whole category the day one was named with a leading
+    # digit. Date cannot be range-queried from this key at all, so the window is applied
+    # after the read, over a fully paginated partition.
     pk = _memory_pk()
-    start_sk = f"MEMORY#{start}"
-    end_sk = "MEMORY#~"
 
     try:
         from mcp.core import _apply_phase_filter  # ADR-058
 
-        resp = table.query(
-            **_apply_phase_filter(
+        items: list[dict] = []
+        start_key = None
+        pages = 0
+        while pages < _MEMORY_MAX_PAGES:
+            params = _apply_phase_filter(
                 {
-                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                    "ExpressionAttributeValues": {
-                        ":pk": pk,
-                        ":s": start_sk,
-                        ":e": end_sk,
-                    },
+                    "KeyConditionExpression": "pk = :pk AND begins_with(sk, :p)",
+                    "ExpressionAttributeValues": {":pk": pk, ":p": "MEMORY#"},
                     "ProjectionExpression": "sk, category, #d",
                     "ExpressionAttributeNames": {"#d": "date"},
                 }
             )
-        )
-        items = resp.get("Items", [])
+            if start_key is not None:
+                params["ExclusiveStartKey"] = start_key
+            resp = table.query(**params)
+            items.extend(resp.get("Items", []))
+            start_key = resp.get("LastEvaluatedKey")
+            pages += 1
+            if not start_key:
+                break
 
-        # Group by category
+        # Group by category, keeping only records inside the requested window. The date
+        # falls back to the sk's own last segment: it is the authoritative copy (the key
+        # is built from it), so a row missing the duplicate `date` attribute is dated
+        # correctly rather than silently landing in every window as "".
         from collections import defaultdict
 
         cats = defaultdict(list)
+        in_window = 0
         for item in items:
-            cat = item.get("category", "unknown")
-            date = item.get("date", "")
-            cats[cat].append(date)
+            date = item.get("date") or (item.get("sk", "").rsplit("#", 1)[-1] if "#" in item.get("sk", "") else "")
+            if not date or date < start:
+                continue
+            in_window += 1
+            cats[item.get("category", "unknown")].append(date)
 
         result = []
         for cat, dates in sorted(cats.items()):
@@ -305,8 +328,14 @@ def tool_list_memory_categories(args: dict) -> dict:
 
         return {
             "categories": result,
-            "total_records": len(items),
+            # ADR-104: say what each number counted. `total_records` is the window (what
+            # `categories` sums to); `records_scanned` is the whole partition it was
+            # filtered out of. `scan_exhausted` False means even that is a floor.
+            "total_records": in_window,
+            "records_scanned": len(items),
+            "scan_exhausted": start_key is None,
             "lookback_days": days,
+            "window_start": start,
             # #1482: the sanctioned taxonomy (code registry: lambdas/platform_memory.py)
             # — chat modes (#1479) read this to route takeaways into valid categories.
             "taxonomy": _pm.taxonomy_summary(),
