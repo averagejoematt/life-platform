@@ -378,6 +378,28 @@ def checks(check_cls, site_base_url, partition, timeout=15):
 WEIGHT_RECONCILE_TOL = 0.05
 
 
+def hero_weight_applicable(journey) -> bool:
+    """Is there a weight claim on the page for `assess_hero_weight` to reconcile?
+
+    #2640: `assess_hero_weight` returns (True, "no weight claim to reconcile") when there
+    is nothing to check, and the caller rendered that as a GREEN CHECK. A green from a
+    check that examined nothing is indistinguishable from a green from a check that
+    examined something and liked it — the ADR-104 class this whole surface exists to
+    police, sitting inside the police.
+
+    The window is real, not theoretical. It opens at every genesis (#931/#939 stage the
+    countdown with weight fields nulled by design) and re-opens for as long as Matthew
+    does not weigh in. Measured 2026-08-15, five days into cycle 13: the live payload IS
+    applicable (2 weigh-ins, span 1d) and the check IS armed — feeding it an impossible
+    `lost_lbs` reds it with a specific message. So the branch is not suppressing anything
+    today; it is that when it does suppress, nobody can tell.
+
+    Split out rather than folded into the return value so every existing caller keeps its
+    `ok, msg = assess_hero_weight(...)` shape.
+    """
+    return not (journey.get("pre_start") or journey.get("current_weight_lbs") is None)
+
+
 def assess_hero_weight(journey):
     """Validate the /api/journey weight row reconciles + is trend-honest.
 
@@ -386,7 +408,7 @@ def assess_hero_weight(journey):
     """
     if not isinstance(journey, dict):
         return False, "journey payload is not an object"
-    if journey.get("pre_start") or journey.get("current_weight_lbs") is None:
+    if not hero_weight_applicable(journey):
         return True, "pre-start / no weigh-in — no weight claim to reconcile"
 
     now = journey.get("current_weight_lbs")

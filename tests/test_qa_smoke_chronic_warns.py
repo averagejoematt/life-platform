@@ -80,6 +80,14 @@ SANCTIONED_CHRONIC_SITES = {
     ("qa_check_outputs.py", "_range_check"),
     ("qa_smoke_lambda.py", "check_canary_precision"),
     ("qa_smoke_lambda.py", "check_coach_ensemble_phase_stamp_coverage"),
+    # #2640, class (a) — a recurring TIMING condition on a healthy platform. The hero-weight
+    # arithmetic check has nothing to reconcile until Matthew's first post-genesis weigh-in
+    # (every genesis nulls the weight fields by design, #931/#939). It used to render that
+    # as a GREEN check, which is indistinguishable from "reconciled and correct" — the
+    # ADR-104 class this surface exists to police, inside the police. Now visible and
+    # non-alarming; it un-chronics itself the moment a weigh-in lands, because the branch
+    # is chosen by `hero_weight_applicable`, not by a flag.
+    ("qa_smoke_lambda.py", "check_hero_weight_arithmetic"),
 }
 
 
