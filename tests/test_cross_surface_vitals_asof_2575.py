@@ -59,7 +59,15 @@ COCKPIT = {
 
 # The mind coach's published card, and the stamp `_write_output_record` now freezes
 # alongside it: the Spine's own answer at 17:02:59Z, which was DATE#2026-08-11.
-_MIND_PROSE = "On the night of 2026-08-10, your recovery came in at 54%, HRV at 41.1 ms, resting HR at 56 bpm — but those are well below your baseline."
+#
+# #2738: this prose used to open "On the night of 2026-08-10, ...". That date was
+# decorative — every assertion in this file passes without it — but it made the fixture
+# the wrong SHAPE for what the file tests. `published_vitals` reconciles a coach citing
+# the reading it shipped with as CURRENT; an explicitly dated citation is not a currency
+# claim at all and is now exempted before the stamp is ever consulted, so a dated fixture
+# would have exercised the exemption while appearing to prove the stamp path.
+# The dated path has its own coverage in test_dated_citation_is_not_a_currency_claim_2738.
+_MIND_PROSE = "Your recovery came in at 54%, HRV at 41.1 ms, resting HR at 56 bpm — but those are well below your baseline."
 _PUBLISHED_08_11 = {
     "recovery_pct": 54.0,
     "hrv_ms": 41.07,
