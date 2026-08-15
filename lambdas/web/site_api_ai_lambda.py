@@ -43,6 +43,7 @@ from experiment.phase_filter import singleton_visible, source_reads_cross_phase,
 from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
 
+import web.site_api_ai_request as _req  # #2688: body parsing lives in the extracted sibling
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.ask_retrieval import retrieve_block as _ask_retrieve  # #2348: the question selects published-archive passages (fail-soft)
 from web.site_api_ai_prompt import (  # noqa: F401
@@ -240,38 +241,6 @@ def _error(status: int, message: str) -> dict:
         "headers": CORS_HEADERS,
         "body": json.dumps({"error": message}),
     }
-
-
-def _json_object_body(event: dict):
-    """Parse the request body as a JSON **object**. Returns (body, error_or_None).
-
-    #2688: `json.loads` happily returns a str/list/int for a bare-string or array
-    body, and the very next `body.get(...)` then raises AttributeError. In
-    `/api/explain` and `/api/board_ask` that call sat OUTSIDE the try, so the
-    exception escaped the handler entirely and the reader got `502 Internal
-    Server Error` — a Lambda error, counted against the function's error metric,
-    for what is a malformed client request.
-    """
-    try:
-        parsed = json.loads(event.get("body") or "{}")
-    except Exception:  # noqa: BLE001 — any parse failure is a client error
-        return None, _error(400, "Invalid JSON")
-    if not isinstance(parsed, dict):
-        return None, _error(400, "Request body must be a JSON object")
-    return parsed, None
-
-
-def _text_field(body: dict, key: str, cap: int = 500) -> str:
-    """One reader-supplied free-text field: type-guarded, HTML-stripped, capped.
-
-    Deliberately mirrors `web/site_api_social._sanitise_text` so the AI doors and
-    the capture doors treat a mistyped field identically. A non-text value yields
-    "" (→ the door's existing length check answers 400), never an AttributeError.
-    """
-    raw = body.get(key)
-    if not isinstance(raw, (str, int, float)) or isinstance(raw, bool):
-        return ""
-    return re.sub(r"<[^>]+>", "", str(raw)).strip()[:cap]
 
 
 def _ai_paused_response():
@@ -1257,10 +1226,10 @@ def _handle_ask(event: dict) -> dict:
         return _paused
     source_ip = _rate_limit_identity(event)
     try:
-        _body, _bad = _json_object_body(event)
-        if _bad:
-            return _bad
-        question = _text_field(_body, "question")
+        _body, _err = _req.json_object_body(event.get("body"))
+        if _body is None:
+            return _error(400, _err or "Invalid JSON")
+        question = _req.text_field(_body, "question")
         if len(question) < 5:
             return _error(400, "Question too short")
 
@@ -1474,9 +1443,9 @@ def _handle_explain(event: dict) -> dict:
     if _paused:
         return _paused
     source_ip = _rate_limit_identity(event)
-    body, _bad = _json_object_body(event)
-    if _bad:
-        return _bad
+    body, _err = _req.json_object_body(event.get("body"))
+    if body is None:
+        return _error(400, _err or "Invalid JSON")
     surface = str(body.get("surface") or "").strip()
     if surface not in _EXPLAIN_SURFACES:
         return _error(400, "Unknown surface")
@@ -1601,9 +1570,9 @@ def _handle_board_ask(event: dict) -> dict:
         board_ts.append(now)
         _board_rate_store[ip_hash] = board_ts[-20:]
 
-    body, _bad = _json_object_body(event)
-    if _bad:
-        return _bad
+    body, _err = _req.json_object_body(event.get("body"))
+    if body is None:
+        return _error(400, _err or "Invalid JSON")
 
     # #546: a request carrying a session_token is a FOLLOW-UP — route it to the
     # same coach with the thread's prior turns as context. The budget pause and
@@ -1612,7 +1581,7 @@ def _handle_board_ask(event: dict) -> dict:
     if body.get("session_token"):
         return _handle_board_followup(body, ip_hash)
 
-    question = _text_field(body, "question")
+    question = _req.text_field(body, "question")
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
@@ -1822,9 +1791,8 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
             "body": json.dumps({"error": f"Unknown persona id. Valid: {', '.join(COACH_ROSTER)}"}),
         }
 
-    # #2688: the follow-up path takes `question` from the same untrusted body as the
-    # opening turn and had the identical AttributeError on a non-string value.
-    question = _text_field(body, "question")
+    # #2688: same untrusted `question` as the opening turn, same AttributeError.
+    question = _req.text_field(body, "question")
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
