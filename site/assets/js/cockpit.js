@@ -47,9 +47,25 @@ const rows = (name) => document.querySelector(`[data-rows="${name}"]`);
 const state = { scope: "today", pillars: {}, coachCache: {} };
 
 /* ── fetch helpers ───────────────────────────────────────────────────────── */
+/* #2673: tag TRANSPORT failures so the empty state can tell "nothing has been
+   computed yet" apart from "the request failed". Both used to land in the same
+   catch and render the same sentence — laundering an outage into a computed-zero
+   state, which ADR-104 forbids and which the sibling doors already get right. */
 async function getJSON(path) {
-  const res = await fetch(path, { headers: { accept: "application/json" } });
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  let res;
+  try {
+    res = await fetch(path, { headers: { accept: "application/json" } });
+  } catch (e) {
+    // Network-level failure (offline, DNS, CORS, aborted) — never a "no data yet".
+    const err = new Error(`${path} → network`);
+    err.transport = true;
+    throw err;
+  }
+  if (!res.ok) {
+    const err = new Error(`${path} → ${res.status}`);
+    err.transport = true;
+    throw err;
+  }
   return res.json();
 }
 
@@ -1518,9 +1534,14 @@ async function load(dateStr) {
     gone(bind("movement")); gone(bind("honest")); gone(bind("boardline"));
     gone("[data-readiness]"); gone(".cap-today");
     gone(".domains"); gone(".band"); gone(".voice.human"); gone("[data-circadian]"); gone("[data-predict]");
+    // #2673: two different truths, two different sentences. A failed request is
+    // NOT "hasn't computed yet" — that copy claims knowledge of the backend's
+    // state that a failed call cannot have. Wording matches the sibling doors.
     bind("verdict").innerHTML = preC
       ? preStartLine(preC)
-      : "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
+      : e && e.transport
+        ? "The cockpit couldn't load its data just now — that's a failed request, not a missing score. Try again in a moment."
+        : "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
     // #974: the levers still render without a sheet — the registry and the
     // pre-registered design are real before (and independent of) today's score.
     renderLevers(preC);
