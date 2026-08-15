@@ -50,16 +50,52 @@ ROUTING = {
     "pattern": "pattern",  # Dr. Nora Vale (chat tier, v2 roster)
     "career": "career",  # Steve Brooks (chat tier, v2 roster)
     "board": "board",
-    "glucose": "glucose",  # consulting tier: routable only if ever created
-    "labs": "labs",
-    # "training" is a SUCCESSION route, not a live seat (ADR-153 amendment,
-    # 2026-08-10): Dr. Sarah Chen retired, but @ajm_training_bot is a chat
-    # Matthew already has open, and cycle-13 messages to it were dead-ending at a
-    # silent Rejected. The key routes to the persona that absorbed the lane
-    # (Dr. Max Reyes, via `telegram_route_aliases` in config/personas.json), so
-    # the thread continues with the coach who now holds it — one partition, one
-    # memory. An unknown bot key still fails CLOSED in gateway.resolve_coach.
-    "training": "training",
+    "glucose": "glucose",  # deliberately uncreated bot, addable later — see ROUTE_GAPS
+    "labs": "labs",  # Dr. Okafor — granted a bot by ADR-153's 2026-08-12 amendment
+}
+
+# #2677: "training" WAS a key here and is deliberately gone.
+#
+# ADR-153's 2026-08-12 amendment reversed its own 2026-08-10 one: the `training`
+# succession alias retired, `@ajm_training_bot` became the Performance seat's PRIMARY
+# route (key `physical`), and the ADR states the consequence in as many words —
+# "`training` is now deliberately unmapped and fails CLOSED in gateway.resolve_coach,
+# which is correct: there is no separate training seat."
+#
+# That amendment updated the ADR, `config/personas.json` and the setup roster's own
+# comment. It left three artifacts behind: this key, the comment above it that still
+# described the reversed 08-10 decision, and a test asserting the old behaviour. So the
+# key kept resolving to a coach id no persona claims, and `resolve_coach` — the gate the
+# ADR names — never got the chance to fail closed.
+#
+# Deletion, not a re-added alias. The alias was retired for a load-bearing reason: the
+# PRIMARY `telegram_route` is the canonical OUTBOUND route, so a seat reachable only by
+# alias can be texted but can never text first, and Max's morning check-ins would have
+# stayed dark. Making the key "work" by restoring the alias would silently undo that.
+#
+# What remains unresolvable is declared below rather than deleted, because deleting it
+# would break something real. `tests/test_telegram_route_provisioning_2677.py` requires
+# every ROUTING key to resolve to a persona or appear here with a reason, so the next
+# dead route is loud on the day it lands instead of found in a bug bash.
+ROUTE_GAPS = {
+    "board": (
+        "NO PERSONA, LIVE BOT. @ajm_board_bot is provisioned in the life-platform/telegram secret with a "
+        "chat id (read 2026-08-15), so the key cannot be dropped. But no persona carries telegram_route "
+        "'board': a message resolves nothing, falls back to the derived id `board_coach` — which no persona "
+        'claims either — and answers as "Matthew\'s board coach", the nameless, persona-free reply that '
+        "telegram_worker_lambda._assemble's own comment records as an incident. Static reading, not an "
+        "observed failure: the worker log holds no board delivery, so the path looks unexercised rather than "
+        "proven-broken. The board is Grand Rounds, meant to be multi-coach (#2363) — a design question, not "
+        "a mapping fix, so it is filed rather than guessed at here."
+    ),
+    "glucose": (
+        "NO PERSONA ROUTE, NO BOT — and the key must stay. setup_telegram_bots.OPTIONAL_BOTS lists "
+        "@ajm_glucose_bot as deliberately NOT created ('an unused bot is a live public webhook endpoint, so "
+        "it is attack surface bought for no benefit') while remaining addable with an explicit argument, and "
+        "tests/test_telegram_transport.py requires every roster key to be routable. The gap worth naming is "
+        "that creating the bot would NOT be enough: glucose_coach has no telegram_route, so the day the bot "
+        "exists it lands in exactly the `board` failure above. Grant the route in the same change."
+    ),
 }
 
 _secrets = None
