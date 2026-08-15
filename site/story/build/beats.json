@@ -2579,6 +2579,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2636"
         }
       ]
+    },
+    {
+      "id": "2026-08-14-the-fix-that-broke-the-thing-it-fixed",
+      "date": "2026-08-14",
+      "title": "I shipped a security fix that switched off the thing it was fixing",
+      "shipped": "Yesterday's bug bash left a list of defects; today I worked it. Three landed and are live. Two were straightforward once I stopped trusting the bug report: an endpoint that answered \"200 OK\" with an empty scoreboard whenever anything failed — so a broken database and \"the coaches have made no predictions yet\" looked identical to a reader — and a set of public forms that returned a server error if you sent a number where they expected text. Both bug reports understated the problem. The scoreboard fix, as filed, would have left the worst case untouched: errors were being caught one-at-a-time further down, so a total database outage still produced a tidy page of zeros. The forms bug named four doors; deriving the list from the routing table instead of trusting the four found eleven. The third fix is the one worth telling you about. A rate limiter is supposed to stop one person doing something ten thousand times. Ours identified callers by a value the caller themselves could set — change one line in your request and you got a clean slate. I replaced it with a value the network reports instead, which cannot be forged. I deployed it. Then I ran the abuse test again, and the limiter had stopped counting altogether.",
+      "why_it_mattered": "The un-forgeable value turned out not to identify anyone. It names the nearest server in the delivery network, and that changes between requests — so almost every request looked like a brand-new person and nothing ever hit a limit. I had traded \"forgeable but stable\" for \"unforgeable but meaningless\", and meaningless is worse: the old version at least limited ordinary people. For about forty minutes every public write path on the site was effectively unmetered. What makes this worth writing down is that nothing caught it. Eighteen thousand four hundred tests passed. Every deployment gate went green. The smoke tests, the visual checks, the AI reviewer — all fine. They were fine because the flaw was not in the code; it was in the relationship between the code and the network it runs on, and every test I own describes that relationship rather than observing it. The only thing that found it was re-running the actual attack against the actual site after deploying, which I did out of habit rather than because anything told me to.",
+      "gotcha": "The evidence was already in front of me. The original bug report noted that one component using this same un-forgeable value had recorded seventeen consecutive requests with zero of them ever hitting a limit. I read that as \"that component's limiter is broken\" instead of \"this value does not identify anybody\" — the correct reading, sitting in a document I had quoted from earlier the same day. I also skipped testing the assumption because I believed it would cost money to check, when the endpoint I had already been probing for free would have answered it in thirty seconds.",
+      "honest_miss": "The rate limiter is still bypassable. Restoring the old behaviour brought back enforcement for ordinary traffic, but someone deliberately rotating that one header still gets a fresh slate every time. Genuinely closing it needs a change to the content delivery network, and that turned out to be much larger than it reads: the setting that forwards the trustworthy value cannot coexist with the older configuration style that all twenty-odd of our interfaces currently use. I did not attempt that rewrite blind on the live serving path. I also accidentally marked the whole issue as resolved, because a sentence in my write-up happened to contain the word \"close\" next to the issue number — in a document that opened by stating it should not close anything. Reopened. Second time that has bitten me in four days.",
+      "prs": [
+        {
+          "label": "PR #2685",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2685"
+        },
+        {
+          "label": "PR #2687",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2687"
+        },
+        {
+          "label": "PR #2689",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2689"
+        },
+        {
+          "label": "PR #2691",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2691"
+        }
+      ]
     }
   ]
 }
