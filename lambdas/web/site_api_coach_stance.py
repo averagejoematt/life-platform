@@ -445,4 +445,4 @@ def handle_coach_team(event, *, _g):
         )
     except Exception as _e:
         logger.warning(f"[/api/coach_team] {_e}")
-        return _ok({"huddle": [], "team_focus": [], "tensions": []}, cache_seconds=60)
+        return _ok({"huddle": [], "team_focus": [], "tensions": []}, cache_seconds=60, degraded=_e)

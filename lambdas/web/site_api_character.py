@@ -376,7 +376,7 @@ def character_config(*, _g) -> dict:
         cfg = json.loads(raw)
     except Exception as e:
         logger.warning("character_config: config load failed: %s", e)
-        return _ok({"config": None, "available": False}, cache_seconds=300)
+        return _ok({"config": None, "available": False}, cache_seconds=300, degraded=e)
 
     # #1412 (ADR-105 rule 4): serve the EFFECTIVE targets — personal-variance
     # derived where the floor cleared, authored + "population prior, n<30"

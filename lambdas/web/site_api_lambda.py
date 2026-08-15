@@ -952,7 +952,7 @@ def lambda_handler(event, context):
             )
         except Exception as _e:
             print(f"[WARN] /api/coaching-dashboard failed: {_e}")
-            return _ok({"weekly_priority": {}, "open_actions": [], "coaches": [], "predictions": []}, cache_seconds=60)
+            return _ok({"weekly_priority": {}, "open_actions": [], "coaches": [], "predictions": []}, cache_seconds=60, degraded=_e)
 
     # Prediction Ledger (GET with query params)
     if path == "/api/predictions":

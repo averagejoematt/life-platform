@@ -507,7 +507,9 @@ def handle_calibration(event, *, _g):
         )
     except Exception as e:
         logger.error(f"[calibration] {e}")
-        return _ok({"platform": {}, "coaches": [], "hypotheses": {}, "interval_forecasts": {}, "prereg_seal": seal}, cache_seconds=60)
+        return _ok(
+            {"platform": {}, "coaches": [], "hypotheses": {}, "interval_forecasts": {}, "prereg_seal": seal}, cache_seconds=60, degraded=e
+        )
 
 
 def handle_voice_fidelity(event, *, _g):
@@ -550,7 +552,13 @@ def handle_voice_fidelity(event, *, _g):
         )
     except Exception as e:
         logger.error(f"[voice_fidelity] {e}")
-        return _ok({"n": 0, "coaches": [], "confusion": {}, "verdict": "insufficient_data"}, cache_seconds=60)
+        # #2686: the fallback verdict used to be "insufficient_data", which is a CLAIM
+        # ABOUT THE DATA — that there is some, and there is not enough of it. On a read
+        # failure that is simply false: nothing was measured, so nothing is known about
+        # how much there was. "unavailable" is the honest word, and it is the one case in
+        # this sweep where the `_meta.degraded` marker alone was not enough, because the
+        # payload itself was asserting something untrue.
+        return _ok({"n": 0, "coaches": [], "confusion": {}, "verdict": "unavailable"}, cache_seconds=60, degraded=e)
 
 
 def handle_predictions(event, *, _g):

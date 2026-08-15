@@ -915,7 +915,7 @@ def workouts(*, _g) -> dict:
         )
         items = _decimal_to_float(resp.get("Items", []))
     except Exception as exc:  # noqa: BLE001
-        return _ok({"workouts": [], "error": str(exc)[:120]}, cache_seconds=300)
+        return _ok({"workouts": [], "error": str(exc)[:120]}, cache_seconds=300, degraded=exc)
 
     def _num(v):
         try:

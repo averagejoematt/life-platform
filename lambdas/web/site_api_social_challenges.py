@@ -38,7 +38,7 @@ def handle_current_challenge(*, _g) -> dict:
         # "Check back soon" placeholder leaked to the UI as a fake day-0-of-7 challenge.
         # 300s not 60s (#2289): this door is unmetered by design, so the empty state
         # must be edge-cacheable too — a new Monday challenge appears within 5 min.
-        return _ok({"current_challenge": None}, cache_seconds=300)
+        return _ok({"current_challenge": None}, cache_seconds=300, degraded=e)
 
 
 def _public_challenge_ids(*, _g) -> set | None:

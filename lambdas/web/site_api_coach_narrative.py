@@ -453,7 +453,7 @@ def handle_coach_analysis(event, *, _g):
         return _ok(resp, cache_seconds=300)
     except Exception as _e:
         logger.warning(f"[/api/coach_analysis] {_e}")
-        return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60)
+        return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60, degraded=_e)
 
 
 def handle_coach_timeline(event, *, _g):
@@ -640,7 +640,7 @@ def handle_coach_timeline(event, *, _g):
         )
     except Exception as _e:
         logger.warning(f"[/api/coach_timeline] {_e}")
-        return _ok({"coach_id": "", "coach_name": "", "milestones": []}, cache_seconds=60)
+        return _ok({"coach_id": "", "coach_name": "", "milestones": []}, cache_seconds=60, degraded=_e)
 
 
 def handle_weekly_priority(event, *, _g):
@@ -674,7 +674,7 @@ def handle_weekly_priority(event, *, _g):
         )
     except Exception as _e:
         logger.warning(f"[/api/weekly_priority] {_e}")
-        return _ok({"weekly_priority": None}, cache_seconds=60)
+        return _ok({"weekly_priority": None}, cache_seconds=60, degraded=_e)
 
 
 def handle_month_rollup(*, _g):
@@ -724,4 +724,4 @@ def handle_month_rollup(*, _g):
         )
     except Exception as _e:
         logger.warning(f"[/api/month_rollup] {_e}")
-        return _ok({"narrative": None}, cache_seconds=60)
+        return _ok({"narrative": None}, cache_seconds=60, degraded=_e)
