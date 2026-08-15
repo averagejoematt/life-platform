@@ -1335,30 +1335,69 @@ async function renderMonth() {
 }
 
 /* ── scope + theme controls ──────────────────────────────────────────────── */
+
+// #2672: the scopes a URL may name. Anything else is ignored rather than trusted —
+// `?scope=` is reader-supplied, and an unknown value must not blank the view.
+const SCOPES = ["today", "week", "month", "journey"];
+
+/** The scope a URL asks for, or "" when it names none/an unknown one. */
+function scopeFromUrl(search = location.search) {
+  const raw = new URLSearchParams(search).get("scope");
+  return SCOPES.includes(raw) ? raw : "";
+}
+
+/** #2672: the canonical URL for a scope. "today" is the bare page, not ?scope=today,
+ *  so the default view keeps exactly one address instead of two that differ only in
+ *  a query string — a shared link and a typed link land identically. */
+function urlForScope(scope) {
+  return scope && scope !== "today" ? `/cockpit/?scope=${scope}` : "/cockpit/";
+}
+
+/** Apply a scope to the view. Pure view work — the caller owns history, so this
+ *  serves the click, the deep link and popstate identically (#2672). */
+function applyScope(scope) {
+  if (!SCOPES.includes(scope)) return;
+  const btn = document.querySelector(`.scope-btn[data-scope="${scope}"]`);
+  document.querySelectorAll(".scope-btn").forEach((x) => {
+    const on = x.dataset.scope === scope;
+    x.classList.toggle("is-active", on);
+    x.setAttribute("aria-pressed", String(on));
+  });
+  state.scope = scope;
+  if (btn) bind("scopeLabel").textContent = btn.textContent.toLowerCase();
+  const wv = document.querySelector("[data-weekview]"); if (wv) wv.hidden = true;
+  const mv = document.querySelector("[data-monthview]"); if (mv) mv.hidden = true;
+  if (scope === "journey") renderJourney();
+  else if (scope === "week") renderWeek();
+  else if (scope === "month") renderMonth();
+  else {
+    // Today: restore what hideDaily() inline-hid (children of .dialogue —
+    // restoring the parent alone leaves them display:none), then reload.
+    const hr = $(".voice.human"); if (hr) hr.style.display = "";
+    const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Today"; // #1115 — the slot holds the daily line, matching Week/Month scope labels
+    showJourney(false); load();
+  }
+}
+
 function wireScope() {
   document.querySelectorAll(".scope-btn").forEach((b) => {
     b.addEventListener("click", () => {
-      if (b.dataset.scope === state.scope) return;
-      document.querySelectorAll(".scope-btn").forEach((x) => {
-        const on = x === b;
-        x.classList.toggle("is-active", on);
-        x.setAttribute("aria-pressed", String(on));
-      });
-      state.scope = b.dataset.scope;
-      bind("scopeLabel").textContent = b.textContent.toLowerCase();
-      const wv = document.querySelector("[data-weekview]"); if (wv) wv.hidden = true;
-      const mv = document.querySelector("[data-monthview]"); if (mv) mv.hidden = true;
-      if (state.scope === "journey") renderJourney();
-      else if (state.scope === "week") renderWeek();
-      else if (state.scope === "month") renderMonth();
-      else {
-        // Today: restore what hideDaily() inline-hid (children of .dialogue —
-        // restoring the parent alone leaves them display:none), then reload.
-        const hr = $(".voice.human"); if (hr) hr.style.display = "";
-        const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Today"; // #1115 — the slot holds the daily line, matching Week/Month scope labels
-        showJourney(false); load();
-      }
+      const scope = b.dataset.scope;
+      if (scope === state.scope) return;
+      // #2672: push BEFORE applying, so the entry exists even if a render throws.
+      // Without this the switch mutated the view with no history entry: Back ejected
+      // the reader off /cockpit/ entirely, and no scope but the default was linkable.
+      try { history.pushState({ scope }, "", urlForScope(scope)); } catch (e) {}
+      applyScope(scope);
     });
+  });
+
+  // Back/forward restores the scope in place — no reload. `state.scope` is read from
+  // the history entry when present and re-derived from the URL otherwise (a manually
+  // edited address, or an entry pushed before this shipped).
+  window.addEventListener("popstate", (e) => {
+    const scope = (e.state && e.state.scope) || scopeFromUrl() || "today";
+    if (scope !== state.scope) applyScope(scope);
   });
 }
 
@@ -1682,9 +1721,19 @@ wireLevelHint();
 wireScrub();
 bind("scopeLabel").textContent = "today";
 const _deepDate = new URLSearchParams(location.search).get("date");
-// #1088: pre-genesis deep links (prior-cycle URLs) fall back to today's cockpit —
-// time travel is scoped to the current cycle.
-load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) && _deepDate >= GENESIS_ISO ? _deepDate : undefined);
+// #2672: a shared /cockpit/?scope=week must OPEN on that scope. Seed the history
+// entry so the first Back has somewhere to return to, then apply it — `applyScope`
+// runs the same render the click path does, so there is no second code path to drift.
+// A ?date= deep link keeps precedence: time travel is a scope of its own.
+const _deepScope = scopeFromUrl();
+if (_deepScope && _deepScope !== "today" && !_deepDate) {
+  try { history.replaceState({ scope: _deepScope }, "", urlForScope(_deepScope)); } catch (e) {}
+  applyScope(_deepScope);
+} else {
+  // #1088: pre-genesis deep links (prior-cycle URLs) fall back to today's cockpit —
+  // time travel is scoped to the current cycle.
+  load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) && _deepDate >= GENESIS_ISO ? _deepDate : undefined);
+}
 
 // Build stamp — muted deploy fingerprint in the footer (apples-to-apples in QA). Reads
 // the <meta name="build"> the deploy script injects; no-op locally where it's absent.
