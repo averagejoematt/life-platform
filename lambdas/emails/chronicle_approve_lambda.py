@@ -262,7 +262,14 @@ def _index_for_recall(date_str: str) -> None:
         from ai import recall_indexer
 
         status = recall_indexer.index_chronicle_installment(table, CHRONICLE_PK, date_str)
-        logger.info("[recall] index %s: %s", date_str, status)
+        # #2705: a `failed` status is not news at INFO. 2026-08-11 logged
+        # "[recall] index 2026-08-11: failed" at INFO and sat unindexed for four
+        # days — the publish path's only trace of a real miss, at the level nobody
+        # greps. Fail-soft is still the contract; quiet is not part of it.
+        if status == "failed":
+            logger.error("[recall] index %s: FAILED — installment is NOT in the recall corpus", date_str)
+        else:
+            logger.info("[recall] index %s: %s", date_str, status)
     except Exception as exc:  # noqa: BLE001 — recall indexing is never load-bearing
         logger.warning("[recall] indexing failed for %s (non-fatal): %s", date_str, exc)
 
