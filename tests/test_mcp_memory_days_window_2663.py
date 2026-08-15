@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
@@ -61,7 +61,18 @@ import pytest  # noqa: E402
 from mcp import tools_memory  # noqa: E402
 from mcp.handler import _validate_tool_args  # noqa: E402
 
-TODAY = datetime.now(timezone.utc).date()
+# #2223: FROZEN, not `datetime.now()`. The tool reads its OWN clock at call time, so a
+# module-level wall-clock sample taken at import would desync from it on a CI run that
+# crosses midnight — and every window assertion here is relative to "today". The
+# `_frozen_clock` fixture pins the tool to this same instant, so the two cannot drift.
+TODAY = date(2026, 8, 15)
+_FROZEN_NOW = datetime(2026, 8, 15, 12, 0, tzinfo=timezone.utc)
+
+
+class _FrozenDatetime(datetime):
+    @classmethod
+    def now(cls, tz=None):  # noqa: D102 — mirrors datetime.now's signature
+        return _FROZEN_NOW if tz else _FROZEN_NOW.replace(tzinfo=None)
 
 
 def _d(days_ago: int) -> str:
@@ -113,12 +124,18 @@ class FakeTable:
 
 def _rows(corpus=CORPUS, drop_date_attr=()):
     rows = []
-    for cat, date in corpus:
-        row = {"sk": f"MEMORY#{cat}#{date}", "category": cat}
-        if (cat, date) not in drop_date_attr:
-            row["date"] = date
+    for cat, day in corpus:
+        row = {"sk": f"MEMORY#{cat}#{day}", "category": cat}
+        if (cat, day) not in drop_date_attr:
+            row["date"] = day
         rows.append(row)
     return rows
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock(monkeypatch):
+    """Pin the tool's clock to the same instant TODAY was built from (#2223)."""
+    monkeypatch.setattr(tools_memory, "datetime", _FrozenDatetime)
 
 
 @pytest.fixture
