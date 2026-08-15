@@ -148,6 +148,14 @@ def handle_tools_call(params):
 
 
 # ── SEC-3: MCP input validation ─────────────────────────────────────────────
+# #2659: argument names that express a RELATIVE window, i.e. a start date DERIVED
+# from "N units back from today". Explicit start_date/end_date were already
+# validated; these were not, so `days=-1` produced start > end and DynamoDB answered
+# with a raw ValidationException reported as a retryable INTERNAL error. Zero or
+# fewer is meaningless for every one of them.
+_RELATIVE_WINDOW_ARGS = frozenset({"days", "weeks", "lookback_days", "days_back", "window_days"})
+
+
 def _validate_tool_args(name: str, arguments: dict) -> str | None:
     """Validate tool arguments against the tool's JSON schema inputSchema.
 
@@ -191,6 +199,35 @@ def _validate_tool_args(name: str, arguments: dict) -> str | None:
             if expected_type == "number" and isinstance(arg_val, int):
                 continue
             return f"Argument '{arg_name}' has wrong type: " f"expected {expected_type}, got {type(arg_val).__name__}"
+
+    # 2b. #2659: enforce the schema's own numeric bounds. Explicit start_date/end_date
+    # were validated (step 4 below) but a DERIVED window — start computed from a
+    # relative `days` — was not, so `days=-1` built start > end and DynamoDB answered
+    # with a raw ValidationException. That reached the caller as
+    # "Tool 'x' failed: ClientError: ... ValidationException" under error_code
+    # INTERNAL, whose default suggestion is "Retry the request — this may be a
+    # transient error." It is not transient: it fails identically forever.
+    #
+    # Enforced from the schema's own `minimum`/`maximum` where declared, so any arg
+    # that states its bounds is covered without naming it here.
+    #
+    # PLUS an implicit floor for relative-window args that declare none. There are 16
+    # such args on the surface today (`days` alone is on 12 tools) and none declared a
+    # minimum. Relying on 16 hand-added declarations would mean the 17th tool is
+    # unguarded on the day it lands — the failure mode this issue IS. A window of
+    # zero or fewer days is meaningless for every one of them, so the floor is a
+    # property of the concept, not of any single schema.
+    for arg_name, arg_val in arguments.items():
+        prop = properties.get(arg_name)
+        if not prop or isinstance(arg_val, bool) or not isinstance(arg_val, (int, float)):
+            continue
+        lo, hi = prop.get("minimum"), prop.get("maximum")
+        if lo is None and arg_name in _RELATIVE_WINDOW_ARGS:
+            lo = 1
+        if lo is not None and arg_val < lo:
+            return f"Argument '{arg_name}' must be at least {lo} (got {arg_val})"
+        if hi is not None and arg_val > hi:
+            return f"Argument '{arg_name}' must be at most {hi} (got {arg_val})"
 
     # 3. Sanity check: reject suspiciously large string values (prompt injection guard)
     MAX_STRING_LEN = 2000
