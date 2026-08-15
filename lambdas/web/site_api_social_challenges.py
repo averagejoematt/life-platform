@@ -231,6 +231,14 @@ def _handle_challenge_follow(event: dict, *, _g) -> dict:
                 "catalog_id": catalog_id,
                 "followed_at": now_epoch,
                 "notified": False,
+                # #2698/#2681 box 3: an address typed into a public form is UNVERIFIED —
+                # a stranger can type a third party's. Recorded as state rather than
+                # assumed, so a future notifier has to look at it. Nothing reads these
+                # partitions today (tests/test_follow_consent_state_2698.py holds that
+                # line), so no unconsented mail can be sent; the day one is added it must
+                # filter on this flag, and the guard's failure message says so.
+                "email_verified": False,
+                "verified_at": None,
             },
             ConditionExpression="attribute_not_exists(pk)",
         )
