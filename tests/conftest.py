@@ -293,6 +293,9 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # sweep, and fails when a suggestion names a tool that is not registered —
         # a repo-shape ratchet whose verdict depends only on source, not on data.
         "test_mcp_suggestion_tool_names_2666.py",
+        # #2698: sweeps lambdas/ mcp/ scripts/ for anything touching a follow partition —
+        # a repo-shape ratchet whose verdict depends only on source (the consent guard).
+        "test_follow_consent_state_2698.py",
         # the derivation guard itself — its own docstring/synthetic-fixture text
         # mentions the three sweep idioms, so it self-matches; it belongs pre-merge
         # regardless (it IS the structural gate this whole entry is about).
