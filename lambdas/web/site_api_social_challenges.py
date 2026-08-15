@@ -181,6 +181,16 @@ def _handle_challenge_follow(event: dict, *, _g) -> dict:
     if not catalog_id or len(catalog_id) > 80:
         return _error(400, "catalog_id is required")
 
+    # #2681: the SAME existence check _handle_challenge_vote makes. Without it this
+    # door returned 200 for any id, and since the sort key is EMAIL#<hash>#CH#<id>,
+    # arbitrary address × id pairs mint unbounded distinct rows. Kept identical to the
+    # sibling (including the 503 and the 404-not-400) so the two doors cannot drift.
+    valid_ids = _public_challenge_ids(_g=_g)
+    if valid_ids is None:
+        return _error(503, "Challenge catalog unavailable — try again shortly")
+    if catalog_id not in valid_ids:
+        return _error(404, "Unknown challenge")
+
     email_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     now_epoch = int(datetime.now(timezone.utc).timestamp())

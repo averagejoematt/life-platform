@@ -277,6 +277,7 @@ def _handle_experiment_follow(event: dict, *, _g) -> dict:
     _error = _g["_error"]
     _rate_limited = _g["_rate_limited"]
     _sanitise_text = _g["_sanitise_text"]
+    _valid_library_ids = _g["_valid_library_ids"]  # #2681: same id source as the vote door
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
     hashlib = _g["hashlib"]
@@ -301,6 +302,17 @@ def _handle_experiment_follow(event: dict, *, _g) -> dict:
         return _error(400, "Valid email is required")
     if not library_id or len(library_id) > 80:
         return _error(400, "library_id is required")
+
+    # #2681: the SAME existence check _handle_experiment_vote makes. Without it this
+    # door returned 200 for any id, and since the sort key is EMAIL#<hash>#EXP#<id>,
+    # arbitrary address × id pairs mint unbounded distinct rows — the exact thing the
+    # vote door's "an attacker can mint arbitrary VOTES rows" comment guards against.
+    # Kept identical to the sibling (including the 503) so the two doors cannot drift.
+    valid_ids = _valid_library_ids()
+    if not valid_ids:
+        return _error(503, "Experiment library unavailable — try again shortly")
+    if library_id not in valid_ids:
+        return _error(400, "Unknown experiment")
 
     email_hash = hashlib.sha256(email.encode()).hexdigest()[:16]
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
