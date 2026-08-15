@@ -50,6 +50,15 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 
 import pytest  # noqa: E402
 
+# `gate_census.discover_ci_gates` imports PyYAML lazily so the module stays importable
+# without it — but this file builds the census at IMPORT time, which runs that path. The
+# deploy-critical CI lane installs a minimal dependency set and has no yaml, so the whole
+# module raised ModuleNotFoundError there and reddened a lane that had nothing to do with
+# this change. Skipping is correct rather than a cop-out: the gate still runs in the full
+# `test / Unit Tests` lane, where PyYAML IS installed — verified, because a guard that
+# skips in every lane is the "cannot fail" pattern this very file exists to measure.
+pytest.importorskip("yaml", reason="gate_census's CI-family walk needs PyYAML; the full Unit Tests lane has it")
+
 gate_census = importlib.import_module("gate_census")
 
 CENSUS = gate_census.build_census(pathlib.Path(_REPO))
