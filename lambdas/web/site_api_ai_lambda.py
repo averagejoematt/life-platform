@@ -43,6 +43,7 @@ from experiment.phase_filter import singleton_visible, source_reads_cross_phase,
 from ingestion.source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
 
+import web.site_api_ai_request as _req  # #2688: body parsing lives in the extracted sibling
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.ask_retrieval import retrieve_block as _ask_retrieve  # #2348: the question selects published-archive passages (fail-soft)
 from web.site_api_ai_prompt import (  # noqa: F401
@@ -1225,9 +1226,10 @@ def _handle_ask(event: dict) -> dict:
         return _paused
     source_ip = _rate_limit_identity(event)
     try:
-        _body = json.loads(event.get("body") or "{}")
-        question = (_body.get("question") or "").strip()[:500]
-        question = re.sub(r"<[^>]+>", "", question)
+        _body, _err = _req.json_object_body(event.get("body"))
+        if _body is None:
+            return _error(400, _err or "Invalid JSON")
+        question = _req.text_field(_body, "question")
         if len(question) < 5:
             return _error(400, "Question too short")
 
@@ -1441,10 +1443,9 @@ def _handle_explain(event: dict) -> dict:
     if _paused:
         return _paused
     source_ip = _rate_limit_identity(event)
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except Exception:
-        return _error(400, "Invalid JSON")
+    body, _err = _req.json_object_body(event.get("body"))
+    if body is None:
+        return _error(400, _err or "Invalid JSON")
     surface = str(body.get("surface") or "").strip()
     if surface not in _EXPLAIN_SURFACES:
         return _error(400, "Unknown surface")
@@ -1569,10 +1570,9 @@ def _handle_board_ask(event: dict) -> dict:
         board_ts.append(now)
         _board_rate_store[ip_hash] = board_ts[-20:]
 
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except Exception:
-        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Invalid JSON"})}
+    body, _err = _req.json_object_body(event.get("body"))
+    if body is None:
+        return _error(400, _err or "Invalid JSON")
 
     # #546: a request carrying a session_token is a FOLLOW-UP — route it to the
     # same coach with the thread's prior turns as context. The budget pause and
@@ -1581,7 +1581,7 @@ def _handle_board_ask(event: dict) -> dict:
     if body.get("session_token"):
         return _handle_board_followup(body, ip_hash)
 
-    question = re.sub(r"<[^>]+>", "", (body.get("question") or "").strip())[:500]
+    question = _req.text_field(body, "question")
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
@@ -1791,7 +1791,8 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
             "body": json.dumps({"error": f"Unknown persona id. Valid: {', '.join(COACH_ROSTER)}"}),
         }
 
-    question = re.sub(r"<[^>]+>", "", (body.get("question") or "").strip())[:500]
+    # #2688: same untrusted `question` as the opening turn, same AttributeError.
+    question = _req.text_field(body, "question")
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
