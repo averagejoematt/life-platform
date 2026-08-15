@@ -93,7 +93,7 @@ from operational.qa_check_outputs import (  # noqa: E402,F401
 # #2335: the email HTML renderer lives in its own module; imported into this
 # namespace so the test seam (monkeypatch on qa.build_report_html) is unchanged.
 from operational.qa_smoke_report import build_report_html  # noqa: E402
-from operational.weight_truth_qa import WEIGHT_RECONCILE_TOL, assess_hero_weight  # noqa: E402,F401
+from operational.weight_truth_qa import WEIGHT_RECONCILE_TOL, assess_hero_weight, hero_weight_applicable  # noqa: E402,F401
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
@@ -604,6 +604,14 @@ def check_hero_weight_arithmetic():
         return [check.warn(f"/api/journey fetch failed (fail-soft): {str(e)[:120]}")]
     journey = data.get("journey", data) if isinstance(data, dict) else {}
     ok, msg = assess_hero_weight(journey)
+    if ok and not hero_weight_applicable(journey):
+        # #2640: nothing was reconciled, so this must not read as a reconciliation that
+        # passed. `chronic` is the sanctioned class for exactly this — a recurring timing
+        # condition on a HEALTHY platform (every genesis nulls the weight fields by
+        # design, #931/#939, and the window re-opens whenever Matthew has not weighed in
+        # yet). Fully visible in the email, the logs and ChronicWarnCount; it does not
+        # increment the alarmed WarnCount, so a novel warn stays unmissable.
+        return [check.warn(msg, chronic=True)]
     return [check.ok(msg) if ok else check.fail(msg)]
 
 
