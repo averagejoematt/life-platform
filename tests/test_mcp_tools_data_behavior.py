@@ -100,25 +100,60 @@ def test_get_sources_reports_first_and_latest_per_source(fake_table):
         # Two queries per source: oldest (ScanIndexForward=True) then newest.
         oldest = kwargs["ScanIndexForward"]
         if n <= 2:  # whoop
-            return {"Items": [{"date": "2025-01-01" if oldest else "2026-08-07"}]}
+            return {"Items": [{"sk": "DATE#2025-01-01" if oldest else "DATE#2026-08-07", "date": "2025-01-01" if oldest else "2026-08-07"}]}
         return {"Items": []}  # withings has nothing
 
     t = fake_table(responder)
     out = td.tool_get_sources({})
 
-    assert out["whoop"] == {"available": True, "first_date": "2025-01-01", "latest_date": "2026-08-07"}
-    assert out["withings"] == {"available": False, "first_date": None, "latest_date": None}
+    assert out["whoop"] == {"available": True, "first_date": "2025-01-01", "latest_date": "2026-08-07", "state": "stale"}
+    assert out["withings"] == {"available": False, "first_date": None, "latest_date": None, "state": "stale"}
     assert len(t.calls) == 4, "two bounded Limit=1 probes per source, never a scan"
     assert all(c["Limit"] == 1 for c in t.calls)
-    assert all(c["ProjectionExpression"] == "#dt" for c in t.calls), "existence probe must not pull the row"
+    # #2671: the projection now pulls `sk` as well, because the sk is the authoritative
+    # copy of the date and the `date` attribute is a duplicate that is not always written.
+    assert all(c["ProjectionExpression"] == "sk, #dt" for c in t.calls), "existence probe must not pull the whole row"
+
+
+def test_get_sources_probes_only_inside_the_date_key_space(fake_table):
+    """#2671: unconstrained edge queries let a marker row decide availability.
+
+    apple_health's lexically-first row is `ALERTSTATE#ah_activity_degraded` and
+    food_delivery's last is `YEAR#2026`; both are real, neither is an observation. Every
+    domain tool ranges inside `DATE#`, so this must too — that is the single truth source.
+    """
+    t = fake_table(lambda kwargs, n: {"Items": []}, sources=("whoop",))
+    td.tool_get_sources({})
+    for call in t.calls:
+        expr = call["KeyConditionExpression"].get_expression()
+        sk_cond = expr["values"][1].get_expression()
+        assert sk_cond["operator"] == "begins_with" and sk_cond["values"][1] == "DATE#", call
 
 
 def test_get_sources_survives_a_record_with_no_date_attribute(fake_table):
-    """2026-05-03 regression: one partition has a record with no `date` field;
-    a KeyError there used to tank the whole tool for every source."""
-    fake_table(lambda kwargs, n: {"Items": [{"pk": "USER#matthew#SOURCE#whoop"}]}, sources=("whoop",))
+    """2026-05-03 regression, AMENDED BY #2671. Two halves; one stands, one is overturned.
+
+    The original: a partition record with no `date` field raised KeyError and tanked the
+    whole tool. That must never come back, and does not — nothing here raises.
+
+    What that fix left behind is what #2671 is about. It answered the KeyError with
+    `.get()` and therefore with `available: False`, so a DATE# row whose duplicate `date`
+    attribute simply was not written read as "this source has no data" — the crash became
+    silence. Live, that was labs: `DATE#2019-05-01`, no `date` attribute, seven years of
+    bloodwork reported absent. The sk is what the write built the key from, so the sk is
+    what gets read.
+    """
+    fake_table(lambda kwargs, n: {"Items": [{"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2019-05-01"}]}, sources=("whoop",))
     out = td.tool_get_sources({})
-    assert out["whoop"] == {"available": False, "first_date": None, "latest_date": None}
+    assert out["whoop"]["available"] is True, "a DATE# row is data whether or not the duplicate attribute was written"
+    assert (out["whoop"]["first_date"], out["whoop"]["latest_date"]) == ("2019-05-01", "2019-05-01")
+
+
+def test_get_sources_reports_a_row_it_cannot_date_as_absent_rather_than_guessing(fake_table):
+    """The other side of the same rule: no sk date and no attribute means no claim."""
+    fake_table(lambda kwargs, n: {"Items": [{"pk": "USER#matthew#SOURCE#whoop", "sk": "ALERTSTATE#degraded"}]}, sources=("whoop",))
+    out = td.tool_get_sources({})
+    assert out["whoop"]["first_date"] is None and out["whoop"]["latest_date"] is None
 
 
 # ──────────────────────────────────────────────────────────────────────────────

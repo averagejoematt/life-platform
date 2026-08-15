@@ -15,29 +15,86 @@ from mcp.core import date_diff_days, decimal_to_float, get_sot, query_source, re
 from mcp.helpers import aggregate_items, flatten_strava_activity
 
 
+def _date_of(items):
+    """The day a partition-edge row belongs to — from the sk, which is authoritative.
+
+    #2671: the `date` ATTRIBUTE is a duplicate of the key's own date segment and is not
+    always written (labs' oldest row, `DATE#2019-05-01`, has no `date`). Reading only the
+    attribute made a present record look absent. The sk is the thing the write built from,
+    so it is what gets read.
+    """
+    if not items:
+        return None
+    row = items[0]
+    if row.get("date"):
+        return str(row["date"])[:10]
+    sk = str(row.get("sk", ""))
+    return sk.split("DATE#", 1)[1][:10] if sk.startswith("DATE#") else None
+
+
 def tool_get_sources(_args):
+    """Which sources have data, and over what span — the orientation call a session makes first.
+
+    #2671: this disagreed with the tools that actually query the data, and it is the tool
+    every subsequent question is steered by, so a false negative here closes a line of
+    inquiry before it starts. Measured live on 2026-08-15, four sources were wrong:
+
+        apple_health   available false — while its own latest_date said 2026-08-15
+        dexa           available false — with 10 months of scans on file (2025-05→2026-03)
+        labs           available false — 2019-05-01 through 2026-04-03 on file
+        food_delivery  latest_date null — real newest DATE# is 2026-03-28
+
+    Two causes, both from asking the partition a different question than the domain tools
+    ask it. First, the edge queries were unconstrained, so the "oldest" and "newest" rows
+    were whatever sorted first and last in the WHOLE partition — apple_health's oldest is
+    `ALERTSTATE#ah_activity_degraded` (an operational marker), food_delivery's newest is
+    `YEAR#2026` (an aggregate), labs' newest is `PROVIDER#function_health#2025-spring`.
+    Availability for apple_health was therefore decided by an alert-state row. Every
+    domain tool ranges on `begins_with("DATE#")`; now this does too, which is the single
+    truth source the issue asks for. Second, `available` keyed off the `date` attribute
+    rather than the record's existence — see `_date_of`.
+
+    The issue named apple_health / labs / food_delivery / strava. The wire says the fourth
+    is **dexa**: strava's edges are both clean DATE# rows and always agreed. dexa is the
+    worst of the four — body composition reported as absent while a year of scans sit in
+    the partition.
+
+    `state` is `resolve_source_state`, the same call `get_freshness_status` makes, so the
+    two tools cannot drift on what "live"/"stale"/"rate_limited" mean — LAYERED over the
+    registry's own `paused` facet, which `resolve_source_state` does not read. Its
+    `DECLARED_PAUSED_SOURCES` is deliberately empty and its comment says so: garmin's
+    pause is registry-driven (ADR-074), not declared there. Without the layer, a source
+    that is intentionally off reports `stale`, which the registry explicitly forbids
+    ("intentionally off — shown as 'paused', never counted stale"). Freshness still wins:
+    a paused source that starts producing again reads `live`, so re-enabling is visible
+    without a code change.
+    """
+    from ingestion.source_registry import qa_paused
+    from ingestion.source_state import STATE_LIVE, has_rate_limit_marker, resolve_source_state
+
+    paused_ids = {k for k, _ in qa_paused()}
+    today = datetime.now(timezone.utc).date().isoformat()
     result = {}
     for source in SOURCES:
         pk = f"{USER_PREFIX}{source}"
-        oldest = table.query(
-            KeyConditionExpression=Key("pk").eq(pk),
-            Limit=1,
-            ScanIndexForward=True,
-            ProjectionExpression="#dt",
-            ExpressionAttributeNames={"#dt": "date"},
-        )
-        newest = table.query(
-            KeyConditionExpression=Key("pk").eq(pk),
-            Limit=1,
-            ScanIndexForward=False,
-            ProjectionExpression="#dt",
-            ExpressionAttributeNames={"#dt": "date"},
-        )
-        # 2026-05-03: use .get() — at least one source partition has a record
-        # without a `date` field; was raising KeyError and tanking the whole tool.
-        first = oldest["Items"][0].get("date") if oldest["Items"] else None
-        last = newest["Items"][0].get("date") if newest["Items"] else None
-        result[source] = {"available": first is not None, "first_date": first, "latest_date": last}
+        edge_kwargs = {
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+            "Limit": 1,
+            "ProjectionExpression": "sk, #dt",
+            "ExpressionAttributeNames": {"#dt": "date"},
+        }
+        oldest = table.query(**edge_kwargs, ScanIndexForward=True)
+        newest = table.query(**edge_kwargs, ScanIndexForward=False)
+        last = _date_of(newest["Items"])
+        state = resolve_source_state(source, last, today, rate_limited=has_rate_limit_marker(table, "matthew", source))
+        if state != STATE_LIVE and source in paused_ids:
+            state = "paused"
+        result[source] = {
+            "available": bool(newest["Items"]),
+            "first_date": _date_of(oldest["Items"]),
+            "latest_date": last,
+            "state": state,
+        }
     return result
 
 
