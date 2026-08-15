@@ -49,7 +49,7 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
-for _p in (os.path.join(_REPO, "tests"), _HERE):
+for _p in (os.path.join(_REPO, "tests"), _HERE, os.path.join(_REPO, "lambdas")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -73,6 +73,57 @@ CONSUMER_CONTRACT = {
 QA_WORKFLOWS = ["ci-cd.yml", "site-deploy.yml", "v4-gate.yml", "surface-drift.yml", "visual-qa.yml", "webkit-mobile-qa.yml"]
 
 _QA_ALARM_TOKENS = ("qa", "smoke", "reader", "visual", "accuracy")
+
+
+def budget_gate_bands():
+    """[(gate, cutoff_tier)] for the CI gates budget can pause — DERIVED, never restated.
+
+    #2650: read from `budget_guard`'s own `_FEATURE_CUTOFF`, the table `allow()` enforces
+    at runtime, and over `CI_GATE_FEATURES`, the set budget_guard itself declares to be CI
+    gates. Neither the gate names nor their bands are written here, so a gate that moves
+    band — as both of these did in #1927 — moves in this report on the same commit.
+
+    Returns None when budget_guard cannot be imported, so the caller can say "not derived"
+    rather than printing a confident number from nothing. A missing import is exactly how
+    a literal creeps back.
+    """
+    try:
+        from ai.budget_guard import _FEATURE_CUTOFF, CI_GATE_FEATURES
+
+        return [(g, _FEATURE_CUTOFF[g]) for g in CI_GATE_FEATURES if g in _FEATURE_CUTOFF]
+    except Exception:  # noqa: BLE001 — an audit must not die because a table moved
+        return None
+
+
+def _budget_pause_detail(live=None):
+    """The budget-pause line, with each CI gate's band read out of budget_guard."""
+    live = live or {}
+    bands = budget_gate_bands()
+    if bands is None:
+        return "budget bands NOT DERIVED — could not import lambdas/ai/budget_guard.py; treat any band claim here as unknown"
+
+    # SSM returns the tier as a STRING. Comparing "1" to an int silently yields no verdict
+    # at all, which would have made the live half of this fix quietly inert.
+    try:
+        tier = int(live["budget_tier"])
+    except (KeyError, TypeError, ValueError):
+        tier = None
+    parts = []
+    for gate, cutoff in bands:
+        state = ""
+        if tier is not None:
+            state = " — PAUSED now" if tier >= cutoff else " — ACTIVE now"
+        parts.append(f"{gate}: pauses at tier >= {cutoff}{state}")
+    detail = (
+        "CI gate bands, derived from budget_guard._FEATURE_CUTOFF (ADR-125; #1927 moved both out of band 1, "
+        "where they were dark 26 of 30 days while still reporting green): " + "; ".join(parts)
+    )
+    detail += " — a paused gate renders SKIPPED-BY-BUDGET + the QAPausedByBudget metric; deterministic sweeps unaffected"
+    if tier is not None:
+        detail += f"; live tier now: {tier}"
+    else:
+        detail += "; live tier not read (offline — pass --live), so no ACTIVE/PAUSED verdict is claimed"
+    return detail
 
 
 def _read(path):
@@ -181,11 +232,17 @@ def silent_skips_section(live=None):
         },
         {
             "kind": "budget_pause",
-            "detail": (
-                "budget tier >= 1 pauses the AI-vision + reader-truth layers (internal-QA band, ADR-125/#1440) — "
-                "renders SKIPPED-BY-BUDGET + the QAPausedByBudget metric, deterministic sweeps unaffected"
-                + (f"; live tier now: {live['budget_tier']}" if "budget_tier" in live else "")
-            ),
+            # #2650: this used to assert, as a PROSE LITERAL, that band one paused the
+            # AI-vision and reader-truth layers — and the file never imported
+            # budget_guard. #1927 had already moved both gates from band 1 to band 3
+            # (ADR-125 amendment 2026-08-03) — precisely because sitting in band 1 left
+            # them dark 26 of 30 days while still reporting green. So at the live tier the
+            # gates DO run and this audit said they do not, and `/qa` tells the operator to
+            # read this FIRST. A drift-detection instrument that had itself drifted.
+            #
+            # The band is now derived per gate from budget_guard's own cutoff table — the
+            # same table the runtime enforces — so the two cannot disagree again.
+            "detail": _budget_pause_detail(live),
         },
         {
             "kind": "qa_level_dial",
