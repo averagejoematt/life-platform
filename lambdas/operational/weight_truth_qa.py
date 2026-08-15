@@ -57,6 +57,50 @@ _HISTORICAL_ANCHOR = re.compile(
 # short enough that a later sentence's date cannot launder an undated claim.
 _ANCHOR_WINDOW_CHARS = 24
 
+# ── #2738: an explicitly DATED reading is not a claim about now ────────────────
+#
+# Measured 2026-08-15, the sole driver of that night's `cross_surface:vitals` FAIL —
+# and the content was correct, not the coach:
+#
+#   "I can see your wearables—Whoop caught 40% recovery and 35.3 ms HRV on the night
+#    of 2026-08-13—but MacroFactor has been blank for four days."
+#
+# 40 / 35.32 IS the 2026-08-14 morning reading (the night of 08-13), confirmed against
+# the `published_vitals` stamps two coaches still carry. The coach named the night it
+# was talking about — exactly the provenance ADR-104 asks for — and the check called it
+# a contradiction with today's cockpit.
+#
+# `_HISTORICAL_ANCHOR` above is the existing escape hatch and it missed this THREE ways,
+# which is why the vocabulary alone is not the fix:
+#   1. "on the night of <date>" is not in it (nor "on <date>", nor "last night");
+#   2. it is forward-only and anchored at offset 0, so "On 2026-08-13, recovery was 40%"
+#      — the date BEFORE the figure — can never match;
+#   3. `_ANCHOR_WINDOW_CHARS = 24` cannot span a compound clause: recovery's window here
+#      is " and 35.3 ms HRV on the n", so even a fixed vocabulary leaves recovery flagged.
+#
+# So this is SENTENCE-scoped, for the same reason `_VITALS_TARGET_SENTENCE` is and with
+# the same #1985 rationale — a gate that fires on correct writing is a gate people learn
+# to ignore. It stays narrow in the way that matters: it requires an EXPLICIT calendar
+# date or a named past night, not any vague backward hint, so "the latest reading is
+# 316.3 lbs" is still judged present-tense. The `_ANCHOR_WINDOW_CHARS` comment's worry —
+# that a LATER sentence's date could launder an undated claim — is preserved exactly,
+# because the scope here is the one sentence the figure lives in, never the blob.
+#
+# Deliberately asymmetric, like the target exemption: "recovery was 40% on 2026-08-13
+# but is 92% now" exempts both figures. That is the correct direction to be wrong in —
+# this gate exists to catch the undated-stale-number class escaping, and a coach who
+# dates a number is doing the thing the platform wants.
+# NOT "last night": in this domain that is the CURRENT reading, not a historical one —
+# a whoop morning IS last night's sleep. The existing #2113 sleep test caught that on the
+# first draft of this pattern, which is the behaviour it exists to protect.
+_DATED_SENTENCE = re.compile(
+    r"""(?:
+          \d{4}-\d{2}-\d{2}                        # an explicit ISO date in the sentence
+        | \b(?:on|since)\s+day\s+\d+\b             # "on Day 3"
+    )""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
 
 def weights_cited_in(prose: str) -> list[float]:
     """Every bodyweight-scale figure asserted **as current** in a blob of prose.
@@ -65,18 +109,22 @@ def weights_cited_in(prose: str) -> list[float]:
     `_HISTORICAL_ANCHOR`. A citation is a contradiction only if it presents itself
     as today's number.
     """
-    text = prose or ""
     out = []
-    for m in _WEIGHT_IN_PROSE.finditer(text):
-        try:
-            v = float(m.group(1))
-        except ValueError:
+    # Sentence-scoped first (#2738), so the dated escape hatch stays ONE seam shared
+    # with vitals_cited_in; the adjacent-anchor check below is unchanged.
+    for text in _SENTENCE_SPLIT.split(prose or ""):
+        if _DATED_SENTENCE.search(text):
             continue
-        if v < _BODYWEIGHT_FLOOR_LBS:
-            continue
-        if _HISTORICAL_ANCHOR.match(text[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
-            continue  # dated, therefore not a claim about now
-        out.append(v)
+        for m in _WEIGHT_IN_PROSE.finditer(text):
+            try:
+                v = float(m.group(1))
+            except ValueError:
+                continue
+            if v < _BODYWEIGHT_FLOOR_LBS:
+                continue
+            if _HISTORICAL_ANCHOR.match(text[m.end() : m.end() + _ANCHOR_WINDOW_CHARS]):
+                continue  # dated, therefore not a claim about now
+            out.append(v)
     return out
 
 
@@ -191,7 +239,7 @@ def vitals_cited_in(prose: str) -> dict:
     """
     out: dict[str, list[float]] = {}
     for sentence in _SENTENCE_SPLIT.split(prose or ""):
-        if _VITALS_TARGET_SENTENCE.search(sentence):
+        if _VITALS_TARGET_SENTENCE.search(sentence) or _DATED_SENTENCE.search(sentence):
             continue
         for metric, patterns in _VITALS_PATTERNS.items():
             lo, hi = _VITALS_DOMAIN[metric]
