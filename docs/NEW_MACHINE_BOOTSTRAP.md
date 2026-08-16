@@ -117,7 +117,7 @@ identity (step 3) or a service secret in Secrets Manager (see "Secrets" below).
 ### 2b. CDK CLI (first time only)
 
 ```bash
-npm install -g aws-cdk@2.1129.0                 # match the pin in .github/workflows/ci-cd.yml
+npm install -g aws-cdk@2.1135.1                 # match the pin in .github/workflows/ci-cd.yml
 cdk bootstrap aws://205930651321/us-west-2      # one-time per account (usually already bootstrapped)
 ```
 
