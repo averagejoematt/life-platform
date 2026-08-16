@@ -250,6 +250,49 @@ def test_score_sanity_reds_a_stale_date(dashboard_s3, no_grace):
     assert c.passed is False and "Stale date" in c.message
 
 
+# ── #2670: the pre-compute morning window ─────────────────────────────────────
+# daily-metrics-compute stamps PT-yesterday at 09:40 PT; before the 10:30 PT
+# cutoff the dashboard honestly carries D-2. An off-schedule sweep (the live
+# case: CI post-deploy smoke at 08:45 PT 2026-08-16) must read that as OK —
+# and the same D-2 after the cutoff must stay a hard FAIL, or the scheduled
+# 11:30 PT sweep loses its ability to catch a genuinely dead compute.
+
+
+def _freeze_pt(monkeypatch, hour, minute):
+    from datetime import datetime as _dt
+
+    from common import pacific_time
+
+    frozen = _dt(2026, 8, 16, hour, minute)
+    monkeypatch.setattr(pacific_time, "pacific_now", lambda: frozen)
+    return frozen
+
+
+def test_score_sanity_d2_inside_the_precompute_window_is_honest_ok(dashboard_s3, no_grace, monkeypatch):
+    _freeze_pt(monkeypatch, 8, 45)  # the live 2026-08-16 false-FAIL time
+    dashboard_s3(_dashboard(date=qco._two_days_ago_str()))
+    c = _by_name(qco.check_score_sanity())["dashboard:date"]
+    assert c.passed is True and "pre-compute morning window" in c.message
+
+
+def test_score_sanity_d2_after_the_cutoff_is_still_a_red(dashboard_s3, no_grace, monkeypatch):
+    _freeze_pt(monkeypatch, 11, 30)  # the scheduled sweep's own hour
+    dashboard_s3(_dashboard(date=qco._two_days_ago_str()))
+    c = _by_name(qco.check_score_sanity())["dashboard:date"]
+    assert c.passed is False and "Stale date" in c.message
+
+
+def test_score_sanity_d3_inside_the_window_is_still_a_red(dashboard_s3, no_grace, monkeypatch):
+    # Only exactly D-2 is the honest gap state; older is real staleness even at 08:45.
+    from datetime import timedelta as _td
+
+    _freeze_pt(monkeypatch, 8, 45)
+    d3 = (_freeze_pt(monkeypatch, 8, 45) - _td(days=3)).strftime("%Y-%m-%d")
+    dashboard_s3(_dashboard(date=d3))
+    c = _by_name(qco.check_score_sanity())["dashboard:date"]
+    assert c.passed is False and "Stale date" in c.message
+
+
 def test_score_sanity_reds_a_missing_date(dashboard_s3, no_grace):
     dashboard_s3(_dashboard(date=""))
     c = _by_name(qco.check_score_sanity())["dashboard:date"]
