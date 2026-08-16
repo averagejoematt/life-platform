@@ -137,15 +137,25 @@ SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-act
 # arrive. _effective_ceiling now floors it with max() as a structural guard, but
 # keeping the pair coherent here means that floor never has to fire.
 _TEMP_CEILING_WINDOW = (date(2026, 8, 1), date(2026, 9, 1))  # [start, end)
-_TEMP_CEILING_USD = 115.0
-_TEMP_SURGE_CEILING_USD = 135.0
+# 2026-08-16 (#2734, second August amendment): $115/$135 → $200/$235. Measured
+# mid-month: mtd $93.65, projection $230.58 (171% of the $135 surge ceiling),
+# tier-1 the default state since Aug 5 and the sustained-7d alarm lit. Matthew's
+# explicit call (interactive session): accept the overrun, raise August only.
+# $200 keeps the tier ladder meaningful against the real projection (bands at
+# ≈$146/$174/$194) instead of pinning tier 3 for the back half of the month;
+# surge keeps the ~1.18 ratio. The window's END DATE IS UNCHANGED — September
+# still reverts to $85/$100 automatically, and the AWS Budgets backstop stays
+# at $85 so the overrun keeps signalling there.
+_TEMP_CEILING_USD = 200.0
+_TEMP_SURGE_CEILING_USD = 235.0
 # One sentence of WHY, carried in the breakdown payload so a public receipt can
 # explain its own raised ceiling instead of leaving the delta unattributed
 # (#1999). Reader-facing prose: no dollar figures (the payload carries those),
 # no operator jargon.
 _TEMP_CEILING_REASON = (
-    "A one-month raise Matthew approved on 2026-08-09 (ADR-133 amendment) so the reader-facing "
-    "AI and the coach chat stay on through August instead of pausing mid-month. It reverts on its own date."
+    "A one-month raise Matthew approved (2026-08-09, raised again 2026-08-16 against the measured "
+    "month-end projection — ADR-133 amendments) so the reader-facing AI and the coach chat stay on "
+    "through August instead of pausing mid-month. It reverts on its own date."
 )
 # An explicit MONTHLY_CEILING_USD in the environment is an operator override and
 # defeats the window entirely — otherwise setting the env var during July would
