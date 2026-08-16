@@ -255,37 +255,18 @@ def path_to_subpaths(d):
 
 
 def _seeded_frame_elems(seed):
-    """Deterministic ring + measuring ticks — the Python mirror of portraits.js
-    seededFrame() (same FNV seed, same geometry). Returned as stroked path 'd' strings."""
+    """The clean ring — the Python mirror of portraits.js seededFrame() v2 (#1114).
 
-    # mulberry32, matching sigils.js.
-    def mulberry32(a):
-        state = a & 0xFFFFFFFF
-
-        def rnd():
-            nonlocal state
-            state = (state + 0x6D2B79F5) & 0xFFFFFFFF
-            t = state
-            t = ((t ^ (t >> 15)) * (t | 1)) & 0xFFFFFFFF
-            t ^= (t + (((t ^ (t >> 7)) * (t | 61)) & 0xFFFFFFFF)) & 0xFFFFFFFF
-            t &= 0xFFFFFFFF
-            return ((t ^ (t >> 14)) & 0xFFFFFFFF) / 4294967296.0
-
-        return rnd
-
-    rnd = mulberry32(seed)
+    v1 mirrored the seeded ring + 6/8/12 radial measuring ticks; the ticks made
+    the frame read as a CLOCK at small sizes and died at the ADR-106 gate
+    (2026-08-16). The site's v2 adds a whisper ring in the coach accent; this
+    raster deliberately does NOT — the mono email stamp is single-ink and has no
+    accent channel, and a second ring in the same ink would just thicken the
+    frame. The `seed` parameter stays for signature stability (v2 is seedless)."""
+    del seed  # v2 frame is deterministic without it; kept for call-site stability
     C, CY, R = 50.0, 46.0, 42.0
-    tick_n = [6, 8, 12][seed % 3]
-    rot = rnd() * 360.0
-    elems = []
     # ring — approximate the circle with an arc pair
-    elems.append({"d": f"M{C - R},{CY} A{R},{R} 0 1 0 {C + R},{CY} A{R},{R} 0 1 0 {C - R},{CY} Z"})
-    for i in range(tick_n):
-        a = math.radians(rot + (360.0 / tick_n) * i)
-        x1, y1 = C + (R - 5) * math.cos(a), CY + (R - 5) * math.sin(a)
-        x2, y2 = C + R * math.cos(a), CY + R * math.sin(a)
-        elems.append({"d": f"M{x1},{y1} L{x2},{y2}"})
-    return elems
+    return [{"d": f"M{C - R},{CY} A{R},{R} 0 1 0 {C + R},{CY} A{R},{R} 0 1 0 {C - R},{CY} Z"}]
 
 
 def _hex(c):

@@ -28,7 +28,7 @@
   Every JS entry point here re-checks prefers-reduced-motion itself (a CSS
   @media guard alone cannot stop a running setInterval).
 */
-import { fnv1a, mulberry32, seedOf } from "/assets/js/sigils.js";
+import { fnv1a, seedOf } from "/assets/js/sigils.js";
 import { PORTRAITS, ALIASES } from "/assets/js/portrait_data.js";
 
 const reducedMotion = () => {
@@ -52,36 +52,39 @@ const DRAW_ORDER = [
 // while running, so the blink can still drive eyes-closed visible.
 const HIDDEN_AT_REST = { "eyes-closed": true, "mouth-a": true, "mouth-b": true };
 
-const STROKE = 'fill="none" stroke="currentColor" stroke-width="1.7" ' +
+// Size-aware ink weight (#1114 v2): 1.7 held at large sizes; at < 160px the same
+// weight reads as a mask over the face (the 2026-07-11 complaint's second half),
+// so small renders drop to 1.3. `vector-effect: non-scaling-stroke` is why the
+// number must change with size — the stroke does NOT thin as the box shrinks.
+const STROKE_W_LARGE = 1.7;
+const STROKE_W_SMALL = 1.3;
+const STROKE_SIZE_CUTOVER = 160;
+const strokeAttrs = (w) => `fill="none" stroke="currentColor" stroke-width="${w}" ` +
   'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"';
+const STROKE = strokeAttrs(STROKE_W_LARGE);
 
 // Colour tones a recipe's palette may define (fixed order → deterministic output).
 // `accent` defaults to the coach identity channel when the palette omits it.
 export const TONES = ["skin", "hair", "cloth", "accent", "blush", "line"];
 
-function pathEl(el) {
+function pathEl(el, sw) {
   if (el.tone) return `<path d="${escAttr(el.d)}" fill="var(--pt-${escAttr(el.tone)})" stroke="none"/>`;
   if (el.filled) return `<path d="${escAttr(el.d)}" fill="currentColor" stroke="none"/>`;
-  return `<path class="pt-stroke" d="${escAttr(el.d)}" ${STROKE} pathLength="1"/>`;
+  return `<path class="pt-stroke" d="${escAttr(el.d)}" ${sw === undefined ? STROKE : strokeAttrs(sw)} pathLength="1"/>`;
 }
 
-// The sigil-as-frame (§8.7): when the recipe has no `frame` layer of its own, a
-// deterministic ring + measuring-ticks behind the head — the coach's instrument
-// vocabulary carried into the portrait. Seeded exactly like sigil() so the frame
-// is stable per coach forever. Centred on the head (50,46), r 42.
-function seededFrame(seed) {
-  const rnd = mulberry32(seed);
+// The sigil-as-frame (§8.7, v2 — #1114, gated 2026-08-16): when the recipe has no
+// `frame` layer of its own, a clean ring behind the head plus a whisper ring in the
+// coach accent. v1 added 6/8/12 seeded radial "measuring ticks" — a circle with
+// twelve ticks IS a clock face, which is exactly the complaint that killed it at
+// the ADR-106 gate. The ring keeps the instrument idiom; the accent whisper is the
+// coach's colour signature. Twin: portrait_raster._seeded_frame_elems (ring only —
+// the mono ink raster has no accent channel, stated there).
+function seededFrame(seed, sw) {
   const C = 50, CY = 46, R = 42;
-  const tickN = [6, 8, 12][seed % 3];
-  const rot = rnd() * 360;
-  let out = `<circle class="pt-stroke" cx="${C}" cy="${CY}" r="${R}" ${STROKE} pathLength="1"/>`;
-  for (let i = 0; i < tickN; i++) {
-    const a = ((rot + (360 / tickN) * i) * Math.PI) / 180;
-    const x1 = r2(C + (R - 5) * Math.cos(a)), y1 = r2(CY + (R - 5) * Math.sin(a));
-    const x2 = r2(C + R * Math.cos(a)), y2 = r2(CY + R * Math.sin(a));
-    out += `<line class="pt-stroke" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="1.7" vector-effect="non-scaling-stroke" pathLength="1"/>`;
-  }
-  return out;
+  return `<circle class="pt-stroke" cx="${C}" cy="${CY}" r="${R}" ${strokeAttrs(sw)} pathLength="1"/>` +
+    `<circle cx="${C}" cy="${CY}" r="${R + 3}" fill="none" stroke="var(--pt-accent)" ` +
+    `stroke-width="0.8" vector-effect="non-scaling-stroke" opacity="0.45"/>`;
 }
 
 /*
@@ -101,10 +104,12 @@ export function renderPortrait(recipe, coach, { title, cls = "", size, state } =
   const blink = r2(4 + (seed % 4001) / 1000); // 4.00–8.00s, deterministic per coach
 
   const withFrame = size == null || size >= 40;
+  // Ink weight follows rendered size (#1114 v2): no size hint = the large weight.
+  const sw = size != null && size < STROKE_SIZE_CUTOVER ? STROKE_W_SMALL : STROKE_W_LARGE;
   let body = "";
   if (withFrame) {
     body += `<g class="pt-l pt-frame" data-l="frame">` +
-      (recipe.layers.frame ? recipe.layers.frame.map(pathEl).join("") : seededFrame(seed)) +
+      (recipe.layers.frame ? recipe.layers.frame.map((e) => pathEl(e, sw)).join("") : seededFrame(seed, sw)) +
       `</g>`;
   }
   let inner = "";
@@ -112,7 +117,7 @@ export function renderPortrait(recipe, coach, { title, cls = "", size, state } =
     const elems = recipe.layers[lid];
     if (!elems || !elems.length) continue;
     const hide = HIDDEN_AT_REST[lid] ? ' style="opacity:0"' : "";
-    inner += `<g class="pt-l pt-${lid}" data-l="${lid}"${hide}>${elems.map(pathEl).join("")}</g>`;
+    inner += `<g class="pt-l pt-${lid}" data-l="${lid}"${hide}>${elems.map((e) => pathEl(e, sw)).join("")}</g>`;
   }
   body += `<g class="pt-breath">${inner}</g>`;
 
