@@ -103,6 +103,7 @@ class MonitoringStack(Stack):
             ext_stat=None,
             to_digest=False,
             evaluation_periods=1,
+            treat_missing=None,  # #2754: pass BREACHING for zero-emission metrics (Invocations of a dead cron)
         ):
             # #1927: `evaluation_periods` defaults to 1, so every existing caller is
             # unchanged. It exists for alarms whose whole point is DURATION — a
@@ -132,7 +133,7 @@ class MonitoringStack(Stack):
                 datapoints_to_alarm=evaluation_periods if evaluation_periods > 1 else None,
                 threshold=threshold,
                 comparison_operator=operator,
-                treat_missing_data=NB,
+                treat_missing_data=treat_missing or NB,
             )
             a.add_alarm_action(cw_actions.SnsAction(digest if to_digest else topic))
             return a
@@ -566,6 +567,7 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #2754: zero invocations emit NO datapoint — NB could never fire. BREACHING; SET guard: test_no_invocation_alarms_2754.
         _alarm(
             "DailyBriefNoInvocations",
             "daily-brief-no-invocations-24h",
@@ -576,6 +578,7 @@ class MonitoringStack(Stack):
             1,
             LT,
             {"FunctionName": "daily-brief"},
+            treat_missing=cloudwatch.TreatMissingData.BREACHING,
         )
 
         _alarm(
@@ -765,6 +768,7 @@ class MonitoringStack(Stack):
             LT,
             {"FunctionName": "daily-debrief"},
             to_digest=True,
+            treat_missing=cloudwatch.TreatMissingData.BREACHING,  # #2754 — see daily-brief above
         )
 
         # AI token budget alarms — consolidated 2026-03-10 (COST-A)
@@ -1052,12 +1056,9 @@ class MonitoringStack(Stack):
         )
         bc_scrub_alarm.add_alarm_action(cw_actions.SnsAction(digest))
 
-        # #2763: the expert analyzer's grounding gate failed to RUN and used to
-        # publish UNGATED text; it now HOLDS and logs this token. Nothing wrong
-        # is being served when this fires — but reader analyses stopped
-        # refreshing, and silence must not be the only tell (the #2654 shape).
-        # Token must equal the literal in ai_expert_analyzer_lambda (twin-pinned
-        # by tests/test_analyzer_gate_all_paths_2421.py).
+        # #2763: the analyzer's gate-INFRA arm HOLDS and logs this token (nothing
+        # wrong served; analyses stopped refreshing — the #2654 silence shape).
+        # Token twin-pinned to the lambda literal by test_analyzer_gate_all_paths_2421.
         gi_lg = logs.LogGroup.from_log_group_name(self, "GateInfraLgExpert", "/aws/lambda/ai-expert-analyzer")
         gi_mf = logs.MetricFilter(
             self,
