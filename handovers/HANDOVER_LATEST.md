@@ -39,6 +39,29 @@ proof are the day-session's first pick.
 
 ---
 
+## MORNING CONTINUATION (2026-08-16 ~07:00–08:30 PT, same session) — every morning step above is DONE
+
+- **All four in-flight PRs merged:** #2777 (→ #2754 CLOSED with `describe-alarms` evidence: both
+  `no-invocations` alarms live at `TreatMissingData: breaching`), #2779, #2776 (→ #2705 CLOSED),
+  #2778 (→ #2762 CLOSED). #2763's deploy-leg evidence appended (alarm exists, INSUFFICIENT_DATA
+  — correct for a never-matched filter).
+- **`cdk deploy LifePlatformMonitoring` ran clean** (55s — first real use of the wrapper's pinned
+  venv); ONE deploy carried #2754's two alarms AND #2763's `expert-gate-infra-hold` filter.
+- **Lease board settled:** `d223e2dd` approved after ancestry check (8.3h parked, #1901 class)
+  → deployed GREEN end-to-end; `bf97c56c` + `c17c5bf8` rejected stale with reasons;
+  tip run at `91b471a4` approved at HEAD → **main GREEN at `91b471a4`**, nothing waiting.
+- **Scar addendum:** PR #2778's branch was a THIRD carrier of the overnight conflict-marker
+  incident (missed in the overnight repair; CI collection caught it at `site_api_common.py:152`).
+  Repaired twice with the restore-and-regenerate recipe (it re-conflicted on doc literals after
+  #2776's squash). Also: a repair loop ran against `main` as a silent no-op because both branch
+  checkouts failed (branches held by worktrees) — main was clean so harmless, but "PUSHED" lines
+  lied; repairs must run INSIDE the holding worktree.
+- **Residual queue is unchanged below** except: the "#2777/#2776/#2778/#2779 merges + Monitoring
+  deploy" pick is DONE; next picks are #2735/#2670 (coherence-overall OK window ~18:45Z),
+  #2668 run 1-of-3 (today's 17:00Z brief), then #2761 boxes 2–3 / #2758 / Blocks 4–5.
+
+---
+
 ## Shipped and LIVE (merged + deployed + probed)
 
 | # | What | Live evidence |
