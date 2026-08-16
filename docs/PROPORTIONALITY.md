@@ -1,6 +1,6 @@
 # The Proportionality Ledger — does this complexity earn its keep?
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-09
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-16
 
 > **The maintained home of the complexity-posture ledger** (ADR-103 established it;
 > ADR-144 made it legible and moved it here). Consult BEFORE adding or removing
@@ -42,6 +42,11 @@ standing subsystem names what it costs, what it earns, and what would demote it.
 |---|---|---|---|
 | Phase machinery (ADR-077 taxonomy + restart pipeline) | Load-bearing | mind, CI | The experiment's reset semantics; coverage-asserted. 11 cycles of worked use |
 | Coherence sentinel + canonical-facts contracts | Load-bearing | CI, attention | The honesty moat's enforcement layer (ADR-104/105) |
+| Permanence archive (nightly public snapshot + continuity switch, #2572) | Load-bearing | S3 (~GBs), one nightly writer | The stolen-laptop/continuity contract in writing — the site survives its operator. Demote: if the nightly writer fails silently >7d with no alarm catching it, the machinery is theater — alarm it or fold it |
+| Coach voice notes (Telegram sendVoice, #2552) | Experiment | Google TTS $ per note, budget-gated | Persona texture measured against real chat use. Demote: if <1 voice note/week is actually played by the owner over a month, retire the path |
+| Outbound initiative pings (celebration + soft-concern, #2527) | Experiment | Bedrock $ within the 2/day outbound cap | The coaches text FIRST when the data moves — the #2490 priority ladder bounds volume. Demote: if the owner mutes/ignores >50% over a month, the initiative reads as notification spam and the classes retire |
+| Gate census + can-it-fail proofs (epic #2578) | Load-bearing | CI seconds, session attention | 425 declared gates with measured error bars; the week's cannot-fail finds (#2746, #2754) came from it. Demote trigger: census derivation cost exceeding one CI minute, or two consecutive sessions with zero acted-on findings |
+| expert-gate-infra-hold alarm (MetricFilter, #2763) | Watcher | CloudWatch ~$0, attention when red | Pages when the analyzer's grounding gate cannot RUN and holds (reader analyses stop refreshing; nothing wrong is served). Fire-proof: the twin-pinned filter literal. Demote: fold into a consolidated AI-hold alarm if a second hold class ships |
 | between-chronicle scrub-failed alarm (MetricFilter + `between-chronicle-scrub-failed-closed`, #2654) | Watcher | CloudWatch (~$0), attention when red | Pages when the outbound privacy scrub fails CLOSED (nothing leaked; the digest went dark and silence must not be the only tell). Filter fire-proof recorded on #2654. Demote: if the fail-closed abort never fires in 12 months AND the vocabulary channel gains its own end-to-end canary, fold into the canary's alarm |
 | 8-coach board + stance engine + orchestrator | Load-bearing | $, mind | The COACHING pillar — the product |
 | Coach feedback loop (nudges #1382, docket #1386, dossier #1387, review pack #1698, calibration ADR-141) | Load-bearing | $, attention | The coaching layer's learning loop; first real-data cycle starts 2026-07-27 — findings-empty rule applies from Q4 |
