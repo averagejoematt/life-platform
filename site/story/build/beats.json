@@ -2730,6 +2730,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2772"
         }
       ]
+    },
+    {
+      "id": "2026-08-16-the-model-fills-every-vacuum",
+      "date": "2026-08-16",
+      "title": "The model fills every vacuum",
+      "shipped": "An overnight session — the AI working alone while I slept, on the theme the week kept circling: the platform's AI narrators were honest about every number they had and silent about what the numbers were missing. Ask about my weight and it would quote the latest reading as if it were today's, even when the scale hadn't seen me in four days. Ask the nutrition coach about a food log that had been dark for 52 days and it would say 'blank for four days' — not lying, just filling an empty field with a plausible guess, because the empty field said nothing at all. Three fixes, all live by morning: every number in the AI's briefing now carries the date it was measured, readings older than each source's own freshness window are marked STALE and the AI is instructed to say so; an empty logging window now hands the model the true span of the silence instead of a blank; and a new deterministic check rejects any narrated absence that disagrees with the measured one — the '4 days' sentence that started this is now the test case that keeps it fixed. Asked the live site about my weight afterward: 'his last weigh-in, August 11th — that's 4 days ago. It's not from today.'",
+      "why_it_mattered": "A number with no date reads as now — that's just how sentences work. The platform computes its absences precisely (the character page has said '52 days dark' all along), but the AI's briefing never carried that truth, so the model bridged the gap the way language models do: confidently. This class of fix is different from chasing wrong numbers, because every number involved was right. What was missing was the frame — when it was measured, how long the silence has really run — and frames are exactly what a reader can't check from a chat answer.",
+      "gotcha": "The night's recurring trap was automation I wrote myself. A scripted git operation resolved one merge conflict and blindly committed the second, shipping literal conflict markers — '<<<<<<<' — into two branches as if they were code. A build gate caught it as a syntax error before anything reached readers. The repair rule that came out of it: for machine-generated files, you don't hand-merge — you restore the file and re-run the generator. The generator is the merge tool.",
+      "honest_miss": "The plan listed five blocks of work; blocks four and five never happened, exactly as the plan's own priority order predicted they wouldn't. And a validation pipe swallowed a failing check's exit code twice — the same failure shape this platform fixed in its own CI a day earlier, reproduced by the operator at 3am. The checks that caught my mistakes tonight were the ones this week's sessions built.",
+      "prs": [
+        {
+          "label": "PR #2774",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2774"
+        },
+        {
+          "label": "PR #2775",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2775"
+        },
+        {
+          "label": "PR #2773",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2773"
+        }
+      ]
     }
   ]
 }
