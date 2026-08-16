@@ -679,6 +679,60 @@ def _span_to_days(n_token: str, unit_token: str):
     return n * _SPAN_UNIT_DAYS.get((unit_token or "").strip().lower(), 1)
 
 
+def absence_span_findings(text: str, *, known_absence_days: dict = None) -> list:
+    """#2756: a narrated ABSENCE span must match the measured one.
+
+    Live case: the nutrition coach said MacroFactor had "been blank for four
+    days" while the platform's own absence derivation said 52 — the fact pack
+    carried None for an empty window and the model filled the vacuum. The span
+    gate above could not catch it (4 < elapsed is a legal span); this class can,
+    because the caller HANDS IT the measured truth.
+
+    `known_absence_days` maps a category label to the measured dark-day count
+    (e.g. {"food": 52}). A sentence that talks about absence (blank/dark/quiet/
+    no logs/hasn't logged) and states a day-span differing from the measured
+    value by more than 1 day is a finding. Precision-first: sentences without
+    absence vocabulary are never touched, and a ±1 tolerance absorbs the
+    end-of-day boundary. Findings use the shared {"type", "detail"} shape.
+    """
+    if not text or not known_absence_days:
+        return []
+    findings = []
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    word_nums = "|".join(_WORD_NUMBERS)
+    span_re = re.compile(rf"\b(\d{{1,4}}|{word_nums})[-\s]day(?:s)?\b|\b(\d{{1,4}}|{word_nums})\s+days?\b", re.IGNORECASE)
+    absent_re = re.compile(
+        r"blank|dark|quiet|silen|no (?:food )?log|hasn'?t (?:been )?logg|nothing (?:has been )?logged|without (?:a )?(?:single )?log|unlogged",
+        re.IGNORECASE,
+    )
+    for cat, true_days in known_absence_days.items():
+        if true_days is None:
+            continue
+        for sent in sentences:
+            if not absent_re.search(sent):
+                continue
+            for m in span_re.finditer(sent):
+                raw = (m.group(1) or m.group(2) or "").lower()
+                n = _WORD_NUMBERS.get(raw) if raw in _WORD_NUMBERS else (int(raw) if raw.isdigit() else None)
+                if n is None or n == 0:
+                    continue
+                if abs(n - int(true_days)) > 1:
+                    findings.append(
+                        {
+                            "type": "absence_span",
+                            "category": cat,
+                            "claimed_days": n,
+                            "true_days": int(true_days),
+                            "detail": (
+                                f"the narrative states a {n}-day {cat} absence, but the measured span is "
+                                f"{int(true_days)} day(s) dark — an understated absence reads as a smaller "
+                                f"lapse than the record shows (#2756)"
+                            ),
+                        }
+                    )
+    return findings
+
+
 def experiment_span_findings(text: str, *, generation_date_iso: str, start_date_iso: str) -> list:
     """Deterministic check on claimed experiment AGE, digits or words (#1897).
 
@@ -965,6 +1019,7 @@ def grounding_findings(
     start_date_iso: str = None,
     weight_tolerance_lbs: float = 1.0,
     available_logs=None,
+    known_absence_days=None,
     evaluated_predictions=None,
     nightly_vitals=None,
     number_tolerance: float = NUMBER_TOLERANCE_TOLERANT,
@@ -1043,6 +1098,10 @@ def grounding_findings(
         findings.extend(experiment_span_findings(text, generation_date_iso=generation_date_iso, start_date_iso=start_date_iso))
     if available_logs is not None:
         findings.extend(ungrounded_behavioral_findings(text, available_logs=available_logs))
+    if known_absence_days:
+        # #2756: narrated absence spans must match the measured span; armed only
+        # when the caller hands the truth in (same optional-param discipline).
+        findings.extend(absence_span_findings(text, known_absence_days=known_absence_days))
     if evaluated_predictions is not None:
         findings.extend(self_graded_verdict_findings(text, evaluated_predictions=evaluated_predictions))
     if nightly_vitals is not None:

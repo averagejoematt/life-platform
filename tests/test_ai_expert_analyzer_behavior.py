@@ -487,7 +487,11 @@ class TestMindSnapshot:
 class TestNutritionSnapshot:
     def test_an_empty_store_is_honest_absence_with_no_fabricated_averages(self, table):
         data = az.gather_data_for_expert("nutrition")
-        assert data["note"] == "No nutrition data available"
+        # #2756: the note now names the TRUE absence state instead of the bare
+        # "no data" that left a vacuum the model filled with a guessed span.
+        assert data["note"].startswith("No nutrition data in the last 30 days.")
+        assert data["absence_transition"] == "never_logged"
+        assert data["absence_days_dark"] is None
         assert data["days_since_last_food_log"] is None and data["food_logs_last_14d"] == 0
         assert "avg_calories" not in data
 
