@@ -144,6 +144,29 @@ def latest_completed_run(runs: list[dict], rejected_ids: object = None) -> dict 
     return None
 
 
+def head_coverage(runs: list[dict], head_sha: str | None) -> dict:
+    """#2762: does ANY run vouch for main's actual HEAD? Pure.
+
+    The swallowed-push shape: a push to main that mints ZERO workflow runs (the
+    #2662 class) leaves the newest completed run pointing at an OLDER sha, and
+    the completed-run verdict vouches green for a HEAD it never saw. States:
+
+      covered   — a completed, non-cancelled run exists AT head_sha
+      pending   — run(s) exist at head_sha but none completed yet (normal post-merge)
+      uncovered — NO run of any status references head_sha: the swallowed push
+      unknown   — head_sha unavailable (caller could not read the remote branch)
+    """
+    if not head_sha:
+        return {"state": "unknown", "pending": None}
+    at_head = [r for r in runs if (r.get("headSha") or "") == head_sha]
+    done = [r for r in at_head if r.get("status") == "completed" and r.get("conclusion") != "cancelled"]
+    if done:
+        return {"state": "covered", "pending": None}
+    if at_head:
+        return {"state": "pending", "pending": at_head[0]}
+    return {"state": "uncovered", "pending": None}
+
+
 def latest_main_conclusion(runs: list[dict]) -> tuple[str | None, str | None]:
     """(conclusion, headSha) of the newest non-cancelled completed run.
 
@@ -397,6 +420,18 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
         )
     elif kind == GREEN:
         lines.append(f"✅ main GREEN — latest completed CI/CD run ({sha8}) succeeded.")
+        cov = (state.get("head_cov") or {}).get("state")
+        head8 = (state.get("head_sha") or "")[:8]
+        if cov == "uncovered":
+            lines.append(
+                f"🛑 …but that vouches ONLY for {sha8}: main's HEAD is {head8} and NO CI/CD run of any status\n"
+                "   references it — the swallowed-push shape (#2762). Re-push or workflow_dispatch ci-cd.yml so\n"
+                "   HEAD earns its own verdict; a green over an unwatched HEAD is not green."
+            )
+        elif cov == "pending":
+            lines.append(f"ℹ️  HEAD {head8} has its run in flight — the green above vouches for {sha8} until it completes.")
+        elif cov == "unknown" and state.get("head_sha_error"):
+            lines.append(f"⚠️  could not read main's HEAD from the API ({state.get('head_sha_error')}) — HEAD coverage unverified.")
     elif kind == NO_VERDICT:
         lines.append("⚠️  no completed non-cancelled CI/CD run found on main — wait for the in-flight run or decode manually.")
     else:
@@ -421,7 +456,8 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
             f"becomes the #1901 stranded class at {STRANDED_WAIT_HOURS:g}h — action it via deploy/approve_deployment.sh)."
         )
 
-    return (0 if kind == GREEN else 1), "\n".join(lines)
+    green_ok = kind == GREEN and (state.get("head_cov") or {}).get("state") != "uncovered"
+    return (0 if green_ok else 1), "\n".join(lines)
 
 
 REPO = "averagejoematt/life-platform"
@@ -489,6 +525,14 @@ def main() -> int:
         )
 
     state = classify_pipeline(runs, latest_failure_jobs=jobs, deploy_wedge=wedge, rejected=rejected)
+    # #2762: the verdict must vouch for the sha main actually points at — read the
+    # REMOTE head (never the local checkout, which may be stale or on a branch).
+    try:
+        state["head_sha"] = _gh_json(["api", f"repos/{REPO}/branches/main"])["commit"]["sha"]
+    except Exception as e:  # noqa: BLE001 — fail-soft: coverage unverified, never a hard error
+        state["head_sha"] = None
+        state["head_sha_error"] = str(e)[:80]
+    state["head_cov"] = head_coverage(runs, state["head_sha"])
     code, message = render(state)
     print(message)
     if code == 0:
