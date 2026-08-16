@@ -51,8 +51,10 @@ proof are the day-session's first pick.
 
 ## In flight at close (all green-lane-pending, zero conflicts)
 
-- **PR #2777** (#2754 BREACHING alarms + SET guard, mutation-proved) — a merge-waiter was
-  armed at close; **on merge: `bash deploy/cdk_deploy.sh LifePlatformMonitoring`** (the
+- **PR #2777** (#2754 BREACHING alarms + SET guard, mutation-proved) — its rebased lane
+  red twice at close on size-guard arithmetic the rebase inherited; PAID in-file both
+  times (file at exactly 1382 == baseline, guards verified green pre-push, `9ec34bab`);
+  lane pending at close. **On merge: `bash deploy/cdk_deploy.sh LifePlatformMonitoring`** (the
   wrapper now builds its own pinned venv) — ONE deploy carries #2754's two alarms AND
   #2763's `expert-gate-infra-hold` filter; then `describe-alarms` evidence onto both issues.
 - **PR #2776** (#2705 read-path: coverage-gap ≠ no-match) — closes #2705 on merge; the
