@@ -161,7 +161,9 @@ def test_the_context_keeps_the_two_metrics_in_different_fields():
     assert CTX["recovery_pct"] != CTX["pillars"]["metabolic"]["raw_score"]
     import inspect
 
-    src = inspect.getsource(ai)
+    from web import site_api_ai_context as _ctxmod  # #2667: the mapping lives in the extracted sibling
+
+    src = inspect.getsource(_ctxmod)
     assert '("recovery_score", "recovery_pct")' in src, "recovery_pct no longer maps from Whoop's recovery_score"
     assert 'pd = rec.get(f"pillar_{p}", {})' in src, "pillar scores no longer come from the character sheet"
 
@@ -171,7 +173,9 @@ def test_the_short_form_context_line_is_labelled_too(monkeypatch):
     monkeypatch.setattr(ai, "_ask_fetch_context", lambda *a, **k: dict(CTX))
     import inspect
 
-    src = inspect.getsource(ai)
+    from web import site_api_ai_context as _ctxmod  # #2667: the mapping lives in the extracted sibling
+
+    src = inspect.getsource(_ctxmod)
     assert "f\"whoop recovery score: {ctx['recovery_pct']:.0f}%\"" in src or "whoop recovery score" in src
     assert not re.search(r'f"recovery: \{ctx\[.recovery_pct.\]', src), "the bare short-form label is back"
 

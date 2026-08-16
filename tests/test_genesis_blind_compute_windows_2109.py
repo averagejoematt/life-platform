@@ -95,11 +95,18 @@ import daily_insight_compute_lambda as insight  # noqa: E402
 import daily_metrics_compute_lambda as metrics  # noqa: E402
 import dashboard_refresh_lambda as dashboard  # noqa: E402
 import forecast_engine_lambda as forecast  # noqa: E402
-import site_api_ai_lambda as site_ai  # noqa: E402
 from experiment import phase_taxonomy as tax  # noqa: E402
 from experiment.phase_filter import source_reads_cross_phase  # noqa: E402
 from intelligence import intelligence_common as ic  # noqa: E402
 from test_genesis_blind_reads_2080_2081 import PhaseAwareFakeTable, _rows  # noqa: E402
+
+# #2667: the recency layer (incl. _latest_item + its phase-filter usage) moved to the
+# extracted context sibling; runtime calls still route via the lambda's re-export, but
+# module-global patches and source derivations must target where the code now lives.
+from web import (
+    site_api_ai_context as site_ctx,  # noqa: E402
+    site_api_ai_lambda as site_ai,
+)  # noqa: E402  (#2667: canonical package form — the context sibling resolves `web.site_api_ai_lambda`, and a bare-name twin would take the patches while the code reads the canonical instance)
 
 # Pinned clock. _GENESIS == _TODAY is "the reset happened this morning" — the worst case
 # for this defect, and the one cycle 12 actually shipped (a same-day genesis).
@@ -199,7 +206,7 @@ def pre_fix(monkeypatch):
     read takes a literal `include_pilot=True` rather than the derivation, so its revert
     is a `with_phase_filter` that ignores the flag.
     """
-    for module in (insight, metrics, dashboard, forecast, site_ai, ic):
+    for module in (insight, metrics, dashboard, forecast, site_ctx, ic):
         monkeypatch.setattr(module, "source_reads_cross_phase", lambda source: False)
     real_filter = brief.with_phase_filter
     monkeypatch.setattr(brief, "with_phase_filter", lambda kwargs, include_pilot=False: real_filter(kwargs))
@@ -476,7 +483,7 @@ _MODULE_PATHS = {
     "metrics": REPO_ROOT / "lambdas" / "compute" / "daily_metrics_compute_lambda.py",
     "dashboard": REPO_ROOT / "lambdas" / "compute" / "dashboard_refresh_lambda.py",
     "forecast": REPO_ROOT / "lambdas" / "compute" / "forecast_engine_lambda.py",
-    "site_ai": REPO_ROOT / "lambdas" / "web" / "site_api_ai_lambda.py",
+    "site_ai": REPO_ROOT / "lambdas" / "web" / "site_api_ai_context.py",  # #2667: the reader moved here
     "inventory": REPO_ROOT / "lambdas" / "intelligence" / "intelligence_common.py",
 }
 
@@ -496,8 +503,27 @@ def _literal_sources_read_by(module_key: str, *func_names: str) -> set[str]:
     call site added later is covered without editing this file)."""
     found: set[str] = set()
     tree = ast.parse(_MODULE_PATHS[module_key].read_text())
+
+    def _names_reader(func) -> bool:
+        # Direct call: _latest_item("withings")
+        if isinstance(func, ast.Name) and func.id in func_names:
+            return True
+        # #2667 seam idiom: _hook("_latest_item")("withings") — the context sibling
+        # routes intra-layer calls through the lambda namespace so the behavior
+        # suite's single patch surface still governs them; the derivation must
+        # follow the reader through that indirection or it silently matches
+        # nothing and every guard here goes vacuous.
+        return (
+            isinstance(func, ast.Call)
+            and isinstance(func.func, ast.Name)
+            and func.func.id == "_hook"
+            and func.args
+            and isinstance(func.args[0], ast.Constant)
+            and func.args[0].value in func_names
+        )
+
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name) or node.func.id not in func_names:
+        if not isinstance(node, ast.Call) or not _names_reader(node.func):
             continue
         if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
             found.add(node.args[0].value)

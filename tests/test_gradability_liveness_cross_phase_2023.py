@@ -462,7 +462,7 @@ _PER_SOURCE_READS: dict[str, str] = {
         "is RAW_TIMESERIES or CROSS_PHASE today, and a scoped one added later keeps its "
         "filter without anyone remembering to ask (#2109)."
     ),
-    "lambdas/web/site_api_ai_lambda.py::_latest_item": (
+    "lambdas/web/site_api_ai_context.py::_latest_item": (  # moved by the #2667 extraction
         "Same shared derivation (#2109): withings/whoop recency reads go cross-phase, while "
         "computed_metrics / computed_insights / adaptive_mode stay current-cycle."
     ),

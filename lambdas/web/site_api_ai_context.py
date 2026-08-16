@@ -28,13 +28,19 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 / #946 / #2109
 
-from web.site_api_common import PT, USER_PREFIX, _decimal_to_float
+from web.site_api_common import PT, _decimal_to_float
+
+# Defined in-module (not imported) so the #2023 phase-read derivation's constant
+# resolver can see the #SOURCE# pattern this module's reads interpolate.
+USER_ID = os.environ.get("USER_ID", "matthew")
+USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 logger = logging.getLogger(__name__)
 
@@ -433,12 +439,15 @@ def _board_facts_block(ctx: dict = None) -> str:
     SAME brief the prompt was built from, not a second, possibly-different read.
     """
     if ctx is None:
-        ctx = _ask_fetch_context()
+        ctx = _hook("_ask_fetch_context")()
     # #2667: every dated line carries its own as-of annotation — a coach citing a
     # five-day-old weigh-in as today's is the exact ADR-104 violation this closes.
-    _asof = ctx.get("as_of") or {}
-    _w_ann = age_annotation(_asof.get("weight"), "withings")
-    _v_ann = age_annotation(_asof.get("vitals"), "whoop")
+    # A ctx WITHOUT an "as_of" map (hand-built fixtures, degraded assemblies)
+    # renders annotation-free — the legacy shape stays legal; only a populated
+    # map turns dating on, and then a missing entry honestly reads unknown-age.
+    _asof = ctx.get("as_of")
+    _w_ann = age_annotation(_asof.get("weight"), "withings") if _asof is not None else ""
+    _v_ann = age_annotation(_asof.get("vitals"), "whoop") if _asof is not None else ""
     lines = []
     if ctx.get("weight_lbs") is not None:
         lines.append(f"weight: {ctx['weight_lbs']:.1f} lb{_w_ann}")

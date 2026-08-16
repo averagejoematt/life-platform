@@ -33,7 +33,9 @@ from web import (
 )
 from web.site_api_common import PT  # noqa: E402
 
-TODAY = datetime.now(PT).strftime("%Y-%m-%d")
+
+def _today() -> str:
+    return datetime.now(PT).strftime("%Y-%m-%d")
 
 
 def _days_ago(n: int) -> str:
@@ -44,7 +46,7 @@ def _days_ago(n: int) -> str:
 
 
 def test_same_day_reading_gets_no_annotation():
-    assert ctxmod.age_annotation(TODAY, "withings") == ""
+    assert ctxmod.age_annotation(_today(), "withings") == ""
 
 
 def test_recent_but_not_today_names_its_date():
@@ -127,14 +129,14 @@ def test_ask_prompt_dates_every_dated_metric_line():
 
 
 def test_ask_prompt_marks_a_stale_vitals_read_stale():
-    prompt = ai._ask_build_prompt(_ctx(TODAY, _days_ago(4)))  # whoop 96h > 48h
+    prompt = ai._ask_build_prompt(_ctx(_today(), _days_ago(4)))  # whoop 96h > 48h
     hrv_line = next(line for line in prompt.split("\n") if line.strip().startswith("HRV:"))
     assert "STALE" in hrv_line and "NOT current" in hrv_line
 
 
 def test_board_facts_block_dates_through_the_same_renderer():
     d_w = _days_ago(8)  # withings stale
-    block = ctxmod._board_facts_block(_ctx(d_w, TODAY))
+    block = ctxmod._board_facts_block(_ctx(d_w, _today()))
     assert f"as of {d_w}" in block and "STALE" in block
     assert "whoop recovery score: 55%" in block or "whoop recovery score: 55" in block
     # fresh vitals stay annotation-free — honesty is signal, not decoration
@@ -142,5 +144,5 @@ def test_board_facts_block_dates_through_the_same_renderer():
 
 
 def test_fresh_everything_renders_clean():
-    block = ctxmod._board_facts_block(_ctx(TODAY, TODAY))
+    block = ctxmod._board_facts_block(_ctx(_today(), _today()))
     assert "as of" not in block and "STALE" not in block

@@ -462,9 +462,9 @@ def _ask_build_prompt(ctx: dict) -> str:
     archive_section = ctx.get("archive_block") or ""  # #2348: "" ⇒ the prompt is byte-identical to the pre-retrieval one
     # #2667: every dated metric line carries its as-of annotation from the ONE
     # renderer in the context sibling — undated lines were narrated as today's.
-    _asof = ctx.get("as_of") or {}
-    _w_ann = _age_annotation(_asof.get("weight"), "withings")
-    _v_ann = _age_annotation(_asof.get("vitals"), "whoop")
+    _asof = ctx.get("as_of")  # absent map (legacy/fixture ctx) -> annotation-free
+    _w_ann = _age_annotation(_asof.get("weight"), "withings") if _asof is not None else ""
+    _v_ann = _age_annotation(_asof.get("vitals"), "whoop") if _asof is not None else ""
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking \
 {_LIVE_SOURCE_COUNT} live data sources ({_PAUSED_SOURCE_COUNT} paused).
 
