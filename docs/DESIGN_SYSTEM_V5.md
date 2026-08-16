@@ -378,6 +378,12 @@ procedure in `docs/design/PORTRAIT_RUNBOOK.md`):
   base + one hyper-distinctive feature + the silhouette litmus). Rendered by
   `portraits.js portrait(c)` with the **`portrait(c) || sigil(c)` fallback chain** — an
   uncommissioned coach renders exactly as today, forever.
+- **The sigil-as-frame is v2 (#1114, gated 2026-08-16):** a clean ring plus a whisper ring in
+  the coach accent behind the head. v1's seeded 6/8/12 radial measuring-ticks read as a **clock**
+  at 96px and were retired at the gate; ink weight is now size-aware (1.7 at ≥160px rendered,
+  1.3 below — the non-scaling stroke otherwise reads as a **mask** on small renders). Twin
+  raster: `portrait_raster._seeded_frame_elems` (ring only; the mono ink stamp has no accent
+  channel).
 - **Human curation is mandatory**: Matthew approves a **contact sheet** (batch side-by-side,
   light + dark, 40/56/96 px) before anything ships. Kill criterion: 2 failed revision rounds →
   that coach stays sigil-only. Provenance (`_meta`: model/prompt/date/sign-off) required in every
