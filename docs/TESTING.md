@@ -17,15 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 **Total tests:** 15545 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
-=======
-**Total tests:** 15545 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
->>>>>>> e788f4c94 (fix(ai): the archive query tells an unindexed installment from a nonexistent one (#2705))
-=======
-**Total tests:** 15545 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
->>>>>>> 8a85b874f (chore(docs): regenerate literals post-rebase)
 
 ---
 

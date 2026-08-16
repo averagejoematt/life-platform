@@ -145,15 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-<<<<<<< HEAD
-<<<<<<< HEAD
     "test_count": 15545,
-=======
-    "test_count": 15519,
->>>>>>> e788f4c94 (fix(ai): the archive query tells an unindexed installment from a nonexistent one (#2705))
-=======
-    "test_count": 15533,
->>>>>>> 8a85b874f (chore(docs): regenerate literals post-rebase)
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
