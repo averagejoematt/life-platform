@@ -55,7 +55,7 @@ caused #814):
 
 ```bash
 cd cdk
-npm install -g aws-cdk@2.1129.0   # match the pin in .github/workflows/ci-cd.yml
+npm install -g aws-cdk@2.1135.1   # match the pin in .github/workflows/ci-cd.yml
 pip install -r requirements.txt   # aws-cdk-lib/constructs pinned exactly — see comments in that file
 cdk bootstrap aws://205930651321/us-west-2   # one-time per account
 ```
