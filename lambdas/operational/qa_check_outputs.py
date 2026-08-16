@@ -42,6 +42,25 @@ def _yesterday_str():
     return (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
+def _two_days_ago_str():
+    from common.pacific_time import pacific_now
+
+    return (pacific_now() - timedelta(days=2)).strftime("%Y-%m-%d")
+
+
+# daily-metrics-compute cron is 16:40Z / 09:40 PT (compute_stack.py, ADR-052);
+# 10:30 PT = compute end + slack, safely before the 11:30 PT scheduled sweep.
+_COMPUTE_CUTOFF_PT_HOUR, _COMPUTE_CUTOFF_PT_MINUTE = 10, 30
+
+
+def _before_compute_window():
+    """True before 10:30 PT — the window where the dashboard honestly carries D-2 (#2670)."""
+    from common.pacific_time import pacific_now
+
+    now = pacific_now()
+    return (now.hour, now.minute) < (_COMPUTE_CUTOFF_PT_HOUR, _COMPUTE_CUTOFF_PT_MINUTE)
+
+
 # ---------------------------------------------------------------------------
 # CHECK 2 — S3 output freshness
 # ---------------------------------------------------------------------------
@@ -128,6 +147,15 @@ def check_score_sanity():
         # AHEAD of expected (e.g. a manual pre-genesis regen computed "today"
         # early) is never data loss; self-heals at the next scheduled brief.
         c.warn(f"Dashboard dated {actual_date}, ahead of expected {expected_date} — pre-start/Day-1 regen artifact, self-heals")
+    elif actual_date == _two_days_ago_str() and _before_compute_window():
+        # #2670: daily-metrics-compute stamps PT-yesterday at 09:40 PT (compute
+        # stack cron 16:40Z, ADR-052). Before that lands, D-2 is the HONEST latest
+        # date — an off-schedule sweep (CI post-deploy smoke ran 08:45 PT
+        # 2026-08-16) must not read the gap as staleness and inject a FAIL that
+        # saturates qa-smoke-failures for a rolling 24h. The 11:30 PT scheduled
+        # sweep sits after the cutoff and still enforces D-1 strictly, so a
+        # genuinely broken compute is caught the same day it breaks.
+        c.ok(f"Date = {actual_date} (D-2, pre-compute morning window — compute stamps {expected_date} at 09:40 PT)")
     elif actual_date:
         c.fail(f"Stale date — expected {expected_date}, got {actual_date}")
     else:
