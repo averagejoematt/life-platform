@@ -81,6 +81,18 @@ _BANNED_OPENERS = [
     re.compile(_CLAUSE_START + r"(?:That's a\s+)?(?:great|good)\s+question[.!,]?\s*", re.I),
     # "To be honest," / "To be fair," as a hedge opener.
     re.compile(_CLAUSE_START + r"To be (?:honest|fair),\s*", re.I),
+    # #2492 — the ceremonial-acknowledgment class on being corrected. The prompt
+    # already bans thanking him for a correction (#2534); this makes it hold. Same
+    # precision-first discipline as above: each pattern requires the phrase to be a
+    # complete ceremonial clause (terminal punctuation, dash, or clause end) so
+    # legitimate gratitude mid-sentence ("thanks for the coffee rec") and load-bearing
+    # grammar ("you're right that duration matters" — stripping would orphan the
+    # complement) survive untouched.
+    re.compile(_CLAUSE_START + r"Thank(?:s| you) for (?:the|that|this) correction(?:[.!,]|\s*—)\s*", re.I),
+    re.compile(_CLAUSE_START + r"Thank(?:s| you) for correcting me(?:[.!,]|\s*—)\s*", re.I),
+    re.compile(_CLAUSE_START + r"I appreciate (?:the|that|your) correction(?:[.!,]|\s*—)\s*", re.I),
+    re.compile(_CLAUSE_START + r"Thank(?:s| you) for (?:pointing (?:that|this) out|flagging (?:that|this))(?:[.!,]|\s*—)\s*", re.I),
+    re.compile(_CLAUSE_START + r"You'?re absolutely right(?:[.!]|\s*—)\s*", re.I),
 ]
 
 

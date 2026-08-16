@@ -303,6 +303,14 @@
       "rationale": "Real texting threads occasionally carry a voice note, and the pieces already existed (registry tts_voice, podcast TTS, Telegram sendVoice). Shipped dark on purpose: arming a coach means deciding how often THAT coach speaks and in what register, which is a per-coach taste call, and a shared default would make every coach speak identically — the same error the emoji_posture work (#2485) exists to avoid. Absence honesty (ADR-104) both ways: no posture means no voice note, and a posture with no tts_voice means no voice note rather than a stand-in voice, which would be a different person answering. Data stays text because a reply read aloud cannot be scrolled back to.",
       "ref": "#2494",
       "observed_effect": null
+    },
+    {
+      "date": "2026-08-16",
+      "coach": "all",
+      "change_type": "voice",
+      "summary": "Prompt-pass v3 (#2492, roadmap ideas 32+43): grounded pushback + conversational repair. One shared rule lands in coach_chat._system_parts — when the facts block contradicts a stated plan the coach disagrees citing the specific reading, and may NOT disagree from a hunch (the facts block is already grounding-gated, so the gate is structurally unrelaxed). The #2534 never-thank-him rule now HOLDS deterministically: coach_style_gate strips the ceremonial-acknowledgment class (thanks-for-the-correction / I-appreciate-the-correction / you're-absolutely-right.) at clause openings, precision-first per the #2555 discipline. One new texting_few_shot per texting-configured coach (sleep/nutrition/mind/physical/explorer — glucose/labs carry no texting_style and are out of this surface's scope): pushback in-voice for Lisa/Max/Henning, flat repair for Marcus/Nathan; persona_core renders [:3] to make room without displacing the register shots. Pins: tests/test_coach_pushback_repair_2492.py.",
+      "rationale": "Transcript QA (2026-08-09/10) measured the two remaining robotic tells this pass targets: coaches agreeing with plans their own stored evidence contradicts (idea 32), and ceremonial gratitude on being corrected (idea 43) — the blind panel's sycophancy/attunement tell class. Rules are requests, so the repair half also gets the deterministic style-gate strip; the pushback half is licensed against the already-grounding-gated facts block ONLY, so honesty-is-the-personality survives the added disagreement.",
+      "observed_effect": null
     }
   ]
 }
