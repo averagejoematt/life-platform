@@ -1022,6 +1022,37 @@ class MonitoringStack(Stack):
         mem_alarm_db.add_alarm_action(cw_actions.SnsAction(digest))
 
         # ══════════════════════════════════════════════════════════════
+        # #2654: between-chronicle scrub failed CLOSED
+        # The lambda logs this literal token when its privacy scrub cannot run
+        # and the send is aborted. Nothing leaked when this fires — but the
+        # friends&family digest went dark, and silence must not be the only
+        # signal (#2503 class). Token must equal
+        # between_chronicle_lambda.SCRUB_FAILED_TOKEN — pinned by
+        # tests/test_between_chronicle_scrub_2654.py::test_metric_filter_token_twin.
+        # ══════════════════════════════════════════════════════════════
+        bc_scrub_lg = logs.LogGroup.from_log_group_name(self, "ScrubFailLgBetweenChronicle", "/aws/lambda/between-chronicle")
+        bc_scrub_mf = logs.MetricFilter(
+            self,
+            "ScrubFailFilterBetweenChronicle",
+            log_group=bc_scrub_lg,
+            filter_pattern=logs.FilterPattern.literal('"BETWEEN-CHRONICLE-SCRUB-FAILED-CLOSED"'),
+            metric_name="BetweenChronicleScrubFailedClosed",
+            metric_namespace="LifePlatform/Privacy",
+            metric_value="1",
+        )
+        bc_scrub_alarm = cloudwatch.Alarm(
+            self,
+            "ScrubFailAlarmBetweenChronicle",
+            alarm_name="between-chronicle-scrub-failed-closed",
+            metric=bc_scrub_mf.metric(period=Duration.seconds(300), statistic="Sum"),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+        bc_scrub_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+
+        # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm
         # BucketSizeBytes is a daily metric — period must be 86400s.
         # Alerts if raw/ accumulation exceeds 50 GB unexpectedly.
