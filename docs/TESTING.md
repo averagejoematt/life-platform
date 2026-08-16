@@ -18,9 +18,9 @@
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
 <<<<<<< HEAD
-**Total tests:** 15536 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+**Total tests:** 15548 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 =======
-**Total tests:** 15536 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+**Total tests:** 15548 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 >>>>>>> 1c1fd83a9 (fix(ci): check_main_green vouches for main's actual HEAD — the swallowed-push shape reads uncovered, never green (#2762))
 
 ---
