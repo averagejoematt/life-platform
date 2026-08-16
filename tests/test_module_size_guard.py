@@ -187,7 +187,11 @@ BASELINE = {
     "lambdas/emails/weekly_digest_lambda.py": 1825,
     "lambdas/health/character_engine.py": 2117,
     "lambdas/content/html_builder.py": 2104,
-    "lambdas/web/site_api_ai_lambda.py": 1991,
+    # 1991 -> 1753 by #2667 (2026-08-16): the context/facts fetch layer moved to
+    # cohesive lambdas/web/site_api_ai_context.py (459 lines, under the ceiling) so
+    # the per-metric as-of work had room. Extracted ~312 net; banked 62 (a fifth,
+    # the #2610 earned-headroom rule), handed the rest back.
+    "lambdas/web/site_api_ai_lambda.py": 1753,
     # 1989 -> 1829 by #2221: tool_get_social_connection_trend was lifted into cohesive
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)
