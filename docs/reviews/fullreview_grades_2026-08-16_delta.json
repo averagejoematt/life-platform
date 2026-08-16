@@ -1,0 +1,703 @@
+{
+ "date": "2026-08-16",
+ "run_id": "wf_8ccd5caf-049",
+ "method": "Fable delta re-grade of the 7 lenses touched by the 2026-08-09..08-15 change surface (~60 PRs / 377 commits, 08c7af26..d7df1148e): queue paydown + coaching team v2/ADR-153 (08-10), non-fable drain (08-11), gate audit #2578 (08-13), bug bash + queue (08-14), silent-failure drain, instruments-were-the-defect, alarm board (#2737-#2749) and the MCP sweep (08-15). Anchors loaded VERBATIM from fullreview_grades_2026-08-09_delta.json (security, principal, cto, narrative, aiq) and fullreview_grades_2026-07-28_partial.json (observability, integrations); never redefined. One grader + one lean-REFUTED verifier per lens, all on Fable (the ritual's model identity, 07-28 rule). Ground truth: Day 6 of cycle 13 (genesis 2026-08-10), budget tier 1 (ensemble/chronicle-editor/coherence-semantic paused by design), Whoop recovered 08-07, MacroFactor behavioral-quiet (correct rest state, #2326/#2735), repo PUBLIC, code reads pinned to d7df1148e. Read-only contract held; the live rate-limit probe used malformed POSTs only.",
+ "headline": "Four lenses up (narrative B->B+, aiq B->B+, observability B+->A-, integrations B+->A-), three held (security B+, principal A-, cto A-). All 7 verifier letters agree with their graders; 27 findings -> 26 CONFIRMED + 1 ADJUSTED, 0 refuted — an unusually clean first pass against the historic ~50% FP rate.",
+ "unchanged_lenses": "reader, data-architect (2026-08-09 delta); cpo, designer, dataviz, qs, a11y, cost, devex, growth (2026-08-02 delta / 2026-07-28 partial) — grades stand.",
+ "lenses": {
+  "security": {
+   "area": "Exposure — privacy absolutes on the live surface, repo secret/PII hygiene, auth surfaces, S3 policy, IAM posture",
+   "grade": "B+",
+   "grade_2026_08_09": "B+",
+   "rubric_anchors": {
+    "A": "Live public JSON exposes zero chronological age / birth year / genome identifiers / vice-substance names (verified by curl+grep, not docs); sensitive S3 prefixes (raw/config/uploads/dashboard) return 403/404 publicly; no live secret or PII in tracked repo files or recent history; the MCP OAuth consent+PKCE gate and DDB-backed per-IP rate limits are provably enforced with no spoofable trust boundary; every Lambda has its own least-privilege role with Resource:* only on actions that cannot be resource-scoped.",
+    "C": "Privacy absolutes hold on the sampled live endpoints but one enforcement boundary is bypassable (e.g. spoofable client-IP so rate limits don't actually bind) or a known-inversion residual is unmitigated, OR an over-broad IAM wildcard / publicly readable sensitive prefix exists without a compensating control.",
+    "F": "Any live public endpoint returns chronological age, a genome identifier, or a named vice/substance; a live credential is committed to the repo; /token or /authorize mints a bearer without consent; or raw health data is publicly fetchable.",
+    "extension_note": "No anchor redefinition. One clarification applied, not a redefinition: 'no live secret or PII in tracked repo files' is read to include the owner's named vices in a committed config file now that the repo is PUBLIC — this is the same sensitivity class the F anchor's 'named vice/substance' protects on the live surface, evaluated here under the repo-hygiene clause of the A anchor."
+   },
+   "grade_rationale": "Both residuals that held the 08-09 grade at B+ are cleared this week, verified from source and live: (1) the in-repo vice vocabulary left the tracked tree — only config/content_filter.example.json remains (git ls-files), the real vocabulary rides the ER-06 env/local/S3 channel (#2503), and fail-closed is REAL at every chokepoint I read: publish paths call blocked_keywords(require=True) which raises ContentFilterUnavailable (privacy_guard.py:56, chronicle_prompt.py:17, margaret_editor_pass.py:113, site_api_ai_lambda.py:728, coach_panel_podcast_lambda.py:254), and the serve chokepoint over-hides on the unavailable sentinel — _scrub_blocked_terms returns \"I can't share that.\" and _is_blocked_vice returns True (site_api_common.py:557-559, 580-583), with denied-vs-absent distinguished at ERROR (#2693, content_filter_channel.py:162-172); (2) raw subscriber-email logging is gone — every send path now logs email_hash[:8] or email[:6]. The named control from the 08-14 incident — the per-IP DynamoDB rate limiter, whose identity derivation #2689 briefly re-keyed onto the unstable CloudFront edge sourceIp, disabling enforcement for ~40 min — is ON now: the ONE derivation is common/client_ip.py ordering CloudFront-Viewer-Address → XFF-last-hop → sourceIp, adopted by every IP-gated write (grep shows zero direct XFF readers), order-pinned by tests/test_rate_limit_identity_1221.py (AST-derived consumer set + a test that fails if sourceIp is preferred again), and proven enforcing on the live wire: 6 malformed POSTs to /api/submit_finding returned 400 400 400 429 429 429 against a 3/hour limit. Every privacy absolute re-verified live: /api/genome_risks serves aggregate counts only with an explicit disclosure line and zero rs-ids/gene names; /api/labs (22KB) and /public_stats.json grep clean for rs\\d+/APOE/MTHFR/genotype/birth/age/dob; habits/vice_streaks/challenges show only public-safe names; raw/, config/, uploads/, dashboard/ 404 via CloudFront and 403 direct; the week's full diff greps clean for secret patterns; no pull_request_target/issue_comment in workflows; IAM improved (role_policies split to 8 per-domain files with Resource:* only on PutMetricData/X-Ray in every sampled statement, LeadingKeys-scoped DDB writes, and the whole IAM family removed from the automerge allowlist per #2611); follow addresses are now stamped email_verified:False with an AST-read ratchet asserting nothing reads the partitions (#2729); stale secret names scrubbed from docstrings (#2730). Why not A/A-: the A anchor requires rate limits \"provably enforced with no spoofable trust boundary,\" and the #1221 interim is exactly a spoofable boundary — the origin request policy does not yet forward CloudFront-Viewer-Address, so the forgeable XFF last hop is the live identity and a rotating header still mints fresh buckets on every IP-gated write. Why not C, though the C anchor names this very condition: the bypass is measured, tracked open (#1221), deliberately ordered so the owner's one infra attach closes it with zero code change, observable via client_ip_is_trusted(), and the limiter demonstrably binds ordinary traffic (live 429s above); every OTHER boundary checked holds and the absolutes are verified live, not sampled from docs. Same letter as last week, but the composition is strictly better: two shipped PII residuals cleared, replaced by one known, mitigated, owner-blocked infra residual plus the known #2654 defense-in-depth no-op.",
+   "findings": [
+    {
+     "id": "SEC-1",
+     "title": "Rate-limit identity still forgeable via X-Forwarded-For until the origin request policy forwards CloudFront-Viewer-Address",
+     "severity": "P2",
+     "dupe_of": "1221",
+     "location": "lambdas/common/client_ip.py:160-167",
+     "evidence": "client_ip.py:163-165 falls back to the XFF last hop when the viewer header is absent, and the module docstring (lines 20-31) documents the 2026-08-14 live measurement that CloudFront on this distribution forwards the client's XFF UNCHANGED — 'X-Forwarded-For: 203.0.113.77 x5 -> 400 400 400 429 429 (bucket armed) / X-Forwarded-For: 198.51.100.42 x2 -> 400 400 (FRESH bucket)' — so the header is attacker-controlled in every position. client_ip_is_trusted() (lines 131-139) reports the degraded state. #1221 is open and names the remaining half: attaching an origin request policy across ~20 cache behaviours (owner infra). Enforcement against non-forging traffic verified live this review: 6 malformed POSTs to /api/submit_finding -> 400 400 400 429 429 429.",
+     "repro": "for i in 1 2 3 4 5; do curl -s -o /dev/null -w '%{http_code} ' -X POST https://averagejoematt.com/api/submit_finding -H 'Content-Type: application/json' -H \"X-Forwarded-For: 203.0.113.$i\" --data '{\"bogus\":1'; done  # each rotated header gets a fresh bucket (all 400, no 429), while a fixed identity 429s after 3"
+    },
+    {
+     "id": "SEC-2",
+     "title": "between-chronicle privacy scrub is fail-soft — on any privacy_guard exception it returns the text unscrubbed",
+     "severity": "P2",
+     "dupe_of": "2654",
+     "location": "lambdas/emails/between_chronicle_lambda.py:77-86",
+     "evidence": "Verified at current checkout: def _scrub(text): try: from privacy import privacy_guard; out,_n = privacy_guard.scrub(str(text)); return out; except Exception: return str(text). The except arm returns the ORIGINAL text, so an import/IAM/config failure silently disables the scrub for every narrative field the digest renders (lines 187-220). Docstring itself calls it 'fail-soft ... defense-in-depth' — the sources are already public-gated, which bounds the blast radius. Known open as #2654 (1 of 4 acceptance boxes done); not re-filed.",
+     "repro": "sed -n '77,87p' lambdas/emails/between_chronicle_lambda.py"
+    },
+    {
+     "id": "SEC-3",
+     "title": "Five send paths log the first 6 characters of subscriber email addresses to CloudWatch",
+     "severity": "note",
+     "dupe_of": "",
+     "evidence": "grep at current checkout: lambdas/emails/chronicle_email_sender_lambda.py:600,603 / lambdas/compute/weekly_signal_lambda.py:338,341 / lambdas/emails/coach_panel_podcast_lambda.py:1519 / lambdas/emails/between_chronicle_lambda.py:301 / lambdas/web/subscriber_onboarding_lambda.py:236,238 all log email[:6]. This is the deliberate mitigation of the prior full-address residual (the subscribe path itself now logs email_hash[:8], email_subscriber_lambda.py:346-394) and is a clear improvement, but 6 chars can reconstruct most of a short local part (e.g. 'johnd@x.com' -> 'johnd@'). Third-party PII, truncated; no exact-address exposure. Note only — no open issue tracks it and the risk is marginal.",
+     "repro": "grep -rn 'email\\[:6\\]' lambdas/ --include='*.py'",
+     "location": "lambdas/emails/chronicle_email_sender_lambda.py:600"
+    }
+   ],
+   "inspected": [
+    "lambdas/common/client_ip.py (full read — identity order, port-strip, trust reporting) + tests/test_rate_limit_identity_1221.py (order-pinning + AST-derived consumer set)",
+    "Adoption sweep: grep extract_client_ip / direct XFF readers across lambdas/ and mcp/ — zero handlers bypass the shared helper",
+    "Live rate-limit probe: 6x malformed POST /api/submit_finding -> 400 400 400 429 429 429 (control ON)",
+    "lambdas/privacy/content_filter_channel.py (full read — env/local/S3 resolution, _validate fail-closed, denied-vs-absent classification #2693) + all require=True/require-less consumers (privacy_guard, chronicle_prompt, margaret_editor_pass, site_api_ai_lambda, coach_panel_podcast, ai_quality_canary, site_api_common:462-591 over-hide sentinel)",
+    "git ls-files content_filter — real vocabulary absent from tracked tree; only .example.json remains",
+    "Live privacy absolutes: /api/genome_risks (aggregate-only, disclosure line, zero rs/gene ids), /api/labs (22KB, zero rs/APOE/MTHFR/genotype/age/birth/dob hits), /public_stats.json (zero hits), /api/habits, /api/vice_streaks, /api/challenges (public-safe names only)",
+    "S3 prefix posture: raw/, config/content_filter.json, uploads/, dashboard/ -> 404 via CloudFront, 403 direct-to-bucket",
+    "Follow consent fix cdc9f9637/#2729 (email_verified:False stamps, AST ratchet that nothing reads the partitions) + follow-door validation/rate-limit path in site_api_social_experiments.py:280-345 (fail-closed 500 on rate-check error)",
+    "Subscriber-email logging across lambdas/web/email_subscriber_lambda.py and all send paths (hash[:8] / email[:6])",
+    "IAM: cdk/stacks/role_policies_{base,compute,email,ingestion,operational,permanence,serve}.py wildcard-resource scan — Resource:* only on cloudwatch:PutMetricData and X-Ray (non-scopable); LeadingKeys-scoped DDB write sampled; #2611 automerge IAM removal per CLAUDE.md",
+    "Secret scan of the full week diff 08c7af26..d7df1148e (AKIA/ghp_/sk-ant-/BEGIN KEY/password= patterns — zero hits) + docstring-secret scrub commit cc7772951 (#2730)",
+    "Workflow trigger hygiene: zero pull_request_target/issue_comment in .github/workflows/; week's workflow commits reviewed by title",
+    "#2654 scrub state re-verified at source (still fail-soft, still open — dupe not re-filed)",
+    "Permanence archive #2572 design (registry AST-gated against web_stack behaviours; API arm fetched anonymously over public origin) and paste-capture #2603 (no deployed function, no token, skip_deploy) — commit-level review"
+   ],
+   "not_covered": [
+    "MCP OAuth consent+PKCE gate — zero commits touched it this window and it was not re-verified live this pass; the anchor's claim about it is carried forward from 08-09, not re-proven",
+    "Permanence archive PAYLOAD — the gating design was read from the commit, but the nightly archive artifact itself was not downloaded and diffed against the public surface",
+    "Exhaustive /api sweep — ~10 endpoints sampled live out of ~134; #2652 (82 endpoints swept by nothing) remains the tracked coverage gap",
+    "CloudWatch log GROUPS were not queried for live PII occurrences — email-prefix and hash logging verified from source only",
+    "Full IAM audit of all 8 role_policies files statement-by-statement — wildcard-resource scan plus sampled statements only; no iam simulate-principal-policy runs",
+    "Git-history reachability of the pre-#2503 vice vocabulary (the anchor already priced this: pre-2026-07-13 history was public; removal limits ongoing discoverability)",
+    "Forged-XFF live bypass probe was NOT re-run (would only re-confirm open #1221); enforcement was probed without forgery",
+    "Telegram coach-chat auth surface (#2363 epic, BotFather residuals) — off-repo credentials, not inspected"
+   ],
+   "verifier": {
+    "grade": "B",
+    "agrees": true,
+    "note": "All three findings CONFIRMED at source and (for SEC-1) on the live wire. Anchors: not A — \"provably enforced with no spoofable trust boundary\" fails outright; I reproduced the full bypass this pass (5 rotated X-Forwarded-For values -> 5 fresh buckets, zero 429s on a 3/hour limit) while a fixed identity 429'd after 3, so the forgeable XFF last hop IS the live identity on every IP-gated write. Not C/F — spot-checked absolutes hold live (genome_risks aggregate-only, public_stats.json greps clean of rs-ids/age/birth/genotype, raw/ and config/content_filter.json 404), the limiter demonstrably binds non-forging traffic, the bypass is tracked (#1221 open), observable (client_ip_is_trusted), and closes with one owner infra attach. I land B rather than the grader's B+: the C anchor's named example (\"spoofable client-IP\") is not merely a residual risk here — it is the live identity, and I proved total evasion on the forgery axis, which the grader explicitly did not re-run. One step apart counts as agreement. Grader's evidence otherwise held 100% under re-verification.",
+    "verdicts": [
+     {
+      "id": "SEC-1",
+      "verdict": "CONFIRMED",
+      "note": "Source matches at lambdas/common/client_ip.py — extract_client_ip orders CloudFront-Viewer-Address -> XFF last hop -> sourceIp, with the forgeable interim documented in the module docstring and client_ip_is_trusted() reporting degraded state. #1221 is OPEN (correctly filed as dupe). Live repro run this pass: 5 POSTs to /api/submit_finding with rotating X-Forwarded-For -> 400 400 400 400 400 (fresh bucket per header, no 429); 5 with a fixed forged header -> 400 400 400 429 429 (enforcement binds a stable identity). Both halves of the claim — enforcement ON, boundary spoofable — reproduce exactly. P2 dupe-of-#1221 is right."
+     },
+     {
+      "id": "SEC-2",
+      "verdict": "CONFIRMED",
+      "note": "Reproduced verbatim at lambdas/emails/between_chronicle_lambda.py:77-86: _scrub catches bare Exception and returns str(text) unscrubbed, docstring self-describes as fail-soft defense-in-depth. #2654 is OPEN and titles this exact defect; correctly marked dupe, not re-filed. Blast radius bounded as stated (sources are public-gated upstream). P2 dupe appropriate."
+     },
+     {
+      "id": "SEC-3",
+      "verdict": "CONFIRMED",
+      "note": "grep -rn 'email\\[:6\\]' lambdas/ reproduces exactly: 9 log lines across 5 send paths (chronicle_email_sender:600,603; weekly_signal:338,341; coach_panel_podcast:1519; between_chronicle:301; subscriber_onboarding:236,238). Subscribe path verified logging email_hash[:8] only (email_subscriber_lambda.py:346-394). This is the deliberate truncation mitigation of the prior full-address residual; 6 chars of local part is marginal reconstruction risk on third-party PII. Note severity is the right call — real, minor, untracked."
+     }
+    ]
+   }
+  },
+  "observability": {
+   "area": "observability — Telemetry & alerting",
+   "grade": "A-",
+   "grade_2026_07_28": "B+",
+   "rubric_anchors": {
+    "A": "Every alarm state is honest (red = a real, actionable condition; nothing permanently red or structurally unclearable), every watchdog's producer is verified actually emitting (not just designed to), and the remediation/drift loop demonstrably closes or explicitly hands off every signal it sees — all within the $85 ceiling, urgent-vs-digest split intact, solo operator paged for what matters and only that.",
+    "C": "The alarm inventory is well-designed on paper but one or more watchdog producers are dead (IAM/emission failures swallowed as warnings), red alarms sit unactioned for a week-plus, or the self-healing loop completes triage only intermittently while reporting green — governance expressed but not achieved.",
+    "F": "Alarms missing or routed to nowhere (no live SNS subscription), DLQ pileup or a dead ingestion source discoverable only by manual audit, budget hard-stop silent, log groups unbounded — the operator learns about failures from the website being wrong."
+   },
+   "grade_rationale": "Measured against the 2026-07-28 anchor (prior B+), the board is now materially closer to the A bar: every one of the 7 alarms currently in ALARM has a current, re-measured citation in docs/alarm_citations.json (verified name-by-name against live describe-alarms); the #2735 and #2670 partials' claims hold live (FailCount reached 0.0 at 2026-08-15 23:00Z/00:00Z, the coherence gauge emitted 0.0 at 21:00Z after the #2737 deploy, WarnCount=1 matches the cited sole survivor); all 5 sampled OK-alarm producers are demonstrably emitting (StaleSourceCount, BudgetTier, ComputeOutputsMissing, AICanary OverallAlarm, QaSmoke Fail/WarnCount); no alarm is routed to nowhere (the only 2 actionless alarms feed SNS-routed composites); and the NB-gauge + BREACHING-heartbeat pairing is applied consistently across coherence, freshness, compute-outputs, cost-governor, ai-canary, and qa-smoke. The citation registry now has teeth (check_alarm_citations.py: 72h citation gate + 14d mandatory-issue ratchet). What keeps it off A: I found one confirmed instance of exactly this week's defect class still on the board — both no-invocations liveness alarms (daily-brief, daily-debrief) structurally cannot fire because AWS/Lambda Invocations emits no datapoint at zero and the _alarm helper hard-codes notBreaching, so the flagship \"protect longest\" deliverable's only schedule-death watchdog is a green light over a metric that goes silent in the failure mode (proven live with a dormant Lambda); plus 8 of 12 citation entries now describe alarms that are green (registry drift the checker cannot see), and two tracked open holes in this lens's territory remain (#2668 Errors-flat-at-0, #2694 no-DLQ Lambdas). Honest, cited, self-measuring board with one verified cannot-fire pair — A- on the anchor's own terms.",
+   "findings": [
+    {
+     "id": "OBS-1",
+     "title": "daily-brief-no-invocations-24h and daily-debrief-no-invocations-24h structurally cannot fire — notBreaching over a metric that goes missing, not zero, in the failure mode",
+     "severity": "P2",
+     "location": "cdk/stacks/monitoring_stack.py:135 (helper hard-codes treat_missing_data=NB with no override parameter; NB defined at :80), instances at :570 (DailyBriefNoInvocations) and :758 (DailyDebriefNoInvocations)",
+     "evidence": "Live config: both alarms are AWS/Lambda Invocations, Sum < 1, Period 86400, TreatMissingData=notBreaching (describe-alarms pasted above). AWS/Lambda emits NO Invocations datapoint for a zero-invocation period — demonstrated live: get-metric-statistics for life-platform-data-export (dormant, alarm OK since 2026-03-06) over 08-01..08-16 returns zero datapoints, not zeros. So the exact condition the alarms exist for (schedule stops firing the Lambda) produces missing data, which notBreaching evaluates as OK — the alarms can never enter ALARM. The repo already knows this failure mode: hae-webhook-no-invocations-24h (monitoring_stack.py:1232-1250) explicitly sets TreatMissingData.BREACHING with the comment 'absence IS the failure', and CLAUDE.md line-141-adjacent comment acknowledges 'invoked emits no metric'. Impact is not hypothetical redundancy: the #734 retirement comment (monitoring_stack.py:744-756) names daily-debrief-no-invocations as THE distribution-liveness signal after panelcast-no-episode-7d was removed, and no compensating alarm covers brief/debrief schedule death — slo-daily-brief-delivery and life-platform-daily-brief-errors are both AWS/Lambda Errors GTE (silent if never invoked), ai-tokens-daily-brief-daily is a GTE token threshold. daily-brief-no-invocations has 0 state updates in retained 30d history and StateUpdated 2026-03-01 — it has never evaluated a transition. The _alarm helper offers no treat_missing_data parameter, so the fix requires either a new parameter or building these two outside the helper as hae-webhook was.",
+     "repro": "aws cloudwatch describe-alarms --region us-west-2 --alarm-names daily-brief-no-invocations-24h daily-debrief-no-invocations-24h --query 'MetricAlarms[].{Name:AlarmName,Metric:MetricName,Stat:Statistic,Op:ComparisonOperator,Thr:Threshold,TMD:TreatMissingData}' ; then: aws cloudwatch get-metric-statistics --region us-west-2 --namespace AWS/Lambda --metric-name Invocations --dimensions Name=FunctionName,Value=life-platform-data-export --start-time 2026-08-01T00:00:00Z --end-time 2026-08-16T00:00:00Z --period 86400 --statistics Sum  # returns NO datapoints for a dormant fn — missing data, which notBreaching holds OK",
+     "dupe_of": ""
+    },
+    {
+     "id": "OBS-2",
+     "title": "8 of 12 alarm_citations.json entries describe alarms that are now OK — the registry drifts green-side and the checker only enforces the missing direction",
+     "severity": "note",
+     "location": "docs/alarm_citations.json (entries: ingest-auth-unhealthy-24h, ingest-auth-unhealthy-whoop, ingest-consecutive-failures-whoop, ingest-liveness-unhealthy, life-platform-dlq-depth-warning, life-platform-ingestion-dlq-messages, qa-paused-by-budget, slo-source-freshness)",
+     "evidence": "Live describe-alarms shows all 8 alarms in OK (whoop set cleared 2026-08-08 after the owner re-auth, DLQ pair cleared 2026-08-06, qa-paused-by-budget 2026-08-03, slo-source-freshness 2026-08-10), yet their entries still describe them as red ('Red since 2026-08-05... Kept RED on purpose', 'ConsecutiveFailures climbing hourly, no data since 08-03'). The file's own header contract says 'remove/replace one once the underlying issue closes AND the alarm has actually cleared live.' scripts/check_alarm_citations.py enumerates only alarms currently in ALARM (per its docstring), so a stale entry is invisible to the gate — the registry can silently diverge from the board in the green direction, which weakens its value as the trusted decode the next long-red triage reads first. Fix is a stale-entry warning in the checker or an entry-removal step in /wrap.",
+     "repro": "python3 -c \"import json; print(list(json.load(open('docs/alarm_citations.json')).keys()))\" then aws cloudwatch describe-alarms --region us-west-2 --alarm-names <those names> --query 'MetricAlarms[].[AlarmName,StateValue]' — 8 of the 12 cited names return OK",
+     "dupe_of": ""
+    },
+    {
+     "id": "OBS-3",
+     "title": "slo-warmer-completeness is a byte-identical duplicate of mcp-warmer-error and measures errors, not completeness",
+     "severity": "note",
+     "location": "cdk/stacks/monitoring_stack.py (slo-warmer-completeness / mcp-warmer-error definitions); live alarms confirm",
+     "evidence": "Both alarms watch AWS/Lambda Errors, FunctionName=life-platform-mcp-warmer, Sum GTE 1, TMD notBreaching — differing only in period (3600 vs 86400). A warmer run that completes without error but warms an incomplete tool set is invisible to an Errors metric, so the alarm named as the completeness SLO cannot observe incompleteness. Pre-existing (both StateUpdated 2026-04-06), COST-A-style cleanup: either retire one or point the SLO at a warmed-count custom metric.",
+     "repro": "aws cloudwatch describe-alarms --region us-west-2 --alarm-names slo-warmer-completeness mcp-warmer-error --query 'MetricAlarms[].{Name:AlarmName,Metric:MetricName,NS:Namespace,Dims:Dimensions,Stat:Statistic,Thr:Threshold,Period:Period}'",
+     "dupe_of": ""
+    },
+    {
+     "id": "OBS-4",
+     "title": "Verified positive: the #2735/#2670 partial claims hold live — FailCount 0.0, coherence gauge 0.0 post-fix, WarnCount survivor = 1",
+     "severity": "note",
+     "location": "LifePlatform/QaSmoke FailCount/WarnCount, LifePlatform/Coherence OverallAlarm (live metrics)",
+     "evidence": "FailCount: ...2026-08-15T15:00-07:00 1.0, 16:00 0.0, 17:00 0.0 — reached 0 live after #2739/#2743. Coherence OverallAlarm: 08-15 11:00 PT = 1.0 (the behavioral false page), 14:00 PT = 0.0 (post-#2737 deploy) — exactly as the citation records. WarnCount steady at 1.0 (the cited character:receipt_replay survivor). The three alarms remain in ALARM solely because Maximum-over-rolling-24h needs the breaching datapoints to age out (earliest ~2026-08-16 18:45Z) — consistent with ground truth, nothing to file. Recorded here as verification evidence, not a defect.",
+     "repro": "aws cloudwatch get-metric-statistics --region us-west-2 --namespace LifePlatform/QaSmoke --metric-name FailCount --start-time 2026-08-15T00:00:00Z --end-time 2026-08-16T02:00:00Z --period 3600 --statistics Maximum",
+     "dupe_of": "#2670"
+    }
+   ],
+   "inspected": [
+    "docs/reviews/fullreview_grades_2026-07-28_partial.json (anchor, applied verbatim)",
+    "aws cloudwatch describe-alarms — full board: 101 metric alarms + 2 composite alarms, all states",
+    "docs/alarm_citations.json — all 12 entries cross-checked name-by-name against live ALARM states (7/7 red alarms cited with current reasons)",
+    "scripts/check_alarm_citations.py — gate contract (72h citation + 14d issue ratchet, fail-open-with-notice on no creds)",
+    "cdk/stacks/monitoring_stack.py — _alarm helper (:93-135, hard-coded NB), no-invocations blocks (:570, :758, #734 comment :744-756), hae-webhook BREACHING contrast (:1232-1250), heartbeat pairs",
+    "Live metric datapoints for 6 producers: QaSmoke FailCount/WarnCount, Coherence OverallAlarm, Freshness StaleSourceCount, Budget BudgetTier, Pipeline ComputeOutputsMissing, AICanary OverallAlarm — all emitting",
+    "Alarm action routing: the only 2 actionless alarms (ai-tokens-platform-daily-total, token-alarm-genesis-window-active) both feed the two SNS-routed composite alarms (urgent vs genesis-window digest split intact per #2116)",
+    "AWS/Lambda Invocations missing-data semantics proven live (life-platform-data-export dormant fn: zero datapoints, not zeros; daily-brief active fn: daily Sum=6)",
+    "describe-alarm-history for daily-brief-no-invocations-24h (0 transitions in retention)",
+    "AnthropicAPIFailure emitters (lambdas/ai/ai_calls.py:95, lambdas/common/retry_utils.py:84) vs empty list-metrics — judged acceptable failure-only pattern given ai-canary-heartbeat covers path liveness",
+    "gh issue list --state open (61 issues) — all candidate findings deduped",
+    "Week's change surface: git log 08c7af26..d7df1148e over alarm/monitoring paths (#2737, #2739, #2742, #2743, #2409, #2406 etc.)"
+   ],
+   "not_covered": [
+    "SNS topic subscription liveness — did not verify life-platform-alerts / -digest topics have confirmed, deliverable subscriptions (anchor F mentions 'routed to nowhere'; I verified alarm→topic routing but not topic→inbox)",
+    "Log-group retention bounds across ~104 Lambdas (anchor F 'log groups unbounded')",
+    "Remediation-agent loop closure — shadow mode (ADR-129); did not audit whether recent triage runs handed off every signal",
+    "monitoring_dashboards.py (extracted this week by #2625) — dashboards not rendered or checked",
+    "The 13 no-DLQ operational Lambdas (#2694, open — tracked, not re-inspected)",
+    "AnthropicAPIFailure emit-path liveness — a failure-only metric cannot be verified emitting without inducing a failure; the adjacent real instance (Errors flat at 0 while IC-3 fails) is already open as #2668",
+    "EMF telemetry underlying MCP tool-usage decisions",
+    "The gating visual-qa / reader-truth CI instruments themselves (covered by other lenses this ritual; only their alarm-facing WarnCount/FailCount emission checked here)",
+    "Composite-alarm genesis-window end behavior (token-alarm-genesis-window-active still ALARM at Day 6 — its citation says file only if red 'well after the genesis window ends'; the window's exact close date was not computed)"
+   ],
+   "verifier": {
+    "grade": "A-",
+    "agrees": true,
+    "note": "Independent A- under the 07-28 anchors. Verified live: all 7 red alarms carry current re-measured citations matching live metric behavior (FailCount 0.0 at 23:00Z, coherence gauge 1.0->0.0 post-#2737, WarnCount survivor=1); citation gate enforces 72h+14d; heartbeat pattern broadly applied; sampled producers emitting. Held off A by the confirmed cannot-fire daily-brief/daily-debrief no-invocations pair (NB over a metric that goes missing at zero, proven with a dormant fn returning zero datapoints, no compensating alarm), green-side citation drift invisible to the checker (8 of 14 entries stale), and tracked holes #2668/#2694. Exact letter match with grader.",
+    "verdicts": [
+     {
+      "id": "OBS-1",
+      "verdict": "CONFIRMED",
+      "note": "Fully reproduced. Live describe-alarms: both alarms AWS/Lambda Invocations Sum<1/86400s/TreatMissingData=notBreaching. _alarm helper hard-codes treat_missing_data=NB with no override param (cdk/stacks/monitoring_stack.py); both instances route through it. Proven live that zero invocations = missing data, not zero: dormant life-platform-data-export returns Datapoints:[] over 08-01..08-16, so NB holds OK in exactly the failure mode the alarms exist for. Repo already encodes the pattern elsewhere (hae-webhook alarm uses BREACHING, 'absence IS the failure'; REL-01 comment: 'invoked emits no metric... sits OK forever'). No compensating coverage: slo-daily-brief-delivery and life-platform-daily-brief-errors are Errors-based (silent if never invoked), and none of the 10 _heartbeat_alarm instances watch a gauge emitted by daily-brief/daily-debrief; the #734 comment names the debrief no-invocations alarm as THE distribution-liveness signal. daily-brief alarm StateUpdated 2026-03-01, no transitions. Not a dupe: #2668 is a different mechanism (Errors flat during handled WARN), #2578 is CI-gate scoped. P2 severity appropriate."
+     },
+     {
+      "id": "OBS-2",
+      "verdict": "CONFIRMED",
+      "note": "Reproduced with one count correction: the registry holds 14 alarm entries (plus _comment), not 12 — so 8 of 14, not 8 of 12; substance and note-severity unchanged. All 8 named entries verified OK live (whoop trio + ingest-auth-24h cleared 2026-08-08, DLQ pair 2026-08-06, qa-paused-by-budget 2026-08-03, slo-source-freshness 2026-08-10) while their notes still describe red states ('Kept RED on purpose', 'ConsecutiveFailures climbing hourly'). Header contract requires removal once cleared; check_alarm_citations.py calls describe_alarms(StateValue=\"ALARM\") only, so green-side drift is structurally invisible to the gate."
+     },
+     {
+      "id": "OBS-3",
+      "verdict": "CONFIRMED",
+      "note": "Reproduced. Both alarms: AWS/Lambda Errors, FunctionName=life-platform-mcp-warmer, Sum GTE 1, notBreaching, differing only in period (3600 vs 86400); both StateUpdated 2026-04-06 (pre-existing, not this week's surface). 'Byte-identical' slightly overstates it given the period difference — which the finding itself acknowledges — but the load-bearing claim holds: an Errors metric cannot observe an error-free run that warms an incomplete tool set, so the alarm named as the completeness SLO cannot measure completeness. Note severity appropriate."
+     },
+     {
+      "id": "OBS-4",
+      "verdict": "CONFIRMED",
+      "note": "Verification-positive reproduced. FailCount: 1.0 at 11:00-15:00 PT, 0.0 at 16:00 and 17:00 PT (23:00Z/00:00Z). Coherence OverallAlarm: 1.0 at 2026-08-15 11:00 PT (the behavioral false page), 0.0 at 14:00 PT post-#2737. WarnCount currently 1.0 (minor deviation: it read 2.0 at 13:00-14:00 PT before settling to the cited sole survivor — does not change the claim for the latest runs). All three alarms remain ALARM solely on rolling-24h Maximum aging, earliest clear ~2026-08-16 18:45Z, consistent with ground truth. Correctly recorded as evidence, not a defect; dupe_of #2670 appropriate."
+     }
+    ]
+   }
+  },
+  "integrations": {
+   "area": "Ingestion health",
+   "grade": "A-",
+   "grade_2026_07_28": "B+",
+   "rubric_anchors": {
+    "A": "Every source's declared cadence/threshold matches its live EventBridge rule with a written derivation (the #471 Todoist standard); the public board and the operator checker tell the same cross-reset-honest story (real last_update + 'dark N days'); a dead OAuth token pages within ~one cadence via alarms that are green because they work, not because they can't fire; dead sources are disclosed everywhere they surface — all with no machinery beyond the one canonical registry.",
+    "C": "Cadences and thresholds are mostly honest, but at least one public surface omits or misstates staleness (e.g. a real lapse rendered as 'no data' with no duration), or a dead source appears live on a reader-facing surface, or token death is only noticed by a daily human glance rather than an alarm.",
+    "F": "Registry facets contradict the live rules (thresholds impossible for the cadence), staleness is silently hidden or fabricated on the public board, dead sources are presented as flowing, and there is no alarm path for a dead token."
+   },
+   "grade_rationale": "Prior B+ has clearly moved. The A-anchor's core demands are now largely met and were verified LIVE: the public board (/api/source_freshness) is registry-derived and honest — all 13 sources' stale_hours match source_registry facets exactly, the 4 stale sources are all behavioral=True rendered as 'behavioral-stale' with real last_update dates (correct rest-state per #2326), and garmin renders 'paused' with no live EventBridge rule (verified: no garmin rule exists; whoop's live cron 0 0,4,12,16,20 = 5x daily matches its facet post-#2355). The 9-issue MCP sweep closed real dishonesty classes — green-over-subset (#2662), false-unavailable (#2671), paused-counted-red (#2715), silent arg replacement (#2660/#2664) — and all three fixes I audited hold in source, pass their 160 tests at this checkout, and the #2662 rejection is confirmed on the DEPLOYED Lambda. Whoop post-recovery ingestion is flowing (DDB DATE# rows 08-10→08-15) and the #2085 AUTH_FAILURE latch is closed with clear-on-success in code. What keeps it off A: the anchor requires the board and the operator checker to tell the SAME story, and they still don't quite — resolve_source_state hardcodes a 2-day default and neither MCP caller passes the registry threshold, so get_sources reports withings/notion 'stale' while inside their declared cadences, and get_freshness_status emits status:fresh + source_state:stale on the same row (live-verified). The drift is in the benign false-alarm direction and the primary verdict field is correct, but it is exactly the one-canonical-registry discipline the A bar names, re-broken one field over.",
+   "findings": [
+    {
+     "id": "INT-1",
+     "title": "resolve_source_state ignores per-source registry thresholds — get_sources misstates slow-cadence sources as 'stale' and get_freshness_status contradicts itself in one row",
+     "severity": "P2",
+     "location": "lambdas/ingestion/source_state.py:38,83 (DEFAULT_STALE_DAYS=2 hardcoded); mcp/tools_data.py:85 and mcp/tools_labs.py:844 (callers never pass stale_days)",
+     "evidence": "Live MCP call get_freshness_status {\"sources\":[\"withings\"]} returned: {\"fresh_sources\": [{\"source\": \"withings\", \"last_date\": \"2026-08-11\", \"age_days\": 5, \"threshold_days\": 7, \"status\": \"fresh\", \"source_state\": \"stale\"}]} — one row, two contradictory labels. Live get_sources returned withings/notion/supplements state:\"stale\" (withings 5d old vs 168h registry threshold; notion 6d old vs 336h threshold) while /api/source_freshness shows withings status:\"fresh\" age_h=122.1 stale_h=168. Cause: resolve_source_state(source, latest, today, *, stale_days=DEFAULT_STALE_DAYS) with DEFAULT_STALE_DAYS=2 at source_state.py:38; mcp/tools_data.py:85 calls it without stale_days even though the loop in tools_labs.py:796 computes the registry threshold two lines above its own call at :844. The #2714 docstring claims 'the two tools cannot drift on what live/stale mean' — they drift on WHEN stale means stale. Also labels never-provisioned sources (bluesky 'handle not provisioned — owner input pending', bluesky_lambda.py:187; x/instagram/tiktok awaiting first paste) as 'stale', which is not staleness. Direction is false-alarm (never false-fresh) and the primary status/verdict fields are correct, hence P2 not P1.",
+     "repro": "MCP tool get_freshness_status with {\"sources\": [\"withings\"]} — observe status:fresh + source_state:stale in the same row. Or: python3 -c \"import sys; sys.path.insert(0,'lambdas'); from ingestion.source_state import resolve_source_state; print(resolve_source_state('withings','2026-08-11','2026-08-16'))\" → 'stale' despite the registry's stale_hours=168 covering 5 days.",
+     "dupe_of": ""
+    },
+    {
+     "id": "INT-2",
+     "title": "mcp/registry.py schema hint hand-types 12 source names while the tool's derived valid set is 14 — hevy and weather missing",
+     "severity": "note",
+     "location": "mcp/registry.py:789",
+     "evidence": "registry.py:789 description reads '(whoop, withings, strava, garmin, eightsleep, habitify, todoist, apple_health, macrofactor, notion, food_delivery, measurements)' — 12 names. The live #2662 rejection names the actual valid set: ['apple_health','eightsleep','food_delivery','garmin','habitify','hevy','macrofactor','measurements','notion','strava','todoist','weather','whoop','withings'] — 14. The #2713 fix's own test docstring says the valid set is derived 'so there is no second list to keep in sync'; the schema description IS a second list, and a client honoring the hint would never ask about hevy or weather. Mitigated by the error path suggesting the correct set.",
+     "repro": "grep -n 'whoop, withings, strava' mcp/registry.py; then call get_freshness_status with {\"sources\":[\"bogus\"]} and diff the suggestion list against the hint.",
+     "dupe_of": ""
+    }
+   ],
+   "inspected": [
+    "Anchor: docs/reviews/fullreview_grades_2026-07-28_partial.json lenses.integrations (verbatim)",
+    "git log 08c7af26..d7df1148e -- mcp/ lambdas/ingestion/ (27 commits) + merged-PR list since 08-09",
+    "PR #2713 full diff + current mcp/tools_labs.py:731-995 (unknown-source rejection, evaluated_sources, _unreadable, paused bucket, escalation tiers)",
+    "PR #2714 full diff + current mcp/tools_data.py:1-95 (_date_of, DATE#-edge queries, resolve_source_state wiring, #2720 supersession)",
+    "PR #2711 (commit 94cb79899) stat + current mcp/handler.py:158,244 / mcp/strength_helpers.py:101,126 / mcp/tools_lifestyle.py:301",
+    "Ran tests/test_mcp_freshness_unknown_source_2662.py + test_mcp_get_sources_truth_2671.py + test_mcp_arg_boundary_honesty_2660_2664.py: 160 passed",
+    "deploy/sync_doc_metadata.py::_auto_discover_tool_count executed = 76 vs CLAUDE.md '~76' — match",
+    "Live https://averagejoematt.com/api/source_freshness: 13 sources, 8 fresh / 4 behavioral-stale / 1 paused; per-source stale_hours diffed against SOURCE_REGISTRY facets — all match",
+    "SOURCE_REGISTRY full dump (22 entries): method/paused/stale_hours/behavioral facets",
+    "Live MCP calls to the deployed Lambda: get_freshness_status (unknown-source rejection; withings row) and get_sources (all 30 keys)",
+    "DDB read-only queries: whoop DATE#2026-08-10..16 (9 rows incl. workouts), todoist newest 3 rows, bluesky/youtube/dropbox_poll partitions (empty)",
+    "Live EventBridge rules for whoop (cron 0 0,4,12,16,20 ENABLED = 5x daily, matches facet/#2355) and garmin (no rule — matches ADR-074 pause)",
+    "CloudWatch logs /aws/lambda/todoist-data-ingestion for the 08-15 14:00Z run (gap-fill stored 2026-08-14, 0 errors — yesterday-finalize by design, #471 threshold accommodates)",
+    "lambdas/common/auth_breaker.py clear_failure + #2085 state (CLOSED); lambdas/ingestion/source_state.py:22-121 full resolver; lambdas/ingestion/bluesky_lambda.py provisioning-pending path"
+   ],
+   "not_covered": [
+    "The other 6 MCP-sweep PRs (#2710 tool-name suggestions, #2712 memory-category days, #2716 zone-2 denominator, #2717 reading shelf, #2700 relative-window, #2706/#2707) — verified only at commit/title level, not line-audited",
+    "Live EventBridge cadence cross-check for the remaining sources (withings/eightsleep/habitify/hevy/weather hourly-class rules) — only whoop and garmin were checked against their rules",
+    "raw/ S3 layout facets (raw_layout) vs actual S3 objects — not sampled this pass",
+    "freshness_checker_lambda + its CloudWatch alarm wiring end-to-end (the 'dead token pages within one cadence' path was verified only via the auth_breaker code and the closed #2085, not by injecting a failure)",
+    "HAE datatype-level darkness (cgm 19d, BP 127d dark) — displayed honestly as dark/manual on the board, treated as behavioral/owner-driven per ground truth, not investigated further",
+    "MCP tools outside the freshness/sources/args set (~70 of 76 tools) and the whoop reconciliation/recovery auxiliary crons"
+   ],
+   "verifier": {
+    "grade": "A-",
+    "agrees": true,
+    "note": "Independent verification supports A-. Verified live against the deployed MCP Lambda: the registry-derived thresholds (withings 7d, notion 14d) flow into get_freshness_status, garmin renders paused, and the dishonesty-class fixes from the MCP sweep hold. The single blocker to full A is exactly the anchor's one-canonical-registry / same-story clause: resolve_source_state's hardcoded 2-day default (source_state.py:38) bypasses registry stale_hours because no MCP caller passes stale_days, producing live self-contradicting rows (status:fresh + source_state:stale on withings AND notion) and get_sources misstating in-cadence sources as stale. Drift is false-alarm-direction only with primary verdict fields correct — a one-field break of the A discipline, not a return to B+ territory. Both findings dedupe clean against the 200-issue open corpus.",
+    "verdicts": [
+     {
+      "id": "INT-1",
+      "verdict": "CONFIRMED",
+      "note": "Reproduced three independent ways. (1) Local: resolve_source_state('withings','2026-08-11','2026-08-16') returns 'stale'; DEFAULT_STALE_DAYS=2 at lambdas/ingestion/source_state.py:38 and registry stale_hours for withings=168/notion=336 confirmed. (2) Code: mcp/tools_data.py:85 and mcp/tools_labs.py:823,844 call resolve_source_state without stale_days, while tools_labs.py:796 computes the registry threshold in the same loop iteration. (3) Live deployed Lambda: get_freshness_status({sources:[withings,notion]}) returned BOTH rows self-contradicting — withings {age_days:5, threshold_days:7, status:'fresh', source_state:'stale'} and notion {age_days:6, threshold_days:14, status:'fresh', source_state:'stale'}; live get_sources reports withings/notion/supplements state:'stale' inside declared cadences and labels never-provisioned sources (bluesky/x/instagram/tiktok) 'stale'. Direction is false-alarm only and primary status/verdict fields are correct, so P2 severity stands. No open-issue dupe found."
+     },
+     {
+      "id": "INT-2",
+      "verdict": "CONFIRMED",
+      "note": "mcp/registry.py:789 hand-types 12 source names in the get_freshness_status schema description; mcp_sources() derives 14 — hevy and weather are absent from the hint. Independently corroborated by the live-served tool schema (the deferred-tool definition loaded this session carries the identical 12-name description, proving the drift is deployed, not just in-repo). Mitigation confirmed at tools_labs.py:751/760/766 — the unknown-source rejection path suggests the correct derived set. 'note' severity is right: a second list the #2713 test docstring says should not exist, but the error path self-corrects any client that guesses wrong."
+     }
+    ]
+   }
+  },
+  "narrative": {
+   "area": "Voice & immersion — copy quality, coach personas, podcast coherence, duplicated narratives across lenses/timescales",
+   "grade": "B+",
+   "grade_2026_08_09": "B",
+   "rubric_anchors": {
+    "A": "Every live narrative surface tells one coherent cycle-6 story — reset seams are invisible to a binge reader, restored prequels are internally reconciled, each coach is distinguishable blind (and the voice-fidelity scoreboard has evidence), and no page contradicts another page's account of the same week.",
+    "C": "Page-by-page prose is competent but cross-surface continuity breaks survive a reset — stale prior-cycle narratives render on live doors, restored posts contradict each other on plan facts, or coach attributions add no voice — so an attentive reader catches the machinery mis-telling the story.",
+    "F": "Personas are interchangeable or the narrator voice is absent, wiped-cycle narratives dominate live pages as if current, or narrative copy contradicts the platform's own data (hype over honesty, unearned glow).",
+    "extension_2026_08_09": "EXTENDED (surface grew — the ~200 honesty corrections made ABSENCE itself a first-class narrated subject): an A additionally requires that one absence is one story — every surface narrating the same missing data agrees on its duration and cause, states n beside any rate, and never grades a zero-observation set. Source: 2026-07-16 baseline re-applied verbatim, extension appended, never silently redefined."
+   },
+   "grade_rationale": "Graded against the 2026-08-09 anchor verbatim (A = one coherent story, coaches distinguishable blind with scoreboard evidence, no page contradicts another; extension = one absence is one story — every surface agrees on duration and cause). The week's fixes are real and live-verified: the two named B-blockers from the prior grade are gone — the nutrition door no longer manufactures a red verdict from zero observations (evidence_nutrition.js:74 `if (Number(n.days_logged)===0) return \"\"`, live payload days_logged=0 renders honest empty), and the deterministic absence layer is now genuinely ONE story (server-derived pillar.absence: nutrition dark, last_log 2026-06-24, days_dark 52; absence_read.js #2388 makes home and cockpit speak the same sentence from it). Coach readings are dated (#2739/#2607 verified live — 'on the night of 2026-08-13' under a 2026-08-15 generation), the voice-fidelity scoreboard finally HAS evidence (n=16, 68.8% vs 12.5% chance), and three coach commentaries read blind-distinguishable (Webb: macro arithmetic; Park: architecture + stated probabilities; Reeves: interior inquiry). Copy quality on honesty is A-grade — the /api/vitals window_disclosure paragraph and the docket disclosure are the dignity bar met. But the grade stops at B+ on the extension clause: the single story that matters most — the food-log absence — is still told two contradictory ways one page hop apart. Deterministic surfaces say 52 days / never logged this cycle; the live coach cards say 'MacroFactor has been blank for four days' (nutrition), 'food gone dark since roughly the 10th' (sleep) — wrong duration by 13x and wrong cause (implies it began at cycle start). That is the C-anchor's 'attentive reader catches the machinery mis-telling the story', now confined to the LLM commentary layer only (last cycle it included deterministic chips), which is why B+ rather than B — and why not A-.",
+   "findings": [
+    {
+     "id": "NARR-1",
+     "title": "Live coach cards state the food-log absence as 'four days' when the true gap is 52 days — contradicting /api/character's own absence facts one page hop away, and misattributing the cause to cycle start",
+     "severity": "P2",
+     "location": "lambdas/intelligence/ai_expert_analyzer_lambda.py:297-305 (gap fact dropped when 30d window empty); lambdas/ai/grounded_generation.py:688-693 (span gate only flags spans LONGER than elapsed days)",
+     "evidence": "Live /api/coach_analysis?domain=nutrition (generated_at 2026-08-15T17:02Z): analysis says 'MacroFactor has been blank for four days', thread_reference says 'No food data logged for four days' — while the SAME payload's weekly_priority says 'nothing has been logged this cycle at any point' (6 days). Live ?domain=sleep: 'habits and food have gone dark since roughly the 10th'. Ground truth: DDB query pk=USER#matthew#SOURCE#macrofactor newest sk = DATE#2026-06-24 (52 days before generation); live /api/character nutrition pillar absence = {\"state\":\"dark\",\"last_log_date\":\"2026-06-24\",\"days_dark\":52,\"transition\":\"never_logged\"}. Mechanism verified from source: when the analyzer's 30-day window is empty it returns days_since_last_food_log=None + 'No nutrition data available' (ai_expert_analyzer_lambda.py:298-305), so the true 52d gap never reaches the prompt; the model fills the vacuum (likely transferring the journal channel's genuinely-4-day gap — mind coach's 'four-day silence in your logging' IS approximately grounded for journal), and grounded_generation.experiment_span_findings deliberately never flags a span SHORTER than elapsed days ('Only a LONGER span is impossible', grounded_generation.py:689-693), so 'four days' at Day 6 passes every deterministic verdict. This is exactly the #2382 defect class ('39 days quiet became paused four days ago on six live coach cards') fixed for deterministic chips in absence_read.js but still live in the LLM commentary layer. Same honesty family as open #2667 (weight dates) and #2740 (dated citations unverified) but a distinct claim class — absence DURATION/CAUSE — with a distinct fix (feed pillar_absence facts into the coach fact pack + an absence-span verdict).",
+     "repro": "curl -s 'https://averagejoematt.com/api/coach_analysis?domain=nutrition' | grep -o 'blank for four days'; curl -s https://averagejoematt.com/api/character | python3 -c \"import json,sys; print([p['absence'] for p in json.load(sys.stdin)['character']['pillars'] if p.get('name')=='nutrition'])\"; aws dynamodb query --table-name life-platform --key-condition-expression 'pk = :p' --expression-attribute-values '{\":p\":{\"S\":\"USER#matthew#SOURCE#macrofactor\"}}' --no-scan-index-forward --limit 1 --query 'Items[].sk.S'",
+     "dupe_of": ""
+    },
+    {
+     "id": "NARR-2",
+     "title": "Persona display identity is hardcoded in three lambda files and has drifted from the registry — the same coach renders different colors/titles on different live pages",
+     "severity": "P3",
+     "location": "lambdas/web/site_api_coach_narrative.py:262; lambdas/web/site_api_lambda.py:789; lambdas/coach/coach_observatory_renderer.py:79",
+     "evidence": "Live /api/coach_analysis serves nutrition_coach coach_color '#10b981' and sleep_coach coach_color '#818cf8'; live /api/coaches (registry-derived) serves the same coaches as '#22c55e' and '#8b5cf6' (config/personas.json agrees: nutrition #22c55e, sleep #8b5cf6). Note #10b981 is layne_norton's registry color — a pre-roster-v2 palette. grep shows the identical hardcoded map duplicated in three files ('nutrition_coach: {\"title\": \"Evidence-Based Nutrition\", \"color\": \"#10b981\"}' at site_api_coach_narrative.py:262, site_api_lambda.py:789 and coach_observatory_renderer.py:79), contradicting the #1986/#2474 'registry-driven cast everywhere' canon; test_cast_roster_consistency.py evidently does not cover these maps. Mind coach (#a78bfa) happens to match, so the drift is silent and per-coach.",
+     "repro": "diff <(curl -s 'https://averagejoematt.com/api/coach_analysis?domain=sleep' | python3 -c \"import json,sys;print(json.load(sys.stdin)['coach_color'])\") <(curl -s https://averagejoematt.com/api/coaches | python3 -c \"import json,sys;print([c['color'] for c in json.load(sys.stdin)['coaches'] if c['persona_id']=='sleep_coach'][0])\")",
+     "dupe_of": ""
+    },
+    {
+     "id": "NARR-3",
+     "title": "Two identity-glyph collisions inside the operational cast render on the same page: eli_marsh and glucose_coach share the microscope emoji; physical_coach and labs_coach share color #f59e0b",
+     "severity": "note",
+     "location": "config/personas.json (eli_marsh emoji vs glucose_coach emoji; physical_coach color vs labs_coach color)",
+     "evidence": "config/personas.json: eli_marsh emoji=🔬 (microscope), glucose_coach emoji=🔬; physical_coach color=#f59e0b, labs_coach color=#f59e0b. Live /api/coach_team renders the lead (eli, microscope) and the huddle (Patel, microscope) in one payload — two coaches, one glyph, on a surface where emoji is the persona's visual mark. Weakens blind distinguishability at the glyph level only; prose voices remain distinct.",
+     "repro": "python3 -c \"import json; p=json.load(open('config/personas.json'))['personas']; print(p['eli_marsh']['emoji']==p['glucose_coach']['emoji'], p['physical_coach']['color']==p['labs_coach']['color'])\"",
+     "dupe_of": ""
+    },
+    {
+     "id": "NARR-4",
+     "title": "The public voice-fidelity scoreboard lists the retired training_coach seat (and omits eli_marsh) with nothing explaining the ghost persona",
+     "severity": "note",
+     "location": "/api/voice_fidelity (cumulative ledger design, lambdas/coach/voice_fidelity_harness.py)",
+     "evidence": "Live /api/voice_fidelity coaches[] includes {\"coach_id\": \"training_coach\", n: 2} — a seat ADR-153's amendment retired (#2599, 'the training alias retires') — and no eli_marsh row; /api/coaches serves 8 coaches with no training_coach. The cumulative-ledger design is deliberate (cross-phase, like calibration), but a reader cross-referencing the live cast sees a ninth name with no copy explaining it is a historical seat. Also note: the harness is a measurement, not a pin — nothing gates on VOICEFIDELITY#scoreboard (only site_api_coach_ledger.py and coach_sim_scoreboard.py read it, both display-side); the pins that DO pin are coach_style_gate.enforce_style (deterministic strip/demote, applied pre-gate in coach_chat.py:601) and the blocking coach quality gate. Harness is also tier-paused at tier>=1 (currently tier 1) — by design per ADR-125, not flagged as a defect.",
+     "repro": "curl -s https://averagejoematt.com/api/voice_fidelity | python3 -c \"import json,sys; print([c['coach_id'] for c in json.load(sys.stdin)['coaches']])\"",
+     "dupe_of": ""
+    }
+   ],
+   "inspected": [
+    "Live: /api/coach_team, /api/coaches, /api/coach_docket, /api/pulse, /api/vitals, /api/coach_analysis?domain=nutrition|sleep|mind, /api/nutrition_overview, /api/training_overview, /api/character (pillar absence states), /api/voice_fidelity, /data/nutrition/ page shell",
+    "DynamoDB read-only: USER#matthew#SOURCE#macrofactor latest DATE# (2026-06-24, confirming the 52-day gap)",
+    "Source: lambdas/coach/voice_fidelity_harness.py (full read — tier gate, sampling, panel, scoreboard persistence), lambdas/coach/coach_style_gate.py + coach_chat.py:595-601 + telegram_worker_lambda.py:338-351 (style ceiling enforcement path), lambdas/ai/grounded_generation.py (number/word-number/span verdicts, experiment_span_findings lower-bound rule), lambdas/intelligence/ai_expert_analyzer_lambda.py:285-335 (nutrition fact pack), site/assets/js/absence_read.js (#2388 unification), site/assets/js/evidence_nutrition.js (#2360 zero-observation guard), site/assets/js/story.js elena kicker, lambdas/web/site_api_coach_narrative.py + site_api_lambda.py + coach_observatory_renderer.py hardcoded persona maps, config/personas.json full registry",
+    "Change surface: git log 08c7af26..d7df1148e over lambdas/coach, web, site (~60 coach/voice commits reviewed by title, key ones traced to source)",
+    "Dedupe: gh issue list --state open (68 issues) checked against every candidate"
+   ],
+   "not_covered": [
+    "Telegram coach chat live surface (epic #2363) — private channel, no read-only path; style ceiling verified from source only, not from live transcripts",
+    "Daily brief / weekly digest email prose this week — no live copy pulled (prior grade's fixes assumed still standing)",
+    "Chronicle / story-door narrative continuity across the cycle-13 reset seam (pre-genesis lead-ins, restored prequels)",
+    "Podcast script coherence (anchor mentions it; #1737-1740 open, untouched this week)",
+    "The board (/api/board ask) responses — #2675 (two coaches state different cycle days) left as tracked, not re-verified live",
+    "Coach sim harness scoreboard content (COACHSIM#) and the eight-moves template break (#2571) — merged but not blind-tested here",
+    "OG coach share cards and coach portraits (ADR-106) — visual persona surfaces not rendered"
+   ],
+   "verifier": {
+    "grade": "B+",
+    "agrees": true,
+    "note": "Independent grade under the 2026-08-09 anchors (loaded verbatim from docs/reviews/fullreview_grades_2026-08-09_delta.json): B+, matching the grader. All four findings survived lean-REFUTED verification with zero adjustments — an unusually clean slate against the ~50% historic false-positive rate, because every claim was live-endpoint-backed and each reproduced byte-for-byte (colors, phrases, DDB keys, source line numbers all exact). The B+ is earned on both sides: upward from the prior B because the deterministic absence layer genuinely is one story now (server-derived pillar absence: dark/2026-06-24/52d, verified live), coach readings are dated, and the voice-fidelity scoreboard has real evidence (n=16, 68.8% vs 12.5% chance, verified live); capped below A- because the extension clause — 'one absence is one story, every surface agrees on duration and cause' — still fails where it matters most: live coach cards state a 13x-wrong duration ('four days' / 'since roughly the 10th') for the 52-day food-log gap one page hop from surfaces stating it correctly, and the grounding gate is structurally blind to under-claimed spans. The contradiction is confined to the LLM commentary layer (last cycle it included deterministic chips), which is precisely the B → B+ step and no further. agrees_with_grader: true (exact letter match).",
+    "verdicts": [
+     {
+      "id": "NARR-1",
+      "verdict": "CONFIRMED",
+      "note": "Fully reproduces live and in source. Live /api/coach_analysis?domain=nutrition (generated_at 2026-08-15T17:02Z) says 'MacroFactor has been blank for four days' and thread_reference 'No food data logged for four days'; the SAME payload's weekly_priority says 'nothing has been logged this cycle at any point'. Live ?domain=sleep says 'habits and food have gone dark since roughly the 10th'. Ground truth re-verified independently: DDB newest macrofactor sk = DATE#2026-06-24 (52 days before generation) and live /api/character nutrition pillar absence = {state:dark, last_log_date:2026-06-24, days_dark:52, transition:never_logged}. Mechanism confirmed at the cited lines: ai_expert_analyzer_lambda.py:297-305 returns days_since_last_food_log=None + 'No nutrition data available' when the 30d window is empty, so the true gap never reaches the prompt; grounded_generation.py:689-693 explicitly never flags a span SHORTER than elapsed days, so 'four days' at Day 6 passes every deterministic verdict. Dedupe check against 61 open issues: no open issue tracks LLM-layer absence-duration misstatement (#2735 is the coherence sentinel's behavioral-awareness gap — a different surface; #2667/#2740 are different claim classes). Not on the do-not-refile list. P2 severity appropriate — this is the highest-stakes narrative contradiction on the site."
+     },
+     {
+      "id": "NARR-2",
+      "verdict": "CONFIRMED",
+      "note": "Reproduces exactly. Live /api/coach_analysis serves nutrition coach_color #10b981 and sleep coach_color #818cf8; live /api/coaches (registry-derived) serves nutrition_coach #22c55e and sleep_coach #8b5cf6, matching config/personas.json. The identical hardcoded map verified at all three cited locations: site_api_coach_narrative.py:262, site_api_lambda.py:789, coach_observatory_renderer.py:79 (all '#10b981' / 'Evidence-Based Nutrition'). #10b981 is confirmed as layne_norton's registry color — pre-roster-v2 palette drift. No open issue covers persona display-identity hardcoding. P3 appropriate."
+     },
+     {
+      "id": "NARR-3",
+      "verdict": "CONFIRMED",
+      "note": "Reproduces. config/personas.json: eli_marsh emoji=microscope == glucose_coach emoji=microscope; physical_coach color=#f59e0b == labs_coach color=#f59e0b. Live /api/coach_team renders both microscope glyphs in one payload (lead eli_marsh + huddle glucose_coach/Dr. Patel — microscope count 2), and live /api/coaches shows the #f59e0b color collision between physical_coach and labs_coach. Note severity is right — glyph-level distinguishability only; prose voices remain distinct."
+     },
+     {
+      "id": "NARR-4",
+      "verdict": "CONFIRMED",
+      "note": "Reproduces. Live /api/voice_fidelity coaches[] includes training_coach (n=2) — the seat ADR-153's amendment retired — with no eli_marsh row, while live /api/coaches serves 8 coaches with no training_coach; a cross-referencing reader sees a ninth unexplained name. The finding's own framing is fair: the cumulative cross-phase ledger is deliberate design, so this is a missing-copy/ghost-persona note, not a data defect. The scoreboard evidence itself is live and real (n=16, 68.8% accuracy vs 12.5% chance), which the finding does not dispute. Note severity appropriate."
+     }
+    ]
+   }
+  },
+  "principal": {
+   "area": "Code health — tests/coverage floor (ADR-107), module health, drift, CI gates",
+   "grade": "A-",
+   "grade_2026_08_09": "A-",
+   "rubric_anchors": {
+    "A": "Full offline suite green and fast with creds blanked; every stated quality gate (coverage floor, mypy tier set, deploy-critical lane, format gates) matches measured reality within a small tolerance; no unreferenced code shipping in the every-bundle shared modules; exactly one canonical implementation per platform invariant (float→Decimal, Pacific-date, ISO parse); golden tests pinned against the known wall-clock defect class.",
+    "C": "Suite green but the gates are partly decorative — coverage floor drifted far below actual so backsliding is possible, gate comments/config contradict enforcement status, hundreds of dead lines ship in every Lambda bundle, and invariant helpers are forked with divergent edge-case semantics.",
+    "F": "Red main tolerated or gates disabled to get green; tests mirror implementation so defects cannot fail them; no coverage or type gate at all; wall-clock time bombs in fixtures with no encoded lesson.",
+    "_extension_2026_08_09": "EXTENDED (not redefined) for the grown surface: 'stated quality gate matches measured reality' now includes the pre-merge lane (pr-checks.yml premerge marker + structural gates) matching the post-merge lane, and 'matches reality' is read UNDER CONCURRENCY — a gate that is green per-PR but blind to the merge union counts as partly decorative for wave-style development."
+   },
+   "grade_rationale": "Hold at A-, trend up — both prior WHY-NOT-A blockers are verifiably resolved, but the week's own instruments prove the anchor's 'every stated gate matches measured reality' clause cannot yet be asserted for the long tail, and the 'fast' clause is measurably breached. RESOLVED FROM THE PRIOR GRADE: (1) the wall-clock time-bomb class got its structural gate (tests/test_wallclock_fixture_bombs_2376.py, cbd47d685) with a documented recall limit (17-hit clock-claiming predicate chosen over a 183-hit allowlist nobody would maintain), reasoned exemptions, and its own synthetic-bomb meta-test (test_scanner_fires_on_a_synthetic_bomb) — the gate proves it can fail every run; (2) the concurrency/union-breach item was re-decided with measured evidence (ADR-148 amendment 2026-08-09, #2371): strict=false stands against a measured ~40-merge wave cost, the merge-ref pre-merge lane caught 4 union-class breaches live, the #2372 derivation landed (tests/test_premerge_extra_files_derivation_2372.py), and revisit triggers are named. NEW STRUCTURAL STRENGTH, verified: the gate census (scripts/gate_census.py, #2631/#2637/#2726) derives 447 gates from source and reports its own error honestly ('n is a FLOOR, in both directions' — 19 enforcement-only CI gates were previously undercounted, 37 steps unadjudicated); 6 verdicts are mutation-proved with the mutation cited; the pipefail/tee class got a SET guard (test_gate_steps_cannot_swallow_status_2746.py) that I proved fires on a synthetic offender and that documents its own false-positive discipline; the #2749 fix converted a membership pin into a genuine ratchet (subset ceiling + non-empty + priced), which I proved can-fail by injecting a 5th disabled code via disabled_codes(ini_path); both module-size guards are int-ratchets with stale-entry cleanup and cross-coverage; the dead computed_coherence instrument (ok/'0 metrics' 11/11 days since the 2023 field rename) now drives the REAL _gather_computed_checks over live-shaped records and WARNs on an empty check set. Sampled gate tests: 162 passed locally; CI/CD at 8905a9249 completed success — main is green at the graded surface. WHY NOT A: (a) the anchor's 'fast' clause fails on the estate's own stated budget — Unit Tests wall-clock 1247s vs 1200s, fourth breach (#2692, tracked); (b) the census's honest numbers say only 6 of 447 gates carry a can-fail verdict, and this very week surfaced two multi-year dead instruments (computed_coherence, the golden-brief 'gating' step) — the mechanism to close this exists and is honest, but the clause is measured-unmet, not merely unverified (#2578, tracked); (c) one instance-pinning recurrence with no set guard: the minimal-lane collection-import class redded the deploy lane twice in 48h (#2699 on 08-14, #2732 on 08-15 — the second AFTER the first fix's lesson was written), and nothing structural prevents the third; (d) main went red in-window from the gate estate's own changes (564c1041), though it was decoded, both causes fixed, and never tolerated — the F-bar clause is nowhere near in play. Path to A: land a set guard for the collection-import class, grow census verdict coverage through the 104 risk-flagged gates, and settle the lane budget by measurement (#2744 landed the instrument).",
+   "findings": [
+    {
+     "id": "F1",
+     "title": "Minimal-lane collection-import class fixed per-instance twice in 48h; no set guard exists for the third recurrence",
+     "severity": "P2",
+     "location": ".github/workflows/ci-cd.yml:355 (lane collects ALL of tests/) + tests/test_gate_census_error_bars_2639.py:~55 (second instance fix)",
+     "evidence": "The deploy-critical lane installs only pytest/boto3/botocore/hypothesis but runs `python3 -m pytest tests/ -m \"deploy_critical and not integration\"` (ci-cd.yml:355), which COLLECTS every test module. #2699 (227e336fb, 08-14): 'main went red and NOTHING deployed... A module-level `import yaml` therefore fails collection for the whole lane, and Plan -> Deploy are skipped.' #2732 (6b486bfc7, 08-15, one day later, same class): 'tests/test_gate_census_error_bars_2639.py builds the census at IMPORT time... which reddened the deploy lane.' Both fixes are per-file `pytest.importorskip(\"yaml\")`. I searched for a structural guard and found none: `grep -rn \"minimal lane\\|collection\" tests/conftest.py tests/test_workflow_hygiene.py` shows no AST scan of tests/ top-level imports against the lane's dep set, and no premerge test collects tests/ in a yaml-less environment. 131 new test files landed this week; the convention is enforced only by memory. This is the week's own named anti-pattern (guard the SET, not the instance) recurring inside the session that named it.",
+     "repro": "grep -rn 'pip install pytest boto3' .github/workflows/ci-cd.yml  # lane deps; then: grep -rln 'importorskip(\"yaml\")' tests/*.py (per-instance fixes exist) and grep -rn 'top.level import\\|collect-only' tests/test_workflow_hygiene.py tests/conftest.py (no class guard). Positive repro of the class: in a venv with only pytest/boto3/botocore/hypothesis, add `import yaml` at module scope to any new tests/test_x.py and run `python3 -m pytest tests/ -m deploy_critical --collect-only -q` — collection errors, lane reds.",
+     "dupe_of": ""
+    },
+    {
+     "id": "F2",
+     "title": "438 of 447 census gates carry no can-fail verdict — the meta-test discipline is 1.3% through its own inventory",
+     "severity": "note",
+     "location": "scripts/gate_census.py (census output)",
+     "evidence": "python3 scripts/gate_census.py: 'gates found n = 447 / verdict proven can-fail n = 6 / attempted, NOT proved n = 3 / no verdict attempted n = 438; carrying >=1 risk flag n = 104'. The census is honest about this (n is a FLOOR) and the epic tracking it is open.",
+     "repro": "python3 scripts/gate_census.py | head -12",
+     "dupe_of": "2578"
+    },
+    {
+     "id": "F3",
+     "title": "Unit Tests lane wall-clock over its own stated budget a fourth time (1247s vs 1200s)",
+     "severity": "note",
+     "location": ".github/workflows/ci-test.yml (duration budget)",
+     "evidence": "Open issue #2692 states the fourth breach; #2744 (84e77b193, 'measure WHICH tests are slow, not just that the suite is') landed the measurement instrument this week but the budget remains breached. This fails the anchor A-clause 'full offline suite green and FAST' on the estate's own number.",
+     "repro": "gh issue view 2692; git show 84e77b193 --stat",
+     "dupe_of": "2692"
+    },
+    {
+     "id": "F4",
+     "title": "Verified fixed (positive verification, not a defect): the three headline instrument defects all carry real regression coverage at HEAD",
+     "severity": "note",
+     "location": "lambdas/operational/coherence_sentinel_lambda.py:256-275; .github/workflows/golden-brief-eval.yml:61-72; tests/test_mypy_disable_cost_2638.py:106-117",
+     "evidence": "(1) coherence_sentinel_lambda.py:256 reads dg.get('total_score')/letter_grade (was score/grade); tests/test_coherence_sentinel.py:40-70 drives the REAL _gather_computed_checks over live-shaped records and asserts '0 computed metrics' not in detail — the stub-the-broken-adapter pattern is gone. (2) golden-brief-eval.yml gating step now sets pipefail with the #2746 in-file proof, and the SET guard passed my synthetic-offender check (guard fires: True). (3) The mypy disable ratchet is derived, non-empty-asserted, and I proved it fails on an injected 5th code (subset-ratchet would FAIL: True). Sampled gate suite: 162 tests passed locally in ~17s; CI/CD success at 8905a9249.",
+     "repro": "python3 -m pytest tests/test_gate_steps_cannot_swallow_status_2746.py tests/test_mypy_disable_cost_2638.py tests/test_wallclock_fixture_bombs_2376.py tests/test_coverage_floor_ratchet.py tests/test_premerge_lane.py tests/test_gate_census_2578.py tests/test_xfail_hygiene.py tests/test_module_size_guard.py tests/test_lambda_size_gate.py tests/test_coherence_sentinel.py tests/test_coherence_behavioral_absence_2735.py tests/test_coherence_invariants.py -q",
+     "dupe_of": ""
+    }
+   ],
+   "inspected": [
+    "Anchor rubric loaded verbatim from docs/reviews/fullreview_grades_2026-08-09_delta.json (principal lens)",
+    "Week's change surface: git log 08c7af26..d7df1148e over tests/ and .github/workflows/ (~60 gate-relevant commits read); 131 new test files enumerated",
+    "Coverage floor + high-water ratchet: pyproject.toml fail_under=74, tests/test_coverage_floor_ratchet.py RATCHET_HIGH_WATER=80.20 with CI-literal parity assertions",
+    "Pipefail/tee class: golden-brief-eval.yml fix (#2748), tests/test_gate_steps_cannot_swallow_status_2746.py read in full, all workflow tee-pipes audited (ci-cd.yml:446 cdk-diff is a documented deliberate set +e), SET-guard proven to fire on a synthetic offender",
+    "Wall-clock time-bomb structural gate: tests/test_wallclock_fixture_bombs_2376.py (predicate, exemption discipline, synthetic-bomb meta-test)",
+    "Mypy tranche ratchets: #2745 return-value enablement, #2749 membership-pin fix read as diff, can-fail proven by injecting a 5th disabled code via disabled_codes(ini_path) against a scratchpad mypy.ini",
+    "Module-size guards: tests/test_module_size_guard.py (int BASELINE, grow/stale/documented tests, character_engine=2117) and tests/test_lambda_size_gate.py (grandfathered-covered-by-baseline cross-check)",
+    "Gate census: scripts/gate_census.py executed live (447/396/6/3/438 + error-bar block); #2631/#2637/#2726 commits; test_gate_census_2578.py in sampled run",
+    "computed_coherence/behavioral-absence fix #2737: source verified at coherence_sentinel_lambda.py:256-275 (total_score/letter_grade/get_tier), tests verified to drive the real gatherer",
+    "Pre-merge lane parity: tests/test_premerge_lane.py test inventory (marker sharing, dep parity, structural floor, coverage-gate can-fail); ADR-148 amendment (#2371) read in DECISIONS.md — strict=false re-decided with measured wave evidence, merge-ref lane caught 4 union breaches, #2372 derivation landed",
+    "Live CI state: gh run list for d7df1148e/8905a9249/eedb61ff1 — CI/CD success at 8905a9249, docs-only at d7df1148e, main green",
+    "Local execution: 162 sampled gate/guard tests passed (two batches, 43+119)",
+    "Dedupe: gh issue list --state open --limit 200 pulled; #2644 state checked (CLOSED); candidates checked against #2578/#2692/#2735/#2738/#2639/#2638",
+    "Instance-pinning scan across all 131 new test files (literal-set equality / exact-count heuristic); test_ai_door_type_guards_2688 membership pin adjudicated as a deliberate forcing pin, not a defect",
+    "xfail hygiene gate (tests/test_xfail_hygiene.py) present and in sampled green run",
+    "github_posture.json strict_required_status_checks_policy read live from file"
+   ],
+   "not_covered": [
+    "Full offline suite execution locally (6,771+ premerge tests) — relied on live CI/CD success at 8905a9249 plus a 162-test local sample of the gate estate",
+    "The anchor's 'no unreferenced code in every-bundle shared modules' clause — no dead-code sweep of lambdas/common|ai|experiment this pass",
+    "The 'one canonical implementation per platform invariant' clause (Decimal/Pacific-date/ISO-parse fork check) — unchanged surface not re-audited this week",
+    "Mutation-proving any of the 104 risk-flagged census gates beyond the 6 already proven (read their verdicts; did not run new mutations)",
+    "Live CloudWatch verification of the three in-ALARM instruments (ground truth stipulates conditions fixed, rolling-24h windows clearing ~08-16 18:45Z)",
+    "Whether CONTENT_FILTER_JSON is actually set as a repo secret (unreadable by design; #2644 closed with evidence, census verdict shows the armed path)",
+    "coverage_gap_warn.py internals beyond the parity assertions the ratchet test makes",
+    "The visual-qa / reader-truth AI gate quality itself (tier-1 pause semantics respected per ADR-125; #2741 known-open partial)"
+   ],
+   "verifier": {
+    "grade": "A-",
+    "agrees": true,
+    "note": "Independent grade A- under the loaded principal anchors; agrees with the grader. Both prior WHY-NOT-A blockers verified resolved: the wall-clock class has a structural gate with its own synthetic-bomb meta-test (test_wallclock_fixture_bombs_2376.py, in my green sample run), and the concurrency clause was re-decided with measured evidence (ADR-148 amendment; dep-parity and marker-derivation guards verified line-by-line in test_premerge_lane.py). The estate sits far above the C anchor — ratcheted coverage floor, honest self-reporting census, dead instruments found and converted to set guards, red main decoded and fixed within hours (F-bar nowhere in play). But three A-clauses are MEASURED-unmet, not merely unverified: 'fast' fails on the estate's own budget (1247s vs 1200s, fourth breach, #2692); 'every stated gate matches measured reality' cannot be asserted while the estate's own census says 6/447 proven can-fail and this week surfaced two multi-year dead instruments; and the collection-import class recurred twice in 48h with nothing structural preventing a third (F1 — the one genuinely new, unfiled gap this verification confirms). All four findings reproduced as stated; F2/F3 are properly deduped against open issues per ground truth. Grader's path to A (collection-import set guard, census verdict growth through the 104 risk-flagged gates, lane budget settled by measurement) is well-targeted.",
+    "verdicts": [
+     {
+      "id": "F1",
+      "verdict": "CONFIRMED",
+      "note": "Fully reproduced at HEAD. ci-cd.yml test-critical installs only pytest/boto3/botocore/hypothesis (ci_pins.py line ~349) yet collects all of tests/ (line 355). Both incident commits verified verbatim (227e336fb #2699 08-14, 6b486bfc7 #2732 08-15 — same class, 48h apart); both fixes are per-file importorskip(\"yaml\"). The existing pre-merge --collect-only gate (pr-checks.yml:84) is structurally blind to this class because that lane installs pyyaml (pr-checks.yml:75) — the offender passes every pre-merge check and reds only the minimal post-merge deploy lane. Searched tests/conftest.py, test_premerge_lane.py, test_workflow_hygiene, and all post-#2732 commits: no AST scan of tests/ module-level imports against the minimal dep set, no yaml-less collection run anywhere. Not tracked by any open issue (checked the open corpus). P2 is right: recurrence blocks Plan→Deploy on main, and it is the week's own named anti-pattern (guard the SET) recurring inside the session that named it."
+     },
+     {
+      "id": "F2",
+      "verdict": "CONFIRMED",
+      "note": "python3 scripts/gate_census.py reproduces the numbers exactly: n=447 gates, 6 proven can-fail, 3 attempted-not-proved, 438 no verdict, 104 risk-flagged, with the honest 'n is a FLOOR in both directions' error block. #2578 is OPEN ([EPIC] prove every armed gate can fail). Correctly severity=note and correctly marked dupe_of 2578 — this is tracked context that legitimately blocks the A clause, not a new filing."
+     },
+     {
+      "id": "F3",
+      "verdict": "CONFIRMED",
+      "note": "#2692 is open with the exact title ('Unit Tests wall-clock crossed its budget a fourth time (1247s vs 1200s) — measure before raising it again'). Commit 84e77b193 (#2744, 08-15) landed the per-test measurement instrument; the budget itself remains breached. Correctly a dupe-of note; the anchor's 'fast' clause is measured-unmet on the estate's own number."
+     },
+     {
+      "id": "F4",
+      "verdict": "CONFIRMED",
+      "note": "All three positive-verification claims hold at HEAD. (1) coherence_sentinel_lambda.py:256-258 reads total_score/letter_grade (get_tier import ~272); tests/test_coherence_sentinel.py:41-70 drives the REAL _gather_computed_checks over live-shaped records ('total_score': 39, 'letter_grade': 'F') and asserts '0 computed metrics' not in detail — the stub-the-broken-adapter pattern is gone. (2) golden-brief-eval.yml:70 sets `set -o pipefail` with the in-file #2746 explanation of the bash -e trap. (3) The mypy disable ratchet test exists and passes. Ran the full 12-file repro suite: 162 passed in 16.5s, matching the grader's count exactly."
+     }
+    ]
+   }
+  },
+  "cto": {
+   "area": "Architecture & ops — stacks, cost posture (ADR-063/133), resilience, DR, complexity ledger (ADR-103)",
+   "grade": "A-",
+   "grade_2026_08_09": "A-",
+   "rubric_anchors": {
+    "A": "Every resilience/ops claim in ARCHITECTURE.md reproduces against live CDK + AWS state; liveness sensors are capability-verified (not just IAM-parity-verified) after deploy; no alarm sits in ALARM unexplained beyond ~72h; the ADR-103 ledger rows match live subsystem state — all inside the solo-operator $85/mo envelope with no added standing machinery.",
+    "C": "The core pipeline (ingest→DLQ→digest, S3/DDB protection, per-lambda roles) works, but one or more monitoring paths are silently dead, the canonical architecture doc materially misdescribes live behavior (crons, stack ownership, quotas), and stale alarms/ledger rows accumulate with no reconcile loop.",
+    "F": "Async paths without DLQ/alarm coverage, shared over-privileged IAM roles, S3/DDB unprotected against operator error, or documentation wrong enough that an incident responder acting on it would make things worse.",
+    "EXTENSION_2026-08-09": "The surface grew: the required pre-merge lane (ADR-148 + the 2026-08-09 structural-gate extension) is now part of the ops posture. A additionally requires the lane's dep-parity and required-check identity to be guard-tested (they are — tests/test_premerge_lane.py, tests/test_branch_protection_spec.py + deploy/github_posture.json + drift_sentinel GET-verification) and any gate relocation to preserve independent per-gate reporting (if: always()). Prior anchors carried verbatim, never redefined."
+   },
+   "grade_rationale": "Holds at A- with the failure set rotated, which is exactly what the anchors say separates A- from A. GAINS, each re-verified from source or live: (1) All three prior anchor failures were remediated this week — qa-smoke-warnings is no longer structurally always-red (the #1958/#2378 chronic-vs-alarmed WarnCount split, monitoring_stack.py:438-455, AST-guarded by test_qa_smoke_chronic_warns; the alarm's current ALARM state is datapoint aging, per ground truth); the deploy-race class got its structural answer (bundle commit fingerprint + ancestry postflight #2408, deploy_lambda.sh:113, plus verify_bundle_boot wired into BOTH the deploy path and the pre-merge lane #2636); and a ledger refresh + a wrap-time ledger gate landed 08-09 (f95f53b6e). (2) Gated-run lease discipline is now structural, not procedural: check_deploy_wedge.py names a gate-parked holder of any age before \"phantom\" can be concluded and prescribes REJECT (STALE_GATE_REJECT_HOURS, #2483), and check_main_green excludes rejected deployments from red verdicts (#2590/#2596). (3) The #2746 pipe-mask class was swept, not spot-fixed — pipefail confirmed at golden-brief-eval.yml:70, eval-harvest.yml:65, deploy-wedge-watch.yml:69, and ci-cd.yml's cdk-diff tee deliberately captures its exit under set +e. (4) Cost posture is honest by construction: _TEMP_CEILING_WINDOW = [2026-08-01, 2026-09-01) consulted at evaluation time (cost_governor_lambda.py:139,382) so the August $115/$135 window auto-reverts with no deploy; live SSM tier = 1 matches ground truth; the sustained-tier escalation alarm is firing exactly as designed and is tracked (#2734). (5) The alarm board passes the ≤72h-unexplained bar: all 7 ALARM states decode to a tracked issue, a fixed-and-aging condition, or a by-design window indicator. (6) Extension guards intact (test_premerge_lane.py, test_branch_protection_spec.py, github_posture.json, 13× if: always() in ci-lint.yml). (7) The incident log grew 16 honest rows since 08-10 and its recurring classes are getting structural answers (denied-config ≠ absent-config #2693, reader-derives-the-week #2629 which deletes the seeder instead of remembering it). HELD BELOW A by: (a) the ledger-currency anchor fails for the SECOND consecutive review — zero commits to docs/PROPORTIONALITY.md since 08-10 while the week added standing machinery with real rent (permanence nightly archive + continuity switch with its own IAM family, Telegram voice TTS, coach outbound budget, gate census), and the #2380 wrap gate written to prevent exactly this was silently skipped by every session since it landed — an unenforced prose gate, the platform's own named anti-pattern; (b) the one-legged-pin class the CDK CLI drift exposed has at least three more live instances (fully unpinned remediation-agent toolchain including npm claude-code under OIDC creds, pip-audit/pip-licenses pinned inline-only with no Dependabot leg, unpinned boto3/pytest in the smoke and golden-brief gates), and the CDK fix itself is a hand-bump plus a comment, not structure; (c) the swallowed-push class remains procedural — check_main_green's verdict never asserts the newest sha has any run, so the documented zero-runs push shape reads as green. The failures are all P3 hygiene/currency, none load-bearing-broken — that is A- on this rubric, not lower; the recurrence pattern (ledger, pins) is why it is not A.",
+   "findings": [
+    {
+     "id": "CTO-1",
+     "title": "Remediation-agent workflow installs its entire toolchain unpinned — npm claude-code + four pip packages float to latest in a job holding AWS OIDC creds and a PR-writing token",
+     "severity": "P3",
+     "location": ".github/workflows/remediation-agent.yml:62-63",
+     "evidence": "Lines 61-63: `pip install --quiet boto3 claude-agent-sdk pytest flake8` and `npm install -g @anthropic-ai/claude-code` — no version on any of the five. The same workflow assumes github-actions-remediation-role via OIDC (Bedrock invoke + read-only diagnosis + audit-log writes) and uses GITHUB_TOKEN to create labels and open PRs. The repo's own convention forbids this shape: ci-cd.yml:429 — 'Pinned exactly (#814, R22-MOD-01) — an unpinned `npm install -g aws-cdk` always pulls whatever released today'. .github/dependabot.yml has NO npm ecosystem entry, so there is no automated bumper either — this is the zero-legged variant of the class that let the CDK CLI pin drift for months (#2468). Runs 3x/week on schedule plus on-demand via repository_dispatch. Bounded by the constrained role and shadow mode, hence P3 not P2. No open issue matches (searched titles for pin/npm/dependabot/claude-code/version).",
+     "repro": "grep -n 'npm install -g @anthropic-ai/claude-code\\|pip install --quiet boto3 claude-agent-sdk' .github/workflows/remediation-agent.yml && grep -c 'package-ecosystem: \"npm\"' .github/dependabot.yml  # 0",
+     "dupe_of": ""
+    },
+    {
+     "id": "CTO-2",
+     "title": "The one-legged-pin class extends beyond the CDK CLI: pip-audit (ENFORCED CVE gate) and pip-licenses are pinned inline-only with no Dependabot leg, and the smoke-test + golden-brief gates install boto3/pytest unpinned, evading the CQ-01 guard",
+     "severity": "P3",
+     "location": ".github/workflows/ci-lint.yml:138,201; .github/workflows/ci-cd.yml:1010; .github/workflows/golden-brief-eval.yml:60",
+     "evidence": "ci-lint.yml:138 `pip install pip-audit==2.10.1` (the BLOCKING dependency-CVE gate) and :201 `pip install pip-licenses==5.0.0` — neither package appears in requirements-dev.txt (verified: full file read), so Dependabot never opens a bump PR for them; identical mechanics to #2468, where 'Dependabot covers only one leg' let the CDK CLI pin sit stale for months. Meanwhile ci-cd.yml:1010 (`pip install boto3 pytest --quiet`, the post-deploy smoke job) and golden-brief-eval.yml (deterministic canary 'gating every push' per PROPORTIONALITY.md) install unpinned — and tests/test_ci_pin_consistency.py's _pin_mismatches only regex-matches `tool==X` literals, so an UNPINNED install is invisible to the exact-equality guard (#2058) by construction. The CDK CLI fix itself (6b8abdfb9, post-graded-surface) is a hand-bump plus the comment 'Dependabot bumps cdk/requirements.txt but NOT this line — bump it by hand when those land' (ci-cd.yml:437) — the class remains guarded by memory, not structure. Structural fix candidates: a cdk/package.json devDependency + npm ecosystem in dependabot.yml for the CLI leg; add pip-audit/pip-licenses to requirements-dev.txt and resolve via the existing scripts/ci_pins.py, which was built for exactly this (#2609).",
+     "repro": "grep -n 'pip-audit==\\|pip-licenses==' .github/workflows/ci-lint.yml; grep -c 'pip-audit\\|pip-licenses' requirements-dev.txt  # 0; sed -n '1010p' .github/workflows/ci-cd.yml",
+     "dupe_of": ""
+    },
+    {
+     "id": "CTO-3",
+     "title": "The #2380 proportionality wrap gate silently failed for every session since it landed: zero ledger commits since 08-10 while the week shipped standing machinery with $, surface, and attention rent",
+     "severity": "P3",
+     "location": "docs/PROPORTIONALITY.md:3; .claude/commands/wrap.md:381-384",
+     "evidence": "wrap.md:381-384 requires every wrap that lands 'a NEW standing CI gate, scheduled writer, or watcher' to name its PROPORTIONALITY.md row OR write an explicit 'ledger: omitted — <reason>' line, ending 'Silent omission is how the ledger became a snapshot.' Measured: `git log --since=2026-08-10 --oneline -- docs/PROPORTIONALITY.md` returns EMPTY; `grep -n ledger handovers/HANDOVER_LATEST.md` returns EMPTY; the ledger's Verified stamp is 2026-08-09. Standing machinery added since: the permanence nightly public archive + continuity switch (#2572, 2026-08-11 — a scheduled writer with its own cdk/stacks/role_policies_permanence.py IAM family, S3 + surface rent, plausibly connected to the s3-bucket-size-high alarm lit since 08-09), Telegram voice-note TTS (#2552, $ per note), the coach outbound ping budget (#2527, attention), and the gate census (#2578). This is the second consecutive review failing the 'ledger rows match live subsystem state' anchor — last review's remediation (the f95f53b6e refresh + the gate itself) covered the PRIOR week's machinery and then the gate never fired again. The gate needs an enforcement leg (e.g., the wrap's #1332-style checklist asserting either a ledger diff or the omission line), not more prose.",
+     "repro": "git log --since=2026-08-10 --oneline -- docs/PROPORTIONALITY.md  # empty; grep -in 'ledger' handovers/HANDOVER_LATEST.md  # empty; grep -n 'permanence\\|Permanence\\|gate census\\|outbound' docs/PROPORTIONALITY.md  # no rows",
+     "dupe_of": ""
+    },
+    {
+     "id": "CTO-4",
+     "title": "check_main_green's completed-run verdict never compares head_sha to main HEAD, so the documented swallowed-push shape (a push that mints ZERO runs) reads as green",
+     "severity": "P3",
+     "location": "scripts/check_main_green.py (latest_completed_run)",
+     "evidence": "latest_completed_run() iterates `gh run list` newest-first and returns the first completed, non-cancelled, non-rejected run — with no check that the returned run's head_sha equals (or descends from) the sha being vouched for: `for r in runs: if r.get(\"status\") != \"completed\": continue ... return r`. grep for 'head_sha|swallow' across check_main_green.py returns zero hits (the only head_sha use in scripts/ is check_deploy_wedge.py:199, display-only). The memory system documents the incident class ('Swallowed push = ZERO runs — query by head_sha') as a manual procedure; the wrap gate's automated main-green verdict therefore vouches for a HEAD that CI may never have seen, the same 'instrument that cannot fail' shape this week's sessions fixed in four other places (#2746, #2736, the wait-loop grep -c). Fix shape: the verdict asserts the newest completed run's head_sha is main HEAD (or that HEAD has at least one run of any status), else reports 'HEAD uncovered', never 'green'.",
+     "repro": "sed -n '/def latest_completed_run/,/return None/p' scripts/check_main_green.py; grep -cn 'head_sha' scripts/check_main_green.py  # 0",
+     "dupe_of": ""
+    },
+    {
+     "id": "CTO-5",
+     "title": "Live alarm board fully decoded — 7 in ALARM, every one explained by a tracked issue, an already-fixed aging condition, or a by-design window; no unexplained standing red",
+     "severity": "note",
+     "location": "CloudWatch us-west-2 (describe-alarms, read-only)",
+     "evidence": "describe-alarms --state-value ALARM: coherence-overall (08-15), qa-smoke-failures (07-31), qa-smoke-warnings (07-18) — all three conditions fixed, Maximum-over-24h aging out per ground truth (tracked #2670, open partial); budget-tier-sustained-7d (08-12) — the deliberate rarity-is-the-escalation alarm doing its job under the August window, tracked #2734 (open partial); life-platform-s3-bucket-size-high (08-09) — tracked #2642 (67 GB noncurrent versions, no NoncurrentVersionExpiration on deploys/ and site/); freshness-interior-gap (08-10) — matches #2643 (Eight Sleep interior gap at 2026-08-09 hidden by the high-water mark); token-alarm-genesis-window-active (08-07) — by design, the #1961 genesis rebuild suppression-window indicator (lambdas/common/token_alarm_window.py), auto-clears by date. Recorded as the A-anchor check ('no alarm sits in ALARM unexplained beyond ~72h') PASSING; the individual conditions are all already tracked, so nothing here counts against the grade beyond its existing weight.",
+     "repro": "aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output text",
+     "dupe_of": "2670, 2734, 2642, 2643"
+    }
+   ],
+   "inspected": [
+    "docs/reviews/fullreview_grades_2026-08-09_delta.json (cto anchor, applied verbatim)",
+    "git log 08c7af26..HEAD over deploy/, .github/workflows/, cdk/, docs/PROPORTIONALITY.md, docs/INCIDENT_LOG.md (~60 commits triaged)",
+    "docs/INCIDENT_LOG.md — all 16 rows dated 2026-08-10..08-15 read; recurring classes traced to their structural answers",
+    "docs/PROPORTIONALITY.md — full ledger read; Verified stamp + row-by-row check against the week's shipped machinery; git log since 08-10 on the file (empty)",
+    ".claude/commands/wrap.md:379-384 (the #2380 ledger gate text)",
+    ".github/dependabot.yml (full), requirements-dev.txt (full), cdk/requirements.txt, scripts/ci_pins.py header, tests/test_ci_pin_consistency.py:100-150 (_GATED_TOOLS/_UNGATED_DEV_PINS/_pin_mismatches)",
+    ".github/workflows/: ci-cd.yml (CDK-diff step 425-500, smoke install 995-1015, pipefail 188), ci-lint.yml (pip-audit/gitleaks/pip-licenses/syft steps 120-231), remediation-agent.yml:55-70, golden-brief-eval.yml, deploy-wedge-watch.yml:55-95, eval-harvest.yml (pipefail sweep verification)",
+    "scripts/check_deploy_wedge.py (stale-gate-holder REJECT machinery, #2483) and scripts/check_main_green.py (latest_completed_run read in full; rejected-run exclusion #2590)",
+    "deploy/deploy_lambda.sh:113 (bundle commit fingerprint), #2408/#2636 postflight+boot-verify wiring",
+    "lambdas/operational/cost_governor_lambda.py (_TEMP_CEILING_WINDOW dates/values/evaluation-time consult) + lambdas/common/token_alarm_window.py",
+    "cdk/stacks/monitoring_stack.py:425-510 (qa-smoke alarm trio + the #2378 chronic split + budget-tier-sustained-7d design)",
+    "LIVE: aws ssm get-parameter /life-platform/budget-tier (=1), aws cloudwatch describe-alarms --state-value ALARM (7 alarms, each decoded)",
+    "gh issue list --state open (200) — every candidate finding deduped against titles",
+    "extension guards: tests/test_premerge_lane.py, tests/test_branch_protection_spec.py, deploy/github_posture.json present; if: always() count in ci-lint.yml"
+   ],
+   "not_covered": [
+    "DR drill re-verification (DDB PITR / S3 versioning / DLQ depths) — verified live by the prior review, not re-run this pass",
+    "IAM least-privilege re-audit of the 8-way role_policies_*.py split (#2604) — file list confirmed, policies not diffed",
+    "Capability-verification of liveness sensors post-deploy (the A-anchor's 'not just IAM-parity' clause) — not exercised live this pass",
+    "The SSM budget-tier-breakdown parameter (name I tried was wrong; tier value verified, breakdown fields not re-read)",
+    "site-deploy.yml and the site-side auto-deploy path — unchanged this week per git log, not re-inspected",
+    "The MCP 9-issue sweep and mcp_stack surface — other lenses' territory",
+    "Whether freshness-interior-gap's live metric dimension is exactly #2643's Eight Sleep gap (inferred from issue title + dates, not traced to the emitting checker)",
+    "The 82 QA-unswept endpoints (#2652) and 13 no-DLQ operational lambdas (#2694) — both open/tracked, not re-measured",
+    "gh issue list capped at 200 — dedupe searched titles only, not bodies"
+   ],
+   "verifier": {
+    "grade": "A-",
+    "agrees": true,
+    "note": "All five findings survive lean-REFUTED verification — an unusually clean set (5/5 against a ~50% historic false-positive rate), and each was re-run against the repo/live state rather than taken from the grader's text: the unpinned remediation toolchain and the zero-npm dependabot config reproduce verbatim; the one-legged/zero-legged pin class is real and the _pin_mismatches guard is blind to unpinned installs by construction; the ledger anchor fails a second consecutive review on measured git history while I independently confirmed the week's standing machinery (permanence #2572, voice TTS #2552, gate census #2578) actually merged; check_main_green demonstrably cannot distinguish 'newest run green' from 'HEAD has a run at all' (its headSha uses are display-only); and the live alarm board decodes 7/7 to tracked issues or by-design/aging conditions. Under the 2026-08-09 anchors my independent grade is A-: the no-unexplained-alarm clause passes live, the extension guards are intact (test_premerge_lane.py, test_branch_protection_spec.py, github_posture.json, 13× if: always()), all three prior anchor failures were remediated, and nothing load-bearing is broken — but the ADR-103 ledger-currency clause fails outright (recurrence, with the #2380 gate itself an unenforced prose gate, the platform's own named anti-pattern) and the pin class recurred one week after #2468. Those are exactly the two things the anchors say keep this at A- rather than A, and none of the failures approach the C anchor's silently-dead-monitoring bar. Matches the grader's A-; agrees_with_grader = true.",
+    "verdicts": [
+     {
+      "id": "CTO-1",
+      "verdict": "CONFIRMED",
+      "note": "Reproduced exactly: remediation-agent.yml lines 62-63 install boto3/claude-agent-sdk/pytest/flake8 and npm -g @anthropic-ai/claude-code with zero version pins, in a job that assumes github-actions-remediation-role via OIDC and writes labels/PRs with GITHUB_TOKEN. dependabot.yml has only github-actions + 2 pip ecosystems, no npm entry, so the class is zero-legged as claimed. ci-cd.yml's own comment (now at :429-437) forbids this shape for aws-cdk. No open issue matches (grepped 200 open titles for pin/npm/dependabot/unpinned — zero hits). P3 is right given shadow mode + constrained role."
+     },
+     {
+      "id": "CTO-2",
+      "verdict": "CONFIRMED",
+      "note": "All four legs reproduce: pip-audit==2.10.1 (ci-lint.yml:138, the blocking CVE gate) and pip-licenses==5.0.0 (:201) with zero occurrences in requirements-dev.txt, so Dependabot never bumps them — identical mechanics to #2468; ci-cd.yml:1010 `pip install boto3 pytest --quiet` (smoke) and golden-brief-eval.yml:60 `pip install pytest boto3 botocore` are fully unpinned. Verified tests/test_ci_pin_consistency.py:_pin_mismatches (lines 131-151) only harvests `tool==version` regex literals, so an unpinned install is structurally invisible to the #2058 exact-equality guard as claimed. The post-graded-surface CDK fix (eedb61ff1) is indeed a hand-bump plus a 'bump it by hand' comment — memory, not structure. No open-issue dupe."
+     },
+     {
+      "id": "CTO-3",
+      "verdict": "CONFIRMED",
+      "note": "All three measured facts reproduce: `git log --since=2026-08-10 -- docs/PROPORTIONALITY.md` is empty; HANDOVER_LATEST.md has zero 'ledger' mentions (no omission line either); ledger Verified stamp is 2026-08-09 with no rows for permanence/gate-census/outbound/voice. I additionally verified the standing machinery actually merged (memory hinted #2552/#2572 were 'held for owner', but c16c75783 = #2572 permanence nightly + continuity switch with cdk/stacks/role_policies_permanence.py, c78c93369 = #2552 voice TTS, and #2578 gate-census commits 015dfa551/37855fd8f are all on main since 08-10). The #2380 wrap gate text at wrap.md:381-384 requires exactly what every session since skipped. Second consecutive failure of the ledger anchor, unenforced prose gate — accurately characterized."
+     },
+     {
+      "id": "CTO-4",
+      "verdict": "CONFIRMED",
+      "note": "The substance reproduces exactly: latest_completed_run() returns the newest completed non-cancelled non-rejected run with no assertion that its sha covers main HEAD, and the verdict kind is GREEN on that run's conclusion alone — so a push that mints zero runs (the documented swallowed-push shape) leaves an older run vouching green for an uncovered HEAD. One evidence detail is an artifact, not a defect in the finding: the repro greps snake_case 'head_sha' (0 hits) but camelCase 'headSha' appears 6 times in the file — all display/reporting only (result dict 'sha' field, _fmt_run, rejection notices), never compared to `git rev-parse HEAD` or any expected sha (grep for rev-parse/expected_sha: zero). 'swallow' has one hit in the #2590 docstring, a different sense. Mechanism, scope, and severity unchanged, so CONFIRMED rather than ADJUSTED."
+     },
+     {
+      "id": "CTO-5",
+      "verdict": "CONFIRMED",
+      "note": "Live describe-alarms (us-west-2, read-only) returns exactly the 7 alarms with the stated StateUpdated dates: coherence-overall 08-15, qa-smoke-failures 07-31, qa-smoke-warnings 07-18 (conditions fixed, Maximum-over-24h aging per ground truth, tracked #2670), budget-tier-sustained-7d 08-12 (#2734 open, by-design under the ADR-133 August window), s3-bucket-size-high 08-09 (#2642 open, 67 GB noncurrent versions), freshness-interior-gap 08-10 (#2643 open, Eight Sleep interior gap — mapping by title+date, same inference the grader disclosed), token-alarm-genesis-window-active 08-07 (by design, lambdas/common/token_alarm_window.py exists). All four cited issues verified open. The ≤72h-unexplained anchor passes; correctly filed as a note with dupes declared, not a finding."
+     }
+    ]
+   }
+  },
+  "aiq": {
+   "area": "AI content integrity — grounded generation (ADR-104), rigor bar (ADR-105), phase/day-awareness, hallucination surface, prompt audience declarations, tier-pause honesty",
+   "grade": "B+",
+   "grade_2026_08_09": "B",
+   "rubric_anchors": {
+    "A": "Every reader-facing AI narrative passes a deterministic grounding gate with the audience-correct fail mode (fail-closed public, keep-best internal), every prompt carries the phase/day truth, a reset leaves zero wiped-cycle narrative reachable on any live endpoint, and live spot-checks find no number, date, or verdict a Day-4 reader couldn't trace to real data.",
+    "C": "The grounding harness exists and covers the flagship surfaces, but coverage is convention rather than structure — at least one live surface serves stale, ungated, or mischaracterized AI content and no test or gate would catch it.",
+    "F": "Models receive raw data and ship unchecked numbers or claims to readers, or a reset/budget state silently narrates wiped or fabricated history as current with no tombstone semantics at all.",
+    "_source": "2026-07-16 baseline via 2026-07-28 partial, re-applied verbatim.",
+    "_extension_2026_08_09": "EXTENSION (surface grew, not a redefinition): the A anchor's 'trace to real data' is now explicitly read to include day-correspondence and window-semantics — a number must not only exist in the fact set but belong to the day/window the sentence claims. #2343/#2344 and this run's findings prove existence-only tracing passes semantically false claims; the anchor's word 'trace' always implied this, the registry classes now need to enforce it."
+   },
+   "grade_rationale": "The two conditions the prior review named for B+ are both met, verified from source and live. (1) The fail-closed public path exists: ai_expert_analyzer_lambda.py:1029-1077 now regenerates-once then HOLDs — residual grounding findings return \"\" and the prior cached record keeps serving (verified at the main call site, line 1199-1201, and in _gate_json_record line 1095-1098); last review's measured keep-best fail-open (published sleep narrative with 2 unresolved findings) is structurally closed. (2) The invoke-site census happened: the position_summary Haiku re-parse — previously 'structurally invisible to the registry' — is on the standard gate and AST-registered (tests/grounding_wiring.py:228 `coach_state_updater.py::_gate_derived_prose`, #2529; 21/21 tests pass at checkout), and #2457 put all four ungated analyzer paths on the gate. The prior C-anchor trait (unlabeled fallback digests, #2333) is closed — live /api/coach_analysis carries ensemble_fallback:true + confidence_language. Live spot-checks now trace: the Park card's dated citation (recovery 40%, HRV 35.3 'on the night of 2026-08-13') matches DDB whoop DATE#2026-08-14 exactly (recovery_score=40, hrv=35.32); /api/vitals discloses weight_as_of vs as_of_date with a Day-6 window_disclosure and honest 30d nulls; /api/nutrition_overview renders the 52-day MacroFactor rest state as nulls + days_logged 0. Behavioral-absence semantics (ADR-104) extended into the instrument layer this week (#2737: quiet_sources derived from source_registry's behavioral facet; empty check set → WARN, never OK), and the week's ADR-105 discipline was exemplary — #2743 measured a 2/8 flake before designing confirm-before-FAIL (demote-never-drop, fail-closed on confirm error), overturning the session's own retirement proposal. Not A-: the A anchor's 'no number a Day-4 reader couldn't trace' still fails on tracked live classes — #2667 (stale weight narrated as current, no per-metric date in the prompt), #2675 (two coaches, two cycle days — the UTC-vs-PT clock split in the analyzer, which sits outside the #2414 Pacific guard's scanned surface), #2634 (HRV vs published_vitals stamp), #2740 (the new dated-citation exemption is itself verified by nothing) — plus one new fail-open residue: a gate-INFRA exception at the analyzer's main call site still publishes ungated text with only a WARN log.",
+   "findings": [
+    {
+     "id": "AIQ-1",
+     "title": "Gate-infra exception at the analyzer's main publish site ships UNGATED narrative to a public surface (fail-open residue of the #2391 hold)",
+     "severity": "P3",
+     "location": "lambdas/intelligence/ai_expert_analyzer_lambda.py:1198-1205",
+     "evidence": "Source at checkout: `try: _gated = _gate_prose(...); if not _gated: return \"\"  # #2391 hold ... except Exception as _sc: logger.warning(\"grounding self-correction failed for %s: %s\", expert_key, _sc)` — after the except, analysis_text proceeds unmodified into the cached EXPERT# item that /api/coach_analysis serves. The docstring at line 1030 states it plainly: 'Gate-INFRA failure still publishes.' Residual-findings now hold (good), but a raise inside grounding_findings/allowed_numbers (facts loader, import, Bedrock error in regen) publishes brand-new ungraded prose to readers with only a WARN log — the same discard-the-WHY silence class the 08-15 sessions drained elsewhere. The A anchor requires the audience-correct fail mode: fail-closed public.",
+     "repro": "sed -n 1029,1031p lambdas/intelligence/ai_expert_analyzer_lambda.py && sed -n 1197,1206p lambdas/intelligence/ai_expert_analyzer_lambda.py — confirm the except swallows and the item write at ~1209 uses the ungated analysis_text",
+     "dupe_of": ""
+    },
+    {
+     "id": "AIQ-2",
+     "title": "Two-clock 'now': the analyzer computes reader-facing experiment day from UTC at 6+ sites and is structurally outside the #2414 Pacific-frame guard",
+     "severity": "P2",
+     "location": "lambdas/intelligence/ai_expert_analyzer_lambda.py:256,553,732,1037,1115,1428,1504,1789",
+     "evidence": "Line 256/553/1115/1428/1789: `days_in_experiment = ... (datetime.now(timezone.utc).date() - ... EXPERIMENT_START ...).days + 1`; line 732 embeds it in the prompt: 'This is Week {week_num} of the experiment (started {EXPERIMENT_START}, now day {days_in_experiment})'; line 1037 sets the grounding gate's own generation_date_iso from UTC. Meanwhile the serving side uses Pacific: site_api_coach_narrative.py:75 `today = datetime.now(PT).date()`. Between 17:00 PT and midnight PT the two disagree by one day — the mechanism behind live-observed #2675. The #2506 guard cannot catch it: tests/test_pacific_today_guard_2414.py:54 scopes to lambdas/web/** plus _READER_BOUND_WRITERS = (\"lambdas/coach/coach_observatory_renderer.py\",) — the analyzer, a reader-bound writer of EXPERT# records, is not in the set. Fixing #2675 without adding the analyzer to the guard's writer set leaves the class re-openable (guard-the-set).",
+     "repro": "grep -n 'now(timezone.utc).date' lambdas/intelligence/ai_expert_analyzer_lambda.py; grep -n '_READER_BOUND_WRITERS' tests/test_pacific_today_guard_2414.py; sed -n 68,80p lambdas/web/site_api_coach_narrative.py",
+     "dupe_of": "2675"
+    },
+    {
+     "id": "AIQ-3",
+     "title": "/api/coach_team as_of_weight_lbs carries no as-of date and silently substitutes the experiment baseline when no weigh-in resolves",
+     "severity": "P3",
+     "location": "lambdas/web/site_api_coach_stance.py:372,434",
+     "evidence": "Line 372: `weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS`; line 434 publishes it as \"as_of_weight_lbs\" — a field whose name asserts an as-of it does not carry. _latest_weight_lbs (site_api_coach_profile.py:78-97) returns the newest withings value and discards its date. Live: coach_team as_of_weight_lbs=317.24 while /api/vitals shows weight 317 with weight_as_of=2026-08-11 (values agree today; the coach_team reader cannot know the reading is 4 days old, and on a no-weigh-in cycle the baseline would masquerade as a reading). Mitigation: grep of site/ finds no front-end consumer of as_of_weight_lbs, so today it also feeds only the ladder-rung selection — reader exposure is latent, and the missing-date-to-prompt class is already tracked as #2667.",
+     "repro": "curl -s https://averagejoematt.com/api/coach_team | python3 -c \"import json,sys; print(json.load(sys.stdin)['as_of_weight_lbs'])\" ; curl -s https://averagejoematt.com/api/vitals | python3 -c \"import json,sys; v=json.load(sys.stdin)['vitals']; print(v['weight_lbs'], v['weight_as_of'])\" ; grep -rn as_of_weight site/",
+     "dupe_of": "2667"
+    },
+    {
+     "id": "AIQ-4",
+     "title": "Confirm-before-FAIL counts only second-pass HIGHs as confirmation — a real finding flapping high↔medium can never FAIL the gate",
+     "severity": "note",
+     "location": "lambdas/operational/qa_check_reader_truth.py:210",
+     "evidence": "`second = {finding_group(f) for f in again if (f or {}).get(\"severity\") == \"high\"}` — the measured #2741 flake was severity flapping (low/med then high on identical content), so a genuine defect the judge rates high on pass 1 and med on pass 2 is demoted every night. Honesty is preserved (demoted findings land in WARN with id+detail, lines 296-302, never dropped) and fail-closed on confirm error is correct — this is a sensitivity note on the boundary the fix itself measured, not a defect: a severity-agnostic membership test (`finding_group in {groups of ALL second-pass findings}`) would confirm reproduction without inheriting the severity coin flip.",
+     "repro": "sed -n 205,220p lambdas/operational/qa_check_reader_truth.py",
+     "dupe_of": ""
+    },
+    {
+     "id": "AIQ-5",
+     "title": "Spot-check inconclusive: the coach_team tensions prose cites '1,500 calorie protocol' and 'Three weeks without glucose data' — dated, but neither number traced to a stored fact in this session",
+     "severity": "note",
+     "location": "https://averagejoematt.com/api/coach_team (tensions[0], generated_at 2026-08-15T14:03:04Z)",
+     "evidence": "Live payload: 'Three weeks without glucose data on a 1,500 calorie protocol is unacceptable.' The tension carries generated_at per #2383 (verified in site_api_coach_stance.py:250-254) and its writer is the gated weekly synthesis with no fallback path, so provenance machinery is present; but I could not resolve a CGM partition under USER#matthew#SOURCE#cgm (GetItem returned no item; cgm is not a source_registry key) and did not locate a stored 1,500-kcal protocol target, so the Day-4-reader traceability of these two numbers is unverified rather than false. Other numbers in the same block (RHR 62 vs today's 61.0, recovery red) reconcile within tolerance of their generation time.",
+     "repro": "curl -s https://averagejoematt.com/api/coach_team | python3 -c \"import json,sys; print(json.load(sys.stdin)['tensions'][0]['position_b'])\"",
+     "dupe_of": ""
+    }
+   ],
+   "inspected": [
+    "Anchor rubric docs/reviews/fullreview_grades_2026-08-09_delta.json (aiq lens) — applied verbatim",
+    "Change surface git log 08c7af26..d7df1148e filtered to lambdas/ai, lambdas/coach, lambdas/intelligence, mcp (376 commits total; ~50 AI-surface commits read at title level, 12 at diff/source level)",
+    "#2743 confirm-before-FAIL: lambdas/operational/qa_check_reader_truth.py:160-310 read in full — demote-not-drop, fail-closed confirm, high-only second-pass membership",
+    "#2739 dated-citation exemption: lambdas/operational/weight_truth_qa.py (_DATED_SENTENCE, _HISTORICAL_ANCHOR, sentence scoping) + commit's watched-fail claims",
+    "#2737 behavioral sentinel: coherence_sentinel_lambda.py quiet_sources derivation from source_registry.behavioral_source_keys(); source_registry behavioral facets; coherence_invariants empty-set→WARN",
+    "Analyzer publish path: ai_expert_analyzer_lambda.py:1029-1215 (_gate_prose regenerate-or-hold, _gate_json_record hold, the except-publish residue, UTC day sites)",
+    "Grounding registry: tests/grounding_wiring.py entry for coach_state_updater._gate_derived_prose; ran tests/test_observatory_summary_grounding_2418.py (21 passed)",
+    "Pacific guard scope: tests/test_pacific_today_guard_2414.py surface definition + #2506 changed-file list",
+    "Live: /api/vitals (window_disclosure, weight_as_of), /api/coach_team (as_of_weight_lbs, huddle, tensions, dispute), /api/coach_analysis (dated citations, ensemble_fallback), /api/coaching-dashboard (position_summary null-hold), /api/nutrition_overview (honest nulls, days_logged 0)",
+    "DDB read-only: whoop DATE#2026-08-14 (recovery_score 40, hrv 35.32 — exact match to the coach's dated citation)",
+    "Dedupe: gh issue list --state open --limit 200 (all 5 findings checked against it; 2 marked dupes)",
+    "Issue states verified: #2333 CLOSED, #2343 CLOSED, #2667 OPEN"
+   ],
+   "not_covered": [
+    "The coach Telegram chat path live (coach_chat grounding #2568, style/quality gates #2555/#2557/#2571, voice notes #2552) — source-level commits read, no live Telegram exchange exercised",
+    "Daily brief / email narratives (internal audience; keep-best fail mode acceptable per anchor) — UTC-date sites noted in emails/ but not audited per-surface",
+    "The #2530 fabrication trio (0 mmHg diastolic, stub-as-coaching, unenforced floor) — trusted from commit, not re-verified live",
+    "MCP 9-issue sweep fixes (#2710-#2717) — commit-level only; no MCP tool invoked to re-verify each contract",
+    "reader_truth_qa's LLM prompt itself (whether the confirm pass reuses cached surfaces vs refetches) — read at call-site level only",
+    "Tension prose number provenance end-to-end (AIQ-5 left inconclusive; CGM partition key form not located)",
+    "OG share cards, chronicle, podcast, and og_moments narrative surfaces — untouched this week per git log, not re-sampled",
+    "Whether _gate_json_record's three callers wrap it in except-and-publish the way line 1203 does (only the main _gate_prose site verified for AIQ-1)"
+   ],
+   "verifier": {
+    "grade": "B+",
+    "agrees": true,
+    "note": "Independent B+ under the 2026-07-16 anchors + 2026-08-09 day-correspondence extension. Verified from source: the #2391 regenerate-or-HOLD path is real (residual findings return \"\" at ai_expert_analyzer_lambda.py:~1077 and the main call site returns \"\" on hold at ~1200-1201), closing the measured public fail-open that anchored the prior B; the position_summary re-parse is gate-registered. Verified live: coach_team/vitals weight agreement, dated Park citation machinery, and an AIQ-5 spot-check I resolved further than the grader did (glucose gap traces to a real 19-day absence in the apple_health HAE partition). Not A: the gate-INFRA except at the analyzer's publish site still ships ungated prose (AIQ-1, new), and the tracked untraced-number classes (#2667 stale-weight-as-current, #2675 UTC/PT day split structurally outside the #2414 guard's writer set, #2634, #2740) keep 'no number a Day-4 reader couldn't trace' failing. Not C: no live surface I checked serves ungated content that nothing would catch — the residuals are tracked, gated-adjacent, or hold-protected. B+ matches the grader.",
+    "verdicts": [
+     {
+      "id": "AIQ-1",
+      "verdict": "CONFIRMED",
+      "note": "Reproduced exactly at checkout. Docstring at lambdas/intelligence/ai_expert_analyzer_lambda.py:~1030 states 'Gate-INFRA failure still publishes'; the except at ~1202-1203 logs a WARN and lets ungated analysis_text flow into the EXPERT# item write at ~1209, served by /api/coach_analysis. Residual-findings correctly hold; only a raise inside the gate machinery (facts loader, import, regen Bedrock error) publishes. No open issue tracks it — genuinely new. P3 is right: narrow trigger, public surface, discard-the-WHY class."
+     },
+     {
+      "id": "AIQ-2",
+      "verdict": "CONFIRMED",
+      "note": "All cited sites reproduce: now(timezone.utc).date() day computations at 256, 553, 1115, 1428, 1504, 1789; prompt embeds 'now day {days_in_experiment}' at ~732; gate generation_date_iso from UTC at 1037. tests/test_pacific_today_guard_2414.py:54 _READER_BOUND_WRITERS = (coach_observatory_renderer.py,) only — the analyzer is outside the scanned surface while site_api_coach_narrative.py:75 serves with datetime.now(PT). 17:00 PT–midnight PT the clocks disagree by one day. Correctly marked dupe of open #2675; the guard-the-set structural gap is the new contribution."
+     },
+     {
+      "id": "AIQ-3",
+      "verdict": "CONFIRMED",
+      "note": "Source reproduces: site_api_coach_stance.py:372 'weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS', published as as_of_weight_lbs at ~432 with no date; site_api_coach_profile.py:78-97 returns the newest withings weight_lbs and discards its date. Live: coach_team as_of_weight_lbs=317.24 while /api/vitals shows 317 with weight_as_of=2026-08-11 (4 days stale, undisclosed to the coach_team consumer). grep of site/ finds no as_of_weight consumer — exposure latent. Correctly deduped to open #2667."
+     },
+     {
+      "id": "AIQ-4",
+      "verdict": "CONFIRMED",
+      "note": "qa_check_reader_truth.py:~210 verified: second-pass membership is {finding_group(f) for f in again if severity == \"high\"} — a genuine defect rated high on pass 1 and medium on pass 2 is demoted every night; a high↔medium flapper can never FAIL the gate. Mitigations verified as stated: demote-not-drop at ~296-302 (unconfirmed highs land in WARN with id+detail), fail-closed on confirm-pass error at ~203-207. 'Note' severity is right — a sensitivity boundary on the #2743 fix, not a defect; the severity-agnostic membership suggestion is sound."
+     },
+     {
+      "id": "AIQ-5",
+      "verdict": "ADJUSTED",
+      "note": "I resolved the half the grader left inconclusive. CGM is not a top-level SOURCE#cgm partition — it is hae_datatypes key 'cgm' inside the apple_health partition (source_registry.py:306, fields blood_glucose_avg/blood_glucose_readings_count), which is why the grader's GetItem missed it. Read-only DDB query: last day with glucose fields is 2026-07-27, a 19-day gap at the 08-15 generation — 'Three weeks without glucose data' is approximate rounding of a real, traceable absence, not an untraced number. The '1,500 calorie protocol' target remains unlocated in constants/coach code (only max_tokens=1500 hits) — that half stays open. Materially narrower than 'neither number traced': one traces, one does not."
+     }
+    ]
+   }
+  }
+ }
+}
