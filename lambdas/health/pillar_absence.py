@@ -217,10 +217,11 @@ def nutrition_absence_facts(latest_row, days_in_experiment: int, experiment_star
         absence = "No food log exists anywhere in the record."
         transition = "never_logged"
     return {
-        "note_absence": absence,
+        "note": f"No nutrition data in the last 30 days. {absence}",
         "absence_days_dark": days_dark,
         "absence_last_log_date": last_date,
         "absence_transition": transition,
+        "days_since_last_food_log": days_dark,
     }
 
 

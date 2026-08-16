@@ -77,7 +77,8 @@ def test_never_logged_this_cycle_names_the_true_span():
     ab = nutrition_absence_facts(row, days_in_experiment=6, experiment_start="2026-08-10", today=date(2026, 8, 15))
     assert ab["absence_days_dark"] == 52
     assert ab["absence_transition"] == "never_logged_this_cycle"
-    assert "52 days dark" in ab["note_absence"] and "never guess a smaller number" in ab["note_absence"]
+    assert "52 days dark" in ab["note"] and "never guess a smaller number" in ab["note"]
+    assert ab["days_since_last_food_log"] == 52
 
 
 def test_paused_within_cycle():

@@ -296,16 +296,12 @@ def gather_data_for_expert(expert_key):
         # EXPECTED and is never a logging failure. Surfaced so the coach never says so.
         _recency_note = "Nutrition logs at end of day (manual upload), so data runs through the latest complete day; an absent current day is expected pipeline lag, never a logging failure — do not frame it as one."
         if not items:
-            # #2756: an empty window is a vacuum the model fills — hand it the TRUE span.
-            ab = nutrition_absence_facts(_latest_item("macrofactor"), days_in_experiment, EXPERIMENT_START)
-            return {
+            return {  # #2756: an empty window hands the model the TRUE absence span, never a vacuum
                 "expert_key": "nutrition",
                 "period": f"experiment days 1-{days_in_experiment}",
-                "note": f"No nutrition data in the last 30 days. {ab.pop('note_absence')}",
-                **ab,
-                "days_since_last_food_log": ab.get("absence_days_dark"),
                 "food_logs_last_14d": 0,
                 "recency_note": _recency_note,
+                **nutrition_absence_facts(_latest_item("macrofactor"), days_in_experiment, EXPERIMENT_START),
             }
         # ADR-104 (#2221): `is not None`, not truthiness — a row that EXISTS with no macro fields is absence (a null
         # average, never "0 kcal across N tracked days"); a logged 0 (the fast `zero_calorie_days` counts) stays in.
@@ -1019,9 +1015,7 @@ def _presence_logs(gen_date_iso):
         return None
 
 
-def _gate_prose(
-    label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, known_absence_days=None, extract=None
-):
+def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, absence=None, extract=None):
     """The module's ONE grounding chokepoint (#2421) — every model call routes here.
 
     Before #2421 only the two `generate_and_cache` calls were gated: the Mode-B
@@ -1053,7 +1047,7 @@ def _gate_prose(
             start_date_iso=EXPERIMENT_START,
             nightly_vitals=_night_map(facts),  # #1968: the unlabeled "7.5-hour sleep"
             available_logs=available_logs,  # #2056/#1699
-            known_absence_days=known_absence_days,  # #2756: narrated absence spans vs measured
+            known_absence_days=absence,  # #2756: narrated absence spans vs measured
         )
 
     def _regen(_correction):
@@ -1191,22 +1185,11 @@ def generate_and_cache(expert_key, shared_system=None):
     # Phase-4 SELF-CORRECTION (ADR-104/ADR-108, #2391) — BEFORE the cache write; the
     # full history (post-put keep-if-better, the wrong-RHR incident, the finding
     # classes, one-rewrite-then-hold) lives in _gate_prose's own docstring above.
-    # #2056: the #1699 map comes from the snapshot's own `days_since_last_*` fields —
-    # computed by `_recency_stats` from the rows THIS render already queried, so zero
-    # extra I/O. Coverage is per-expert and declared: the nutrition snapshot answers for
-    # food and stays silent about training. A category the expert cannot see is left
-    # UNKNOWN, never reported absent — what makes arming honest on partial visibility.
+    # #2056/#1699 availability contract: ai/behavior_logs.LogAvailability docstring.
     if analysis_text:
         try:
-            _gated = _gate_prose(
-                expert_key,
-                analysis_text,
-                prompt,
-                api_key,
-                shared_system=shared_system,
-                available_logs=_avail_logs(data),
-                known_absence_days=absence_gate_map(data),
-            )
+            _g = dict(shared_system=shared_system, available_logs=_avail_logs(data), absence=absence_gate_map(data))
+            _gated = _gate_prose(expert_key, analysis_text, prompt, api_key, **_g)
             if not _gated:
                 return ""  # #2391 hold — prior cached analysis keeps serving
             analysis_text = _gated
