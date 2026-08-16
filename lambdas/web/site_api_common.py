@@ -145,11 +145,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-<<<<<<< HEAD
     "test_count": 15542,
-=======
-    "test_count": 15516,
->>>>>>> 778e158bb (fix(monitoring): no-invocations alarms treat missing data as BREACHING — they could structurally never fire (#2754))
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

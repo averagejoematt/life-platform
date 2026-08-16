@@ -17,11 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-<<<<<<< HEAD
 **Total tests:** 15542 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
-=======
-**Total tests:** 15542 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
->>>>>>> 778e158bb (fix(monitoring): no-invocations alarms treat missing data as BREACHING — they could structurally never fire (#2754))
 
 ---
 
