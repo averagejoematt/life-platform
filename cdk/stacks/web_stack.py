@@ -975,26 +975,18 @@ class WebStack(Stack):
                         cached_methods=["GET", "HEAD"],
                     ),
                 ],
-                # Custom error pages
-                # WR-28: Custom error responses for subpage routing.
-                # S3 website hosting handles /story/ → /story/index.html normally,
-                # but if a path doesn't exist (e.g. /nonexistent), serve 404 page
-                # with proper 404 status. The 403 response handles S3 access denied
-                # (which S3 returns for some missing-file scenarios).
-                custom_error_responses=[
-                    cloudfront.CfnDistribution.CustomErrorResponseProperty(
-                        error_code=404,
-                        response_code=404,
-                        response_page_path="/404.html",
-                        error_caching_min_ttl=10,
-                    ),
-                    cloudfront.CfnDistribution.CustomErrorResponseProperty(
-                        error_code=403,
-                        response_code=200,
-                        response_page_path="/index.html",  # S3 returns 403 for missing dirs
-                        error_caching_min_ttl=10,
-                    ),
-                ],
+                # NO distribution-wide custom error responses — removed 2026-08-16
+                # (#2683/#2680, owner-authorized). They cannot be scoped per-behavior,
+                # so the WR-28-era pair was rewriting API responses too: a Lambda 404's
+                # JSON body/content-type became the HTML 404 page (#2683), and a
+                # Lambda 403 became a 200 HOMEPAGE (#2680 — status corruption). Site
+                # paths lose nothing: the S3 origins are WEBSITE endpoints and the
+                # bucket's website ErrorDocument now points at site/404.html (it
+                # previously pointed at a bucket-root error.html that DID NOT EXIST),
+                # so a missing site key still renders the 404 page with a 404 status
+                # — maintained by every site deploy instead of hand-copied. The old
+                # 403→200 mapping's "S3 access denied" rationale is a REST-origin
+                # concern; website endpoints return 404 for missing keys.
             ),
         )
 
