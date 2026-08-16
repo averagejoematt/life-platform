@@ -2753,6 +2753,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2773"
         }
       ]
+    },
+    {
+      "id": "2026-08-16-a-new-scale-arrives-and-writes-the-playbook",
+      "date": "2026-08-16",
+      "title": "A new scale arrives — and writes the playbook",
+      "shipped": "A new Withings scale (a BodyScan 2) arrived and I weighed in before the platform knew it existed. The session's first move was a live capture of everything the device sends: 12 measurement types the pipeline had never mapped — per-limb muscle and fat mass, water compartments, visceral fat, basal metabolic rate, nerve-health scores, an afib screen — plus a quieter surprise: 19 already-mapped fields that had NEVER fired, because the old scale only ever sent weight. An hour later the hourly ingestion proved the point live: today's database row grew from 10 fields to 22 with zero code changes, including a vascular-age metric that landed before anyone had classified its privacy. Everything now flows — position-aware segmental parsing, privacy tiers decided before the data moved, and a written playbook (ADR-154) so the NEXT new device lands through a checklist instead of an afternoon of archaeology.",
+      "why_it_mattered": "The platform is three years of accumulated machinery around a handful of signals; a new device is the test of whether it's a system or a pile. The honest answer was 'pile with good instincts': nothing leaked only because every consumer happened to pick fields explicitly. The playbook converts that luck into an ordered contract — capture unfiltered first, privacy tier BEFORE the first scheduled run, absence semantics decided the day a metric is born — because ingestion starts on the cron's schedule, not the developer's.",
+      "gotcha": "The scale transmitted a blood-oxygen reading of 0% — which is not a reading, it's a failed measurement encoded as a number — and the pipeline faithfully stored it. Meanwhile the afib screen ALSO sent 0, and that zero is a real result (screening ran, nothing found). Same digit, opposite meanings, one skip rule and one keep rule apart — absence semantics are per-field decisions, never a blanket policy.",
+      "honest_miss": "The per-limb position codes aren't in the vendor's public docs, so the arm/leg/torso mapping is inferred from physiological magnitude and labeled as such in the schema — if a future reading looks anatomically absurd, the mapping is the first suspect. And the day's nine merged PRs cost four rounds of literal-reconciliation between branches, the standing tax of generated doc counts under concurrent merges.",
+      "prs": [
+        {
+          "label": "PR #2794",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2794"
+        },
+        {
+          "label": "PR #2788",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2788"
+        },
+        {
+          "label": "PR #2787",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2787"
+        }
+      ]
     }
   ]
 }

@@ -1,137 +1,119 @@
-# Handover — 2026-08-16 (overnight, 21:40→06:30 PT): the honesty arc, autonomous
+# Handover — 2026-08-16 (day, ~10:15→14:15 PT): the BodyScan 2 wave, owner-interactive
 
-**Session:** Fable, fully autonomous (owner asleep; FULL authority incl. cdk+IAM granted at
-plan approval). **Driver:** `~/.claude/plans/cryptic-cooking-sparkle.md` — Block 0 stabilize
-+ arm, Block 1 the honesty arc (#2667/#2756/#2763), Block 2 verify-and-close, Block 3 the
-CI/instrument cluster, wrap by 06:30. Blocks 4–5 were sacrificed exactly per the plan's
-priority order.
+**Session:** Fable, interactive (Matthew present and answering asks). **Driver:**
+`~/.claude/plans/cryptic-cooking-sparkle.md` — board pickup → the Body Scale 2 spike
+(file-first, live API capture) → batch the owner-unblock numbered ask EARLY → Fable
+continuum → Now-queue paydown. The early batched ask was the session's hinge: Matthew
+answered all seven items mid-flight, converting investigation into a shipping wave.
 
-**Build beat:** `2026-08-16-the-model-fills-every-vacuum`
-**Docs:** `docs/PROPORTIONALITY.md` (+5 rows incl. tonight's watcher, Verified bumped —
-PR #2779 in flight) · doc-literal regens rode every PR · module-size baselines banked
-down (site_api_ai 1991→1753)
-**Decisions:** none needed — every fix applied existing contracts (ADR-104/105 honesty,
-ADR-108 regenerate-or-hold extended to gate-INFRA with the flipped pin's rationale
-documented in-test, #1665/#2610 size discipline, #2109/#1967 grounding frames)
-**Main:** green at `bbdeb849` (run 31929446983: Deploy ✅ Smoke ✅ visual-QA ✅ — the
-approved fleet lease) at last verification; later merges (#2774/#2775) mint their own
-runs. The 04:45Z red at `d30ffd62` is pre-decoded: visual-QA raced the wrap commit's
-site-deploy invalidation on `/data/autonomic/` (transient — the REAL harness passed the
-same page minutes later; the page honestly renders its 6-of-7-days pre-data state).
-**Stash/hooks:** clean / 🟢
-**Closures:** 5 with live evidence — #2667 (live probe: "last weigh-in, August 11th …
-not from today"), #2756 (partial verdict — next analyzer run is the realized test),
-#2763 (partial — alarm awaits the Monitoring deploy), #2634 (measured: candidate 2,
-already fixed by #2739; offline control on live payloads passes), plus evidence banked
-on #2741/#2668/#2705. **#2741's confirm path ran in PRODUCTION for the first time**
-(06:03:16Z, "confirmed on a second pass" — the overnight monitor caught it).
-**Incidents:** 2 rows — (1) the visual-QA invalidation-race false positive (Block 0);
-(2) my batch-rebase committed CONFLICT MARKERS to two branches (bundle-boot gate caught
-it; both repaired from origin/main + regenerated).
-**Backlog:** #2780 filed (the confirmed sleep_detail temporal finding). Story-liveness
-floor still honestly unmeetable (2 actionable stories; Next's only others are
-blocked:dep) — same report as the evening wrap; 14 actionable bugs/chores sit on Now.
-**Alarms:** 7 red at session start and end, all cited, zero new reds across ~15 deploys.
-`coherence-overall`'s earliest OK ~18:45Z TODAY — the #2735/#2670 transitions + planted
-proof are the day-session's first pick.
-**CI warnings:** 1 on green `bbdeb849`, triaged — the non-gating content-truth smoke warning IS the confirmed sleep_detail finding, filed tonight as #2780; `--decoded` run.
-**Leases at close:** `ec4532f7` REJECTED (stale, one behind tip; both merges already per-function-deployed with postflights); run `31931261838` at `d223e2dd` was pending — **morning step: ancestry-check and approve ITS gate at HEAD** (or the post-#2777 run's, whichever is tip by then).
+## What shipped — 9 PRs merged + fleet-deployed (main `4b482c441`)
 
----
+- **#2783** — #2780's sleep contradiction was the CHECKER misreading the wake-date frame
+  (proven: live payload night_of 08-15 / as_of 08-16 matches the whoop partition);
+  `is_wake_frame_correct` retires the class mid-cycle, scoped + pinned.
+- **#2784** — IC-3 success leaves a positive log line (#2668 box-3 evidence upgrade;
+  "absence of the failure line" was the exact class the original incident hid behind).
+- **#2785** — `dashboard:date` learns the pre-compute morning window: an off-schedule CI
+  smoke at 08:45 PT was injecting a false FAIL that re-armed `qa-smoke-failures` for a
+  rolling 24h (#2670's live saturation driver).
+- **#2786** — the #2758 lane-import guard: AST sweep of tests/ module-scope imports vs a
+  single-source dep list, self-protecting, in-suite mutation proof.
+- **#2787** — August ceiling $115/$135 → **$200/$235** (owner call vs the measured 171%
+  projection; ADR-133 third amendment; September revert + $85 backstop unchanged).
+- **#2788** — CloudFront custom error responses REMOVED (they rewrote API 404 bodies to
+  HTML and API 403s to a 200 homepage); S3 website ErrorDocument repointed to
+  `site/404.html` (it referenced a file that didn't exist); smoke pins both directions.
+- **#2794** — **BodyScan 2 ingest-all + `docs/NEW_SIGNAL_PLAYBOOK.md` sanctioned as
+  ADR-154.** 12 new meastypes incl. position-aware segmental parsing; SpO2-zero stored as
+  absence, afib-zero kept as honest negative; Tier-2 owner-only for vascular/metabolic
+  age; SoT rulings in SCHEMA.md.
+- **#2795** — chronicle timeout trilogy (#2669): generation cache (a crash retry costs
+  $0, and fills ONLY the void a crash left — a changes_requested regen stays fresh),
+  reusable `common/timeout_watchdog` + `ChronicleTimeoutImminent`, cdk timeout 120→300.
+- **#2796** — `post_cdk_reconcile_smoke.sh` handler check was latently red for ALL seven
+  entries since #1653's packaging (first-dot-segment compare); fixed suffix-aware.
 
-## MORNING CONTINUATION (2026-08-16 ~07:00–08:30 PT, same session) — every morning step above is DONE
+**Owner-authorized infra applied live:** `cdk deploy LifePlatformWeb` (error-response
+removal, verified: API 404 → `404 application/json` with the handler's envelope) and
+`cdk deploy LifePlatformEmail` (chronicle timeout confirmed 300s live) — the latter after
+the CDK drift gate correctly REFUSED the pipeline deploy of the IAM diff (the system
+working). **S3 lifecycle applied** (#2642): `deploys/` + `site/` noncurrent 7d/keep-1,
+`raw/` untouched; census measured 93 GB noncurrent (85.9 under deploys/), found
+**`imports/` as an unnoticed 2.2 GB all-ghost prefix** — flagged for owner, not touched.
 
-- **All four in-flight PRs merged:** #2777 (→ #2754 CLOSED with `describe-alarms` evidence: both
-  `no-invocations` alarms live at `TreatMissingData: breaching`), #2779, #2776 (→ #2705 CLOSED),
-  #2778 (→ #2762 CLOSED). #2763's deploy-leg evidence appended (alarm exists, INSUFFICIENT_DATA
-  — correct for a never-matched filter).
-- **`cdk deploy LifePlatformMonitoring` ran clean** (55s — first real use of the wrapper's pinned
-  venv); ONE deploy carried #2754's two alarms AND #2763's `expert-gate-infra-hold` filter.
-- **Lease board settled:** `d223e2dd` approved after ancestry check (8.3h parked, #1901 class)
-  → deployed GREEN end-to-end; `bf97c56c` + `c17c5bf8` rejected stale with reasons;
-  tip run at `91b471a4` approved at HEAD → **main GREEN at `91b471a4`**, nothing waiting.
-- **Scar addendum:** PR #2778's branch was a THIRD carrier of the overnight conflict-marker
-  incident (missed in the overnight repair; CI collection caught it at `site_api_common.py:152`).
-  Repaired twice with the restore-and-regenerate recipe (it re-conflicted on doc literals after
-  #2776's squash). Also: a repair loop ran against `main` as a silent no-op because both branch
-  checkouts failed (branches held by worktrees) — main was clean so harmless, but "PUSHED" lines
-  lied; repairs must run INSIDE the holding worktree.
-- **Residual queue is unchanged below** except: the "#2777/#2776/#2778/#2779 merges + Monitoring
-  deploy" pick is DONE; next picks are #2735/#2670 (coherence-overall OK window ~18:45Z),
-  #2668 run 1-of-3 (today's 17:00Z brief), then #2761 boxes 2–3 / #2758 / Blocks 4–5.
+## Verified
 
----
+Every merge behind a full unpiped lane (exit + passed line read; final 19,307 passed).
+Fleet lease approved at HEAD twice (0483ae3e, then the c3aaeccc rerun) — Deploy ✅ Smoke ✅
+visual-QA ✅ both. Four stale leases rejected with reasons. Live probes: CloudFront
+contract both directions; chronicle timeout 300s; reconcile smoke ALL GREEN post-#2796.
+First governor run under $200/$235: mtd $99.77, projected $223.38 → **tier stays 1** —
+the projection (not mtd) drives `_decide_tier`; an accepted overrun keeps tier 1 as
+August's operating state by design (recorded on #2734).
 
-## Shipped and LIVE (merged + deployed + probed)
+## The coherence story (#2735/#2670)
 
-| # | What | Live evidence |
-|---|---|---|
-| #2667 (PR #2774) | Every AI-prompt metric carries its as-of date; registry-derived STALE labels; the context layer extracted to `site_api_ai_context.py` (the module was AT its ceiling) | deployed `ec4532f7`; live /api/ask: **"last weigh-in, August 11th … that's 4 days ago … not from today"** |
-| #2756 (PR #2775) | Empty nutrition window hands the model the TRUE absence span (`never_logged_this_cycle`, 52d dark) + the `absence_span` grounding class (labelled positive = the live "four days" sentence) | analyzer deployed `d223e2dd` 06:46Z; realized-check = next scheduled regeneration |
-| #2763 (PR #2773) | Gate-INFRA HOLDS (was: published ungated text); token `EXPERT-GATE-INFRA-HOLD`; the old fail-open pin flipped WITH its rationale | fleet-deployed at `bbdeb849` (Deploy ✅ Smoke ✅); alarm ships with the Monitoring deploy below |
-| #2634 | Closed by measurement: whoop rows prove the coach cited 08-14's real reading, dated; #2739 had fixed the check; offline control on live payloads = True | zero cross_surface FAILs since the 00:34Z deploy |
-| #2741 | **Confirm-before-FAIL observed in production for the first time** — 06:03:16Z, a real high confirmed on a second pass | evidence + monitor transcript on the issue |
+The 18:45Z sentinel run — first scheduled run with the behavioral-excuse fix — WARNs the
+MacroFactor rest state correctly AND stayed ALARM on **two genuinely new findings**, filed
+as **#2792** (coach rows cite recovery 40 vs canonical 57, no grounding stamp — likely an
+ADR-108 hold serving yesterday's row) and **#2793** (day_grade stored 68 vs derived 70).
+The 18:30Z qa-smoke sweep was the **first zero-FAIL zero-WARN scheduled run on record**;
+both saturated alarms clear ~15:46Z 08-17 when the off-schedule datapoint ages out.
 
-## In flight at close (all green-lane-pending, zero conflicts)
+## Gotchas hit (the durable ones are in memory)
 
-- **PR #2777** (#2754 BREACHING alarms + SET guard, mutation-proved) — its rebased lane
-  red twice at close on size-guard arithmetic the rebase inherited; PAID in-file both
-  times (file at exactly 1382 == baseline, guards verified green pre-push, `9ec34bab`);
-  lane pending at close. **On merge: `bash deploy/cdk_deploy.sh LifePlatformMonitoring`** (the
-  wrapper now builds its own pinned venv) — ONE deploy carries #2754's two alarms AND
-  #2763's `expert-gate-infra-hold` filter; then `describe-alarms` evidence onto both issues.
-- **PR #2776** (#2705 read-path: coverage-gap ≠ no-match) — closes #2705 on merge; the
-  backfill/root-cause/nightly halves are already evidenced on the issue.
-- **PR #2778** (#2762 `check_main_green` head-coverage — the swallowed-push shape reads
-  uncovered) and **PR #2779** (#2761 box 1, five ledger rows).
-- Merge recipe for all four: they conflict ONLY on the two doc-literal files; resolve by
-  `git checkout origin/main -- <both>` + `sync_doc_metadata --apply` + commit — **never**
-  `checkout --theirs` inside a multi-commit rebase (see gotcha 1).
+- **Task-notification exit codes lie** (twice): the harness reports the wrapper's exit;
+  `LANE_EXIT=1` with 22 failures arrived under a "completed (exit code 0)" notification.
+  Only the output file's own line is truth (memory: `reference_task_notification_exit_codes_lie`).
+- **Four guards caught four of my own mistakes pre-ship**: pin-consistency rejected a
+  $DEPS indirection; the size ratchet forced extraction over registration; the
+  metric-grant lockstep demanded the watchdog's IAM; design review caught the cache
+  serving rejected drafts. Trust a red before overriding it.
+- **The facade's imports are `_g`-seam surface**: removing an "unused" `timezone` import
+  broke `chronicle_personas` at runtime — now noqa'd with the reason.
+- Homebrew black 25.9.0 fights the pinned 26.3.1 — only `.venv/bin/black` is safe.
+- Four rounds of doc-literal reconciliation across the 9-PR wave (rail-3 recipe each
+  time) — the standing concurrent-merge tax.
 
-## Gotchas — tonight's own scars
+## Wrap gates
 
-1. **A blind `git add -A` inside a scripted rebase committed CONFLICT MARKERS to two
-   branches** (a 2-commit branch conflicts twice; my loop resolved once). The deploy-
-   critical bundle-boot gate caught it ("SyntaxError: invalid decimal literal",
-   site_api_common:152). Repair: restore both literal files from origin/main and
-   REGENERATE — the generator is the merge tool for generated content. Incident row.
-2. **The `| tail` class bit me twice more:** a `--timeout` usage error read as a green
-   full lane (0 "passed" lines was the tell), and a piped size-guard failure let a
-   commit+PR chain proceed (caught minutes later; amended). Unpiped + `exit=$?` + read
-   BOTH is now muscle memory — and it still failed once when the assert lived mid-chain.
-3. **`monkeypatch` and extractions:** a moved layer silently orphans every
-   `setattr(module, ...)` patch — the behavior suite would have hit real DynamoDB while
-   green. The fix that held: the sibling resolves its patchable seams through the LAMBDA
-   namespace at call time (`_table()`/`_hook()`), keeping ONE patch surface; the #2109
-   AST derivations then needed to learn the `_hook("...")(...)` call shape or they'd
-   have gone vacuous. Both are pinned now.
-4. **The dual-import identity trap:** `import site_api_ai_lambda` (bare) and
-   `from web import site_api_ai_lambda` are TWO module objects; patches land on one,
-   code reads the other. Canonicalize tests to the package form.
-5. **`gh pr checks` returning empty is the conflicting-PR shape** — a PR with conflicts
-   mints NO checks (memory had this; tonight confirmed it live on #2776).
-6. **The frame-of-reference reflex paid twice more:** the recall "missing installment"
-   was two instruments disagreeing about which partition/keying defines "indexed" (it
-   was indexed; the checker had been green since 08-15 — silence in logs was the pass
-   signal), and the 06:03Z reader-truth finding is candidate-frame ambiguity
-   (`night_of` vs `as_of`) filed as #2780 rather than assumed.
+**Build beat:** 2026-08-16-a-new-scale-arrives-and-writes-the-playbook
+**Docs:** SCHEMA.md, NEW_SIGNAL_PLAYBOOK.md (new), DECISIONS.md (ADR-154 + ADR-133 3rd
+amendment), docs/README.md + CLAUDE.md indices, COACH_STANCE.md re-verified,
+PROPORTIONALITY.md (+#2758 lane-guard row — the #2380 ledger gate), INCIDENT_LOG.md (+1)
+**Decisions:** ADR-154 filed (new-signal playbook) + ADR-133 third amendment (both merged)
+**Main:** HEAD `4b482c441` was a swallowed push (ZERO runs minted — the #2762 class,
+caught by check_main_green exactly as designed); re-dispatched as run 31973036045, in
+progress at wrap; the last completed verdict is green at `c3aaeccc` (deployed HEAD-1,
+diff since is the deploy-script-only #2796).
+**Incidents:** 1 row added — the August ceiling raise as an accepted budget-tier event
+**Stash/hooks:** clean
+**Closures:** #2680, #2683, #2758, #2780 commented (contract shape; #2780 honestly
+`partial` pending tonight's nightly)
+**Backlog:** Now live at 22 actionable; no stale Later issues; hygiene — my three filed
+issues (#2782/#2792/#2793) fixed to contract, **6 violations remain on #2797–#2802 from a
+concurrent session's ~45-issue batch (#2797–#2841) — that session's wrap owns them**
+**Alarms:** all red >72h cited (gate passed clean)
+**CI warnings:** 1 — the perf-trend persist advisory on visual-QA (known #1435
+IAM-staging/transient-S3 class, already documented there) — deliberate no-action this
+session, it is #1435's existing scope
+**Ledger:** #2758 row added to PROPORTIONALITY.md (posture load-bearing, rent ~2s/run,
+demote trigger stated)
 
-## Residual queue / next picks
+## Residuals / next picks
 
-- **#2735/#2670** — `coherence-overall` earliest OK ~2026-08-16 18:45Z; observe the
-  transitions, then the planted OK→ALARM proof against the clean baseline. First pick.
-- **#2777/#2776/#2778/#2779 merges + the ONE Monitoring cdk deploy + evidence comments**
-  (recipe above) — second pick, mechanical.
-- **#2669** — untouched (persist-reorder + Email timeout cdk); the live-run box needs a
-  source-verified non-publishing path per the standing rail.
-- **#2668** — interim evidence banked; box 3's 3-run count starts with TODAY's 17:00Z
-  brief; closeable ~08-18 evening.
-- **#2758** — deliberately deferred with a scoping comment (the collection-constraint
-  fix wants its own watched-fail slot; the class hit the operator a third time tonight).
-- **#2761** — box 1 shipped (PR #2779); the enforcement-leg script + can-fail proof next.
-- **#2759/#2760/#2755/#2757/#2674/#2639** — Blocks 4–5, not reached (per the plan's
-  stated priority order); all still carry their review-filed scoping.
-- **#2780** — the confirmed sleep_detail temporal finding (filed tonight, Next).
-- not-work — the #2741 monitor (persistent) dies with this session; re-arm only if the
-  demote leg's observation is wanted sooner than its ~2-nights-in-8 natural rate.
-- not-work — first @ajm_board_bot message (owner-only) still owed for #2719's final proof.
+- **#2792** — the coach grounding-stamp investigation (the repaired alarm's first real
+  catch; check ADR-108 hold verdicts for nutrition/physical coach 08-15→16). Best first pick.
+- **#2793** — day_grade 68 vs 70 re-derivation.
+- **#2735 / #2670** — observation boxes: alarms clear ~15:46Z 08-17, then the planted
+  OK→ALARM proofs against clean baselines.
+- **#2668** — closes Monday evening on 3-of-3 (positive-evidence log line now live).
+- **#2669** — Wednesday's scheduled run is the live box (duration + no duplicate generation).
+- **#2642** — post-sweep size measure ~08-23; `imports/` lifecycle decision (owner).
+- **#2643** — Eight Sleep interior-gap backfill: data-write, awaiting Matthew's explicit OK.
+- **#2761 boxes 2–3, #2674, pins #2759/#2760/#2755/#2757** — untouched this session.
+- The **#2797–#2841 corpus** (concurrent session's filing wave) — next session triages
+  from it via `backlog_next.py`; its 6 hygiene violators belong to that session.
+- not-work — owner-only: CONTENT_FILTER_JSON arming (three `!` commands in-session),
+  BotFather ×3 + first board-bot message, the gate:owner activation pick
+  (#1738/#1571/#1677/#1631 — "none" fine).
