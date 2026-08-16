@@ -173,7 +173,8 @@ Output this exact JSON structure:
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
         if raw.endswith("```"):
             raw = raw[:-3]
-        return json.loads(raw.strip())
+        print("[INFO] IC-3 analysis parsed clean (%d keys)" % len(parsed := json.loads(raw.strip())))  # #2668: positive evidence
+        return parsed
     except Exception as e:
         # #2668: ERROR + a keyable metric. This ran dead 10 of 12 days with Errors
         # flat at 0.0 — `_format_analysis(None)` returns "", so Pass 2 silently
