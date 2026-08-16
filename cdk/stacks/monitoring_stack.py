@@ -103,6 +103,7 @@ class MonitoringStack(Stack):
             ext_stat=None,
             to_digest=False,
             evaluation_periods=1,
+            treat_missing=None,  # #2754: pass BREACHING for zero-emission metrics (Invocations of a dead cron)
         ):
             # #1927: `evaluation_periods` defaults to 1, so every existing caller is
             # unchanged. It exists for alarms whose whole point is DURATION — a
@@ -132,7 +133,7 @@ class MonitoringStack(Stack):
                 datapoints_to_alarm=evaluation_periods if evaluation_periods > 1 else None,
                 threshold=threshold,
                 comparison_operator=operator,
-                treat_missing_data=NB,
+                treat_missing_data=treat_missing or NB,
             )
             a.add_alarm_action(cw_actions.SnsAction(digest if to_digest else topic))
             return a
@@ -566,6 +567,10 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #2754: AWS/Lambda emits NO datapoint for a zero-invocation period, so a
+        # Sum<1 alarm with missing→NOT_BREACHING structurally cannot fire — the exact
+        # silence it exists to catch reads as health. BREACHING per the hae-webhook
+        # prior art; the SET is guarded by tests/test_no_invocation_alarms_2754.py.
         _alarm(
             "DailyBriefNoInvocations",
             "daily-brief-no-invocations-24h",
@@ -576,6 +581,7 @@ class MonitoringStack(Stack):
             1,
             LT,
             {"FunctionName": "daily-brief"},
+            treat_missing=cloudwatch.TreatMissingData.BREACHING,
         )
 
         _alarm(
@@ -765,6 +771,7 @@ class MonitoringStack(Stack):
             LT,
             {"FunctionName": "daily-debrief"},
             to_digest=True,
+            treat_missing=cloudwatch.TreatMissingData.BREACHING,  # #2754 — see daily-brief above
         )
 
         # AI token budget alarms — consolidated 2026-03-10 (COST-A)
