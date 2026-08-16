@@ -134,9 +134,17 @@ AWAITING_APPROVAL = "awaiting-approval"
 STRANDED_APPROVAL = "stranded-approval"
 QUEUED_BEHIND = "queued-behind"
 PHANTOM_WEDGE = "phantom-wedge"
+# (#2791) A missing/unparseable job timestamp is NOT "0 hours old". Before this state
+# existed, `_parse_iso` returning None fed `(blocked_min or 0.0)` and silently read as a
+# freshly-parked, healthy-looking wait — disarming the #2467 stale-holder detection for
+# exactly the malformed-data case most likely to accompany a wedged state. This is the
+# explicit alternative: age genuinely unknown, reported — never coerced to zero.
+UNKNOWN_AGE = "unknown-age"
 
-# Worst-first. The fleet verdict is the worst per-run verdict.
-_SEVERITY = [HEALTHY, AWAITING_APPROVAL, QUEUED_BEHIND, STRANDED_APPROVAL, PHANTOM_WEDGE]
+# Worst-first. The fleet verdict is the worst per-run verdict. UNKNOWN_AGE sits ABOVE
+# STRANDED_APPROVAL on purpose — it must be at least as loud as a confirmed stale holder,
+# never quieter (#2791): an unresolvable age cannot be ruled out as the #2467 shape.
+_SEVERITY = [HEALTHY, AWAITING_APPROVAL, QUEUED_BEHIND, STRANDED_APPROVAL, UNKNOWN_AGE, PHANTOM_WEDGE]
 
 
 def _parse_iso(ts: str | None) -> datetime | None:
@@ -232,8 +240,26 @@ def classify_run(
     if status == "waiting":
         # The environment gate is OPEN. pending_deployments corroborates it; if it is
         # empty here GitHub is mid-transition, which is not an incident on its own.
-        wait_h = (blocked_min or 0.0) / 60.0
         approvable = bool(pending)
+        if blocked_min is None:
+            # (#2791) `started_at` is missing or unparseable — age is genuinely UNKNOWN,
+            # not zero. Coercing this to 0h via `(blocked_min or 0.0)` used to read as a
+            # freshly-parked, normal wait forever — silently disarming the #2467
+            # stale-holder detection for exactly the malformed-data case most likely to
+            # accompany a wedged state. Report it, at least as loud as a stale holder.
+            verdict["kind"] = UNKNOWN_AGE
+            verdict["gate_open"] = True
+            verdict["can_approve"] = approvable
+            verdict["detail"] = (
+                "Deploy is `waiting` at the `production` gate but its job `started_at` is missing "
+                "or unparseable — how long it has been parked cannot be computed, so it can be "
+                "neither cleared as fresh nor confirmed stale (#2791). Treat as AT LEAST as urgent "
+                f"as a STALE gate holder (#2467): decode manually (`gh run view {run_id} --json "
+                "jobs`) before approving or rejecting — do NOT assume it is safe to approve just "
+                "because the age could not be computed."
+            )
+            return verdict
+        wait_h = blocked_min / 60.0
         if wait_h >= STALE_GATE_REJECT_HOURS:
             # #2467: a run parked at the gate for this long is pinned to a stale sha,
             # and while it waits it OCCUPIES the job-level deploy slot — this exact
@@ -279,12 +305,19 @@ def classify_run(
 
         if held_by:
             verdict["kind"] = QUEUED_BEHIND
-            descs, stale_ids = [], []
+            descs, stale_ids, unknown_ids = [], [], []
             for h in held_by:
                 hid = h.get("id")
                 hjob = deploy_job(jobs_by_run.get(str(hid), []))
                 h_min = _minutes_since((hjob or {}).get("started_at"), now)
-                if hjob is not None and hjob.get("status") == "waiting" and h_min is not None and h_min >= STALE_GATE_REJECT_HOURS * 60.0:
+                if hjob is not None and hjob.get("status") == "waiting" and h_min is None:
+                    # (#2791) a gate-parked holder with NO computable age must not
+                    # silently fall through to "not stale" (the old `elif ... is not
+                    # None` guard skipped it entirely) — it is genuinely unknown, and
+                    # unknown cannot be ruled out as the #2467 stale-holder shape.
+                    unknown_ids.append(hid)
+                    descs.append(f"{hid} (Deploy parked at the gate — `started_at` missing/unparseable, UNKNOWN AGE, #2791)")
+                elif hjob is not None and hjob.get("status") == "waiting" and h_min is not None and h_min >= STALE_GATE_REJECT_HOURS * 60.0:
                     stale_ids.append(hid)
                     descs.append(f"{hid} (Deploy parked at the gate {h_min / 1440.0:.1f}d — STALE holder, #2467)")
                 elif h_min is not None and hjob is not None:
@@ -301,7 +334,14 @@ def classify_run(
                     " A STALE holder gets REJECTED — never approved (stale sha), never left waiting "
                     "(it holds the deploy slot): " + " ".join(f"`bash deploy/reject_deployment.sh {i}`" for i in stale_ids) + " (#2467)."
                 )
-            else:
+            if unknown_ids:
+                verdict["detail"] += (
+                    " A holder with UNKNOWN age (missing/unparseable `started_at`) cannot be cleared as "
+                    "fresh — decode manually before actioning: "
+                    + " ".join(f"`gh run view {i} --json jobs`" for i in unknown_ids)
+                    + " (#2791)."
+                )
+            if not stale_ids and not unknown_ids:
                 verdict["detail"] += " Fresh holder: approve or let it finish (`bash deploy/approve_deployment.sh <run_id>`)."
             return verdict
 
@@ -359,6 +399,11 @@ def render(state: dict) -> tuple[int, str]:
 
     if kind == PHANTOM_WEDGE:
         lines.append("🛑 PHANTOM DEPLOY WEDGE (#2052 class) — the deploy will NEVER start on its own.")
+    elif kind == UNKNOWN_AGE:
+        lines.append(
+            "🛑 UNKNOWN-AGE DEPLOY STATE (#2791) — a wait/holder timestamp is missing or unparseable; "
+            "cannot rule out a #2467-class stale wedge."
+        )
     elif kind == STRANDED_APPROVAL:
         lines.append("🛑 STRANDED PRODUCTION APPROVAL (#1901 class) — the gate is open and unactioned.")
     elif kind == QUEUED_BEHIND:
@@ -380,7 +425,7 @@ def render(state: dict) -> tuple[int, str]:
             "   githubstatus.com before recovering. Everything else about this state is measured."
         )
 
-    return (1 if kind in (PHANTOM_WEDGE, STRANDED_APPROVAL) else 0), "\n".join(lines)
+    return (1 if kind in (PHANTOM_WEDGE, STRANDED_APPROVAL, UNKNOWN_AGE) else 0), "\n".join(lines)
 
 
 # ── Last-mile alerting (#2149) ───────────────────────────────────────────────
@@ -403,7 +448,7 @@ def render(state: dict) -> tuple[int, str]:
 # issue.py`) — rather than an AWS-written SSM/DDB marker, which is exactly what
 # that existing prior art already does for "don't re-notify every red run."
 
-ALERT_KINDS = frozenset({STRANDED_APPROVAL, PHANTOM_WEDGE})
+ALERT_KINDS = frozenset({STRANDED_APPROVAL, PHANTOM_WEDGE, UNKNOWN_AGE})
 ALERT_EVENT_TYPE = "urgent_alarm"  # the exact type remediation-agent.yml already listens for
 ALERT_LABEL = "deploy-wedge-alert"
 ALERT_LABEL_COLOR = "B60205"
