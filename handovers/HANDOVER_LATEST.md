@@ -1,80 +1,66 @@
-# Handover — 2026-08-15 (late evening): make the alarm board mean something
+# Handover — 2026-08-16 (early, PT 08-15 night): Fable grades the week, then pays its own queue
 
-**Session:** interactive, Opus. Driver only, no subagents.
-**Driver:** the approved plan `~/.claude/plans/alarm-board-that-means-something.md` — *every red CloudWatch alarm either signals, or is silenced with a written reason AND a proof it can still fire. Closure count is the OUTPUT, not the target.* Batch 1 the alarm board (#2670 the anchor, `coherence-overall` triaged first), Batch 2 the three counted residuals (#2639/#2652/#2638), Batch 3 the two deep ones (#2674/#2692). Mid-session the owner extended it twice — first "keep going", then "go to batch 2".
+**Session:** interactive, Fable (first fable session since 08-09), attended — the owner granted cdk+IAM authority mid-session and made three live gate decisions. **Driver:** the approved plan `~/.claude/plans/sprightly-growing-firefly.md` — Phase 0 observations owed from 08-15, the fable-identity delta review, then the fable Now queue (#2654/#2492/#1114), stretch (#2675, #2719 design to Matthew).
 
-**Build beat:** `2026-08-15-the-alarm-that-cried-rest-day`
-**Docs:** `docs/engines/SCORING.md` + `docs/engines/CHARACTER.md` (17 line citations re-derived from the AST, both `Verified:` stamps rewritten) · `docs/alarm_citations.json` (+`coherence-overall`, 2 stale notes re-measured) · `docs/INCIDENT_LOG.md` (+1 row) · `mypy.ini` (tranche-1 record)
-**Decisions:** none needed — the session applied existing contracts (ADR-104 behavioural absence, ADR-105 deterministic-before-LLM, ADR-099 filing/closure, #2326 behavioural-never-pages, #1665 never-raise-a-baseline). The two genuinely governance-shaped calls — whether to retire an LLM finding class, and whether to reword the home page — were put to Matthew rather than decided unilaterally.
-**Main:** red at close — decoded, and both causes are already fixed on `main`. The newest COMPLETED CI/CD run is `564c1041` (FAILURE), which carries BOTH self-inflicted reds of this session: its `Deploy` was the stale gate I rejected, and its `test / Unit Tests` failed on the disable-list guard that pinned membership — fixed in #2749, merged as `8905a9249`. Two newer runs are in flight and neither had completed at close: the owner-approved `deploy_all` at `1407b0e4` (run `31916736140`) already shows **Deploy ✅ and Smoke ✅**, and `8905a9249`'s own run was still building. Three stale gated runs were REJECTED with reasons, never left waiting — one of them (`31915499337`, sha `f63395bf`) was pinned to the very sha carrying the module-size regression, so approving it would have deployed the bug.
-**Stash/hooks:** hook freshness 🟢. `git stash list` empty at close — but see gotcha 4: a `git stash push -- docs/` silently created nothing this session and a doc edit was lost to it.
-**Closures:** 3 commented with live evidence — #2736, #2738, #2746. Five carry an honest `partial` with unmet boxes named: #2735, #2741, #2670, #2638, #2639.
-**Incidents:** 1 row — a module-size regression merged past a pre-merge gate that had caught it, because my own wait loop read "no checks reported" as "all checks green".
-**Backlog:** Now live at 16 (well above the 3-actionable floor); no stale `Later` issues; 6 filed this session (#2735, #2736, #2738, #2740, #2741, #2746), 2 of them fixed at the wrap gate for ADR-099 violations I introduced (a 6-box acceptance list, an unsanctioned `**reader**` audience).
-**Alarms:** 7 red, all cited; none red >14d without a filed issue. `coherence-overall` and `qa-smoke-failures` have their **conditions** fixed but not their **alarms** — both are `Maximum` over rolling 24h windows.
-**CI warnings:** unverified at close — `check_ci_warnings.py` reads the latest *green* completed main run, and the run at HEAD was still deploying. Nothing was left untriaged; there was simply no green run yet to read.
+**Build beat:** `2026-08-16-the-warning-no-deploy-could-clear`
+**Docs:** `docs/DESIGN_SYSTEM_V5.md` §8.7 (frame v2 decision recorded) · `docs/reviews/FULLREVIEW_2026-08-16_DELTA.md` + `fullreview_grades_2026-08-16_delta.json` (new, banked) · `docs/QUICKSTART.md`/`NEW_MACHINE_BOOTSTRAP.md` (CLI pin mirrors) · `docs/PROPORTIONALITY.md` (+1 row, the scrub alarm) · doc-literal regens rode each PR
+**Decisions:** none needed — the sessions's three governance-shaped calls (portrait direction, Grand Rounds routing, coverage bank) were owner gate decisions applied under existing contracts (ADR-106, ADR-153 alias mechanism, #1658's bank-the-gain rule), each recorded on its issue/PR
+**Main:** red at close, decoded — the newest COMPLETED run at close (`ea2f2507`, #2771's) fails Unit Tests on the same stale-guard defect #2772 already fixed on main (`d30ffd62`); the post-fix run was in flight at close and is the green candidate. Deploy plane is NOT stranded: the `1b767c8c` fleet deploy was approved at HEAD and its **Deploy ✅ Smoke ✅** — only its test lane carried the stale guard.
+**Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢
+**Closures:** 6 with live evidence — #2468, #2654, #2492, #1114, #2719, #2675. Partials honestly held: #2692 (boxes 3–4 named), #2741 (confirm path still unobserved in prod; window checked and recorded).
+**Incidents:** 1 row added — main red ~40min from my own #2769 escape (a second guard file pinning the pre-resolution board state; targeted suites passed, the full lane was not run for that PR).
+**Backlog:** promoted #2639, #2674, #1629 to Now by stored rank (score-line arrows updated). The STORY-liveness floor is honestly unmet and unmeetable: Now holds 2 actionable stories (#1221, #1629) + 2 `gate:owner`; Next's only other stories are both `blocked:dep` (#1739, #1740 — the TTS bake-off chain behind gate:owner #1738). Fourteen actionable bugs/chores sit on Now regardless — the queue has work, the story pipeline is what's thin. `later_staleness` sweep: clean (67 issues satisfy the filing contract). 11 filed this session (#2753 epic + #2754–#2763, `review:2026-08-16`).
+**Alarms:** 7 red, all cited, unchanged since session start (zero new reds across ~12 deploys); the new `between-chronicle-scrub-failed-closed` alarm is live at INSUFFICIENT_DATA with an offline `test-metric-filter` fire-proof. `coherence-overall`'s earliest possible OK is ~2026-08-16 18:45Z — the #2735/#2670 transition observations and the planted OK→ALARM proof remain time-blocked (#2735).
+**CI warnings:** 1 at close-check → 0 — the coverage high-water warning (81.71 vs 80.20) was triaged the sanctioned way: banked to 81.60 (#2771, merged).
 
 ---
 
-## What shipped — 9 PRs, all merged
+## What shipped — 10 PRs, all merged
 
 | PR | Issue | What |
 |---|---|---|
-| #2737 | #2735, #2736 | a correct rest state is not an outage; 0 checks is not green |
-| #2739 | #2738 | a coach that dates its reading is not contradicting the cockpit |
-| #2742 | — | alarm citations: +`coherence-overall`, two stale notes re-measured |
-| #2743 | #2741 | a blocking alarm's FAIL boundary is not a coin flip |
-| #2744 | #2692 | CI measures WHICH tests are slow, not just that the suite is |
-| #2745 | #2638 | mypy `return-value` enabled — 32 sites, zero behaviour change |
-| #2747 | #2638 | character_engine back to its 2117 baseline — **I broke it** |
-| #2748 | #2746 | a step named "Deterministic verdict (gating, free)" could not fail |
-| #2749 | #2638 | the disable-list guard pinned membership, so it failed on progress |
+| #2751 | #2468 | CDK CLI pin 2.1129.0→2.1135.1 — necessary hygiene, but its comment blamed the wrong leg (corrected in #2767) |
+| #2752 | — | the 08-16 Fable delta scorecard banked |
+| #2764 | #2654 | between-chronicle scrub fails CLOSED + token alarm |
+| #2765 | #2492 | coach prompt-pass v3 — grounded pushback + repair, deterministically held |
+| #2766 | #1114 | portrait frame v2 — the ring stays, the clock dies; size-aware ink |
+| #2767 | #2468 | cdk_deploy.sh owns its toolchain (pinned venv synth) + honest mechanism correction |
+| #2768 | — | i16 parses the date SEGMENT of whoop's sub-keyed sort keys |
+| #2769 | #2719 | Grand Rounds chaired by the lead — board → eli_marsh |
+| #2771 | — | coverage high-water banked 80.20 → 81.60 |
+| #2772 | — | the board-refusal guard pins the CLASS, not the pre-#2719 instance (decodes main's red) |
 
-**Deployed** per-function: `life-platform-coherence-sentinel`, `life-platform-qa-smoke` (×2). The four-stack owner `cdk deploy` had already landed — `check_deploy_drift.py` reads clean on all four.
+**Deployed:** all 7 Lambda stacks via cdk with the PINNED aws-cdk-lib (the #2468 fix) + Monitoring (the new alarm); per-function `between-chronicle`, `telegram-coach-worker` (twice — see gotcha 3), `telegram-webhook`, `life-platform-site-api-ai`; 5 voice specs + `personas.json` to S3; two site auto-deploys (portraits live and verified in-situ). One fleet lease approved at HEAD (Deploy ✅ Smoke ✅); five stale leases REJECTED with reasons.
+
+## The review (the session's first half)
+
+Scoped Fable delta re-grade of the true ungraded surface — **08c7af26..d7df1148e** (the plan's `07b80001` anchor was the 07-16 scorecard sha, and the 08-02 anchors were already superseded by an 08-09 Fable delta; both corrected before launching). 7 lenses, one grader + one lean-REFUTED verifier each, all Fable: **narrative B→B+, aiq B→B+, observability B+→A−, integrations B+→A− — four lenses up, three held (security B+, principal A−, cto A−).** All 7 verifier letters agree; 27 findings → 26 CONFIRMED + 1 ADJUSTED + 0 refuted (unusually clean against the historic ~50% FP rate). 10 filed + epic #2753. ~1.09M subagent tokens, 14 agents, zero errors.
 
 ## The through-line
 
-Last session's finding was that four defects sat inside the instruments. This session went one level down: **the instruments were mostly fine — the harm came from measurements that returned a clean number while measuring nothing.**
+The week's sessions kept finding measurements that returned clean numbers while measuring nothing. This session's version was subtler: **measurements that were CORRECT and still produced the wrong verdict, because two of them disagreed about the frame of reference.**
 
-- `coherence-overall` fired on a **correct rest state**. `macrofactor` is `behavioral: True, posture: load-bearing`, and #2326 (2026-08-09) is explicit that such a source must never page, "because that pages on a correct rest state" — it even cites this same source going dark 45 days before. The sentinel had no notion of `behavioral` at all: `grep -n 'behavioral'` returned **zero hits** across both its modules. The owner's one-line correction — *"I haven't logged anything in macrofactor so it's probably not a technical issue"* — turned a 52-day "outage" investigation into the session's best finding.
-- `computed_coherence` reported `ok / "0 computed metrics agree"` on **11 of 11 retained days**. Its adapter read `score`/`grade`; the record has stored `total_score`/`letter_grade` since the OLDEST row in the partition (2023-07-23). It had never executed a single check. All three tests stubbed the broken adapter with `lambda: []` — its own broken return value.
-- A step named **"Deterministic verdict (gating, free)"** could not fail. Piped into `tee`, no `pipefail`, last command a `head`. Same bug `ci-test.yml` already fixed and documents beside its coverage gate.
-- And my own: a wait loop that read "no checks reported" as "all checks passed", which merged a PR whose pre-merge lane was red.
+- The 7 config-drift warnings were TRUE every night — CI's synth genuinely differed from deployed — but un-actionable by the deploy they prescribed, because the owner's machine synthesized with aws-cdk-lib 2.244.0 against CI's pinned 2.263.0. Four owner stack deploys "fixed" them into persisting. The board went clean only when deployed reality was moved to match the PIN (7-stack deploy), and stays clean because the wrapper now builds its own toolchain (#2767).
+- #2675's two coaches disagreeing about the cycle day: BOTH were blessed by their own gate, because the Day-N gate ran on UTC while the prompt asserted PT. Every PT evening the gate flagged the platform's own correct day and passed the wrong one. One clock now (`pacific_today()`), pinned at the dual-clock instant itself; live board probe post-deploy: three voices, Day 6, unanimous.
 
-**Every one is the same shape** — a number arrived, it looked clean, and it described nothing.
+## Gotchas — read before the next session
 
-## Where the measurement overturned me
-
-Recorded because in both cases the confident answer was wrong and only re-measuring caught it:
-
-- **#2741** — I filed it recommending we RETIRE the reader-truth `temporal_contradiction` class per the #1922/#2613 precedent. Then measured: **2 of 8 runs** on byte-identical content, two severities, two rationales. Those precedents retired classes that were *persistent* (3/3, 4/5); a 2/8 class is flaky, and retiring it would delete real coverage to fix a coin flip. Recommendation withdrawn **on the issue**, and the shipped fix is confirm-before-FAIL instead.
-- **A 0/5 that was nearly a false all-clear.** My N=5 harness returned zero findings — a clean, plausible "the fix works". Running the real Lambda as a control produced `failed=1` at 22:16 and `failed=0` at 22:40. Without the control I'd have reported success.
-- **#2638** — `mypy.ini` predicted "behavior-adjacent surgery on the scoring path". All 32 were annotations under-describing already-correct code. `load_character_config` looked like a latent `AttributeError` until I read the callers: they already do `if not config: raise RuntimeError(...)`, with a test pinning it.
-
-## Gotchas — read these before the next session
-
-1. **`grep -c` on `gh pr checks` cannot tell "all green" from "no checks yet".** `gh pr checks` prints `no checks reported on the '<branch>' branch` while checks re-register after a push; `grep -cE "fail|pending"` returns **0** for that too. My wait loop broke on it and merged #2745 with a FAILING pre-merge lane. Use a rollup assertion instead: **`total_checks > 0 AND 0 not-green`** — an empty list is NOT READY, never READY.
-2. **A `-k` filter narrower than your change is not a test run.** Twice tonight. `-k "mypy_clean"` does not match `test_mypy_disable_cost_2638.py`; `-k "gate_census"` did not match the module-size guard. Both escaped to main. The honest fix is running the full lane before merging, not another gate.
-3. **`mypy_disable_cost.py` names TWO places to update when enabling a code; there are THREE.** `mypy.ini`, `GLOBAL_DISABLE_BASELINE`, **and** `test_mypy_disable_cost_2638.py`'s recorded set. That third one pinned membership as a literal and reddened main the moment the tranche it guards made progress — now a ratchet (`declared <= _ORIGINAL_DISABLED`).
-4. **`git stash push -- <path>` can silently create nothing, and `stash pop` then says "No stash entries found".** I lost a hand-written `INCIDENT_LOG.md` row that way mid-wrap and had to rewrite it. If you stash before a checkout, verify with `git stash list` **before** switching branches.
-5. **`||` is not a pipe.** My first swallow-sweep regex matched `|| cat` and reported `ci-cd.yml`'s smoke and canary steps as unable to fail. Both are fine — each ends on an unpiped `smoke_oracle_decision.py`. I nearly filed "the deploy smoke test cannot fail". Use `(?<!\|)\|(?!\|)`; pinned by a test.
-6. **A gate whose title says "Guard the SET" can still pin an instance.** Two examples tonight: the disable-list membership assert, and my own first #2746 guard, which selected on `_GATE_VERB` — and `_GATE_VERB` didn't match `*_eval.py`, so it could not have caught the bug it was written for. Its meta-test caught that. **Write the meta-test.**
-7. **"The condition is fixed" and "the alarm returned to OK" are different claims,** and on this board the gap is structural: `coherence-overall` and both `qa-smoke-*` alarms are `Maximum` over a **rolling 24h** window. A fresh `0.0` cannot pull a maximum down until the old datapoint ages out. No deploy shortens that.
-8. **A stale gated run must be REJECTED, and tonight one of them proved why:** run `31915499337` was pinned to `f63395bf` — the sha carrying the module-size regression that the very next commit fixed. Approving it would have deployed the bug.
+1. **My own false isolation, on the record:** I "proved" the CDK CLI decides the LogRetention runtime with a venv experiment — but `cdk` spawns `python3` through the login shell, so the activated venv never reached `app.py` and my "2.263.0 synth" was actually 2.244.0. The tell that unwound it: **decode the template's `CDK::Metadata` Analytics blob (gzip+base64) — it names the exact aws-cdk-lib that synthesized it.** Ground truth beats a plausible experiment.
+2. **`… | tail` swallowed a pytest usage error and the task reported exit 0.** My first "full lane" for #2654 never ran one test (`--timeout` unsupported → usage error → `tail` exits 0) — the #2746 class, in my own command, same week. The tell: zero `passed` lines in a "green" run. Run pytest unpiped to a file, append `pytest exit=$?`, read BOTH.
+3. **`gh pr merge` does not pull.** I deployed `telegram-coach-worker` + uploaded S3 voice specs from a checkout one merge behind — the ancestry postflight's sha is what exposed it (deployed sha matched MY stale HEAD, honestly). Pull, verify the sha you're about to ship IS the merge, then deploy. Both redone correct.
+4. **Updating "the" guard file is not sweeping the guard SET.** #2769 updated `test_telegram_route_provisioning_2677.py` and missed `test_board_route_refuses_2719.py` pinning the same state — targeted suites green, main red 40min later. Grep the repo for every test referencing the state you changed, then run the FULL lane (which I had skipped for exactly that PR).
+5. **A branch switch under a running full lane poisons it.** My #2492 lane "failed" test_count because I checked main out mid-run. A lane's tree must be frozen for its duration — worktrees exist for this.
+6. **`config/coaches/*.json` voice specs are S3-FIRST at runtime** — a merged few-shot does nothing until `aws s3 cp` (the `deploy_coach_intelligence.sh` glob, or per-file). Same for `personas.json` route aliases.
+7. **The email portrait PNGs render `with_frame=False`** — regenerating after a frame change is a byte-identical no-op BY DESIGN; verify that claim (`git status`) rather than assuming the manifest guard covers renderer changes (it keys on recipe hashes only).
 
 ## Residual queue / next picks
 
-- **#2735** — `partial`, 4 of 6. The two unmet boxes are the CloudWatch transition (earliest ~2026-08-16 18:45Z, no deploy needed) and the planted OK→ALARM proof, which the owner chose to run next session against a genuinely-OK baseline.
-- **#2670** — `partial`. `FailCount` reached **0** live; the alarm still cannot clear until the day's earlier `1`s age out. The one alarmed WarnCount survivor is `character:receipt_replay`, self-clearing by its own message.
-- **#2741** — `partial`. Confirm-before-FAIL is deployed but the confirmation path has **never run in production** (it only fires on a `high`, ~2 nights in 8). Needs a real demotion observed.
-- **#2638** — `partial`. Tranche 1 of 4 landed; `assignment` (285), `arg-type` (60), `operator` (38) remain, measured and itemised in `mypy.ini`.
-- **#2639** — `partial`. Box 2 adjudicated: the census's false-negative rate on its 38-step residual is **1–2 of 38**, and the one it missed was #2746. Boxes 1 and 3 unchanged.
-- **#2652** — untouched this session; its 69-route residual is still counted and named.
-- **#2740** — the named residual of #2738: a dated citation is exempt from the currency check but verified by nothing. Deliberately `Later`; acceptance box 1 is "measure whether dated citations are common enough to be worth the machinery".
-- **#2674** — still needs real browser measurement + before/after screenshots; not started.
-- **#2692** — mechanism shipped (`--durations=25`), measurement lands on the next main run. Nobody has read it yet.
-- **#2734** — not-work — a budget decision only Matthew can make; the alarm is cited and correct.
-- **#2642, #2643** — not-work — excluded by the brief (destructive S3 / data write).
-- **#2468** — not-work — `model:fable`, owner-run `cdk deploy`; drift currently reads clean.
-- **#2683, #2680, #1221** — not-work — `gate:owner` / CloudFront-side, excluded.
-- not-work — re-run `python3 scripts/check_ci_warnings.py` once run `31916736140` completes green; it could not read a warning board this session because there was no green run yet.
+- **#2735 / #2670** — the alarm OK transitions + the planted OK→ALARM proof; time-blocked until `coherence-overall`'s 24h maximum ages out (~2026-08-16 18:45Z). Observe the transitions, paste into both, then plant against the clean baseline.
+- **#2667** — per-metric as-of dates in the AI prompt; verified real from source, scoping comment banked on the issue: `site_api_ai_lambda` is FULL at its size ceiling, so the work STARTS with the sibling extraction (`site_api_ai_prompt.py` is the host). Deliberately not started at 3am.
+- **#2741** — confirm-before-FAIL still unobserved in production (fires ~2 nights in 8); the 08-16 01:30Z window check is on the issue.
+- **#2692** — boxes 3–4 open (per-test regression detection + PROPORTIONALITY row); the CI durations measurement + local/CI gap explanation are banked on the issue. Note the run-to-run wall-clock variance (±300s) recorded there is the design input for box 3.
+- **#2754–#2763 + epic #2753** — the review's filed findings, ranked and milestoned; `backlog_next.py` will surface them.
+- **#2673 / #1080 / #2363** — the coach-experience epics move next: #1080 pairs with the now-approved portrait direction; the #2363 multi-coach Grand Rounds room now has its interim (lead chairs it) live.
+- not-work — the post-#2772 main run was in flight at close; if its Deploy gate is waiting when next seen, ancestry-check and approve at HEAD (it is the green candidate). If `ea2f2507`'s red completed meanwhile, it is pre-decoded above.
+- not-work — first real message to `@ajm_board_bot` is the live Grand Rounds proof (only Matthew can send it); Eli should answer by name.
+- not-work — transcript-QA night should sample correction + contradicted-plan exchanges to measure #2492's outcome in real chats (recorded on the issue).

@@ -42,6 +42,7 @@ standing subsystem names what it costs, what it earns, and what would demote it.
 |---|---|---|---|
 | Phase machinery (ADR-077 taxonomy + restart pipeline) | Load-bearing | mind, CI | The experiment's reset semantics; coverage-asserted. 11 cycles of worked use |
 | Coherence sentinel + canonical-facts contracts | Load-bearing | CI, attention | The honesty moat's enforcement layer (ADR-104/105) |
+| between-chronicle scrub-failed alarm (MetricFilter + `between-chronicle-scrub-failed-closed`, #2654) | Watcher | CloudWatch (~$0), attention when red | Pages when the outbound privacy scrub fails CLOSED (nothing leaked; the digest went dark and silence must not be the only tell). Filter fire-proof recorded on #2654. Demote: if the fail-closed abort never fires in 12 months AND the vocabulary channel gains its own end-to-end canary, fold into the canary's alarm |
 | 8-coach board + stance engine + orchestrator | Load-bearing | $, mind | The COACHING pillar — the product |
 | Coach feedback loop (nudges #1382, docket #1386, dossier #1387, review pack #1698, calibration ADR-141) | Load-bearing | $, attention | The coaching layer's learning loop; first real-data cycle starts 2026-07-27 — findings-empty rule applies from Q4 |
 | Budget governor + budget_guard | Load-bearing | attention | Enforces the ADR-063/133 ceiling; the reason rent class `$` stays bounded |
