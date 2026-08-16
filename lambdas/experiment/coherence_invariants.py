@@ -233,18 +233,32 @@ def _mentions_value(low_text: str, true_val: float) -> bool:
     return any(re.search(r"(?<![\d.])" + re.escape(v) + r"(?![\d])", low_text) for v in forms)
 
 
-def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
+def check_facts_agreement(narratives, facts, *, surfaces=None, facts_overrides=None) -> Finding:
     """`narratives`: list of served text blobs. `facts`: the canonical dict
     ({recovery_pct, hrv_ms, rhr_bpm, latest_weight}, plus optional derived `tsb`).
     Flags a cited number that contradicts a fact by > its tolerance, and HRV quoted
     in bpm. Tuned for PRECISION (a false alarm erodes trust) — the AI semantic pass
-    carries recall. Derived values (tsb, M-8/#493) get a WIDE absolute tolerance."""
+    carries recall. Derived values (tsb, M-8/#493) get a WIDE absolute tolerance.
+
+    `facts_overrides` (#2792): ``{label: {"facts": {...}, "as_of": "YYYY-MM-DD"}}`` —
+    a surface served STALE (an ADR-108 hold kept yesterday's narrative live) is judged
+    against the facts of its own generation day, so honest-but-yesterday is not read
+    as a contradiction. This is a frame correction, not a softening: a narrative that
+    contradicts its OWN day's facts still fires, and the stale serving is named in the
+    finding detail either way."""
     f = Finding("facts_agreement", value=0.0)
     offenders = []
     labels = surfaces or [f"narrative_{i}" for i in range(len(narratives))]
+    overrides = facts_overrides or {}
+    stale_notes = []
     for text, label in zip(narratives, labels):
         if not text:
             continue
+        override = overrides.get(label)
+        surface_facts = facts
+        if override and override.get("facts"):
+            surface_facts = override["facts"]
+            stale_notes.append(f"{label} served stale from {override.get('as_of', '?')} (checked against its own-day facts)")
         low = text.lower()
         # HRV-unit error: an HRV value directly carried in bpm (HRV is milliseconds).
         # Require number-then-bpm right after HRV so "HRV 25 ms and RHR 64 bpm" — two
@@ -252,7 +266,7 @@ def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
         if re.search(r"hrv[^.\d]{0,12}\d{1,3}(?:\.\d+)?\s*bpm", low):
             offenders.append(f"{label}: HRV cited in bpm (HRV is milliseconds)")
         for key, (patterns, tol) in _FACT_PATTERNS.items():
-            true_val = facts.get(key)
+            true_val = surface_facts.get(key)
             signed = key in _ABS_TOL
             # 0 means "no data" for the positive vitals (recovery/hrv/rhr/weight); a SIGNED
             # metric (TSB) can legitimately be a real 0, so only skip it when truly absent.
@@ -285,6 +299,10 @@ def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
         f.detail = "; ".join(offenders[:5])
     else:
         f.detail = "served narratives agree with the canonical facts"
+    if stale_notes:
+        # Honest staleness stays VISIBLE (ADR-104) without manufacturing a
+        # contradiction: the operator sees WHICH surfaces are held/stale and as of when.
+        f.detail += "; " + "; ".join(stale_notes[:6])
     return f
 
 
