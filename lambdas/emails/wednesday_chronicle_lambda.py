@@ -25,7 +25,7 @@ import json
 import logging
 import os
 import secrets as _secrets
-from datetime import datetime, timezone
+from datetime import datetime, timezone  # noqa: F401 — timezone is resolved via the _g seam (chronicle_personas:204)
 
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
@@ -376,51 +376,15 @@ def _held_week(week_num, reason, display, body, status_code=500, dry_run=False):
 
 
 def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track last send."""
-    import time as _time
-
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                # #2221: derive the user from USER_ID like every other write in this
-                # Lambda. The hard-coded 'matthew' put the send record in the wrong
-                # partition under any non-default USER_ID (same fix as
-                # nutrition_review_lambda's copy of this helper).
-                "pk": f"USER#{USER_ID}#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+    return _store.record_email_send(table, lambda_name, _g=globals())
 
 
-# #2254: hard stop on the installment-listing pagination loop. The chronicle partition
-# holds one row per week (~20 KB each, ~400 KB total as of 2026-08-08), so 25 pages is
-# orders of magnitude of headroom — it exists only so a malformed LastEvaluatedKey can
-# never spin this Lambda for its whole timeout.
+# #2254 pagination cap — rationale at chronicle_store; kept here for its consumers.
 _MAX_INSTALLMENT_PAGES = 25
 
 
 def _existing_installment(date_str):
-    """#2254: read the already-stored installment for `date_str`, or None.
-
-    Fail-OPEN by design: if the read itself fails we return None and the run proceeds,
-    because a DDB blip must not silently stop the week from being written at all. The
-    conditional put in chronicle_store.store_installment is the fail-CLOSED backstop that
-    still refuses to clobber a protected row in that case.
-    """
-    if not date_str:
-        return None
-    try:
-        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{date_str}"})
-        return resp.get("Item") or None
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"[#2254] idempotency read failed (proceeding, conditional put still guards): {e}")
-        return None
+    return _store.existing_installment(date_str, _g=globals())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -463,7 +427,7 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
     return _personas._run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, allowed_numbers, _g=globals())
 
 
-def lambda_handler(event: dict, context) -> dict:
+def _handler_core(event: dict, context) -> dict:
     logger.info("Wednesday Chronicle v1.1.0 (Board Centralization) — The Measured Life — starting...")
 
     # Phase 3 bootstrap/regenerate: {"recap_only": true} builds + commits the
@@ -552,6 +516,7 @@ def lambda_handler(event: dict, context) -> dict:
     # to regenerate. {"force": true} is the deliberate-regeneration escape hatch.
     # #2112 closed this class on the downstream sender; this is the generator's half.
     _target_date = (data.get("dates") or {}).get("end")
+    _existing_status = None
     if _target_date and not event.get("force"):
         _existing = _existing_installment(_target_date)
         _existing_status = (_existing or {}).get("status")
@@ -719,10 +684,23 @@ def lambda_handler(event: dict, context) -> dict:
         logger.warning(f"[#1385] archive build skipped (non-fatal): {_arch_e}")
         _archive_text = ""
 
+    # #2669: a cache hit = a prior run finished the model pipeline and died in
+    # the tail (08-05 went 3x that way) — reuse skips every model pass below.
+    # ONLY into the void a crash left (`_existing_status is None`): a
+    # changes_requested week's regeneration must be FRESH — reusing the cache
+    # would re-store the exact text Matthew rejected. Rehearsals (#2221) and
+    # force never touch it; rationale at chronicle_store.
+    _cache_ok = not _dry and not event.get("force") and _target_date and _existing_status is None
+    _cached = _store.read_raw_cache(_target_date, _g=globals()) if _cache_ok else None
+    _skip_model_passes = _cached is not None
+    if _cached is not None:  # the explicit narrow — mypy can't see through the bool
+        raw_installment = _cached
+
     # Call Sonnet
-    logger.info("Calling Sonnet for Elena's installment (whole-life-context, 1h-cached archive)...")
     try:
-        raw_installment = call_anthropic(elena_prompt, user_message, archive_text=_archive_text)
+        if not _skip_model_passes:
+            logger.info("Calling Sonnet for Elena's installment (whole-life-context, 1h-cached archive)...")
+            raw_installment = call_anthropic(elena_prompt, user_message, archive_text=_archive_text)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
         return _held_week(
@@ -743,78 +721,85 @@ def lambda_handler(event: dict, context) -> dict:
     # human-reviewed (PREVIEW_MODE) + privacy-gated downstream, so a residual
     # finding degrades to the best draft instead of going dark.
     _allowed = None
-    try:
-        from ai import grounded_generation as _gg
+    if _skip_model_passes:
+        logger.info("[#2669] cached generation reused — grounding/Margaret/presence passes already ran on this text")
+    else:
+        try:
+            from ai import grounded_generation as _gg
 
-        # #1385: fold the whole-life archive into the allow-list source — Elena was
-        # shown it, so its numbers/dates are grounded vocabulary, not fabrications.
-        _allowed = _gg.allowed_numbers(elena_prompt, user_message, _archive_text)
-        _draft_before_gate = raw_installment  # #812/#744: keep the pre-gate draft for retention
-        _findings_fn = lambda t: installment_grounding_findings(elena_prompt, user_message, t, archive_text=_archive_text)  # noqa: E731
-        _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr, archive_text=_archive_text)  # noqa: E731
-        raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn)
-        if _corrected:
-            logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
-        elif _residual:
-            logger.warning(f"[ADR-104] chronicle keeps {len(_residual)} residual grounding findings (best draft)")
-        if (_corrected or _residual) and not _dry:
-            # #812/#744: a fired chronicle gate is labeled eval data — retain the pair.
-            # #2221: a rehearsal writes nothing, not even fail-soft eval data.
-            try:
-                from experiment import eval_retention
+            # #1385: fold the whole-life archive into the allow-list source — Elena was
+            # shown it, so its numbers/dates are grounded vocabulary, not fabrications.
+            _allowed = _gg.allowed_numbers(elena_prompt, user_message, _archive_text)
+            _draft_before_gate = raw_installment  # #812/#744: keep the pre-gate draft for retention
+            _findings_fn = lambda t: installment_grounding_findings(elena_prompt, user_message, t, archive_text=_archive_text)  # noqa: E731
+            _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr, archive_text=_archive_text)  # noqa: E731
+            raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn)
+            if _corrected:
+                logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
+            elif _residual:
+                logger.warning(f"[ADR-104] chronicle keeps {len(_residual)} residual grounding findings (best draft)")
+            if (_corrected or _residual) and not _dry:
+                # #812/#744: a fired chronicle gate is labeled eval data — retain the pair.
+                # #2221: a rehearsal writes nothing, not even fail-soft eval data.
+                try:
+                    from experiment import eval_retention
 
-                eval_retention.retain(
-                    "chronicle",
-                    "flagged_corrected" if _corrected else "flagged_kept_best",
-                    draft=_draft_before_gate,
-                    final=raw_installment,
-                    findings=_findings_fn(_draft_before_gate),  # the DRAFT's findings — they define a canary's expected checks
-                    allowed=_allowed,
-                    extra={"week_number": week_num},
+                    eval_retention.retain(
+                        "chronicle",
+                        "flagged_corrected" if _corrected else "flagged_kept_best",
+                        draft=_draft_before_gate,
+                        final=raw_installment,
+                        findings=_findings_fn(_draft_before_gate),  # the DRAFT's findings — they define a canary's expected checks
+                        allowed=_allowed,
+                        extra={"week_number": week_num},
+                    )
+                except Exception:  # noqa: BLE001 — retention is never load-bearing
+                    pass
+        except ImportError:
+            pass  # gate module unavailable — serve as before
+        except Exception as _gg_e:
+            logger.warning(f"[ADR-104] chronicle grounding gate error (fail-open): {_gg_e}")
+
+        # #548: Margaret Calloway's red pen — one critique + conditional revision
+        # pass over Elena's grounded draft, before AI-3 validation / parsing / the
+        # privacy gate (all of which still run on whatever text comes back here).
+        raw_installment = _run_margaret_edit_pass(raw_installment, week_num, data["dates"]["end"], elena_prompt, _allowed)
+
+        # #914: presence-acknowledgment gate (ADR-108 regenerate-or-hold). Runs AFTER
+        # Margaret's edit so her rewrite can't strip the acknowledgment unnoticed. At
+        # severity loud/alarm an installment that narrates a normal week over a real
+        # logging stall is regenerated once, then HELD — no chronicle beats a dishonest
+        # one. Deterministic anchor check, no LLM judge.
+        try:
+            from content.engagement_core import enforce_presence_acknowledgment as _epa, presence_ack_required as _par
+
+            if _presence_sig and _par(_presence_sig) and raw_installment:
+                raw_installment, _ack_finding = _epa(
+                    raw_installment,
+                    _presence_sig,
+                    regenerate_fn=lambda note: call_anthropic(elena_prompt, user_message + "\n\n" + note, archive_text=_archive_text),
                 )
-            except Exception:  # noqa: BLE001 — retention is never load-bearing
-                pass
-    except ImportError:
-        pass  # gate module unavailable — serve as before
-    except Exception as _gg_e:
-        logger.warning(f"[ADR-104] chronicle grounding gate error (fail-open): {_gg_e}")
+                if _ack_finding:
+                    logger.warning(f"[#914] chronicle presence-ack gate fired: {_ack_finding.get('detail')}")
+                if raw_installment is None:
+                    logger.error("[#914] chronicle HELD by presence-ack gate — not publishing this week")
+                    return _held_week(
+                        week_num,
+                        "presence_hold",
+                        f"Week {week_num}'s installment was written and then withheld — Matthew's own logging went "
+                        "quiet during the window, and the draft narrated a normal week over an incomplete one. "
+                        "No chronicle beats a dishonest one. Nothing was published or stored for this week.",
+                        "[#914] Chronicle held: presence gap unacknowledged at severity loud/alarm",
+                        dry_run=_dry,
+                    )
+        except ImportError:
+            pass  # engagement_core unavailable — serve as before
+        except Exception as _ack_e:
+            logger.warning(f"[#914] presence-ack gate error (fail-open): {_ack_e}")
 
-    # #548: Margaret Calloway's red pen — one critique + conditional revision
-    # pass over Elena's grounded draft, before AI-3 validation / parsing / the
-    # privacy gate (all of which still run on whatever text comes back here).
-    raw_installment = _run_margaret_edit_pass(raw_installment, week_num, data["dates"]["end"], elena_prompt, _allowed)
-
-    # #914: presence-acknowledgment gate (ADR-108 regenerate-or-hold). Runs AFTER
-    # Margaret's edit so her rewrite can't strip the acknowledgment unnoticed. At
-    # severity loud/alarm an installment that narrates a normal week over a real
-    # logging stall is regenerated once, then HELD — no chronicle beats a dishonest
-    # one. Deterministic anchor check, no LLM judge.
-    try:
-        from content.engagement_core import enforce_presence_acknowledgment as _epa, presence_ack_required as _par
-
-        if _presence_sig and _par(_presence_sig) and raw_installment:
-            raw_installment, _ack_finding = _epa(
-                raw_installment,
-                _presence_sig,
-                regenerate_fn=lambda note: call_anthropic(elena_prompt, user_message + "\n\n" + note, archive_text=_archive_text),
-            )
-            if _ack_finding:
-                logger.warning(f"[#914] chronicle presence-ack gate fired: {_ack_finding.get('detail')}")
-            if raw_installment is None:
-                logger.error("[#914] chronicle HELD by presence-ack gate — not publishing this week")
-                return _held_week(
-                    week_num,
-                    "presence_hold",
-                    f"Week {week_num}'s installment was written and then withheld — Matthew's own logging went "
-                    "quiet during the window, and the draft narrated a normal week over an incomplete one. "
-                    "No chronicle beats a dishonest one. Nothing was published or stored for this week.",
-                    "[#914] Chronicle held: presence gap unacknowledged at severity loud/alarm",
-                    dry_run=_dry,
-                )
-    except ImportError:
-        pass  # engagement_core unavailable — serve as before
-    except Exception as _ack_e:
-        logger.warning(f"[#914] presence-ack gate error (fail-open): {_ack_e}")
+    # #2669: pipeline complete — persist NOW, before the render/mail tail can die.
+    if not _dry and not _skip_model_passes and _target_date and raw_installment:
+        _store.write_raw_cache(_target_date, week_num, raw_installment, _g=globals())
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and raw_installment:
@@ -1198,3 +1183,18 @@ def lambda_handler(event: dict, context) -> dict:
         "statusCode": 200,
         "body": f'Chronicle Week {week_num} published: "{title}" ({len(raw_installment.split())} words)',
     }
+
+
+def lambda_handler(event: dict, context) -> dict:
+    """#2669: timeout-watchdog wrapper (common.timeout_watchdog) — _handler_core is the real flow."""
+    from common.timeout_watchdog import arm, disarm
+
+    timer = arm(
+        context,
+        metric_name="ChronicleTimeoutImminent",
+        detail="the run dies mid-tail; if a '[#2669] generation cached' line appears above, the retry is free",
+    )
+    try:
+        return _handler_core(event, context)
+    finally:
+        disarm(timer)

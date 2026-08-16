@@ -407,7 +407,9 @@ def env(monkeypatch, frozen_clock):
 
 
 def _stored_installment(env):
-    rows = [p for p in env["table"].puts if p.get("source") == "chronicle"]
+    # sk filter (#2669): the generation-cache row (RAWCACHE#, chronicle_store)
+    # shares the partition and source; "the stored installment" means the DATE# row.
+    rows = [p for p in env["table"].puts if p.get("source") == "chronicle" and str(p.get("sk", "")).startswith("DATE#")]
     return rows[0] if rows else None
 
 
@@ -1477,6 +1479,31 @@ def test_a_week_whose_changes_were_requested_is_regenerated_without_force(env):
     assert len(env["calls"]["ai"]) == 1
 
 
+def test_a_crashed_runs_cache_never_serves_a_requested_regeneration(env):
+    """#2669: the cache fills the void a CRASH left (no DATE# row). A
+    changes_requested week regenerates without force by design — reusing the
+    cached text would re-store the exact draft Matthew rejected."""
+    env["table"].rows.append(_installment_row(WEEK_END, 5, title="The rejected draft", status="changes_requested"))
+    env["table"].rows.append(
+        {"pk": "USER#matthew#SOURCE#chronicle", "sk": f"RAWCACHE#{WEEK_END}", "source": "chronicle", "raw_text": RAW_INSTALLMENT}
+    )
+    m.lambda_handler({}, None)
+    assert len(env["calls"]["ai"]) >= 1, "the regeneration must be FRESH — the cache may not satisfy it"
+
+
+def test_the_cache_is_reused_when_a_crash_left_no_installment_row(env):
+    """#2669: the crash case — the pipeline finished, the persist never ran.
+    A retry must reuse the cached text and pay for zero model calls."""
+    env["table"].rows.append(
+        {"pk": "USER#matthew#SOURCE#chronicle", "sk": f"RAWCACHE#{WEEK_END}", "source": "chronicle", "raw_text": RAW_INSTALLMENT}
+    )
+    resp = m.lambda_handler({}, None)
+    assert resp["statusCode"] == 200
+    assert env["calls"]["ai"] == [], "a cache hit must cost zero generations"
+    stored = _stored_installment(env)
+    assert stored is not None and TITLE in str(stored.get("title", "")), "the cached text is what gets stored"
+
+
 def test_force_regenerates_a_week_that_already_has_a_draft(env):
     m.lambda_handler({}, None)
     env["table"].puts.clear()
@@ -1519,12 +1546,20 @@ def test_the_installment_put_is_conditional_unless_overwrite_is_explicit(env):
     """Mutation proof for the guard itself: the put carries a ConditionExpression that
     names both protected statuses, and only `force` drops it."""
     m.lambda_handler({}, None)
-    kwargs = [k for k in env["table"].put_kwargs if (k.get("Item") or {}).get("source") == "chronicle"][0]
+    kwargs = [
+        k
+        for k in env["table"].put_kwargs
+        if (k.get("Item") or {}).get("source") == "chronicle" and str((k.get("Item") or {}).get("sk", "")).startswith("DATE#")
+    ][0]
     assert "ConditionExpression" in kwargs
     assert set(kwargs["ExpressionAttributeValues"].values()) == set(m._store.PROTECTED_STATUSES)
     env["table"].put_kwargs.clear()
     m.lambda_handler({"force": True}, None)
-    forced = [k for k in env["table"].put_kwargs if (k.get("Item") or {}).get("source") == "chronicle"][0]
+    forced = [
+        k
+        for k in env["table"].put_kwargs
+        if (k.get("Item") or {}).get("source") == "chronicle" and str((k.get("Item") or {}).get("sk", "")).startswith("DATE#")
+    ][0]
     assert "ConditionExpression" not in forced
 
 

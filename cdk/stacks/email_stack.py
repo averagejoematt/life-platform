@@ -247,7 +247,13 @@ class EmailStack(Stack):
             handler="emails.wednesday_chronicle_lambda.lambda_handler",
             source_file="lambdas/emails/wednesday_chronicle_lambda.py",
             schedule="cron(0 15 ? * WED *)",
-            timeout_seconds=120,
+            # #2669: 120 → 300. A representative full generation measured ~102s
+            # (Elena + ADR-104 corrective + Margaret + presence gates), and three
+            # runs in 21 days hit the 120s wall AFTER the paid model work
+            # completed. 300s = the measured pipeline + the persist/render tail
+            # with real headroom; the generation cache (chronicle_store, #2669)
+            # is the other half — a timeout retry reuses the text it already paid for.
+            timeout_seconds=300,
             memory_mb=256,
             environment=_email_env,
             custom_policies=rp.email_wednesday_chronicle(),
