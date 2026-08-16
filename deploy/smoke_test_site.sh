@@ -253,6 +253,28 @@ check_status "/api/pulse"           "$BASE/api/pulse"
 check_status "/api/snapshot"        "$BASE/api/snapshot"
 check_status "/api/source_freshness" "$BASE/api/source_freshness"
 check_status "/api/platform_stats"  "$BASE/api/platform_stats"
+
+# ── #2683/#2680: error-path CONTRACT (mapping removed 2026-08-16) ─────────────
+# The distribution-wide custom error responses rewrote API errors (404 body →
+# HTML page; 403 → 200 homepage). With them gone: an API 404 must be the
+# handler's JSON, and a site-path 404 must still render the HTML 404 page (via
+# the S3 website ErrorDocument, site/404.html). Both directions pinned.
+check_status_and_type() {
+  local label="$1" url="$2" want_status="$3" want_type="$4"
+  local out status ctype
+  CURRENT_CHECK="$label ($url)"
+  out=$(smoke_curl -s -o /dev/null -w "%{http_code} %{content_type}" --max-time 10 "$url")
+  status="${out%% *}"; ctype="${out#* }"
+  if [[ "$status" == "$want_status" && "$ctype" == *"$want_type"* ]]; then
+    echo "  ✅ $label"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $label — expected $want_status $want_type, got $out ($url)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+check_status_and_type "API 404 is JSON (#2683)"    "$BASE/api/smoke-nonexistent-route" 404 "application/json"
+check_status_and_type "site 404 stays HTML (#2683)" "$BASE/smoke-nonexistent-page/"    404 "text/html"
 # #1112 — the head coach's detail route (lead tier) must resolve, not 404
 check_status "/api/coach/eli_marsh" "$BASE/api/coach/eli_marsh"
 # #1409 — the felt-reality calibration ledger (aggregates only)

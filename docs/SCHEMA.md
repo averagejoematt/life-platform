@@ -321,6 +321,13 @@ Daily records (`sk = DATE#YYYY-MM-DD`) + workout sub-items (`sk = DATE#YYYY-MM-D
 
 Note: every mass metric is written in kg with a derived lbs twin — `fat_mass_kg`, `fat_free_mass_kg`, `muscle_mass_kg`, `bone_mass_kg` accompany the `*_lbs` fields above. Additional conditional fields are written whenever the device reports them (all in `MEAS_TYPES` in `withings_lambda.py`): `height_m`, `systolic_blood_pressure`, `diastolic_blood_pressure`, `temperature_c`, `body_temperature_c`, `skin_temperature_c`, `spo2_pct`, `pulse_wave_velocity_mps`, `vo2_max`, ECG intervals (`qrs_interval_ms`, `pr_interval_ms`, `qt_interval_ms`), and `vascular_age`.
 
+**BodyScan 2 fields (#2782, first fired 2026-08-16 — owner-decided ingest-all):**
+`extracellular_water_kg`, `intracellular_water_kg`, `visceral_fat_index` (unitless), `bmr_kcal` (label inferred from device class — BodyScan publishes BMR, value is kcal-scale), `eda_feet`/`eda_left_foot`/`eda_right_foot` (electrodermal activity / nerve health), `afib_result` (0 = screening ran, not detected — an event-class medical result, never a trend stat), `metabolic_age`, and segmental body composition `{fat_free_mass,fat_mass,muscle_mass}_{torso,left_arm,right_arm,left_leg,right_leg}_kg` (15 fields; no lbs twins). **Segment mapping is magnitude-inferred, not vendor-documented** — the `position` attribute→limb map in `SEGMENT_POSITIONS` was derived from the live 2026-08-16 capture (torso carries the dominant share; the type-173 five-segment sum equals scalar `fat_free_mass_kg` exactly, which pins the semantics); an anatomically absurd future reading means the mapping, not the body, changed. `spo2_pct` **zero is never stored** (the device transmits 0 on a failed measurement — ADR-104 absence, not a reading).
+
+**Privacy tiers (PhenoAge posture):** `vascular_age`, `metabolic_age`, and `afib_result` are **Tier-2 owner-only** — never on a public surface and never quoted into an AI narrative context. All current consumers are field-selective (verified in #2782); any future consumer of the withings partition must pick fields explicitly, never dump rows.
+
+**SoT rulings (#2782):** weight/body-comp SoT = Withings (unchanged, now including segmental + water compartments). `heart_pulse` and `spo2_pct` are **ancillary** to Whoop (Whoop stays the HR/recovery truth surface); `bmr_kcal` is a cross-check against MacroFactor's expenditure model, never a substitute for it.
+
 ### strava
 Day-level aggregates (rolled up from individual activities):
 

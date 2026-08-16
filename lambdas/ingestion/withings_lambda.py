@@ -66,7 +66,39 @@ MEAS_TYPES = {
     135: "qrs_interval_ms",
     136: "pr_interval_ms",
     137: "qt_interval_ms",
-    155: "vascular_age",
+    155: "vascular_age",  # age-class — Tier-2 owner-only (SCHEMA.md), never a public/AI surface
+    # ── BodyScan 2 arrivals (#2782, owner-decided ingest-all 2026-08-16) ──────
+    130: "afib_result",  # ECG screening: 0 = not detected. Event-class, owner-only.
+    168: "extracellular_water_kg",
+    169: "intracellular_water_kg",
+    170: "visceral_fat_index",  # unitless index
+    196: "eda_feet",  # electrodermal activity (nerve health), both feet
+    197: "eda_left_foot",
+    198: "eda_right_foot",
+    226: "bmr_kcal",  # basal metabolic rate — label inferred (BodyScan publishes BMR; kcal-scale value)
+    227: "metabolic_age",  # age-class — Tier-2 owner-only, same posture as vascular_age
+}
+
+# ── BodyScan 2 segmental body composition (#2782) ─────────────────────────────
+# Types 173/174/175 arrive as FIVE measures per reading, one per body segment,
+# distinguished by the measure's `position` attribute. The official docs do not
+# publish the position→limb mapping; this one is inferred from physiological
+# magnitude on the live 2026-08-16 capture (torso carries 48.76 of the 92.08 kg
+# fat-free total; legs ≈15.4; arms ≈6.2) and marked as such in SCHEMA.md. If a
+# future reading looks anatomically absurd, suspect this mapping first.
+# Internal cross-check that pins 173's semantics: the five position values sum
+# to exactly the scalar fat_free_mass_kg (type 5).
+SEGMENTAL_TYPES = {
+    173: "fat_free_mass",
+    174: "fat_mass",
+    175: "muscle_mass",
+}
+SEGMENT_POSITIONS = {
+    2: "left_arm",
+    3: "right_arm",
+    10: "left_leg",
+    11: "right_leg",
+    12: "torso",
 }
 
 # ── Withings API helpers ───────────────────────────────────────────────────────
@@ -170,12 +202,28 @@ def _parse_measurements(raw_body: dict) -> dict:
     for grp in grps_sorted:
         for meas in grp.get("measures", []):
             mtype = meas["type"]
+            value = meas["value"] * (10 ** meas["unit"])
+            if mtype in SEGMENTAL_TYPES:
+                # #2782: per-limb values share one type id; `position` picks the
+                # segment. An unknown position is skipped visibly, never guessed.
+                segment = SEGMENT_POSITIONS.get(meas.get("position"))
+                if segment is None:
+                    logger.warning(f"withings: segmental type {mtype} with unmapped position {meas.get('position')!r} — skipped")
+                    continue
+                field_name = f"{SEGMENTAL_TYPES[mtype]}_{segment}_kg"
+                if field_name not in result:
+                    result[field_name] = round(value, 4)
+                continue
             if mtype not in MEAS_TYPES:
+                continue
+            if mtype == 54 and value == 0:
+                # ADR-104 (#2782): the BodyScan transmits SpO2 = 0 when the
+                # measurement failed to compute. 0% is an absence encoded as a
+                # number, not a reading — never store it.
                 continue
             field_name = MEAS_TYPES[mtype]
             if field_name in result:
                 continue  # keep most-recent only
-            value = meas["value"] * (10 ** meas["unit"])
             result[field_name] = round(value, 4)
             if field_name in ("weight_kg", "fat_mass_kg", "fat_free_mass_kg", "muscle_mass_kg", "bone_mass_kg"):
                 result[field_name.replace("_kg", "_lbs")] = round(value * 2.20462, 2)

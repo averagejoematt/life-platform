@@ -285,7 +285,7 @@ def test_tier_for_scales_proportionally_with_surge_ceiling(gov):
 
 
 # ── temporary raise window (_TEMP_CEILING_WINDOW) ────────────────────────────
-# August 2026 is raised to $115/$135 for one month and reverts on its own date.
+# August 2026 is raised to $200/$235 for one month (#2381 then #2734) and reverts on its own date.
 # These tests inject the date instead of reading the clock, so they assert the
 # same thing in September 2026 as they did the day they were written.
 
@@ -310,9 +310,9 @@ def _clock_at(day):
     "today,expected",
     [
         (date(2026, 7, 31), (85.0, 100.0)),  # day before the window opens
-        (date(2026, 8, 1), (115.0, 135.0)),  # inclusive start
-        (date(2026, 8, 9), (115.0, 135.0)),  # the day it was decided
-        (date(2026, 8, 31), (115.0, 135.0)),  # last day inside
+        (date(2026, 8, 1), (200.0, 235.0)),  # inclusive start
+        (date(2026, 8, 9), (200.0, 235.0)),  # the day the first August raise was decided
+        (date(2026, 8, 31), (200.0, 235.0)),  # last day inside
         (date(2026, 9, 1), (85.0, 100.0)),  # EXCLUSIVE end — reverts unattended
         (date(2027, 8, 15), (85.0, 100.0)),  # does not recur next August
     ],
@@ -471,7 +471,7 @@ def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch
     # pair for every OTHER test in this module; undo that here so _alert_surge
     # sees the real, date-scoped resolution this test is about.
     monkeypatch.setattr(gov, "_active_ceilings", gov._REAL_ACTIVE_CEILINGS)
-    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))  # inside the $115/$135 window
+    monkeypatch.setattr(gov, "datetime", _clock_at(date(2026, 8, 9)))  # inside the $200/$235 window
     fake_sns = _FakeSNS()
     monkeypatch.setattr(gov, "_sns", fake_sns)
 
@@ -480,8 +480,8 @@ def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch
     assert len(fake_sns.calls) == 1
     subj = fake_sns.calls[0]["Subject"]
     body = fake_sns.calls[0]["Message"]
-    assert "$115" in subj and "$135" in subj, f"subject must carry the ACTIVE pair, not the base constants: {subj!r}"
-    assert "$115" in body and "$135" in body, f"body must carry the ACTIVE pair, not the base constants: {body!r}"
+    assert "$200" in subj and "$235" in subj, f"subject must carry the ACTIVE pair, not the base constants: {subj!r}"
+    assert "$200" in body and "$235" in body, f"body must carry the ACTIVE pair, not the base constants: {body!r}"
     assert "$85" not in subj and "$100" not in subj, f"subject must not fall back to the out-of-window base pair: {subj!r}"
 
 
@@ -496,8 +496,8 @@ def test_alert_surge_disengage_uses_active_ceilings_in_temp_window(gov, monkeypa
     assert len(fake_sns.calls) == 1
     subj = fake_sns.calls[0]["Subject"]
     body = fake_sns.calls[0]["Message"]
-    assert "$115" in subj, f"subject must revert to the ACTIVE base ($115 in this window), not $85: {subj!r}"
-    assert "$135" in body and "$115" in body, f"body must name the ACTIVE pair reverted from/to: {body!r}"
+    assert "$200" in subj, f"subject must revert to the ACTIVE base ($200 in this window), not $85: {subj!r}"
+    assert "$235" in body and "$200" in body, f"body must name the ACTIVE pair reverted from/to: {body!r}"
 
 
 def test_alert_surge_out_of_window_still_uses_the_default_base(gov, monkeypatch):
