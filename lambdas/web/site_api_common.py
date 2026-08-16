@@ -145,7 +145,11 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 15540,
+<<<<<<< HEAD
+    "test_count": 15528,
+=======
+    "test_count": 15522,
+>>>>>>> 1c1fd83a9 (fix(ci): check_main_green vouches for main's actual HEAD — the swallowed-push shape reads uncovered, never green (#2762))
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
