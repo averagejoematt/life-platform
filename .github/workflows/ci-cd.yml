@@ -346,6 +346,10 @@ jobs:
         # hypothesis: property tests (#1664) are collected in this lane. Versions are
         # READ from requirements-dev.txt, never copied here (CQ-01, #2609).
         run: |
+          # #2758: this literal list is drift-pinned to tests/deploy_critical_lane_deps.py
+          # (LANE_THIRD_PARTY_DEPS) by test_deploy_critical_lane_imports_2758 — the same
+          # module the lane-import guard checks against. Names stay LITERAL here so
+          # test_ci_pin_consistency can statically verify each is pinned (CQ-01).
           PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis)
           pip install $PINS
 
