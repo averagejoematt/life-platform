@@ -207,6 +207,81 @@ def test_withings_empty_and_unknown_type():
     assert out["measurement_timestamp"] == 1_700_000_000
 
 
+# ── BodyScan 2 (#2782): the wire shape from the 2026-08-16 live capture ───────
+# Structure (group layout, types, positions, attribs) mirrors the real capture;
+# values are altered but keep the device's own invariant — the five segmental
+# fat-free values (type 173) sum to the scalar fat_free_mass (type 5).
+
+
+def _bodyscan2_grp(date=1_700_000_000):
+    seg = lambda t, v, pos: {"type": t, "value": v, "unit": -2, "position": pos}  # noqa: E731
+    return {
+        "date": date,
+        "attrib": 0,
+        "measures": [
+            {"type": 1, "value": 90000, "unit": -3},  # 90.0 kg
+            {"type": 5, "value": 6000, "unit": -2},  # fat-free 60.0 kg
+            {"type": 170, "value": 79, "unit": -1},  # visceral fat 7.9
+            {"type": 168, "value": 2000, "unit": -2},  # ECW 20.0 kg
+            {"type": 169, "value": 3000, "unit": -2},  # ICW 30.0 kg
+            {"type": 226, "value": 1800, "unit": 0},  # BMR 1800 kcal
+            {"type": 227, "value": 40, "unit": 0},  # metabolic age 40
+            # segmental fat-free: 30 + 10 + 10 + 5 + 5 = 60.0 = type 5 above
+            seg(173, 3000, 12),
+            seg(173, 1000, 10),
+            seg(173, 1000, 11),
+            seg(173, 500, 2),
+            seg(173, 500, 3),
+            seg(174, 900, 12),
+            seg(175, 2800, 12),
+        ],
+    }
+
+
+def test_withings_bodyscan2_scalars_and_segments():
+    out = _parse_measurements({"measuregrps": [_bodyscan2_grp()]})
+    assert _f(out["visceral_fat_index"]) == 7.9
+    assert _f(out["extracellular_water_kg"]) == 20.0
+    assert _f(out["intracellular_water_kg"]) == 30.0
+    assert _f(out["bmr_kcal"]) == 1800
+    assert _f(out["metabolic_age"]) == 40
+    # position → segment mapping, all five present
+    assert _f(out["fat_free_mass_torso_kg"]) == 30.0
+    assert _f(out["fat_free_mass_left_leg_kg"]) == 10.0
+    assert _f(out["fat_free_mass_right_leg_kg"]) == 10.0
+    assert _f(out["fat_free_mass_left_arm_kg"]) == 5.0
+    assert _f(out["fat_free_mass_right_arm_kg"]) == 5.0
+    # the device invariant that pins 173's semantics
+    seg_sum = sum(_f(out[f"fat_free_mass_{s}_kg"]) for s in ("torso", "left_leg", "right_leg", "left_arm", "right_arm"))
+    assert seg_sum == _f(out["fat_free_mass_kg"]) == 60.0
+    assert _f(out["fat_mass_torso_kg"]) == 9.0
+    assert _f(out["muscle_mass_torso_kg"]) == 28.0
+    # segmental fields get no _lbs twins (the lbs list is the scalar five only)
+    assert "fat_free_mass_torso_lbs" not in out
+
+
+def test_withings_spo2_zero_is_absence_not_a_reading():
+    # ADR-104: the BodyScan transmits SpO2=0 when the measurement failed.
+    raw = {"measuregrps": [{"date": 1_700_000_000, "measures": [{"type": 54, "value": 0, "unit": 0}]}]}
+    out = _parse_measurements(raw)
+    assert "spo2_pct" not in out
+    # a real SpO2 still stores
+    raw2 = {"measuregrps": [{"date": 1_700_000_000, "measures": [{"type": 54, "value": 97, "unit": 0}]}]}
+    assert _f(_parse_measurements(raw2)["spo2_pct"]) == 97
+
+
+def test_withings_afib_zero_is_a_legitimate_negative():
+    # Unlike SpO2, afib_result 0 IS the reading (screening ran, nothing detected).
+    raw = {"measuregrps": [{"date": 1_700_000_000, "measures": [{"type": 130, "value": 0, "unit": 0}]}]}
+    assert _f(_parse_measurements(raw)["afib_result"]) == 0
+
+
+def test_withings_unmapped_segment_position_is_skipped_not_guessed():
+    raw = {"measuregrps": [{"date": 1_700_000_000, "measures": [{"type": 173, "value": 1000, "unit": -2, "position": 99}]}]}
+    out = _parse_measurements(raw)
+    assert not any(k.startswith("fat_free_mass_") for k in out), out
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # Strava — activity normalization + unit conversions
 # ══════════════════════════════════════════════════════════════════════════
