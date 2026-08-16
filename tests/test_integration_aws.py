@@ -1078,11 +1078,18 @@ def test_i16_recent_ingest_records_exist():
         if not items:
             breached.append(f"{source}: NO DATE# records at all (threshold {stale_hours}h)")
             continue
-        latest = items[0]["sk"]["S"][len("DATE#") :]
+        # Some sources sub-key their rows (whoop: DATE#YYYY-MM-DD#WORKOUT#<uuid>).
+        # The date SEGMENT still orders lexically with plain DATE# rows, so the
+        # newest sk's first segment is the newest date; parse that segment only.
+        # A key whose first segment is not a date still reports unparseable —
+        # this widens the accepted SHAPE, never the accepted content (found as a
+        # standing local red on 2026-08-16: whoop's newest row was a fresh
+        # workout sub-key and the gate called it unparseable).
+        latest = items[0]["sk"]["S"][len("DATE#") :].split("#")[0]
         try:
             age_h = (now - datetime.strptime(latest, "%Y-%m-%d").replace(tzinfo=timezone.utc)).total_seconds() / 3600
         except ValueError:
-            breached.append(f"{source}: unparseable sort key {latest!r}")
+            breached.append(f"{source}: unparseable sort key {items[0]['sk']['S']!r}")
             continue
         checked.append(f"{source}@{latest} ({age_h:.0f}h/{stale_hours}h)")
         # The record is stamped with a DATE, so "today's record" is 0h old at 00:00Z
