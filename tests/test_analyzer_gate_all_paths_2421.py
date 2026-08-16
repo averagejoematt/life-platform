@@ -253,3 +253,61 @@ class TestRegisteredSurfaceAndCensus:
         src = open(os.path.join(_REPO, MODULE), encoding="utf-8").read()
         assert f"{MODULE}::_gate_prose" in scan_source(MODULE, src), "precondition: the scan is not vacuous"
         assert f"{MODULE}::_gate_prose" not in scan_source(MODULE, src.replace("grounding_findings(", "disabled_findings("))
+
+
+# ── #2763: gate-INFRA failure HOLDS — the old arm published ungated text ──────
+class TestGateInfraHoldsNotPublishes:
+    """The `except Exception` around `_gate_prose` used to log WARN and fall
+    through, shipping the UNGATED draft into the cached EXPERT# item that
+    /api/coach_analysis serves — the module's own docstring said it out loud
+    ("Gate-INFRA failure still publishes"). A gate that cannot run must be
+    indistinguishable from a gate that failed: HOLD, keep the prior gated item,
+    and say why loudly enough for an alarm to key on."""
+
+    @pytest.fixture(autouse=True)
+    def _paths(self, monkeypatch, table):
+        monkeypatch.setattr(az, "gather_data_for_expert", lambda key: {})
+        monkeypatch.setattr(az, "build_prompt", lambda *a, **k: "PROMPT")
+        monkeypatch.setattr(az, "_load_prior_analysis", lambda key: ("", ""))
+
+    def test_gate_infra_failure_holds_and_names_why(self, table, model, monkeypatch):
+        prior = {"pk": az.CACHE_PK, "sk": "EXPERT#sleep", "analysis": "Yesterday's gated read."}
+        table.items[(az.CACHE_PK, "EXPERT#sleep")] = dict(prior)
+        model(CLEAN)
+
+        def _boom(*_a, **_k):
+            raise RuntimeError("bedrock unreachable")
+
+        monkeypatch.setattr(az, "_gate_prose", _boom)
+        logged: list = []
+        monkeypatch.setattr(az.logger, "error", lambda msg, *a, **k: logged.append(msg % a if a else str(msg)))
+
+        out = az.generate_and_cache("sleep")
+
+        assert out == "", "gate-infra failure must HOLD, never return draft text"
+        assert table.writes == [], "nothing may be written when the gate could not run"
+        assert table.items[(az.CACHE_PK, "EXPERT#sleep")]["analysis"] == "Yesterday's gated read."
+        hold_lines = [m for m in logged if "EXPERT-GATE-INFRA-HOLD" in m]
+        assert hold_lines, f"the hold must carry the alarm token: {logged}"
+        assert "RuntimeError" in hold_lines[0] and "bedrock unreachable" in hold_lines[0], "the WHY rides the token line"
+
+    def test_a_gate_that_runs_and_passes_still_publishes(self, table, model, monkeypatch):
+        """Control: the hold arm must not dark the healthy path."""
+        model(CLEAN)
+        monkeypatch.setattr(az, "_gate_prose", lambda _k, text, *a, **kw: text)
+        out = az.generate_and_cache("sleep")
+        assert out == CLEAN
+        assert table.items[(az.CACHE_PK, "EXPERT#sleep")]["analysis"] == CLEAN
+
+
+def test_gate_infra_token_twin_with_monitoring_filter():
+    """The CDK MetricFilter literal and the lambda's token may not drift (#2763,
+    same twin discipline as the between-chronicle scrub token, #2654)."""
+    import re
+
+    lam = open(os.path.join(_REPO, MODULE)).read()
+    stack = open(os.path.join(_REPO, "cdk/stacks/monitoring_stack.py")).read()
+    m = re.search(r'"GateInfraFilterExpert".*?FilterPattern\.literal\(\'"([^"]+)"\'\)', stack, re.DOTALL)
+    assert m, "monitoring_stack.py must define GateInfraFilterExpert with a literal token"
+    assert m.group(1) == "EXPERT-GATE-INFRA-HOLD"
+    assert "[EXPERT-GATE-INFRA-HOLD]" in lam, "the lambda must log the exact token the filter scans for"

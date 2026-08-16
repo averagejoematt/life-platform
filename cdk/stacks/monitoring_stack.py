@@ -1052,6 +1052,34 @@ class MonitoringStack(Stack):
         )
         bc_scrub_alarm.add_alarm_action(cw_actions.SnsAction(digest))
 
+        # #2763: the expert analyzer's grounding gate failed to RUN and used to
+        # publish UNGATED text; it now HOLDS and logs this token. Nothing wrong
+        # is being served when this fires — but reader analyses stopped
+        # refreshing, and silence must not be the only tell (the #2654 shape).
+        # Token must equal the literal in ai_expert_analyzer_lambda (twin-pinned
+        # by tests/test_analyzer_gate_all_paths_2421.py).
+        gi_lg = logs.LogGroup.from_log_group_name(self, "GateInfraLgExpert", "/aws/lambda/ai-expert-analyzer")
+        gi_mf = logs.MetricFilter(
+            self,
+            "GateInfraFilterExpert",
+            log_group=gi_lg,
+            filter_pattern=logs.FilterPattern.literal('"EXPERT-GATE-INFRA-HOLD"'),
+            metric_name="ExpertGateInfraHold",
+            metric_namespace="LifePlatform/AI",
+            metric_value="1",
+        )
+        gi_alarm = cloudwatch.Alarm(
+            self,
+            "GateInfraAlarmExpert",
+            alarm_name="expert-gate-infra-hold",
+            metric=gi_mf.metric(period=Duration.seconds(300), statistic="Sum"),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=GTE,
+            treat_missing_data=NB,
+        )
+        gi_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+
         # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm
         # BucketSizeBytes is a daily metric — period must be 86400s.

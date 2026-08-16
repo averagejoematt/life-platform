@@ -1242,13 +1242,18 @@ class TestGroundingSelfCorrection:
         assert text == "" and m.calls == 2
         assert (az.CACHE_PK, "EXPERT#sleep") not in self.table.items
 
-    def test_the_grounding_pass_never_breaks_a_successful_generation(self, monkeypatch, model):
-        """Gate-INFRA failure (the gate itself cannot run) fails soft and publishes —
-        distinct from measured findings, which hold. A grounding gate must never be
-        the thing that takes the surface down."""
+    def test_gate_infra_failure_holds_instead_of_publishing_ungated(self, monkeypatch, model):
+        """CONTRACT FLIPPED by #2763 (2026-08-16). The prior pin here said gate-INFRA
+        "fails soft and publishes" so the gate could never take the surface down —
+        but under regenerate-or-hold that fear was already answered: a hold serves
+        the PRIOR gated item, so the surface never goes dark, while the old arm
+        shipped UNGATED text into the reader-facing cache. A gate that cannot run
+        is now indistinguishable from a gate that failed. The full hold-path pins
+        (prior preserved, token logged, healthy-path control) live in
+        tests/test_analyzer_gate_all_paths_2421.py::TestGateInfraHoldsNotPublishes."""
         monkeypatch.setattr(az._gg, "allowed_numbers", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
         model(FULL_REPLY)
-        assert az.generate_and_cache("sleep").startswith("Deep sleep held")
+        assert az.generate_and_cache("sleep") == "", "gate-infra must HOLD, never publish the ungated draft"
 
     def test_a_hold_preserves_the_PRIOR_good_analysis_in_the_cache(self, model):
         """The ADR-108 point of holding: yesterday's clean analysis keeps serving.

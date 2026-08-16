@@ -1027,7 +1027,7 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
     Posture is #2391's, unchanged: allow-list numbers + canonical facts + the cycle
     anchors + night scope + the #1699 behavioral map, ONE corrective rewrite via
     `regen_once`, then **regenerate-or-HOLD** — residual findings return "" and the caller
-    keeps the prior cached record serving. Gate-INFRA failure still publishes.
+    keeps the prior cached record serving. Gate-INFRA failure HOLDS too (#2763).
 
     `extract` maps a raw rewrite back to reader text for the JSON-shaped callers, which
     also use it to capture the re-parsed record. Returns grounded text, or "" to hold.
@@ -1181,14 +1181,9 @@ def generate_and_cache(expert_key, shared_system=None):
         logger.warning("generate_and_cache: empty response for %s — cached record preserved (#2218)", expert_key)
         return ""
 
-    # Phase-4 SELF-CORRECTION (ADR-104/ADR-108, #2391) — BEFORE the cache write:
-    # it used to run AFTER put_item with keep-if-better semantics, so the ungrounded
-    # original published first and a merely-improved rewrite shipped over it.
-    # Log-only wasn't enough — coaches kept serving a wrong RHR (53 vs the canonical
-    # 64) that the Coherence Sentinel caught daily. Findings = hard canonical
-    # contradictions PLUS the allow-list number gate (any number not present in the
-    # prompt/system/facts is a fabrication — catches invented trend endpoints).
-    # One corrective rewrite, kept only if strictly better (never regress).
+    # Phase-4 SELF-CORRECTION (ADR-104/ADR-108, #2391) — BEFORE the cache write; the
+    # full history (post-put keep-if-better, the wrong-RHR incident, the finding
+    # classes, one-rewrite-then-hold) lives in _gate_prose's own docstring above.
     # #2056: the #1699 map comes from the snapshot's own `days_since_last_*` fields —
     # computed by `_recency_stats` from the rows THIS render already queried, so zero
     # extra I/O. Coverage is per-expert and declared: the nutrition snapshot answers for
@@ -1201,7 +1196,12 @@ def generate_and_cache(expert_key, shared_system=None):
                 return ""  # #2391 hold — prior cached analysis keeps serving
             analysis_text = _gated
         except Exception as _sc:
-            logger.warning("grounding self-correction failed for %s: %s", expert_key, _sc)
+            # #2763: gate-INFRA holds (this arm used to publish the ungated draft);
+            # hold ≠ dark — the prior gated item keeps serving. Token = alarm signal.
+            logger.error(
+                "[EXPERT-GATE-INFRA-HOLD] gate infra failed for %s (%s: %s) — holding", expert_key, type(_sc).__name__, str(_sc)[:300]
+            )
+            return ""
 
     now = datetime.now(timezone.utc)
     ttl = int((now + timedelta(days=8)).timestamp())
