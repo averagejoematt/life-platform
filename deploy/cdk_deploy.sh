@@ -54,5 +54,20 @@ fi
 echo "→ dual-deployment-plane guard (checkout freshness + live-code drift)…"
 python3 "$ROOT/deploy/check_deploy_drift.py" "${STACKS[@]}" "${GUARD_ARGS[@]+"${GUARD_ARGS[@]}"}"
 
+# ── Toolchain parity (#2468 postmortem, 2026-08-16) ───────────────────────────
+# Synth output depends on WHICH aws-cdk-lib the spawned `python3 app.py` resolves,
+# and that is environment roulette: the night this landed, three different libs
+# lived on one machine (system 2.244.0, a stale cdk/.venv 2.241.0, the pin
+# 2.263.0) and `cdk` did not even honor an activated venv's PATH. Deploys made
+# from a stale lib can NEVER converge with CI's pinned synth — that is exactly
+# how seven "cannot ship" config-drift warnings stood for a week while stack
+# deploys kept "fixing" them. So this wrapper owns its toolchain: refresh
+# cdk/.venv from the pin file and synth through its absolute interpreter path,
+# byte-matching the venv CI's Plan job builds fresh on every run.
+echo "→ toolchain parity: cdk/.venv ← cdk/requirements.txt…"
+python3 -m venv "$ROOT/cdk/.venv"
+"$ROOT/cdk/.venv/bin/pip" install -q -r "$ROOT/cdk/requirements.txt"
+APP_OVERRIDE=(--app "$ROOT/cdk/.venv/bin/python3 app.py")
+
 echo "→ guard passed. Deploying: ${STACKS[*]}"
-(cd "$ROOT/cdk" && npx cdk deploy "${STACKS[@]}" "${EXTRA[@]+"${EXTRA[@]}"}")
+(cd "$ROOT/cdk" && npx cdk deploy "${STACKS[@]}" "${APP_OVERRIDE[@]}" "${EXTRA[@]+"${EXTRA[@]}"}")

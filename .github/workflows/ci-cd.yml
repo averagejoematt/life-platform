@@ -428,13 +428,17 @@ jobs:
           node --version
           # Pinned exactly (#814, R22-MOD-01) — an unpinned `npm install -g aws-cdk`
           # always pulls whatever released today, so a routine push can red CI on an
-          # untested CDK release. Bump deliberately, in lockstep with cdk/requirements.txt
-          # — and the CLI leg really does change synth output: the CLI, not aws-cdk-lib,
-          # decides the LogRetention singleton's runtime, so a stale CLI pin here makes
-          # this step's config-drift warning fire on every stack forever (#2468 — CLI
-          # 2.1129.0 synthesized nodejs24.x while 2.1135.1 and the deployed stacks agree
-          # on nodejs22.x; no owner deploy could ever clear that). Dependabot bumps
-          # cdk/requirements.txt but NOT this line — bump it by hand when those land.
+          # untested CDK release. Bump deliberately, in lockstep with cdk/requirements.txt;
+          # Dependabot bumps that file but NOT this line — bump it by hand when those land.
+          #
+          # CORRECTION (#2468 postmortem, 2026-08-16): PR #2751's comment here blamed the
+          # CLI for the LogRetention runtime — wrong, decoded the same night from template
+          # Analytics metadata. The synth-side chooser is aws-cdk-lib's regionalFact
+          # default (2.244.0 → nodejs22.x, 2.263.0 → nodejs24.x); the seven standing
+          # config-drift warnings existed because owner deploys resolved a STALE local
+          # aws-cdk-lib while this venv honors the pin. The durable guard lives in
+          # deploy/cdk_deploy.sh, which now builds cdk/.venv from cdk/requirements.txt
+          # and synths through it — the exact toolchain this step builds fresh each run.
           npm install -g aws-cdk@2.1135.1 --quiet
 
           cd cdk
