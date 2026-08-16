@@ -35,8 +35,15 @@ def cycle_gate_params(generation_date_iso: Optional[str] = None) -> Dict[str, An
 
         grounding_findings(text, allowed=allowed, **cycle_gate_params())
 
-    ``generation_date_iso`` defaults to today (UTC, matching the coach pipeline's
-    ``date.today()``); pass it explicitly when the surface narrates a fixed date.
+    ``generation_date_iso`` defaults to today in the PACIFIC frame (#2675). It
+    defaulted to UTC until 2026-08-16, which armed the Day-N gate with a clock
+    one day AHEAD of the platform's own every PT evening: the prompt's phase
+    block asserts the pacific_day_n day (#1955, THE one day-index formula), so
+    between 17:00 PDT and midnight the gate flagged a coach who echoed the
+    prompt's correct day and PASSED one who said the UTC day — which is exactly
+    how two board voices published two different cycle days in one response on
+    2026-08-13 PT (#2675), both blessed by their own gate. Pass it explicitly
+    when the surface narrates a fixed date.
 
     Fail-soft by contract: if the constants module is unavailable (a partial bundle,
     an import-order edge) this returns ``{}``, which leaves the caller at EXACT
@@ -47,8 +54,15 @@ def cycle_gate_params(generation_date_iso: Optional[str] = None) -> Dict[str, An
         from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
     except Exception:  # noqa: BLE001 — see the fail-soft contract above
         return {}
+    if generation_date_iso is None:
+        try:
+            from common.pacific_time import pacific_today
+
+            generation_date_iso = pacific_today()
+        except Exception:  # noqa: BLE001 — same fail-soft contract: degrade to UTC, never take the surface down
+            generation_date_iso = _date.today().isoformat()
     return {
-        "generation_date_iso": generation_date_iso or _date.today().isoformat(),
+        "generation_date_iso": generation_date_iso,
         "start_date_iso": EXPERIMENT_START_DATE,
         "baseline_lbs": EXPERIMENT_BASELINE_WEIGHT_LBS,
     }
