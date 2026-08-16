@@ -129,6 +129,42 @@ def is_code_owned_temporal(finding, start_date):
     return any(d <= start_date for d in _NOTE_ISO_DATE_RE.findall(finding.get("note") or ""))
 
 
+# Night-frame language in a finding's note ("night_of", "last_night", "night of" —
+# matched after collapsing spaces to underscores so all three spellings converge).
+_NIGHT_FRAME_TOKENS = ("night_of", "last_night")
+
+
+def is_wake_frame_correct(finding):
+    """True when `finding` restates the wake-date convention as a contradiction (#2780).
+
+    The first production run of the confirm-before-FAIL path (#2741, 2026-08-16)
+    confirmed a temporal_contradiction on /api/sleep_detail: 'last_night' carrying
+    `night_of` D under `as_of_date` D+1. Measured against the whoop partition and the
+    live payload, that is the #1923 convention being RIGHT: a night is dated by the
+    evening it began, the payload by the morning it serves, so night_of + 1 day =
+    as_of IS last night — mid-cycle, every day, not just at genesis (#2583 covered
+    only the genesis edge). The deterministic night-label pass (R5, #1968) already
+    requires these surfaces to name their night; per ADR-105 the LLM does not get to
+    overrule the layer that already graded it.
+
+    Structural conditions, all required: temporal_contradiction; a night-scoped
+    surface the deterministic pass grades; night-frame language in the note; and
+    every cited ISO date fitting one single-day span. A >1-day spread (a genuinely
+    stale night), a single-date note, or any other surface survives at full severity.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    if finding.get("page") not in CODE_OWNED_TEMPORAL_SURFACES:
+        return False
+    note = finding.get("note") or ""
+    if not any(t in note.lower().replace(" ", "_") for t in _NIGHT_FRAME_TOKENS):
+        return False
+    dates = {date.fromisoformat(d) for d in _NOTE_ISO_DATE_RE.findall(note)}
+    if len(dates) < 2:
+        return False
+    return (max(dates) - min(dates)).days == 1
+
+
 # Batch 4-6 surfaces per call so the duplicated-narrative check sees pages
 # side-by-side (a single-page call structurally cannot catch duplication).
 DEFAULT_BATCH_SIZE = 5
@@ -492,6 +528,14 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     print(
                         f"  ↩ reader-truth: dropped a code-owned pre-cycle-date finding on {f['page']} "
                         f"(phase_plausibility R6/R7 owns this, #2613): {f['note'][:120]}"
+                    )
+                    continue
+                # #2780: same discipline for the mid-cycle wake-date frame — printed,
+                # never silently swallowed.
+                if is_wake_frame_correct(f):
+                    print(
+                        f"  ↩ reader-truth: dropped a wake-frame-correct night finding on {f['page']} "
+                        f"(night_of + 1 = as_of IS the convention, #2780): {f['note'][:120]}"
                     )
                     continue
                 findings.append(f)
