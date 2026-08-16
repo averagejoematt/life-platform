@@ -36,9 +36,7 @@ from common.numeric import floats_to_decimal  # bundled shared module: canonical
 logger = logging.getLogger(__name__)
 
 # ── In-memory cache (survives Lambda warm starts) ──
-# dict[str, Any] — heterogeneous by design (the config dict + an int timestamp);
-# unannotated, mypy joins them and every read reads as the wrong type (#2638).
-_config_cache: dict[str, Any] = {"data": None, "ts": 0}
+_config_cache: dict[str, Any] = {"data": None, "ts": 0}  # dict[str, Any]: heterogeneous, see #2638
 _CONFIG_TTL_S = 300  # 5 minutes
 
 ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
@@ -82,15 +80,7 @@ def load_character_config(
     force_refresh: bool = False,
     user_id: str = "matthew",
 ) -> Optional[dict[str, Any]]:
-    """Load character_sheet.json from S3 with warm-container caching.
-
-    Returns None when S3 is unreadable AND there is no warm cache to fall back on.
-    That is deliberate and already handled: `character_sheet_lambda` does
-    `if not config: raise RuntimeError(...)` so the async failure lands in the DLQ
-    with an Errors metric, rather than a dict that reads as success — and
-    `tests/test_character_sheet_lambda.py` pins that RuntimeError. Only the
-    annotation was wrong (#2638), never the contract.
-    """
+    """Load character_sheet.json from S3, warm-cached. None if unreadable with no cache (#2638)."""
     now = time.time()
     if not force_refresh and _config_cache["data"] and (now - _config_cache["ts"]) < _CONFIG_TTL_S:
         return _config_cache["data"]
