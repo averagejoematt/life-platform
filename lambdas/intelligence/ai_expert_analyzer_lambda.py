@@ -148,6 +148,7 @@ def _latest_item(source):
 
 
 from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+from health.pillar_absence import absence_gate_map, nutrition_absence_facts  # #2756
 
 _CANON_FACTS_CACHE: dict[str, Any] = {}
 
@@ -295,11 +296,14 @@ def gather_data_for_expert(expert_key):
         # EXPECTED and is never a logging failure. Surfaced so the coach never says so.
         _recency_note = "Nutrition logs at end of day (manual upload), so data runs through the latest complete day; an absent current day is expected pipeline lag, never a logging failure — do not frame it as one."
         if not items:
+            # #2756: an empty window is a vacuum the model fills — hand it the TRUE span.
+            ab = nutrition_absence_facts(_latest_item("macrofactor"), days_in_experiment, EXPERIMENT_START)
             return {
                 "expert_key": "nutrition",
                 "period": f"experiment days 1-{days_in_experiment}",
-                "note": "No nutrition data available",
-                "days_since_last_food_log": None,
+                "note": f"No nutrition data in the last 30 days. {ab.pop('note_absence')}",
+                **ab,
+                "days_since_last_food_log": ab.get("absence_days_dark"),
                 "food_logs_last_14d": 0,
                 "recency_note": _recency_note,
             }
@@ -1015,7 +1019,9 @@ def _presence_logs(gen_date_iso):
         return None
 
 
-def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, extract=None):
+def _gate_prose(
+    label, text, prompt, api_key, *, shared_system=None, extra_sources=(), available_logs=None, known_absence_days=None, extract=None
+):
     """The module's ONE grounding chokepoint (#2421) — every model call routes here.
 
     Before #2421 only the two `generate_and_cache` calls were gated: the Mode-B
@@ -1047,6 +1053,7 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
             start_date_iso=EXPERIMENT_START,
             nightly_vitals=_night_map(facts),  # #1968: the unlabeled "7.5-hour sleep"
             available_logs=available_logs,  # #2056/#1699
+            known_absence_days=known_absence_days,  # #2756: narrated absence spans vs measured
         )
 
     def _regen(_correction):
@@ -1191,7 +1198,15 @@ def generate_and_cache(expert_key, shared_system=None):
     # UNKNOWN, never reported absent — what makes arming honest on partial visibility.
     if analysis_text:
         try:
-            _gated = _gate_prose(expert_key, analysis_text, prompt, api_key, shared_system=shared_system, available_logs=_avail_logs(data))
+            _gated = _gate_prose(
+                expert_key,
+                analysis_text,
+                prompt,
+                api_key,
+                shared_system=shared_system,
+                available_logs=_avail_logs(data),
+                known_absence_days=absence_gate_map(data),
+            )
             if not _gated:
                 return ""  # #2391 hold — prior cached analysis keeps serving
             analysis_text = _gated
