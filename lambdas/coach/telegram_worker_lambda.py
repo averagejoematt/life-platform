@@ -972,12 +972,15 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
             logger.error("[telegram] route %r derives the RETIRED persona %r — refusing", coach_id, derived)
             return {"ok": True, "reason": "route_retired"}
         # #2719: the retired check catches a derived id that names a RETIRED seat. It does
-        # not catch one that names NO seat, and that is the live `board` case: @ajm_board_bot
-        # is provisioned with a chat id, no persona carries telegram_route "board", and the
-        # derived `board_coach` does not exist either — so this fell through to _assemble,
+        # not catch one that names NO seat — found as the then-live `board` case:
+        # @ajm_board_bot provisioned with a chat id, no persona carrying telegram_route
+        # "board", derived `board_coach` nonexistent — so this fell through to _assemble,
         # which emitted TelegramPersonaMissing and answered as "Matthew's board coach". A
         # nameless coach with no persona block and no voice spec is worse than silence: it
-        # is a reply Matthew cannot tell apart from a real one.
+        # is a reply Matthew cannot tell apart from a real one. (`board` itself resolved
+        # 2026-08-16 — the lead chairs Grand Rounds via telegram_route_aliases — but this
+        # refusal stays: it guards the CLASS, and the day another route lands unclaimed it
+        # is what stands between Matthew and a nameless reply.)
         #
         # The distinction that keeps this from darking a working coach is REGISTRY
         # READABLE vs PERSONA ABSENT. _persona_known returns None when the registry could

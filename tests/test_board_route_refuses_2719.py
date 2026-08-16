@@ -101,16 +101,28 @@ def test_the_fixture_reaches_the_code_under_test(monkeypatch):
         worker.lambda_handler(_order("sleep"), None)
 
 
-# ── the precondition: this is a real gap, not a hypothetical ─────────────────
+# ── the precondition, updated by the resolution it demanded ──────────────────
+# #2719 owner decision (2026-08-16): Grand Rounds is CHAIRED BY THE LEAD —
+# eli_marsh claims `board` via telegram_route_aliases. The refusal tests below
+# keep their full mechanism coverage by testing the SAME route and derived id
+# against a registry snapshot WITHOUT the alias (the exact pre-resolution
+# shape); the live registry now resolves, and the last test in this file pins
+# that board reaches assembly like the other ten routes.
 
 
-def test_no_persona_claims_the_board_route():
-    """If someone gives board a persona, this whole file should start failing — loudly."""
+def _registry_without_board_alias():
+    """The pre-#2769 registry shape: board resolves to nothing, board_coach absent."""
+    reg = {k: dict(v) for k, v in PERSONAS.items()}
+    reg["eli_marsh"]["telegram_route_aliases"] = [a for a in (reg["eli_marsh"].get("telegram_route_aliases") or []) if a != "board"]
+    return reg
+
+
+def test_the_board_route_is_claimed_by_the_lead():
     claimed = [
         pid for pid, p in PERSONAS.items() if p.get("telegram_route") == "board" or "board" in (p.get("telegram_route_aliases") or [])
     ]
-    assert claimed == [], f"board now resolves to {claimed} — delete this guard's ROUTE_GAPS entry and revisit #2719"
-    assert "board_coach" not in PERSONAS, "the derived fallback id does not exist either — that is the bug"
+    assert claimed == ["eli_marsh"], f"board must be chaired by the lead (#2719 owner decision): {claimed}"
+    assert "board_coach" not in PERSONAS, "the derived fallback id must stay absent — the refusal guard protects that class"
 
 
 # ── the three-valued existence check ─────────────────────────────────────────
@@ -145,8 +157,9 @@ def test_an_empty_registry_reads_none_not_false(monkeypatch):
 # ── the refusal ──────────────────────────────────────────────────────────────
 
 
-def test_the_board_route_refuses_rather_than_answering_nameless(monkeypatch, _no_aws):
-    monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: dict(PERSONAS))
+def test_an_unmapped_route_refuses_rather_than_answering_nameless(monkeypatch, _no_aws):
+    """The refusal mechanism, on the exact pre-resolution registry shape."""
+    monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: _registry_without_board_alias())
     result = worker.lambda_handler(_order("board"), None)
     assert result == {"ok": True, "reason": "route_unmapped"}, result
     assert _no_aws == [] or all(m != "sendMessage" for m, _ in _no_aws), f"a refusal must send nothing: {_no_aws}"
@@ -154,7 +167,7 @@ def test_the_board_route_refuses_rather_than_answering_nameless(monkeypatch, _no
 
 def test_the_refusal_is_a_2xx_so_telegram_does_not_redeliver(monkeypatch, _no_aws):
     """`ok: True` is the transport contract, not a claim that the message was answered."""
-    monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: dict(PERSONAS))
+    monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: _registry_without_board_alias())
     assert worker.lambda_handler(_order("board"), None)["ok"] is True
 
 
@@ -165,7 +178,7 @@ def test_the_refusal_is_loud(monkeypatch):
     the platform logger is a configured, non-propagating instance, so caplog sees nothing
     and the assertion would pass vacuously against a refusal that logged nothing at all.
     """
-    monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: dict(PERSONAS))
+    monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: _registry_without_board_alias())
     emitted, logged = [], []
     monkeypatch.setattr(worker, "_emit_metric", lambda name, *a, **k: emitted.append(name))
     monkeypatch.setattr(worker.logger, "error", lambda msg, *a, **k: logged.append(msg % a if a else msg))
@@ -200,10 +213,11 @@ def test_a_retired_seat_still_refuses_with_its_own_reason(monkeypatch):
     assert worker.lambda_handler(_order("training"), None) == {"ok": True, "reason": "route_retired"}
 
 
-@pytest.mark.parametrize("route", ["sleep", "nutrition", "physical", "headcoach", "labs", "pattern", "career", "explorer", "mind"])
+@pytest.mark.parametrize("route", ["sleep", "nutrition", "physical", "headcoach", "labs", "pattern", "career", "explorer", "mind", "board"])
 def test_every_route_that_resolves_today_still_reaches_assembly(monkeypatch, route):
-    """The nine live routes that work must be untouched — a guard that stops a working
-    coach is a worse bug than the nameless reply it replaces."""
+    """The live routes that work must be untouched — a guard that stops a working
+    coach is a worse bug than the nameless reply it replaces. `board` joined the
+    set with the #2719 resolution (chaired by the lead)."""
     monkeypatch.setattr("coach.persona_registry.personas", lambda *a, **k: dict(PERSONAS))
     monkeypatch.setattr(worker, "_assemble", lambda *a, **k: (_ for _ in ()).throw(AssertionError("reached assembly")))
     with pytest.raises(AssertionError, match="reached assembly"):
