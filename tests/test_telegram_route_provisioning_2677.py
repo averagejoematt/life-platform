@@ -46,6 +46,11 @@ holds no board delivery, so the path looks unexercised rather than proven-broken
 in ROUTE_GAPS and filed separately, because the board is meant to be multi-coach Grand
 Rounds (#2363) — a design question, not a mapping fix.
 
+  ^ RESOLVED (#2719, owner decision 2026-08-16): Grand Rounds is chaired by the lead —
+  eli_marsh claims `board` via telegram_route_aliases, the entry left ROUTE_GAPS, and
+  test_board_is_chaired_by_the_lead pins the resolution. The paragraph above stays as
+  the record of what the guard caught. The multi-coach room remains epic #2363's.
+
 THE GUARD IS THE POINT. Three routes were dead in three different ways, each silent in a
 different place, and the one that was found was found by a bug bash rather than by CI. So
 this file does not assert "training is gone". It asserts that EVERY key in ROUTING resolves
