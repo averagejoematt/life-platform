@@ -75,10 +75,20 @@ def test_mypy_ini_records_the_owner_too():
 # ── the cost is recorded where the decision is made ──────────────────────────
 
 
-@pytest.mark.parametrize("code", ["assignment", "arg-type", "return-value", "operator"])
+# The four codes mypy.ini disabled when #2638 was filed. `return-value` was ENABLED on
+# 2026-08-15 (32 sites fixed, all annotation-only), so the live set is a SUBSET of this.
+# Kept as a ratchet ceiling, never as the expected membership: pinning the membership is
+# what made this test fail the moment the issue it guards made progress.
+_ORIGINAL_DISABLED = {"assignment", "arg-type", "return-value", "operator"}
+
+
+@pytest.mark.parametrize("code", sorted(cost.disabled_codes()))
 def test_every_retained_code_carries_a_measured_count(code):
     """Acceptance box 1: retained WITH a written reason and a count of what enabling it
-    would surface today. A retained code with no number is an unpriced decision."""
+    would surface today. A retained code with no number is an unpriced decision.
+
+    Derived from the live disable list, not a literal — a code enabled by a tranche must
+    stop being required to justify itself as "retained"."""
     block = MYPY_INI.split("RETAINED, WITH THE COST MEASURED")[1][:1600]
     assert code in block, f"{code} has no recorded clean-set count"
 
@@ -96,7 +106,12 @@ def test_the_disable_list_and_the_recorded_codes_are_the_same_set():
     unpriced decision this issue is about."""
     declared = set(cost.disabled_codes())
     block = MYPY_INI.split("RETAINED, WITH THE COST MEASURED")[1][:1600]
-    assert declared == {"assignment", "arg-type", "return-value", "operator"}, declared
+    # A RATCHET, not a membership pin. The invariant is "no disabled code is unpriced",
+    # and it must survive a tranche landing — the old `== {four literals}` reddened main
+    # the moment #2638 enabled `return-value`, i.e. it failed on the progress it existed
+    # to encourage. A NEW code still fails here, via the subset check and the loop.
+    assert declared <= _ORIGINAL_DISABLED, f"a new code was disabled without a recorded cost: {declared - _ORIGINAL_DISABLED}"
+    assert declared, "an empty disable list means this guard has nothing left to check — retire it deliberately"
     for code in declared:
         assert code in block, f"{code} is disabled but its cost is not recorded"
 
