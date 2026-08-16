@@ -73,17 +73,35 @@ ses = boto3.client("sesv2", region_name=REGION)
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
 
+# #2654: the log token monitoring keys a MetricFilter + alarm on. The literal in
+# cdk/stacks/monitoring_stack.py must match this constant EXACTLY — pinned by
+# tests/test_between_chronicle_scrub_2654.py, so the two cannot drift apart silently.
+SCRUB_FAILED_TOKEN = "BETWEEN-CHRONICLE-SCRUB-FAILED-CLOSED"  # noqa: S105 — a log token, not a credential
+
 
 def _scrub(text: str) -> str:
-    """Fail-soft privacy scrub — the sources are already public-gated, this is
-    defense-in-depth on anything narrative."""
+    """Fail-CLOSED privacy scrub (#2654) — defense-in-depth on anything narrative.
+
+    A scrub that cannot run (vocabulary channel down, guard defect) must abort
+    the send, not return the input unchanged: a privacy screen that fails open
+    guards nothing. The raise is what stops the outbound loop — build_email is
+    called OUTSIDE the per-recipient try in lambda_handler, so no recipient
+    receives text this function did not scrub. The token line is the alarm's
+    signal; nothing leaked when it fires, but the digest went dark and silence
+    must not be the only tell (#2503 class)."""
     try:
         from privacy import privacy_guard
 
         out, _n = privacy_guard.scrub(str(text))
         return out
-    except Exception:
-        return str(text)
+    except Exception as exc:
+        logger.error(
+            "[%s] privacy scrub failed (%s: %s) — aborting the send; no unscrubbed text goes out",
+            SCRUB_FAILED_TOKEN,
+            type(exc).__name__,
+            str(exc)[:300],
+        )
+        raise
 
 
 # ── Gather (already-computed records only — the same ones the public APIs serve) ──
