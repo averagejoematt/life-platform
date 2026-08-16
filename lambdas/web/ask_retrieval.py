@@ -233,6 +233,42 @@ def render_block(passages) -> str:
     return "\n".join(lines) + "\n"
 
 
+def coverage_gaps(table, corpus) -> list:
+    """Published installment dates MISSING from the loaded corpus (#2705's read half).
+
+    The nightly checker (recall_freshness_qa) already alarms on this state; what it
+    cannot do is stop the MODEL from saying "the archive doesn't cover it" over a gap
+    — silence indistinguishable from absence, for the reader asking about that exact
+    week. Reuses the checker's own `published_installment_dates` derivation (sk-keyed,
+    phase-visible, status-gated) so the query and the checker cannot disagree about
+    what "published" means. Fail-soft: any error reads as no-gaps — the note is an
+    enhancement, never a cost."""
+    try:
+        from boto3.dynamodb.conditions import Key
+        from operational.recall_freshness_qa import published_installment_dates
+
+        user_id = os.environ.get("USER_ID", "matthew")
+        r = table.query(KeyConditionExpression=Key("pk").eq(f"USER#{user_id}#SOURCE#chronicle"))
+        pub = set(published_installment_dates(r.get("Items") or []))
+        have = {str(d.get("sk", ""))[len("DOC#chronicle#") :] for d in corpus or [] if str(d.get("sk", "")).startswith("DOC#chronicle#")}
+        return sorted(pub - have)
+    except Exception as e:  # noqa: BLE001 — same never-load-bearing posture as retrieve_block
+        logger.warning(f"[ask retrieval] coverage-gap read unavailable (non-blocking): {e}")
+        return []
+
+
+def coverage_note(gaps) -> str:
+    """The honesty line for an incomplete index — rendered even when passages exist."""
+    if not gaps:
+        return ""
+    return (
+        "\nARCHIVE COVERAGE NOTE: the archive index is currently INCOMPLETE — published installment(s) dated "
+        + ", ".join(gaps)
+        + " are not yet searchable. If the question concerns those dates, say the archive INDEX is incomplete "
+        "there — never say the archive doesn't cover them.\n"
+    )
+
+
 def retrieve_block(question: str, *, table=None, top_k: int | None = None):
     """(prompt_block, telemetry) for one reader question. NEVER raises.
 
@@ -274,7 +310,11 @@ def retrieve_block(question: str, *, table=None, top_k: int | None = None):
                 os.environ.get("TABLE_NAME", "life-platform")
             )
         query_vector = _bc.embed_text(question)
-        passages, tel = select_passages(query_vector, sr.load_corpus(table), top_k=top_k)
+        corpus = sr.load_corpus(table)
+        gaps = coverage_gaps(table, corpus)
+        if gaps:
+            tel["coverage_gaps"] = len(gaps)
+        passages, tel = select_passages(query_vector, corpus, top_k=top_k)
         tel.setdefault("resolved", 0)
 
         # AC2, first half: a passage may only inform an answer if it still resolves to a
@@ -287,6 +327,13 @@ def retrieve_block(question: str, *, table=None, top_k: int | None = None):
         if passages and not resolved:
             tel["status"] = "miss:unresolved"
         block = render_block(resolved)
+        # #2705: an incomplete index says so — with no gaps this is byte-identical
+        # to the pre-#2705 block (including the empty-retrieval "" contract).
+        note = coverage_note(gaps)
+        if note:
+            block = (block or "") + note
+            if not resolved:
+                tel["status"] = "miss:coverage-gap"
         return block, _stamp(tel, t0)
     except Exception as e:  # noqa: BLE001 — retrieval is never load-bearing on a reader path
         tel["status"] = f"skipped:error:{type(e).__name__}"
