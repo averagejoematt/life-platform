@@ -46,6 +46,11 @@ holds no board delivery, so the path looks unexercised rather than proven-broken
 in ROUTE_GAPS and filed separately, because the board is meant to be multi-coach Grand
 Rounds (#2363) — a design question, not a mapping fix.
 
+  ^ RESOLVED (#2719, owner decision 2026-08-16): Grand Rounds is chaired by the lead —
+  eli_marsh claims `board` via telegram_route_aliases, the entry left ROUTE_GAPS, and
+  test_board_is_chaired_by_the_lead pins the resolution. The paragraph above stays as
+  the record of what the guard caught. The multi-coach room remains epic #2363's.
+
 THE GUARD IS THE POINT. Three routes were dead in three different ways, each silent in a
 different place, and the one that was found was found by a bug bash rather than by CI. So
 this file does not assert "training is gone". It asserts that EVERY key in ROUTING resolves
@@ -150,7 +155,13 @@ def test_no_persona_claims_training_and_none_should():
     tests/test_persona_registry.py, because this file is where someone would be tempted."""
     assert _claiming_persona("training") is None
     assert persona_for_telegram_route("training") == (None, None)
-    assert not any(p.get("telegram_route_aliases") for p in PERSONAS.values()), "no succession alias is live"
+    # The original form of this line asserted NO alias exists anywhere — that
+    # pinned the empty set when the intent was "training must never come back"
+    # (#2719 legitimately gave `board` to the lead as an alias). Guard the intent:
+    # no persona may claim `training` through the alias mechanism either.
+    assert not any(
+        "training" in (p.get("telegram_route_aliases") or []) for p in PERSONAS.values()
+    ), "the retired training route may not return as anyone's alias"
 
 
 def test_glucose_stays_routable_but_is_declared():
@@ -197,10 +208,17 @@ def test_the_labs_bot_the_amendment_granted_still_resolves():
 # ── the third route, declared rather than guessed at ─────────────────────────
 
 
-def test_board_is_kept_and_declared_because_its_bot_is_real():
+def test_board_is_chaired_by_the_lead():
+    """#2719, owner decision 2026-08-16: Grand Rounds is chaired by the lead.
+
+    eli_marsh claims `board` via telegram_route_aliases (the sanctioned mechanism);
+    the multi-coach room remains epic #2363's. This test replaced
+    test_board_is_kept_and_declared_because_its_bot_is_real, whose gap it closes —
+    the ROUTE_GAPS entry may not return while the route resolves."""
     assert "board" in ROUTING, "a live, chat-id-bearing bot must keep its route"
-    assert _claiming_persona("board") is None
-    assert "board" in ROUTE_GAPS and "NO PERSONA" in ROUTE_GAPS["board"]
+    assert _claiming_persona("board") == "eli_marsh"
+    assert persona_for_telegram_route("board")[0] == "eli_marsh"
+    assert "board" not in ROUTE_GAPS
 
 
 def test_no_route_survives_only_because_a_comment_says_so():

@@ -77,24 +77,22 @@ ROUTING = {
 # would break something real. `tests/test_telegram_route_provisioning_2677.py` requires
 # every ROUTING key to resolve to a persona or appear here with a reason, so the next
 # dead route is loud on the day it lands instead of found in a bug bash.
+# #2719 RESOLVED (owner decision, 2026-08-16): `board` left this registry — Grand
+# Rounds is CHAIRED BY THE LEAD. eli_marsh claims the route via
+# telegram_route_aliases, the sanctioned mechanism (a board message lands in his
+# one thread, the same deliberate merge the `training` → physical succession
+# made); the true multi-coach room remains epic #2363's slice to build. The
+# nameless-fallback class the gap documented is separately closed: the worker
+# refuses absent persona ids outright (TelegramUnmappedRouteRefused, #2677/#2719).
 ROUTE_GAPS = {
-    "board": (
-        "NO PERSONA, LIVE BOT. @ajm_board_bot is provisioned in the life-platform/telegram secret with a "
-        "chat id (read 2026-08-15), so the key cannot be dropped. But no persona carries telegram_route "
-        "'board': a message resolves nothing, falls back to the derived id `board_coach` — which no persona "
-        'claims either — and answers as "Matthew\'s board coach", the nameless, persona-free reply that '
-        "telegram_worker_lambda._assemble's own comment records as an incident. Static reading, not an "
-        "observed failure: the worker log holds no board delivery, so the path looks unexercised rather than "
-        "proven-broken. The board is Grand Rounds, meant to be multi-coach (#2363) — a design question, not "
-        "a mapping fix, so it is filed rather than guessed at here."
-    ),
     "glucose": (
         "NO PERSONA ROUTE, NO BOT — and the key must stay. setup_telegram_bots.OPTIONAL_BOTS lists "
         "@ajm_glucose_bot as deliberately NOT created ('an unused bot is a live public webhook endpoint, so "
         "it is attack surface bought for no benefit') while remaining addable with an explicit argument, and "
         "tests/test_telegram_transport.py requires every roster key to be routable. The gap worth naming is "
         "that creating the bot would NOT be enough: glucose_coach has no telegram_route, so the day the bot "
-        "exists it lands in exactly the `board` failure above. Grant the route in the same change."
+        "exists a message would resolve no persona and be REFUSED (TelegramUnmappedRouteRefused — the "
+        "nameless-coach class #2719 closed). Grant the route in the same change that creates the bot."
     ),
 }
 
