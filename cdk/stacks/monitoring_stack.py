@@ -567,10 +567,8 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
-        # #2754: AWS/Lambda emits NO datapoint for a zero-invocation period, so a
-        # Sum<1 alarm with missing→NOT_BREACHING structurally cannot fire — the exact
-        # silence it exists to catch reads as health. BREACHING per the hae-webhook
-        # prior art; the SET is guarded by tests/test_no_invocation_alarms_2754.py.
+        # #2754: zero invocations emit NO datapoint, so missing→NOT_BREACHING could
+        # never fire. BREACHING; SET guarded by tests/test_no_invocation_alarms_2754.py.
         _alarm(
             "DailyBriefNoInvocations",
             "daily-brief-no-invocations-24h",
@@ -1059,12 +1057,9 @@ class MonitoringStack(Stack):
         )
         bc_scrub_alarm.add_alarm_action(cw_actions.SnsAction(digest))
 
-        # #2763: the expert analyzer's grounding gate failed to RUN and used to
-        # publish UNGATED text; it now HOLDS and logs this token. Nothing wrong
-        # is being served when this fires — but reader analyses stopped
-        # refreshing, and silence must not be the only tell (the #2654 shape).
-        # Token must equal the literal in ai_expert_analyzer_lambda (twin-pinned
-        # by tests/test_analyzer_gate_all_paths_2421.py).
+        # #2763: the analyzer's gate-INFRA arm HOLDS and logs this token (nothing
+        # wrong served; analyses stopped refreshing — the #2654 silence shape).
+        # Token twin-pinned to the lambda literal by test_analyzer_gate_all_paths_2421.
         gi_lg = logs.LogGroup.from_log_group_name(self, "GateInfraLgExpert", "/aws/lambda/ai-expert-analyzer")
         gi_mf = logs.MetricFilter(
             self,
