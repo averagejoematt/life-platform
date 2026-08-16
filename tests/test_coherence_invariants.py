@@ -130,6 +130,39 @@ class TestFactsAgreement:
         f = ci.check_facts_agreement(narratives, self.FACTS)
         assert f.status in (ci.WARN, ci.ALARM)
 
+    # ── #2792: a held (ADR-108) narrative served a day late is judged like-for-like ──
+    def test_held_stale_surface_grounded_on_its_own_day_is_ok(self):
+        # The live 2026-08-16 shape: today's canonical recovery is 57, but the served
+        # coach row was generated 08-15 and honestly cited 40 — ITS day's canonical
+        # (computed_metrics DATE#2026-08-14, the newest record at its 17:00Z brief).
+        # With the own-day override the row is grounded-but-stale, not a contradiction,
+        # and the staleness is named in the detail instead of alarming.
+        facts = {"recovery_pct": 57, "hrv_ms": 39.8, "rhr_bpm": 61, "latest_weight": 300.8}
+        narratives = ["Recovery at 40%, HRV at 35.3 ms — take the deload seriously."]
+        overrides = {"coach:nutrition_coach": {"facts": {"recovery_pct": 40, "hrv_ms": 35.3, "rhr_bpm": 62}, "as_of": "2026-08-15"}}
+        f = ci.check_facts_agreement(narratives, facts, surfaces=["coach:nutrition_coach"], facts_overrides=overrides)
+        assert f.status == ci.OK
+        assert "served stale from 2026-08-15" in f.detail
+
+    def test_held_stale_surface_contradicting_its_own_day_still_fires(self):
+        # The override is a frame correction, not a pardon: a held row whose citation
+        # disagrees with its OWN day's facts is a real fabrication and still fires.
+        facts = {"recovery_pct": 57, "hrv_ms": 39.8, "rhr_bpm": 61, "latest_weight": 300.8}
+        narratives = ["Recovery sits at 86 right now — push hard today."]
+        overrides = {"coach:x": {"facts": {"recovery_pct": 40, "hrv_ms": 35.3, "rhr_bpm": 62}, "as_of": "2026-08-15"}}
+        f = ci.check_facts_agreement(narratives, facts, surfaces=["coach:x"], facts_overrides=overrides)
+        assert f.offenders and any("recovery" in o for o in f.offenders)
+
+    def test_override_scopes_to_its_surface_only(self):
+        # Two surfaces cite 40; only the held one carries an override. The live
+        # (non-overridden) surface is still judged against today's 57 and fires.
+        facts = {"recovery_pct": 57, "hrv_ms": 39.8, "rhr_bpm": 61, "latest_weight": 300.8}
+        narratives = ["Recovery at 40% this morning.", "Recovery at 40% — keep it easy."]
+        overrides = {"coach:held": {"facts": {"recovery_pct": 40}, "as_of": "2026-08-15"}}
+        f = ci.check_facts_agreement(narratives, facts, surfaces=["coach:held", "expert:training"], facts_overrides=overrides)
+        assert any("expert:training" in o for o in f.offenders)
+        assert not any("coach:held" in o for o in f.offenders)
+
     # ── TSB: derived-value coverage (M-8 / #493 / ADR-109) ──────────────────────
     # TSB is a signed, duration-proxy Banister value covered by this scheduled scan
     # (never the tight grounding_guard). Wide ABSOLUTE tolerance (±12 points).

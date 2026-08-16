@@ -155,8 +155,8 @@ def _gather_predictions():
     return out
 
 
-def _gather_facts_and_narratives():
-    """Canonical facts (computed_metrics) + the day's served narratives.
+def _facts_from_cm(cm):
+    """Build the sentinel's facts dict from ONE computed_metrics record.
 
     Facts come from `canonical_facts.build_canonical_facts` — the SAME schema the
     coaches are grounded on (ai_expert_analyzer._load_canonical_facts). That closes
@@ -164,7 +164,6 @@ def _gather_facts_and_narratives():
     exact extraction the coaches were handed, and the semantic pass now sees the
     protein avg/target/floor distinctly (the 140/170/190 confusion it flagged live).
     Fail-soft to the 4 invariant-required fields if the module isn't importable."""
-    cm = _latest("computed_metrics")
     try:
         from experiment.canonical_facts import build_canonical_facts
 
@@ -189,7 +188,39 @@ def _gather_facts_and_narratives():
         facts["tsb"] = round(float(_tsb), 1) if _tsb is not None else None
     except (TypeError, ValueError):
         facts["tsb"] = None
+    return facts
+
+
+def _facts_as_of_generation(out_date):
+    """The computed_metrics record a coach generated on ``out_date`` was grounded on.
+
+    computed_metrics computes COMPLETED days: at the 17:00Z brief on day D the newest
+    record is DATE#(D-1), so a narrative dated D cites D-1's vitals. When an ADR-108
+    hold serves that narrative on D+1, `_latest` has advanced and the citations read
+    as contradictions (#2792's live false-ALARM). Returns the latest record strictly
+    BEFORE out_date, or {} (fail-soft — caller then checks against today's facts,
+    the pre-#2792 behaviour: absence can only make the check stricter, never blind)."""
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}computed_metrics") & Key("sk").lt(f"DATE#{out_date}"),
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = _decimal(resp.get("Items", []))
+        return _facts_from_cm(items[0]) if items else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _gather_facts_and_narratives():
+    """Canonical facts (computed_metrics) + the day's served narratives.
+
+    Returns ``(facts, narratives, labels, facts_overrides)`` — the overrides map a
+    stale-served coach label to the facts of ITS OWN generation day (#2792), so a
+    held narrative is judged like-for-like instead of against facts it never saw."""
+    facts = _facts_from_cm(_latest("computed_metrics"))
     narratives, labels = [], []
+    facts_overrides = {}
     # The served coach essays + the integrator synthesis.
     ai_pk = f"{USER_PREFIX}ai_analysis"
     for key in EXPERTS + ["integrator"]:
@@ -208,7 +239,10 @@ def _gather_facts_and_narratives():
     # coach, but only if served today/yesterday: the facts are the LATEST record,
     # so checking an old narrative against new facts would manufacture false
     # contradictions (the day-boundary-skew lesson).
-    _fresh_floor = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    _now = datetime.now(timezone.utc)
+    _fresh_floor = (_now - timedelta(days=1)).strftime("%Y-%m-%d")
+    _today = _now.strftime("%Y-%m-%d")
+    _own_day_cache: dict = {}
     for coach_id in V2_COACHES:
         try:
             resp = table.query(
@@ -226,7 +260,15 @@ def _gather_facts_and_narratives():
             if txt.strip() and _out_date >= _fresh_floor:
                 narratives.append(txt)
                 labels.append(f"coach:{coach_id}")
-    return facts, narratives, labels
+                # #2792: a row dated before today is being SERVED STALE (ADR-108 hold
+                # or a skipped generation kept yesterday's narrative live). Judge it
+                # against the facts of its own generation day, not today's.
+                if _out_date < _today:
+                    if _out_date not in _own_day_cache:
+                        _own_day_cache[_out_date] = _facts_as_of_generation(_out_date)
+                    if _own_day_cache[_out_date]:
+                        facts_overrides[f"coach:{coach_id}"] = {"facts": _own_day_cache[_out_date], "as_of": _out_date}
+    return facts, narratives, labels, facts_overrides
 
 
 def _gather_computed_checks():
@@ -521,8 +563,8 @@ def run_checks():
 
     findings.append(ci.check_prediction_health(_gather_predictions()))
 
-    facts, narratives, labels = _gather_facts_and_narratives()
-    findings.append(ci.check_facts_agreement(narratives, facts, surfaces=labels))
+    facts, narratives, labels, facts_overrides = _gather_facts_and_narratives()
+    findings.append(ci.check_facts_agreement(narratives, facts, surfaces=labels, facts_overrides=facts_overrides))
 
     findings.append(ci.check_computed_coherence(_gather_computed_checks()))
 

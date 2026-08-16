@@ -86,6 +86,7 @@ def _patch_bad_state(monkeypatch):
             {"recovery_pct": 30, "hrv_ms": 25.2, "rhr_bpm": 58, "latest_weight": 300.8},
             ["Recovery sat at 30% today.", "With recovery up at 86 you're primed to push."],
             ["expert:training", "expert:nutrition"],
+            {},
         ),
     )
     _pin_computed_checks(monkeypatch)
@@ -122,10 +123,65 @@ def test_facts_use_canonical_schema_closing_the_grounding_loop(monkeypatch):
         lambda src: {"recovery_pct": 30, "hrv_ms": 25.18, "protein_g_avg": 140.7, "protein_g_target": 190, "protein_g_floor": 170},
     )
     monkeypatch.setattr(sentinel, "table", None)  # narratives query → except → []
-    facts, narratives, labels = sentinel._gather_facts_and_narratives()
+    facts, narratives, labels, overrides = sentinel._gather_facts_and_narratives()
     assert facts["protein_g_avg"] == 140.7
     assert facts["protein_g_target"] == 190 and facts["protein_g_floor"] == 170
     assert facts["hrv_ms"] == 25.2 and "as_of" not in facts  # ms, no stray non-numeric key
+
+
+def test_facts_as_of_generation_queries_strictly_before_and_fail_softs(monkeypatch):
+    # #2792: a coach generated on day D was grounded on the newest computed_metrics
+    # BEFORE D (the compute writes completed days). The query bound must be strict.
+    captured = {}
+
+    class _T:
+        def query(self, **kw):
+            captured.update(kw)
+            return {"Items": [{"recovery_pct": 40, "hrv_ms": 35.32, "rhr_bpm": 62}]}
+
+    monkeypatch.setattr(sentinel, "table", _T())
+    facts = sentinel._facts_as_of_generation("2026-08-15")
+    assert facts["recovery_pct"] == 40
+    expr = captured["KeyConditionExpression"].get_expression()
+    lt = [v for v in expr["values"] if v.get_expression()["operator"] == "<"]
+    assert lt and lt[0].get_expression()["values"][1] == "DATE#2026-08-15"
+
+    class _Boom:
+        def query(self, **kw):
+            raise RuntimeError("ddb down")
+
+    # Fail-soft: {} means the caller falls back to today's facts — the check can only
+    # get STRICTER on a lookup failure, never blind.
+    monkeypatch.setattr(sentinel, "table", _Boom())
+    assert sentinel._facts_as_of_generation("2026-08-15") == {}
+
+
+def test_gather_marks_stale_served_coach_rows_with_own_day_facts(monkeypatch):
+    # #2792 live shape: today's generation HELD (ADR-108) for every V2 coach, so each
+    # coach's latest OUTPUT# row is yesterday's. The gather must attach an own-day
+    # facts override for those labels, and the checker must then read the honest
+    # citation of yesterday's canonical as grounded-but-stale, not a contradiction.
+    monkeypatch.setattr(sentinel, "_latest", lambda src: {"recovery_pct": 57, "hrv_ms": 39.76, "rhr_bpm": 61})
+    yesterday = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=1)).strftime("%Y-%m-%d")
+
+    class _T:
+        def get_item(self, Key):
+            return {}  # no EXPERT# rows in this fixture
+
+        def query(self, **kw):
+            return {"Items": [{"sk": f"OUTPUT#{yesterday}#daily_brief_x", "content": "Recovery at 40% this morning."}]}
+
+    monkeypatch.setattr(sentinel, "table", _T())
+    monkeypatch.setattr(sentinel, "_facts_as_of_generation", lambda d: {"recovery_pct": 40, "hrv_ms": 35.3, "rhr_bpm": 62})
+    facts, narratives, labels, overrides = sentinel._gather_facts_and_narratives()
+    coach_labels = [x for x in labels if x.startswith("coach:")]
+    assert coach_labels, "fixture produced no coach narratives"
+    assert all(x in overrides for x in coach_labels)
+    ov = overrides[coach_labels[0]]
+    assert ov["as_of"] == yesterday and ov["facts"]["recovery_pct"] == 40
+    f = sentinel.ci.check_facts_agreement(narratives, facts, surfaces=labels, facts_overrides=overrides)
+    assert f.status == sentinel.ci.OK
+    assert "served stale" in f.detail
 
 
 def test_build_record_is_serializable_and_complete(monkeypatch):
@@ -180,7 +236,7 @@ def _patch_empty_post_reset_board(monkeypatch, age_days):
     empty. All the endpoint specs' required keys are present-but-empty containers
     (never None), so only the non_degenerate gate is in play."""
     monkeypatch.setattr(sentinel, "_gather_predictions", lambda: [])
-    monkeypatch.setattr(sentinel, "_gather_facts_and_narratives", lambda: ({}, [], []))
+    monkeypatch.setattr(sentinel, "_gather_facts_and_narratives", lambda: ({}, [], [], {}))
     _pin_computed_checks(monkeypatch)
     monkeypatch.setattr(sentinel, "_gather_counts", lambda: [])
     monkeypatch.setattr(sentinel, "_semantic_pass", lambda facts, narr: None)
@@ -232,7 +288,7 @@ def test_healthy_state_is_ok(monkeypatch):
     monkeypatch.setattr(
         sentinel,
         "_gather_facts_and_narratives",
-        lambda: ({"recovery_pct": 30, "hrv_ms": 25.2}, ["Recovery was 30% today; HRV 25 ms."], ["expert:sleep"]),
+        lambda: ({"recovery_pct": 30, "hrv_ms": 25.2}, ["Recovery was 30% today; HRV 25 ms."], ["expert:sleep"], {}),
     )
     _pin_computed_checks(monkeypatch)
     monkeypatch.setattr(sentinel, "_gather_endpoint_specs", lambda: [])
