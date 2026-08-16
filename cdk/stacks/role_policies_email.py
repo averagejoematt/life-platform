@@ -269,7 +269,9 @@ def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
                 sid="InvokeElenaStateUpdater",  # #537: direct-publish path (PREVIEW_MODE=false)
                 actions=["lambda:InvokeFunction"],
                 resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:elena-state-updater"],
-            )
+            ),
+            # #2669: the timeout watchdog emits ChronicleTimeoutImminent.
+            iam.PolicyStatement(sid="TimeoutWatchdogMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
         ],
     )
 

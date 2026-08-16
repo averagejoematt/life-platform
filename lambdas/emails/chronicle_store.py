@@ -314,3 +314,102 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html, k
     except Exception as e:
         logger.error(f"FEAT-12: Failed to send preview email: {e}")
         raise
+
+
+# ── #2669: the generation cache — a timeout must not cost a second generation ──
+# The 2026-08-05 issue was generated THREE times: the full model pipeline (Elena
+# + the ADR-104 corrective pass + Margaret + presence-ack) completed inside the
+# 120s timeout each time, the function died in the persist/render tail, and the
+# retry started from zero. The cache row persists the FINAL gated text the moment
+# the model pipeline completes, so a retry reuses it and pays $0 in Bedrock.
+# Deliberately NOT an installment row: it carries no approval_token, no HTML, no
+# status — it is a crash-recovery artifact with a TTL, invisible to the reader
+# path and to the #2254 idempotency gate (which protects draft/published rows).
+
+RAW_CACHE_TTL_DAYS = 7
+
+
+def read_raw_cache(date_str, *, _g):
+    """The cached final text for this week, or None. Never raises."""
+    table = _g["table"]
+    logger = _g["logger"]
+    USER_ID = _g["USER_ID"]
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"RAWCACHE#{date_str}"})
+        item = resp.get("Item")
+        if item and item.get("raw_text"):
+            logger.info(f"[#2669] generation cache HIT for {date_str} (generated {item.get('generated_at')}) — no Bedrock spend")
+            return str(item["raw_text"])
+    except Exception as e:  # noqa: BLE001 — a cache read must never kill the run
+        logger.warning(f"[#2669] generation cache read failed (non-fatal): {e}")
+    return None
+
+
+def write_raw_cache(date_str, week_num, raw_text, *, _g):
+    """Persist the final gated generation. Failure is loud but non-fatal."""
+    table = _g["table"]
+    logger = _g["logger"]
+    USER_ID = _g["USER_ID"]
+    try:
+        now = datetime.now(timezone.utc)
+        table.put_item(
+            Item={
+                "pk": f"USER#{USER_ID}#SOURCE#chronicle",
+                "sk": f"RAWCACHE#{date_str}",
+                "source": "chronicle",
+                "week_number": week_num,
+                "raw_text": raw_text,
+                "generated_at": now.isoformat(),
+                # TTL: crash-recovery artifact only — expires on its own.
+                "ttl": int(now.timestamp()) + RAW_CACHE_TTL_DAYS * 86400,
+            }
+        )
+        logger.info(f"[#2669] generation cached for {date_str} — a retry now reuses this text instead of regenerating")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[#2669] generation cache write FAILED — a timeout retry will regenerate: {e}")
+
+
+# ── #2669 size-ceiling extraction: two facade helpers, verbatim behavior ───────
+
+
+def record_email_send(table, lambda_name, *, _g):
+    """Write a completion record so the status page can track last send."""
+    import time as _time
+
+    USER_ID = _g["USER_ID"]
+    logger = _g["logger"]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        table.put_item(
+            Item={
+                # #2221: derive the user from USER_ID like every other write in this
+                # Lambda (the hard-coded 'matthew' bug class).
+                "pk": f"USER#{USER_ID}#SOURCE#email_log#{lambda_name}",
+                "sk": f"DATE#{today}",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "status": "success",
+                "ttl": int(_time.time()) + 86400 * 90,
+            }
+        )
+    except Exception as e:
+        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+
+
+def existing_installment(date_str, *, _g):
+    """#2254: the already-stored installment for `date_str`, or None.
+
+    Fail-OPEN by design: if the read fails we return None and the run proceeds —
+    a DDB blip must not stop the week from being written; store_installment's
+    conditional put is the fail-CLOSED backstop against clobbering.
+    """
+    table = _g["table"]
+    USER_ID = _g["USER_ID"]
+    logger = _g["logger"]
+    if not date_str:
+        return None
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{date_str}"})
+        return resp.get("Item") or None
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[#2254] idempotency read failed (proceeding, conditional put still guards): {e}")
+        return None
