@@ -264,8 +264,9 @@ def texting_block(spec: dict) -> str:
         return ""
     block = "HOW YOU TEXT (this surface only — a phone, not a report):\n" + "\n".join(bits)
     # Bubble-shaped few-shots (#2402): the bibles' dialogue examples re-cut for a
-    # phone. Two at most, generously clipped — register calibration, not a corpus.
-    shots = [str(s).strip()[:600] for s in (spec.get("texting_few_shots") or [])[:2] if str(s).strip()]
+    # phone. Three at most (#2492 added one pushback/repair shot per coach),
+    # generously clipped — register calibration, not a corpus.
+    shots = [str(s).strip()[:600] for s in (spec.get("texting_few_shots") or [])[:3] if str(s).strip()]
     if shots:
         block += "\n\nHOW A REAL EXCHANGE READS (register calibration, never scripts to reuse):\n" + "\n\n".join(shots)
     return block
