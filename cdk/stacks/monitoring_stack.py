@@ -567,8 +567,7 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
-        # #2754: zero invocations emit NO datapoint, so missing→NOT_BREACHING could
-        # never fire. BREACHING; SET guarded by tests/test_no_invocation_alarms_2754.py.
+        # #2754: zero invocations emit NO datapoint — NB could never fire. BREACHING; SET guard: test_no_invocation_alarms_2754.
         _alarm(
             "DailyBriefNoInvocations",
             "daily-brief-no-invocations-24h",
