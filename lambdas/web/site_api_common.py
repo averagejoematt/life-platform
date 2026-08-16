@@ -131,7 +131,7 @@ PLATFORM_STATS = {
     "mcp_tools": 76,
     "lambdas": 104,
     "cdk_stacks": 8,
-    "alarms": 100,
+    "alarms": 101,
     "adrs": 151,
     "monthly_cost": "~$80",  # GROUND-TRUTH run-rate, pinned (#1232). Source = the budget
     # governor's own numbers: June 2026 actual $79.80 (Cost Explorer), July projects $82.22
@@ -146,10 +146,14 @@ PLATFORM_STATS = {
     "active_secrets": 21,
     "site_pages": 77,
 <<<<<<< HEAD
-    "test_count": 15540,
+<<<<<<< HEAD
+    "test_count": 15545,
 =======
     "test_count": 15519,
 >>>>>>> e788f4c94 (fix(ai): the archive query tells an unindexed installment from a nonexistent one (#2705))
+=======
+    "test_count": 15533,
+>>>>>>> 8a85b874f (chore(docs): regenerate literals post-rebase)
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
