@@ -30,7 +30,9 @@ credited — and it behaves identically.
 
 ## The three axes (grade against these, always)
 
-Every grade answers: *what would a specific reviewer, reading cold, conclude?*
+Every grade answers: *what would a specific reviewer, reading cold, conclude?* For anything
+architecture-shaped, the frame is `docs/CHARTER.md` — grade an area by which of the five
+primitives (registry → derivation guard → ratchet → contract → dead-man) it is missing.
 
 1. **First-impression craft** — the tree, a random file, the README, the commit log seen with
    zero context. Does it read as disciplined and idiomatic, or as a working directory someone

@@ -14,7 +14,9 @@ skip the broad survey — but still run Phase 0 and still score the work against
 
 ## Phase 0 — Orient (always, ~10 min, no shortcuts)
 
-1. Read the v5 brief in order: `docs/PLATFORM_NORTH_STAR.md` → `docs/SITE_MAP_AND_INTENT.md` →
+1. Read `docs/CHARTER.md` first — the five-primitive constitution is the architecture
+   grading frame (an area's grade is which primitives it's missing) — then the v5 brief in
+   order: `docs/PLATFORM_NORTH_STAR.md` → `docs/SITE_MAP_AND_INTENT.md` →
    `docs/DESIGN_SYSTEM_V5.md` → `docs/SITE_UPLEVEL_PLAYBOOK.md`.
 2. Read `handovers/HANDOVER_LATEST.md` + the Active Work section of memory. Note in-flight
    branches and open follow-ups — you must not duplicate or stomp them.

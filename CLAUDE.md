@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation Index
 
 Deep documentation lives in `docs/`. Start here when context is needed:
+- **`docs/CHARTER.md` — READ FIRST: the architecture constitution (#2843, epic #2842).** The five primitives (registry → derivation guard → ratchet → contract → dead-man) with their canonical exemplars, the paved roads (the ONLY sanctioned way to add a signal/lambda/page/coach/gate), and the standing rules. Session boot derives the architecture from the charter (+ the system model, #2845, when it lands), not from prose re-reads; `/uplevel` and the review skills grade against it.
 - **Website redesign / uplevel? Read these four first (the v5 brief):**
   - `docs/PLATFORM_NORTH_STAR.md` — the durable **why**: purpose, the causal-loop thesis, the 4 audiences, the success bar
   - `docs/SITE_MAP_AND_INTENT.md` — **what each page is for** and why it matters to the platform (one scannable registry)

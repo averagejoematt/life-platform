@@ -21,13 +21,14 @@ folder hierarchy, is how you navigate. Every page carries a status header
 ## Start here, by role
 
 **"I'm a new engineer, day one"** — read in this order:
-1. [ONBOARDING.md](ONBOARDING.md) — the mental model (what this system is, in one page)
-2. [REPO_STRUCTURE.md](REPO_STRUCTURE.md) — the repo map + "where does X go" rules
-3. [AWS_ACCESS.md](AWS_ACCESS.md) — get AWS access (SSO — the one true auth procedure)
-4. [QUICKSTART.md](QUICKSTART.md) — fresh laptop → first deploy (already have the toolchain + AWS access)
-5. [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the layer below QUICKSTART: bare metal → operational (rebuild a lost/replacement Mac from zero)
-6. [ARCHITECTURE.md](ARCHITECTURE.md) — the full system design
-7. [CONVENTIONS.md](CONVENTIONS.md) — the load-bearing reflexes (read before your first deploy)
+1. [CHARTER.md](CHARTER.md) — the architecture constitution: the five primitives, the paved roads, the standing rules (#2843)
+2. [ONBOARDING.md](ONBOARDING.md) — the mental model (what this system is, in one page)
+3. [REPO_STRUCTURE.md](REPO_STRUCTURE.md) — the repo map + "where does X go" rules
+4. [AWS_ACCESS.md](AWS_ACCESS.md) — get AWS access (SSO — the one true auth procedure)
+5. [QUICKSTART.md](QUICKSTART.md) — fresh laptop → first deploy (already have the toolchain + AWS access)
+6. [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the layer below QUICKSTART: bare metal → operational (rebuild a lost/replacement Mac from zero)
+7. [ARCHITECTURE.md](ARCHITECTURE.md) — the full system design
+8. [CONVENTIONS.md](CONVENTIONS.md) — the load-bearing reflexes (read before your first deploy)
 
 **"I'm operating the system today"** (on-call view):
 [RUNBOOK.md](RUNBOOK.md) — daily ops + troubleshooting · [MONITORING.md](MONITORING.md) — what fires and why · [SLOs.md](SLOs.md) · [OPERATOR_GUIDE.md](OPERATOR_GUIDE.md) — the daily health check · [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) — backups + drilled restore procedures

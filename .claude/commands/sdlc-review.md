@@ -20,7 +20,9 @@ Token-heavy multi-agent ritual (same order as /platform-review). Two input modes
 
 ## The three outcome axes (grade against these, always)
 
-Every grade and every recommendation is judged against what this platform is *for*:
+Every grade and every recommendation is judged against what this platform is *for* — and,
+for anything architecture-shaped, against `docs/CHARTER.md` (the five-primitive
+constitution): the question is which primitive is missing, not whether the code is pretty.
 
 1. **Commercialization defensibility** — could this survive the audit an acquirer, investor,
    or first enterprise customer would run? Not "is it enterprise" but "is every deviation from

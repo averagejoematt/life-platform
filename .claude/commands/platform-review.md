@@ -6,7 +6,7 @@
 
 ## The recipe (phases; use the Workflow tool)
 
-**Phase 0 — Orient + hygiene.** Read the v5 brief + `handovers/HANDOVER_LATEST.md`. Establish ground truth: live `version.json` vs HEAD, `gh issue list --state open`, budget tier (SSM `/life-platform/budget-tier`). Prune stale `.claude/worktrees/*` (check merged PRs first). Full-suite baseline on clean main — a red baseline blocks the night's merge queue; fix it first.
+**Phase 0 — Orient + hygiene.** Read `docs/CHARTER.md` (the five-primitive constitution — the architecture grading frame: an area's grade is which primitives it's missing) + the v5 brief + `handovers/HANDOVER_LATEST.md`. Establish ground truth: live `version.json` vs HEAD, `gh issue list --state open`, budget tier (SSM `/life-platform/budget-tier`). Prune stale `.claude/worktrees/*` (check merged PRs first). Full-suite baseline on clean main — a red baseline blocks the night's merge queue; fix it first.
 
 **Phase 1 — Survey fan-out (Workflow, one agent per lens).** Lenses: engine-bugs · serving-bugs · render-live (render-qa agent on the live site, 1280+390) · missing-features · code-quality (vs ADR-103 posture) · doc-drift (what the gates DON'T cover) · ai-content (ADR-104/105/108 coverage matrices, prompt craft) · throughline (live copy as each north-star audience) · database (read-only DDB vs SCHEMA/phase-taxonomy) · privacy (#920-class regression, reader-facing only). Add task-specific lenses (e.g. the character-math pair with a simulation harness) as the session demands. (The `sdlc` lens — CLAUDE.md/memory/skills/agents ergonomics — retired 2026-07-18: `/sdlc-review` is the dedicated, deeper ritual for the whole ideation→oversight pipeline; ADR-103.)
 
