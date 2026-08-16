@@ -389,6 +389,9 @@
         "integrator"
       ],
       "telegram_route": "headcoach",
+      "telegram_route_aliases": [
+        "board"
+      ],
       "chat": true,
       "title": "Head Coach",
       "lens": "integrated strategy, cross-domain trade-offs, the one priority that matters this week",
