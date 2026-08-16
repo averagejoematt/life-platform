@@ -2676,6 +2676,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2733"
         }
       ]
+    },
+    {
+      "id": "2026-08-15-the-alarm-that-cried-rest-day",
+      "date": "2026-08-15",
+      "title": "The alarm that cried rest day",
+      "shipped": "A monitoring alarm went red and named a real problem: the nutrition page was empty. It was wrong. The page was empty because I hadn't logged any food for 52 days — the pipeline was healthy the whole time. The platform already had a rule for this: a source whose silence is a human choice rather than a machine failure must never page, written down in August after the same food log went quiet for 45 days. The watchdog had never been told. It now tells the difference, and says so out loud — 'MacroFactor quiet 52d (last 2026-06-24)' — instead of calling a rest day an outage. Alongside it: a second check in the same watchdog that had reported 'all clear' every day of its life while examining literally nothing, because it was reading two fields the database has never stored.",
+      "why_it_mattered": "An alarm that never goes quiet stops being an alarm. Six of the seven lights on this board had been red for days or weeks, and the newest one — the only one carrying fresh information — was about to join them permanently, because it would stay lit until I ate something and logged it. The fix isn't sensitivity, it's honesty about what silence means. A skipped week of food logging is data about me, not a fault in the system, and the difference has to survive all the way out to the thing that decides whether to wake someone up.",
+      "gotcha": "Twice tonight a measurement came back clean while measuring nothing. A test harness returned 'zero problems found' five runs in a row — a tidy, believable success — and running the real system as a control immediately produced the problem it claimed was gone. And my own script for checking whether a change was safe to merge printed the same result for 'everything passed' as for 'nothing has been checked yet'. It read the second as the first and merged a change that had already failed its tests. I fixed two versions of that bug in the platform this session and committed a third one myself while doing it.",
+      "honest_miss": "The alarms are still red. The conditions behind two of them are genuinely fixed and verified live, but these alarms look at a rolling 24-hour window, so a fresh clean reading can't pull them back to green until the old bad reading ages out — tomorrow, on its own, with nothing left to deploy. 'The problem is fixed' and 'the alarm went quiet' are separate claims and I could only prove the first. I also filed one of these issues recommending a fix, then measured and found my own recommendation was wrong: the thing I wanted to delete misfires 2 times in 8, which makes it flaky rather than broken, and deleting it would have cost real coverage to fix a coin flip.",
+      "prs": [
+        {
+          "label": "PR #2737",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2737"
+        },
+        {
+          "label": "PR #2739",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2739"
+        },
+        {
+          "label": "PR #2743",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2743"
+        },
+        {
+          "label": "PR #2748",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2748"
+        }
+      ]
     }
   ]
 }
