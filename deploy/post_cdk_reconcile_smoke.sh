@@ -48,8 +48,12 @@ check_handler() {
     return
   fi
 
-  actual_module="${actual%%.*}"
-  if [[ "$actual_module" == "$expected_module" ]]; then
+  # #1653/ADR-146: handlers are domain-packaged ("ingestion.garmin_lambda.lambda_handler");
+  # compare the MODULE PATH (everything before the final segment) by suffix, so both the
+  # flat legacy form and the packaged form pass while the CDK-reconcile regression this
+  # check exists for ("lambda_function.lambda_handler") still fails loudly.
+  actual_module="${actual%.*}"
+  if [[ "$actual_module" == "$expected_module" || "$actual_module" == *".$expected_module" ]]; then
     ok "$fn — handler: $actual"
   elif [[ "$actual_module" == "lambda_function" ]]; then
     fail "$fn — handler is 'lambda_function.lambda_handler' (CDK reconcile regression!). Fix: aws lambda update-function-configuration --function-name $fn --handler ${expected_module}.lambda_handler --region $REGION"
