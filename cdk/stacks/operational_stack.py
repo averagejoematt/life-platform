@@ -591,6 +591,26 @@ class OperationalStack(Stack):
         )
 
         # ── 9. Insight Email Parser — SES inbound trigger (previously unmanaged)
+        # #2821: this Lambda had ZERO watch surface — dlq=None + alerts_topic=None
+        # meant the shared helper's error alarm was never minted, and SES's async
+        # invoke (2 retries, then drop) had nowhere durable to land a terminal
+        # failure. Two independent signals now cover the two ways a reply can be
+        # lost:
+        #   (a) an unhandled exception (crash class) → the helper's own Errors
+        #       alarm (alerts_topic below, digest-routed like its siblings) PLUS
+        #       dlq=local_dlq so the original SES/S3 event is preserved verbatim
+        #       and picked up by the existing dlq-consumer sweep (#402/ADR-115),
+        #       same pattern as AiQualityCanary's #2655/#809/ADR-116 fix.
+        #   (b) a failure this handler catches itself and does NOT re-raise (a
+        #       record it deliberately skips rather than crash the batch) → the
+        #       handler now persists the failing envelope to
+        #       dead-letter-archive/insight-email-parser/ and emits
+        #       LifePlatform/Email::InsightParseFailure, alarmed right below
+        #       (InsightEmailParserParseFailure) — a class the Errors alarm
+        #       structurally cannot see (the function still returns 200). Landed
+        #       here rather than monitoring_stack.py because that module is
+        #       BASELINED at zero headroom (tests/test_module_size_guard.py) —
+        #       operational_stack.py owns the Lambda already and has room.
         insight_parser = create_platform_lambda(
             self,
             "InsightEmailParser",
@@ -605,14 +625,35 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_insight_email_parser(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
-            alerts_topic=None,
+            dlq=local_dlq,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
         )
         insight_parser.add_permission(
             "SESInvokeInsightParser",
             principal=iam.ServicePrincipal("ses.amazonaws.com"),
             source_arn=f"arn:aws:ses:{REGION}:{ACCT}:receipt-rule-set/*",
         )
+        # #2821 (b) above: the custom-metric twin of the Errors alarm — fires on a
+        # caught-and-continued parse failure the Lambda Errors metric never sees.
+        # 1h window matches the helper's own per-function Errors alarm period.
+        insight_parser_parse_failure_alarm = cloudwatch.Alarm(
+            self,
+            "InsightEmailParserParseFailureAlarm",
+            alarm_name="life-platform-insight-email-parser-parse-failure",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Email",
+                metric_name="InsightParseFailure",
+                period=Duration.hours(1),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        insight_parser_parse_failure_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── Canary custom metric alarms ──
         # ADR-143 (#1333): the DDB + S3 canary legs are the serving path's

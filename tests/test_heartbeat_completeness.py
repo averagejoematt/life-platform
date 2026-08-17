@@ -13,6 +13,12 @@ How it works (all offline — no AWS credentials, no cdk synth):
         - explicit events.Rule(...) + rule.add_target(targets.LambdaFunction(fn))
           chains (rules shipped with enabled=False are NOT scheduled — e.g.
           hevy-routine-cron, ADR-066)
+      #2821: `ses_triggered_lambdas()` is a SECOND enumerator, unioned with the
+      above before S2-S4 run. A Lambda invoked only by an SES receipt rule
+      (`<fn>.add_permission(..., principal=ServicePrincipal("ses.amazonaws.com"))`)
+      has no `schedule=` at all, so S1 alone structurally cannot see it — this
+      ledger would never even ask about it. The union closes that blind spot for
+      any current or future SES-triggered Lambda, not just the one #2821 found.
   S2  Every enumerated function_name must appear in COVERAGE below.
   S3  Every COVERAGE claim is verified against source:
         ("alarm", name)            → `name` must exist as an alarm_name in cdk/stacks/
@@ -143,6 +149,58 @@ def scheduled_lambdas() -> dict:
         "(a new wiring pattern? teach scheduled_lambdas() about it — do NOT let it "
         "be silently skipped):\n  " + "\n  ".join(unresolved)
     )
+    return out
+
+
+def ses_triggered_lambdas() -> dict:
+    """Return {function_name: "stack_file:line"} for every Lambda granted an SES
+    invoke permission — `<fn>.add_permission(..., principal=ServicePrincipal("ses.amazonaws.com"))`.
+
+    #2821: these Lambdas are event-triggered (SES receipt rule → Lambda, never
+    scheduled), so scheduled_lambdas() above cannot enumerate them — no
+    schedule= kwarg exists to find. Resolves the `<fn>` receiver the same way
+    scheduled_lambdas() resolves add_target's LambdaFunction(<var>): a local
+    var_to_fn map built from create_platform_lambda(...) calls assigned to a
+    variable in the same file.
+    """
+    out = {}
+    for fname in sorted(os.listdir(CDK_STACKS_DIR)):
+        if not fname.endswith(".py") or fname.startswith("__") or fname in _SKIP_FILES:
+            continue
+        with open(os.path.join(CDK_STACKS_DIR, fname), encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+
+        var_to_fn = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and _is_call_to(node, "create_platform_lambda"):
+                fn_kw = _kw(node, "function_name")
+                if isinstance(fn_kw, ast.Constant):
+                    node._fn_name = fn_kw.value
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+                call = node.value
+                if _is_call_to(call, "create_platform_lambda") and hasattr(call, "_fn_name"):
+                    for t in node.targets:
+                        if isinstance(t, ast.Name):
+                            var_to_fn[t.id] = call._fn_name
+
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_permission"):
+                continue
+            principal_kw = _kw(node, "principal")
+            if principal_kw is None:
+                continue
+            # Exact match: the CDK principal is the literal service id string
+            # ("ses.amazonaws.com"), not a URL — equality also satisfies CodeQL's
+            # py/incomplete-url-substring-sanitization (alert #158).
+            is_ses = any(isinstance(sub, ast.Constant) and sub.value == "ses.amazonaws.com" for sub in ast.walk(principal_kw))
+            if not is_ses:
+                continue
+            base = node.func.value
+            if isinstance(base, ast.Name):
+                fn_name = var_to_fn.get(base.id)
+                if fn_name:
+                    out.setdefault(fn_name, f"{fname}:{node.lineno}")
     return out
 
 
@@ -505,6 +563,18 @@ COVERAGE = {
         "INGEST_HEALTH sentinel; a real liveness alarm would false-fire every run on a Lambda that cannot invoke by design. When "
         "the account is provisioned, flip active_api:True in source_registry and move this to ('ingest-liveness', 'mastodon').",
     ),
+    # ── SES-triggered (ses_triggered_lambdas() above, #2821) ─────────────────────
+    "insight-email-parser": (
+        EXEMPT,
+        "2026-08-16",
+        "#2821: SES-triggered on Matthew's own reply cadence, never scheduled — invocation counts cannot distinguish 'no "
+        "incoming email' from 'the SES trigger died', so an absence/heartbeat alarm is not meaningful here (same reasoning as "
+        "the operator-email rows above, just event-triggered instead of cron-triggered). Failure-mode is the real risk and is "
+        "now covered instead: the shared helper's per-function Errors alarm (ingestion-error-insight-email-parser, dlq= + "
+        "alerts_topic= wired) for an unhandled exception, plus life-platform-insight-email-parser-parse-failure "
+        "(LifePlatform/Email::InsightParseFailure) for a caught-and-continued per-record failure that never raises. Both fire "
+        "on invocation, which is exactly the case an absence alarm cannot cover.",
+    ),
 }
 
 
@@ -519,12 +589,22 @@ def test_enumerator_sanity():
     assert len(found) >= 60, f"Only {len(found)} scheduled Lambdas enumerated — the AST walk in scheduled_lambdas() has likely rotted."
 
 
+def test_ses_enumerator_finds_insight_email_parser():
+    """#2821: guard the new enumerator the same way — it must find the one
+    currently-known SES-triggered Lambda, or the whole extension is silently
+    vacuous (an empty dict would make the union below a no-op forever)."""
+    found = ses_triggered_lambdas()
+    assert "insight-email-parser" in found, f"ses_triggered_lambdas() found {sorted(found)} — resolver broke or the SES wiring moved."
+
+
 def test_every_scheduled_lambda_has_liveness_signal_or_dated_exemption():
-    found = scheduled_lambdas()
+    # #2821: union with ses_triggered_lambdas() — an event-triggered Lambda has
+    # no schedule= for S1 to find, so it would otherwise never even be asked about.
+    found = {**scheduled_lambdas(), **ses_triggered_lambdas()}
     missing = sorted(set(found) - set(COVERAGE))
     lines = [f"  {fn}  (defined at cdk/stacks/{found[fn]})" for fn in missing]
     assert not missing, (
-        f"{len(missing)} scheduled Lambda(s) have NO liveness signal and NO dated exemption "
+        f"{len(missing)} scheduled/event-triggered Lambda(s) have NO liveness signal and NO dated exemption "
         "(#1455 — 'scheduled but silently dead' must not be reachable).\n"
         "Give each a real absence signal (heartbeat/no-invocations alarm — an error alarm "
         "does NOT count, errors require an invocation) and map it in COVERAGE, or add a "
@@ -533,10 +613,11 @@ def test_every_scheduled_lambda_has_liveness_signal_or_dated_exemption():
 
 
 def test_no_stale_ledger_entries():
-    found = scheduled_lambdas()
+    found = {**scheduled_lambdas(), **ses_triggered_lambdas()}
     stale = sorted(set(COVERAGE) - set(found))
-    assert not stale, "COVERAGE rows for Lambdas that are no longer scheduled — remove them so the ledger stays honest:\n  " + "\n  ".join(
-        stale
+    assert not stale, (
+        "COVERAGE rows for Lambdas that are no longer scheduled/event-triggered — remove them so the ledger stays honest:\n  "
+        + "\n  ".join(stale)
     )
 
 
@@ -592,8 +673,10 @@ def test_exemptions_are_dated_and_reasoned():
 
 
 if __name__ == "__main__":
-    found = scheduled_lambdas()
+    found = {**scheduled_lambdas(), **ses_triggered_lambdas()}
     for fn in sorted(found):
         status = COVERAGE.get(fn, ("MISSING",))[0]
         print(f"{fn:55s} {status:16s} {found[fn]}")
-    print(f"\n{len(found)} scheduled · {sum(1 for f in found if f in COVERAGE)} covered · {len(set(found) - set(COVERAGE))} gaps")
+    print(
+        f"\n{len(found)} scheduled/event-triggered · {sum(1 for f in found if f in COVERAGE)} covered · {len(set(found) - set(COVERAGE))} gaps"
+    )

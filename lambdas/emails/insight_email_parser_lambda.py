@@ -1,5 +1,5 @@
 """
-Insight Email Parser Lambda — v1.1.0
+Insight Email Parser Lambda — v1.2.0
 
 Triggered by SES inbound email → S3 → Lambda.
 
@@ -20,6 +20,18 @@ Changes v1.1.0:
   - Subdomain routing: insight@aws.mattsusername.com (avoids SimpleLogin conflict)
   - Dynamic reply-to-sender for confirmation emails
   - ALLOWED_SENDERS from env var for easier config updates
+
+Changes v1.2.0 (#2821 — the watch-surface fix):
+  - Every per-record path that catches a failure and continues (rather than
+    re-raising) now persists the failing envelope to
+    dead-letter-archive/insight-email-parser/ AND emits
+    LifePlatform/Email::InsightParseFailure (see _persist_failure_envelope /
+    _emit_parse_failure_metric below) — a class the CDK-level Errors alarm
+    structurally cannot see (the function still returns 200).
+  - CDK side (cdk/stacks/operational_stack.py): dlq=local_dlq +
+    alerts_topic=local_digest_topic so a genuine unhandled exception (crash
+    class) now mints the shared helper's per-function Errors alarm AND
+    preserves the original SES/S3 event in the ingestion DLQ.
 
 Dry-run posture (#2291): this module is EVENT-driven (SES inbound receipt →
 S3 → Lambda), never scheduled, so it is exempt from #2222's DEFAULT dry-run
@@ -82,8 +94,59 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
+cloudwatch = boto3.client("cloudwatch", region_name=REGION)
 
 S3_BUCKET = os.environ["S3_BUCKET"]
+
+# #2821: this Lambda had ZERO watch surface — an SES-async invoke that raises
+# retries twice then evaporates with no DLQ, AND several code paths below
+# already caught a per-record failure and just `continue`d (the function still
+# returns 200, so neither a raised exception nor a Lambda Errors-metric alarm
+# would ever see it). The CDK side now wires dlq= + alerts_topic= for the
+# crash class; these two helpers close the SILENT-catch class — every place
+# this handler decides not to process a record now leaves (1) a durable
+# envelope in S3 and (2) an alarmable metric, instead of nothing.
+FAILURE_METRIC_NAMESPACE = "LifePlatform/Email"
+FAILURE_METRIC_NAME = "InsightParseFailure"
+_FAILURE_ARCHIVE_PREFIX = "dead-letter-archive/insight-email-parser"
+
+
+def _emit_parse_failure_metric(reason: str) -> None:
+    """Best-effort EMF-style emit — a metric-service hiccup must never mask the
+    failure it is reporting (that would recreate the exact silent-loss bug)."""
+    try:
+        cloudwatch.put_metric_data(
+            Namespace=FAILURE_METRIC_NAMESPACE,
+            MetricData=[{"MetricName": FAILURE_METRIC_NAME, "Value": 1.0, "Unit": "Count"}],
+        )
+    except Exception as e:  # noqa: BLE001 — telemetry is best-effort
+        print(f"[WARN] parse-failure metric emit failed ({reason}): {e}")
+
+
+def _persist_failure_envelope(identifier: str, reason: str, payload: dict) -> str:
+    """Durable trace of a record this handler decided not to process, so a
+    caught-and-skipped failure is never fully silent. Mirrors the
+    dead-letter-archive/ convention dlq_consumer_lambda.py already uses for
+    terminal ASYNC failures (#402/ADR-115) — this is the inline twin for a
+    failure caught HERE and not re-raised, so the Lambda DLQ never sees it.
+    Own subfolder (not the DLQ consumer's dead-letter-archive/ root) so the two
+    writers never share a key namespace. Fail-soft on the S3 write (the metric
+    above is the primary alarmable signal either way); returns the key written,
+    or "" on a write failure."""
+    now = datetime.now(timezone.utc)
+    safe_id = re.sub(r"[^A-Za-z0-9_.-]", "_", str(identifier) or "unknown")[:180] or "unknown"
+    key = f"{_FAILURE_ARCHIVE_PREFIX}/{now.strftime('%Y/%m/%d')}/{now.strftime('%H%M%S')}-{safe_id}.json"
+    record = {"failed_at": now.isoformat(), "reason": reason, "identifier": identifier, "payload": payload}
+    written = ""
+    try:
+        s3.put_object(Bucket=S3_BUCKET, Key=key, Body=json.dumps(record, indent=2, default=str), ContentType="application/json")
+        written = key
+        print(f"[INFO] failure envelope archived to s3://{S3_BUCKET}/{key}")
+    except Exception as e:  # noqa: BLE001 — archival is best-effort
+        print(f"[ERROR] failed to archive failure envelope ({reason}): {e}")
+    _emit_parse_failure_metric(reason)
+    return written
+
 
 # Confirmation emails send FROM this address (root domain DKIM already verified)
 SENDER = "awsdev@mattsusername.com"
@@ -391,6 +454,10 @@ def lambda_handler(event, context):
                     key = f"raw/inbound_email/{message_id}"
                 else:
                     print("[WARN] No S3 key or SES messageId found, skipping")
+                    # #2821: an S3-key-less/messageId-less record is itself a
+                    # malformed envelope — persist the whole record so it is
+                    # never just a WARN line nobody watches.
+                    _persist_failure_envelope("unresolvable-record", "missing_s3_key", record)
                     continue
 
             print(f"[INFO] Processing: s3://{bucket}/{key}")
@@ -401,43 +468,55 @@ def lambda_handler(event, context):
                 raw_email = obj["Body"].read().decode("utf-8", errors="replace")
             except Exception as e:
                 print(f"[ERROR] Failed to read email from S3: {e}")
+                # #2821: can't even read the email — the reply is otherwise gone
+                # with only this log line as a trace. Persist what we know.
+                _persist_failure_envelope(key, "s3_read_failed", {"bucket": bucket, "key": key, "error": str(e)})
                 continue
 
-            # Parse email
-            msg = email.message_from_string(raw_email, policy=policy.default)
+            # #2821: parsing/extraction wrapped so a malformed MIME payload (an
+            # exception nothing below explicitly catches) leaves an envelope +
+            # metric HERE, immediately, rather than only via the outer
+            # catch-log-reraise → DLQ → 6-hourly dlq-consumer sweep path.
+            try:
+                # Parse email
+                msg = email.message_from_string(raw_email, policy=policy.default)
 
-            # Security: check sender
-            from_addr = msg.get("From", "")
-            sender_email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", from_addr)
-            sender = sender_email.group(0).lower() if sender_email else ""
+                # Security: check sender
+                from_addr = msg.get("From", "")
+                sender_email = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", from_addr)
+                sender = sender_email.group(0).lower() if sender_email else ""
 
-            if sender not in ALLOWED_SENDERS:
-                print(f"[WARN] Unauthorized sender: {sender}. Allowed: {ALLOWED_SENDERS}. Ignoring.")
-                continue
+                if sender not in ALLOWED_SENDERS:
+                    print(f"[WARN] Unauthorized sender: {sender}. Allowed: {ALLOWED_SENDERS}. Ignoring.")
+                    continue
 
-            subject = msg.get("Subject", "")
-            print(f"[INFO] From: {sender}, Subject: {subject}")
+                subject = msg.get("Subject", "")
+                print(f"[INFO] From: {sender}, Subject: {subject}")
 
-            # Extract text body
-            body_text = ""
-            if msg.is_multipart():
-                for part in msg.walk():
-                    if part.get_content_type() == "text/plain":
-                        body_text = part.get_content()
-                        break
-                # Fallback to HTML if no plain text
-                if not body_text:
+                # Extract text body
+                body_text = ""
+                if msg.is_multipart():
                     for part in msg.walk():
-                        if part.get_content_type() == "text/html":
-                            html_content = part.get_content()
-                            # Basic HTML stripping
-                            body_text = re.sub(r"<[^>]+>", "", html_content)
+                        if part.get_content_type() == "text/plain":
+                            body_text = part.get_content()
                             break
-            else:
-                body_text = msg.get_content()
+                    # Fallback to HTML if no plain text
+                    if not body_text:
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/html":
+                                html_content = part.get_content()
+                                # Basic HTML stripping
+                                body_text = re.sub(r"<[^>]+>", "", html_content)
+                                break
+                else:
+                    body_text = msg.get_content()
 
-            # Extract reply text
-            reply_text = extract_reply_text(body_text)
+                # Extract reply text
+                reply_text = extract_reply_text(body_text)
+            except Exception as e:
+                print(f"[ERROR] Failed to parse email: {e}")
+                _persist_failure_envelope(key, "parse_exception", {"bucket": bucket, "key": key, "error": str(e), "raw_email": raw_email})
+                continue
 
             # #1690 (epic #1687): a reply to the weekly AI review-pack email carrying
             # "#N <correction>" lines is a CORRECTION, not a generic insight — route it
@@ -455,8 +534,17 @@ def lambda_handler(event, context):
 
             print(f"[INFO] Extracted reply ({len(reply_text)} chars): {reply_text[:100]}...")
 
-            # Save as insight
-            insight_id, date_saved = save_insight(reply_text, source_email_subject=subject, dry_run=dry_run)
+            # Save as insight — the actual DDB write path #2821 is centrally about.
+            try:
+                insight_id, date_saved = save_insight(reply_text, source_email_subject=subject, dry_run=dry_run)
+            except Exception as e:
+                print(f"[ERROR] Failed to save insight: {e}")
+                _persist_failure_envelope(
+                    key,
+                    "insight_write_failed",
+                    {"bucket": bucket, "key": key, "sender": sender, "subject": subject, "reply_text": reply_text, "error": str(e)},
+                )
+                continue
             print(f"[INFO] Insight saved: {insight_id}")
 
             # Send confirmation back to sender
@@ -469,4 +557,10 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": json.dumps({"status": "ok", "dry_run": dry_run})}
     except Exception as e:
         logger.error("lambda_handler failed: %s", e, exc_info=True)
+        # #2821: the last-resort path (anything NOT already caught+persisted
+        # per-record above — e.g. a malformed event shape). Persist + emit
+        # immediately rather than waiting on the DLQ/dlq-consumer's 6-hourly
+        # sweep; the re-raise below is UNCHANGED (still needed so the async
+        # invoke's retry + DLQ safety net stays live for this class too).
+        _persist_failure_envelope("event", "unhandled_exception", {"event": event, "error": str(e)})
         raise
