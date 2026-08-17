@@ -125,6 +125,7 @@ def test_build_sub_scripts_sequence():
         "restart_chronicle_handler",
         "restart_media_reset",
         "restart_leadin_pages",
+        "recall_corpus_sync",  # #2858: after visibility settles — re-dating rotates derived reader links
         "restart_character_rebuild",
         "restart_site_copy_sync",
         "restart_docs_update",
