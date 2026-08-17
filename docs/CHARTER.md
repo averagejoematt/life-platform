@@ -70,8 +70,13 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
 ## The standing rules
 
 1. **No hand-maintained enumeration** of registry vocabulary without a dated
-   exemption. The fleet-wide enforcement is the #2844 conformance guard; until it
-   lands, this is the review bar every PR is held to.
+   exemption. The fleet-wide enforcement is the #2844 conformance guard —
+   `tests/test_conformance_guard_2844.py`, the fleet-wide form of the
+   derivation-guard primitive: an AST sweep of `lambdas/ mcp/ cdk/` keyed on the
+   live registry vocabularies (sources, personas, lambda names, alarm names),
+   with every pre-existing site carried as a dated exemption in the shrink-only
+   ledger `tests/conformance_residue.py`. Editing an exempted hand-list re-reds
+   it by construction; the only green path is deriving from the registry.
 2. **Debt counts only ratchet down.**
 3. **Every new "must agree" pair gets a contract test at birth**, on the real wire
    shape.

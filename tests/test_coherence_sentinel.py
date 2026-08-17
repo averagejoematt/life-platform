@@ -22,6 +22,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "operational"))
 
 import coherence_sentinel_lambda as sentinel  # noqa: E402
+from common import (
+    constants as _constants,  # noqa: E402
+    pacific_time,  # noqa: E402
+)
 
 
 def _pin_continuity(monkeypatch, genesis="2026-06-08", today="2026-07-01", surfaced=()):
@@ -63,7 +67,9 @@ def test_gather_computed_checks_reads_the_real_record_shape(monkeypatch):
     checks = sentinel._gather_computed_checks()
     assert checks, "adapter found nothing to check against a live-shaped record"
     names = {c["name"] for c in checks}
-    assert "day_grade_letter_vs_score" in names
+    # #2793: the check name now carries the letters ("day_grade_letter_vs_score[F vs F]")
+    # so an alarm reads as letters rather than ord() values.
+    assert any(n.startswith("day_grade_letter_vs_score") for n in names)
     # and the invariant grades them rather than reporting an empty-set green
     f = sentinel.ci.check_computed_coherence(checks)
     assert f.status == sentinel.ci.OK
@@ -162,7 +168,10 @@ def test_gather_marks_stale_served_coach_rows_with_own_day_facts(monkeypatch):
     # facts override for those labels, and the checker must then read the honest
     # citation of yesterday's canonical as grounded-but-stale, not a contradiction.
     monkeypatch.setattr(sentinel, "_latest", lambda src: {"recovery_pct": 57, "hrv_ms": 39.76, "rhr_bpm": 61})
-    yesterday = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    # #2814: "yesterday" in the SENTINEL'S frame — Pacific. The UTC form this
+    # replaced made the fixture disagree with the gather every PT evening
+    # (17:00–24:00 PT), exactly the window the sentinel bug lived in.
+    yesterday = (pacific_time.pacific_now() - _dt.timedelta(days=1)).strftime("%Y-%m-%d")
 
     class _T:
         def get_item(self, Key):
@@ -296,3 +305,88 @@ def test_healthy_state_is_ok(monkeypatch):
     monkeypatch.setattr(sentinel, "_semantic_pass", lambda facts, narr: None)
     findings, _ = sentinel.run_checks()
     assert sentinel.ci.overall_status(findings) == sentinel.ci.OK
+
+
+# ── #2814: the sentinel's own day frame is Pacific, in EVERY invocation context ──
+#
+# The only schedule is cron(45 18 ? * * *) = 10:45/11:45 AM PT — inside the window
+# where the UTC and Pacific calendars agree — so every SCHEDULED run computed the
+# right frame by accident. Any off-schedule invoke between 17:00 PDT and midnight
+# PT (manual verification invokes are real: 08-15 14:52 PT; diagnostics are
+# routine) anchored the surface-agreement instrument on TOMORROW's date — the
+# #2675 class (a UTC clock inside a PT instrument). One frozen instant is the
+# wire for every test below: 2026-08-17T02:30Z == 19:30 PDT **2026-08-16**. The
+# sentinel must read it as 08-16 everywhere it names or counts a day.
+
+_EVENING_UTC = _dt.datetime(2026, 8, 17, 2, 30, tzinfo=_dt.timezone.utc)  # 19:30 PDT 2026-08-16
+
+
+class _FrozenDatetime(_dt.datetime):
+    """`datetime` frozen at _EVENING_UTC. Patching this over sentinel.datetime
+    controls the UTC path the UNFIXED code read — these tests were watched
+    failing (returning 2026-08-17) against the pre-#2814 sentinel."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return _EVENING_UTC.astimezone(tz) if tz is not None else _EVENING_UTC.replace(tzinfo=None)
+
+
+def _freeze_evening_clock(monkeypatch):
+    """ONE instant, both frames: the sentinel's own datetime AND the canonical
+    Pacific helper derive from the same frozen wire time."""
+    monkeypatch.setattr(sentinel, "datetime", _FrozenDatetime)
+    monkeypatch.setattr(pacific_time, "pacific_now", lambda: _EVENING_UTC.astimezone(pacific_time.PACIFIC))
+
+
+def test_today_is_the_pacific_day_at_pt_evening(monkeypatch):
+    # Unfixed: datetime.now(timezone.utc) → "2026-08-17" (tomorrow's frame).
+    _freeze_evening_clock(monkeypatch)
+    assert sentinel._today() == "2026-08-16"
+
+
+def test_fresh_floor_and_stale_marking_use_the_pacific_frame(monkeypatch):
+    """A coach OUTPUT# row dated the CURRENT Pacific day, read at 19:30 PT: it is
+    today's row. The unfixed gather called the UTC tomorrow "today", so the row
+    tripped the #2792 stale-served branch and was judged against override facts
+    it should never have been given."""
+    _freeze_evening_clock(monkeypatch)
+    monkeypatch.setattr(sentinel, "_latest", lambda src: {"recovery_pct": 57, "hrv_ms": 39.76, "rhr_bpm": 61})
+
+    class _T:
+        def get_item(self, Key):
+            return {}  # no EXPERT# rows in this fixture
+
+        def query(self, **kw):
+            return {"Items": [{"sk": "OUTPUT#2026-08-16#daily_brief_x", "content": "Recovery at 57% this evening."}]}
+
+    monkeypatch.setattr(sentinel, "table", _T())
+    calls = []
+    monkeypatch.setattr(sentinel, "_facts_as_of_generation", lambda d: calls.append(d) or {})
+    facts, narratives, labels, overrides = sentinel._gather_facts_and_narratives()
+    assert any(x.startswith("coach:") for x in labels), "today's row fell below the fresh floor — wrong day frame"
+    assert overrides == {}, f"today's row was marked stale-served (frame is a day ahead): {overrides}"
+    assert not calls, "own-day facts were looked up for a same-day row"
+
+
+def test_experiment_age_counts_pacific_days(monkeypatch):
+    # Genesis 7 calendar days before the UTC date of the frozen instant, but 6
+    # before its PACIFIC day. The post-reset grace window must count PT days —
+    # the UTC count ages a fresh cycle a day early every PT evening.
+    _freeze_evening_clock(monkeypatch)
+    monkeypatch.setattr(_constants, "EXPERIMENT_START_DATE", "2026-08-10")
+    assert sentinel._experiment_age_days() == 6
+
+
+def test_quiet_source_staleness_counts_pacific_days(monkeypatch):
+    # days-silent for a behavioural source is (PT today − last DATE#); the UTC
+    # frame inflates it by one every PT evening. 2026-06-01 → 08-16 = 76 days
+    # (far past every registry threshold, so the entry is always emitted and the
+    # assertion is purely about the frame, not the cutoff).
+    _freeze_evening_clock(monkeypatch)
+    from ingestion.source_registry import behavioral_source_keys
+
+    key = sorted(behavioral_source_keys())[0]  # any real behavioural source
+    monkeypatch.setattr(sentinel, "_latest", lambda src: {"sk": "DATE#2026-06-01"})
+    out = sentinel._quiet_behavioral_sources([key])
+    assert out and out[0]["last_date"] == "2026-06-01"
+    assert out[0]["days"] == 76, f"staleness counted in the wrong frame: {out[0]['days']}"
