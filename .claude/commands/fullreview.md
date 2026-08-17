@@ -53,7 +53,9 @@ queue before filing or shipping.
 
 ## Phase 0 — Orient (always)
 
-1. Read `docs/PLATFORM_NORTH_STAR.md` → `docs/SITE_MAP_AND_INTENT.md` →
+1. Read `docs/CHARTER.md` first (the five-primitive constitution — for every
+   architecture-shaped area the rubric question is which primitive is missing), then
+   `docs/PLATFORM_NORTH_STAR.md` → `docs/SITE_MAP_AND_INTENT.md` →
    `docs/DESIGN_SYSTEM_V5.md` → `docs/SITE_UPLEVEL_PLAYBOOK.md`, plus
    `handovers/HANDOVER_LATEST.md` and Active Work memory (no stomping in-flight work).
 2. Establish live ground truth: `/version.json` == HEAD, experiment phase
