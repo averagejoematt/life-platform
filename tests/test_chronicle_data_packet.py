@@ -344,7 +344,9 @@ def test_packet_profile_lines_prefer_profile_over_fallbacks():
 def test_packet_profile_falls_back_when_fields_are_absent():
     text, _ = cd.build_data_packet(_empty_data(start=GENESIS, end="2026-08-09"))
 
-    assert "Journey start weight: 321.6 lbs" in text  # EXPERIMENT_BASELINE_WEIGHT_LBS
+    # Derived, not pinned: the fallback IS the live constant, and a reset re-anchors it
+    # (321.6 pinned here redded main at the cycle-14 reset — the genesis-relative-fixture class).
+    assert f"Journey start weight: {cd.EXPERIMENT_BASELINE_WEIGHT_LBS} lbs" in text
     assert "Goal weight: 185 lbs" in text
     assert "Age: 37" in text
     assert "Targets: 1800 cal, 190g protein" in text
