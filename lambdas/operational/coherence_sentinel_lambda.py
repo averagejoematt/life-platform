@@ -24,7 +24,7 @@ import json
 import logging
 import os
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import boto3
@@ -38,6 +38,14 @@ except ImportError:
     logger = logging.getLogger("coherence-sentinel")
     logger.setLevel(logging.INFO)
 
+# #2814: the platform's day boundary is Pacific (#2506; the #2675 precedent — a UTC
+# clock inside a PT instrument). The sentinel judges PT-keyed surfaces, so its OWN
+# day frame is PT in EVERY invocation context — the 18:45Z cron lands 11:45 AM PT
+# where UTC and PT agree, so scheduled runs were only correct by accident; an
+# off-schedule invoke between 17:00 PDT and midnight computed TOMORROW's frame.
+# Module import (not `from … import`) so tests pin ONE clock via the module attr;
+# #1964: this helper is the one sanctioned Pacific frame — never hand-build it here.
+from common import pacific_time
 from experiment import coherence_invariants as ci  # bundled shared module (pure cores)
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -78,7 +86,8 @@ except ImportError:  # pragma: no cover
 
 
 def _today():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    """The sentinel's day frame — the PACIFIC calendar day (#2814), never UTC."""
+    return pacific_time.pacific_today()
 
 
 def _decimal(o):
@@ -239,7 +248,10 @@ def _gather_facts_and_narratives():
     # coach, but only if served today/yesterday: the facts are the LATEST record,
     # so checking an old narrative against new facts would manufacture false
     # contradictions (the day-boundary-skew lesson).
-    _now = datetime.now(timezone.utc)
+    # #2814: the fresh floor and "today" are PACIFIC days — OUTPUT# rows are keyed
+    # by the PT generation day, so the UTC frame called PT-today's row "yesterday's"
+    # every PT evening and routed it into the #2792 stale-served branch below.
+    _now = pacific_time.pacific_now()
     _fresh_floor = (_now - timedelta(days=1)).strftime("%Y-%m-%d")
     _today = _now.strftime("%Y-%m-%d")
     _own_day_cache: dict = {}
@@ -366,7 +378,9 @@ def _experiment_age_days():
         return None
     try:
         g = datetime.strptime(str(genesis)[:10], "%Y-%m-%d").date()
-        return (datetime.now(timezone.utc).date() - g).days
+        # #2814: count PACIFIC days — the UTC frame aged a fresh cycle a day
+        # early every PT evening, shrinking the post-reset grace window.
+        return (pacific_time.pacific_now().date() - g).days
     except (ValueError, TypeError):
         return None
 
@@ -435,7 +449,9 @@ def _quiet_behavioral_sources(keys):
         logger.warning("coherence: source registry unavailable, no behavioural excuse: %s", e)
         return []
     out = []
-    today = datetime.now(timezone.utc).date()
+    # #2814: DATE# rows are PT-keyed, so days-silent counts in the PACIFIC frame
+    # (the UTC frame inflated every source's silence by one each PT evening).
+    today = pacific_time.pacific_now().date()
     for key in keys:
         if key not in behavioral:
             continue

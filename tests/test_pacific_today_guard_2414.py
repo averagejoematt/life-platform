@@ -53,6 +53,14 @@ _SKIP_PATH_MARKERS = ("__pycache__", "_staging", "cdk.out", "layer-build")
 # assembles the /coaching observatory cards (#2392's original defect family).
 _READER_BOUND_WRITERS = ("lambdas/coach/coach_observatory_renderer.py",)
 
+# PT-frame instruments (#2814): operator-facing modules whose whole JOB is judging
+# PT-keyed days — the coherence sentinel anchored its own frame in UTC, so any
+# off-schedule invoke between 17:00 PDT and midnight computed tomorrow's date
+# (the schedule-masked latent class: its 18:45Z cron happens to land where UTC
+# and PT agree). Down-payment on the fleet-wide ban story: an instrument fixed
+# for this class enters the guarded surface here, never a whitelist.
+_PT_FRAME_INSTRUMENTS = ("lambdas/operational/coherence_sentinel_lambda.py",)
+
 _EXEMPT_MARKER = "utc-exempt(#"
 
 # A date-ONLY strftime format: names the day, carries no clock time.
@@ -63,7 +71,7 @@ _TIME_MARKERS = ("%H", "%M", "%S", "%X", "%c")
 def _surface_files() -> list[pathlib.Path]:
     """The DERIVED scan surface: lambdas/web/**/*.py + the reader-bound writers."""
     files = [p for p in (ROOT / "lambdas" / "web").rglob("*.py") if not any(m in str(p) for m in _SKIP_PATH_MARKERS)]
-    files += [ROOT / rel for rel in _READER_BOUND_WRITERS]
+    files += [ROOT / rel for rel in _READER_BOUND_WRITERS + _PT_FRAME_INSTRUMENTS]
     return sorted(files)
 
 
@@ -196,6 +204,7 @@ def test_surface_is_derived_and_nonempty():
         "lambdas/web/site_api_habits.py",
         "lambdas/web/og_image_lambda.py",
         "lambdas/coach/coach_observatory_renderer.py",
+        "lambdas/operational/coherence_sentinel_lambda.py",
     ):
         assert expected in rels, f"derived surface lost {expected}"
     for p in files:
