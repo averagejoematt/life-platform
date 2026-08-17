@@ -70,6 +70,18 @@ GRANDFATHERED_UNSEALED_CYCLES: dict[int, dict[str, str]] = {
             "silently passing forever."
         ),
     },
+    13: {
+        "genesis": "2026-08-10",
+        "recorded_at": "2026-08-17",
+        "reason": (
+            "Claims were frozen on time (2026-08-09, archived as "
+            "genesis_preregistration_2026-08-10_cycle13.json) but the attended publication + "
+            "stamp upload — an explicitly owed step in the 08-09 handover — was never run "
+            "before the cycle closed at the 2026-08-17 reset. Owner chose grandfathering over "
+            "a retroactive seal (stamped_at is never backdated; publishing after close would "
+            "be theater). Recorded at the cycle-14 reset."
+        ),
+    },
 }
 
 
