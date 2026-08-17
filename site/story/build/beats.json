@@ -2776,6 +2776,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2787"
         }
       ]
+    },
+    {
+      "id": "2026-08-17-cycle-14-goes-live-with-a-constitution",
+      "date": "2026-08-17",
+      "title": "Cycle 14 goes live the morning after it was decided — and the platform gets a written constitution",
+      "shipped": "Sunday night Matthew asked for a full experiment reset with the new go-live the next morning. By Monday ~9 AM cycle 14 was live: one command re-anchored every surface to genesis 2026-08-17, redeployed the fleet, and passed all three verify gates — 96/96 rendered pages, 8/8 semantic checks, 8/8 AI reader-truth checks at Day 1. Sixteen board predictions and two hypotheses were frozen and published as 'The Plan, On the Record' with a SHA-256 seal anyone can verify against the public JSON. The same session shipped docs/CHARTER.md — the five-primitive pattern (registry, derivation guard, ratchet, contract test, dead-man) that every reliable part of this platform already follows, now written down as the constitution every future session boots from — plus five watchdog fixes built in parallel by worker agents, including a coherence-alarm repair that root-caused a false contradiction: a quality gate had held back four coaches' daily updates, so yesterday's honestly-grounded advice was being graded against today's numbers.",
+      "why_it_mattered": "A reset that used to be a multi-day checklist ran same-day on one command with the receipts to prove it, and the pre-registration seal means the plan's targets — 321.01 lbs at the start, 185 the goal — were public before any data existed to flatter them. The charter matters longer-term: the platform's architecture no longer lives in incident history and one AI's session memory. It's two pages any future session (or human) reads first, and the review rituals now grade every area by which of the five primitives it's missing.",
+      "gotcha": "A same-day genesis exposed a circular gate: the reset's verify step demands the predict-the-week surface be live, but the seeding step that lights that surface only runs after the verify step passes. Eve-of resets never hit this because the check doesn't arm until genesis week. Breaking the circle took seeding manually, invalidating the CDN cache, and re-running the gate — now written into the reset runbook.",
+      "honest_miss": "The genesis-eve 'predictions lock tonight' email never went out — the merge queue plus a GitHub platform incident ate the whole night, and the sender refuses to send late by design, so cycle 14 launched without it. Cycle 13's pre-registration also got an honest reckoning: its claims were frozen on time but the publication step never ran before the cycle closed, so it's now formally grandfathered as unsealed rather than given a backdated seal. And the session stalled twice overnight because my own progress-watchers only knew how to report success — a failure left them waiting forever. That's fixed as a standing rule now.",
+      "prs": [
+        {
+          "label": "PR #2853",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2853"
+        },
+        {
+          "label": "PR #2851",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2851"
+        },
+        {
+          "label": "PR #2855",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2855"
+        }
+      ]
     }
   ]
 }
