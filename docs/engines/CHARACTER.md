@@ -1,6 +1,6 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-15 (#2638 re-verify — `character_engine.py` took mypy `return-value` annotation corrections ONLY. `load_character_config` is now typed `Optional[dict]`, which is what it has always returned: None when S3 is unreadable with no warm cache, a case `character_sheet_lambda` already handles with `if not config: raise RuntimeError(...)` and a test already pins. `store_character_sheet` is typed `-> dict` (it returns the tagged record; no caller reads it, and removing the return would have been a real change). **No pillar weight, formula, threshold or leveling knob moved**; config still v1.6.0, engine still v1.8.0. Every line citation in this doc WAS re-derived from the AST rather than assumed: a 2-line cache annotation and a 7-line docstring shifted all six (`PILLAR_COMPUTERS` 1690-1697 -> 1700-1707, `evaluate_level_changes` 1266-1494 -> 1282-1508, and four more). Prior verify 2026-08-09: cycle-13 reset re-verify — the only `config/character_sheet.json` change is the baseline block: `start_date` 2026-08-03 → **2026-08-10** (genesis moved to the Monday, #2465), `start_weight_kg` 145.877 → **145.875** (the carried 321.6 lbs baseline re-derived by the pipeline), `last_updated` bumped. No pillar weight, formula, threshold or leveling knob moved; config still v1.6.0, engine still v1.8.0, and the `PILLAR_COMPUTERS` citation `character_engine.py:1690-1697` is unchanged from the 08-08 verify. Prior verify 2026-08-08: #2235 re-verify — `character_sheet_lambda.get_food_delivery_modifier` now reads the food-delivery streak through the shared `common.digest_utils.get_food_delivery_streak_state` accessor instead of a direct `STREAK#current` `get_item`, so a source past its `stale_hours` threshold yields the neutral **1.0** modifier rather than a frozen streak from the last import. That is a real behaviour change at the modifier's *input*, and it is the honest one: the stored `streak_days` is written once at ingestion and never recomputed, so once the source goes stale it is a snapshot, not a counter. Re-verified rather than date-bumped: **nothing in the engine moved** — no pillar weight, formula, threshold or leveling knob, config still v1.6.0, engine still v1.8.0, and the "Behavioral modifiers are engine inputs" contract below is unchanged (the caller still passes `raw_score_modifiers`; the engine still scales raw + unblended raw at step 1). The `PILLAR_COMPUTERS` citation `character_engine.py:1690-1697` re-checked and still resolves. Prior verify 2026-08-03: cycle-12 reset re-verify — the only `config/character_sheet.json` change is the baseline block: `start_date` 2026-07-27 → **2026-08-03**, `start_weight_lbs` 321.09 → **321.6** (the real genesis-morning weigh-in), `last_updated` bumped. No pillar weight, formula, threshold or leveling knob moved; config still v1.6.0, engine still v1.8.0, `PILLAR_COMPUTERS` citation `character_engine.py:1690-1697` re-checked and still resolves. Prior verify 2026-07-30: #1898 plan-literal re-verify — `config/character_sheet.json` protein `target_grams` 190 → **170** (the sealed cycle-11 prereg's floor; the wiped pilot's 190 had survived the reset) and `character_engine.py`'s matching hardcoded fallback. `target_grams` is a SCORING target, so protein now grades against the pre-registered plan — a real behaviour change, not a label fix. **A citation genuinely drifted and is corrected here:** the +6 lines of comment above the fallback moved `PILLAR_COMPUTERS` from `character_engine.py:1684-1693` to **:1690-1697** (verified by reading both ranges — the old one now lands on a comment header). Config still v1.6.0, all seven pillar weights unchanged, engine still v1.8.0, `character_sheet.json` line count 571 → 571. Prior verify 2026-07-29: #1891 cast re-verify — the only `config/character_sheet.json` change is two `pillars.*.owner` DISPLAY strings (metabolic `Dr. Peter Attia` → `Dr. Amara Patel`, mind `Coach Maya Rodriguez` → `Dr. Nathan Reeves`); `owner` is read by no Lambda and by no claim in this doc. Re-verified rather than date-bumped: config still v1.6.0, all seven pillar weights unchanged (sleep 0.20 / movement 0.18 / nutrition 0.18 / mind 0.15 / metabolic 0.12 / consistency 0.10 / relationships 0.07), `leveling.neglect_decay` present, file line count 571 → 571 so no citation shifted, and `character_engine.py:1684-1693` re-checked and still resolves. Prior verify 2026-07-28: #1653 packaging re-verify — `character_engine.py` moved to `lambdas/health/` and `character_sheet_lambda.py` had its imports rewritten; both are pure relocation (no formula, threshold or leveling change). Line count unchanged in `character_engine.py`, so the `character_engine.py:1684-1693` citation was re-checked and still resolves. Prior verify 2026-07-27: Day-1 re-verify: the only `config/character_sheet.json` change since 07-26 is the baseline block — the real genesis weigh-in 321.09 lbs superseding the 317.61 override; pillar weights/ema_lambda/leveling knobs and every formula untouched. Prior: #1590 re-verify — line refs + version stamps re-derived against live source; formulas unchanged since #1403; 07-26: only #1656/#1709/#1713 mypy churn in `character_engine.py`)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-17 (cycle-14 reset re-verify — the only `config/character_sheet.json` change is the `_meta`+baseline block: `start_date` 2026-08-10 → **2026-08-17**, `start_weight_lbs` 321.6 → **321.01** (the reset's `--override-weight-lbs`; the standing supersede reflex replaces it when the genesis-morning Withings reading syncs — currently blocked by the 08-17 Whoop-only auth latch, Withings itself healthy), `start_weight_kg` 145.875 → **145.608**, `last_updated` bumped. No pillar weight, formula, threshold or leveling knob moved; config still v1.6.0, engine still v1.8.0. **All 13 line citations re-derived by AST**: #2747's return of `character_engine.py` to its 2117-line baseline landed after the 08-15 stamp's derivation, shifting most anchors −10 (`PILLAR_COMPUTERS` 1700-1707 → **1690-1697**, `evaluate_level_changes` 1282-1508 → **1272-1498**, `_compute_xp` 202-261 → **192-251**) while `derive_consistency_inputs`/`neglect_decay_state`/`compute_character_mood` sit at **893-971**/**1152-1186**/**1193-1252** and the lambda-side `_enriched_mood_to_10` at **232-253**; every corrected range read back to confirm it lands on the named symbol. Prior verify 2026-08-15: #2638 re-verify — `character_engine.py` took mypy `return-value` annotation corrections ONLY. `load_character_config` is now typed `Optional[dict]`, which is what it has always returned: None when S3 is unreadable with no warm cache, a case `character_sheet_lambda` already handles with `if not config: raise RuntimeError(...)` and a test already pins. `store_character_sheet` is typed `-> dict` (it returns the tagged record; no caller reads it, and removing the return would have been a real change). **No pillar weight, formula, threshold or leveling knob moved**; config still v1.6.0, engine still v1.8.0. Every line citation in this doc WAS re-derived from the AST rather than assumed: a 2-line cache annotation and a 7-line docstring shifted all six (`PILLAR_COMPUTERS` 1690-1697 -> 1700-1707, `evaluate_level_changes` 1266-1494 -> 1282-1508, and four more). Prior verify 2026-08-09: cycle-13 reset re-verify — the only `config/character_sheet.json` change is the baseline block: `start_date` 2026-08-03 → **2026-08-10** (genesis moved to the Monday, #2465), `start_weight_kg` 145.877 → **145.875** (the carried 321.6 lbs baseline re-derived by the pipeline), `last_updated` bumped. No pillar weight, formula, threshold or leveling knob moved; config still v1.6.0, engine still v1.8.0, and the `PILLAR_COMPUTERS` citation `character_engine.py:1690-1697` is unchanged from the 08-08 verify. Prior verify 2026-08-08: #2235 re-verify — `character_sheet_lambda.get_food_delivery_modifier` now reads the food-delivery streak through the shared `common.digest_utils.get_food_delivery_streak_state` accessor instead of a direct `STREAK#current` `get_item`, so a source past its `stale_hours` threshold yields the neutral **1.0** modifier rather than a frozen streak from the last import. That is a real behaviour change at the modifier's *input*, and it is the honest one: the stored `streak_days` is written once at ingestion and never recomputed, so once the source goes stale it is a snapshot, not a counter. Re-verified rather than date-bumped: **nothing in the engine moved** — no pillar weight, formula, threshold or leveling knob, config still v1.6.0, engine still v1.8.0, and the "Behavioral modifiers are engine inputs" contract below is unchanged (the caller still passes `raw_score_modifiers`; the engine still scales raw + unblended raw at step 1). The `PILLAR_COMPUTERS` citation `character_engine.py:1690-1697` re-checked and still resolves. Prior verify 2026-08-03: cycle-12 reset re-verify — the only `config/character_sheet.json` change is the baseline block: `start_date` 2026-07-27 → **2026-08-03**, `start_weight_lbs` 321.09 → **321.6** (the real genesis-morning weigh-in), `last_updated` bumped. No pillar weight, formula, threshold or leveling knob moved; config still v1.6.0, engine still v1.8.0, `PILLAR_COMPUTERS` citation `character_engine.py:1690-1697` re-checked and still resolves. Prior verify 2026-07-30: #1898 plan-literal re-verify — `config/character_sheet.json` protein `target_grams` 190 → **170** (the sealed cycle-11 prereg's floor; the wiped pilot's 190 had survived the reset) and `character_engine.py`'s matching hardcoded fallback. `target_grams` is a SCORING target, so protein now grades against the pre-registered plan — a real behaviour change, not a label fix. **A citation genuinely drifted and is corrected here:** the +6 lines of comment above the fallback moved `PILLAR_COMPUTERS` from `character_engine.py:1684-1693` to **:1690-1697** (verified by reading both ranges — the old one now lands on a comment header). Config still v1.6.0, all seven pillar weights unchanged, engine still v1.8.0, `character_sheet.json` line count 571 → 571. Prior verify 2026-07-29: #1891 cast re-verify — the only `config/character_sheet.json` change is two `pillars.*.owner` DISPLAY strings (metabolic `Dr. Peter Attia` → `Dr. Amara Patel`, mind `Coach Maya Rodriguez` → `Dr. Nathan Reeves`); `owner` is read by no Lambda and by no claim in this doc. Re-verified rather than date-bumped: config still v1.6.0, all seven pillar weights unchanged (sleep 0.20 / movement 0.18 / nutrition 0.18 / mind 0.15 / metabolic 0.12 / consistency 0.10 / relationships 0.07), `leveling.neglect_decay` present, file line count 571 → 571 so no citation shifted, and `character_engine.py:1684-1693` re-checked and still resolves. Prior verify 2026-07-28: #1653 packaging re-verify — `character_engine.py` moved to `lambdas/health/` and `character_sheet_lambda.py` had its imports rewritten; both are pure relocation (no formula, threshold or leveling change). Line count unchanged in `character_engine.py`, so the `character_engine.py:1684-1693` citation was re-checked and still resolves. Prior verify 2026-07-27: Day-1 re-verify: the only `config/character_sheet.json` change since 07-26 is the baseline block — the real genesis weigh-in 321.09 lbs superseding the 317.61 override; pillar weights/ema_lambda/leveling knobs and every formula untouched. Prior: #1590 re-verify — line refs + version stamps re-derived against live source; formulas unchanged since #1403; 07-26: only #1656/#1709/#1713 mypy churn in `character_engine.py`)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
 > **Sources of truth:** `lambdas/health/character_engine.py` (v1.8.0 — v1.7.0 #1373 progression receipts, v1.6.1 #1125 level-up drivers, v1.6.0 #965 source wiring; #1412 personal-baselines targets and #1411 fitted-not-authored badges shipped without an engine version bump), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.6.0, deployed to `s3://…/config/matthew/character_sheet.json`)
 
@@ -12,13 +12,13 @@ character mood. Runs in the `character-sheet` compute Lambda (daily, before 11 A
 
 ## The pillar model
 
-Six primary pillars (`PILLAR_COMPUTERS`, `character_engine.py:1700-1707`): sleep, movement,
+Six primary pillars (`PILLAR_COMPUTERS`, `character_engine.py:1690-1697`): sleep, movement,
 nutrition, metabolic, mind, relationships — plus the **consistency** meta-pillar computed from
 the others. Config pillar weights (live `config/character_sheet.json`): sleep 0.20,
 movement 0.18, nutrition 0.18, mind 0.15, metabolic 0.12, consistency 0.10, relationships 0.07.
 
 Each pillar raw score is a weighted mean of components with a **confidence blend**
-(`_weighted_pillar_score`, :1042-1110):
+(`_weighted_pillar_score`, :1032-1100):
 
 ```
 raw        = Σ(scoreᵢ·wᵢ)/Σwᵢ            over components with data
@@ -43,15 +43,15 @@ always the number the engine leveled on; nothing mutates it post-compute.
 
 **Categorical→numeric bridges** (read-time, in the gather layer):
 - #902/#905: `enriched_mood` (native 1–5 from `journal_enrichment_lambda`) → `mood_avg` on the
-  0–10 scale via `(m−1)/4×10` (`character_sheet_lambda._enriched_mood_to_10`, :230-253).
+  0–10 scale via `(m−1)/4×10` (`character_sheet_lambda._enriched_mood_to_10`, :232-253).
 - #910/#911: categorical `enriched_social_quality` → `social_score` 0–10 by rank,
   `rank/3×10` (alone→0, surface→3.33, meaningful→6.67, deep→10;
-  `character_engine._social_quality_to_10`, :801-827), averaged across the day's entries. The
+  `character_engine._social_quality_to_10`, :791-817), averaged across the day's entries. The
   numeric `social_connection_score` fields remain the primary path (no producer writes them yet).
 - #962: `vice_streaks` is lifted from the day's habit_scores record (daily_metrics_compute has
   always written it) into the top-level key the mind pillar's vice_control component reads;
   `streak_all_above_30th` + `weekend_weekday_ratio` are derived by
-  `character_engine.derive_consistency_inputs` (:888-967) from the same 21-day record window
+  `character_engine.derive_consistency_inputs` (:893-971) from the same 21-day record window
   the EMA histories already fetch. `buddy_engagement` was removed (B-3 precedent — no producer
   ever wrote `buddy_freshness_days`); relationships weights renormalized (.45/.35/.20).
 
@@ -83,7 +83,7 @@ hand-authored config target; `_weighted_pillar_score` surfaces each target's der
 provenance into component details. Target values still live in CONFIG, so a baselines refresh
 shows as labeled `config_drift`, never `engine_drift`, in progression-receipt replay.
 
-## EMA smoothing (`compute_ema_level_score`, :1118-1139)
+## EMA smoothing (`compute_ema_level_score`, :1108-1129)
 
 Exponentially weighted mean over the last `ema_window_days` (21) raw scores, most-recent
 heaviest, per-pillar decay `ema_lambda` (live: sleep 0.85, movement 0.90, nutrition 0.88,
@@ -93,7 +93,7 @@ metabolic 0.95, mind 0.85, relationships 0.93, consistency 0.93):
 level_score = Σ(rawᵢ · λ^age) / Σ λ^age        (empty history → 50)
 ```
 
-## Anti-flip-flop level rules (`evaluate_level_changes`, :1282-1508)
+## Anti-flip-flop level rules (`evaluate_level_changes`, :1272-1498)
 
 `target_level = round(level_score)`. Movement requires consecutive-day streaks, harder by tier
 (live `tier_streak_overrides`: Foundation up 3/down 5 … Elite up 14/down 21; tier-boundary
@@ -130,7 +130,7 @@ Gates, in order:
    failure mode) and recovers ~28 days after resuming. Kill-switch:
    `leveling.neglect_decay.persistent_down_streak`.
 
-## XP and debt (`_compute_xp`, :202-261; buffer `_roll_xp_buffer`, :286-312)
+## XP and debt (`_compute_xp`, :192-251; buffer `_roll_xp_buffer`, :276-302)
 
 Bands on raw score: ≥80 ⇒ +3, ≥60 ⇒ +2, ≥40 ⇒ +1, ≥20 ⇒ 0, else −1; minus `daily_xp_decay`
 (**1** since ADR-134 — the zero-point sits at "a decent day": raw 40–59 nets 0, 60+ grows,
@@ -149,13 +149,13 @@ record stores successfully.
 
 ## Neglect atrophy + mood (#913)
 
-- `neglect_decay_state` (:1146-1186): when `engagement_state.presence_class == "dark"` (and not a
+- `neglect_decay_state` (:1152-1186): when `engagement_state.presence_class == "dark"` (and not a
   planned pause), after `n_grace_days` (3) the level score of pillars whose behavioral weight
   share ≥ 0.3 is multiplied by `0.98^(gap−3)`, floored at the day's own raw score and the config
   floor (0). Models detraining/evidence loss, never punishment (ADR-104). Knobs live in
   `config/character_sheet.json` under `leveling.neglect_decay`
   (`n_grace_days` / `rate` / `floor` / `min_behavioral_share` / `persistent_down_streak`).
-- `compute_character_mood` (:1187-1248), pure code (ADR-105), first match wins:
+- `compute_character_mood` (:1193-1252), pure code (ADR-105), first match wins:
   dark ⇒ **dormant**; quiet or 7d-composite trend ≤ −5 ⇒ **fading**; present/light AND trend ≥ +3
   AND composite ≥ 55 ⇒ **thriving**; else **steady**. Trend = mean(last 3 d) − mean(prior 4 d).
 
@@ -165,7 +165,7 @@ Config `cross_pillar_effects` conditions evaluate EMA level_**scores** — delib
 ADR-134/#963: effects model current-state physiology synergies (poor sleep drags today's
 training capacity), not tier achievements; the config narrative is worded to match. The
 `any_vice_streak` conditions are data-driven since #962 (`compute_cross_pillar_effects`,
-:1553-1610, takes the day's vice_streaks — the Vice Shield can actually fire). Modifiers are
+:1559-1614, takes the day's vice_streaks — the Vice Shield can actually fire). Modifiers are
 multiplicative: `adjusted = level_score × (1 + Σ mod)` [F-05]. **#1411 (ADR-105):** every fired
 effect carries a `fit_status` badge — config can only declare `authored-prior`; `fitted` is
 earned from data by the quarterly `effect_fitter` re-fit (lagged pairs, block-bootstrap CI,
@@ -183,7 +183,7 @@ honestly. Excluded pillars ride the record as `headline_excluded_pillars`. Tiers
 ## Outputs / config surface
 
 Record → `USER#matthew#SOURCE#character_sheet / DATE#<date>` (`store_character_sheet`,
-:2076-2100; pre-genesis dates tagged `phase=pilot`), EXPERIMENT_SCOPED — wiped + rebuilt at
+:2082-2104; pre-genesis dates tagged `phase=pilot`), EXPERIMENT_SCOPED — wiped + rebuilt at
 reset. Per-pillar output carries raw_score, level_score, level, tier, xp_total/xp_delta/xp_debt,
 `raw_modifier`, `challenge_bonus_xp`, confidence, data_coverage, `not_instrumented`,
 `absent_behaviors`, `drivers` (ADR-104 provenance), `coverage_hold`, `neglect_decay`. Config:
