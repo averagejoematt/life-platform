@@ -71,6 +71,16 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+# Split out by the module-size ratchet (#1665): the #2639 error-bar machinery lives in
+# gate_census_precision; re-exported here so the CLI report and tests keep one address.
+from gate_census_precision import (  # noqa: F401
+    FLAG_PRECISION,
+    FlagPrecisionSample,
+    _live_flag_count,
+    _render_error_bars,
+    _wilson_interval,
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -985,43 +995,6 @@ def _wrap(text: str, width: int = 88, indent: str = " " * 16) -> str:
     if cur:
         out.append(cur)
     return f"\n{indent}".join(out)
-
-
-def _render_error_bars(census: dict[str, Any]) -> str:
-    """#2639: n is a FLOOR. Print the census's own known error, in both directions.
-
-    A census with a silent blind spot answers a different question than the one it appears
-    to answer — the exact defect class #2578 exists to hunt, and it was present in the
-    instrument. So the report now states, every run:
-
-      * how many CI gates only ONE of the two detectors caught (the false-negative the
-        verb-only detector was carrying, measured rather than sampled),
-      * how many steps remain classified non-gate and are therefore UNADJUDICATED,
-      * that the risk flags are syntactic leads with unmeasured precision.
-
-    Numbers, not adjectives. `steps_nongate` is the residual a human still has to read;
-    printing its size is what turns "we might be missing some" into a bounded claim.
-    """
-    ci = (census.get("counters") or {}).get("ci") or {}
-    if not ci:
-        return "-- KNOWN ERROR ----\n  CI counters absent (family not swept) — no error bars computable."
-    residual = ci.get("steps_nongate", 0)
-    only_enforce = ci.get("by_enforcement_only", 0)
-    total_ci = ci.get("by_verb_only", 0) + only_enforce + ci.get("by_both", 0)
-    out = [
-        "-- KNOWN ERROR — n is a FLOOR, in both directions (#2639) ---------------------",
-        f"  FALSE NEGATIVES (measured): {only_enforce} of {total_ci} CI gates are detected ONLY by their",
-        "    explicit non-zero exit, not by any tool verb. Before the derivation was widened these",
-        "    were counted as non-gates, so every prior n and every coverage % was under-measured.",
-        f"  UNADJUDICATED: {residual} workflow steps remain classified non-gate. Nobody has read them,",
-        "    so the true count is >= n, never = n. `--json` carries `counters.ci.nongate_sample`",
-        "    with every one of their labels — the list exists so the residual can be worked, not",
-        "    asserted away.",
-        "  FALSE POSITIVES (unmeasured): every risk flag is a SYNTACTIC lead requiring adjudication.",
-        "    The two `vacuous-empty` hits sampled in slice 2 were BOTH false positives; two is not a",
-        "    precision estimate, and no larger sample has been taken. Treat flag counts as upper bounds.",
-    ]
-    return "\n".join(out)
 
 
 def render_report(census: dict[str, Any]) -> str:
