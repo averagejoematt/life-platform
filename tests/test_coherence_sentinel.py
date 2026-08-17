@@ -67,7 +67,9 @@ def test_gather_computed_checks_reads_the_real_record_shape(monkeypatch):
     checks = sentinel._gather_computed_checks()
     assert checks, "adapter found nothing to check against a live-shaped record"
     names = {c["name"] for c in checks}
-    assert "day_grade_letter_vs_score" in names
+    # #2793: the check name now carries the letters ("day_grade_letter_vs_score[F vs F]")
+    # so an alarm reads as letters rather than ord() values.
+    assert any(n.startswith("day_grade_letter_vs_score") for n in names)
     # and the invariant grades them rather than reporting an empty-set green
     f = sentinel.ci.check_computed_coherence(checks)
     assert f.status == sentinel.ci.OK

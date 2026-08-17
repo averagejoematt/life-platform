@@ -295,7 +295,8 @@ def _gather_computed_checks():
     from a live item, not from a fixture.
 
     Coverage against what the compute Lambdas actually store (checked 2026-08-15):
-      · day_grade      — COVERED (letter vs its own score band)
+      · day_grade      — COVERED (letter vs its own score, via the engine's
+                          letter_grade, so the band table is never re-typed here — #2793)
       · character_sheet — COVERED (tier vs its own level, via the engine's get_tier,
                           so the band table is never re-typed here)
       · adaptive_mode  — not covered: `mode_label` is chosen by a policy, not derived
@@ -311,14 +312,34 @@ def _gather_computed_checks():
     letter = (dg or {}).get("letter_grade")
     if score is not None and letter:
         try:
-            score = float(score)
-            # The platform's A–F band mapping (matches scoring_engine bands).
-            bands = [(90, "A"), (80, "B"), (70, "C"), (60, "D"), (0, "F")]
-            expected = next(lt for lo, lt in bands if score >= lo)
-            # compare first letter only (ignore +/- modifiers)
-            checks.append({"name": "day_grade_letter_vs_score", "stored": ord(str(letter)[0].upper()), "expected": ord(expected), "tol": 0})
-        except (ValueError, StopIteration):
-            pass
+            # #2793: derive the expected letter from the ENGINE's own mapping — never a
+            # re-typed band table. This block used to hand-type "collegiate" bands
+            # (90/A 80/B 70/C 60/D) claiming they "match scoring_engine bands"; the
+            # engine's real curve (A- down to 85, B- down to 70, C- down to 55, D=45-54,
+            # F<45) disagrees at first-letter level for every score in 45-89 except
+            # 80-84. The first stored row in the disagreement range (DATE#2026-08-15,
+            # total_score 51, letter D — engine-coherent) tripped the 2026-08-16 18:45Z
+            # run: the instrument's copy had drifted, not the stored record. Same
+            # single-source pattern as get_tier below (charter standing rule 1); the
+            # comparison stays tol 0 and is now the FULL letter, modifiers included,
+            # since the stored letter comes from this exact function at store time.
+            from health.scoring_engine import letter_grade
+
+            derived = letter_grade(float(score))
+            stored_letter = str(letter).strip()
+            checks.append(
+                {
+                    # The letters ride in the name so an alarm reads as letters — the
+                    # old ord() encoding printed "stored 68 vs derived 70" and sent
+                    # #2793 hunting a 2-point score bug that never existed.
+                    "name": f"day_grade_letter_vs_score[{stored_letter} vs {derived}]",
+                    "stored": float(stored_letter == derived),
+                    "expected": 1.0,
+                    "tol": 0,
+                }
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("coherence: day-grade letter check unavailable: %s", e)
     cs = _latest("character_sheet")
     level = cs.get("character_level") if isinstance(cs, dict) else None
     tier = (cs or {}).get("character_tier")
