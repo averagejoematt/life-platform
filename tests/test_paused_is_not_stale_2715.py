@@ -81,12 +81,18 @@ from ingestion.source_state import DECLARED_PAUSED_SOURCES, is_paused, resolve_s
 from mcp import tools_labs  # noqa: E402
 
 TODAY = "2026-08-15"
-# tool_get_freshness_status ages rows against the REAL wall clock (no injectable seam),
-# so a "fresh" fixture row must move with the calendar — the pinned "2026-08-15" here
-# aged past whoop's staleness threshold two days after this file was written and redded
-# main at the cycle-14 reset. The resolve_source_state tests keep pinned dates because
-# they pass their own `today`.
-FRESH = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
+
+
+def _fresh_today() -> str:
+    """tool_get_freshness_status ages rows against the REAL wall clock (no injectable
+    seam), so a "fresh" fixture row must move with the calendar — a pinned "2026-08-15"
+    here aged past whoop's staleness threshold two days after this file was written and
+    redded main at the cycle-14 reset. Sampled at CALL time (not a module global) so a
+    run crossing a day boundary between collection and execution can't desync (#2223).
+    The resolve_source_state tests keep pinned dates because they pass their own `today`."""
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
+
+
 REGISTRY_PAUSED = sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("paused"))
 
 
@@ -202,7 +208,7 @@ def test_a_genuinely_stale_source_still_reds_the_verdict(freshness):
 
 def test_a_paused_source_beside_a_stale_one_does_not_inflate_the_count(freshness):
     """Three stale sources trip `red` regardless of age — a paused one must not be the third."""
-    freshness({"garmin": _row("garmin", "2026-06-15"), "whoop": _row("whoop", FRESH)})
+    freshness({"garmin": _row("garmin", "2026-06-15"), "whoop": _row("whoop", _fresh_today())})
     out = tools_labs.tool_get_freshness_status({"sources": ["garmin", "whoop"]})
     assert out["stale_count"] == 0 and out["paused_count"] == 1 and out["fresh_count"] == 1
     assert out["status"] == "green"
@@ -211,7 +217,7 @@ def test_a_paused_source_beside_a_stale_one_does_not_inflate_the_count(freshness
 def test_a_paused_source_producing_again_is_counted_as_fresh(freshness):
     """No code change required to notice a re-enable — the property that stops the label
     from becoming a permanent suppressor."""
-    freshness({"garmin": _row("garmin", FRESH)})
+    freshness({"garmin": _row("garmin", _fresh_today())})
     out = tools_labs.tool_get_freshness_status({"sources": ["garmin"]})
     assert out["paused_count"] == 0 and out["fresh_count"] == 1
     assert out["fresh_sources"][0]["source_state"] == "live"
