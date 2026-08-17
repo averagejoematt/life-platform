@@ -858,10 +858,18 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     generation the pack numbered, it re-reads the D2 archive exactly as the pack does —
     so it needs GetObject on the qa_archive text leg + a scoped ListBucket (mirrors the
     email_ai_review_pack role's QaArchiveRead/QaArchiveList).
+
+    #2821: two additions closing the watch-surface gap — S3Write scoped to the
+    handler's own dead-letter-archive/insight-email-parser/ prefix (a failure it
+    catches and does not re-raise persists its envelope there, never on the
+    shared dlq-consumer's dead-letter-archive/ root) and CloudWatchMetrics so it
+    can emit LifePlatform/Email::InsightParseFailure — required in lockstep with
+    that emit by tests/test_put_metric_data_grant_lockstep.py (#1196).
     """
     return _operational_base(
         ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"],
         needs_s3_read=["inbound-email/*", "generated/qa_archive/text/*"],
+        needs_s3_write=["dead-letter-archive/insight-email-parser/*"],
         needs_dlq=True,
         extra_statements=[
             iam.PolicyStatement(
@@ -869,6 +877,11 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
                 actions=["s3:ListBucket"],
                 resources=[BUCKET_ARN],
                 conditions={"StringLike": {"s3:prefix": ["generated/qa_archive/text/*"]}},
+            ),
+            iam.PolicyStatement(
+                sid="CloudWatchMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],  # PutMetricData only accepts "*"
             ),
         ],
     )
