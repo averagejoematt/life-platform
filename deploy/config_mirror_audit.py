@@ -181,6 +181,22 @@ def _static_int(node: ast.AST | None) -> int | None:
     return None
 
 
+def _name_value_pairs(node: ast.AST) -> list[tuple[str, ast.AST]]:
+    """(name, value) for both `NAME = value` and `NAME: type = value`.
+
+    A TTL constant declared with a type annotation (`TTL_SECONDS: int = 900`)
+    is an `ast.AnnAssign` node, not an `ast.Assign` — a walk that only matches
+    `Assign` is blind to it and the constant reads as "no window declared",
+    silently downgrading a stale-serving FAIL to a warn. Both shapes funnel
+    through here so the caller has one place to match against.
+    """
+    if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+        return [(node.targets[0].id, node.value)]
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+        return [(node.target.id, node.value)]
+    return []
+
+
 def writer_max_age(repo_root: str, modules: tuple[str, ...]) -> tuple[int | None, str | None]:
     """The writer's own declared validity window, in seconds.
 
@@ -198,16 +214,12 @@ def writer_max_age(repo_root: str, modules: tuple[str, ...]) -> tuple[int | None
         except (OSError, SyntaxError):
             continue
         for node in ast.walk(tree):
-            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
-                continue
-            target = node.targets[0]
-            if not isinstance(target, ast.Name):
-                continue
-            if not any(fnmatch.fnmatch(target.id, pattern) for pattern in _TTL_NAME_PATTERNS):
-                continue
-            seconds = _static_int(node.value)
-            if seconds and seconds > 0 and (best is None or seconds > best[0]):
-                best = (seconds, f"{module}:{target.id}")
+            for name, value_node in _name_value_pairs(node):
+                if not any(fnmatch.fnmatch(name, pattern) for pattern in _TTL_NAME_PATTERNS):
+                    continue
+                seconds = _static_int(value_node)
+                if seconds and seconds > 0 and (best is None or seconds > best[0]):
+                    best = (seconds, f"{module}:{name}")
     return (best[0], best[1]) if best else (None, None)
 
 
@@ -272,6 +284,51 @@ def readers_of(registry: Registry, key: str, repo_root: str) -> list[str]:
     if basename in registry.bare_reads and os.path.exists(os.path.join(repo_root, key.replace("/", os.sep))):
         modules.update(registry.bare_reads[basename])
     return sorted(modules)
+
+
+def population_floor(registry: Registry) -> int:
+    """Minimum plausible count for the live listing, derived from the registry.
+
+    Never hand-typed: every repo-tracked `config/` twin is expected to have a
+    live counterpart (`config_twin_sync` keeps them in sync), so seeing FEWER
+    live objects than there are repo twins means the *listing itself* is
+    broken — wrong creds/region/prefix, a bucket/prefix typo, an S3 API
+    change — not that the mirror genuinely emptied out. Grows and shrinks with
+    the repo `config/` tree on its own, same derivation discipline as the twin
+    set itself.
+    """
+    return len(registry.twins)
+
+
+def build_report(registry: Registry, live: dict[str, datetime], repo_root: str, now: datetime) -> dict:
+    """`audit()` + `summarize()`, gated by the population floor (#2789).
+
+    A live listing with fewer objects than `population_floor(registry)` is not
+    "a clean mirror" — `audit()` would happily return zero findings over it and
+    `summarize` would report `clean: true`, which is exactly the
+    vacuously-passing failure mode this closes. Short-circuit BEFORE the normal
+    per-key classification so a broken listing can never be laundered into a
+    clean report by having nothing to find fault with.
+    """
+    floor = population_floor(registry)
+    if len(live) < floor:
+        return {
+            "bucket": S3_BUCKET,
+            "audited": 0,
+            "by_owner": {},
+            "failures": [],
+            "warnings": [],
+            "findings": [],
+            "clean": False,
+            "population_floor": floor,
+            "population_floor_error": (
+                f"live listing returned {len(live)} object(s) under {S3_CONFIG_PREFIX!r}, "
+                f"below the floor of {floor} derived from the repo's own tracked config twins — "
+                "treating this as a broken listing (wrong creds/region/prefix, or an S3 API "
+                "change), not an empty mirror"
+            ),
+        }
+    return summarize(audit(registry, live, repo_root, now))
 
 
 def audit(registry: Registry, live: dict[str, datetime], repo_root: str, now: datetime) -> list[Finding]:
@@ -389,14 +446,17 @@ def main() -> int:
     s3 = boto3.client("s3", region_name=AWS_REGION)
     live = _live_objects(s3)
 
-    findings = audit(registry, live, repo_root, datetime.now(timezone.utc))
-    report = summarize(findings)
+    report = build_report(registry, live, repo_root, datetime.now(timezone.utc))
 
     if args.as_json:
         print(json.dumps(report, indent=2, sort_keys=True, default=str))
+    elif "population_floor_error" in report:
+        print(f"{_ICON['fail']} FAIL — config mirror audit did not run: {report['population_floor_error']}")
     else:
         _print_human(report)
 
+    if "population_floor_error" in report:
+        return 1  # a broken listing fails loud regardless of --strict
     return 1 if (args.strict and not report["clean"]) else 0
 
 
