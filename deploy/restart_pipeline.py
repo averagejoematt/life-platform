@@ -717,6 +717,10 @@ def build_sub_scripts(
         ("restart_phase_tag", ["python3", "deploy/restart_phase_tag.py", "--apply"]),
         ("restart_intelligence_wipe", ["python3", "deploy/restart_intelligence_wipe.py", "--apply"]),
         ("restart_ledger_reset", ledger_cmd),
+        # #2858: converge the recall corpus INSIDE the reset — the chronicle/leadin inserts at
+        # [3] land above this, and re-dating rotates derived reader links under embedded rows
+        # (2026-07-21 carried link="" from its wiped era). Narrative: test_recall_reset_window_2858.
+        ("recall_corpus_sync", ["python3", "deploy/backfill_recall_embeddings.py", "--apply", "--kinds", "chronicle"]),
         ("restart_character_rebuild", ["python3", "deploy/restart_character_rebuild.py", "--apply"]),
         ("restart_site_copy_sync", ["python3", "deploy/restart_site_copy_sync.py", "--apply", "--old-genesis", old_genesis]),
         ("restart_docs_update", ["python3", "deploy/restart_docs_update.py", "--apply"]),

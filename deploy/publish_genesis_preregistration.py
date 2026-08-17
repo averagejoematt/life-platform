@@ -296,6 +296,57 @@ def build_chronicle_record(goals: dict, frozen: dict, cycle=None, stamp: dict = 
     return item
 
 
+def publish_record(table, record, *, embed=None) -> str:
+    """Write the chronicle record AND index it into the recall corpus — one operation.
+
+    #2858: this script is the SECOND chronicle publish site. The approve lambda has
+    carried the #1384 publish-time recall hook since it shipped (and #2705 made its
+    failures loud), but this path minted `status=published` with a bare put_item — so
+    the cycle-14 prereg installment (sk DATE#2026-08-16, published across the same-day
+    reset window) never reached the corpus, and "when did I feel like this before?"
+    returned silence for that week (qa-smoke `recall:corpus_freshness`, 2026-08-17 —
+    the #2705 class recurring through a publish site that fix never covered). Publish
+    ⇒ index is fused here so no future edit can keep the record write while dropping
+    the embedding; tests/test_recall_reset_window_2858.py pins main() to this path.
+
+    Fail-soft like the Lambda hook — indexing must never block the publish, and the
+    put_item lands first — but LOUD: the status string is returned for main() to turn
+    into a non-zero exit via `final_exit_code`. An attended script's honest failure
+    surface is its exit code.
+
+    `embed` is injected by tests (no Bedrock); production resolves the ADR-062
+    chokepoint inside the indexer.
+    """
+    from ai import recall_indexer
+
+    table.put_item(Item=record)  # fixed sk → idempotent overwrite
+    print(f"WROTE {record['pk']} / {record['sk']}")
+    status = recall_indexer.index_chronicle_installment(
+        table, record["pk"], recall_indexer.date_from_sk(str(record["sk"])), sk=str(record["sk"]), embed=embed
+    )
+    print(f"[recall] index {record['sk']}: {status}")
+    return status
+
+
+def final_exit_code(leadin_rc, index_status) -> int:
+    """Non-zero when the published installment did NOT reach the recall corpus.
+
+    Only the genuine fault (`FAILED`) reds the run: a band-2 budget pause is the corpus
+    deliberately not advancing (ADR-125), which `recall:corpus_freshness` reports as
+    paused, not broken — an exit code that redded on an honest pause would train the
+    operator to ignore the red (#2705 AC3's FAILED-vs-skip distinction).
+    """
+    from ai import recall_indexer
+
+    if index_status == recall_indexer.FAILED:
+        print(
+            "[recall] LOUD FAILURE: the installment published but is NOT in the recall corpus — "
+            "repair now: python3 deploy/backfill_recall_embeddings.py --apply --kinds chronicle"
+        )
+        return 1
+    return int(leadin_rc or 0)
+
+
 def main():
     ap = argparse.ArgumentParser(description='Publish "Prologue · The Plan, On the Record" (#976)')
     ap.add_argument("--apply", action="store_true", help="write DDB + S3 + CloudFront (default: dry-run)")
@@ -353,13 +404,12 @@ def main():
     cycle = _current_cycle()
     if cycle is not None:
         record["cycle"] = cycle
-    table.put_item(Item=record)  # fixed sk → idempotent overwrite
-    print(f"WROTE {record['pk']} / {record['sk']}")
+    index_status = publish_record(table, record)  # #2858: publish ⇒ index, one operation
 
     # Page + manifest + invalidation — the shared lead-in machinery, unmodified.
     rc = leadin.run(apply=True, no_invalidate=args.no_invalidate)
     print("\n" + WIPE_REMINDER)
-    return rc
+    return final_exit_code(rc, index_status)
 
 
 if __name__ == "__main__":
