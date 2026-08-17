@@ -166,7 +166,15 @@
       "Bash(aws s3api head-object *)",
       "Bash(aws s3api list-* *)",
       "Bash(aws ce get-cost-and-usage *)",
-      "Bash(aws secretsmanager list-secrets *)"
+      "Bash(aws secretsmanager list-secrets *)",
+      "Bash(git fetch)",
+      "Bash(git fetch *)",
+      "Bash(aws iam get-* *)",
+      "Bash(aws iam list-* *)",
+      "Bash(aws s3api get-* *)",
+      "Bash(aws ssm describe-parameters *)",
+      "Bash(gh label list *)",
+      "Bash(gh run watch *)"
     ]
   }
 }

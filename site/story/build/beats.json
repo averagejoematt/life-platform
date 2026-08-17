@@ -2799,6 +2799,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2855"
         }
       ]
+    },
+    {
+      "id": "2026-08-17-the-constitution-became-executable",
+      "date": "2026-08-17",
+      "title": "The constitution became executable — and the alarm board caught three real bugs on its first day back",
+      "shipped": "Yesterday's charter said no hand-typed copy of registry vocabulary lands without a dated exemption; today that sentence became a test. The new conformance guard AST-sweeps the whole codebase against the live registries (data sources, coach personas, lambda and alarm names) and fails the build on any new hand-typed list. The initial sweep honestly priced the existing debt: 37 sites, each now a dated ledger entry that can only ever be deleted — editing an exempted list re-flags it by construction. The same session closed the alarm-board arc: after two weeks of saturated red, qa-smoke-failures returned to OK at exactly the predicted minute, then fired again three hours later on three genuine new bugs — one fixed and verified in-corpus the same afternoon. The coherence alarm's planted-failure proof fired 47 seconds after emission.",
+      "why_it_mattered": "Every silently-missed consumer this platform has ever debugged traces to the same defect: somebody copied a list instead of deriving it, and the copy went stale. Fixing instances one review at a time never closes the class — a guard that makes the next copy fail CI does. And an alarm that can never return to OK carries no information; today produced the strongest possible evidence the repaired board works, because its first day back at OK it caught real, previously-unknown bugs on production traffic rather than a synthetic test.",
+      "gotcha": "The best catch of the day was inside an instrument: a coherence check that reported 'stored 68 vs derived 70' — which read like a two-point score bug — was actually comparing ord('D') to ord('F'). The checker had hand-typed its own 90/80/70/60 grade table (with a comment claiming it matched the engine) that disagreed with the real grading bands for every score from 45 to 89 except 80-84. The stored data was never wrong; the instrument was. It was found and fixed by deriving from the engine's own function — the exact defect class the guard that merged the same day now polices.",
+      "honest_miss": "Whoop's API started rejecting freshly-minted tokens at 5 AM and the auth breaker latched, so cycle 14's Day 1 opens with a sleep-data gap that only an owner OAuth re-grant can close — the alarms fired in real time, but no amount of platform machinery can re-authorize a third-party account. And the guard's 37-entry ledger is honestly still 37: today closed the class, not the backlog.",
+      "prs": [
+        {
+          "label": "PR #2861",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2861"
+        },
+        {
+          "label": "PR #2862",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2862"
+        },
+        {
+          "label": "PR #2863",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2863"
+        },
+        {
+          "label": "PR #2864",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2864"
+        }
+      ]
     }
   ]
 }

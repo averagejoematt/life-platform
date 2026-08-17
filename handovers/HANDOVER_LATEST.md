@@ -1,111 +1,129 @@
-# Handover — 2026-08-16→17 (eve→morning, ~14:30 PT → ~10:00 PT): the charter, the paydown queue, and the same-day cycle-14 reset
+# Handover — 2026-08-17 (day, ~11:30 → ~16:30 PT): the conformance guard, the alarm board's first day back, and the merge queue
 
-**Session:** Fable, owner-interactive (Matthew present at both ends, away overnight).
-**Driver:** plan `purring-sprouting-toucan` — hybrid lane chosen by owner at 55% usage:
-Fable-native work (#2792 investigation, #2843 charter) + a 4-worker sonnet fan-out over
-small Now stories, then an owner-requested **full experiment reset with genesis
-2026-08-17** (decided Sunday night, applied Monday morning — the night passed waiting out
-CI + a GitHub platform incident, converting the planned eve-of reset into the cycle-12
-same-day pattern).
+**Session:** Fable, owner-directed (plan `purring-sprouting-toucan` executed in full: Phase 0
+verify-and-close sweep → the #2844 headline build → a 3-worker sonnet fan-out → merge queue →
+deploys). Opened with `/fewer-permission-prompts` (8 read-only patterns added to
+`.claude/settings.json`; rides the wrap commit).
 
-## What shipped — 6 PRs merged, fleet deployed, cycle 14 LIVE
+## What shipped — 4 PRs merged, sentinel deployed + verified, 4 stacks flattened
 
-- **#2851 (#2792)** — the repaired coherence alarm's first real catch, root-caused with
-  live evidence: the 17:00Z brief HELD four coaches (ADR-108, scores 28–50), the 08-15
-  rows kept serving, and their citations exactly match `computed_metrics DATE#2026-08-14`
-  — the coach's own-day grounding. The sentinel now judges a stale-served row against the
-  facts of ITS generation day (`facts_overrides` + strictly-before lookup, fail-soft);
-  fabrication vs own-day facts still fires. Frame correction (#2783 class), not softening.
-- **#2853 (#2843)** — **docs/CHARTER.md, the Kernel's first landing**: the five
-  primitives (registry → derivation guard → ratchet → contract → dead-man) with canonical
-  exemplars, the paved roads, the standing rules. CLAUDE.md points to it FIRST;
-  /uplevel + the four review skills grade against it. #2844 (conformance guard) is the
-  next Fable-session pick.
-- **Sonnet fan-out (4 workers, ~340k subagent tokens total):** **#2850 (#2791)**
-  deploy-wedge UNKNOWN_AGE verdict (mutation-proven); **#2852 (#2639)** gate-census
-  measured FP rates with Wilson intervals (+ the size-ratchet-forced split to
-  `gate_census_precision.py`); **#2854 (#2789)** config_mirror_audit population floor +
-  AnnAssign TTL walk (both were #2639's adjudicated true positives — measurement→fix in
-  one session); **#2855 (#2821)** insight-email-parser watch surface (failure envelopes,
-  EMF metric + alarm, real DLQ, SES-trigger dead-man enumeration; both alarms verified
-  live in OK).
-- **Cycle 14 reset, genesis 2026-08-17 (same-day):** `restart_pipeline.py --genesis
-  2026-08-17 --override-weight-lbs 321.01 --with-preregistration --apply --sync-site`,
-  fleet deployed inside the pipeline (`cdk deploy --all` — also the deploy vehicle for
-  the whole PR queue). Gates: rendered **96/96**, semantic **8/8**, truth **8/8** at
-  Day 1. Prereg: 16 predictions + 2 hypotheses frozen; **"The Plan, On the Record"
-  published after owner review of the dry-run** + SHA-256 stamp byte-verified on the
-  public URL (`da3a2a7f…`). **Cycle 13 grandfathered** in `prereg_seal_gate.py` (owner
-  decision: frozen on time, publication never ran, a backdated seal would be theater).
-  Live checks: /api/journey Day-1 story correct (321.0 → 185.0, weighin_count 1),
-  /api/vitals honestly defers weight to the real Day-1 weigh-in.
+- **#2861 (#2844, the headline)** — **the kernel conformance guard**: charter standing rule 1
+  made executable. AST sweep of `lambdas/ mcp/ cdk/` against four live registry vocabularies
+  (source ids, persona ids, CDK-declared lambda + alarm names); **37-entry dated shrink-only
+  ledger** (`tests/conformance_residue.py`), every entry spot-checkable real debt.
+  Content-keyed sites: editing an exempted hand-list re-reds by construction — the only green
+  path is deriving. 11 mutation self-tests + a live planted-file proof in the PR. CONVENTIONS
+  §9 row, PROPORTIONALITY row, charter cross-reference all in the same PR.
+- **#2862 (#2793)** — the sentinel's "stored 68 vs derived 70" was **`ord('D')` vs `ord('F')`**:
+  the #2737 adapter hand-typed a collegiate 90/80/70/60 band table (its comment claimed it
+  "matches scoring_engine bands" — it disagreed for every score in 45–89 except 80–84). The
+  archived row was always coherent with the engine. Fix derives via
+  `health.scoring_engine.letter_grade`; alarm text now carries letters. The #2844 defect class,
+  found inside a coherence instrument, by a worker, the same day the guard merged.
+- **#2863 (#2814)** — the sentinel's day frame is Pacific in every invocation context (4 UTC
+  sites → `common.pacific_time`; the #2851 strictly-before lookups corrected transitively;
+  sentinel joined `_PT_FRAME_INSTRUMENTS`). Evening off-schedule invokes no longer compute
+  tomorrow's date.
+- **#2864 (#2858)** — the reset window's two recall-corpus blind spots: the cycle-14 prereg
+  publisher was a **second, unhooked publish site** (bare `put_item`, no recall hook — why
+  #2705's fix never covered it), and reset re-dating rots stored links. Publish⇒index now
+  fused + a `recall_corpus_sync` step inside `restart_pipeline.build_sub_scripts`. Repair
+  executed live: 08-16 installment embedded (256-dim), 07-21 link fixed, both read back from DDB.
+- **Deploys:** sentinel deployed via the approved `4b4ea1936` pipeline run (smoke green,
+  auto-rollback armed) and **both symbols byte-verified in the live bundle**; then the 4
+  S3Key-only drifted stacks (Operational/Email/Compute/Ingestion) flattened via the guarded
+  `cdk_deploy.sh` (see CI-warnings gate below).
+
+## Phase 0 — the observation boxes all landed (with live CloudWatch evidence)
+
+- **#2735 CLOSED**: `coherence-overall` ALARM→OK observed 18:46:27Z (first fully-green
+  scheduled sentinel run + age-out), planted OK→ALARM observed 21:21:27Z (47s after the
+  synthetic datapoint, owner-sequenced against a genuinely-OK baseline). All five boxes.
+- **#2792 box 3 realized**: 18:45Z run green on `facts_agreement`, no softening (caveat
+  recorded: no coaches held today, so the stale-served path itself wasn't re-exercised).
+- **#2670**: `qa-smoke-failures` ALARM→OK at the predicted minute (15:46:04Z), then
+  **organic OK→ALARM at 18:32Z on 3 genuine new FAILs** — stronger than the planned plant.
+  `qa-smoke-warnings` measured structurally unclearable (1–3 transient warns land daily);
+  issue scoped to the threshold-shape residual.
+- **#2668**: count 2/3 clean, now on positive evidence (`IC-3 analysis parsed clean`, 17:07:40Z).
+- The 3 new FAILs filed with evidence: **#2858** (fixed+repaired this session), **#2859**
+  (two `/archive/v1/*` redirects 404), **#2860** (a default-timeout sync invoke ran the brief's
+  7.5-min generation 3× at 15:54–15:56Z and tripped the token alarms).
 
 ## Verified
 
-Every merge behind the checks rollup (`total>0 AND 0 not-green`) with worker diffs
-verified against their issues' acceptance (one false-trail avoided: #2852's numbers were
-confirmed present in #2639's own comment thread, not invented). Reset gates as above.
-Prereg seal curl-verified. Charter exemplar paths all confirmed to exist before writing.
+Every merge behind the checks rollup (`total>0 AND 0 not-green`), worker diffs verified
+against acceptance before merge (engine bands read, corpus rows read back from DDB, deployed
+symbols greps). Backfill dry-run before apply. All three worker mechanisms verified live, not
+from worker claims alone.
 
-## Gotchas hit (durable ones in memory)
+## Gotchas hit
 
-- **Green-only watchers stall the session** — two failures sat under `until all-green`
-  loops that can never complete on failure; Matthew had to prod twice. Root-caused and
-  fixed as a standing rule: watchers exit on ANY terminal state + a time cap
-  (memory: `feedback_watchers_exit_on_terminal_not_green`). ~2h idle cost.
-- **The reconcile recipe's `tail -5` ate two conflict files** — #2855's merge conflicted
-  in FOUR doc files; only two got resolved and `git add -A` committed raw markers. The
-  conflict-marker guard (born of the identical 08-08 incident) caught it pre-merge.
-- **A piped pytest exit** (`| tail`) let a red lane read green mid-queue — caught by
-  re-running unpiped; the failures were the venv missing `pyyaml`/`hypothesis` (now
-  installed from the dev pins).
-- **Four guards fired correctly on real defects this session:** module-size ratchet
-  (census split), conflict-marker guard, CodeQL (worker's substring principal match —
-  fixed to equality), and the #1952 predict-week hook check (the same-day circularity:
-  the gate red blocks the hooks that light the surface the gate checks — broken by
-  seeding + CloudFront-invalidating, then re-running the gate).
-- **GitHub platform incident (429/502/503)** burned ~3 CI cycles + a CodeQL rerun.
+- **The deploy lease wedged ~1.3h**: the `9d4ffda94` run sat `waiting` at the production gate
+  holding the concurrency lease while three newer merges auto-cancelled/queued behind it.
+  Resolved per the standing rule: REJECT the superseded ancestor (`reject_deployment.sh`),
+  approve current HEAD. The wedge-watch alone didn't surface it — my own run-watcher's
+  "pending for an hour" did.
+- **A monitor that greps for a count threshold can never terminate** (total>5 on a sha whose
+  check-runs stay at 5) — two monitors timed out harmlessly; poll the workflow-run conclusion
+  by id instead.
+- **Whoop auth latch** (see Incidents) explains today's vitals FAIL — one root cause, two
+  symptom surfaces; the #2613 deterministic rule caught it honestly.
+- The wiki gate red on #2861 was pre-existing reset drift (CHARACTER.md vs the regenerated
+  `character_sheet.json`) — resolved properly: **all 13 line citations re-derived by AST**
+  (they'd drifted −10 via #2747 after the 08-15 stamp), not just a date bump.
 
 ## Wrap gates
 
-**Build beat:** 2026-08-17-cycle-14-goes-live-with-a-constitution
-**Docs:** CHARTER.md (new, #2853), SCHEMA/CHANGELOG/RESET_LOG/CLAUDE.md via the reset
-pipeline's own doc sync; MONITORING/TESTING auto-synced in the PRs; wiki checkers green
-**Decisions:** none needed — the charter landed as `docs/CHARTER.md` per #2843's own
-acceptance (no new ADR); the cycle-13 seal used #1979's existing grandfather mechanism
-**Main:** tests green at `2b2769dda` (reset HEAD); deploy leases at `c538bf2a4`/
-`ae8e4edb9`/`b8d69d270`/`2b2769dda` REJECTED with reasons (redundant — the pipeline's
-`cdk deploy --all` was the deploy vehicle at final HEAD); `7333d711e`'s red = the GitHub
-429 incident in setup-ci; wrap-commit run approved at close (see status block for verdict)
-**Incidents:** 1 row added — the 08-16→17 main-red window (flaky timing test + GitHub
-platform incident, false-positive class, no data loss)
+**Build beat:** 2026-08-17-the-constitution-became-executable
+**Docs:** CHARTER.md (guard named, in #2861) · CONVENTIONS §9 row · PROPORTIONALITY row ·
+`docs/engines/CHARACTER.md` cycle-14 re-verify (13 citations re-derived) · INCIDENT_LOG +1 row ·
+doc-sync literals regenerated in each queue PR
+**Decisions:** none needed — the guard implements the already-decided charter rule 1
+(#2843/#2844); the one open governance call is the owner's #2836 (September base, due 09-01)
+**Main:** green (4b4ea1936) — decode: two gated leases resolved this session (32072197180
+REJECTED as superseded ancestor; 32073572460 approved and completed success incl. smoke)
+**Incidents:** 1 row added — the Whoop data-endpoint auth latch (cycle-14 Day 1 sleep gap,
+owner re-auth pending, #1934 class)
 **Stash/hooks:** clean
-**Closures:** #2791, #2792 (partial — next 18:45Z run is the box), #2639, #2843, #2789,
-#2821 commented to contract
-**Backlog:** Now live at 18 actionable; no stale Later issues; hygiene clean — fixed the
-7 outcome_audience violators on the elite-review epics (#2797–#2802, #2842) this wrap
-**Alarms:** all red >72h cited (gate passed clean)
-**CI warnings:** none printable — latest main run not yet green at gate time ((e2) owns
-that; wrap-HEAD run watched to verdict at close)
-**Ledger:** none needed — no new standing gate/writer/watcher landed (the charter is
-paper; the session-watcher rule is memory, not machinery)
+**Closures:** #2844, #2735, #2793, #2814, #2858 all carry the two-line verdict; #2792 (closed
+prior session) got its box-3 realized comment; #2668/#2670 got evidence-update comments
+**Backlog:** Now live at 16 actionable; hygiene OK (108 open issues clean); no stale Later
+issues printed
+**Alarms:** gate passed clean — every red >72h cited (`qa-smoke-warnings` → #2670). Current
+<72h reds, all explained: `coherence-overall` (planted proof, self-clears ≤21:20Z 08-18),
+`qa-smoke-failures` (3 real FAILs — #2858 fixed, #2859/#2860 filed), whoop trio (incident row),
+`ai-tokens-daily-brief-daily` + genesis-window (the #2860 dry-run triple)
+**CI warnings:** 4 — all the same class: Plan-deployments flagged 4 stacks as "config change";
+`cdk diff` showed **S3Key-only** (shared-bundle hash catch-up from today's merges, #781
+one-bundle). Triage: flattened by the guarded 4-stack `cdk_deploy.sh` this session; closed
+`--decoded`.
+**Ledger:** the new standing gate's PROPORTIONALITY row (posture Load-bearing · rent CI
+seconds + ledger mind · demote trigger: reds resolved by loosening instead of deriving)
+landed inside PR #2861 itself
 
 ## Residuals / next picks
 
-- **Genesis weigh-in supersede** — Matthew weighed in 08-17 but the reading hasn't
-  reached Withings' API yet; when it lands run the standing supersede reflex (profile +
-  user_goals + constants + rebakes; memory `project_monday_reset`). not-work — standing
-  documented reflex awaiting device sync, owner's scale already stepped on.
-- **#2792 box 3** — facts_agreement green at the next 18:45Z sentinel run (fix live).
-- **#2735 / #2670** — observation boxes: both saturated alarms clear ~15:46Z 08-17;
-  then the planted OK→ALARM proofs.
-- **#2844** — the kernel conformance guard: the next Fable session's headline build
-  (charter sequenced it explicitly).
-- **#2793** — day_grade 68 vs 70 re-derivation (untouched this session).
-- **#2668 / #2669** — close Monday evening / Wednesday per their live boxes.
-- **Eve-only lock email skipped** — genesis-eve passed while CI + the GitHub incident
-  ran; the sender refuses late by design. not-work — structurally impossible for cycle
-  14 now; recorded honestly.
-- **#2856/#2857** — auto-filed deploy-wedge issues from this session's rejected leases,
-  auto-resolved; no action.
-- The **#2797–#2841 elite-review corpus** — triage continues from `backlog_next.py`.
+- **#2668** — 3-of-3 close at the 2026-08-18 evening check (count 2/3 recorded today).
+- **#2669** — Wednesday's chronicle run is its live box.
+- **#2670** — the `qa-smoke-warnings` threshold-shape decision (sustained-N-of-M or
+  new-warn-key alarm; reason recorded at the alarm definition) is the sole residual.
+- **#2859** — the two broken `/archive/v1/*` redirects (small mechanical, `redirects.map` +
+  regenerate).
+- **#2860** — the daily-brief sync-invoke retry storm (in-flight guard and/or documented
+  async-invoke reflex).
+- **#2858 live-evidence box** — tomorrow's 11:30 PT qa-smoke sweep should pass
+  `recall:corpus_freshness`.
+- **Genesis weigh-in supersede** — not-work — standing documented reflex; the 08-17 Withings
+  reading had NOT reached the API by 22:15Z (checked twice; 0 DDB rows). Note: Withings
+  ingestion is healthy — this is device-sync lag, unrelated to the Whoop latch.
+- **Whoop re-auth** — owner action (session ask #2): re-grant OAuth, then the #2085
+  latch-clear, then gap-aware backfill recovers 08-16/17. Machinery side is #1934-complete.
+- **#2836** — September budget base (gate:owner, due before 09-01; options + measured
+  numbers in the session's owner-ask message; optional D2–D4 = #2833/#2834/#2841).
+- **#2845 / #2846** — the next kernel builds (system model; enrollment-by-construction),
+  charter-sequenced after #2844.
+- **The 37-entry conformance ledger paydown** — tracked under epic #2842; each converted
+  site deletes its ledger line (shrink-only).
+- **`coherence-overall` planted red** — not-work: self-clears ≤21:20Z 08-18 by age-out;
+  documented on #2735.
