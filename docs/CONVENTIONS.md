@@ -851,6 +851,7 @@ read that section for the incident narrative and the exact mechanics.
 | A merged repo `config/` change never reaches the S3 object the API reads ("merged but not serving") | Config-twin sync on merge + daily drift check (#2019) | `deploy/config_twin_sync.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A live `config/` object a Lambda reads is stale or unowned — a writer class the repo-twin check cannot see | Config mirror ownership + freshness audit (#2057) | `deploy/config_mirror_audit.py`; `.github/workflows/config-drift.yml`; §7 above |
 | A registry published through two prefixes drifts between its copies — two endpoints, two answers | `config/` ↔ `site/config/` byte parity (#2084) | `tests/test_config_site_mirror_parity.py`; §7 above |
+| A consumer hand-types a copy of registry vocabulary (source ids, persona ids, lambda names, alarm names) — the missed-consumer class (#2842 WS-A) | Kernel conformance guard (#2844): AST sweep + shrink-only dated exemption ledger; editing an exempted list re-reds it by content-keying | `tests/test_conformance_guard_2844.py`; ledger `tests/conformance_residue.py`; charter standing rule 1 |
 | A generator-owned artifact (doc-sync literals, ADR index, chrome block) goes stale across a merge queue | Merge-day reconcile job | §4c above |
 | A doc claims a stale count/version/cadence in any phrasing | `check_doc_facts.py` | §8 above |
 | A page references a retired concept | `check_doc_tombstones.py` + `docs/_lint/tombstones.txt` | §8 above |
