@@ -498,15 +498,42 @@ if [[ "$QUICK" != "--quick" ]]; then
 
   # ── API data quality ─────────────────────────────────────────────────────────
   echo "── API data quality ──────────────────────────────────────"
-  # Pre-start (countdown) window: journey serves pre_start=true and baseline-dependent
-  # vitals are legitimately absent — accept either state, but only the right one.
-  PRE_START=$(smoke_curl -s --max-time 10 "$BASE/api/journey" | python3 -c "import sys,json; d=json.load(sys.stdin); j=d.get('journey',d); print('1' if (j.get('pre_start') or (j.get('day_n') is not None and j.get('day_n') <= 1)) else '0')" 2>/dev/null || echo 0)
-  if [ "$PRE_START" = "1" ]; then
-    echo "  ✅ /api/vitals: pre-start/Day-1 window (weight_lbs not required before the first weigh-in)"; PASS=$((PASS + 1))
-  elif smoke_curl -s --max-time 10 "$BASE/api/vitals" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('vitals',{}).get('weight_lbs') is not None" 2>/dev/null; then
+  # #2878: `weight_lbs` is required exactly when a weigh-in has ACTUALLY happened in
+  # this cycle — never on a day-number proxy. The original carve-out was
+  # `pre_start or day_n <= 1`, which expired on Day 2 while the real condition (no
+  # in-cycle weigh-in yet) was still true; every site/** merge then deployed, failed
+  # here, and auto-rolled-back with the build on main but not served.
+  #
+  # The predicate is read from /api/source_freshness — a DIFFERENT lambda module and
+  # query path than /api/vitals, and deliberately NOT genesis-clamped, so it reports
+  # the newest withings record even when it predates the cycle. That independence is
+  # what keeps the check able to fail: if a weigh-in exists in-cycle and /api/vitals
+  # still omits it, the two sources disagree and this FAILs.
+  #   yes     → an in-cycle weigh-in exists; weight_lbs is mandatory
+  #   no      → no in-cycle weigh-in; a null weight_lbs is the honest answer (ADR-104)
+  #   unknown → freshness unreadable; fail closed, because absence can't be verified
+  IN_CYCLE_WEIGHIN=$(smoke_curl -s --max-time 10 "$BASE/api/source_freshness" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    genesis = str((d.get('experiment') or {}).get('genesis') or '')[:10]
+    src = next((s for s in (d.get('sources') or []) if s.get('id') == 'withings'), None)
+    last = str((src or {}).get('last_update') or '')[:10]
+    if not genesis or src is None:
+        print('unknown')
+    else:
+        print('yes' if (last and last >= genesis) else 'no')
+except Exception:
+    print('unknown')
+" 2>/dev/null || echo unknown)
+  if smoke_curl -s --max-time 10 "$BASE/api/vitals" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('vitals',{}).get('weight_lbs') is not None" 2>/dev/null; then
     echo "  ✅ /api/vitals: weight_lbs present"; PASS=$((PASS + 1))
+  elif [ "$IN_CYCLE_WEIGHIN" = "no" ]; then
+    echo "  ✅ /api/vitals: no in-cycle weigh-in yet — null weight_lbs is the honest state"; PASS=$((PASS + 1))
+  elif [ "$IN_CYCLE_WEIGHIN" = "unknown" ]; then
+    echo "  ❌ /api/vitals: missing weight_lbs and /api/source_freshness could not confirm whether a weigh-in exists"; FAIL=$((FAIL + 1))
   else
-    echo "  ❌ /api/vitals: missing weight_lbs"; FAIL=$((FAIL + 1))
+    echo "  ❌ /api/vitals: missing weight_lbs — an in-cycle weigh-in EXISTS in source_freshness but the payload dropped it"; FAIL=$((FAIL + 1))
   fi
   if smoke_curl -s --max-time 10 "$BASE/api/source_freshness" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('sources'),list) and len(d['sources'])>0" 2>/dev/null; then
     echo "  ✅ /api/source_freshness: sources present"; PASS=$((PASS + 1))
