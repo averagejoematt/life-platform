@@ -101,11 +101,12 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | `generated/qa_archive/` (generation-time AI-surface archive: text + screenshots, #1441) | **Listed 90 days; bytes fully purged ≈ day 97** (audit-log class — the D3 review-pack evidentiary window). Versioned-bucket mechanics: delete marker at 90d → the noncurrent data version expires 7d later (own rule, NO keep-newest carve-out — the `generated/` keep-1 rule must not shield these write-once keys) → expired delete marker swept | #1441 — `qa-archive-expire-90d` + `qa-archive-clean-delete-markers` |
 | `generated/archive/` (the nightly public permanence archive, #1400) | **Current: forever; non-current: 7 days (keep 1)** — inherits the `generated/` rule unchanged, and needs no rule of its own: the run overwrites three fixed keys in place rather than accumulating dated ones. The single dated artefact (`final-YYYY-MM-DD.tar.gz`) is written only if the continuity switch trips, and is meant to be permanent. | P1.3 — `generated-expire-noncurrent-7d` (inherited) |
 | `config/` (platform config: filters, schemas) | **Current: forever; non-current: 30 days (keep 3)** | P1.3 — `config-expire-noncurrent-30d` |
-| `deploys/` (Lambda deploy artifacts) | **30 days** | Pre-existing |
+| `deploys/` (Lambda deploy artifacts) | **Current: 30 days; non-current: 7 days (keep 1)** | Pre-existing (Expiration) + #2642 — `expire-lambda-deploy-artifacts` (added `NoncurrentVersionExpiration`) |
 | `cloudtrail/` (audit logs) | **90 days** | P2.5 / P7 — `cloudtrail-expire-90d` |
 | `mcp-audit/` (MCP write-audit trail, #753) | **90 days** (classed with `cloudtrail/` audit logs); Infrequent Access at 30 days | #886 — `mcp-audit-ia-30d-expire-90d` |
 | `remediation-log/` (automerge audit ledger, ADR-065) | **Forever**; only the `dispatch-dedupe/` sub-prefix (transient dedupe markers) expires at **1 day** | `remediation-dispatch-dedupe-expire-1d` |
-| `dashboard/`, `site/`, `blog/` | **Forever** (static content) | None — long-lived public assets |
+| `site/` (published website) | **Current: forever; non-current: 7 days (keep 1)** — every content-hashed redeploy versions the whole tree; `rollback_site.sh` rebuilds from git and never reads noncurrent S3 versions, so this cannot break rollback | #2642 — `site-expire-noncurrent-7d` |
+| `dashboard/`, `blog/` | **Forever** (static content) | None — long-lived public assets |
 
 All lifecycle rules are declared in **`deploy/apply_s3_lifecycle.sh`** — the single source
 of truth for the bucket's lifecycle configuration (the bucket is CDK-imported via
@@ -228,6 +229,7 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-07-18 | #1350 code half: "Raj directive" never-delete comment replaced with a pointer to this doc's (unsigned) retention row; `deploy/subscriber_retention_purge.py` purge/anonymize implementation + `delete_user_data_lambda` single-subscriber deletion shipped, one-command-ready pending Matthew's window sign-off | #1350 |
 | 2026-07-19 | `generated/qa_archive/` added (90d, audit-log class): generation-time archive of every AI surface — text written by `lambdas/common/qa_archive.py` at each surface's publish point, screenshots by the daily standalone visual-qa sweep. No new PII class: archives the already-public reader-facing text plus rendered-page screenshots | #1441 |
 | 2026-07-25 | #1350 [gate:owner] **SIGNED**: subscriber emails → anonymize 548 days (18 months) post-unsubscribe (was UNSIGNED). Signed window/mode centralized in `lambdas/content/subscriber_retention.py`; enacted weekly by `delete_user_data_lambda`'s `subscriber_retention_sweep` EventBridge rule (reuses existing IAM — no role change); guard test `tests/test_subscriber_retention_sweep.py` added | #1350 |
+| 2026-08-18 | `deploys/` gained `NoncurrentVersionExpiration` (7d, keep 1) and `site/` gained a noncurrent-version rule (7d, keep 1) — closes 67 GB of unbounded noncurrent-version growth (`life-platform-s3-bucket-size-high` red 4.5 days). `imports/` found accumulating noncurrent versions under zero current bytes (2.23 GB) — flagged, not yet covered, out of scope for this pass | #2642 |
 
 ---
 
