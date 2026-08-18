@@ -11,7 +11,7 @@ pytest-cov==7.1.0
 # gates (tests/test_prop_*.py, #1664). Deterministic + bounded example counts so CI
 # stays fast; no browser/native deps. Version MUST equal the CI gate's pin (CQ-01,
 # #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-hypothesis==6.165.2
+hypothesis==6.165.9
 # PyYAML — scripts/apply_branch_protection.py's preflight_contexts() parses
 # .github/workflows/*.yml to verify every required check context actually exists
 # as an unfiltered, un-gated job (#1662/#2198). tests/test_branch_protection_spec.py
@@ -43,16 +43,16 @@ black==26.3.1
 # Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
 # see tests/test_mypy_clean_modules.py + mypy.ini). Version MUST equal ci-lint.yml's
 # pin (CQ-01, #1963).
-mypy==2.3.0
+mypy==2.3.1
 
 # AWS SDK (for tests that call boto3 directly). Versions MUST equal the CI gate's
 # pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
-boto3==1.43.67
-botocore==1.43.67
+boto3==1.43.72
+botocore==1.43.72
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release
 # reach CI unpinned). Bump both files together as a deliberate PR, plus the
 # `npm install -g aws-cdk@X.Y.Z` CLI pin in ci-cd.yml.
-aws-cdk-lib==2.263.0
+aws-cdk-lib==2.265.0
 constructs==10.8.1
