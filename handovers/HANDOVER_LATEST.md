@@ -20,7 +20,14 @@ rather than on whether a weigh-in happened, so **every `site/**` deploy auto-rol
 one lands** (#2878, owner-gated); (2) a merge to `main` produced ZERO CI runs (swallowed-push
 class, second documented occurrence; caught by a by-`head_sha` check, recovered by manual
 dispatch).
-**Main:** green (`9e3659a1`) — `check_main_green.py` exit 0.
+**Main:** green — the last code-bearing sha `9e3659a1` passed CI/CD in full (lint, tests,
+deploy, smoke, visual+AI QA). HEAD `39f77205` is a **docs-only** wrap amendment touching only
+`docs/INCIDENT_LOG.md` + `handovers/HANDOVER_LATEST.md`, which `ci-cd.yml`'s path filters
+correctly exclude — so it has no CI/CD run **by design**, and the workflow that does apply,
+Docs CI, is green on HEAD. `check_main_green.py` flags this as the swallowed-push shape (#2762)
+because it cannot see paths; distinguished by reading the changed paths against the filter —
+and contrast the *real* swallowed push earlier today, where a commit touching `lambdas/**` and
+`tests/**` minted zero runs. Closed with `--decoded`.
 **CI warnings:** 1 — Unit Tests 1297s vs the 1200s budget (fifth crossing). Triaged to the
 existing #2692 with today's datapoint and an explicit **no-action call**: not raising the budget,
 not filing a duplicate; #2692 owns the measure-first decision and its rationale is unchanged.
