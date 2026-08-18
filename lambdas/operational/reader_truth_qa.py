@@ -165,6 +165,92 @@ def is_wake_frame_correct(finding):
     return (max(dates) - min(dates)).days == 1
 
 
+# ── durable design copy: the rubric's exempt vocabulary, enforced (#2741) ─────
+#
+# THE REGISTRY. These strings were named as exempt in the prompt's DO-NOT-FLAG
+# list from 2026-08-09, widened at #2575, and re-stated at #2741 — and the model
+# went on flagging them anyway. Measured from the qa-smoke log group over the ten
+# days to 2026-08-18: a home-page `temporal_contradiction` was raised in **25 of
+# 60 runs (42%)**, spanning Day 6 of cycle 13, the pre-start countdown, Day 1 and
+# Day 2 of cycle 14 — i.e. in every phase, which is exactly the claim the clause
+# makes. Severity flipped run to run on byte-identical copy: two runs 35 minutes
+# apart produced `med` then `high`, and `high` is what FAILs a blocking alarm.
+#
+# That is #1922's and #2613's signature, and both of those retired their class
+# STRUCTURALLY after measuring that prose could not fix it. Per ADR-105 and
+# charter primitive 4, the exemption stops being an instruction the model may
+# ignore and becomes a decision code makes: the vocabulary lives here, ONE copy,
+# and `build_prompt` renders the prompt's example list from it — so the clause the
+# model reads and the clause the code enforces cannot drift apart (charter
+# primitive 1 + 2; the derivation is asserted in tests/test_durable_design_copy_2741.py).
+#
+# SCOPE — deliberately narrow, per the issue's own bar. A finding is dropped only
+# when EVERY quoted span in the model's note is one of these strings. A note that
+# also quotes something else (a progress claim, a number, any other sentence) is
+# NOT this class and survives at full severity, because the thing being retired is
+# the re-litigation of design copy, not the ability to catch a page that claims
+# progress it has not made.
+DURABLE_DESIGN_COPY = (
+    "starts at the Day-1 weigh-in",
+    "tap any day",
+    "the week ahead",
+)
+
+# The model quotes page copy with the page's own typography — the live notes carry
+# U+2011 NON-BREAKING HYPHEN in "Day‑1" while the rubric writes an ASCII hyphen, and
+# curly quotes appear in both directions. Comparing raw strings would silently never
+# match, which is the failure mode where a gate looks wired and is not.
+_DASHES = dict.fromkeys(map(ord, "‐‑‒–—―−"), "-")
+_QUOTED_SPAN_RE = re.compile(r"[‘’']([^‘’']{4,})[‘’']|[“”\"]([^“”\"]{4,})[“”\"]")
+
+
+def _normalize_copy(s):
+    """Casefold, unify every Unicode dash to '-', and collapse whitespace."""
+    return " ".join(str(s or "").translate(_DASHES).casefold().split())
+
+
+def quoted_spans(note):
+    """The quoted page-copy spans inside a model note, in order.
+
+    Apostrophes inside quoted prose ("What's different") make single-quote pairing
+    ambiguous. That is fine and deliberate: an ambiguous parse yields spans that do
+    not match the registry, and the all-spans-must-match rule below then KEEPS the
+    finding. The failure direction preserves the old behaviour rather than silencing
+    it — the same fail-closed posture as `_confirm_high_findings`.
+    """
+    return [m.group(1) if m.group(1) is not None else m.group(2) for m in _QUOTED_SPAN_RE.finditer(note or "")]
+
+
+def is_durable_design_copy(finding):
+    """True when `finding` re-litigates registered durable design copy (#2741).
+
+    Structural conditions, all required: the finding is a temporal_contradiction;
+    its note quotes at least one span; and EVERY quoted span contains a registered
+    durable-design string. A note quoting any other page copy alongside it survives,
+    as does any finding in another category.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    spans = quoted_spans(finding.get("note"))
+    if not spans:
+        return False
+    registry = [_normalize_copy(s) for s in DURABLE_DESIGN_COPY]
+    return all(_is_registered_span(_normalize_copy(span), registry) for span in spans)
+
+
+# A quoted span counts as registered copy in either direction of containment. The
+# 2026-08-15 21:49Z production note quotes the whole string AND the bare fragment
+# 'starts at' — a note re-litigating exempt copy naturally quotes pieces of it, and
+# requiring whole-string equality would have kept that finding while dropping its
+# near-identical siblings. The fragment direction carries a length floor so a stray
+# common word inside a registered phrase ("the", "day") can never exempt a finding.
+_MIN_FRAGMENT_CHARS = 8
+
+
+def _is_registered_span(span, registry):
+    return any(r in span or (len(span) >= _MIN_FRAGMENT_CHARS and span in r) for r in registry)
+
+
 # Batch 4-6 surfaces per call so the duplicated-narrative check sees pages
 # side-by-side (a single-page call structurally cannot catch duplication).
 DEFAULT_BATCH_SIZE = 5
@@ -398,7 +484,7 @@ metric or section reading "··" is DECLARING that no data exists, never claimin
 early-cycle pages deliberately stage their instruments with "··" (empty scaffolding is the designed \
 honest state, not an implied history);
 - durable design copy and structural UI affordances describing what the experiment DOES once \
-running — "starts at the Day-1 weigh-in", "tap any day", "the week ahead", section headings for \
+running — {durable_copy}, section headings for \
 instruments that currently read "··". Habitual-present descriptions of the design are correct in \
 EVERY phase — before Day 1, ON Day 1, and after; flag only prose asserting that specific \
 measurements or progress ALREADY happened when the phase makes that impossible;
@@ -432,7 +518,16 @@ def build_prompt(pages, phase, max_chars=MAX_PROSE_CHARS):
     `pages`: [{"name": str, "path": str, "prose": str}, ...] (4-6 per batch so the
     duplicated-narrative check sees the surfaces side-by-side).
     """
-    parts = [_PROMPT_HEADER.format(k=len(pages), phase_line=_phase_line(phase))]
+    # #2741: the exempt-copy examples render from DURABLE_DESIGN_COPY, the same
+    # tuple the deterministic drop enforces — one vocabulary, so the clause the
+    # model reads and the clause code applies cannot drift (charter primitive 1).
+    parts = [
+        _PROMPT_HEADER.format(
+            k=len(pages),
+            phase_line=_phase_line(phase),
+            durable_copy=", ".join(f'"{s}"' for s in DURABLE_DESIGN_COPY),
+        )
+    ]
     for i, p in enumerate(pages, 1):
         prose = (p.get("prose") or "").strip()
         if len(prose) > max_chars:
@@ -536,6 +631,16 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     print(
                         f"  ↩ reader-truth: dropped a wake-frame-correct night finding on {f['page']} "
                         f"(night_of + 1 = as_of IS the convention, #2780): {f['note'][:120]}"
+                    )
+                    continue
+                # #2741: the durable-design-copy retirement, enforced. Every quoted
+                # span in the note is registered exempt copy, so the finding is a
+                # re-reading of the DO-NOT-FLAG clause, not a truth finding —
+                # printed, never silently swallowed.
+                if is_durable_design_copy(f):
+                    print(
+                        f"  ↩ reader-truth: dropped a durable-design-copy finding on {f['page']} "
+                        f"(the rubric names this copy exempt in every phase, #2741): {f['note'][:120]}"
                     )
                     continue
                 findings.append(f)
