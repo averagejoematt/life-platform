@@ -840,6 +840,20 @@ class WebStack(Stack):
                         min_ttl=0,
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
+                        # #2859: this behavior bypasses the default behavior's v4-redirects
+                        # function (same bug class as #1805's /journal/posts/week-* fix), so
+                        # every legacy /archive/v1/* URL 404'd instead of 301'ing to
+                        # /legacy/archive/v1/* — the redirects.map/generated-function entries
+                        # were correct but never reached. The permanence-contract paths
+                        # (/archive/latest.tar.gz, manifest/continuity docs — #1400) all carry
+                        # a file extension, so the function's map lookup passes them through
+                        # to S3GeneratedOrigin untouched.
+                        function_associations=[
+                            cloudfront.CfnDistribution.FunctionAssociationProperty(
+                                event_type="viewer-request",
+                                function_arn=f"arn:aws:cloudfront::{ACCT}:function/v4-redirects",
+                            ),
+                        ],
                     ),
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/public_stats.json",
