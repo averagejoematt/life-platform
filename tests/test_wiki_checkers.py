@@ -378,29 +378,56 @@ def test_experiment_anchor_clean_on_current_tree():
 
 
 def test_cdk_cron_map_discovers_from_source():
-    """#1205: the cron gate's ground truth is LIVE-discovered from cdk/stacks/*.py, not a
-    pinned literal — re-derive two schedules (one per stack file) straight from source and
-    assert the map agrees, proving the fact the gate polices tracks the CDK."""
+    """#1205: the cron gate's ground truth is LIVE-discovered from cdk/stacks/*.py (via the
+    #2845 model generator's `extract_lambdas()`, #2866), not a pinned literal — re-derive
+    two schedules (one per stack file) straight from source and assert the map agrees,
+    proving the fact the gate polices tracks the CDK. Each entry is now a LIST of crons
+    (a multi-schedule function maps to its full schedule set, #2866) — single-schedule
+    functions still resolve to one-element lists."""
     facts = _load("scripts/check_doc_facts.py")
     cmap = facts._cdk_cron_map()
     assert cmap, "CDK cron map is empty — discovery broke"
     compute = (ROOT / "cdk" / "stacks" / "compute_stack.py").read_text(encoding="utf-8")
     m = re.search(r'function_name="character-sheet-compute".*?schedule="(cron\([^"]*\))"', compute, re.S)
     assert m, "could not locate character-sheet-compute schedule in compute_stack.py"
-    assert cmap.get("character-sheet-compute") == m.group(1)
+    assert cmap.get("character-sheet-compute") == [m.group(1)]
     email = (ROOT / "cdk" / "stacks" / "email_stack.py").read_text(encoding="utf-8")
     mb = re.search(r'function_name="daily-brief".*?schedule="(cron\([^"]*\))"', email, re.S)
     assert mb, "could not locate daily-brief schedule in email_stack.py"
-    assert cmap.get("daily-brief") == mb.group(1)
+    assert cmap.get("daily-brief") == [mb.group(1)]
+
+
+def test_cdk_cron_map_whoop_multi_schedule():
+    """#2866: `whoop-data-ingestion` has THREE real schedules — the primary cadence
+    (an f-string resolved through the WHOOP_HOURS module constant), the recovery refresh
+    (a standalone `events.Rule` wired via `add_target`), and the DI-2 reconcile rule (a
+    `Schedule.cron(...)` keyword form). The old hand-rolled regex mapped this function to
+    ONLY the recovery cron — the exact defect this issue fixes. All three must be present,
+    and the primary cadence (the one a reader actually cares about) must be among them."""
+    facts = _load("scripts/check_doc_facts.py")
+    cmap = facts._cdk_cron_map()
+    whoop = cmap.get("whoop-data-ingestion")
+    assert whoop is not None, "whoop-data-ingestion missing from the derived cron map"
+    assert set(whoop) == {
+        "cron(0 0,4,12,16,20 * * ? *)",  # primary cadence — f-string via WHOOP_HOURS
+        "cron(30 17 * * ? *)",  # recovery refresh (events.Rule + add_target)
+        "cron(20 18 * * ? *)",  # DI-2 reconcile (Schedule.cron(hour=, minute=))
+    }, f"whoop-data-ingestion schedule set is wrong: {whoop}"
 
 
 def test_cron_gate_is_not_vacuous():
     """#1205 (per the #1189 vacuous-scan lesson): the cron scan must FLAG a doc cron that
     disagrees with the CDK, PASS the matching value, and EXEMPT the shapes that legitimately
-    differ (history, hyphen-suffixed rule names, ambiguous multi-cron lines)."""
+    differ (history, hyphen-suffixed rule names, ambiguous multi-cron lines). #2866: cdk map
+    values are now LISTS (a multi-schedule function's full schedule set) — a doc cron
+    matching ANY entry passes, one matching none reds (proven here with whoop's three)."""
     facts = _load("scripts/check_doc_facts.py")
     d = Path(tempfile.mkdtemp())
-    cdk = {"character-sheet-compute": "cron(30 16 * * ? *)", "wednesday-chronicle": "cron(0 15 ? * WED *)"}
+    cdk = {
+        "character-sheet-compute": ["cron(30 16 * * ? *)"],
+        "wednesday-chronicle": ["cron(0 15 ? * WED *)"],
+        "whoop-data-ingestion": ["cron(0 0,4,12,16,20 * * ? *)", "cron(30 17 * * ? *)", "cron(20 18 * * ? *)"],
+    }
 
     # the EXACT #1205 defect: a stale cron quoted next to the function name — must be caught.
     bad = d / "stale.md"
@@ -429,6 +456,24 @@ def test_cron_gate_is_not_vacuous():
     ambig = d / "ambig.md"
     ambig.write_text("`character-sheet-compute` `cron(35 17 * * ? *)` and `cron(30 16 * * ? *)`\n")
     assert facts._cron_hits([ambig], cdk) == []
+
+    # #2866: whoop's PRIMARY cadence — must pass even though it is not whoop's ONLY cron.
+    whoop_primary = d / "whoop_primary.md"
+    whoop_primary.write_text("`whoop-data-ingestion` runs `cron(0 0,4,12,16,20 * * ? *)`\n")
+    assert facts._cron_hits([whoop_primary], cdk) == []
+
+    # #2866: whoop's RECOVERY cron — also a real schedule, must ALSO pass (the exact
+    # defect: the old map pinned this as the ONLY correct value for whoop).
+    whoop_recovery = d / "whoop_recovery.md"
+    whoop_recovery.write_text("`whoop-data-ingestion` recovery refresh `cron(30 17 * * ? *)`\n")
+    assert facts._cron_hits([whoop_recovery], cdk) == []
+
+    # #2866: a cron matching NONE of whoop's three real schedules — must still be caught.
+    whoop_bad = d / "whoop_bad.md"
+    whoop_bad.write_text("`whoop-data-ingestion` runs `cron(15 9 * * ? *)`\n")
+    hits = facts._cron_hits([whoop_bad], cdk)
+    assert hits, "cron scan is VACUOUS for a multi-schedule function — planted-wrong whoop cron not flagged"
+    assert "whoop-data-ingestion" in hits[0]
 
 
 def test_cron_gate_clean_on_current_tree():
@@ -577,7 +622,7 @@ def test_governor_cadence_ground_truth_is_discovered():
     stack = (ROOT / "cdk" / "stacks" / "operational_stack.py").read_text(encoding="utf-8")
     m = re.search(r'function_name="life-platform-cost-governor".*?schedule="(cron\([^"]*\))"', stack, re.S)
     assert m, "could not locate life-platform-cost-governor's schedule in operational_stack.py"
-    assert cdk_map.get("life-platform-cost-governor") == m.group(1)
+    assert cdk_map.get("life-platform-cost-governor") == [m.group(1)]
     step = facts._governor_cadence_hours(cdk_map)
     assert step == 8, f"expected the governor's true cadence to be every 8h, discovered {step}"
 

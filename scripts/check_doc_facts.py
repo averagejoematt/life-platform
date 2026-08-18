@@ -331,56 +331,74 @@ def _anchor_hits(files, genesis: str, cycle: int) -> list[str]:
 # computes run 17:20-17:35 UTC (AFTER the brief) while compute_stack.py had moved them to
 # 16:30-16:45 (BEFORE it, Phase 3.1) — and NO gate caught it. This rule makes every
 # `cron(...)` a reader quotes next to a Lambda function name a synced fact: it is diffed
-# against that function's `schedule=`/`Schedule.expression("cron(...)")` string in the CDK.
+# against that function's real schedule(s) in the CDK.
+#
+# #2866: ground truth used to be a hand-rolled regex over per-function *text blocks* (a
+# function's block ran to the next `function_name=`). Two failure modes composed for
+# `whoop-data-ingestion`: its primary schedule is an f-string (`cron(0 {WHOOP_HOURS} *
+# * ? *)`) the regex couldn't resolve, and its two secondary `events.Rule` schedules
+# (recovery refresh, DI-2 reconcile) fell inside its text block — so the map silently
+# pointed a reader at the recovery cron instead of the real cadence, a hand-maintained
+# enumeration of registry vocabulary the charter's derivation-guard primitive forbids.
+# Ground truth is now `generate_platform_model.py::extract_lambdas()` (#2845) — the SAME
+# AST walk the system model is built from: it resolves f-string schedules through module
+# constants and traces standalone `events.Rule(...).add_target(...)` secondary schedules,
+# so a multi-schedule function (whoop x3, pipeline-health-check x3, strava-data-ingestion,
+# dashboard-refresh, telegram-coach-worker) maps to its FULL schedule set — one schedule
+# parse, shared with the model, instead of two disagreeing ones (the #2862 instrument-
+# defect class).
 #
 # PRECISION (the whole game — a false-positive gate gets disabled):
-#   • Ground truth is the CDK: function_name -> cron, parsed per-function-block so a
-#     schedule never leaks to the wrong function. Templated crons (`cron(0 {INGEST_HOURLY}
-#     ...)`) are dropped — a resolved doc value can't be diffed against a template.
+#   • Ground truth is function_name -> [cron, ...] (every real schedule); a doc value
+#     matching ANY of them passes, one matching none reds. Dynamic/unresolved schedules
+#     carry no `cron(...)` string and are dropped — nothing to diff a doc value against.
 #   • A doc line is compared ONLY when it names EXACTLY ONE known CDK function (matched
 #     hyphen-aware, so `wednesday-chronicle` never matches inside `wednesday-chronicle-
 #     schedule`) AND quotes EXACTLY ONE cron — the unambiguous "one row, one function,
-#     one cron" shape of the table. Multi-cron / multi-function lines are skipped.
+#     one cron" shape of the table. Multi-cron / multi-function lines are skipped (the
+#     model's own render_doc puts a multi-schedule function's crons in one cell for this
+#     reason — see generate_platform_model.py's comment by that name).
 #   • HISTORICAL-framed lines are exempt as everywhere else. Frozen snapshots
 #     (docs/reviews/, docs/archive/) and ledgers (CHANGELOG) are already out of scope via
 #     _scan_files()'s EXEMPT_DIRS/EXEMPT_FILES, so stale review-bundle tables don't trip it.
-CDK_STACKS_DIR = ROOT / "cdk" / "stacks"
 CRON_RE = re.compile(r"cron\([^)]*\)")
-_CDK_FUNC_RE = re.compile(r'function_name\s*=\s*"([^"]+)"')
-_CDK_SCHED_RE = re.compile(r'schedule\s*=\s*(?:events\.Schedule\.expression\(\s*)?"(cron\([^"]*\))"')
+
+
+def _load_model_gen():
+    """generate_platform_model.py, loaded by path (same convention as `_load_ops` above):
+    this script runs both as `python3 scripts/check_doc_facts.py` and via spec-load in
+    tests, so `scripts/` is not reliably importable as a package."""
+    spec = importlib.util.spec_from_file_location("_platformmodelgen", ROOT / "scripts" / "generate_platform_model.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 
 def _cdk_cron_map() -> dict:
-    """function_name -> cron expression, parsed from cdk/stacks/*.py.
-
-    Each function's schedule is searched only within its own block (up to the next
-    `function_name=`), so an unscheduled function can't inherit a neighbour's cron.
-    Templated crons (containing `{`) are dropped — they can't be diffed against a
-    resolved doc value.
+    """function_name -> sorted list of real cron expressions, derived from the #2845
+    model generator's `extract_lambdas()` (#2866) — see the module comment above for why
+    a hand-rolled regex map is banned here. A multi-schedule function's list holds every
+    one of its real crons; dynamic/unresolved schedules (no `cron(...)` string) are
+    dropped, and a function with no resolvable cron at all is omitted from the map.
     """
-    cmap: dict = {}
-    if not CDK_STACKS_DIR.exists():
+    cmap: dict[str, list[str]] = {}
+    try:
+        lambdas = _load_model_gen().extract_lambdas()
+    except Exception:
         return cmap
-    for f in sorted(CDK_STACKS_DIR.glob("*.py")):
-        txt = f.read_text(encoding="utf-8")
-        funcs = list(_CDK_FUNC_RE.finditer(txt))
-        for i, fm in enumerate(funcs):
-            name = fm.group(1)
-            end = funcs[i + 1].start() if i + 1 < len(funcs) else len(txt)
-            sm = _CDK_SCHED_RE.search(txt, fm.end(), end)
-            if not sm:
-                continue
-            cron = sm.group(1)
-            if "{" in cron:  # templated (e.g. INGEST_HOURLY) — unresolvable, skip
-                continue
-            cmap.setdefault(name, cron)
+    for name, record in lambdas.items():
+        crons = sorted(
+            {s["expr"] for s in record["schedules"] if s.get("resolution") != "dynamic" and s.get("expr") and s["expr"].startswith("cron(")}
+        )
+        if crons:
+            cmap[name] = crons
     return cmap
 
 
 def _cron_hits(files, cdk_map: dict) -> list[str]:
-    """Live doc lines quoting a cron that disagrees with the CDK schedule for the same
-    function. Exposed so the regression test can plant a stale cron in a scratch file and
-    prove the rule bites (the #1189 non-vacuous-scan lesson)."""
+    """Live doc lines quoting a cron that matches NONE of the real CDK schedules for the
+    same function. Exposed so the regression test can plant a stale cron in a scratch
+    file and prove the rule bites (the #1189 non-vacuous-scan lesson)."""
     if not cdk_map:
         return []
     name_res = {n: re.compile(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])") for n in cdk_map}
@@ -399,10 +417,11 @@ def _cron_hits(files, cdk_map: dict) -> list[str]:
             named = [n for n, rx in name_res.items() if rx.search(line)]
             if len(named) != 1:
                 continue  # no CDK function named, or ambiguous multi-function line
-            name, doc_cron, cdk_cron = named[0], crons[0], cdk_map[named[0]]
-            if doc_cron != cdk_cron:
+            name, doc_cron, cdk_crons = named[0], crons[0], cdk_map[named[0]]
+            if doc_cron not in cdk_crons:
                 hits.append(
-                    f"{rel}:{lineno}: cron for `{name}` claims {doc_cron}, CDK schedules {cdk_cron} (#1205)\n"
+                    f"{rel}:{lineno}: cron for `{name}` claims {doc_cron}, "
+                    f"CDK schedules {' or '.join(cdk_crons)} (#1205)\n"
                     f"      | {line.strip()[:120]}"
                 )
     return hits
@@ -671,16 +690,22 @@ COST_TRACKER_VERIFIED_MAX_AGE_DAYS = 45
 
 
 def _governor_cadence_hours(cdk_map: dict) -> int | None:
-    """Hours between cost-governor runs, parsed from its own CDK cron (the same
-    `_cdk_cron_map()` the #1205 cron-diff rule uses — one CDK read, two gates).
-    Returns None if the function or an `N/step` hour field isn't found, in which
-    case the caller must treat ground truth as undiscoverable (fail loud, never
-    silently skip — the #1189 vacuous-scan lesson)."""
-    cron = cdk_map.get(GOVERNOR_FUNCTION_NAME)
-    if not cron:
+    """Hours between cost-governor runs, parsed from its own CDK cron(s) (the same
+    `_cdk_cron_map()` the #1205 cron-diff rule uses — one CDK read, two gates). #2866:
+    each map entry is now a LIST of real schedules (a multi-schedule function's full
+    set) — the governor has exactly one, but this reads the whole list so a future
+    second schedule can't silently return None. Returns None if the function or an
+    `N/step` hour field isn't found in ANY of its crons, in which case the caller must
+    treat ground truth as undiscoverable (fail loud, never silently skip — the #1189
+    vacuous-scan lesson)."""
+    crons = cdk_map.get(GOVERNOR_FUNCTION_NAME)
+    if not crons:
         return None
-    m = _GOVERNOR_CRON_STEP_RE.search(cron)
-    return int(m.group(1)) if m else None
+    for cron in crons:
+        m = _GOVERNOR_CRON_STEP_RE.search(cron)
+        if m:
+            return int(m.group(1))
+    return None
 
 
 def _scan_governor_surface() -> list[Path]:
