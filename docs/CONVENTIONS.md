@@ -860,6 +860,7 @@ read that section for the incident narrative and the exact mechanics.
 | A canonical page is unindexed or unverified >180d | `check_doc_index.py` | §8 above |
 | A doc-sync literal (test/alarm/lambda count) drifts from ground truth | `deploy/sync_doc_metadata.py --check` | §8 above; literals excluded from this table's edits (see CLAUDE.md) |
 | `health-auto-export-webhook` gains a second ingress (an out-of-IaC API Gateway) or a wider-than-declared invoke grant | HAE webhook single-ingress parity (#1946) | `deploy/check_hae_webhook_ingress_drift.py --strict` + its daily blocking workflow |
+| A public route serves **handled** 5xx indefinitely at AWS/Lambda `Errors` = 0 — the top-level `except` returns `_error(500, …)` instead of re-raising, so every existing alarm stays OK (the 2026-07-19 `/api/fulfillment_ritual` ~4h class) | Handled-5xx EMF metric + `site-api-handled-5xx` alarm (#2819), emitted from the error **envelope** — not the route log, which the early-returning routes never reach | `tests/test_handled_5xx_metric_2819.py`; `site_api_common::emit_handled_5xx`; `serve_stack.py` |
 
 **Pre-commit hook** (`scripts/install_hooks.sh`, installed once per clone — runs on every local commit):
 

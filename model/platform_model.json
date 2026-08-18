@@ -140,6 +140,10 @@
       "routing": "digest",
       "stack": "serve_stack"
     },
+    "site-api-handled-5xx": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
     "site-api-invocation-spike": {
       "routing": "digest",
       "stack": "serve_stack"
@@ -6070,7 +6074,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 45,
+      "alarms": 46,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,
