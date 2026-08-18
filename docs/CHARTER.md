@@ -90,8 +90,10 @@ or removing anything.
 
 ## Using this
 
-- **Session boot:** this charter (+ the system model, #2845, when it lands) is the
-  architecture context; the prose docs are depth, not prerequisites.
+- **Session boot:** this charter + the system model (#2845 — `model/platform_model.json`,
+  queried via `scripts/blast_radius.py --touches <partition>` / `--feeds <module>`,
+  rendered as `docs/DEPENDENCY_GRAPH.md`) is the architecture context; the prose docs
+  are depth, not prerequisites.
 - **Grading frame:** `/uplevel` and the review skills grade an area by asking which
   of the five primitives it is missing — that, not taste, is what separates the
   platform's A areas from its C areas.

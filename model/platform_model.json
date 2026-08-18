@@ -1,0 +1,6593 @@
+{
+  "alarms": {
+    "ai-tokens-platform-daily-total": {
+      "routing": "unresolved",
+      "stack": "monitoring_stack"
+    },
+    "between-chronicle-scrub-failed-closed": {
+      "routing": "digest",
+      "stack": "monitoring_stack"
+    },
+    "email-subscriber-errors": {
+      "routing": "unresolved",
+      "stack": "web_stack"
+    },
+    "expert-gate-infra-hold": {
+      "routing": "digest",
+      "stack": "monitoring_stack"
+    },
+    "freshness-checker-errors": {
+      "routing": "unresolved",
+      "stack": "operational_stack"
+    },
+    "grading-stalled": {
+      "routing": "digest",
+      "stack": "monitoring_stack"
+    },
+    "hae-webhook-no-invocations-24h": {
+      "routing": "digest",
+      "stack": "monitoring_stack"
+    },
+    "hevy-restamp-errors": {
+      "routing": "unresolved",
+      "stack": "operational_stack"
+    },
+    "hevy-routine-cron-errors": {
+      "routing": "unresolved",
+      "stack": "operational_stack"
+    },
+    "ingest-auth-unhealthy-24h": {
+      "routing": "urgent",
+      "stack": "monitoring_stack"
+    },
+    "ingestion-error-eightsleep": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "ingestion-error-enrichment": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "ingestion-error-hevy-backfill": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "ingestion-error-macrofactor": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "ingestion-error-strava": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "ingestion-error-todoist": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "ingestion-error-whoop": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "ingestion-error-withings": {
+      "routing": "unresolved",
+      "stack": "ingestion_stack"
+    },
+    "key-rotator-errors": {
+      "routing": "unresolved",
+      "stack": "operational_stack"
+    },
+    "life-platform-daily-brief-memory-high": {
+      "routing": "digest",
+      "stack": "monitoring_stack"
+    },
+    "life-platform-data-export-errors": {
+      "routing": "unresolved",
+      "stack": "operational_stack"
+    },
+    "life-platform-delete-user-data-errors": {
+      "routing": "unresolved",
+      "stack": "operational_stack"
+    },
+    "life-platform-dlq-depth-warning": {
+      "routing": "digest",
+      "stack": "operational_stack"
+    },
+    "life-platform-freshness-checker-not-emitting": {
+      "routing": "digest",
+      "stack": "operational_stack"
+    },
+    "life-platform-insight-email-parser-parse-failure": {
+      "routing": "digest",
+      "stack": "operational_stack"
+    },
+    "life-platform-recursive-loop": {
+      "routing": "digest",
+      "stack": "mcp_stack"
+    },
+    "mcp-server-duration-high": {
+      "routing": "digest",
+      "stack": "mcp_stack"
+    },
+    "mcp-warmer-error": {
+      "routing": "unresolved",
+      "stack": "mcp_stack"
+    },
+    "paging-budget-tier-3": {
+      "routing": "paging",
+      "stack": "monitoring_stack"
+    },
+    "paging-pipeline-dead": {
+      "routing": "paging",
+      "stack": "monitoring_stack"
+    },
+    "permanence-errors": {
+      "routing": "unresolved",
+      "stack": "operational_stack"
+    },
+    "permanence-heartbeat": {
+      "routing": "digest",
+      "stack": "operational_stack"
+    },
+    "site-api-ai-errors": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "site-api-ai-throttles": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "site-api-errors": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "site-api-invocation-spike": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "site-api-p95-latency-high": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "site-api-throttles": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "slo-mcp-availability": {
+      "routing": "digest",
+      "stack": "mcp_stack"
+    },
+    "slo-warmer-completeness": {
+      "routing": "digest",
+      "stack": "mcp_stack"
+    },
+    "telegram-event-sweep-heartbeat": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "telegram-webhook-throttles": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "telegram-worker-errors": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "telegram-worker-throttles": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
+    "token-alarm-genesis-window-active": {
+      "routing": "unresolved",
+      "stack": "monitoring_stack"
+    }
+  },
+  "edges": [
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/ai/ai_calls.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/ai/ai_calls.py",
+      "partition": "forecast",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/ai/ai_output_validator.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ai/conversation_enrichment.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ai/conversation_enrichment.py",
+      "partition": "habit_causality",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ai/conversation_enrichment.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ai/platform_memory.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/ai/semantic_recall.py",
+      "partition": "recall_embeddings",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/coach_chat_grounding.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/coach_corrections.py",
+      "partition": "coach_corrections",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_corrections.py",
+      "partition": "coach_corrections",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/coach/coach_corrections.py",
+      "partition": "coach_corrections",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/coach_diary_reaction.py",
+      "partition": "diary_reactions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_diary_reaction.py",
+      "partition": "diary_reactions",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/coach/coach_diary_reaction.py",
+      "partition": "diary_reactions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-history-summarizer",
+      "module": "lambdas/coach/coach_history_summarizer.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-narrative-orchestrator",
+      "module": "lambdas/coach/coach_narrative_orchestrator.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-narrative-orchestrator",
+      "module": "lambdas/coach/coach_narrative_orchestrator.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-narrative-orchestrator",
+      "module": "lambdas/coach/coach_narrative_orchestrator.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-narrative-orchestrator",
+      "module": "lambdas/coach/coach_narrative_orchestrator.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_nudge_engine.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_nudge_engine.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-prediction-evaluator",
+      "module": "lambdas/coach/coach_prediction_evaluator.py",
+      "partition": "diary_claims",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "coach-prediction-evaluator",
+      "module": "lambdas/coach/coach_prediction_evaluator.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/intake_response.py",
+      "partition": "private_intake",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/intake_response.py",
+      "partition": "private_intake",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/intake_response.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/intake_response.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/coach/spiral_breaker.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "telegram-coach-worker",
+      "module": "lambdas/coach/telegram_worker_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/common/digest_utils.py",
+      "partition": "food_delivery",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/common/generation_cache.py",
+      "partition": "coach_gen_cache",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/common/generation_cache.py",
+      "partition": "coach_gen_cache",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/common/generation_cache.py",
+      "partition": "coach_gen_cache",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "acwr-compute",
+      "module": "lambdas/compute/acwr_compute_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "adaptive_mode",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "adaptive_mode",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "day_grade",
+      "via": "local-seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "habit_scores",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "travel",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "adaptive-mode-compute",
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "character_receipt",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "food_delivery",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "character-sheet-compute",
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "circadian-compliance",
+      "module": "lambdas/compute/circadian_compliance_lambda.py",
+      "partition": "circadian",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "circadian-compliance",
+      "module": "lambdas/compute/circadian_compliance_lambda.py",
+      "partition": "circadian",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "circadian-compliance",
+      "module": "lambdas/compute/circadian_compliance_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "circadian-compliance",
+      "module": "lambdas/compute/circadian_compliance_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "computed_insights",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "computed_insights",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "computed_insights",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "supplements",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "todoist",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "todoist",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-insight-compute",
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "day_grade",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "day_grade",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "episode-detect",
+      "module": "lambdas/compute/episode_detect_lambda.py",
+      "partition": "training_reference",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "episode-detect",
+      "module": "lambdas/compute/episode_detect_lambda.py",
+      "partition": "weight_episodes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "failure-pattern-compute",
+      "module": "lambdas/compute/failure_pattern_compute_lambda.py",
+      "partition": "day_grade",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "failure-pattern-compute",
+      "module": "lambdas/compute/failure_pattern_compute_lambda.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "failure-pattern-compute",
+      "module": "lambdas/compute/failure_pattern_compute_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "failure-pattern-compute",
+      "module": "lambdas/compute/failure_pattern_compute_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "failure-pattern-compute",
+      "module": "lambdas/compute/failure_pattern_compute_lambda.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "forecast-engine",
+      "module": "lambdas/compute/forecast_engine_lambda.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "forecast-engine",
+      "module": "lambdas/compute/forecast_engine_lambda.py",
+      "partition": "forecast",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "forecast-engine",
+      "module": "lambdas/compute/forecast_engine_lambda.py",
+      "partition": "forecast",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "journal_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "hypothesis-engine",
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "scenario-explorer",
+      "module": "lambdas/compute/scenario_explorer_lambda.py",
+      "partition": "scenarios",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "forecast",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "forecast",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "state-of-matthew",
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "partition": "state_of_matthew",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "centenarian_progress",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "centenarian_progress",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "what_changed",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "what_changed",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "what_changed",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "zone2_efficiency",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-correlation-compute",
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "partition": "zone2_efficiency",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "weekly-signal",
+      "module": "lambdas/compute/weekly_signal_lambda.py",
+      "partition": "computed_insights",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-signal",
+      "module": "lambdas/compute/weekly_signal_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/insight_writer.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/output_writers.py",
+      "partition": "rewards",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/site_writer.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/theme_river.py",
+      "partition": "flourishing",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/content/theme_river.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/vacation_fund.py",
+      "partition": "hevy",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/content/vacation_fund.py",
+      "partition": "strava",
+      "via": "local-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "ai-review-pack",
+      "module": "lambdas/emails/ai_review_pack_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "anomalies",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "anomalies",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "anomalies",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "travel",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "travel",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "email_digest",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "email_digest",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "email_digest",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "what_changed",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "chronicle-approve",
+      "module": "lambdas/emails/chronicle_approve_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "chronicle-approve",
+      "module": "lambdas/emails/chronicle_approve_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "chronicle-approve",
+      "module": "lambdas/emails/chronicle_approve_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_data.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_data.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_data.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_data.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_data.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "chronicle-email-sender",
+      "module": "lambdas/emails/chronicle_email_sender_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "chronicle-email-sender",
+      "module": "lambdas/emails/chronicle_email_sender_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "chronicle-email-sender",
+      "module": "lambdas/emails/chronicle_email_sender_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "chronicle-email-sender",
+      "module": "lambdas/emails/chronicle_email_sender_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "chronicle-email-sender",
+      "module": "lambdas/emails/chronicle_email_sender_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "chronicle-podcast",
+      "module": "lambdas/emails/chronicle_podcast_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_recap.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_store.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_store.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_store.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/emails/chronicle_store.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "coach-nudge",
+      "module": "lambdas/emails/coach_nudge_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "coach-nudge",
+      "module": "lambdas/emails/coach_nudge_lambda.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-nudge",
+      "module": "lambdas/emails/coach_nudge_lambda.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "coach-panel-podcast",
+      "module": "lambdas/emails/coach_panel_podcast_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "coach-panel-podcast",
+      "module": "lambdas/emails/coach_panel_podcast_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "coach-panel-podcast",
+      "module": "lambdas/emails/coach_panel_podcast_lambda.py",
+      "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-panel-podcast",
+      "module": "lambdas/emails/coach_panel_podcast_lambda.py",
+      "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "coach-panel-podcast",
+      "module": "lambdas/emails/coach_panel_podcast_lambda.py",
+      "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-panel-podcast",
+      "module": "lambdas/emails/coach_panel_podcast_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "anomalies",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "computed_insights",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "day_grade",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "day_grade",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "travel",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-debrief",
+      "module": "lambdas/emails/daily_debrief_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-debrief",
+      "module": "lambdas/emails/daily_debrief_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "elena-state-updater",
+      "module": "lambdas/emails/elena_state_updater.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "evening-nudge",
+      "module": "lambdas/emails/evening_nudge_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "evening-nudge",
+      "module": "lambdas/emails/evening_nudge_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-freshness-checker",
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-freshness-checker",
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-freshness-checker",
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-freshness-checker",
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-freshness-checker",
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-freshness-checker",
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-freshness-checker",
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "insight-email-parser",
+      "module": "lambdas/emails/insight_email_parser_lambda.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "insight-email-parser",
+      "module": "lambdas/emails/insight_email_parser_lambda.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "character_sheet",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "computed_metrics",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "day_grade",
+      "via": "seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "habit_scores",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "monthly-digest",
+      "module": "lambdas/emails/monthly_digest_lambda.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "monthly-digest",
+      "module": "lambdas/emails/monthly_digest_lambda.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "monthly-digest",
+      "module": "lambdas/emails/monthly_digest_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "monthly-digest",
+      "module": "lambdas/emails/monthly_digest_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "monthly-digest",
+      "module": "lambdas/emails/monthly_digest_lambda.py",
+      "partition": "strava",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "dexa",
+      "via": "local-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "genome",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "labs",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "nutrition_review",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "nutrition_review",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "nutrition_review",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "partner-weekly-email",
+      "module": "lambdas/emails/partner_email_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/podcast_script_v2.py",
+      "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/emails/podcast_script_v2.py",
+      "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "wednesday-chronicle",
+      "module": "lambdas/emails/wednesday_chronicle_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/emails/weekly_digest_extractors.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-plate",
+      "module": "lambdas/emails/weekly_plate_lambda.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "weekly-plate",
+      "module": "lambdas/emails/weekly_plate_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "weekly-plate",
+      "module": "lambdas/emails/weekly_plate_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-plate",
+      "module": "lambdas/emails/weekly_plate_lambda.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/experiment/effect_fitter.py",
+      "partition": "effect_fits",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/experiment/eyeball_calibration.py",
+      "partition": "eyeball_estimate",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/experiment/phase_taxonomy.py",
+      "partition": "coach_thread",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/experiment/phase_taxonomy.py",
+      "partition": "intelligence_quality",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/experiment/prereg_voids.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/experiment/prereg_voids.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/achievement_rules.py",
+      "partition": "achievements",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/flourishing.py",
+      "partition": "flourishing",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/health/flourishing.py",
+      "partition": "flourishing",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/meal_projection.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/meal_projection.py",
+      "partition": "macrofactor_meals",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/milestone_ledger.py",
+      "partition": "milestones",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/health/sick_day_checker.py",
+      "partition": "sick_days",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/sick_day_checker.py",
+      "partition": "sick_days",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/health/sick_day_checker.py",
+      "partition": "sick_days",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/health/time_affluence.py",
+      "partition": "time_affluence",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "dropbox-poll",
+      "module": "lambdas/ingestion/dropbox_poll_lambda.py",
+      "partition": "dropbox_tracker",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "dropbox-poll",
+      "module": "lambdas/ingestion/dropbox_poll_lambda.py",
+      "partition": "dropbox_tracker",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "dropbox-poll",
+      "module": "lambdas/ingestion/dropbox_poll_lambda.py",
+      "partition": "dropbox_tracker",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "activity-enrichment",
+      "module": "lambdas/ingestion/enrichment_lambda.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "activity-enrichment",
+      "module": "lambdas/ingestion/enrichment_lambda.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "activity-enrichment",
+      "module": "lambdas/ingestion/enrichment_lambda.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "food-delivery-ingestion",
+      "module": "lambdas/ingestion/food_delivery_lambda.py",
+      "partition": "food_delivery",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "food-delivery-ingestion",
+      "module": "lambdas/ingestion/food_delivery_lambda.py",
+      "partition": "food_delivery",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "garmin-data-ingestion",
+      "module": "lambdas/ingestion/garmin_lambda.py",
+      "partition": "garmin",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "habitify-data-ingestion",
+      "module": "lambdas/ingestion/habitify_lambda.py",
+      "partition": "supplements",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "habitify-data-ingestion",
+      "module": "lambdas/ingestion/habitify_lambda.py",
+      "partition": "supplements",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "habitify-data-ingestion",
+      "module": "lambdas/ingestion/habitify_lambda.py",
+      "partition": "supplements",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "health-auto-export-webhook",
+      "module": "lambdas/ingestion/health_auto_export_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "health-auto-export-webhook",
+      "module": "lambdas/ingestion/health_auto_export_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "health-auto-export-webhook",
+      "module": "lambdas/ingestion/health_auto_export_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "journal-enrichment",
+      "module": "lambdas/ingestion/journal_enrichment_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "macrofactor-data-ingestion",
+      "module": "lambdas/ingestion/macrofactor_lambda.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "macrofactor-data-ingestion",
+      "module": "lambdas/ingestion/macrofactor_lambda.py",
+      "partition": "macrofactor_workouts",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "measurements-ingestion",
+      "module": "lambdas/ingestion/measurements_ingestion_lambda.py",
+      "partition": "measurements",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "measurements-ingestion",
+      "module": "lambdas/ingestion/measurements_ingestion_lambda.py",
+      "partition": "measurements",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "notion-journal-ingestion",
+      "module": "lambdas/ingestion/notion_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "notion-journal-ingestion",
+      "module": "lambdas/ingestion/notion_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "notion-journal-ingestion",
+      "module": "lambdas/ingestion/notion_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "strava-data-ingestion",
+      "module": "lambdas/ingestion/strava_lambda.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "whoop-data-ingestion",
+      "module": "lambdas/ingestion/whoop_lambda.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "whoop-data-ingestion",
+      "module": "lambdas/ingestion/whoop_lambda.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "whoop-data-ingestion",
+      "module": "lambdas/ingestion/whoop_lambda.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "withings-data-ingestion",
+      "module": "lambdas/ingestion/withings_lambda.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "computed_metrics",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "dexa",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "eightsleep",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "habitify",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "journal_analysis",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "labs",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "macrofactor",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "measurements",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "withings",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "ai-expert-analyzer",
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "challenge-generator",
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "character_sheet",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "field-notes-generate",
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "coach_actions",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "coach_actions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "coach_credibility",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "coach_thread",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "garmin",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "intelligence_quality",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/intelligence/intelligence_common.py",
+      "partition": "todoist",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "journal-analyzer",
+      "module": "lambdas/intelligence/journal_analyzer_lambda.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "journal-analyzer",
+      "module": "lambdas/intelligence/journal_analyzer_lambda.py",
+      "partition": "journal_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "journal-analyzer",
+      "module": "lambdas/intelligence/journal_analyzer_lambda.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-canary",
+      "module": "lambdas/operational/canary_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-canary",
+      "module": "lambdas/operational/canary_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-canary",
+      "module": "lambdas/operational/canary_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-coherence-sentinel",
+      "module": "lambdas/operational/coherence_sentinel_lambda.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-coherence-sentinel",
+      "module": "lambdas/operational/coherence_sentinel_lambda.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-coherence-sentinel",
+      "module": "lambdas/operational/coherence_sentinel_lambda.py",
+      "partition": "character_sheet",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-coherence-sentinel",
+      "module": "lambdas/operational/coherence_sentinel_lambda.py",
+      "partition": "computed_metrics",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-coherence-sentinel",
+      "module": "lambdas/operational/coherence_sentinel_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-coherence-sentinel",
+      "module": "lambdas/operational/coherence_sentinel_lambda.py",
+      "partition": "day_grade",
+      "via": "local-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-delete-user-data",
+      "module": "lambdas/operational/delete_user_data_lambda.py",
+      "partition": "deletion_log",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-delete-user-data",
+      "module": "lambdas/operational/delete_user_data_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-delete-user-data",
+      "module": "lambdas/operational/delete_user_data_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-delete-user-data",
+      "module": "lambdas/operational/delete_user_data_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "hevy-restamp",
+      "module": "lambdas/operational/hevy_restamp_lambda.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "pipeline-health-check",
+      "module": "lambdas/operational/pipeline_health_check_lambda.py",
+      "partition": "health_check",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "pipeline-health-check",
+      "module": "lambdas/operational/pipeline_health_check_lambda.py",
+      "partition": "ingest_liveness",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/operational/qa_check_outputs.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "character_receipt",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "qa_predict_dark",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "qa_predict_dark",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-traffic-digest",
+      "module": "lambdas/operational/traffic_digest_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/privacy/diary_claims.py",
+      "partition": "diary_claims",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/privacy/diary_claims.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/privacy/diary_publish.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/reading/reading_resonance.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/exercise_history.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/hevy_common.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/hevy_common.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/routine_repo.py",
+      "partition": "hevy_id_map",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/routine_repo.py",
+      "partition": "hevy_id_map",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/routine_repo.py",
+      "partition": "hevy_id_map",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/routine_repo.py",
+      "partition": "routine_index",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/routine_repo.py",
+      "partition": "routine_index",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/routine_repo.py",
+      "partition": "routine_index",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/routine_title.py",
+      "partition": "routine_index",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/routine_title.py",
+      "partition": "routine_index",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/training_notes.py",
+      "partition": "coach_thread",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/training_notes.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/training_notes.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/training_notes.py",
+      "partition": "training_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/training/training_notes_llm.py",
+      "partition": "training_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/training/training_notes_llm.py",
+      "partition": "training_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/training/training_notes_llm.py",
+      "partition": "training_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/ask_retrieval.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "email-subscriber",
+      "module": "lambdas/web/email_subscriber_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "email-subscriber",
+      "module": "lambdas/web/email_subscriber_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "email-subscriber",
+      "module": "lambdas/web/email_subscriber_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ai_context.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ai_context.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ai_context.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ai_context.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ai_context.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ai_context.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ai_context.py",
+      "partition": "what_changed",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_autonomic.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_biomarkers.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_biomarkers.py",
+      "partition": "genome",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_biomarkers.py",
+      "partition": "genome",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_body.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_body.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_body.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_body.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_character.py",
+      "partition": "character_receipt",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_character.py",
+      "partition": "character_receipt",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_character.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_character.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_coach_ledger.py",
+      "partition": "calibration",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_coach_ledger.py",
+      "partition": "panelcast",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_coach_narrative.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_coach_narrative.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_coach_narrative.py",
+      "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_coach_profile.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_coach_stance.py",
+      "partition": "ai_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_data.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_data.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_diary.py",
+      "partition": "diary_claims",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_diary.py",
+      "partition": "diary_claims",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_diary.py",
+      "partition": "journal_quotes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_diary.py",
+      "partition": "journal_quotes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_diary.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_discovery.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_discovery.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_discovery.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_discovery.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_discovery.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_discovery.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fingerprint.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fingerprint.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fingerprint.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_foresight.py",
+      "partition": "forecast",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_foresight.py",
+      "partition": "intelligence_quality",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_foresight.py",
+      "partition": "scenarios",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_foresight.py",
+      "partition": "state_of_matthew",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_freshness.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_freshness.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_freshness.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_freshness.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "character_sheet",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "evening_ritual",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "evening_ritual",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "evening_ritual",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "felt_probe",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "flourishing",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "interactions",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "notion",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_fulfillment.py",
+      "partition": "todoist",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "habit_causality",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_habits.py",
+      "partition": "habitify",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "discovery_annotations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "discovery_annotations",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "life_events",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "life_events",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_journey.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-site-api",
+      "module": "lambdas/web/site_api_lambda.py",
+      "partition": "coach_actions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-site-api",
+      "module": "lambdas/web/site_api_lambda.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ledger.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ledger.py",
+      "partition": "ledger",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ledger.py",
+      "partition": "ledger",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ledger.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ledger.py",
+      "partition": "what_changed",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_meals.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_meals.py",
+      "partition": "food_delivery",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_meals.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "character_sheet",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "interactions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "interactions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "journal_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "journal_analysis",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "state_of_mind",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "temptations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_mind.py",
+      "partition": "temptations",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_nutrition.py",
+      "partition": "food_delivery",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_nutrition.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_nutrition.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_nutrition.py",
+      "partition": "training_reference",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_nutrition.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_nutrition.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "dexa",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "dexa",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "measurements",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "measurements",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_physical.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_protocols.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_protocols.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_protocols.py",
+      "partition": "protocols",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_protocols.py",
+      "partition": "protocols",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_protocols.py",
+      "partition": "routine_index",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_protocols.py",
+      "partition": "supplements",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_protocols.py",
+      "partition": "supplements",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "state_of_mind",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "withings",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_pulse.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_rollups.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_rollups.py",
+      "partition": "character_sheet",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_rollups.py",
+      "partition": "experiments",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_rollups.py",
+      "partition": "journal",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_rollups.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_rollups.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_rollups.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_sleep.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_sleep.py",
+      "partition": "eightsleep",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_sleep.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_sleep.py",
+      "partition": "todoist",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_sleep.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_sleep.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_challenges.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_challenges.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_challenges.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_engage.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_experiments.py",
+      "partition": "experiment_suggestions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_ladder.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_social_ladder.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_status.py",
+      "partition": "health_check",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "diary_reactions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "diary_reactions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "journal_quotes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_thirdwall.py",
+      "partition": "journal_quotes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "benchmarks",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "training_reference",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_training.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_vitals_depth.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/web/site_api_vitals_depth.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "site-stats-refresh",
+      "module": "lambdas/web/site_stats_refresh_lambda.py",
+      "partition": "apple_health",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "site-stats-refresh",
+      "module": "lambdas/web/site_stats_refresh_lambda.py",
+      "partition": "character_sheet",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "site-stats-refresh",
+      "module": "lambdas/web/site_stats_refresh_lambda.py",
+      "partition": "habitify",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "site-stats-refresh",
+      "module": "lambdas/web/site_stats_refresh_lambda.py",
+      "partition": "macrofactor",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "site-stats-refresh",
+      "module": "lambdas/web/site_stats_refresh_lambda.py",
+      "partition": "strava",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "site-stats-refresh",
+      "module": "lambdas/web/site_stats_refresh_lambda.py",
+      "partition": "withings",
+      "via": "local-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "subscriber-onboarding",
+      "module": "lambdas/web/subscriber_onboarding_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "subscriber-onboarding",
+      "module": "lambdas/web/subscriber_onboarding_lambda.py",
+      "partition": "subscribers",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "challenges",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "discovery_annotations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "exposures",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "food_responses",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "interactions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "life_events",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "protocols",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "ruck_log",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "temptations",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/config.py",
+      "partition": "travel",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/labs_helpers.py",
+      "partition": "dexa",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/labs_helpers.py",
+      "partition": "genome",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/labs_helpers.py",
+      "partition": "labs",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_benchmark.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_benchmark.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_cgm.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_cgm.py",
+      "partition": "labs",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_coach_checkin.py",
+      "partition": "adaptive_mode",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_coach_checkin.py",
+      "partition": "engagement_state",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_coach_intelligence.py",
+      "partition": "coach_thread",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_coach_intelligence.py",
+      "partition": "diary_claims",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_correlation.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_data.py",
+      "partition": "intelligence_quality",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_decisions.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_health.py",
+      "partition": "apple_health",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_health.py",
+      "partition": "computed_metrics",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_health.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_health.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_health.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_health.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_hevy_routine.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_hevy_routine.py",
+      "partition": "whoop",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_journal.py",
+      "partition": "diary_claims",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_journal.py",
+      "partition": "flourishing",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_journal.py",
+      "partition": "journal_quotes",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_journal.py",
+      "partition": "journal_quotes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_journal.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_journal.py",
+      "partition": "notion",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_labs.py",
+      "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "apple_health",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "experiments",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "field_notes",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "hypotheses",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "insights",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "ledger",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "travel",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "weather",
+      "via": "seam"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "weather",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_lifestyle.py",
+      "partition": "weather",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_memory.py",
+      "partition": "platform_memory",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_nutrition.py",
+      "partition": "eightsleep",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_nutrition.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_nutrition.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_nutrition.py",
+      "partition": "withings",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_reading.py",
+      "partition": "adaptive_mode",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_reading.py",
+      "partition": "adaptive_mode",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_sick_days.py",
+      "partition": "sick_days",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_sick_days.py",
+      "partition": "sick_days",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_sick_days.py",
+      "partition": "sick_days",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_social.py",
+      "partition": "interactions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_social_connection.py",
+      "partition": "notion",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_strength.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_todoist.py",
+      "partition": "todoist",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "computed_metrics",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "eightsleep",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "garmin",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "macrofactor_workouts",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "strava",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training.py",
+      "partition": "whoop",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training_notes.py",
+      "partition": "hevy",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_training_notes.py",
+      "partition": "training_notes",
+      "via": "pk"
+    }
+  ],
+  "lambdas": {
+    "activity-enrichment": {
+      "declared_alarm": "ingestion-error-enrichment",
+      "handler": "ingestion.enrichment_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/enrichment_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 15 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "acwr-compute": {
+      "declared_alarm": null,
+      "handler": "compute.acwr_compute_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/acwr_compute_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(55 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 60
+    },
+    "adaptive-mode-compute": {
+      "declared_alarm": null,
+      "handler": "compute.adaptive_mode_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/adaptive_mode_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(35 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "ai-expert-analyzer": {
+      "declared_alarm": null,
+      "handler": "intelligence.ai_expert_analyzer_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 14 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 600
+    },
+    "ai-review-pack": {
+      "declared_alarm": null,
+      "handler": "emails.ai_review_pack_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/ai_review_pack_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 18 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "anomaly-detector": {
+      "declared_alarm": null,
+      "handler": "emails.anomaly_detector_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(5 15 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 90
+    },
+    "between-chronicle": {
+      "declared_alarm": null,
+      "handler": "emails.between_chronicle_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 300
+    },
+    "bluesky-social-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.bluesky_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/bluesky_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    },
+    "challenge-generator": {
+      "declared_alarm": null,
+      "handler": "intelligence.challenge_generator_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/intelligence/challenge_generator_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 22 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "character-sheet-compute": {
+      "declared_alarm": null,
+      "handler": "compute.character_sheet_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/compute/character_sheet_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 60
+    },
+    "chronicle-approve": {
+      "declared_alarm": null,
+      "handler": "emails.chronicle_approve_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/chronicle_approve_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 18 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 60
+    },
+    "chronicle-email-sender": {
+      "declared_alarm": null,
+      "handler": "emails.chronicle_email_sender_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/chronicle_email_sender_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(10 15 ? * WED *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 300
+    },
+    "chronicle-podcast": {
+      "declared_alarm": null,
+      "handler": "emails.chronicle_podcast_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/emails/chronicle_podcast_lambda.py",
+      "schedules": [],
+      "stack": "email_stack",
+      "timeout_seconds": 900
+    },
+    "circadian-compliance": {
+      "declared_alarm": null,
+      "handler": "compute.circadian_compliance_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/circadian_compliance_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 2 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 60
+    },
+    "coach-computation-engine": {
+      "declared_alarm": null,
+      "handler": "coach.coach_computation_engine.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_computation_engine.py",
+      "schedules": [],
+      "stack": "compute_stack",
+      "timeout_seconds": 60
+    },
+    "coach-daily-reflection": {
+      "declared_alarm": null,
+      "handler": "compute.coach_daily_reflection_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/coach_daily_reflection_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 19 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 180
+    },
+    "coach-ensemble-digest": {
+      "declared_alarm": null,
+      "handler": "coach.coach_ensemble_digest.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_ensemble_digest.py",
+      "schedules": [],
+      "stack": "compute_stack",
+      "timeout_seconds": 90
+    },
+    "coach-history-summarizer": {
+      "declared_alarm": null,
+      "handler": "coach.coach_history_summarizer.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_history_summarizer.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 600
+    },
+    "coach-memoir": {
+      "declared_alarm": null,
+      "handler": "compute.coach_memoir_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/coach_memoir_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 15 1 1,4,7,10 ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 300
+    },
+    "coach-narrative-orchestrator": {
+      "declared_alarm": null,
+      "handler": "coach.coach_narrative_orchestrator.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_narrative_orchestrator.py",
+      "schedules": [],
+      "stack": "compute_stack",
+      "timeout_seconds": 90
+    },
+    "coach-nudge": {
+      "declared_alarm": null,
+      "handler": "emails.coach_nudge_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/coach_nudge_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(10 0-5,15-23 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "coach-observatory-renderer": {
+      "declared_alarm": null,
+      "handler": "coach.coach_observatory_renderer.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_observatory_renderer.py",
+      "schedules": [],
+      "stack": "compute_stack",
+      "timeout_seconds": 30
+    },
+    "coach-panel-podcast": {
+      "declared_alarm": null,
+      "handler": "emails.coach_panel_podcast_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/emails/coach_panel_podcast_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 18 * * MON,WED *)",
+          "resolution": "constructed"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 900
+    },
+    "coach-prediction-evaluator": {
+      "declared_alarm": null,
+      "handler": "coach.coach_prediction_evaluator.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_prediction_evaluator.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 90
+    },
+    "coach-quality-gate": {
+      "declared_alarm": null,
+      "handler": "coach.coach_quality_gate.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_quality_gate.py",
+      "schedules": [],
+      "stack": "compute_stack",
+      "timeout_seconds": 30
+    },
+    "coach-state-updater": {
+      "declared_alarm": null,
+      "handler": "coach.coach_state_updater.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/coach_state_updater.py",
+      "schedules": [],
+      "stack": "compute_stack",
+      "timeout_seconds": 60
+    },
+    "daily-brief": {
+      "declared_alarm": null,
+      "handler": "emails.daily_brief_lambda.lambda_handler",
+      "memory_mb": 768,
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 900
+    },
+    "daily-debrief": {
+      "declared_alarm": null,
+      "handler": "emails.daily_debrief_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/emails/daily_debrief_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 19 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 300
+    },
+    "daily-insight-compute": {
+      "declared_alarm": null,
+      "handler": "compute.daily_insight_compute_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/compute/daily_insight_compute_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(45 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "daily-metrics-compute": {
+      "declared_alarm": null,
+      "handler": "compute.daily_metrics_compute_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(40 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "dashboard-refresh": {
+      "declared_alarm": null,
+      "handler": "compute.dashboard_refresh_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/dashboard_refresh_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 1 * * ? *)",
+          "resolution": "constant"
+        },
+        {
+          "expr": "cron(0 21 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 60
+    },
+    "dropbox-poll": {
+      "declared_alarm": null,
+      "handler": "ingestion.dropbox_poll_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/dropbox_poll_lambda.py",
+      "schedules": [
+        {
+          "expr": "rate(30 minutes)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    },
+    "eightsleep-data-ingestion": {
+      "declared_alarm": "ingestion-error-eightsleep",
+      "handler": "ingestion.eightsleep_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/eightsleep_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(15 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    },
+    "elena-state-updater": {
+      "declared_alarm": null,
+      "handler": "emails.elena_state_updater.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/elena_state_updater.py",
+      "schedules": [],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "email-subscriber": {
+      "declared_alarm": null,
+      "handler": "web.email_subscriber_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/web/email_subscriber_lambda.py",
+      "schedules": [],
+      "stack": "web_stack",
+      "timeout_seconds": 30
+    },
+    "episode-detect": {
+      "declared_alarm": null,
+      "handler": "compute.episode_detect_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/compute/episode_detect_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "evening-nudge": {
+      "declared_alarm": null,
+      "handler": "emails.evening_nudge_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/evening_nudge_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 3 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 60
+    },
+    "failure-pattern-compute": {
+      "declared_alarm": null,
+      "handler": "compute.failure_pattern_compute_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/failure_pattern_compute_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(50 17 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 300
+    },
+    "field-notes-generate": {
+      "declared_alarm": null,
+      "handler": "intelligence.field_notes_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/intelligence/field_notes_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 18 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "food-delivery-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.food_delivery_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/food_delivery_lambda.py",
+      "schedules": [],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 60
+    },
+    "forecast-engine": {
+      "declared_alarm": null,
+      "handler": "compute.forecast_engine_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/compute/forecast_engine_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(50 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "garmin-data-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.garmin_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/ingestion/garmin_lambda.py",
+      "schedules": [],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "habitify-data-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.habitify_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/habitify_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 180
+    },
+    "health-auto-export-webhook": {
+      "declared_alarm": null,
+      "handler": "ingestion.health_auto_export_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/health_auto_export_lambda.py",
+      "schedules": [],
+      "stack": "ingestion_stack",
+      "timeout_seconds": null
+    },
+    "hevy-backfill": {
+      "declared_alarm": "ingestion-error-hevy-backfill",
+      "handler": "ingestion.hevy_backfill_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/ingestion/hevy_backfill_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 12-23 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "hevy-restamp": {
+      "declared_alarm": "hevy-restamp-errors",
+      "handler": "operational.hevy_restamp_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/hevy_restamp_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 18 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
+    "hevy-routine-cron": {
+      "declared_alarm": "hevy-routine-cron-errors",
+      "handler": "operational.hevy_routine_cron_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/hevy_routine_cron_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 13 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
+    "hypothesis-engine": {
+      "declared_alarm": null,
+      "handler": "compute.hypothesis_engine_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/hypothesis_engine_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 19 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "insight-email-parser": {
+      "declared_alarm": null,
+      "handler": "emails.insight_email_parser_lambda.lambda_handler",
+      "memory_mb": 128,
+      "module": "lambdas/emails/insight_email_parser_lambda.py",
+      "schedules": [],
+      "stack": "operational_stack",
+      "timeout_seconds": 30
+    },
+    "inter-coach-dialogue": {
+      "declared_alarm": null,
+      "handler": "coach.inter_coach_dialogue_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/inter_coach_dialogue_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 18 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 300
+    },
+    "journal-analyzer": {
+      "declared_alarm": null,
+      "handler": "intelligence.journal_analyzer_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/intelligence/journal_analyzer_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 10 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 180
+    },
+    "journal-enrichment": {
+      "declared_alarm": null,
+      "handler": "ingestion.journal_enrichment_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/journal_enrichment_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 14 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "life-platform-ai-quality-canary": {
+      "declared_alarm": null,
+      "handler": "operational.ai_quality_canary_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/ai_quality_canary_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(20 16 ? * MON,WED,FRI *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
+    "life-platform-alert-digest": {
+      "declared_alarm": null,
+      "handler": "operational.alert_digest_lambda.lambda_handler",
+      "memory_mb": 128,
+      "module": "lambdas/operational/alert_digest_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 15 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 60
+    },
+    "life-platform-canary": {
+      "declared_alarm": null,
+      "handler": "operational.canary_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/canary_lambda.py",
+      "schedules": [
+        {
+          "expr": "rate(4 hours)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 60
+    },
+    "life-platform-coherence-sentinel": {
+      "declared_alarm": null,
+      "handler": "operational.coherence_sentinel_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/coherence_sentinel_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(45 18 ? * * *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
+    "life-platform-cost-governor": {
+      "declared_alarm": null,
+      "handler": "operational.cost_governor_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/cost_governor_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 0/8 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 60
+    },
+    "life-platform-data-export": {
+      "declared_alarm": "life-platform-data-export-errors",
+      "handler": "operational.data_export_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/operational/data_export_lambda.py",
+      "schedules": [],
+      "stack": "operational_stack",
+      "timeout_seconds": 300
+    },
+    "life-platform-data-reconciliation": {
+      "declared_alarm": null,
+      "handler": "operational.data_reconciliation_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/data_reconciliation_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 7 ? * MON *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
+    "life-platform-delete-user-data": {
+      "declared_alarm": "life-platform-delete-user-data-errors",
+      "handler": "operational.delete_user_data_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/delete_user_data_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 8 ? * MON *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 300
+    },
+    "life-platform-dlq-consumer": {
+      "declared_alarm": null,
+      "handler": "operational.dlq_consumer_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/dlq_consumer_lambda.py",
+      "schedules": [
+        {
+          "expr": "rate(6 hours)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
+    "life-platform-freshness-checker": {
+      "declared_alarm": "freshness-checker-errors",
+      "handler": "emails.freshness_checker_lambda.lambda_handler",
+      "memory_mb": 128,
+      "module": "lambdas/emails/freshness_checker_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(45 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 30
+    },
+    "life-platform-key-rotator": {
+      "declared_alarm": "key-rotator-errors",
+      "handler": "operational.key_rotator_lambda.lambda_handler",
+      "memory_mb": 128,
+      "module": "lambdas/operational/key_rotator_lambda.py",
+      "schedules": [],
+      "stack": "operational_stack",
+      "timeout_seconds": 30
+    },
+    "life-platform-og-image": {
+      "declared_alarm": null,
+      "handler": "og_image_lambda.handler",
+      "memory_mb": null,
+      "module": null,
+      "schedules": [],
+      "stack": "web_stack",
+      "timeout_seconds": null
+    },
+    "life-platform-permanence": {
+      "declared_alarm": "permanence-errors",
+      "handler": "operational.permanence_lambda.lambda_handler",
+      "memory_mb": 1024,
+      "module": "lambdas/operational/permanence_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 6 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 600
+    },
+    "life-platform-pip-audit": {
+      "declared_alarm": null,
+      "handler": "operational.pip_audit_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/operational/pip_audit_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 ? * MON *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 300
+    },
+    "life-platform-qa-smoke": {
+      "declared_alarm": null,
+      "handler": "operational.qa_smoke_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 18 ? * * *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 240
+    },
+    "life-platform-remediation-dispatcher": {
+      "declared_alarm": null,
+      "handler": "operational.remediation_dispatcher_lambda.lambda_handler",
+      "memory_mb": 128,
+      "module": "lambdas/operational/remediation_dispatcher_lambda.py",
+      "schedules": [],
+      "stack": "operational_stack",
+      "timeout_seconds": 30
+    },
+    "life-platform-site-api": {
+      "declared_alarm": null,
+      "handler": "web.site_api_lambda.lambda_handler",
+      "memory_mb": 1024,
+      "module": "lambdas/web/site_api_lambda.py",
+      "schedules": [],
+      "stack": "serve_stack",
+      "timeout_seconds": 30
+    },
+    "life-platform-site-api-ai": {
+      "declared_alarm": null,
+      "handler": "web.site_api_ai_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/web/site_api_ai_lambda.py",
+      "schedules": [],
+      "stack": "serve_stack",
+      "timeout_seconds": 30
+    },
+    "life-platform-traffic-digest": {
+      "declared_alarm": null,
+      "handler": "operational.traffic_digest_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/traffic_digest_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 ? * MON *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 120
+    },
+    "macrofactor-data-ingestion": {
+      "declared_alarm": "ingestion-error-macrofactor",
+      "handler": "ingestion.macrofactor_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/macrofactor_lambda.py",
+      "schedules": [],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "mastodon-social-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.mastodon_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/mastodon_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    },
+    "measurements-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.measurements_ingestion_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/measurements_ingestion_lambda.py",
+      "schedules": [],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 60
+    },
+    "milestone-digest": {
+      "declared_alarm": null,
+      "handler": "emails.milestone_digest_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/milestone_digest_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(15 17 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 60
+    },
+    "monday-compass": {
+      "declared_alarm": null,
+      "handler": "emails.monday_compass_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 15 ? * MON *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "monthly-digest": {
+      "declared_alarm": null,
+      "handler": "emails.monthly_digest_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/monthly_digest_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 ? * 1#1 *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "notion-journal-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.notion_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/notion_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    },
+    "nutrition-review": {
+      "declared_alarm": null,
+      "handler": "emails.nutrition_review_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 17 ? * SAT *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 300
+    },
+    "og-image-generator": {
+      "declared_alarm": null,
+      "handler": "web.og_image_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/web/og_image_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 19 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 60
+    },
+    "partner-weekly-email": {
+      "declared_alarm": null,
+      "handler": "emails.partner_email_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/partner_email_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 17 ? * 1 *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 90
+    },
+    "personal-baselines-compute": {
+      "declared_alarm": null,
+      "handler": "compute.personal_baselines_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/personal_baselines_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 8 1 * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "pipeline-health-check": {
+      "declared_alarm": null,
+      "handler": "operational.pipeline_health_check_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/operational/pipeline_health_check_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(10 17 * * ? *)",
+          "resolution": "constructed"
+        },
+        {
+          "expr": "cron(30 2,6,14,18,22 * * ? *)",
+          "resolution": "constant"
+        },
+        {
+          "expr": "cron(58 16 * * ? *)",
+          "resolution": "constructed"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 300
+    },
+    "reading-cover-pipeline": {
+      "declared_alarm": null,
+      "handler": "reading.cover_pipeline_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/reading/cover_pipeline_lambda.py",
+      "schedules": [],
+      "stack": "operational_stack",
+      "timeout_seconds": 60
+    },
+    "reading-recall-sweep": {
+      "declared_alarm": null,
+      "handler": "reading.reading_recall_sweep_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/reading/reading_recall_sweep_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 60
+    },
+    "scenario-explorer": {
+      "declared_alarm": null,
+      "handler": "compute.scenario_explorer_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/compute/scenario_explorer_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(10 12 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "site-stats-refresh": {
+      "declared_alarm": null,
+      "handler": "web.site_stats_refresh_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/web/site_stats_refresh_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 * * * ? *)",
+          "resolution": "constructed"
+        }
+      ],
+      "stack": "operational_stack",
+      "timeout_seconds": 300
+    },
+    "social-enrichment": {
+      "declared_alarm": null,
+      "handler": "ingestion.social_enrichment_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/social_enrichment_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(45 14 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "state-of-matthew": {
+      "declared_alarm": null,
+      "handler": "compute.state_of_matthew_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/state_of_matthew_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 19 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 60
+    },
+    "strava-data-ingestion": {
+      "declared_alarm": "ingestion-error-strava",
+      "handler": "ingestion.strava_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/strava_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        },
+        {
+          "expr": "cron(20 17 * * ? *)",
+          "resolution": "constructed"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "subscriber-onboarding": {
+      "declared_alarm": null,
+      "handler": "web.subscriber_onboarding_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/web/subscriber_onboarding_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(5 17 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "telegram-coach-worker": {
+      "declared_alarm": null,
+      "handler": "coach.telegram_worker_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/coach/telegram_worker_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 * * ? *)",
+          "resolution": "constant"
+        },
+        {
+          "expr": "cron(15 17 ? * MON-FRI *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "serve_stack",
+      "timeout_seconds": 60
+    },
+    "telegram-webhook": {
+      "declared_alarm": null,
+      "handler": "web.telegram_webhook_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/web/telegram_webhook_lambda.py",
+      "schedules": [],
+      "stack": "serve_stack",
+      "timeout_seconds": 10
+    },
+    "todoist-data-ingestion": {
+      "declared_alarm": "ingestion-error-todoist",
+      "handler": "ingestion.todoist_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/todoist_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 14 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    },
+    "voice-fidelity-harness": {
+      "declared_alarm": null,
+      "handler": "coach.voice_fidelity_harness.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/voice_fidelity_harness.py",
+      "schedules": [
+        {
+          "expr": "cron(0 15 1 * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 600
+    },
+    "weather-data-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.weather_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/weather_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 14,2 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 60
+    },
+    "wednesday-chronicle": {
+      "declared_alarm": null,
+      "handler": "emails.wednesday_chronicle_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/wednesday_chronicle_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 15 ? * WED *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 300
+    },
+    "weekly-correlation-compute": {
+      "declared_alarm": null,
+      "handler": "compute.weekly_correlation_compute_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/weekly_correlation_compute_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 18 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "compute_stack",
+      "timeout_seconds": 120
+    },
+    "weekly-digest": {
+      "declared_alarm": null,
+      "handler": "emails.weekly_digest_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 16 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "weekly-plate": {
+      "declared_alarm": null,
+      "handler": "emails.weekly_plate_lambda.lambda_handler",
+      "memory_mb": 512,
+      "module": "lambdas/emails/weekly_plate_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 2 ? * SAT *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 120
+    },
+    "weekly-signal": {
+      "declared_alarm": null,
+      "handler": "compute.weekly_signal_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/compute/weekly_signal_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(30 16 ? * SUN *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "email_stack",
+      "timeout_seconds": 300
+    },
+    "whoop-data-ingestion": {
+      "declared_alarm": "ingestion-error-whoop",
+      "handler": "ingestion.whoop_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/whoop_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 0,4,12,16,20 * * ? *)",
+          "resolution": "resolved"
+        },
+        {
+          "expr": "cron(20 18 * * ? *)",
+          "resolution": "constructed"
+        },
+        {
+          "expr": "cron(30 17 * * ? *)",
+          "resolution": "constant"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 300
+    },
+    "withings-data-ingestion": {
+      "declared_alarm": "ingestion-error-withings",
+      "handler": "ingestion.withings_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/withings_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    },
+    "youtube-social-ingestion": {
+      "declared_alarm": null,
+      "handler": "ingestion.youtube_lambda.lambda_handler",
+      "memory_mb": null,
+      "module": "lambdas/ingestion/youtube_lambda.py",
+      "schedules": [
+        {
+          "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+          "resolution": "resolved"
+        }
+      ],
+      "stack": "ingestion_stack",
+      "timeout_seconds": 120
+    }
+  },
+  "meta": {
+    "authorities": {
+      "alarms": "cdk/stacks/*.py alarm_name= declarations (AST) + variable-traced SNS routing",
+      "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
+      "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
+      "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
+    },
+    "counts": {
+      "alarms": 45,
+      "edges": 644,
+      "lambdas": 104,
+      "mcp_tool_modules": 26,
+      "mcp_tools": 76,
+      "partitions": 105,
+      "scheduled_lambdas": 81
+    },
+    "coverage": {
+      "edge_sites": {
+        "sites_dynamic": 310,
+        "sites_resolved": 802,
+        "sites_total": 1112
+      },
+      "schedule_resolution": {
+        "dynamic": 0,
+        "resolved": 81
+      }
+    },
+    "non_census_families": [
+      "coach_credibility",
+      "coach_thread",
+      "intelligence_quality",
+      "journal",
+      "platform_memory",
+      "zone2_efficiency"
+    ],
+    "scope_cuts": [
+      "field-level edges wait on the #2797 per-field wiring registry",
+      "privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) \u2014 not modeled",
+      "helper-default error alarms (ingestion-error-<fn>) are not enumerated \u2014 the alarms plane matches the #2844 vocabulary (explicit alarm_name declarations)",
+      "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)"
+    ],
+    "spec": "#2845 (epic #2842) \u2014 generated by scripts/generate_platform_model.py; drift-gated by tests/test_platform_model_drift.py"
+  },
+  "partitions": {
+    "achievements": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "adaptive_mode": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "ai_analysis": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "anomalies": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "apple_health": {
+      "category": "Wearables",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Health Auto Export webhook, near-real-time",
+      "stale_hours": null
+    },
+    "benchmarks": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "bluesky": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Keyless public AppView pull (framework), hourly",
+      "stale_hours": null
+    },
+    "calibration": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "centenarian_progress": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "challenges": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "character_receipt": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "character_sheet": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "chronicle": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "chronicling": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "circadian": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "coach_actions": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "coach_corrections": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "coach_gen_cache": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "composite_scores": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "computed_insights": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "computed_metrics": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "day_grade": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "decisions": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "deletion_log": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "dexa": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "diary_claims": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "diary_reactions": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "discovery_annotations": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "dropbox_tracker": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "effect_fits": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "eightsleep": {
+      "category": "Wearables",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "API pull, hourly",
+      "stale_hours": null
+    },
+    "email_digest": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "email_log": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "engagement_state": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "evening_ritual": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "experiment_suggestions": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "experiments": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "exposures": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "eyeball_estimate": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "felt_probe": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "field_notes": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "flourishing": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "food_delivery": {
+      "category": "Manual logs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Manual log",
+      "stale_hours": 336
+    },
+    "food_responses": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "forecast": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "garmin": {
+      "category": "Wearables",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "OAuth API pull, 4x daily \u2014 paused (ADR-074)",
+      "stale_hours": null
+    },
+    "genome": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "google_calendar": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "habit_causality": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "habit_scores": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "habitify": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "API pull, hourly",
+      "stale_hours": null
+    },
+    "health_check": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "hevy": {
+      "category": "Manual logs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "API-key pull, hourly 12\u201323 UTC",
+      "stale_hours": 168
+    },
+    "hevy_id_map": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "hypotheses": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "ingest_liveness": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "insights": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "instagram": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Manual paste (no token) \u2014 staged to PASTE# and ingested through the SIMP-2 framework",
+      "stale_hours": null
+    },
+    "interactions": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "journal_analysis": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "journal_quotes": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "labs": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "ledger": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "life_events": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "macrofactor": {
+      "category": "Manual logs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Manual CSV export via Dropbox poller, ~24h behind by design",
+      "stale_hours": 96
+    },
+    "macrofactor_meals": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "macrofactor_workouts": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "mastodon": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Keyless public REST pull (framework), hourly",
+      "stale_hours": null
+    },
+    "measurements": {
+      "category": "Manual logs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Manual entry via MCP",
+      "stale_hours": 1440
+    },
+    "milestones": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "mood": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "notion": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "API pull (journal database), hourly",
+      "stale_hours": 336
+    },
+    "nutrition_review": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "panelcast": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "personal_baselines": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "private_intake": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "protocols": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "qa_predict_dark": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "recall_embeddings": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "rewards": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "routine_index": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "ruck_log": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "scenarios": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "sick_days": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "sleep_unified": {
+      "class": "system_state",
+      "ingestion": false
+    },
+    "state_of_matthew": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "state_of_mind": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "strava": {
+      "category": "Wearables",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "OAuth API pull, hourly",
+      "stale_hours": null
+    },
+    "subscribers": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "supplements": {
+      "category": "Manual logs",
+      "class": "cross_phase",
+      "ingestion": true,
+      "method": "Habitify bridge (name-mapped habits)",
+      "stale_hours": null
+    },
+    "temptations": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "tiktok": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Manual paste (no token) \u2014 staged to PASTE# and ingested through the SIMP-2 framework",
+      "stale_hours": null
+    },
+    "time_affluence": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "todoist": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "API pull, 1x daily (14:00 UTC)",
+      "stale_hours": 72
+    },
+    "training_notes": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "training_reference": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "travel": {
+      "class": "raw_timeseries",
+      "ingestion": false
+    },
+    "weather": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Open-Meteo API pull, 2x daily",
+      "stale_hours": null
+    },
+    "weekly_correlations": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "weight_episodes": {
+      "class": "cross_phase",
+      "ingestion": false
+    },
+    "what_changed": {
+      "class": "experiment_scoped",
+      "ingestion": false
+    },
+    "whoop": {
+      "category": "Wearables",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "OAuth API pull, 5x daily",
+      "stale_hours": null
+    },
+    "withings": {
+      "category": "Wearables",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "OAuth API pull, hourly",
+      "stale_hours": 168
+    },
+    "x": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Manual paste (no token) \u2014 staged to PASTE# and ingested through the SIMP-2 framework",
+      "stale_hours": null
+    },
+    "youtube": {
+      "category": "Inputs",
+      "class": "raw_timeseries",
+      "ingestion": true,
+      "method": "Keyless per-channel RSS pull (framework), hourly",
+      "stale_hours": null
+    }
+  }
+}
