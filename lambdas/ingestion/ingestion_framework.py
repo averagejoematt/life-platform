@@ -291,6 +291,7 @@ class IngestionConfig:
         refresh_trailing_days: int = 0,
         carry_forward_fn=None,
         enable_raw_archive: bool = True,
+        record_gap_exhausted_absence: bool = False,
     ):
         self.source_name = source_name
         self.secret_id = secret_id
@@ -333,6 +334,21 @@ class IngestionConfig:
         # NOT a way to quiet a failing archive: #1949 made a FAILED archive a failed run
         # on purpose. This is "there is no raw response", not "the write is broken".
         self.enable_raw_archive = enable_raw_archive
+        # #2643: gap-fill's lookback window silently forgets a date once it ages
+        # out — every hourly run retries a genuinely-vendor-absent date for
+        # `lookback_days` days, then it simply drops off `_find_missing_dates`'
+        # check_dates set with no record of the outcome. The interior-gap alarm
+        # (freshness_checker_lambda.DAILY_SOURCES) then holds red forever with
+        # no automatic way to close, because nothing ever gets written for that
+        # date. Opting in writes an explicit ADR-104 absence marker on the date's
+        # LAST retry attempt (see `_absence_boundary_date` in run_ingestion) so
+        # the gap closes honestly instead of vanishing. Scope this to sources the
+        # interior-gap detector actually holds to a record-every-day bar
+        # (DAILY_SOURCES) — a sparse/behavioral source (Strava rest days,
+        # Withings weeks without a weigh-in) must NOT opt in: "no record" is
+        # already its correct, honest, silent absence signal, and marking every
+        # rest day would be noise, not honesty.
+        self.record_gap_exhausted_absence = record_gap_exhausted_absence
 
         # Environment
         self.region = os.environ.get("AWS_REGION", "us-west-2")
@@ -561,6 +577,49 @@ def _archive_raw(s3, config, date_str, raw_data):
         return e
 
 
+def _record_absence_marker(table, s3, config, date_str, logger):
+    """#2643: write an explicit ADR-104 absence marker for a date gap-fill is
+    about to give up on.
+
+    Only called for `date_str == the oldest date in this run's lookback window`
+    (see `_absence_boundary_date` in `run_ingestion`) — i.e. the date's LAST
+    scheduled retry, so a date still legitimately delayed by vendor-side
+    processing (Eight Sleep marks a fresh session `incomplete`/`processing` for
+    a while) gets the full `lookback_days` retries before being called absent.
+
+    The marker is a normal framework-shaped item (pk/sk/source/schema_version/
+    ingested_at/phase, via `_store_item` — same validation, carry-forward, and
+    item-size-guard path as a real record) plus `absent: True` and a reason.
+    Writing it through `_store_item` means a genuinely-invalid marker (a schema
+    the validator rejects) fails exactly like a real record would, rather than
+    silently landing malformed data.
+
+    Never fatal: a failed marker write is logged and the run continues — the
+    date simply stays a silent hole for one more cycle, which is the existing
+    (pre-#2643) behavior, not a regression.
+    """
+    item = {
+        "pk": f"USER#{config.user_id}#SOURCE#{config.source_name}",
+        "sk": f"DATE#{date_str}",
+        "source": config.source_name,
+        "schema_version": config.schema_version,
+        "ingested_at": datetime.now(timezone.utc).isoformat(),
+        "date": date_str,
+        "absent": True,
+        "absence_reason": (
+            f"No data returned by the source across the full {config.lookback_days}-day "
+            "gap-fill retry window (#2643) — recorded as a measured absence, not a pipeline miss."
+        ),
+    }
+    try:
+        if _store_item(table, s3, config, item, date_str, logger):
+            logger.info(f"  {date_str}: recorded explicit absence marker (gap-fill window exhausted, #2643)")
+        else:
+            logger.warning(f"  {date_str}: absence-marker write skipped by validator")
+    except Exception as e:  # pragma: no cover - defensive, never break the run over a marker
+        logger.warning(f"  {date_str}: absence-marker write failed (non-fatal): {e}")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -690,6 +749,9 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
 
     # ── Determine dates to ingest ──
     date_override = event.get("date_override") if isinstance(event, dict) else None
+    # #2643: set only in Mode 2 below — a manual date_override or the plain
+    # yesterday+today default were never gap-fill's forgetting problem.
+    _absence_boundary_date = None
 
     if date_override:
         # Mode 1: Explicit date
@@ -702,6 +764,15 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     elif config.enable_gap_detection:
         # Mode 2: Gap-aware lookback
         dates_to_ingest = _find_missing_dates(table, config, logger)
+        # #2643: the oldest date `_find_missing_dates` will ever check on THIS
+        # run — on the next run it ages out of the window and is never looked
+        # at again. If it's still missing after this attempt, this is the last
+        # chance to record why honestly instead of letting it vanish.
+        _absence_boundary_date = (
+            (datetime.strptime(today, "%Y-%m-%d").date() - timedelta(days=config.lookback_days)).strftime("%Y-%m-%d")
+            if getattr(config, "record_gap_exhausted_absence", False)
+            else None
+        )
         if not dates_to_ingest:
             # ER-01: gap detection ran and found nothing missing — the source is
             # up to date. A healthy run (Lambda ran, no error), so it counts as a
@@ -725,6 +796,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     # ── Ingest each date ──
     results = {}
     records_written = 0
+    absence_markers_written = 0  # #2643
     errors = 0
     archive_failures = 0  # #1949: raw-S3 archive writes that failed (non-fatal per date, never silent)
     last_archive_error = None
@@ -737,6 +809,10 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
             if raw is None:
                 logger.info(f"  {date_str}: no data (fetch returned None)")
                 results[date_str] = "no_data"
+                if date_str == _absence_boundary_date:
+                    _record_absence_marker(table, s3, config, date_str, logger)
+                    results[date_str] = "no_data (absence recorded)"
+                    absence_markers_written += 1
                 continue
 
             # Transform
@@ -744,6 +820,15 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
             if not items:
                 logger.info(f"  {date_str}: no records after transform")
                 results[date_str] = "no_records"
+                if date_str == _absence_boundary_date:
+                    # We have the raw response in hand — archive it too, so the
+                    # evidence for "the vendor returned this, and it wasn't in
+                    # it" survives alongside every other day's raw capture.
+                    if config.enable_raw_archive:
+                        _archive_raw(s3, config, date_str, raw)
+                    _record_absence_marker(table, s3, config, date_str, logger)
+                    results[date_str] = "no_records (absence recorded)"
+                    absence_markers_written += 1
                 continue
 
             # Store each item
@@ -848,6 +933,8 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     if config.enable_gap_detection:
         summary["mode"] = "gap_fill"
         summary["lookback_days"] = config.lookback_days
+    if config.record_gap_exhausted_absence:
+        summary["absence_markers_written"] = absence_markers_written
 
     logger.info(f"Ingestion complete: {records_written} records, {errors} errors, {archive_failures} archive failures")
 

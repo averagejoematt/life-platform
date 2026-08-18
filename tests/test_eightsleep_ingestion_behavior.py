@@ -1236,6 +1236,143 @@ class TestEndToEndIngestion:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 11b. #2643 — the absence marker gap-fill writes when a night ages out of the
+# lookback window with the vendor never producing a matching session. Before
+# this, such a night vanished silently once `_find_missing_dates`' check_dates
+# window slid past it — exactly the "Eight Sleep 2026-08-09" interior gap.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestAbsenceMarkerOnGapExhaustion:
+    # WAKE_DATE ("today" under the `wired` fixture) minus the config's own
+    # lookback window — computed from the live config rather than hardcoded so
+    # a future LOOKBACK_DAYS retune can't silently desync the fixture.
+    BOUNDARY_DATE = (datetime.strptime(WAKE_DATE, "%Y-%m-%d") - timedelta(days=es._config.lookback_days if es else 7)).strftime("%Y-%m-%d")
+
+    def _omit_boundary_from_existing(self, wired):
+        # The `wired` fixture pre-seeds every date 2026-05-03..2026-05-09 as
+        # already present. Drop the boundary date so gap-fill sees it missing.
+        wired["table"].query_items = [it for it in wired["table"].query_items if it["sk"] != f"DATE#{self.BOUNDARY_DATE}"]
+
+    def _fake_api_get_never_matching_boundary(self, params_key="to"):
+        def fake(path, token, params=None):
+            requested = (params or {}).get(params_key)
+            if requested == self.BOUNDARY_DATE:
+                # The vendor answers, but with a night that isn't the boundary
+                # date — exactly what live Eight Sleep did for 2026-08-09
+                # (issue #2643): every hourly window asked and got back only
+                # the OTHER day in its 2-day span, never a match.
+                return canonical_trends(canonical_day(day="2026-04-20"))
+            return canonical_trends(canonical_day(day=requested))
+
+        return fake
+
+    def test_the_last_retry_of_a_genuinely_vendor_absent_night_writes_an_absence_marker(self, wired, monkeypatch):
+        self._omit_boundary_from_existing(wired)
+        monkeypatch.setattr(es, "api_get", self._fake_api_get_never_matching_boundary())
+
+        body = json.loads(es.lambda_handler({}, None)["body"])
+
+        assert body["absence_markers_written"] == 1
+        assert body["results"][self.BOUNDARY_DATE] == "no_records (absence recorded)"
+        assert body["records_written"] == 1  # today's real night still lands normally
+
+        marker = wired["table"].items[(f"USER#{es._config.user_id}#SOURCE#eightsleep", f"DATE#{self.BOUNDARY_DATE}")]
+        assert marker["absent"] is True
+        assert marker["date"] == self.BOUNDARY_DATE
+        assert marker["source"] == "eightsleep"
+        assert "gap-fill retry window" in marker["absence_reason"]
+        # No sleep fields — an absence marker must never masquerade as a measured night.
+        assert "sleep_duration_hours" not in marker
+        assert "sleep_efficiency_pct" not in marker
+
+    def test_the_absence_marker_closes_the_interior_gap_the_freshness_checker_scans_for(self, wired, monkeypatch):
+        # freshness_checker_lambda.find_interior_gaps only checks sk PRESENCE —
+        # any record, including this marker, closes the hole it scans for.
+        from emails.freshness_checker_lambda import find_interior_gaps
+
+        self._omit_boundary_from_existing(wired)
+        monkeypatch.setattr(es, "api_get", self._fake_api_get_never_matching_boundary())
+        es.lambda_handler({}, None)
+
+        present = {sk.replace("DATE#", "") for (_pk, sk) in wired["table"].items if sk.startswith("DATE#")}
+        gaps = find_interior_gaps(present, self.BOUNDARY_DATE, WAKE_DATE)
+        assert self.BOUNDARY_DATE not in gaps
+
+    def test_the_absence_marker_passes_the_platforms_own_eightsleep_validator(self, wired, monkeypatch):
+        self._omit_boundary_from_existing(wired)
+        monkeypatch.setattr(es, "api_get", self._fake_api_get_never_matching_boundary())
+        es.lambda_handler({}, None)
+
+        marker = wired["table"].items[(f"USER#{es._config.user_id}#SOURCE#eightsleep", f"DATE#{self.BOUNDARY_DATE}")]
+        result = validate_item("eightsleep", marker, self.BOUNDARY_DATE)
+        assert result.errors == []  # CRITICAL only — the marker must never be dropped
+
+    def test_the_raw_vendor_response_for_the_boundary_day_is_archived_even_though_no_record_was_stored(self, wired, monkeypatch):
+        self._omit_boundary_from_existing(wired)
+        monkeypatch.setattr(es, "api_get", self._fake_api_get_never_matching_boundary())
+        es.lambda_handler({}, None)
+
+        expected_key = "{p}/{y}/{m}/{d}.json".format(
+            p=RAW_LAYOUT["prefix"], y=self.BOUNDARY_DATE[:4], m=self.BOUNDARY_DATE[5:7], d=self.BOUNDARY_DATE
+        )
+        assert expected_key in wired["s3"].objects
+        archived = json.loads(wired["s3"].objects[expected_key]["Body"])
+        assert archived["raw"]["trends"]["days"][0]["day"] == "2026-04-20"  # the non-matching night the vendor sent back
+
+    def test_a_missing_date_still_inside_its_retry_budget_gets_no_marker_yet(self, wired, monkeypatch):
+        # One day younger than the boundary — still has retries left under the
+        # existing (pre-#2643) gap-fill cadence, so it must stay silently
+        # missing rather than being called absent prematurely.
+        one_day_in = (datetime.strptime(self.BOUNDARY_DATE, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        wired["table"].query_items = [it for it in wired["table"].query_items if it["sk"] != f"DATE#{one_day_in}"]
+
+        def fake(path, token, params=None):
+            requested = (params or {}).get("to")
+            if requested == one_day_in:
+                return canonical_trends(canonical_day(day="2026-04-20"))
+            return canonical_trends(canonical_day(day=requested))
+
+        monkeypatch.setattr(es, "api_get", fake)
+        body = json.loads(es.lambda_handler({}, None)["body"])
+
+        assert body.get("absence_markers_written", 0) == 0
+        assert body["results"][one_day_in] == "no_records"
+        key = (f"USER#{es._config.user_id}#SOURCE#eightsleep", f"DATE#{one_day_in}")
+        assert key not in wired["table"].items
+
+    def test_a_source_that_does_not_opt_in_never_writes_a_marker(self, wired, monkeypatch):
+        # The mechanism is opt-in per source (IngestionConfig default False) —
+        # a sparse/behavioral source (Strava rest days, Withings weigh-ins)
+        # must be able to leave a date silently missing forever, since that IS
+        # its correct, honest absence signal. Simulated here by flipping the
+        # already-wired eightsleep config's flag off for one run.
+        monkeypatch.setattr(es._config, "record_gap_exhausted_absence", False, raising=False)
+        self._omit_boundary_from_existing(wired)
+        monkeypatch.setattr(es, "api_get", self._fake_api_get_never_matching_boundary())
+
+        body = json.loads(es.lambda_handler({}, None)["body"])
+
+        assert body.get("absence_markers_written", 0) == 0
+        assert body["results"][self.BOUNDARY_DATE] == "no_records"
+        key = (f"USER#{es._config.user_id}#SOURCE#eightsleep", f"DATE#{self.BOUNDARY_DATE}")
+        assert key not in wired["table"].items
+
+    def test_a_night_the_vendor_actually_has_at_the_boundary_is_stored_normally_not_marked_absent(self, wired, monkeypatch):
+        # The mechanism must never shadow a real recovery — if the vendor DOES
+        # answer with the boundary night on its last retry, that's a genuine
+        # backfill, not an absence.
+        self._omit_boundary_from_existing(wired)
+        # Default wired fake_api_get always matches the requested date — no override needed.
+        body = json.loads(es.lambda_handler({}, None)["body"])
+
+        assert body.get("absence_markers_written", 0) == 0
+        marker_or_record = wired["table"].items[(f"USER#{es._config.user_id}#SOURCE#eightsleep", f"DATE#{self.BOUNDARY_DATE}")]
+        assert "absent" not in marker_or_record
+        assert "sleep_duration_hours" in marker_or_record
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 12. Writer/reader field-name contract
 # ══════════════════════════════════════════════════════════════════════════════
 
