@@ -35,22 +35,73 @@ def add_dashboards(stack) -> None:
     # ══════════════════════════════════════════════════════════════
     # site_api_lambda.py emits a per-request structured log line:
     #   {"_aws": {...}, "Route": "/api/...", "Method": "GET", "DurationMs": N, "ColdStart": 0/1}
-    # CloudWatch auto-extracts DurationMs + ColdStart as metrics in
-    # the LifePlatform/SiteAPI namespace, dimensions (Route, Method).
-    # The Lambda runs in us-west-2 (R17-09 move) so same-region dashboards work.
     #
-    # Top 6 routes by expected traffic: /api/vitals, /api/healthz, /api/character,
-    # /api/snapshot, /api/journey, /api/platform_stats
-    TOP_ROUTES = ["/api/vitals", "/api/healthz", "/api/character", "/api/snapshot", "/api/journey", "/api/platform_stats"]
+    # #2876 cost amendment (2026-08-18): `Route`/`Method` used to ALSO be
+    # listed as EMF `Dimensions`, which mints one BILLED CloudWatch custom
+    # metric per unique (Route, Method) pair — $0.30/metric/month each.
+    # Measured live on 2026-08-18: 158 already-active billable streams from
+    # this alone, and #2882's coverage fix (every route now reaches the
+    # emitter, not just the 93 that used to) would have added ~88 more —
+    # net-new cost was priced at +$12-13/month for that PR as shipped.
+    # `_emit_route_log` (lambdas/web/site_api_lambda.py) now ships ONE
+    # dimensionless metric variant only (`Dimensions: [[]]`), for every
+    # route uniformly — no per-route allowlist, that would be the
+    # hand-enumeration the charter's standing rule 1 forbids. Expected
+    # effect: roughly -$20 to -$25/month vs. leaving Route+Method dimensioned
+    # for all ~137 routes.
+    #
+    # `Route` and `Method` are STILL plain top-level JSON fields on every log
+    # line (EMF *properties*, never billed) — per-route latency stays fully
+    # queryable via CloudWatch Logs Insights, just not auto-graphable by
+    # metric name+dimensions anymore. The 6 hardcoded `TOP_ROUTES` panels
+    # this dashboard used to read (Route+Method dimensioned Metric objects)
+    # would have rendered EMPTY post-#2876 without this rewrite — a
+    # dashboard silently reporting nothing is the "reports clean while
+    # measuring nothing" defect class this repo keeps re-finding, so the
+    # panels below are LogQueryWidgets (live Logs Insights queries over the
+    # same log group) instead. They also fix a smaller pre-existing issue:
+    # the old 6-route list was itself a hand-typed enumeration that silently
+    # missed every other route; a `stats ... by Route, Method` query finds
+    # whatever is actually hot or slow, dynamically, with no list to drift.
+    #
+    # The Lambda runs in us-west-2 (R17-09 move) so same-region dashboards work.
+    SITE_API_LOG_GROUP = "/aws/lambda/life-platform-site-api"
 
-    def _route_p_metric(route: str, method: str, stat: str = "p50"):
+    def _aggregate_metric(metric_name: str, stat: str, label: str):
+        """The ONE dimensionless LifePlatform/SiteAPI custom metric #2876
+        kept — flat ~$0.30/metric/month regardless of route count, giving a
+        fleet-wide latency/cold-start signal without enumerating any route."""
         return cloudwatch.Metric(
             namespace="LifePlatform/SiteAPI",
-            metric_name="DurationMs",
-            dimensions_map={"Route": route, "Method": method},
+            metric_name=metric_name,
             statistic=stat,
             period=Duration.minutes(5),
-            label=f"{route} {stat}",
+            label=label,
+        )
+
+    def _route_log_query(title: str, sort_expr: str):
+        """A live Logs Insights table over the route_metric log lines.
+        Route/Method are plain JSON properties on every line (never billed
+        dimensions post-#2876), so per-route breakdown stays available here
+        without minting a metric per route. See the #2876 PR body for the
+        equivalent query run ad hoc in the console."""
+        return cloudwatch.LogQueryWidget(
+            log_group_names=[SITE_API_LOG_GROUP],
+            title=title,
+            width=12,
+            height=6,
+            view=cloudwatch.LogQueryVisualizationType.TABLE,
+            query_lines=[
+                "fields Route, Method, DurationMs, ColdStart",
+                'filter _type = "route_metric"',
+                "stats count(*) as requests, "
+                "pct(DurationMs, 50) as p50_ms, "
+                "pct(DurationMs, 95) as p95_ms, "
+                "avg(ColdStart) * 100 as cold_start_pct "
+                "by Route, Method",
+                f"sort {sort_expr}",
+                "limit 20",
+            ],
         )
 
     site_api_dash = cloudwatch.Dashboard(
@@ -61,42 +112,19 @@ def add_dashboards(stack) -> None:
         start="-PT1H",
     )
 
-    # Row 1: Latency p50 + p95 for top 6 GET routes
+    # Row 1: live per-route latency (Logs Insights) — two views of the same
+    # underlying query, by traffic (what's hot) and by p95 (what's slow).
+    # Replaces the old hardcoded-6-route p50/p95 metric panels.
     site_api_dash.add_widgets(
-        cloudwatch.GraphWidget(
-            title="Latency p50 (top routes, GET)",
-            width=12,
-            height=6,
-            left=[_route_p_metric(r, "GET", "p50") for r in TOP_ROUTES],
-            left_y_axis=cloudwatch.YAxisProps(label="ms", show_units=False),
-        ),
-        cloudwatch.GraphWidget(
-            title="Latency p95 (top routes, GET)",
-            width=12,
-            height=6,
-            left=[_route_p_metric(r, "GET", "p95") for r in TOP_ROUTES],
-            left_y_axis=cloudwatch.YAxisProps(label="ms", show_units=False),
-        ),
+        _route_log_query("Per-route latency — top 20 by traffic (Logs Insights, live)", "requests desc"),
+        _route_log_query("Per-route latency — slowest 20 by p95 (Logs Insights, live)", "p95_ms desc"),
     )
 
-    # Row 2: Cold-start count + total invocations
+    # Row 2: cold starts by route (Logs Insights) + the unchanged AWS/Lambda
+    # function-wide panel (that one was never on our custom dimensions —
+    # AWS/Lambda's own Invocations/Errors/Duration — so #2876 doesn't touch it).
     site_api_dash.add_widgets(
-        cloudwatch.GraphWidget(
-            title="Cold starts per route (Sum, 5min)",
-            width=12,
-            height=6,
-            left=[
-                cloudwatch.Metric(
-                    namespace="LifePlatform/SiteAPI",
-                    metric_name="ColdStart",
-                    dimensions_map={"Route": r, "Method": "GET"},
-                    statistic="Sum",
-                    period=Duration.minutes(5),
-                    label=r,
-                )
-                for r in TOP_ROUTES
-            ],
-        ),
+        _route_log_query("Cold starts by route — top 20 by rate (Logs Insights, live)", "cold_start_pct desc"),
         cloudwatch.GraphWidget(
             title="site-api Lambda — Errors + Invocations + Duration",
             width=12,
@@ -134,39 +162,25 @@ def add_dashboards(stack) -> None:
         ),
     )
 
-    # Row 3: 404s + slow endpoints (single-number panels)
+    # Row 3: the ONE flat-cost dimensionless aggregate #2876 kept — fleet-wide
+    # latency + cold-start rate, ~$0.60/month total (2 metrics x 1 dimension
+    # set) regardless of how many routes exist or how much traffic they get.
     site_api_dash.add_widgets(
-        cloudwatch.SingleValueWidget(
-            title="Total requests last 1h (all routes, GET)",
-            width=8,
-            height=4,
-            metrics=[
-                cloudwatch.Metric(
-                    namespace="LifePlatform/SiteAPI",
-                    metric_name="DurationMs",
-                    dimensions_map={"Route": r, "Method": "GET"},
-                    statistic="SampleCount",
-                    period=Duration.hours(1),
-                    label=r,
-                )
-                for r in TOP_ROUTES
+        cloudwatch.GraphWidget(
+            title="Fleet-wide latency p50/p95 — all routes, aggregate metric (~$0.30/mo flat)",
+            width=12,
+            height=6,
+            left=[
+                _aggregate_metric("DurationMs", "p50", "p50 (ms)"),
+                _aggregate_metric("DurationMs", "p95", "p95 (ms)"),
             ],
+            left_y_axis=cloudwatch.YAxisProps(label="ms", show_units=False),
         ),
-        cloudwatch.SingleValueWidget(
-            title="Cold start rate (1h)",
-            width=8,
-            height=4,
-            metrics=[
-                cloudwatch.Metric(
-                    namespace="LifePlatform/SiteAPI",
-                    metric_name="ColdStart",
-                    dimensions_map={"Route": r, "Method": "GET"},
-                    statistic="Sum",
-                    period=Duration.hours(1),
-                    label=r,
-                )
-                for r in TOP_ROUTES
-            ],
+        cloudwatch.GraphWidget(
+            title="Fleet-wide cold starts — all routes, aggregate metric (~$0.30/mo flat)",
+            width=12,
+            height=6,
+            left=[_aggregate_metric("ColdStart", "Sum", "cold starts")],
         ),
     )
 

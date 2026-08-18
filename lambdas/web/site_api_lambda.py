@@ -927,44 +927,46 @@ def lambda_handler(event, context):
     def _emit_route_log(status_code):
         """Emit structured JSON route metric to CloudWatch Logs.
 
-        Uses CloudWatch EMF (Embedded Metric Format) so per-route latency is
-        auto-extracted as real CloudWatch metrics (no PutMetricData cost — see
-        docs/CONVENTIONS.md and #2876's PR body for the pricing basis of the
-        metrics themselves).
+        Uses CloudWatch EMF (Embedded Metric Format) so the dimensionless
+        aggregate is auto-extracted as a real CloudWatch metric (no
+        PutMetricData cost — see docs/CONVENTIONS.md and #2876's PR body for
+        the pricing basis).
 
-        Two dimension sets, deliberately (#2876, mirroring #2819's
-        Handled5xx aggregate+detail split):
-          - `["Route", "Method"]` — unchanged from before #2876. This is what
-            `cdk/stacks/monitoring_dashboards.py`'s `life-platform-site-api-dashboard`
-            already reads for its 6 `TOP_ROUTES` panels; keeping the shape
-            identical means #2876 (which now calls this for every route,
-            including the 27+16 that never reached it before) is a pure
-            coverage extension, not a dashboard-behavior change.
-          - `[]` — a NEW dimensionless aggregate (#2876), so a future
-            fleet-wide p95/cold-start alarm can watch every route without
-            enumerating any of them, the same "alarm on the aggregate,
-            diagnose on the per-route" split `emit_handled_5xx` already uses.
+        ONE dimension set ships: `[]` — the dimensionless aggregate, so a
+        fleet-wide p95/cold-start alarm can watch every route without
+        enumerating any of them (the same "alarm on the aggregate, diagnose
+        on the per-route" split `emit_handled_5xx` uses for its own alarm
+        half).
 
-        Extending the FULL per-route dimension set to the newly-covered
-        routes is priced explicitly in the #2876 PR body — it is the
-        cheaper of the two "bounded design" options that PR considered
-        (the alternative, dropping the `Route` dimension to a free EMF
-        property, would also change the shape for the 6 dashboarded routes
-        and need a coordinated `monitoring_dashboards.py` update+deploy,
-        which was deliberately left out of this PR's blast radius).
+        `Route` and `Method` deliberately are NOT listed in any `Dimensions`
+        entry (#2876 cost amendment, 2026-08-18). CloudWatch bills
+        $0.30/metric/month per *unique dimension set*, and Route x Method
+        was measured live at 158 already-active billable streams on
+        2026-08-18 — before this PR's ~44 newly-covered routes would have
+        added ~88 more. Route and Method stay as plain top-level JSON fields
+        on every log line (EMF *properties*, not *dimensions*), so per-route
+        latency/cold-start stays fully queryable via CloudWatch Logs Insights
+        — see the `LogQueryWidget`s in `cdk/stacks/monitoring_dashboards.py`
+        and the example query in the #2876 PR body — it just no longer mints
+        a billed metric per route. This applies uniformly to every route,
+        old and new: a per-route allowlist/exception here would be exactly
+        the hand-enumeration the charter's standing rule 1 forbids.
+        tests/test_route_metric_coverage_2876.py's
+        `test_route_metric_dimensions_have_no_route_or_method` guards the
+        declaration itself so this can't silently regress.
         """
         global _COLD_START
         try:
             duration_ms = round((_time.time() - _req_start) * 1000, 1)
             emf = {
                 # _aws block → CloudWatch automatically ingests the named
-                # fields as metrics. Cheap (≤ 5 dimension sets, no API call).
+                # fields as metrics. Cheap (1 dimension set, no API call).
                 "_aws": {
                     "Timestamp": int(_time.time() * 1000),
                     "CloudWatchMetrics": [
                         {
                             "Namespace": "LifePlatform/SiteAPI",
-                            "Dimensions": [["Route", "Method"], []],
+                            "Dimensions": [[]],
                             "Metrics": [
                                 {"Name": "DurationMs", "Unit": "Milliseconds"},
                                 {"Name": "ColdStart", "Unit": "Count"},

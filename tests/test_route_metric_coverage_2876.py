@@ -102,6 +102,44 @@ def test_every_route_branch_lives_inside_the_single_dispatch_function():
     )
 
 
+def test_route_metric_dimensions_have_no_route_or_method():
+    """#2876 cost amendment (2026-08-18): CloudWatch bills $0.30/metric/month
+    per unique EMF *dimension set*. `Route` x `Method` dimensioned
+    `DurationMs`/`ColdStart` was measured live at 158 already-active billable
+    streams before this amendment, and the coverage fix in this same PR would
+    have added ~88 more (44 newly-covered routes x 2 metrics). `Route` and
+    `Method` must stay plain top-level JSON fields (EMF *properties* — still
+    fully queryable via Logs Insights) and never appear inside any
+    `Dimensions` entry, for ANY route, old or new — a per-route exception
+    here would be exactly the hand-enumeration the charter's standing rule 1
+    forbids.
+
+    This guards the actual `Dimensions` declaration inside `_emit_route_log`
+    (via `ast.get_source_segment` on the real function node, not a
+    hand-retyped copy), so a future edit that reintroduces a per-route
+    dimension fails here immediately — guard the set, not the instance.
+    """
+    tree = ast.parse(SRC)
+    target = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_emit_route_log":
+            target = node
+            break
+    assert target is not None, "_emit_route_log not found anywhere in the module"
+
+    func_src = ast.get_source_segment(SRC, target)
+    dim_lines = [line for line in func_src.splitlines() if '"Dimensions"' in line]
+    assert dim_lines, "expected a Dimensions declaration inside _emit_route_log"
+    for line in dim_lines:
+        assert "Route" not in line and "Method" not in line, (
+            "Route/Method must never appear inside an EMF Dimensions entry "
+            f"(CloudWatch bills $0.30/metric/month per unique dimension set): {line.strip()}"
+        )
+    # And the dimensionless aggregate must still be there — dropping ALL
+    # dimension sets would silently kill the fleet-wide alarm capability.
+    assert any("[[]]" in line for line in dim_lines), f"expected the dimensionless aggregate ([[]]) to remain: {dim_lines}"
+
+
 def test_dispatch_route_never_calls_the_emitter():
     """`_dispatch_route` must return to its caller, never emit itself — that is
     what makes the exit point single. If a future edit hoists `_emit_route_log`
@@ -171,20 +209,21 @@ def test_a_previously_uncovered_route_now_emits_on_the_wire():
     assert resp["statusCode"] == 200
     assert len(emitted) == 1, "must emit exactly once"
     emf = emitted[0]
-    assert emf["Route"] == "/api/coaching-dashboard"
-    assert emf["Method"] == "GET"
 
     directives = emf["_aws"]["CloudWatchMetrics"]
     assert len(directives) == 1
     d = directives[0]
     assert d["Namespace"] == "LifePlatform/SiteAPI"
     assert {m["Name"] for m in d["Metrics"]} == {"DurationMs", "ColdStart"}
-    # Both dimension sets: the pre-existing per-route detail (UNCHANGED shape —
-    # cdk/stacks/monitoring_dashboards.py's TOP_ROUTES panels don't regress)
-    # plus the new #2876 dimensionless aggregate (a future fleet-wide alarm
-    # can watch every route without enumerating any of them).
-    assert ["Route", "Method"] in d["Dimensions"]
-    assert [] in d["Dimensions"]
+    # Only the dimensionless aggregate ships (#2876 cost amendment,
+    # 2026-08-18) — a future fleet-wide alarm can watch every route without
+    # enumerating any of them, and without minting a billed metric per route.
+    assert d["Dimensions"] == [[]]
+    # Route/Method are STILL plain top-level fields on the log line (EMF
+    # properties, not dimensions) — per-route latency stays queryable via
+    # Logs Insights even though it's no longer a billed CloudWatch metric.
+    assert emf["Route"] == "/api/coaching-dashboard"
+    assert emf["Method"] == "GET"
 
 
 def test_a_previously_uncovered_route_emits_on_a_handled_500_too():
@@ -221,14 +260,22 @@ def test_unmatched_path_still_emits_a_404():
     assert emitted[0]["status"] == 404
 
 
-def test_an_already_covered_route_keeps_its_exact_shape():
+def test_an_already_covered_route_keeps_its_dimensionless_shape():
     """Non-regression: `/api/healthz` was already measured before #2876 (the
-    one pre-existing explicit-emit exception). Its shape must be unchanged
-    apart from gaining the new aggregate dimension set, or the deployed
-    `life-platform-site-api-dashboard` (which reads exactly this shape for
-    six TOP_ROUTES) would silently go blank."""
+    one pre-existing explicit-emit exception). #2876's cost amendment
+    (2026-08-18) applies uniformly to EVERY route including this
+    already-covered one — no per-route exception list — so `/api/healthz`
+    also loses its `["Route", "Method"]` dimension set and keeps only the
+    dimensionless aggregate. `cdk/stacks/monitoring_dashboards.py`'s
+    `life-platform-site-api-dashboard` was rewritten in the same change to
+    stop reading the now-retired per-route dimensioned metric (Logs Insights
+    widgets + the aggregate metric instead), so this is not a silent
+    dashboard regression."""
     resp, emitted = _emitted_route_metrics(_event("/api/healthz"))
     assert resp["statusCode"] == 200
     assert len(emitted) == 1
-    d = emitted[0]["_aws"]["CloudWatchMetrics"][0]
-    assert ["Route", "Method"] in d["Dimensions"]
+    emf = emitted[0]
+    d = emf["_aws"]["CloudWatchMetrics"][0]
+    assert d["Dimensions"] == [[]]
+    assert emf["Route"] == "/api/healthz"
+    assert emf["Method"] == "GET"
