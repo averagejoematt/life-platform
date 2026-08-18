@@ -2880,6 +2880,25 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2877"
         }
       ]
+    },
+    {
+      "id": "2026-08-18-the-reviewer-that-kept-changing-its-mind",
+      "date": "2026-08-18",
+      "title": "An AI kept flagging a sentence it had already been told was fine — and kept changing its mind about how bad it was",
+      "shipped": "Every night an AI reads this site the way a stranger would and reports anything that reads as a lie. One sentence on the home page — \"This attempt starts at the Day-1 weigh-in\" — kept getting flagged as a contradiction, because by the time it was read the experiment had already started. It is not a contradiction; it describes how the thing works, which is true on every day of the run. The rulebook the AI is given already lists that exact sentence as one it must not flag. It flagged it anyway, 25 times out of 60 runs over ten days, across four different phases of the experiment. Worse, it could not keep its own story straight: two runs thirty-five minutes apart, reading byte-identical text, rated it \"medium\" and then \"high\" — and \"high\" is the level that trips a real alarm. So an alarm meant to mean \"something is wrong\" could fire because a language model changed its mind. Now the exemption is enforced by ordinary code before the AI's severity rating is ever consulted: the list of protected sentences lives in one place, the rulebook the AI reads is generated from that same list so the two can never drift apart, and a finding is discarded only when everything it quotes is protected text. A complaint that quotes anything else survives at full strength. The same session fixed a deploy gate that had blocked every publish to this site for two days.",
+      "why_it_mattered": "An alarm you cannot trust is worse than no alarm, because it still costs you the time to investigate and it teaches you to ignore the next one. This platform had already retired two other AI checks for the same reason, and both times the lesson was identical: you cannot fix a model that ignores an instruction by writing the instruction more forcefully. The rule here is that deterministic code decides first, and the AI only gets to judge what code cannot. That is a standing principle in this codebase, and this was the third time the same class of problem proved it.",
+      "gotcha": "The fix nearly shipped broken in a way that would have looked perfect. The live page renders \"Day-1\" with a non-breaking hyphen — a different character from the ordinary hyphen the rulebook is written with. A straightforward text comparison would have matched nothing at all, forever, while every test written by hand passed and the check appeared to be working. It was caught only because the tests were built from real logged output rather than retyped by hand. A second real example then broke the first attempt honestly: the AI sometimes quotes a fragment of the protected sentence alongside the whole thing, which the initial rule rejected.",
+      "honest_miss": "This does not fully close the underlying issue, and it is recorded that way rather than declared done. The strongest remaining question — whether the alarm should require a finding to repeat across separate nights before it can fire at all — was considered and deliberately not built, because it would delay a genuine problem by a full day and stabilise a signal rather than fix it. That is a judgement call, not an oversight, so it is written down as one. And the final proof is not in hand yet: the check has to run overnight against the deployed code and the alarm has to be watched returning to normal. Until that is observed, the issue stays open.",
+      "prs": [
+        {
+          "label": "PR #2880",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2880"
+        },
+        {
+          "label": "PR #2879",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2879"
+        }
+      ]
     }
   ]
 }
