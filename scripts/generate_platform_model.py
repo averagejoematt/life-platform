@@ -242,13 +242,22 @@ def extract_alarms() -> dict[str, dict]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            for kw in node.keywords:
-                if kw.arg != "alarm_name":
-                    continue
-                resolved = _resolve_str(kw.value, consts)
-                if resolved is None or "{" in resolved:
-                    continue  # per-call dynamic names (helper parameters) — scope cut
-                declared_here[resolved] = {"stack": path.stem, "routing": "unresolved"}
+            kwargs = {kw.arg: kw.value for kw in node.keywords if kw.arg}
+            an = kwargs.get("alarm_name")
+            if an is None:
+                continue
+            resolved = _resolve_str(an, consts)
+            if resolved is None or "{" in resolved:
+                continue  # per-call dynamic names (helper parameters) — scope cut
+            # ADR-050 helper contract: an explicit digest= flag on the declaring
+            # call routes to the digest (True) or urgent (False) topic. Absent
+            # flag stays "unresolved" — the helper's default depends on runtime
+            # wiring (alerts_topic) this AST pass cannot see.
+            routing = "unresolved"
+            dg = kwargs.get("digest")
+            if isinstance(dg, ast.Constant) and isinstance(dg.value, bool):
+                routing = "digest" if dg.value else "urgent"
+            declared_here[resolved] = {"stack": path.stem, "routing": routing}
         # Variable trace: `<var> = ...create_alarm(..., alarm_name=X)` then
         # `<var>.add_alarm_action(cw_actions.SnsAction(<topic>))`.
         for node in ast.walk(tree):

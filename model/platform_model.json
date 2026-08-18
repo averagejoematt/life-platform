@@ -17,7 +17,7 @@
       "stack": "monitoring_stack"
     },
     "freshness-checker-errors": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "operational_stack"
     },
     "grading-stalled": {
@@ -29,11 +29,11 @@
       "stack": "monitoring_stack"
     },
     "hevy-restamp-errors": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "operational_stack"
     },
     "hevy-routine-cron-errors": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "operational_stack"
     },
     "ingest-auth-unhealthy-24h": {
@@ -73,7 +73,7 @@
       "stack": "ingestion_stack"
     },
     "key-rotator-errors": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "operational_stack"
     },
     "life-platform-daily-brief-memory-high": {
@@ -81,11 +81,11 @@
       "stack": "monitoring_stack"
     },
     "life-platform-data-export-errors": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "operational_stack"
     },
     "life-platform-delete-user-data-errors": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "operational_stack"
     },
     "life-platform-dlq-depth-warning": {
@@ -109,7 +109,7 @@
       "stack": "mcp_stack"
     },
     "mcp-warmer-error": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "mcp_stack"
     },
     "paging-budget-tier-3": {
@@ -121,7 +121,7 @@
       "stack": "monitoring_stack"
     },
     "permanence-errors": {
-      "routing": "unresolved",
+      "routing": "digest",
       "stack": "operational_stack"
     },
     "permanence-heartbeat": {
