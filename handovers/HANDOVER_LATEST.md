@@ -77,9 +77,10 @@ not filing a duplicate; #2692 owns the measure-first decision and its rationale 
   `recall:*` line. Because a pass is *silent* in that log, the box was confirmed against the
   underlying data instead: the recall partition holds 21 chronicle rows and **2026-08-16 is
   present**. The 07-21 link divergence is also resolved (`assess()` fails on either condition).
-- **#2735 — on track, carried.** `coherence-overall` is a 24h-`Maximum` alarm whose last
-  breaching datapoint is 08-17 21:00Z, so it ages out ~21:00–21:20Z 08-18, exactly as predicted.
-  Session closed before that; the plan says comment only if it did NOT clear.
+- **#2735 — CONFIRMED CLEAR.** `coherence-overall` is a 24h-`Maximum` alarm whose last breaching
+  datapoint was 08-17 21:00Z; verified `OK` at 19:09Z 08-18, i.e. it aged out on its own inside
+  the predicted ≤21:20Z window. The plan says comment only if it did NOT clear — it did, so no
+  comment was filed.
 - **#2669 — not applicable.** Wednesday box; today is Tuesday.
 
 ## Analysis, deliberately not shipped
@@ -129,8 +130,6 @@ not filing a duplicate; #2692 owns the measure-first decision and its rationale 
 
 - **#2668** — close on the 2026-08-19 17:00Z brief if it logs `parsed clean` with no truncation
   lines; that is run 3 of 3. Boxes 1/2/4 already met.
-- **#2735** — confirm `coherence-overall` returned to OK on its own after ~21:20Z 08-18; comment
-  only if it did NOT.
 - **#2669** — the Wednesday chronicle box: on/after 08-19's 15:00Z cron, check
   `/aws/lambda/wednesday-chronicle` for ONE generation, <300s, persisted, no duplicates.
 - **#2643 fast-follow** — whoop and habitify are the other non-behavioral `DAILY_SOURCES` and have
