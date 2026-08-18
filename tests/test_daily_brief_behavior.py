@@ -80,6 +80,7 @@ sys.path.insert(0, str(REPO_ROOT / "lambdas" / "emails"))
 _import_err = None
 try:
     import daily_brief_lambda as brief  # noqa: E402
+    import daily_brief_lock as _lock  # noqa: E402 — #2860, split out for the module-size ratchet
     from experiment import phase_taxonomy as tax  # noqa: E402
     from experiment.phase_filter import PHASE_FILTER_EXPRESSION  # noqa: E402
     from ingestion import source_registry as registry  # noqa: E402
@@ -1612,6 +1613,16 @@ class TestDryRun:
         `output_writers` JSON artifacts, the two `site_writer` live artifacts,
         the insight ledger, the async coach-ensemble-digest fan-out, and SES.
 
+        One deliberate, narrow exception (#2860): the in-flight lock's own
+        lease row (`_lock.DAILY_BRIEF_LOCK_PK`). It writes regardless of
+        `dry_run` on purpose — the lock exists BECAUSE dry_run does not
+        suppress AI spend, so a dry run must still be guarded against a
+        concurrent duplicate. It's an ops-namespace row (phase_taxonomy
+        SYSTEM_STATE), not a content/persistence write in the #2255 sense —
+        see `test_daily_brief_inflight_guard_2860.py` for its own dedicated
+        coverage. Filtered out here rather than added to the assertion so this
+        set-level guarantee still catches any OTHER new write site.
+
         The paired real invocation below is what makes this non-vacuous: with
         the same fixture and the same row, a normal run lights up the same
         sinks. If the dry-run half ever passes because the handler bailed early
@@ -1622,7 +1633,8 @@ class TestDryRun:
         brief.lambda_handler({"dry_run": True}, None)
 
         table, writers, s3 = handler_env["table"], handler_env["writers"], handler_env["s3"]
-        assert table.puts == [], f"DRY_RUN wrote to DynamoDB: {table.puts}"
+        content_puts = [p for p in table.puts if p.get("pk") != _lock.DAILY_BRIEF_LOCK_PK]
+        assert content_puts == [], f"DRY_RUN wrote to DynamoDB: {content_puts}"
         assert table.updates == [], f"DRY_RUN updated DynamoDB: {table.updates}"
         assert s3.puts == [], f"DRY_RUN wrote to S3: {s3.puts}"
         assert writers.dashboard == [] and writers.clinical == [] and writers.buddy == [] and writers.public_stats == []
@@ -1634,7 +1646,8 @@ class TestDryRun:
 
         # Falsifier: the identical run without the flag exercises those sinks.
         brief.lambda_handler({}, None)
-        assert table.puts, "the real path writes nothing either — the assertions above are vacuous"
+        content_puts = [p for p in table.puts if p.get("pk") != _lock.DAILY_BRIEF_LOCK_PK]
+        assert content_puts, "the real path writes nothing either — the assertions above are vacuous"
         assert writers.dashboard and writers.clinical and writers.buddy and writers.public_stats
         assert handler_env["public_stats"].calls and handler_env["pulse"].calls
         assert len(handler_env["ses"].sent) == 1
@@ -1647,7 +1660,9 @@ class TestDryRun:
         r = computed_row()
         handler_env["table"].store[(r["pk"], r["sk"])] = r
         brief.lambda_handler({}, None)
-        assert handler_env["table"].puts == []
+        # #2860: the in-flight lock's lease row is the one deliberate exception
+        # to "dry run writes nothing" — see test_a_dry_run_writes_nothing_anywhere.
+        assert [p for p in handler_env["table"].puts if p.get("pk") != _lock.DAILY_BRIEF_LOCK_PK] == []
         assert handler_env["public_stats"].calls == []
 
     def test_force_send_restores_the_writes_as_well_as_the_send(self, handler_env, monkeypatch):
@@ -1670,7 +1685,10 @@ class TestDryRun:
         out = brief.lambda_handler({"dry_run": True}, None)
         assert handler_env["ses"].sent == []
         assert handler_env["writers"].buddy == []
-        assert handler_env["table"].puts == []
+        # #2860: the in-flight lock's lease row is the one deliberate exception
+        # to "dry run writes nothing" — it runs before the sick-day branch even
+        # forks. See test_a_dry_run_writes_nothing_anywhere.
+        assert [p for p in handler_env["table"].puts if p.get("pk") != _lock.DAILY_BRIEF_LOCK_PK] == []
         assert "not sent" in out["body"]
         # Falsifier: the same sick day, really run, does write the buddy file.
         brief.lambda_handler({}, None)
