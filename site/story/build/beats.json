@@ -2853,6 +2853,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2869"
         }
       ]
+    },
+    {
+      "id": "2026-08-18-the-failure-that-looked-like-health",
+      "date": "2026-08-18",
+      "title": "A handled 500 left the error count at zero — the failure that looked like health",
+      "shipped": "When a page on this site broke badly enough to return a server error, the platform caught the error, returned a polite failure to the reader, and recorded nothing. The alarm that watches for errors counts *unhandled* crashes, and catching an exception politely means it never becomes one — so a route could serve nothing but failures indefinitely while every dashboard stayed green. That happened for about four hours on July 19th, and the only reason anyone found out was an unrelated audit. Now every error response the API builds emits a real metric, and an alarm on it pages within fifteen minutes. The same day closed a missing night in the sleep data (the vendor genuinely had no session for August 9th — confirmed by querying it directly nine days later, so the gap is now recorded as a measured absence rather than left as a hole), stopped 67 GB of superseded deploy artifacts from accumulating forever, and made a cron-checking tool derive its facts from the infrastructure code instead of a hand-written list.",
+      "why_it_mattered": "The interesting part was not writing the metric — it was finding where to put it. The obvious home was the function that already logs every route's timing, which reads like the one place all requests pass through. It isn't: it sits on the tail end of the request dispatch, and 27 routes return before ever reaching it — including the site's busiest ones, and including both routes from a previous latency incident. A metric hung there would have covered a fraction of the site while looking complete on a dashboard, which is a worse outcome than no metric at all. The error envelope itself is the real chokepoint, so that is where it went. The 27 unmeasured routes are now their own filed issue rather than a thing quietly discovered and quietly forgotten.",
+      "gotcha": "Proving a detector works is harder than writing one. Unit tests can show the code emits the right shape, but a malformed metric block is accepted silently by the logging service and simply never becomes a metric — an instrument that measures nothing while reporting success, which is the exact failure being fixed. So the wire format was published to a throwaway namespace and checked that the metric actually materialized, rather than polluting the real one with fake data to prove a point. It did, in both forms: the aggregate the alarm watches, and the per-route breakdown that names which door broke. Separately, a routine merge produced zero CI runs at all — not a failure, an absence — which would have left the branch unvalidated and the fix undeployed had the check been 'is it green' instead of 'did it run'.",
+      "honest_miss": "The detector is armed against something that is not currently happening, so there is no real datapoint yet — the detection path is proven end to end, but the page itself awaits its first genuine failure. A separate fix was expected to close today on its third consecutive clean run and does not: the success message it checks for was added by the fix itself, so the two silent days before it went live were successes that logged nothing, not the passes they were assumed to be. That makes today the second clean run, not the third, and it closes tomorrow. Counting them as three would have been the easier and wronger answer.",
+      "prs": [
+        {
+          "label": "PR #2874",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2874"
+        },
+        {
+          "label": "PR #2873",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2873"
+        },
+        {
+          "label": "PR #2875",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2875"
+        },
+        {
+          "label": "PR #2877",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2877"
+        }
+      ]
     }
   ]
 }

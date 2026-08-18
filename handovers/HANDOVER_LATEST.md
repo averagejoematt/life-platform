@@ -1,139 +1,150 @@
-# Handover — 2026-08-17 (evening, ~18:00 → ~21:45 PT): the system model, and the map found the defects
+# Handover — 2026-08-18 (daytime, ~06:30 → ~12:00 PT): the failure that looked like health
 
-**Session:** Fable, owner-directed (plan `system-model-and-matured-boxes` executed: Phase 0
-owner-ask harvest → the #2845 headline build → a 3-worker sonnet fan-out → merge queue →
-deploys → an unplanned main-red fix). Session started ~1.5h after the day wrap, so the
-plan's matured boxes all sit tomorrow (08-18 daytime UTC) — noted below, not forced.
+**Session:** Opus, owner-directed (plan `opus-boxes-and-hardening`, model ceiling Opus — no
+kernel builds; #2846/#2847 stay Fable-sequenced). Boot was **charter + model** (#2845) rather
+than a prose re-read. The session started ~06:30 PT, so every Phase-0 box was still ahead of
+the clock — Phase 1 and the fan-out ran first, and the boxes were taken as they fired.
 
-## What shipped — 4 PRs merged + deployed, 1 issue filed, 5 issues closed
+**Build beat:** `2026-08-18-the-failure-that-looked-like-health`
+**Docs:** CONVENTIONS §9 (gate registry row), INCIDENT_LOG (recurrence pointer + 1 new row),
+ARCHITECTURE/INFRASTRUCTURE/MONITORING (alarm count 103→104), DATA_GOVERNANCE (retention table),
+DEPENDENCY_GRAPH + `model/platform_model.json` (regenerated) — all landed inside their PRs; the
+wrap's `sync_doc_metadata --apply` found everything already in sync.
+**Decisions:** none needed — the session's judgement calls (emitter at the error envelope, alarm
+in `serve_stack` not `monitoring_stack`, absence-marker opt-in scoped to non-behavioral
+`DAILY_SOURCES`) are implementations of existing ADRs 104/125/050, and are recorded in
+CONVENTIONS §9 and in-code rather than as new governance.
+**Incidents:** 1 row added — a merge to `main` produced ZERO CI runs (swallowed-push class,
+second documented occurrence; caught by a by-`head_sha` check, recovered by manual dispatch).
+**Main:** green (`9e3659a1`) — `check_main_green.py` exit 0.
+**CI warnings:** 1 — Unit Tests 1297s vs the 1200s budget (fifth crossing). Triaged to the
+existing #2692 with today's datapoint and an explicit **no-action call**: not raising the budget,
+not filing a duplicate; #2692 owns the measure-first decision and its rationale is unchanged.
+**Alarms:** clean — every alarm red >72h cites an incident row or issue; none red >14d uncited.
+**Backlog:** Now live at 11 actionable; no stale `Later` issues.
+**Closures:** #2819, #2642, #2866, #2643 commented (ADR-099 two-line contract).
+**Stash/hooks:** clean — `git stash list` empty.
 
-- **#2865 (#2845 + #2805, the headline)** — **the system model**: `model/platform_model.json`
-  + `docs/DEPENDENCY_GRAPH.md` are now GENERATED (`scripts/generate_platform_model.py`)
-  from the charter's own authorities (CDK AST, `source_registry`, the ADR-077
-  `phase_taxonomy` census — which IS the computed-partition registry #2805 called for),
-  drift-gated byte-for-byte every CI run (`tests/test_platform_model_drift.py`, with
-  known-true-edge pins so extractor regressions can't masquerade as model changes), and
-  queried via `scripts/blast_radius.py --touches/--feeds`. 104 lambdas / 81 scheduled /
-  45 alarms (34 routings resolved) / 105 partitions / 644 edges. Sampled ground truth
-  **162/163 = 99.4%** (method in the PR; the 1 miss verified prose). Mutation-proven both
-  artifacts live. Scope cuts stated in `meta.scope_cuts`, never faked. **#2839 closed with
-  verdict (subsumed)** — the prose doc's false-edge class dies with the prose. The model
-  immediately surfaced 5 multi-schedule lambdas no doc listed (whoop has THREE schedules)
-  and an instrument defect: `check_doc_facts`' regex cron map attributes whoop's *recovery*
-  cron as its cadence → **#2866 filed** with tonight's evidence.
-- **#2867 (#2860)** — daily-brief in-flight lease guard (`emails/daily_brief_lock.py`,
-  DDB conditional-put lease on `SYSTEM#daily-brief-lock`, TTL 1200s > the 900s Lambda
-  timeout, fail-open on non-conflict errors) + RUNBOOK safe-invoke reflex; reserved-
-  concurrency=1 weighed and rejected in the PR. Deployed direct (`deploy_lambda.sh`) and
-  **byte-verified in the live bundle** (lock module present, imported, called at :1635
-  before any AI section).
-- **#2868 (#2859)** — the two 404ing `/archive/v1/*` redirects were NOT a map gap: the
-  `/archive/*` CloudFront behavior (#2572) had **no function association** (the #1805
-  class), so every request under it bypassed `v4-redirects`. 14-line `web_stack.py` fix;
-  deployed via guarded `cdk_deploy.sh LifePlatformWeb` + viewer-path invalidation;
-  **live-verified**: both named URLs (and the wider class) 301, the Permanence tarball
-  still 200s. Evidence commented on #2859.
-- **#2869 (unplanned)** — main redded 3× tonight on `test_public_write_hardening` vote
-  tests (503 vs 404/200). Root cause reproduced BOTH directions: the tests patched
-  `_challenge_catalog_cache` but not the `_cache_at` TTL stamp; a stale stamp + CI FAKE
-  creds → S3 reload `{}` → 503, while local REAL creds silently served the REAL catalog
-  (fixture-must-be-the-wire). Tonight's ~30 new tests shifted the suite past the TTL edge.
-  Fix pins the stamp (`None` = the module's own documented test-injection contract);
-  proof: a deliberately leaky stale-stamp test + FAKE creds fails 3 exactly as CI did
-  unfixed, passes 8/8 fixed. Deploy/smoke/visual-QA were green on every red run — the
-  platform was healthy; the instrument wasn't.
-- **#2669 needed no work** — the worker verified PR #2795 (merged 08-16, deployed,
-  timeout 300s live) already implements it; Wednesday 08-19's chronicle run is its live
-  box (its `Fixes` line was `Refs`, so the issue stays open for that evidence — correct).
+## What shipped — 4 PRs merged + deployed, 4 issues closed, 1 filed
 
-## Phase 0 findings (the plan's harvest)
+- **#2874 (#2819, the headline) — the handled-5xx detector.** A handled 500 returns
+  `_error(500, …)` instead of re-raising, so AWS/Lambda `Errors` stays 0 and `site-api-errors`
+  never fires — `/api/fulfillment_ritual` served handled 500s for ~4h on 2026-07-19 with nothing
+  to notice. `emit_handled_5xx()` in `site_api_common` now emits a `Handled5xx` EMF datapoint from
+  **all three** response builders: `_error` (the 29-module chokepoint), `_envelope` (the #2221
+  write doors), and `site_api_ai_lambda`'s own `_error` (that lambda does not share the common
+  one, so `/api/ask` + `/api/board_ask` would otherwise have stayed blind). Alarm
+  `site-api-handled-5xx` → digest, Sum ≥ 5/15min, `NOT_BREACHING`.
+  **The load-bearing finding: `_emit_route_log` is NOT a chokepoint.** It sits on the
+  `ROUTES.get(path)` tail, so 27 routes return before reaching it. Hanging the metric there would
+  have covered a strict subset while reading as complete on a dashboard.
+- **#2873 (#2642) — S3 noncurrent-version lifecycle.** The worker **corrected the brief**: the
+  bucket is `Bucket.from_bucket_name` (imported), so CDK *cannot* own its lifecycle —
+  `deploy/apply_s3_lifecycle.sh` is the source of truth — and the fix had already been applied
+  live on 08-16 without ever being written back to the script, which
+  `put-bucket-lifecycle-configuration` **replaces wholesale on every run**. One stale re-run from
+  silent reversion. Measured 96.87 GB (08-15) → 37.72 GB (08-16).
+- **#2875 (#2866) — cron map derives from the model.** `check_doc_facts._cdk_cron_map` now calls
+  the #2845 generator's `extract_lambdas()`; whoop went from one wrong entry (its *recovery* cron)
+  to its real three-schedule set. #1189 non-vacuity mutation re-proven.
+- **#2877 (#2643) — Eight Sleep's 08-09 interior gap.** Settled by **direct live vendor probe**:
+  the trends API queried on 08-18 for 08-05..08-12 returned every day except 08-09, nine days
+  later — branch 2, a real night not in the pod. Plus the mechanism defect behind it: a date that
+  ages out of the gap-fill window was simply forgotten. New opt-in
+  `record_gap_exhausted_absence` writes an ADR-104 marker on a date's **last** retry.
+- **Filed #2876** — the 27 routes that reach no route-metric at all, so per-route latency is
+  **absent, not zero**. Both routes from the 2026-07-19 latency incident are on that list.
 
-- **#2836 September base**: zero comments — still the owner's call, due 09-01.
-- **Whoop re-auth**: NOT done (secret last-changed 12:00Z 08-17 = the auto-refresh at
-  latch time; no rows past 08-16). The #2085 latch-clear + backfill stay ready to run.
-- **Withings genesis weigh-in**: still not synced (0 rows for 08-17+) — baseline remains
-  the 321.01 override; supersede reflex documented in `project_monday_reset`.
-- **Matured boxes** (all 08-18 daytime UTC, deliberately not forced tonight): #2668
-  3-of-3 at the 17:00Z brief; #2858's live box at the 18:30Z qa-smoke sweep; #2735's
-  planted red ages out ≤21:20Z.
+## Phase 0 boxes
+
+- **#2668 — 2 of 3, NOT closed.** The plan expected today to close it; that premise was off by
+  one. `[INFO] IC-3 analysis parsed clean` was added *by the fix itself*, so 08-13/15/16 were
+  silent successes under the old code (which logged only on failure), and the fix — committed
+  08-15 15:07Z — was not in the live bundle until 08-17. Runs with positive evidence: 08-17 = 1,
+  08-18 = 2 (clean at 17:07:19 and 17:07:50), **08-19 = 3**. Honest count commented, not closed.
+- **#2858 — box confirmed, not reopened.** The 18:30Z sweep: `FailCount 0`, 58 passes, no
+  `recall:*` line. Because a pass is *silent* in that log, the box was confirmed against the
+  underlying data instead: the recall partition holds 21 chronicle rows and **2026-08-16 is
+  present**. The 07-21 link divergence is also resolved (`assess()` fails on either condition).
+- **#2735 — on track, carried.** `coherence-overall` is a 24h-`Maximum` alarm whose last
+  breaching datapoint is 08-17 21:00Z, so it ages out ~21:00–21:20Z 08-18, exactly as predicted.
+  Session closed before that; the plan says comment only if it did NOT clear.
+- **#2669 — not applicable.** Wednesday box; today is Tuesday.
+
+## Analysis, deliberately not shipped
+
+- **#1221** (client IP from the trusted hop). The plan said don't ship if uncertain about the
+  CloudFront hop model. Verified live: all six `/api/*` behaviours have
+  `OriginRequestPolicyId: None`. **New blocking fact:** they are all still on legacy
+  `ForwardedValues`, and CloudFront rejects that alongside an origin-request-policy — so
+  attaching the policy means migrating all six onto cache-policy pairs, with the public read
+  surface's caching as blast radius. Also: the issue body is stale — the `site_api_ai_lambda`
+  holdout is already fixed (`grep -c sourceIp` = 0). Owner call; analysis posted on the issue.
 
 ## Verified
 
-Every merge behind the checks rollup on the exact head sha (`total>0 AND 0 not-green`).
-Clean full local suite 19,377 passed / 0 failed (the one earlier red was my own live
-mutation-proof racing the suite — re-run clean). Redirects, daily-brief bundle symbols,
-and the model's ground-truth edges all verified live, not from claims. Final main run
-32096134923 fully green including Unit Tests.
+- `pytest tests/` 19397 passed / 0 failed at the #2819 merge; every merged PR green on its exact
+  head sha (`total>0 AND 0 not-green`).
+- **#2819 proven three ways beyond unit tests:** emitter symbol-verified in *both* deployed
+  bundles (and again after the cdk deploy re-shipped them); the EMF wire shape published to a
+  throwaway namespace materialized **both** dimension sets (`[]` aggregate + `Route`) with
+  `Sum = 1.0`, proving CloudWatch ingests it — a malformed `_aws` block yields no metric silently,
+  which is the very class being fixed; alarm live, `OK`, routed to digest.
+- **#2643:** DDB + CloudWatch cross-checked independently of the worker's report before merge;
+  marker mechanism symbol-verified in the deployed bundle; backfill applied — series 08-05..08-12
+  contiguous, `InteriorGapCount` **1.0 → 0.0 at 16:26Z**, the first emission after the write.
+- **#2642:** all 14 live lifecycle rules diffed against the script field-by-field (identical), so
+  the post-merge re-apply was a proven no-op rather than a hoped-one.
 
 ## Gotchas hit
 
-- **A tests-only merge skips Deploy** (Plan classifier) — after the #2869 merge the
-  pipeline went green WITHOUT deploying, which would have silently left #2867's guard
-  undeployed; caught by checking the run's job list, resolved by direct `deploy_lambda.sh`
-  + bundle symbol grep. Reflex: after any merge, confirm the Deploy job actually ran for
-  the surfaces you think shipped.
-- **Two instruments disagreed about one registry**: my AST schedule extractor vs
-  `check_doc_facts`' regex block map (whoop: real cadence vs recovery cron). Rendering
-  multi-schedule rows as multi-cron lines (which the #1205 scan skips by design)
-  sidestepped it honestly; the checker fix is #2866, not a widened PR.
-- **The deploy-gate queue with 3 rapid merges**: run 1 approved+deployed, run 2 rejected
-  as superseded at its gate, run 3 completed with Deploy skipped — the lease discipline
-  (approve HEAD, reject ancestors) held, but see the tests-only-skip gotcha above for
-  what "green" hid.
-- The `gh pr merge --delete-branch` local-branch delete fails while the branch's worktree
-  exists — remove the worktree first, then `git branch -D`; remote delete succeeds anyway.
+- **Local `black` was 25.9.0 against the repo's pinned 26.3.1.** A bare `black` run reformatted
+  **20 unrelated files** — committing them would have redded CI in both directions. This is the
+  documented #2570 class and the fix already exists: `deploy/agent_commit.sh` resolves the pin.
+  Reverted the collateral, verified the tree against a venv-installed 26.3.1, and briefed both
+  workers after hitting it.
+- **A watcher pointed at a log group that does not exist** (`/aws/lambda/qa-smoke`; the real name
+  is `/aws/lambda/life-platform-qa-smoke`). It would have reported "nothing found" — an absence
+  indistinguishable from a pass, on the very session about absence-vs-failure. Caught by
+  verifying the group name before trusting the watcher.
+- **A qa-smoke pass is silent.** The sweep logs only WARN/FAIL/PAUSE, so "no `recall:` line" cannot
+  by itself distinguish passed from never-ran — hence verifying #2858 against the corpus data.
+- **Both sonnet workers stopped mid-flight** waiting on background test runs, with real
+  uncommitted work and no PR. Resumed via `SendMessage` (context intact) rather than restarted.
+- **A 17:06Z watcher fired ~13s before the brief's IC-3 line** (17:07:19) and reported nothing —
+  nearly recorded a clean run as a miss. The brief takes ~8 min; sample after ~17:10Z.
 
-## Wrap gates
+## Residual / next picks
 
-**Build beat:** 2026-08-17-the-map-became-code
-**Docs:** CHARTER.md ("Using this" names the model + query commands) · CONVENTIONS §9 row
-(stale-model class → drift gate) · PROPORTIONALITY row (Load-bearing + demote trigger) ·
-REPO_STRUCTURE `model/` row + `model/README.md` · DEPENDENCY_GRAPH.md now generated ·
-doc-sync literals regenerated (test_count 15653 → 15668 across the queue)
-**Decisions:** none needed — #2845/#2805/#2839 execute the already-decided charter/kernel
-sequencing (#2842); no new governance posture was set
-**Main:** green (46f79a222) — decode: runs 32088472048/32089517789/32090032559 red on the
-#2869 test-fixture class only (deploy+smoke green throughout); 32089517789 REJECTED as
-superseded at its gate; final run 32096134923 fully green
-**Incidents:** 2 rows added — main red ~2.5h across three runs on the vote-test
-order-dependence (fixture-not-the-wire; zero user impact, deploys stayed healthy), and
-the wrap-beat site auto-rollback (visual-QA transient on /data/autonomic/, false-positive
-class — INCLUDING the `--failed`-rerun trap: it greens against rolled-back content and
-ships nothing; full rerun + served-artifact check is the recovery; memory reflex written)
-**Stash/hooks:** clean
-**Closures:** #2845, #2805, #2839, #2860, #2859 all carry the two-line verdict; #2866
-filed this session (not closed)
-**Backlog:** Now live at 14 actionable; hygiene OK (104 open issues clean after fixing
-#2866's Outcome audience); no stale Later issues printed
-**Alarms:** gate passed clean — every red >72h cited, every red >14d cites an issue.
-Current expected reds: whoop trio (owner re-auth pending, incident row),
-`qa-smoke-failures` (empties as #2859's next sweep passes + Whoop clears),
-`coherence-overall` planted red (self-clears ≤21:20Z 08-18, #2735), `qa-smoke-warnings`
-(#2670)
-**CI warnings:** 2 — both the S3Key/config bundle-drift class on LifePlatformMcp +
-LifePlatformServe (shared-bundle hash catch-up from tonight's merges, #781 one-bundle);
-triage: flattened same-session via the guarded 2-stack `cdk_deploy.sh` (drift guard
-reported live code clean, deploys ✅ 16s/21s); closed `--decoded`
-**Ledger:** the #2845 drift gate's PROPORTIONALITY row (posture Load-bearing · rent ~30s
-CI regenerate+diff per run · demote trigger: drift reds resolved by regenerating without
-reading the diff) landed inside PR #2865 itself
+- **#2668** — close on the 2026-08-19 17:00Z brief if it logs `parsed clean` with no truncation
+  lines; that is run 3 of 3. Boxes 1/2/4 already met.
+- **#2735** — confirm `coherence-overall` returned to OK on its own after ~21:20Z 08-18; comment
+  only if it did NOT.
+- **#2669** — the Wednesday chronicle box: on/after 08-19's 15:00Z cron, check
+  `/aws/lambda/wednesday-chronicle` for ONE generation, <300s, persisted, no duplicates.
+- **#2643 fast-follow** — whoop and habitify are the other non-behavioral `DAILY_SOURCES` and have
+  not opted into `record_gap_exhausted_absence`; clean today, so left untested rather than shipped
+  blind. Covered by #2643's own thread — file if it is to be worked standalone.
+- **#2876** — the 27 unmeasured routes; note it is NOT free like #2819's sparse 5xx metric.
+- **#1221** — owner call on the origin-request-policy migration (see analysis above).
+- **#2692** — Unit Tests wall-clock, fifth crossing (1297s); measure-first still the standing call.
+- **Owner asks (all three still open, batched below)** — `not-work — owner decisions/actions only`.
 
-## Residuals / next picks
+## Owner asks — one numbered list
 
-- **#2668** — 3-of-3 close at the 08-18 17:00Z brief (positive-evidence filter query).
-- **#2858 live box** — the 08-18 18:30Z qa-smoke sweep should pass `recall:corpus_freshness`;
-  comment evidence on the closed issue (reopen if it FAILs).
-- **#2735 planted red** — not-work — self-clears ≤21:20Z 08-18 by age-out; confirm only if
-  it does NOT.
-- **#2669** — Wednesday 08-19's chronicle run is the live box; check duration + single
-  generation in logs, close with the verdict.
-- **#2866** — the check_doc_facts cron-map fix (derive from the model's extractor).
-- **#2670** — the `qa-smoke-warnings` threshold shape; sequence after Whoop clears and
-  #2859's sweep passes (both in motion tonight).
-- **Whoop re-auth** — owner ask #2 (standing); then #2085 latch-clear + gap backfill
-  08-16→now.
-- **#2836** — September base, owner ask #1, due before 09-01.
-- **Genesis weigh-in supersede** — not-work — standing reflex fires when the Withings
-  reading syncs; baseline stays 321.01 until then.
-- **#2845 follow-ons already tracked**: field-level edges on #2797; enrollment-by-
-  construction #2846; resident-operator #2847+ (charter-sequenced, epic #2842).
+1. **#2836, the September budget base — the sharp one (due 09-01).** Measured today: MTD
+   **$107.40** (non-AI $37.29 + AI $70.11), projected month-end **$171.67** against August's
+   temporary $200 ceiling, tier 1, surge off (773 uniques < 900). Trailing-7d burn is
+   **~$4.71/day**. September auto-reverts to **$85 base / $100 surge** with no deploy — and 30
+   days at that burn is **≈$141**, i.e. **166% of the base and 141% of the surge ceiling**. That
+   is **tier 3, the hard cutoff**, from early in the month: website AI returns "paused", the daily
+   brief skips AI, and both AI CI gates go dark. AI is 65% of spend. Decide the September base (or
+   accept the tier-3 state deliberately); answering also largely resolves **#2734**.
+2. **Whoop re-auth — still not done.** No rows since 2026-08-16; `ingest-auth-unhealthy-whoop` and
+   `ingest-consecutive-failures-whoop` in ALARM since 08-17. After re-auth: #2085 latch-clear,
+   verify the next hourly ingest, backfill 08-16→now (dry-run first), watch the vitals qa-smoke
+   FAIL clear. The breaker re-latching on TTL until then is expected, not a new fault.
+3. **A Withings weigh-in.** No reading since 08-16; the cycle-14 genesis baseline still reads the
+   **321.01 override**. Once you step on the scale, the documented supersede reflex in
+   `project_monday_reset` runs (profile + `config/user_goals.json` + `sync_constants_from_config`
+   + rebakes + CHARACTER.md stamp).
