@@ -103,6 +103,7 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
     logger,
     pre_start_meta,
     set_request_id,
+    set_request_route,
     table,
 )
 
@@ -575,6 +576,9 @@ def lambda_handler(event, context):
     inbound_headers = event.get("headers") or {}
     incoming_rid = inbound_headers.get("x-request-id") or inbound_headers.get("X-Request-Id")
     set_request_id(incoming_rid if incoming_rid else _uuid.uuid4().hex[:16])
+    # #2819: the handled-5xx emitter lives on the error envelope, which is called
+    # from modules that never see the event — hand it the route the same way.
+    set_request_route(path)
 
     # Phase 2.2 (2026-05-16): centralized request envelope validation.
     # Catches oversized bodies, injection patterns, malformed user_id/date/source

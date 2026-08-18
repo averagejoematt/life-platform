@@ -73,6 +73,8 @@ from web.site_api_common import (
     PT,  # #2414: the reader's "today" is the Pacific day
     SITE_API_ORIGIN_SECRET,  # #815 R22-SEC-03: shared with site_api_lambda's SEC-04 guard
     _scrub_blocked_terms as _scrub_blocked_terms_base,  # canonical shared helpers (#368)
+    emit_handled_5xx as _emit_handled_5xx,  # #2819: one emitter, both serving lambdas
+    set_request_route as _set_request_route,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,6 +214,10 @@ def _decimal_to_float(obj):
 
 
 def _error(status: int, message: str) -> dict:
+    # #2819: this lambda builds its own envelope (it does not share
+    # site_api_common's `_error`), so it needs the same handled-5xx emitter or
+    # /api/ask and /api/board_ask stay in the blind spot the issue is about.
+    _emit_handled_5xx(status)
     return {
         "statusCode": status,
         "headers": CORS_HEADERS,
@@ -869,6 +875,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
 
     path = event.get("rawPath") or event.get("path", "/")
     method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "GET")).upper()
+    _set_request_route(path)  # #2819: give the handled-5xx emitter its Route dimension
 
     # CORS preflight
     if method == "OPTIONS":

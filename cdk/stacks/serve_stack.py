@@ -253,6 +253,34 @@ class ServeStack(Stack):
         )
         _site_api_errors_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # ── #2819: the handled-5xx detector ──
+        # `site-api-errors` above watches AWS/Lambda Errors, which counts only
+        # RAISED exceptions. The handler's top-level `except` returns
+        # `_error(500, …)` instead of re-raising, so a route can serve 500s
+        # indefinitely at Errors=0 — /api/fulfillment_ritual did exactly that for
+        # ~4h on 2026-07-19 with no alarm. `Handled5xx` is emitted from the error
+        # envelope in site_api_common (both serving lambdas) and alarmed here on
+        # the dimensionless AGGREGATE, so one alarm covers all ~134 routes; the
+        # per-Route dimension of the same metric names the failing door.
+        # Threshold 5/15min: a single transient DDB timeout stays quiet, a route
+        # that is actually broken does not.
+        _site_api_handled_5xx = cloudwatch.Alarm(
+            self,
+            "SiteApiHandled5xx",
+            alarm_name="site-api-handled-5xx",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/SiteAPI",
+                metric_name="Handled5xx",
+                period=Duration.minutes(15),
+                statistic="Sum",
+            ),
+            threshold=5,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _site_api_handled_5xx.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         _site_api_latency_alarm = cloudwatch.Alarm(
             self,
             "SiteApiLatencyHigh",

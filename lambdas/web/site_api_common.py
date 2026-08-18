@@ -100,6 +100,78 @@ def get_request_id():
     return _current_request_id
 
 
+# ── #2819: the handled-5xx detector ───────────────────────
+# A handled 500 is invisible. `lambda_handler`'s top-level `except` returns
+# `_error(500, …)` instead of re-raising, so AWS/Lambda `Errors` stays 0 and
+# `site-api-errors` — which watches exactly that metric — never fires. The
+# existing route EMF line carries `status` as a plain JSON field, which is not
+# a metric and which no MetricFilter matches. So on 2026-07-19
+# /api/fulfillment_ritual returned handled 500s for ~4h with nothing to notice
+# it (docs/INCIDENT_LOG.md).
+#
+# The emitter hangs off the ERROR ENVELOPE, not off `_emit_route_log`, and that
+# is the load-bearing choice: `_emit_route_log` is only reached on the
+# `ROUTES.get(path)` tail of the dispatch, so the routes that return earlier —
+# /api/predictions, /api/calibration, /api/voice_fidelity, /api/coach_timeline,
+# /api/weekly_priority and the inline blocks above them — never emit a route
+# line at all. `_error` is the real chokepoint: 29 modules in this package
+# build every handled failure through it.
+#
+# Route comes from a per-request global set by the handler, mirroring the
+# `set_request_id` idiom directly above — `_error` is called from modules that
+# have no access to the event.
+_current_request_route: str | None = None
+
+
+def set_request_route(route):
+    global _current_request_route
+    _current_request_route = route
+
+
+def get_request_route():
+    return _current_request_route
+
+
+def emit_handled_5xx(status: int, route: str | None = None) -> None:
+    """Emit a `Handled5xx` EMF datapoint when `status` is a 5xx. Never raises.
+
+    Two dimension sets are published deliberately: `["Route"]` so the operator
+    can see WHICH door is failing, and `[]` (the aggregate) so a single alarm
+    covers all ~134 routes without enumerating them. Alarming on the aggregate
+    and diagnosing on the per-route metric is the whole point.
+
+    Cardinality is bounded by behaviour, not by route count: CloudWatch bills a
+    custom metric only for a month in which it receives datapoints, and this one
+    is only ever written on a 5xx. A healthy month publishes zero metrics; a bad
+    month publishes one per broken route.
+    """
+    try:
+        if int(status) < 500:
+            return
+        emf = {
+            "_aws": {
+                "Timestamp": int(time.time() * 1000),
+                "CloudWatchMetrics": [
+                    {
+                        "Namespace": "LifePlatform/SiteAPI",
+                        "Dimensions": [["Route"], []],
+                        "Metrics": [{"Name": "Handled5xx", "Unit": "Count"}],
+                    }
+                ],
+            },
+            "_type": "handled_5xx",
+            "Route": route or _current_request_route or "unknown",
+            "Handled5xx": 1,
+            "status": int(status),
+            "request_id": _current_request_id,
+        }
+        print(json.dumps(emf))
+    except Exception:
+        # An observability emitter must never be able to break the response it
+        # is observing.
+        pass
+
+
 # ── CORS ──────────────────────────────────────────────────
 # SEC-07: CORS_ORIGIN env-configurable so staging/dev can override.
 CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "https://averagejoematt.com")
@@ -131,7 +203,7 @@ PLATFORM_STATS = {
     "mcp_tools": 76,
     "lambdas": 104,
     "cdk_stacks": 8,
-    "alarms": 103,
+    "alarms": 104,
     "adrs": 152,
     "monthly_cost": "~$80",  # GROUND-TRUTH run-rate, pinned (#1232). Source = the budget
     # governor's own numbers: June 2026 actual $79.80 (Cost Explorer), July projects $82.22
@@ -145,7 +217,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 15668,
+    "test_count": 15675,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -646,6 +718,7 @@ def _error(status: int, message: str, **extra) -> dict:
     Keep it to context the caller already holds; it is not a data-fetch escape hatch.
     """
     rid = get_request_id()
+    emit_handled_5xx(status)  # #2819 — no-op below 500
     return {
         "statusCode": status,
         "headers": {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": "no-cache, no-store"},
@@ -670,6 +743,7 @@ def _error(status: int, message: str, **extra) -> dict:
 def _envelope(status: int, payload: dict, cache_control: str = "no-store", retry_after=None) -> dict:
     """A write-door response carrying the same correlation-id contract as `_ok`/`_error`."""
     rid = get_request_id()
+    emit_handled_5xx(status)  # #2819 — the write doors are a 5xx path too
     headers = {**CORS_HEADERS, **_request_id_headers(), "Cache-Control": cache_control}
     if retry_after is not None:
         headers["Retry-After"] = str(retry_after)
