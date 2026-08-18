@@ -558,130 +558,34 @@ _SIMPLE_ROUTES = {
 }
 
 
-def lambda_handler(event, context):
+# ═══════════════════════════════════════════════════════════════════════════
+# #2876: the single dispatch exit point
+# ═══════════════════════════════════════════════════════════════════════════
+# `_dispatch_route` resolves path+method to a response dict (or `None` for "no
+# route matched" — the caller renders that as 404). It is the ONLY place in this
+# module that decides which handler answers a request: every route table
+# (`ROUTES`, `_SIMPLE_ROUTES`) and every inline `if path == "..."` branch lives
+# inside this one function.
+#
+# The load-bearing property (#2876, out of #2819): this function must NEVER call
+# `_emit_route_log` itself, or otherwise short-circuit past its caller.
+# `lambda_handler` calls it exactly once and unconditionally emits the route
+# metric on whatever comes back — a dict, `None`, or a propagated exception.
+# That makes "does this route get measured" a structural fact of the call graph
+# instead of something every branch has to remember to do. Before this refactor,
+# 27 branches here (plus all of `_SIMPLE_ROUTES`) `return`ed straight out of
+# `lambda_handler` and skipped the metric entirely — a fast route and a route
+# that was never called looked identical: no datapoint either way.
+# `tests/test_route_metric_coverage_2876.py` is the derivation guard: it parses
+# every route literal this function dispatches on and asserts none of them can
+# answer without returning through here.
+def _dispatch_route(event, path, method):
+    """Resolve `path`/`method` to a response dict, or `None` if unmatched.
+
+    Exceptions propagate to the caller (`lambda_handler`) — do not catch and
+    emit here; that would recreate the per-branch bypass this function exists
+    to remove.
     """
-    Main Lambda handler. Supports both API Gateway HTTP API and Function URL events.
-    """
-    import time as _time
-    import uuid as _uuid
-
-    _req_start = _time.time()
-
-    path = event.get("rawPath") or event.get("path", "/")
-    method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "GET")).upper()
-
-    # P3.4: assign a per-request correlation ID. Honor an inbound x-request-id
-    # header if the client (CloudFront / a debugging operator) set one — this
-    # lets the same id flow end-to-end. Otherwise generate a fresh uuid4.
-    inbound_headers = event.get("headers") or {}
-    incoming_rid = inbound_headers.get("x-request-id") or inbound_headers.get("X-Request-Id")
-    set_request_id(incoming_rid if incoming_rid else _uuid.uuid4().hex[:16])
-    # #2819: the handled-5xx emitter lives on the error envelope, which is called
-    # from modules that never see the event — hand it the route the same way.
-    set_request_route(path)
-
-    # Phase 2.2 (2026-05-16): centralized request envelope validation.
-    # Catches oversized bodies, injection patterns, malformed user_id/date/source
-    # before any handler runs. Returns 4xx for obvious abuse; legit traffic unaffected.
-    try:
-        from common.request_validator import validate_envelope
-
-        validate_envelope(event, path=path, method=method)
-    except ImportError:
-        pass  # Validator not yet deployed; fall through to legacy behavior
-    except Exception as _ve:
-        # Imported as ValidationError above when import succeeds
-        if _ve.__class__.__name__ == "ValidationError":
-            return {
-                "statusCode": getattr(_ve, "status", 400),
-                "headers": CORS_HEADERS,
-                "body": json.dumps({"error": getattr(_ve, "message", str(_ve))}),
-            }
-        raise
-
-    def _emit_route_log(status_code):
-        """Emit structured JSON route metric to CloudWatch Logs.
-
-        Uses CloudWatch EMF (Embedded Metric Format) so per-route latency is
-        auto-extracted as a real CloudWatch metric (no PutMetricData cost).
-        Dimensions: Route + Method. The Logs Insights query can pivot on either
-        via the JSON object — same line, two consumers.
-        """
-        global _COLD_START
-        try:
-            duration_ms = round((_time.time() - _req_start) * 1000, 1)
-            emf = {
-                # _aws block → CloudWatch automatically ingests the named
-                # fields as metrics. Cheap (≤ 5 dimension sets, no API call).
-                "_aws": {
-                    "Timestamp": int(_time.time() * 1000),
-                    "CloudWatchMetrics": [
-                        {
-                            "Namespace": "LifePlatform/SiteAPI",
-                            "Dimensions": [["Route", "Method"]],
-                            "Metrics": [
-                                {"Name": "DurationMs", "Unit": "Milliseconds"},
-                                {"Name": "ColdStart", "Unit": "Count"},
-                            ],
-                        }
-                    ],
-                },
-                "_type": "route_metric",
-                "Route": path,
-                "Method": method,
-                "status": status_code,
-                "DurationMs": duration_ms,
-                "ColdStart": 1 if _COLD_START else 0,
-                "request_id": get_request_id(),
-                "duration_ms": duration_ms,  # back-compat field name
-                "cold_start": _COLD_START,
-            }
-            print(json.dumps(emf))
-        except Exception:
-            pass
-        _COLD_START = False
-
-    # CORS preflight
-    if method == "OPTIONS":
-        return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
-
-    # /api/healthz — lightweight health check (no auth, no PII)
-    if path == "/api/healthz" and method == "GET":
-        try:
-            ddb_start = _time.time()
-            table.get_item(Key={"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-01-01"})
-            ddb_ms = round((_time.time() - ddb_start) * 1000)
-            ddb_ok = True
-        except Exception:
-            ddb_ms = -1
-            ddb_ok = False
-        try:
-            s3_client = boto3.client("s3", region_name=S3_REGION)
-            stats_obj = s3_client.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="generated/public_stats.json")
-            refreshed = json.loads(stats_obj["Body"].read()).get("_meta", {}).get("refreshed_at", "unknown")
-        except Exception:
-            refreshed = "unavailable"
-        total_ms = round((_time.time() - _req_start) * 1000)
-        health = {
-            "status": "ok" if ddb_ok else "degraded",
-            "version": "v4.5.1",
-            "checks": {
-                "dynamodb": {"status": "ok" if ddb_ok else "error", "latency_ms": ddb_ms},
-                "last_daily_refresh": refreshed,
-                "lambda_warm": not _COLD_START,
-            },
-            "response_ms": total_ms,
-        }
-        _emit_route_log(200)
-        return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
-
-    # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
-    if SITE_API_ORIGIN_SECRET:
-        req_headers = event.get("headers") or {}
-        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
-        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
-            return _error(403, "Forbidden")
-
     # Phase 4.5 SCOPED (2026-05-16): single dispatch for 11 simple delegate
     # routes. The complex inline routes (correlations, changes_since, etc.)
     # remain below — they include query-param parsing or multi-step logic.
@@ -974,14 +878,166 @@ def lambda_handler(event, context):
 
     handler = ROUTES.get(path)
     if not handler:
-        _emit_route_log(404)
-        return _error(404, "Not found")
+        return None
+
+    return handler()
+
+
+def lambda_handler(event, context):
+    """
+    Main Lambda handler. Supports both API Gateway HTTP API and Function URL events.
+    """
+    import time as _time
+    import uuid as _uuid
+
+    _req_start = _time.time()
+
+    path = event.get("rawPath") or event.get("path", "/")
+    method = (event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod", "GET")).upper()
+
+    # P3.4: assign a per-request correlation ID. Honor an inbound x-request-id
+    # header if the client (CloudFront / a debugging operator) set one — this
+    # lets the same id flow end-to-end. Otherwise generate a fresh uuid4.
+    inbound_headers = event.get("headers") or {}
+    incoming_rid = inbound_headers.get("x-request-id") or inbound_headers.get("X-Request-Id")
+    set_request_id(incoming_rid if incoming_rid else _uuid.uuid4().hex[:16])
+    # #2819: the handled-5xx emitter lives on the error envelope, which is called
+    # from modules that never see the event — hand it the route the same way.
+    set_request_route(path)
+
+    # Phase 2.2 (2026-05-16): centralized request envelope validation.
+    # Catches oversized bodies, injection patterns, malformed user_id/date/source
+    # before any handler runs. Returns 4xx for obvious abuse; legit traffic unaffected.
+    try:
+        from common.request_validator import validate_envelope
+
+        validate_envelope(event, path=path, method=method)
+    except ImportError:
+        pass  # Validator not yet deployed; fall through to legacy behavior
+    except Exception as _ve:
+        # Imported as ValidationError above when import succeeds
+        if _ve.__class__.__name__ == "ValidationError":
+            return {
+                "statusCode": getattr(_ve, "status", 400),
+                "headers": CORS_HEADERS,
+                "body": json.dumps({"error": getattr(_ve, "message", str(_ve))}),
+            }
+        raise
+
+    def _emit_route_log(status_code):
+        """Emit structured JSON route metric to CloudWatch Logs.
+
+        Uses CloudWatch EMF (Embedded Metric Format) so per-route latency is
+        auto-extracted as real CloudWatch metrics (no PutMetricData cost — see
+        docs/CONVENTIONS.md and #2876's PR body for the pricing basis of the
+        metrics themselves).
+
+        Two dimension sets, deliberately (#2876, mirroring #2819's
+        Handled5xx aggregate+detail split):
+          - `["Route", "Method"]` — unchanged from before #2876. This is what
+            `cdk/stacks/monitoring_dashboards.py`'s `life-platform-site-api-dashboard`
+            already reads for its 6 `TOP_ROUTES` panels; keeping the shape
+            identical means #2876 (which now calls this for every route,
+            including the 27+16 that never reached it before) is a pure
+            coverage extension, not a dashboard-behavior change.
+          - `[]` — a NEW dimensionless aggregate (#2876), so a future
+            fleet-wide p95/cold-start alarm can watch every route without
+            enumerating any of them, the same "alarm on the aggregate,
+            diagnose on the per-route" split `emit_handled_5xx` already uses.
+
+        Extending the FULL per-route dimension set to the newly-covered
+        routes is priced explicitly in the #2876 PR body — it is the
+        cheaper of the two "bounded design" options that PR considered
+        (the alternative, dropping the `Route` dimension to a free EMF
+        property, would also change the shape for the 6 dashboarded routes
+        and need a coordinated `monitoring_dashboards.py` update+deploy,
+        which was deliberately left out of this PR's blast radius).
+        """
+        global _COLD_START
+        try:
+            duration_ms = round((_time.time() - _req_start) * 1000, 1)
+            emf = {
+                # _aws block → CloudWatch automatically ingests the named
+                # fields as metrics. Cheap (≤ 5 dimension sets, no API call).
+                "_aws": {
+                    "Timestamp": int(_time.time() * 1000),
+                    "CloudWatchMetrics": [
+                        {
+                            "Namespace": "LifePlatform/SiteAPI",
+                            "Dimensions": [["Route", "Method"], []],
+                            "Metrics": [
+                                {"Name": "DurationMs", "Unit": "Milliseconds"},
+                                {"Name": "ColdStart", "Unit": "Count"},
+                            ],
+                        }
+                    ],
+                },
+                "_type": "route_metric",
+                "Route": path,
+                "Method": method,
+                "status": status_code,
+                "DurationMs": duration_ms,
+                "ColdStart": 1 if _COLD_START else 0,
+                "request_id": get_request_id(),
+                "duration_ms": duration_ms,  # back-compat field name
+                "cold_start": _COLD_START,
+            }
+            print(json.dumps(emf))
+        except Exception:
+            pass
+        _COLD_START = False
+
+    # CORS preflight
+    if method == "OPTIONS":
+        return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
+
+    # /api/healthz — lightweight health check (no auth, no PII)
+    if path == "/api/healthz" and method == "GET":
+        try:
+            ddb_start = _time.time()
+            table.get_item(Key={"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-01-01"})
+            ddb_ms = round((_time.time() - ddb_start) * 1000)
+            ddb_ok = True
+        except Exception:
+            ddb_ms = -1
+            ddb_ok = False
+        try:
+            s3_client = boto3.client("s3", region_name=S3_REGION)
+            stats_obj = s3_client.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="generated/public_stats.json")
+            refreshed = json.loads(stats_obj["Body"].read()).get("_meta", {}).get("refreshed_at", "unknown")
+        except Exception:
+            refreshed = "unavailable"
+        total_ms = round((_time.time() - _req_start) * 1000)
+        health = {
+            "status": "ok" if ddb_ok else "degraded",
+            "version": "v4.5.1",
+            "checks": {
+                "dynamodb": {"status": "ok" if ddb_ok else "error", "latency_ms": ddb_ms},
+                "last_daily_refresh": refreshed,
+                "lambda_warm": not _COLD_START,
+            },
+            "response_ms": total_ms,
+        }
+        _emit_route_log(200)
+        return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
+
+    # SEC-04: Reject requests that didn't come through CloudFront (when secret is configured).
+    if SITE_API_ORIGIN_SECRET:
+        req_headers = event.get("headers") or {}
+        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
+        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
+            return _error(403, "Forbidden")
 
     try:
-        result = handler()
-        _emit_route_log(result.get("statusCode", 200))
-        return result
+        result = _dispatch_route(event, path, method)
     except Exception as e:
         logger.error(f"[site_api] {path} failed: {e}")
         _emit_route_log(500)
         return _error(500, "Internal error — check CloudWatch logs")
+
+    if result is None:
+        _emit_route_log(404)
+        return _error(404, "Not found")
+
+    _emit_route_log(result.get("statusCode", 200))
+    return result
