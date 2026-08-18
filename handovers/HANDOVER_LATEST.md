@@ -5,7 +5,7 @@ kernel builds; #2846/#2847 stay Fable-sequenced). Boot was **charter + model** (
 than a prose re-read. The session started ~06:30 PT, so every Phase-0 box was still ahead of
 the clock — Phase 1 and the fan-out ran first, and the boxes were taken as they fired.
 
-**Build beat:** `2026-08-18-the-failure-that-looked-like-health`
+**Build beat:** `2026-08-18-the-failure-that-looked-like-health` — on `main` and validated, but **NOT currently served**: the wrap deploy auto-rolled-back on the #2878 vitals-smoke gate (see Incidents). It publishes on the next successful site deploy, which is owner-gated on a Withings weigh-in.
 **Docs:** CONVENTIONS §9 (gate registry row), INCIDENT_LOG (recurrence pointer + 1 new row),
 ARCHITECTURE/INFRASTRUCTURE/MONITORING (alarm count 103→104), DATA_GOVERNANCE (retention table),
 DEPENDENCY_GRAPH + `model/platform_model.json` (regenerated) — all landed inside their PRs; the
@@ -14,8 +14,12 @@ wrap's `sync_doc_metadata --apply` found everything already in sync.
 in `serve_stack` not `monitoring_stack`, absence-marker opt-in scoped to non-behavioral
 `DAILY_SOURCES`) are implementations of existing ADRs 104/125/050, and are recorded in
 CONVENTIONS §9 and in-code rather than as new governance.
-**Incidents:** 1 row added — a merge to `main` produced ZERO CI runs (swallowed-push class,
-second documented occurrence; caught by a by-`head_sha` check, recovered by manual dispatch).
+**Incidents:** 2 rows added — (1) the wrap-beat site auto-rollback: a TRUE positive about the
+data and a FALSE positive about the deploy — the vitals smoke carve-out keys on `day_n <= 1`
+rather than on whether a weigh-in happened, so **every `site/**` deploy auto-rolls-back until
+one lands** (#2878, owner-gated); (2) a merge to `main` produced ZERO CI runs (swallowed-push
+class, second documented occurrence; caught by a by-`head_sha` check, recovered by manual
+dispatch).
 **Main:** green (`9e3659a1`) — `check_main_green.py` exit 0.
 **CI warnings:** 1 — Unit Tests 1297s vs the 1200s budget (fifth crossing). Triaged to the
 existing #2692 with today's datapoint and an explicit **no-action call**: not raising the budget,
@@ -126,6 +130,9 @@ not filing a duplicate; #2692 owns the measure-first decision and its rationale 
   not opted into `record_gap_exhausted_absence`; clean today, so left untested rather than shipped
   blind. Covered by #2643's own thread — file if it is to be worked standalone.
 - **#2876** — the 27 unmeasured routes; note it is NOT free like #2819's sparse 5xx metric.
+- **#2878** — the vitals smoke carve-out (`day_n <= 1` instead of "has a weigh-in happened").
+  **This blocks every site deploy right now**; owner ask 3 (a weigh-in) also clears it, but the
+  gate shape should be fixed so a content deploy is never reverted for a data condition again.
 - **#1221** — owner call on the origin-request-policy migration (see analysis above).
 - **#2692** — Unit Tests wall-clock, fifth crossing (1297s); measure-first still the standing call.
 - **Owner asks (all three still open, batched below)** — `not-work — owner decisions/actions only`.
@@ -144,7 +151,10 @@ not filing a duplicate; #2692 owns the measure-first decision and its rationale 
    `ingest-consecutive-failures-whoop` in ALARM since 08-17. After re-auth: #2085 latch-clear,
    verify the next hourly ingest, backfill 08-16→now (dry-run first), watch the vitals qa-smoke
    FAIL clear. The breaker re-latching on TTL until then is expected, not a new fault.
-3. **A Withings weigh-in.** No reading since 08-16; the cycle-14 genesis baseline still reads the
-   **321.01 override**. Once you step on the scale, the documented supersede reflex in
+3. **A Withings weigh-in — now also blocking site deploys.** No reading since 08-16; the cycle-14
+   genesis baseline still reads the **321.01 override**. Beyond the baseline, this is what the
+   #2878 smoke gate is waiting on: until an in-cycle weigh-in exists, every `site/**` merge
+   deploys, fails smoke on `/api/vitals: missing weight_lbs`, and auto-rolls-back — today's build
+   beat is on `main` but not served because of it. Once you step on the scale, the documented supersede reflex in
    `project_monday_reset` runs (profile + `config/user_goals.json` + `sync_constants_from_config`
    + rebakes + CHARACTER.md stamp).
