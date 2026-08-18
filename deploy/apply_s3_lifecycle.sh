@@ -14,7 +14,23 @@
 # in docs/DATA_GOVERNANCE.md — change them together.
 #
 # Rules (one per managed prefix):
-#   deploys/       expire 30d (rollback artifacts; latest.zip age resets each deploy)
+#   deploys/       expire (current) 30d (rollback artifacts; latest.zip age resets
+#                  each deploy); noncurrent versions 7d (keep 1) — added #2642. The
+#                  bucket is versioned, so `deploy_lambda.sh` copying latest.zip to
+#                  previous.zip creates a NEW current version each deploy and pushes
+#                  the prior previous.zip to noncurrent; deploys/ had NO
+#                  NoncurrentVersionExpiration and 15+ deploys/session made those
+#                  noncurrent versions accumulate forever (85.9 GB measured, #2642
+#                  census). NewerNoncurrentVersions: 1 keeps the newest noncurrent
+#                  generation so `deploys/<fn>/previous.zip` — the CURRENT object,
+#                  unaffected by this rule either way — always resolves; rollback
+#                  reads the current object, never a noncurrent version.
+#   site/          keep current forever; noncurrent versions 7d (keep 1) — added
+#                  #2642 (was completely uncovered: 4.42 GB / 276k noncurrent
+#                  objects from every content-hashed redeploy versioning the whole
+#                  tree). `rollback_site.sh` rebuilds from a git ref (checkout →
+#                  re-hash → sync + version.json restamp, #418/ADR-117) and never
+#                  reads S3 noncurrent versions, so this expiry cannot affect it.
 #   raw/           keep current forever; noncurrent versions 7d (keep 1); abort MPU 7d
 #   uploads/       expire 30d; noncurrent 7d
 #   generated/     keep current forever; noncurrent 7d (keep 1)
@@ -85,7 +101,14 @@ aws s3api put-bucket-lifecycle-configuration \
         "ID": "expire-lambda-deploy-artifacts",
         "Status": "Enabled",
         "Filter": {"Prefix": "deploys/"},
-        "Expiration": {"Days": 30}
+        "Expiration": {"Days": 30},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+      },
+      {
+        "ID": "site-expire-noncurrent-7d",
+        "Status": "Enabled",
+        "Filter": {"Prefix": "site/"},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
       },
       {
         "ID": "raw-expire-noncurrent-versions-7d",
