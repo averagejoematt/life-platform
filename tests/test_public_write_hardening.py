@@ -48,8 +48,21 @@ class _FakeTable:
 # ── challenge_vote: catalog_id validation ─────────────────────────────────────
 
 
+def _pin_catalog(monkeypatch, catalog):
+    """Inject the catalog cache AND pin its TTL stamp (None = pinned — the
+    documented test-injection contract at site_api_social._challenge_catalog_cache_at).
+
+    Patching only the cache dict is order-dependent: any earlier test that ran a
+    real load leaves a monotonic stamp, and once the suite has run longer than the
+    config TTL, _catalog_cached() ignores the injected dict and re-loads from S3 —
+    which 503s under CI's FAKE creds but silently serves the REAL catalog under
+    local creds (the fixture-must-be-the-wire failure mode; redded main 2026-08-17)."""
+    monkeypatch.setattr(social, "_challenge_catalog_cache", catalog)
+    monkeypatch.setattr(social, "_challenge_catalog_cache_at", None)
+
+
 def test_vote_rejects_unknown_catalog_id(monkeypatch):
-    monkeypatch.setattr(social, "_challenge_catalog_cache", {"challenges": [{"id": "cold-shower", "public": True}]})
+    _pin_catalog(monkeypatch, {"challenges": [{"id": "cold-shower", "public": True}]})
     ft = _FakeTable()
     monkeypatch.setattr(social, "table", ft)
     r = social._handle_challenge_vote(_event({"catalog_id": "totally-fake"}))
@@ -59,7 +72,7 @@ def test_vote_rejects_unknown_catalog_id(monkeypatch):
 
 def test_vote_rejects_private_challenge(monkeypatch):
     # public:false vice entries must not be voteable from the public site
-    monkeypatch.setattr(social, "_challenge_catalog_cache", {"challenges": [{"id": "no-zzq-30", "public": False}]})
+    _pin_catalog(monkeypatch, {"challenges": [{"id": "no-zzq-30", "public": False}]})
     ft = _FakeTable()
     monkeypatch.setattr(social, "table", ft)
     r = social._handle_challenge_vote(_event({"catalog_id": "no-zzq-30"}))
@@ -68,7 +81,7 @@ def test_vote_rejects_private_challenge(monkeypatch):
 
 
 def test_vote_503_when_catalog_unavailable(monkeypatch):
-    monkeypatch.setattr(social, "_challenge_catalog_cache", {})  # empty → _public_challenge_ids returns None
+    _pin_catalog(monkeypatch, {})  # empty → _public_challenge_ids returns None
     ft = _FakeTable()
     monkeypatch.setattr(social, "table", ft)
     r = social._handle_challenge_vote(_event({"catalog_id": "cold-shower"}))
@@ -77,7 +90,7 @@ def test_vote_503_when_catalog_unavailable(monkeypatch):
 
 
 def test_vote_accepts_known_catalog_id(monkeypatch):
-    monkeypatch.setattr(social, "_challenge_catalog_cache", {"challenges": [{"id": "cold-shower", "public": True}]})
+    _pin_catalog(monkeypatch, {"challenges": [{"id": "cold-shower", "public": True}]})
     ft = _FakeTable()
     monkeypatch.setattr(social, "table", ft)
     r = social._handle_challenge_vote(_event({"catalog_id": "cold-shower"}))
