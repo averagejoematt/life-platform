@@ -633,6 +633,15 @@ _config = IngestionConfig(
     enable_secret_writeback=True,
     enable_item_size_guard=True,
     refresh_today=True,
+    # #2643: a night the API never scores for the requested wake_date (Matthew
+    # didn't sleep in the pod, or the vendor simply has no session) currently
+    # vanished silently once it aged out of the gap-fill window — the interior-
+    # gap alarm (source is in freshness_checker_lambda.DAILY_SOURCES — a record
+    # every night is the expected shape) then holds red forever with no way to
+    # self-clear. Eight Sleep is DAILY_SOURCES + behavioral=False (worn nightly,
+    # passive), so "no record" here is always worth explaining, never a normal
+    # rest day the way it is for Strava/Withings.
+    record_gap_exhausted_absence=True,
 )
 
 
