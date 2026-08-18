@@ -1,130 +1,136 @@
-# Handover — 2026-08-17 (day, ~11:30 → ~16:30 PT): the conformance guard, the alarm board's first day back, and the merge queue
+# Handover — 2026-08-17 (evening, ~18:00 → ~21:45 PT): the system model, and the map found the defects
 
-**Session:** Fable, owner-directed (plan `purring-sprouting-toucan` executed in full: Phase 0
-verify-and-close sweep → the #2844 headline build → a 3-worker sonnet fan-out → merge queue →
-deploys). Opened with `/fewer-permission-prompts` (8 read-only patterns added to
-`.claude/settings.json`; rides the wrap commit).
+**Session:** Fable, owner-directed (plan `system-model-and-matured-boxes` executed: Phase 0
+owner-ask harvest → the #2845 headline build → a 3-worker sonnet fan-out → merge queue →
+deploys → an unplanned main-red fix). Session started ~1.5h after the day wrap, so the
+plan's matured boxes all sit tomorrow (08-18 daytime UTC) — noted below, not forced.
 
-## What shipped — 4 PRs merged, sentinel deployed + verified, 4 stacks flattened
+## What shipped — 4 PRs merged + deployed, 1 issue filed, 5 issues closed
 
-- **#2861 (#2844, the headline)** — **the kernel conformance guard**: charter standing rule 1
-  made executable. AST sweep of `lambdas/ mcp/ cdk/` against four live registry vocabularies
-  (source ids, persona ids, CDK-declared lambda + alarm names); **37-entry dated shrink-only
-  ledger** (`tests/conformance_residue.py`), every entry spot-checkable real debt.
-  Content-keyed sites: editing an exempted hand-list re-reds by construction — the only green
-  path is deriving. 11 mutation self-tests + a live planted-file proof in the PR. CONVENTIONS
-  §9 row, PROPORTIONALITY row, charter cross-reference all in the same PR.
-- **#2862 (#2793)** — the sentinel's "stored 68 vs derived 70" was **`ord('D')` vs `ord('F')`**:
-  the #2737 adapter hand-typed a collegiate 90/80/70/60 band table (its comment claimed it
-  "matches scoring_engine bands" — it disagreed for every score in 45–89 except 80–84). The
-  archived row was always coherent with the engine. Fix derives via
-  `health.scoring_engine.letter_grade`; alarm text now carries letters. The #2844 defect class,
-  found inside a coherence instrument, by a worker, the same day the guard merged.
-- **#2863 (#2814)** — the sentinel's day frame is Pacific in every invocation context (4 UTC
-  sites → `common.pacific_time`; the #2851 strictly-before lookups corrected transitively;
-  sentinel joined `_PT_FRAME_INSTRUMENTS`). Evening off-schedule invokes no longer compute
-  tomorrow's date.
-- **#2864 (#2858)** — the reset window's two recall-corpus blind spots: the cycle-14 prereg
-  publisher was a **second, unhooked publish site** (bare `put_item`, no recall hook — why
-  #2705's fix never covered it), and reset re-dating rots stored links. Publish⇒index now
-  fused + a `recall_corpus_sync` step inside `restart_pipeline.build_sub_scripts`. Repair
-  executed live: 08-16 installment embedded (256-dim), 07-21 link fixed, both read back from DDB.
-- **Deploys:** sentinel deployed via the approved `4b4ea1936` pipeline run (smoke green,
-  auto-rollback armed) and **both symbols byte-verified in the live bundle**; then the 4
-  S3Key-only drifted stacks (Operational/Email/Compute/Ingestion) flattened via the guarded
-  `cdk_deploy.sh` (see CI-warnings gate below).
+- **#2865 (#2845 + #2805, the headline)** — **the system model**: `model/platform_model.json`
+  + `docs/DEPENDENCY_GRAPH.md` are now GENERATED (`scripts/generate_platform_model.py`)
+  from the charter's own authorities (CDK AST, `source_registry`, the ADR-077
+  `phase_taxonomy` census — which IS the computed-partition registry #2805 called for),
+  drift-gated byte-for-byte every CI run (`tests/test_platform_model_drift.py`, with
+  known-true-edge pins so extractor regressions can't masquerade as model changes), and
+  queried via `scripts/blast_radius.py --touches/--feeds`. 104 lambdas / 81 scheduled /
+  45 alarms (34 routings resolved) / 105 partitions / 644 edges. Sampled ground truth
+  **162/163 = 99.4%** (method in the PR; the 1 miss verified prose). Mutation-proven both
+  artifacts live. Scope cuts stated in `meta.scope_cuts`, never faked. **#2839 closed with
+  verdict (subsumed)** — the prose doc's false-edge class dies with the prose. The model
+  immediately surfaced 5 multi-schedule lambdas no doc listed (whoop has THREE schedules)
+  and an instrument defect: `check_doc_facts`' regex cron map attributes whoop's *recovery*
+  cron as its cadence → **#2866 filed** with tonight's evidence.
+- **#2867 (#2860)** — daily-brief in-flight lease guard (`emails/daily_brief_lock.py`,
+  DDB conditional-put lease on `SYSTEM#daily-brief-lock`, TTL 1200s > the 900s Lambda
+  timeout, fail-open on non-conflict errors) + RUNBOOK safe-invoke reflex; reserved-
+  concurrency=1 weighed and rejected in the PR. Deployed direct (`deploy_lambda.sh`) and
+  **byte-verified in the live bundle** (lock module present, imported, called at :1635
+  before any AI section).
+- **#2868 (#2859)** — the two 404ing `/archive/v1/*` redirects were NOT a map gap: the
+  `/archive/*` CloudFront behavior (#2572) had **no function association** (the #1805
+  class), so every request under it bypassed `v4-redirects`. 14-line `web_stack.py` fix;
+  deployed via guarded `cdk_deploy.sh LifePlatformWeb` + viewer-path invalidation;
+  **live-verified**: both named URLs (and the wider class) 301, the Permanence tarball
+  still 200s. Evidence commented on #2859.
+- **#2869 (unplanned)** — main redded 3× tonight on `test_public_write_hardening` vote
+  tests (503 vs 404/200). Root cause reproduced BOTH directions: the tests patched
+  `_challenge_catalog_cache` but not the `_cache_at` TTL stamp; a stale stamp + CI FAKE
+  creds → S3 reload `{}` → 503, while local REAL creds silently served the REAL catalog
+  (fixture-must-be-the-wire). Tonight's ~30 new tests shifted the suite past the TTL edge.
+  Fix pins the stamp (`None` = the module's own documented test-injection contract);
+  proof: a deliberately leaky stale-stamp test + FAKE creds fails 3 exactly as CI did
+  unfixed, passes 8/8 fixed. Deploy/smoke/visual-QA were green on every red run — the
+  platform was healthy; the instrument wasn't.
+- **#2669 needed no work** — the worker verified PR #2795 (merged 08-16, deployed,
+  timeout 300s live) already implements it; Wednesday 08-19's chronicle run is its live
+  box (its `Fixes` line was `Refs`, so the issue stays open for that evidence — correct).
 
-## Phase 0 — the observation boxes all landed (with live CloudWatch evidence)
+## Phase 0 findings (the plan's harvest)
 
-- **#2735 CLOSED**: `coherence-overall` ALARM→OK observed 18:46:27Z (first fully-green
-  scheduled sentinel run + age-out), planted OK→ALARM observed 21:21:27Z (47s after the
-  synthetic datapoint, owner-sequenced against a genuinely-OK baseline). All five boxes.
-- **#2792 box 3 realized**: 18:45Z run green on `facts_agreement`, no softening (caveat
-  recorded: no coaches held today, so the stale-served path itself wasn't re-exercised).
-- **#2670**: `qa-smoke-failures` ALARM→OK at the predicted minute (15:46:04Z), then
-  **organic OK→ALARM at 18:32Z on 3 genuine new FAILs** — stronger than the planned plant.
-  `qa-smoke-warnings` measured structurally unclearable (1–3 transient warns land daily);
-  issue scoped to the threshold-shape residual.
-- **#2668**: count 2/3 clean, now on positive evidence (`IC-3 analysis parsed clean`, 17:07:40Z).
-- The 3 new FAILs filed with evidence: **#2858** (fixed+repaired this session), **#2859**
-  (two `/archive/v1/*` redirects 404), **#2860** (a default-timeout sync invoke ran the brief's
-  7.5-min generation 3× at 15:54–15:56Z and tripped the token alarms).
+- **#2836 September base**: zero comments — still the owner's call, due 09-01.
+- **Whoop re-auth**: NOT done (secret last-changed 12:00Z 08-17 = the auto-refresh at
+  latch time; no rows past 08-16). The #2085 latch-clear + backfill stay ready to run.
+- **Withings genesis weigh-in**: still not synced (0 rows for 08-17+) — baseline remains
+  the 321.01 override; supersede reflex documented in `project_monday_reset`.
+- **Matured boxes** (all 08-18 daytime UTC, deliberately not forced tonight): #2668
+  3-of-3 at the 17:00Z brief; #2858's live box at the 18:30Z qa-smoke sweep; #2735's
+  planted red ages out ≤21:20Z.
 
 ## Verified
 
-Every merge behind the checks rollup (`total>0 AND 0 not-green`), worker diffs verified
-against acceptance before merge (engine bands read, corpus rows read back from DDB, deployed
-symbols greps). Backfill dry-run before apply. All three worker mechanisms verified live, not
-from worker claims alone.
+Every merge behind the checks rollup on the exact head sha (`total>0 AND 0 not-green`).
+Clean full local suite 19,377 passed / 0 failed (the one earlier red was my own live
+mutation-proof racing the suite — re-run clean). Redirects, daily-brief bundle symbols,
+and the model's ground-truth edges all verified live, not from claims. Final main run
+32096134923 fully green including Unit Tests.
 
 ## Gotchas hit
 
-- **The deploy lease wedged ~1.3h**: the `9d4ffda94` run sat `waiting` at the production gate
-  holding the concurrency lease while three newer merges auto-cancelled/queued behind it.
-  Resolved per the standing rule: REJECT the superseded ancestor (`reject_deployment.sh`),
-  approve current HEAD. The wedge-watch alone didn't surface it — my own run-watcher's
-  "pending for an hour" did.
-- **A monitor that greps for a count threshold can never terminate** (total>5 on a sha whose
-  check-runs stay at 5) — two monitors timed out harmlessly; poll the workflow-run conclusion
-  by id instead.
-- **Whoop auth latch** (see Incidents) explains today's vitals FAIL — one root cause, two
-  symptom surfaces; the #2613 deterministic rule caught it honestly.
-- The wiki gate red on #2861 was pre-existing reset drift (CHARACTER.md vs the regenerated
-  `character_sheet.json`) — resolved properly: **all 13 line citations re-derived by AST**
-  (they'd drifted −10 via #2747 after the 08-15 stamp), not just a date bump.
+- **A tests-only merge skips Deploy** (Plan classifier) — after the #2869 merge the
+  pipeline went green WITHOUT deploying, which would have silently left #2867's guard
+  undeployed; caught by checking the run's job list, resolved by direct `deploy_lambda.sh`
+  + bundle symbol grep. Reflex: after any merge, confirm the Deploy job actually ran for
+  the surfaces you think shipped.
+- **Two instruments disagreed about one registry**: my AST schedule extractor vs
+  `check_doc_facts`' regex block map (whoop: real cadence vs recovery cron). Rendering
+  multi-schedule rows as multi-cron lines (which the #1205 scan skips by design)
+  sidestepped it honestly; the checker fix is #2866, not a widened PR.
+- **The deploy-gate queue with 3 rapid merges**: run 1 approved+deployed, run 2 rejected
+  as superseded at its gate, run 3 completed with Deploy skipped — the lease discipline
+  (approve HEAD, reject ancestors) held, but see the tests-only-skip gotcha above for
+  what "green" hid.
+- The `gh pr merge --delete-branch` local-branch delete fails while the branch's worktree
+  exists — remove the worktree first, then `git branch -D`; remote delete succeeds anyway.
 
 ## Wrap gates
 
-**Build beat:** 2026-08-17-the-constitution-became-executable
-**Docs:** CHARTER.md (guard named, in #2861) · CONVENTIONS §9 row · PROPORTIONALITY row ·
-`docs/engines/CHARACTER.md` cycle-14 re-verify (13 citations re-derived) · INCIDENT_LOG +2 rows ·
-doc-sync literals regenerated in each queue PR
-**Decisions:** none needed — the guard implements the already-decided charter rule 1
-(#2843/#2844); the one open governance call is the owner's #2836 (September base, due 09-01)
-**Main:** green (4b4ea1936) — decode: two gated leases resolved this session (32072197180
-REJECTED as superseded ancestor; 32073572460 approved and completed success incl. smoke)
-**Incidents:** 2 rows added — the Whoop data-endpoint auth latch (cycle-14 Day 1 sleep gap,
-owner re-auth pending, #1934 class), and the wrap-beat site auto-rollback (visual-QA transient
-on /method/biology/, false-positive class — endpoint probed healthy, rerun shipped the beat)
+**Build beat:** 2026-08-17-the-map-became-code
+**Docs:** CHARTER.md ("Using this" names the model + query commands) · CONVENTIONS §9 row
+(stale-model class → drift gate) · PROPORTIONALITY row (Load-bearing + demote trigger) ·
+REPO_STRUCTURE `model/` row + `model/README.md` · DEPENDENCY_GRAPH.md now generated ·
+doc-sync literals regenerated (test_count 15653 → 15668 across the queue)
+**Decisions:** none needed — #2845/#2805/#2839 execute the already-decided charter/kernel
+sequencing (#2842); no new governance posture was set
+**Main:** green (46f79a222) — decode: runs 32088472048/32089517789/32090032559 red on the
+#2869 test-fixture class only (deploy+smoke green throughout); 32089517789 REJECTED as
+superseded at its gate; final run 32096134923 fully green
+**Incidents:** 1 row added — main red ~2.5h across three runs on the vote-test
+order-dependence (fixture-not-the-wire; zero user impact, deploys stayed healthy)
 **Stash/hooks:** clean
-**Closures:** #2844, #2735, #2793, #2814, #2858 all carry the two-line verdict; #2792 (closed
-prior session) got its box-3 realized comment; #2668/#2670 got evidence-update comments
-**Backlog:** Now live at 16 actionable; hygiene OK (108 open issues clean); no stale Later
-issues printed
-**Alarms:** gate passed clean — every red >72h cited (`qa-smoke-warnings` → #2670). Current
-<72h reds, all explained: `coherence-overall` (planted proof, self-clears ≤21:20Z 08-18),
-`qa-smoke-failures` (3 real FAILs — #2858 fixed, #2859/#2860 filed), whoop trio (incident row),
-`ai-tokens-daily-brief-daily` + genesis-window (the #2860 dry-run triple)
-**CI warnings:** 4 — all the same class: Plan-deployments flagged 4 stacks as "config change";
-`cdk diff` showed **S3Key-only** (shared-bundle hash catch-up from today's merges, #781
-one-bundle). Triage: flattened by the guarded 4-stack `cdk_deploy.sh` this session; closed
-`--decoded`.
-**Ledger:** the new standing gate's PROPORTIONALITY row (posture Load-bearing · rent CI
-seconds + ledger mind · demote trigger: reds resolved by loosening instead of deriving)
-landed inside PR #2861 itself
+**Closures:** #2845, #2805, #2839, #2860, #2859 all carry the two-line verdict; #2866
+filed this session (not closed)
+**Backlog:** Now live at 14 actionable; hygiene OK (104 open issues clean after fixing
+#2866's Outcome audience); no stale Later issues printed
+**Alarms:** gate passed clean — every red >72h cited, every red >14d cites an issue.
+Current expected reds: whoop trio (owner re-auth pending, incident row),
+`qa-smoke-failures` (empties as #2859's next sweep passes + Whoop clears),
+`coherence-overall` planted red (self-clears ≤21:20Z 08-18, #2735), `qa-smoke-warnings`
+(#2670)
+**CI warnings:** 2 — both the S3Key/config bundle-drift class on LifePlatformMcp +
+LifePlatformServe (shared-bundle hash catch-up from tonight's merges, #781 one-bundle);
+triage: flattened same-session via the guarded 2-stack `cdk_deploy.sh` (drift guard
+reported live code clean, deploys ✅ 16s/21s); closed `--decoded`
+**Ledger:** the #2845 drift gate's PROPORTIONALITY row (posture Load-bearing · rent ~30s
+CI regenerate+diff per run · demote trigger: drift reds resolved by regenerating without
+reading the diff) landed inside PR #2865 itself
 
 ## Residuals / next picks
 
-- **#2668** — 3-of-3 close at the 2026-08-18 evening check (count 2/3 recorded today).
-- **#2669** — Wednesday's chronicle run is its live box.
-- **#2670** — the `qa-smoke-warnings` threshold-shape decision (sustained-N-of-M or
-  new-warn-key alarm; reason recorded at the alarm definition) is the sole residual.
-- **#2859** — the two broken `/archive/v1/*` redirects (small mechanical, `redirects.map` +
-  regenerate).
-- **#2860** — the daily-brief sync-invoke retry storm (in-flight guard and/or documented
-  async-invoke reflex).
-- **#2858 live-evidence box** — tomorrow's 11:30 PT qa-smoke sweep should pass
-  `recall:corpus_freshness`.
-- **Genesis weigh-in supersede** — not-work — standing documented reflex; the 08-17 Withings
-  reading had NOT reached the API by 22:15Z (checked twice; 0 DDB rows). Note: Withings
-  ingestion is healthy — this is device-sync lag, unrelated to the Whoop latch.
-- **Whoop re-auth** — owner action (session ask #2): re-grant OAuth, then the #2085
-  latch-clear, then gap-aware backfill recovers 08-16/17. Machinery side is #1934-complete.
-- **#2836** — September budget base (gate:owner, due before 09-01; options + measured
-  numbers in the session's owner-ask message; optional D2–D4 = #2833/#2834/#2841).
-- **#2845 / #2846** — the next kernel builds (system model; enrollment-by-construction),
-  charter-sequenced after #2844.
-- **The 37-entry conformance ledger paydown** — tracked under epic #2842; each converted
-  site deletes its ledger line (shrink-only).
-- **`coherence-overall` planted red** — not-work: self-clears ≤21:20Z 08-18 by age-out;
-  documented on #2735.
+- **#2668** — 3-of-3 close at the 08-18 17:00Z brief (positive-evidence filter query).
+- **#2858 live box** — the 08-18 18:30Z qa-smoke sweep should pass `recall:corpus_freshness`;
+  comment evidence on the closed issue (reopen if it FAILs).
+- **#2735 planted red** — not-work — self-clears ≤21:20Z 08-18 by age-out; confirm only if
+  it does NOT.
+- **#2669** — Wednesday 08-19's chronicle run is the live box; check duration + single
+  generation in logs, close with the verdict.
+- **#2866** — the check_doc_facts cron-map fix (derive from the model's extractor).
+- **#2670** — the `qa-smoke-warnings` threshold shape; sequence after Whoop clears and
+  #2859's sweep passes (both in motion tonight).
+- **Whoop re-auth** — owner ask #2 (standing); then #2085 latch-clear + gap backfill
+  08-16→now.
+- **#2836** — September base, owner ask #1, due before 09-01.
+- **Genesis weigh-in supersede** — not-work — standing reflex fires when the Withings
+  reading syncs; baseline stays 321.01 until then.
+- **#2845 follow-ons already tracked**: field-level edges on #2797; enrollment-by-
+  construction #2846; resident-operator #2847+ (charter-sequenced, epic #2842).

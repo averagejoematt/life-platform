@@ -2826,6 +2826,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2864"
         }
       ]
+    },
+    {
+      "id": "2026-08-17-the-map-became-code",
+      "date": "2026-08-17",
+      "title": "The dependency map became code — and immediately caught two of the tools that check it",
+      "shipped": "The platform's dependency picture — which of the 104 Lambdas reads and writes which of the 105 data partitions, on what schedule, watched by which alarm — stopped being a hand-written document and became a generated artifact. A script now derives the whole model from the code itself (the CDK infrastructure definitions, the source registry, the partition census) into one machine-readable file plus a rendered doc, with a CI gate that regenerates and byte-compares both on every run: a hand-edit or a stale commit fails the build. A blast-radius tool answers 'what touches X' as a one-second lookup — 644 edges, checked against a 163-pair ground-truth sample at 99.4%, with everything unresolvable tagged dynamic and counted rather than guessed. The same evening shipped an in-flight lease so a routine diagnostic invoke of the daily brief can no longer silently run the platform's most expensive AI generation three times, and a one-behavior CloudFront fix that un-404ed every legacy /archive/v1/ link.",
+      "why_it_mattered": "The old prose map misled on the platform's most critical path — it listed a single writer for the day-grade partition when the code has two, omitted an entire subsystem, and carried edges that never existed, and it had survived multiple regenerations that way. A map that CI forces to match reality changes what an operator can trust: 'if I change this, what breaks?' is now a lookup, not an investigation. The model proved the point on day one by finding five multi-schedule Lambdas no document had ever listed and a cron-checking tool that attributed the wrong schedule to the Whoop ingester.",
+      "gotcha": "Main went red three times on tests that had nothing to do with any change shipped. The vote-endpoint tests injected a fake challenge catalog but not its freshness stamp — so once the suite ran long enough for the cache TTL to lapse, the handler ignored the injected fixture and re-fetched from S3, which fails in CI's credential-less environment (503) but silently serves the real production catalog on a developer machine, where the tests then pass by coincidence. The night's ~30 new tests shifted the suite just past that TTL edge and exposed it. The fix is one line per test: pin the stamp, the module's own documented test-injection contract.",
+      "honest_miss": "The model states its scope cuts instead of hiding them, and they are real: field-level edges (who reads which field, not just which partition) wait on the signal-wiring registry, privacy tiers exist only as prose so they are not modeled at all, and 310 of 1,112 data-access sites resolve to a runtime variable the AST pass can only tag as dynamic. And the deploy pipeline quietly skipped deploying one merged fix because the follow-up commit was tests-only — caught by reading the run's job list, not by any gate.",
+      "prs": [
+        {
+          "label": "PR #2865",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2865"
+        },
+        {
+          "label": "PR #2867",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2867"
+        },
+        {
+          "label": "PR #2868",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2868"
+        },
+        {
+          "label": "PR #2869",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2869"
+        }
+      ]
     }
   ]
 }
