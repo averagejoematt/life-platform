@@ -17,7 +17,13 @@ comment rather than as new governance.
 2026-08-18 site-auto-rollback row: it claimed "not resolved — owner-gated on a Withings weigh-in",
 which was wrong. It was resolved the same day by #2879 *without* a weigh-in. The missing Withings row
 was the trigger; the day-number proxy was the defect.
-**Main:** green — `check_main_green.py` exit 0. See "Main-green decode" below for HEAD's own run.
+**Main:** green — the last code sha `fcd78ceb` (#2880/#2741) ran **fully green**: Reconcile, Lint,
+Deploy-critical, Unit Tests, Plan, **Deploy**, Smoke, Post-deploy integration and Visual+AI-QA all
+success, rollback skipped. `check_main_green.py` then reds on the WRAP commit `475c50c9` itself,
+which is the expected **docs+site path-filter skip**, not the swallowed-push shape the gate warns
+about: `CLAUDE.md`, `handovers/`, `docs/` and `site/` are all outside `ci-cd.yml`'s `paths:`, so that
+sha correctly earns no CI/CD run (it did earn 4 others — Docs CI, CodeQL, v4 site gate, Site deploy).
+Same decode as the morning session's `9b089412d`. Re-run with `--decoded`.
 **Stash/hooks:** clean — `git stash list` empty, `session_postflight.py` hook freshness 🟢.
 **Closures:** #2878 commented (full ADR-099 contract, `Outcome: realized`). The nine other issues
 closed on 2026-08-18 belong to the morning session, which already wrapped them — not backfilled.
