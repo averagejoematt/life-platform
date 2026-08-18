@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
 
 > OBS-3: Formal SLO definitions for critical platform paths.
-> Last updated: 2026-08-17 (v8.6.0)
+> Last updated: 2026-08-18 (v8.6.0)
 
 ---
 

@@ -77,14 +77,15 @@ from worker claims alone.
 
 **Build beat:** 2026-08-17-the-constitution-became-executable
 **Docs:** CHARTER.md (guard named, in #2861) · CONVENTIONS §9 row · PROPORTIONALITY row ·
-`docs/engines/CHARACTER.md` cycle-14 re-verify (13 citations re-derived) · INCIDENT_LOG +1 row ·
+`docs/engines/CHARACTER.md` cycle-14 re-verify (13 citations re-derived) · INCIDENT_LOG +2 rows ·
 doc-sync literals regenerated in each queue PR
 **Decisions:** none needed — the guard implements the already-decided charter rule 1
 (#2843/#2844); the one open governance call is the owner's #2836 (September base, due 09-01)
 **Main:** green (4b4ea1936) — decode: two gated leases resolved this session (32072197180
 REJECTED as superseded ancestor; 32073572460 approved and completed success incl. smoke)
-**Incidents:** 1 row added — the Whoop data-endpoint auth latch (cycle-14 Day 1 sleep gap,
-owner re-auth pending, #1934 class)
+**Incidents:** 2 rows added — the Whoop data-endpoint auth latch (cycle-14 Day 1 sleep gap,
+owner re-auth pending, #1934 class), and the wrap-beat site auto-rollback (visual-QA transient
+on /method/biology/, false-positive class — endpoint probed healthy, rerun shipped the beat)
 **Stash/hooks:** clean
 **Closures:** #2844, #2735, #2793, #2814, #2858 all carry the two-line verdict; #2792 (closed
 prior session) got its box-3 realized comment; #2668/#2670 got evidence-update comments
