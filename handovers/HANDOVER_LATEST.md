@@ -95,8 +95,11 @@ sequencing (#2842); no new governance posture was set
 **Main:** green (46f79a222) — decode: runs 32088472048/32089517789/32090032559 red on the
 #2869 test-fixture class only (deploy+smoke green throughout); 32089517789 REJECTED as
 superseded at its gate; final run 32096134923 fully green
-**Incidents:** 1 row added — main red ~2.5h across three runs on the vote-test
-order-dependence (fixture-not-the-wire; zero user impact, deploys stayed healthy)
+**Incidents:** 2 rows added — main red ~2.5h across three runs on the vote-test
+order-dependence (fixture-not-the-wire; zero user impact, deploys stayed healthy), and
+the wrap-beat site auto-rollback (visual-QA transient on /data/autonomic/, false-positive
+class — INCLUDING the `--failed`-rerun trap: it greens against rolled-back content and
+ships nothing; full rerun + served-artifact check is the recovery; memory reflex written)
 **Stash/hooks:** clean
 **Closures:** #2845, #2805, #2839, #2860, #2859 all carry the two-line verdict; #2866
 filed this session (not closed)
