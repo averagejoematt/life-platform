@@ -338,6 +338,56 @@ aws lambda invoke \
 
 The `--cli-binary-format raw-in-base64-out` flag is required on AWS CLI v2. Without it, the CLI base64-encodes the literal `{}` string and the Lambda receives invalid JSON.
 
+### Long-running / AI-generating Lambdas — never a bare sync invoke (#2860)
+
+A default `aws lambda invoke` is SYNCHRONOUS over the AWS SDK's own client-side
+read timeout (~60s) — far shorter than a multi-minute AI generation like
+daily-brief's (~7.5min, 4 AI calls) or wednesday-chronicle's. The CLI/SDK's
+standard retry mode treats that client timeout as transient and retries the
+**same invocation**, `attempts=3`, ~60s apart — three separate Lambda
+executions, three separate paid AI generations, and a real risk of tripping
+the AI token-usage alarms. This happened live: daily-brief, 2026-08-17
+15:54–15:56Z (#2860).
+
+**`dry_run:true` does NOT protect you here.** Per #2255, DRY_RUN suppresses
+writes only (SES, S3, DynamoDB) — never AI spend, which is the expensive half.
+Before invoking any AI-generating email Lambda by hand, use ONE of:
+
+```bash
+# Preferred when you don't need to block on the response: async invoke has no
+# client-side timeout/retry loop at all.
+aws lambda invoke \
+  --function-name daily-brief \
+  --invocation-type Event \
+  --payload '{"dry_run": true}' \
+  --cli-binary-format raw-in-base64-out \
+  --region us-west-2 \
+  /tmp/response.json
+# Event invokes return 202 immediately with no response body — check
+# completion via CloudWatch Logs (see "Daily-Brief Log Inspection" below).
+
+# If you need the sync response body, disable the client read-timeout instead
+# of racing it — do not just re-run the command if it "hangs":
+aws lambda invoke \
+  --function-name daily-brief \
+  --cli-read-timeout 0 \
+  --payload '{"dry_run": true}' \
+  --cli-binary-format raw-in-base64-out \
+  --region us-west-2 \
+  /tmp/response.json && cat /tmp/response.json
+```
+
+daily-brief additionally carries an in-flight guard as a backstop
+(`lambdas/emails/daily_brief_lambda.py::_acquire_daily_brief_lock` — a
+DynamoDB conditional-put LEASE keyed on `date + dry_run`, TTL comfortably
+longer than the function's own 900s configured timeout) that short-circuits a
+concurrent duplicate invocation BEFORE any AI call runs. That guard is a
+backstop for the retry-storm case, not a substitute for avoiding the retry
+storm in the first place — it still means a wasted invocation, just not a paid
+one. wednesday-chronicle addresses the same duplicate-generation risk with a
+generation cache instead (#2669, `chronicle_store.py`) — same symptom class,
+different mechanism; don't conflate the two when troubleshooting either.
+
 ## Daily-Brief Log Inspection (most common ops task)
 
 ```bash

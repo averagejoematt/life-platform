@@ -175,6 +175,7 @@ from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its o
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 from emails.brief_data_status import build_data_status_banner_html, scan_quiet_behavioral_sources  # #2326 quiet notice
+from emails.daily_brief_lock import acquire_daily_brief_lock  # #2860 in-flight guard
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
 ai_calls.init(
@@ -1601,10 +1602,11 @@ def lambda_handler(event, context):
     #     the next real run, a silenced alarm is not.
     # It deliberately does NOT suppress reads, rendering, AI generation (that's
     # usually what you invoked a dry run to look at — cap the spend with the
-    # budget tier, not with this flag), or the ComputePipelineStaleness
-    # datapoint, which measures the compute pipeline rather than this run.
+    # budget tier, not with this flag), the ComputePipelineStaleness datapoint,
+    # or — #2860, see daily_brief_lock.py — the in-flight lock's own lease write
+    # (a dry run must still guard against a concurrent duplicate dry run).
     # The single predicate below is `dry_run.persistence_enabled(event, demo_mode)`
-    # — one place, so a new write site cannot pick up only the demo_mode half.
+    # — one place, so a new CONTENT write site cannot pick up only the demo_mode half.
     _dry_run = dry_run.stash(event)
     if _dry_run:
         logger.info("[daily-brief] DRY_RUN mode — generating the brief but writing nothing (no SES, no S3, no DynamoDB)")
@@ -1624,14 +1626,22 @@ def lambda_handler(event, context):
     # #2255: THE gate for every write below — demo_mode OR dry_run suppresses it.
     _persist = dry_run.persistence_enabled(event, demo_mode)
     logger.info("Daily Brief v2.82.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
+
+    today = datetime.now(timezone.utc).date()
+    yesterday = (today - timedelta(days=1)).isoformat()
+
+    # #2860 in-flight guard (daily_brief_lock.py) — claims a lease BEFORE
+    # fetch_profile/any AI call, so a duplicate sync-invoke retry costs nothing.
+    if not acquire_daily_brief_lock(yesterday, _dry_run, _g={"table": table, "logger": logger}):
+        logger.warning("[#2860] daily-brief %s dry_run=%s already in flight — skipping", yesterday, _dry_run)
+        return {"statusCode": 200, "body": f"Daily brief for {yesterday} (dry_run={_dry_run}) already in flight — skipped"}
+
     profile = fetch_profile()
     if not profile:
         # RAISE so the daily-brief Errors alarm fires — a returned 500 reads as a
         # successful invocation and the brief would silently never send. (Elite review 2026-06-15)
         raise RuntimeError("daily-brief: no profile found")
 
-    today = datetime.now(timezone.utc).date()
-    yesterday = (today - timedelta(days=1)).isoformat()
     # OBS-1: Set correlation_id so all structured logs tie to this execution date
     try:
         logger.set_date(yesterday)
