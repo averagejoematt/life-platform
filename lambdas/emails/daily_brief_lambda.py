@@ -526,27 +526,12 @@ def fetch_journal_entries(date_str):
 
 
 def fetch_social_posts(start, end):
-    """#1671 (epic #1668): enriched inbound social posts over [start, end] so the coach
-    surfaces (ai_context) can read Matthew's public voice as a routed coach signal.
-
-    Human-origin only — the #1670 membrane (``origin <> platform``) excludes the
-    platform's own re-ingested outbound echoes. Fail-soft: a query error or an
-    unprovisioned channel yields [].
-
-    Channel set is registry-derived (#2808) — every ``social_channel`` source in
-    ``lambdas/ingestion/source_registry.py`` (the same vocabulary the enrichment
-    lambda's ``SOCIAL_CHANNELS`` env and the site's ``_BROADCAST_SOURCES`` derive
-    from), NOT the ``SOCIAL_CHANNELS`` env var: the live daily-brief function has
-    never had that var set, so a hand-typed env default silently read youtube-only
-    while the enrichment lambda's set (and the registry's real channel set) grew.
-    ``SOCIAL_CHANNELS`` is still honored as an explicit override when present, for
-    parity with the enrichment lambda's own env-override contract.
+    """#1671 (epic #1668): enriched inbound social posts, human-origin only (#1670 membrane).
+    Fail-soft: a query error or an unprovisioned channel yields []. Channel set is
+    registry-derived (#2808); SOCIAL_CHANNELS overrides.
     """
-    env_channels = os.environ.get("SOCIAL_CHANNELS")
-    if env_channels:
-        channels = [c.strip() for c in env_channels.split(",") if c.strip()]
-    else:
-        channels = source_registry.social_channel_source_ids()
+    env = os.environ.get("SOCIAL_CHANNELS", "")
+    channels = [c.strip() for c in env.split(",") if c.strip()] or source_registry.social_channel_source_ids()
     out = []
     for ch in channels:
         try:
