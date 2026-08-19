@@ -209,7 +209,14 @@ def test_unwired_inbound_channel_reports_dormant_not_zero(monkeypatch):
     monkeypatch.setattr(social, "_inbound_channel_live", lambda s: False)
     inbound = _body(social.handle_membrane())["inbound"]
     assert inbound["state"] == "dormant"
-    assert all(c["state"] == "dormant" and c["live"] is False for c in inbound["channels"])
+    # #2807: `live` follows the (monkeypatched) active_api signal for every channel,
+    # but `state` is inbound_mode-aware — the three paste-only closed platforms
+    # (x/instagram/tiktok) are NEVER "live" (no API to poll) yet are a real,
+    # owner-driven channel, so they report "paste-only", not "dormant".
+    assert all(c["live"] is False for c in inbound["channels"])
+    for c in inbound["channels"]:
+        expected_state = "paste-only" if c["channel"] in ("x", "instagram", "tiktok") else "dormant"
+        assert c["state"] == expected_state, c
 
 
 def test_wired_but_quiet_inbound_channel_reports_live(monkeypatch):
@@ -257,7 +264,10 @@ def test_held_posts_are_neither_shown_nor_counted(monkeypatch):
 def test_per_channel_inbound_count_is_the_visible_count_only(monkeypatch):
     rows = [_post("v1"), _post("v2", sensitivity="flagged"), _post("v3", origin="platform")]
     monkeypatch.setattr(social, "table", _FakeTable({INGEST_PK: rows}))
-    chan = _body(social.handle_membrane())["inbound"]["channels"][0]
+    # _BROADCAST_SOURCES is registry-derived (sorted, #2806/#2807/#2808) — no longer
+    # youtube-first, so select the channel by name rather than assuming index 0.
+    channels = _body(social.handle_membrane())["inbound"]["channels"]
+    chan = next(c for c in channels if c["channel"] == "youtube")
     assert chan["visible"] == 1
 
 

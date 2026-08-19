@@ -59,7 +59,11 @@ from boto3.dynamodb.conditions import Key
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
 from content.social_signals import coach_route_of  # #1671 — training/mind coach-route classifier, reused read-side (#1674)
 from experiment.phase_filter import with_phase_filter  # ADR-058
-from ingestion.source_registry import SOURCE_REGISTRY  # #1679 — inbound channel live/dormant, read from the canonical registry
+from ingestion.source_registry import (  # #1679 — inbound channel live/dormant, read from the canonical registry
+    INBOUND_PASTE_ONLY,
+    SOURCE_REGISTRY,
+    social_channel_source_ids,  # #2806/#2807/#2808 — the registry-derived broadcast/social channel set
+)
 from privacy import social_provenance  # #1670 membrane — the origin:human predicate for the broadcast feed (#1672)
 
 # ── Split handler modules (#2515) — the handler BODIES live there; this file keeps
@@ -663,12 +667,16 @@ def _handle_board_question(event: dict) -> dict:
 # filtered to the CLEARED, human-origin set. Modeled on handle_journey_timeline:
 # read-only, aggregate-only, fail-soft, one _ok() envelope.
 
-# The ingested-post partitions (#1669, extended #1676). All three are dormant until the
-# owner provisions their respective identity (channel id / handle / instance+handle); as
-# more inbound channels land they append here and the feed picks them up with no other
-# change. pk = USER#matthew#SOURCE#<source>, sk = DATE#<date>#<post_id>, one row per post
-# (youtube_lambda / bluesky_lambda / mastodon_lambda .transform — same shape).
-_BROADCAST_SOURCES = ("youtube", "bluesky", "mastodon")
+# The ingested-post partitions (#1669, extended #1676/#1677). Registry-derived
+# (#2806/#2807/#2808) from `social_channel_source_ids()` — every `social_channel`
+# source in lambdas/ingestion/source_registry.py, so a new inbound channel appears
+# here with NO code change instead of needing a hand-edit that can silently miss one
+# (exactly what happened to the three paste-only closed platforms, x/instagram/tiktok:
+# they landed in #1677 after this tuple was last hand-typed and were uniquely absent).
+# pk = USER#matthew#SOURCE#<source>, sk = DATE#<date>#<post_id>, one row per post
+# (youtube_lambda / bluesky_lambda / mastodon_lambda .transform, or the paste inbox for
+# the closed three — same shape, same SIMP-2 write path, same S2 membrane).
+_BROADCAST_SOURCES = tuple(social_channel_source_ids())
 _BROADCAST_LIMIT = 60  # newest N cleared posts; the feed is a voice highlight, not an archive
 
 # ── S5 sensitivity gate seam — RECONCILED to #1673 (PR #1701) ────────────────────
@@ -814,12 +822,17 @@ def _handle_social_context(event: dict) -> dict:
 # records the platform itself wrote, which is the only thing it can honestly claim.
 #
 # HONEST ABSENCE (ADR-104). Today every partition below is empty, and "empty" has
-# two different meanings that must not be flattened into one 0:
+# three different meanings that must not be flattened into one 0:
 #   * a channel that is not wired yet is `dormant` — the absence of a pipe, not the
 #     absence of posting. Derived from the source registry's own `active_api` facet,
 #     never hand-stated here (the #2003 drift class).
-#   * a channel that IS wired and has no rows is `empty` — a real zero.
-# The payload carries the state, and the page renders the two differently.
+#   * a channel whose ONLY inbound path is a manual paste (x/instagram/tiktok, #1677)
+#     is `paste-only` — a real, owner-driven channel with no automatic pipe to be
+#     "dormant" about. `active_api` is False for these by construction (there is no
+#     API), so reporting them as `dormant` would misrepresent a working channel as a
+#     broken one — the #2807 residual defect this facet exists to close.
+#   * a channel that IS wired (or paste-only) and has no rows is `empty` — a real zero.
+# The payload carries the state, and the page renders the three differently.
 #
 # PRIVACY. Everything published here is already public by construction: outbound
 # rows describe posts the platform made in public, and inbound items are exactly the
@@ -847,6 +860,23 @@ def _inbound_channel_live(source: str) -> bool:
         return bool((SOURCE_REGISTRY.get(source) or {}).get("active_api"))
     except Exception:  # noqa: BLE001 — a registry read must never break the dashboard
         return False
+
+
+def _inbound_channel_state(source: str) -> str:
+    """The membrane dashboard's per-channel state (#2807): 'live' | 'paste-only' |
+    'dormant'. `inbound_mode` (read from the registry, never inferred from
+    `active_api`) takes precedence — a paste-only channel is ALWAYS `active_api: False`
+    by construction (there is no API to poll), so deriving its state from `_inbound_
+    channel_live` alone would render an honest, owner-driven channel as the same
+    "nothing here" `dormant` a truly unwired channel gets. That was the residual
+    defect: the membrane page's whole purpose is showing honest inbound coverage, and
+    a real channel reading as absent defeats it."""
+    try:
+        if (SOURCE_REGISTRY.get(source) or {}).get("inbound_mode") == INBOUND_PASTE_ONLY:
+            return "paste-only"
+    except Exception:  # noqa: BLE001 — a registry read must never break the dashboard
+        pass
+    return "live" if _inbound_channel_live(source) else "dormant"
 
 
 def handle_membrane() -> dict:

@@ -12,7 +12,6 @@ is real debt: convert the site to a registry projection, then delete its line.
 """
 
 CONFORMANCE_RESIDUE: dict[str, str] = {
-    "cdk/stacks/ingestion_stack.py::sources::bluesky,mastodon,youtube": "2026-08-17",
     "cdk/stacks/monitoring_dashboards.py::lambdas::adaptive-mode-compute,character-sheet-compute,daily-brief,daily-insight-compute,daily-metrics-compute": "2026-08-17",
     "cdk/stacks/monitoring_stack.py::lambdas::between-chronicle,chronicle-email-sender,weekly-signal": "2026-08-17",
     "cdk/stacks/monitoring_stack.py::sources::dropbox,habitify,todoist,whoop": "2026-08-17",
@@ -41,7 +40,6 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "lambdas/web/site_api_ai_lambda.py::personas::nutrition_coach,sleep_coach,training_coach": "2026-08-17",
     "lambdas/web/site_api_nutrition.py::sources::habitify,strava,whoop": "2026-08-17",
     "lambdas/web/site_api_rollups.py::sources::macrofactor,notion,withings": "2026-08-17",
-    "lambdas/web/site_api_social.py::sources::bluesky,mastodon,youtube": "2026-08-17",
     "lambdas/web/site_api_status.py::sources::eightsleep,whoop": "2026-08-17",
     "lambdas/web/site_stats_refresh_lambda.py::lambdas::habitify-data-ingestion,whoop-data-ingestion,withings-data-ingestion": "2026-08-17",
     "lambdas/web/vitals_resolver.py::sources::apple_health,garmin": "2026-08-17",

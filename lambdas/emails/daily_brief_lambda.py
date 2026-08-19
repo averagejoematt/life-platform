@@ -531,9 +531,22 @@ def fetch_social_posts(start, end):
 
     Human-origin only — the #1670 membrane (``origin <> platform``) excludes the
     platform's own re-ingested outbound echoes. Fail-soft: a query error or an
-    unprovisioned channel yields []. Channels come from SOCIAL_CHANNELS (default youtube).
+    unprovisioned channel yields [].
+
+    Channel set is registry-derived (#2808) — every ``social_channel`` source in
+    ``lambdas/ingestion/source_registry.py`` (the same vocabulary the enrichment
+    lambda's ``SOCIAL_CHANNELS`` env and the site's ``_BROADCAST_SOURCES`` derive
+    from), NOT the ``SOCIAL_CHANNELS`` env var: the live daily-brief function has
+    never had that var set, so a hand-typed env default silently read youtube-only
+    while the enrichment lambda's set (and the registry's real channel set) grew.
+    ``SOCIAL_CHANNELS`` is still honored as an explicit override when present, for
+    parity with the enrichment lambda's own env-override contract.
     """
-    channels = [c.strip() for c in os.environ.get("SOCIAL_CHANNELS", "youtube").split(",") if c.strip()]
+    env_channels = os.environ.get("SOCIAL_CHANNELS")
+    if env_channels:
+        channels = [c.strip() for c in env_channels.split(",") if c.strip()]
+    else:
+        channels = source_registry.social_channel_source_ids()
     out = []
     for ch in channels:
         try:

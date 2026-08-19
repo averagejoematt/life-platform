@@ -112,6 +112,16 @@ DEFAULT_STALE_HOURS = 48
 #                  no client, no secret, no token path in this repo — the owner pastes
 #                  or nothing arrives. Read by paste_only_source_ids(); do NOT infer it
 #                  from active_api:False, which only means "not yet polling".
+#   social_channel True = an inbound social/broadcast channel (epic #1668): Matthew's own
+#                  public voice ingested back in, whether fetched (youtube/bluesky/
+#                  mastodon) or paste-only (x/instagram/tiktok). #2806/#2807/#2808: the
+#                  ONE vocabulary for "which channels does social enrichment/the
+#                  broadcast feed/the daily-brief coach context cover" — it had drifted
+#                  into three hand-typed copies (SOCIAL_CHANNELS in ingestion_stack.py,
+#                  _BROADCAST_SOURCES in site_api_social.py, daily_brief_lambda's env
+#                  fallback), and the paste-only three were uniquely missing from all of
+#                  them. Read by social_channel_source_ids(); paste_only_source_ids() is
+#                  a strict subset by construction.
 #   provider_reconcile
 #                  True = OPT-IN source-of-truth reconciliation (DI-2/TR-07): a
 #                  daily job diffs the PROVIDER API against stored records and
@@ -590,6 +600,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own YouTube videos (public voice)",
         "category": "Inputs",
         "behavioral": True,  # public posting is the behavior
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,  # registry-resident until the channel id is provisioned (#1669)
         "monitored": False,  # never paged; not on the public board yet
@@ -632,6 +643,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own Bluesky posts (public voice)",
         "category": "Inputs",
         "behavioral": True,  # public posting is the behavior
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,  # registry-resident until the handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
@@ -670,6 +682,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own Mastodon posts (public voice)",
         "category": "Inputs",
         "behavioral": True,  # public posting is the behavior
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,  # registry-resident until the instance/handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
@@ -891,6 +904,25 @@ def paste_only_source_ids() -> list:
     registry. See source_registry_closed_social.py for what the facet commits to.
     """
     return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("inbound_mode") == INBOUND_PASTE_ONLY)
+
+
+def social_channel_source_ids() -> list:
+    """Every inbound social/broadcast channel (epic #1668) — the three fetched, open
+    platforms (youtube/bluesky/mastodon) UNION the three paste-only closed platforms
+    (x/instagram/tiktok, `paste_only_source_ids()`). `paste_only_source_ids()` is a
+    strict subset by construction: every paste-only source also carries
+    `social_channel: True`.
+
+    THE one registry-derived vocabulary for "which channels count as social" (#2806/
+    #2807/#2808) — three consumers had each hand-typed their own copy and drifted
+    apart, uniquely excluding the paste-only three (the closed platforms landed after
+    the enrichment lambda's env and the site's `_BROADCAST_SOURCES` tuple were last
+    hand-edited, #1677): the enrichment lambda's `SOCIAL_CHANNELS` env
+    (`cdk/stacks/ingestion_stack.py`, now derived at synth time), the broadcast feed +
+    membrane dashboard's `_BROADCAST_SOURCES` (`lambdas/web/site_api_social.py`), and
+    the daily brief's coach-context channel read (`lambdas/emails/daily_brief_lambda.py`).
+    """
+    return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("social_channel"))
 
 
 def best_effort_source_ids() -> set:
