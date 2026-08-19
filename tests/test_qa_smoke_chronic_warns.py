@@ -88,6 +88,15 @@ SANCTIONED_CHRONIC_SITES = {
     # non-alarming; it un-chronics itself the moment a weigh-in lands, because the branch
     # is chosen by `hero_weight_applicable`, not by a flag.
     ("qa_smoke_lambda.py", "check_hero_weight_arithmetic"),
+    # #2670, class (a) — qa-smoke-warnings sat structurally red 32+ days; measured 8 of 8
+    # consecutive nightly runs 2026-08-17->18 warned on check_receipt_replay's config/engine
+    # drift branch. The docstring's "expected once after a deliberate change" premise was
+    # false in practice: this platform redeploys core config/engine routinely (multiple times
+    # a week, often multiple times a day), so at least one of the last 7 daily receipts nearly
+    # always predates the live config/engine — a receipt is a snapshot, not a promise the
+    # engine stays still. The mismatched-with-UNCHANGED-config branch (real nondeterminism) is
+    # untouched and stays alarmed; only the expected/self-healing drift branch is chronic.
+    ("qa_smoke_lambda.py", "check_receipt_replay"),
 }
 
 
@@ -350,6 +359,53 @@ def test_phase_stamp_gap_is_chronic_but_check_error_stays_alarmed(monkeypatch):
     (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
     assert c.passed is None
     assert c.chronic is False, "the check ERRORING must stay on the alarmed side"
+
+
+# --- #2670: qa-smoke-warnings sat structurally red 32+ days — the dominant driver ---
+
+
+class _ReceiptTable:
+    """DDB table stub: one stored character_receipt, non-tombstoned."""
+
+    def query(self, **kw):  # noqa: N803 — boto3 surface
+        return {"Items": [{"pk": "USER#matthew#character_receipt", "sk": "DATE#2026-08-17", "date": "2026-08-17"}]}
+
+
+def _receipt_replay_with(monkeypatch, verdict):
+    from health import character_engine, personal_baselines, progression_receipts as pr
+
+    monkeypatch.setattr(qa, "table", _ReceiptTable())
+    monkeypatch.setattr(character_engine, "load_character_config", lambda *a, **kw: {"fake": "config"})
+    monkeypatch.setattr(personal_baselines, "effective_character_config", lambda config, table, user_prefix: config)
+    monkeypatch.setattr(pr, "replay", lambda receipt, config, engine=None: verdict)
+    (c,) = qa.check_receipt_replay()
+    return c
+
+
+def test_receipt_replay_config_drift_branch_is_chronic(monkeypatch):
+    """#2670: config/engine changed since a receipt was written is the
+    expected, self-healing state on a platform that redeploys routinely —
+    measured 8 of 8 consecutive nightly runs 2026-08-17->18. It must be
+    chronic so qa-smoke-warnings can actually reach 0 on an otherwise-clean
+    night."""
+    c = _receipt_replay_with(monkeypatch, {"verified": False, "config_drift": True, "engine_drift": False})
+    assert c.passed is None
+    assert c.chronic is True, "the config/engine-drift branch must be chronic (#2670)"
+
+
+def test_receipt_replay_mismatch_stays_alarmed(monkeypatch):
+    """Genuine nondeterminism — a replay mismatch with UNCHANGED config/engine
+    — is the real fault this check exists to catch and must stay alarmed;
+    chronic-izing the drift branch must not swallow it."""
+    c = _receipt_replay_with(monkeypatch, {"verified": False, "config_drift": False, "engine_drift": False})
+    assert c.passed is False
+    assert c.chronic is False, "a genuine replay mismatch must never be chronic"
+
+
+def test_receipt_replay_clean_is_ok(monkeypatch):
+    c = _receipt_replay_with(monkeypatch, {"verified": True, "config_drift": False, "engine_drift": False})
+    assert c.passed is True
+    assert c.chronic is False
 
 
 # ---------------------------------------------------------------------------

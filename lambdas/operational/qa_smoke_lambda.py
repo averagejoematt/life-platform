@@ -468,12 +468,25 @@ def check_receipt_replay():
     Replays the last 7 stored character_receipt records through the LIVE
     bundled engine + the LIVE S3 config:
       - a mismatch with UNCHANGED config hash + engine version = real
-        nondeterminism (or a tampered receipt) → RED (the drift alarm);
-      - config/engine changed since a receipt was written → YELLOW (expected
-        exactly once after a deliberate change; new receipts re-baseline on
-        the next compute);
+        nondeterminism (or a tampered receipt) → RED (the drift alarm, stays
+        fully alarmed — this is the one this check exists to catch);
+      - config/engine changed since a receipt was written → YELLOW, CHRONIC
+        (#2670). The docstring used to say "expected exactly once after a
+        deliberate change" — measured wrong: on a platform that redeploys
+        core config/engine multiple times a WEEK (routinely multiple times a
+        DAY across concurrent sessions), at least one of the last 7 daily
+        receipts has an outdated snapshot on nearly every run — 8 of 8
+        consecutive nightly runs 2026-08-17→18 warned drift, the dominant
+        driver keeping qa-smoke-warnings permanently red (#2670). It is the
+        same "known-recurring TIMING condition" class #1958/#2378 already
+        carved out elsewhere: a receipt is a snapshot, the engine keeps
+        moving, and the next nightly compute re-baselines automatically — no
+        action is ever taken on this branch. Chronic-izing it does NOT touch
+        the mismatch branch above, which is where a real regression would
+        surface;
       - all digests reproduce → green.
-    No receipts at all is YELLOW until the first post-#1373 compute lands.
+    No receipts at all is YELLOW (alarmed — rare/first-run) until the first
+    post-#1373 compute lands.
     """
     c = Check("character:receipt_replay", "Character Receipts", DEPLOY_HEALTH)
     try:
@@ -515,8 +528,10 @@ def check_receipt_replay():
             )
         elif drifted:
             c.warn(
-                f"config/engine changed since receipt(s) {drifted} were written — expected once after a deliberate "
-                f"change; nightly computes re-baseline going forward"
+                f"config/engine changed since receipt(s) {drifted} were written — expected on a platform that "
+                f"redeploys routinely; nightly computes re-baseline going forward (#2670: chronic, not a "
+                f"one-time event)",
+                chronic=True,
             )
         else:
             c.ok(f"{len(items)} receipt(s) replay clean against the live engine + config")
