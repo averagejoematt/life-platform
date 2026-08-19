@@ -35,6 +35,15 @@ from web import site_api_social as social
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "cdk"))
+
+# tests/test_role_policies.py stubs `sys.modules["aws_cdk.aws_iam"]` with a bare
+# aws_cdk-shaped module to keep itself dependency-free — but that stub, once in
+# sys.modules, poisons every LATER `import aws_cdk` in the same pytest process
+# (jsii's lazy module loader can't resolve `Duration` etc. through it). Collection
+# order isn't guaranteed, so purge any aws_cdk* entry before importing the real
+# package here rather than depending on which test file ran first.
+for _mod in [_m for _m in list(sys.modules) if _m == "aws_cdk" or _m.startswith("aws_cdk.")]:
+    del sys.modules[_mod]
 import stacks.ingestion_stack as ingestion_stack  # noqa: E402
 
 # ═══════════════════════════════════════════════════════════════════════════════
