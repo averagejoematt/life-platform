@@ -11,6 +11,11 @@ wrap is archived as `HANDOVER_2026-08-18_wrong-day-wrong-gauge.md`.
 `RUNBOOK`, `SECURITY`, `DIARY_STUDIO_KIT`, `COACH_HUMANITY_ROADMAP`); `INCIDENT_LOG` +1 row.
 **Decisions:** ADR-133 amendment filed (2026-08-18, #2836 — the September base, permanent).
 **Main:** green (`b69eab778`) — verified via `check_main_green.py` after a 1h02m red, see Incidents.
+The wrap commit `4c3f7028` itself earns **no CI/CD run, correctly**: its four paths (`CLAUDE.md`,
+`docs/INCIDENT_LOG.md`, `handovers/`, `site/story/build/beats.json`) are all outside `ci-cd.yml`'s
+`paths:` filter — the documented path-filter skip, **not** the swallowed-push shape (#2762). It did
+fire a real **Site deploy**, which went green on Deploy + Smoke with rollback skipped; the beat is
+live (117 beats, `/version.json` build `4c3f702` == HEAD).
 **Incidents:** 1 row added — main red 1h02m on the $150 ceiling merge (four deselected stale-literal
 test failures; deploy gate rejected, not approved; fixed by #2896).
 **Alarms:** clean — every alarm red >72h cites an issue/incident row; none red >14d uncited.
