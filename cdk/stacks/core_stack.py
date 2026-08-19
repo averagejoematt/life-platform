@@ -132,7 +132,7 @@ class CoreStack(Stack):
                 budget_name="life-platform-monthly-75",
                 budget_type="COST",
                 time_unit="MONTHLY",
-                budget_limit=budgets.CfnBudget.SpendProperty(amount=85, unit="USD"),
+                budget_limit=budgets.CfnBudget.SpendProperty(amount=150, unit="USD"),
             ),
             notifications_with_subscribers=_budget_notifications,
         )
