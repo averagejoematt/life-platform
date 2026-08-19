@@ -56,8 +56,9 @@ on rather than hunting. The three alarm predictions were re-verified live and al
 | **#2882** | #2876 — single dispatch exit point; EMF dimensions → properties | merged `cd9652a3`, site-api + Monitoring CDK **deployed** |
 | **#2895** | #2836 — **the September base, $85 → $150 / surge $176** | merged `71607f78`, cost-governor + Core CDK + site-api **deployed** |
 | **#2896** | four ceiling literals the pre-merge lane deselected | merged `b69eab77`, main green |
-| #2887 | #2883 box 2 — drift ratio scoped to AI-only, unbuffered (2.445 → 1.366) | **open** (Sonnet worker) |
-| #2894 | #2692 — pre-merge deselection made visible + guards pulled in | **open** (Sonnet worker) |
+| **#2887** | #2883 box 2 — drift ratio scoped to AI-only, unbuffered | merged `68022d1f2`, cost-governor **deployed** |
+| **#2894** | #2692 — pre-merge deselection made visible + guards pulled in | merged `157211eb9` |
+| **#2900** | #2692 — the pre-merge lane's `tee` swallowed pytest's exit status | merged `957b0be52` |
 
 ### The owner decisions, all three answered
 
@@ -172,9 +173,11 @@ twelve days earlier, and two guards ran over them the whole time.
 - **#2670 box 2** — still needs a *planted* failure driving OK→ALARM. #2670
 - **The Day-2 temporal contradiction on Home** — genuine, live, and now the thing holding
   `qa-smoke-failures` red. #2741
-- **Merge #2887** (drift ratio, #2883 box 2) — needs a rebase; it collides with #2895 in
-  `test_cost_governor.py`. Implies a `cost-governor` deploy. #2883
-- **Merge #2894** (#2692 deselection) — CI-tooling only, nothing to deploy. #2692
+- ~~Merge #2887~~ **done** — merged + deployed 2026-08-19; the rebase auto-merged cleanly and both
+  sides were verified present. Live: `CostMetricDriftRatio` **2.4709 → 1.3719**. #2883 boxes 3–4 remain. #2883
+- ~~Merge #2894~~ **done** — but it shipped a gate that cannot fail (`pytest | tee` swallowed the
+  exit status, so the pre-merge lane reported success on failing tests). Caught by the #2746 guard
+  one merge later; fixed and merged as #2900. #2692
 - **#2897 / #2898 / #2899** — the three filed tonight; #2897 is P1. #2897
 - **A Withings weigh-in** — newest row still `DATE#2026-08-16`. not-work — only Matthew can do it.
 - **~100 accumulated git worktrees**, most prunable. not-work — pre-existing housekeeping, owner's call.
