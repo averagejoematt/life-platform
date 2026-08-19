@@ -38,6 +38,7 @@ CLOSED_SOCIAL_PASTE_SOURCES: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own X posts (public voice), captured by paste",
         "category": "Inputs",
         "behavioral": True,  # a paste happens only when he does it
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,  # no automatic pipe — never on a freshness surface (#1677)
         "monitored": False,
@@ -65,6 +66,7 @@ CLOSED_SOCIAL_PASTE_SOURCES: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own Instagram posts (public voice), captured by paste",
         "category": "Inputs",
         "behavioral": True,
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,
         "monitored": False,
@@ -89,6 +91,7 @@ CLOSED_SOCIAL_PASTE_SOURCES: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own TikTok posts (public voice), captured by paste",
         "category": "Inputs",
         "behavioral": True,
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,
         "monitored": False,

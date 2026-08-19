@@ -2752,13 +2752,22 @@ def test_the_contextual_sidebar_is_capped_to_a_highlight(monkeypatch):
 def test_the_membrane_reports_a_dormant_inbound_channel_as_dormant_not_empty(monkeypatch):
     """ADR-104's exact distinction: the absence of a PIPE is not the absence of
     posting. `live` is derived from the source registry's own `active_api` facet,
-    so this asserts against the registry rather than restating today's state."""
+    so this asserts against the registry rather than restating today's state.
+
+    #2807: a THIRD state exists for the paste-only closed platforms (x/instagram/
+    tiktok) — `active_api` is False for them by construction (there is no API), but
+    they are a real, owner-driven channel, so they must report "paste-only", never
+    the "dormant" a truly unwired channel gets."""
     wire(monkeypatch)
     body = ok_body(social.handle_membrane())
     for channel in body["inbound"]["channels"]:
-        expected = bool((SOURCE_REGISTRY.get(channel["channel"]) or {}).get("active_api"))
-        assert channel["live"] is expected
-        assert channel["state"] == ("live" if expected else "dormant")
+        entry = SOURCE_REGISTRY.get(channel["channel"]) or {}
+        expected_live = bool(entry.get("active_api"))
+        assert channel["live"] is expected_live
+        if entry.get("inbound_mode") == "paste-only":
+            assert channel["state"] == "paste-only"
+        else:
+            assert channel["state"] == ("live" if expected_live else "dormant")
 
 
 def test_the_membrane_counts_platform_echoes_it_kept_out(monkeypatch):

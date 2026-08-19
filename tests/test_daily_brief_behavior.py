@@ -571,6 +571,17 @@ class TestReaders:
         table.query_error = RuntimeError("channel unprovisioned")
         assert brief.fetch_social_posts(D7, YESTERDAY) == []
 
+    def test_social_posts_default_to_the_registry_derived_channel_set(self, table, monkeypatch):
+        """#2808: with NO `SOCIAL_CHANNELS` env set (the live daily-brief function's
+        actual state — the var has never been set on it), the channel list must come
+        from `source_registry.social_channel_source_ids()`, not the old hand-typed
+        "youtube" default that silently read one channel while the registry's real
+        social vocabulary grew to six."""
+        monkeypatch.delenv("SOCIAL_CHANNELS", raising=False)
+        brief.fetch_social_posts(D7, YESTERDAY)
+        pks = {q["ExpressionAttributeValues"][":pk"] for q in table.queries}
+        assert pks == {brief.USER_PREFIX + c for c in registry.social_channel_source_ids()}
+
     def test_an_absent_anomaly_record_is_an_empty_dict_not_none(self, table):
         assert brief.fetch_anomaly_record(YESTERDAY) == {}
 

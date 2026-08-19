@@ -59,6 +59,11 @@ from typing import Any, cast
 # (one registry, spliced in below) — see source_registry_closed_social.py.
 from ingestion.source_registry_closed_social import CLOSED_SOCIAL_PASTE_SOURCES, INBOUND_PASTE_ONLY  # noqa: F401
 
+# #2806/#2807/#2808: the social/broadcast channel derivation, split into a cohesive
+# sibling (module-size ceiling, #1665) — re-exported so every existing caller keeps
+# importing it via `ingestion.source_registry` unchanged. See source_registry_social.py.
+from ingestion.source_registry_social import social_channel_source_ids  # noqa: F401
+
 # Default staleness threshold when a source has no override (hours). The
 # checker may still override its own default via the STALE_HOURS env var.
 DEFAULT_STALE_HOURS = 48
@@ -112,6 +117,9 @@ DEFAULT_STALE_HOURS = 48
 #                  no client, no secret, no token path in this repo — the owner pastes
 #                  or nothing arrives. Read by paste_only_source_ids(); do NOT infer it
 #                  from active_api:False, which only means "not yet polling".
+#   social_channel True = an inbound social/broadcast channel, fetched or paste-only
+#                  (#2806/#2807/#2808 — rationale in source_registry_social.py). Read by
+#                  social_channel_source_ids().
 #   provider_reconcile
 #                  True = OPT-IN source-of-truth reconciliation (DI-2/TR-07): a
 #                  daily job diffs the PROVIDER API against stored records and
@@ -590,6 +598,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own YouTube videos (public voice)",
         "category": "Inputs",
         "behavioral": True,  # public posting is the behavior
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,  # registry-resident until the channel id is provisioned (#1669)
         "monitored": False,  # never paged; not on the public board yet
@@ -632,6 +641,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own Bluesky posts (public voice)",
         "category": "Inputs",
         "behavioral": True,  # public posting is the behavior
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,  # registry-resident until the handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet
@@ -670,6 +680,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "desc": "Inbound social — Matthew's own Mastodon posts (public voice)",
         "category": "Inputs",
         "behavioral": True,  # public posting is the behavior
+        "social_channel": True,  # #2806/#2807/#2808: registry vocabulary for social/broadcast channels
         "stale_hours": None,
         "freshness": False,  # registry-resident until the instance/handle is provisioned (#1676)
         "monitored": False,  # never paged; not on the public board yet

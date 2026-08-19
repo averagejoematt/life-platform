@@ -526,14 +526,12 @@ def fetch_journal_entries(date_str):
 
 
 def fetch_social_posts(start, end):
-    """#1671 (epic #1668): enriched inbound social posts over [start, end] so the coach
-    surfaces (ai_context) can read Matthew's public voice as a routed coach signal.
-
-    Human-origin only — the #1670 membrane (``origin <> platform``) excludes the
-    platform's own re-ingested outbound echoes. Fail-soft: a query error or an
-    unprovisioned channel yields []. Channels come from SOCIAL_CHANNELS (default youtube).
+    """#1671 (epic #1668): enriched inbound social posts, human-origin only (#1670 membrane).
+    Fail-soft: a query error or an unprovisioned channel yields []. Channel set is
+    registry-derived (#2808); SOCIAL_CHANNELS overrides.
     """
-    channels = [c.strip() for c in os.environ.get("SOCIAL_CHANNELS", "youtube").split(",") if c.strip()]
+    env = os.environ.get("SOCIAL_CHANNELS", "")
+    channels = [c.strip() for c in env.split(",") if c.strip()] or source_registry.social_channel_source_ids()
     out = []
     for ch in channels:
         try:

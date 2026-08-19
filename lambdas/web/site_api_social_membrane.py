@@ -118,6 +118,7 @@ def handle_membrane(*, _g) -> dict:
     _OUTBOUND_CHANNELS = _g["_OUTBOUND_CHANNELS"]
     _broadcast_card = _g["_broadcast_card"]
     _inbound_channel_live = _g["_inbound_channel_live"]
+    _inbound_channel_state = _g["_inbound_channel_state"]
     _is_broadcast_visible = _g["_is_broadcast_visible"]
     _membrane_source_rows = _g["_membrane_source_rows"]
     _ok = _g["_ok"]
@@ -150,7 +151,11 @@ def handle_membrane(*, _g) -> dict:
             {
                 "channel": source,
                 "live": live,
-                "state": "live" if live else "dormant",
+                # #2807: 'live' | 'paste-only' | 'dormant' — a paste-only channel
+                # (x/instagram/tiktok) is never `live` (no API to poll) but is a real,
+                # owner-driven channel, not an unwired one; it must not render as the
+                # same "dormant" a truly absent pipe gets.
+                "state": _inbound_channel_state(source),
                 # VISIBLE (cleared, human-origin) rows only — never the raw partition
                 # count, which would make the held set derivable by subtraction.
                 "visible": sum(1 for r in visible if r.get("channel") == source),

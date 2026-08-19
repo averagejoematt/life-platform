@@ -9,6 +9,9 @@ v2.1 (v3.4.0): CDK-managed IAM roles + CDK-managed EventBridge rules.
 Covers 16 Lambdas (13 scheduled + 1 S3-triggered + 1 API Gateway-triggered).
 """
 
+import sys
+from pathlib import Path
+
 import aws_cdk as cdk
 from aws_cdk import (
     Duration,
@@ -29,6 +32,18 @@ from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 from stacks import role_policies as rp
 from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 from stacks.lambda_helpers import create_platform_lambda, staged_tree_asset
+
+# ── #2806/#2807/#2808: the social-enrichment channel set, derived at synth time ──
+# from lambdas/ingestion/source_registry.py — the ONE registry vocabulary for
+# "which channels count as social" (mirrors scripts/v4_build_data_sources.py's
+# sys.path pattern for reading the same registry from outside lambdas/). Replaces
+# the hand-typed "youtube,bluesky,mastodon" env string, which had already drifted:
+# the three paste-only closed platforms (x/instagram/tiktok, #1677) were uniquely
+# absent because they landed after this literal was last hand-edited.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lambdas"))
+from ingestion.source_registry import social_channel_source_ids  # noqa: E402
+
+SOCIAL_CHANNELS_ENV = ",".join(social_channel_source_ids())
 
 # ── Hourly ingestion with 10pm-4am PST maintenance window ──
 # Active hours: 4am-10pm PST = UTC 12-6 (next day) = 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23
@@ -373,12 +388,15 @@ class IngestionStack(Stack):
 
         # ── 7a. Social Enrichment — 6:45 AM PT daily (#1671, epic #1668).
         # S3 of The Social Membrane: Haiku extraction over ingested inbound-social posts
-        # (youtube, bluesky, mastodon — #1676 extended the channel set) so Matthew's own
-        # public voice becomes a coach signal, riding the SAME journal enrichment path (no
-        # second pipeline). ONLY origin:human posts enter (the #1670 membrane filters
-        # platform echoes); each record is enriched IN PLACE and routed (training vs mind)
-        # by content. Runs after youtube/bluesky/mastodon ingestion + journal enrichment
-        # (14:30) and well before the 17:00 UTC brief. UTC-fixed, no DST drift.
+        # so Matthew's own public voice becomes a coach signal, riding the SAME journal
+        # enrichment path (no second pipeline). SOCIAL_CHANNELS_ENV is every
+        # `social_channel` registry source (#2806/#2807/#2808) — the three fetched, open
+        # platforms (youtube/bluesky/mastodon, #1676) plus the three paste-only closed
+        # platforms (x/instagram/tiktok, #1677), derived at synth time so a new channel
+        # can't silently miss this env again. ONLY origin:human posts enter (the #1670
+        # membrane filters platform echoes); each record is enriched IN PLACE and routed
+        # (training vs mind) by content. Runs after inbound-social ingestion + journal
+        # enrichment (14:30) and well before the 17:00 UTC brief. UTC-fixed, no DST drift.
         create_platform_lambda(
             self,
             "SocialEnrichment",
@@ -387,7 +405,7 @@ class IngestionStack(Stack):
             handler="ingestion.social_enrichment_lambda.lambda_handler",
             schedule="cron(45 14 * * ? *)",
             timeout_seconds=300,
-            environment={"ANTHROPIC_SECRET": "life-platform/ai-keys", "SOCIAL_CHANNELS": "youtube,bluesky,mastodon"},
+            environment={"ANTHROPIC_SECRET": "life-platform/ai-keys", "SOCIAL_CHANNELS": SOCIAL_CHANNELS_ENV},
             custom_policies=rp.ingestion_social_enrichment(),
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
