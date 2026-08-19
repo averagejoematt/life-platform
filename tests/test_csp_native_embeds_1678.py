@@ -267,12 +267,48 @@ def _site_files(*exts):
                 yield os.path.join(dirpath, name)
 
 
+# The floor for the two extensions the offender sweeps below actually scan.
+# #2790: a bare os.walk that silently yields zero files (site/ renamed, root
+# derivation broken, CI checkout shallow-cloned wrong) makes both sweeps pass
+# vacuously — `assert not offenders` is trivially true over an empty list.
+# These minimums are well under the live counts (93 .html / 60 .js as of
+# 2026-08-19) so ordinary content growth/shrinkage never flakes this floor.
+_MIN_SITE_HTML_FILES = 50
+_MIN_SITE_JS_FILES = 20
+
+
+def _floored_site_files(*exts, minimum):
+    """Materialize `_site_files(*exts)` and assert the surface is real before
+    any offender sweep is allowed to trust it (in the style of
+    test_pacific_today_guard_2414.py:195-209 — GUARD THE SET, NOT THE INSTANCE)."""
+    files = list(_site_files(*exts))
+    assert len(files) >= minimum, (
+        f"site file surface for {exts} yielded only {len(files)} files (expected "
+        f">= {minimum}) — the os.walk root may have moved, been renamed, or gone "
+        "missing; the offender sweeps below cannot be trusted over an empty walk (#2790)"
+    )
+    return files
+
+
+def test_site_html_surface_is_derived_and_nonempty():
+    files = _floored_site_files(".html", minimum=_MIN_SITE_HTML_FILES)
+    rels = {os.path.relpath(p, _ROOT) for p in files}
+    for expected in ("site/index.html", "site/cockpit/index.html", "site/coaching/index.html"):
+        assert expected in rels, f"derived site HTML surface lost {expected}"
+
+
+def test_site_js_surface_is_derived_and_nonempty():
+    files = _floored_site_files(".js", minimum=_MIN_SITE_JS_FILES)
+    rels = {os.path.relpath(p, _ROOT) for p in files}
+    assert "site/assets/js/ask.js" in rels, "derived site JS surface lost site/assets/js/ask.js"
+
+
 def test_no_site_iframe_points_at_a_non_allowlisted_origin():
     """A third-party `<iframe>` whose origin is not in NATIVE_EMBED_FRAME_SRC is
     blocked by the CSP and renders as a blank box. Relative/same-origin frames
     are fine."""
     offenders = []
-    for path in _site_files(".html"):
+    for path in _floored_site_files(".html", minimum=_MIN_SITE_HTML_FILES):
         for src in _IFRAME_SRC_RE.findall(open(path, encoding="utf-8", errors="ignore").read()):
             if not src.lower().startswith(("http://", "https://")):
                 continue  # relative → same-origin → covered by default-src 'self'
@@ -287,7 +323,9 @@ def test_site_js_builds_no_iframes_yet():
     lands WITH the owner's `cdk deploy LifePlatformWeb` — update this test then,
     deliberately, not as a drive-by."""
     offenders = [
-        os.path.relpath(p, _ROOT) for p in _site_files(".js") if _JS_IFRAME_RE.search(open(p, encoding="utf-8", errors="ignore").read())
+        os.path.relpath(p, _ROOT)
+        for p in _floored_site_files(".js", minimum=_MIN_SITE_JS_FILES)
+        if _JS_IFRAME_RE.search(open(p, encoding="utf-8", errors="ignore").read())
     ]
     assert not offenders, (
         "site JS now creates an <iframe>. Native players require ADR-149's CSP to be "

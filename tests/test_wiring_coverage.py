@@ -11,16 +11,40 @@ THREE categories of checks:
   W3  ai_output_validator — ALL email + AI-compute Lambdas must import validate_ai_output (AI-3)
   W4  causal language    — No prompt strings may use causal framing ("causes", "proves", etc.)
 
-KNOWN GAPS (documented here; update this list as each gap is closed):
-  These are currently unwired but tracked — they fail CI until fixed.
-  Remove from the known-gap list when wired; the test will then enforce permanently.
+#2825: ``ALL_LAMBDAS`` used to be a hand-list frozen at 40 of ~106 CDK-defined
+Lambdas — ~67 deployed Lambdas (all 12 coach/* engine+chat Lambdas, site-api,
+telegram webhook/worker, chronicle-email-sender) had ZERO W1/W2/W3 coverage,
+and the list carried a phantom (``weather_handler.py``, renamed to
+``weather_lambda.py`` in d50ef4d28) whose checks silently `pytest.skip()`'d to
+green. ``ALL_LAMBDAS`` is now DERIVED — an AST walk of `cdk/stacks/*.py`'s
+``create_platform_lambda(source_file=...)`` call sites (plus the two hand-
+rolled raw ``_lambda.Function(...)`` constructs), in the style of
+`tests/test_heartbeat_completeness.py`'s `scheduled_lambdas()`. See
+`_derive_all_lambdas()` below for the exact scope (Python sources under
+`lambdas/` only — `mcp_server.py` and the Node.js OG-image generator are
+different domains, deliberately out of scope, not oversights).
+
+`_exists()` failure is now a hard FAIL, never a skip — a derived entry that
+resolves to no file on disk is real drift (a rename on one side of the
+CDK/lambdas boundary), and `INGESTION_LAMBDAS`/`AI_OUTPUT_LAMBDAS`/
+`PROMPT_LAMBDAS` below stay hand-curated *subsets* of `ALL_LAMBDAS` (deriving
+those too — "is this Lambda ingestion? does it call AI?" — is a judgment call
+outside this issue's scope; tracked as follow-on debt, not fixed here).
+
+KNOWN GAPS (dated, reasoned, shrink-only — the ratchet primitive, charter #3):
+  Each entry is `filename: "YYYY-MM-DD: reason"`. New entries only ever come
+  OUT once wired; a gap surfaced by widening ALL_LAMBDAS is recorded here, not
+  mass-fixed and not silently exempted. Remove the line when the Lambda is
+  wired; the test then enforces it permanently.
 
 Run with:   python3 -m pytest tests/test_wiring_coverage.py -v
 Or directly: python3 tests/test_wiring_coverage.py
 
 v1.0.0 — 2026-03-11
+v2.0.0 — 2026-08-19 (#2825): ALL_LAMBDAS derived from CDK AST walk, phantom fixed, skip→fail
 """
 
+import ast
 import os
 import re
 import sys
@@ -33,6 +57,7 @@ pytestmark = pytest.mark.deploy_critical
 # ── Project root ─────────────────────────────────────────────────────────────
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
+CDK_STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")
 
 
 # P3.1 (2026-05-25): subpkg-aware flat-name resolution
@@ -61,58 +86,107 @@ def _exists(filename: str) -> bool:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Lambda categorisation
-# Source of truth: ci/lambda_map.json — keep in sync if Lambdas are added.
+# #2825 — ALL_LAMBDAS derived from a CDK AST walk (never a hand list again)
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Every deployable Lambda (filename only, relative to lambdas/)
-ALL_LAMBDAS = [
-    # Ingestion
-    "strava_lambda.py",
-    "whoop_lambda.py",
-    "garmin_lambda.py",
-    "eightsleep_lambda.py",
-    "habitify_lambda.py",
-    "withings_lambda.py",
-    "todoist_lambda.py",
-    "notion_lambda.py",
-    "macrofactor_lambda.py",
-    "health_auto_export_lambda.py",
-    "dropbox_poll_lambda.py",
-    "weather_handler.py",
-    "enrichment_lambda.py",
-    "journal_enrichment_lambda.py",
-    # Email
-    "daily_brief_lambda.py",
-    "weekly_digest_lambda.py",
-    "monthly_digest_lambda.py",
-    "nutrition_review_lambda.py",
-    "wednesday_chronicle_lambda.py",
-    "weekly_plate_lambda.py",
-    "monday_compass_lambda.py",
-    "partner_email_lambda.py",
-    # AI-compute
-    "anomaly_detector_lambda.py",
-    "daily_insight_compute_lambda.py",
-    "hypothesis_engine_lambda.py",
-    "adaptive_mode_lambda.py",
-    # Non-AI compute / operational
-    "character_sheet_lambda.py",
-    "daily_metrics_compute_lambda.py",
-    "dashboard_refresh_lambda.py",
-    "failure_pattern_compute_lambda.py",
-    "freshness_checker_lambda.py",
-    "insight_email_parser_lambda.py",
-    "canary_lambda.py",
-    "qa_smoke_lambda.py",
-    "dlq_consumer_lambda.py",
-    "key_rotator_lambda.py",
-    "pip_audit_lambda.py",
-    "data_export_lambda.py",
-    "data_reconciliation_lambda.py",
-    # ADR-066 (2026-05-31): Hevy routine write-loop cron
-    "hevy_routine_cron_lambda.py",
-]
+_SKIP_STACK_FILES = {"lambda_helpers.py"}  # the generic construction helper, not a Lambda call site
+
+
+def _is_call_to(node: ast.Call, name: str) -> bool:
+    f = node.func
+    return (isinstance(f, ast.Name) and f.id == name) or (isinstance(f, ast.Attribute) and f.attr == name)
+
+
+def _kw(node: ast.Call, name: str):
+    for kw in node.keywords:
+        if kw.arg == name:
+            return kw.value
+    return None
+
+
+def _module_string_constants(tree: ast.Module) -> dict:
+    """Map NAME -> str for simple top-level `NAME = "literal"` assignments
+    (mcp_stack.py's MCP_FUNCTION_NAME/WARMER_FUNCTION_NAME pattern)."""
+    out = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    out[t.id] = node.value.value
+    return out
+
+
+def _resolve_str(node, constants: dict):
+    if node is None:
+        return None
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return constants.get(node.id)
+    return None
+
+
+def _derive_all_lambdas() -> dict:
+    """{basename: "stack_file:line"} for every Python Lambda wired via
+    cdk/stacks/*.py — create_platform_lambda(source_file=...) calls plus the
+    two hand-rolled raw `_lambda.Function(...)` constructs (the HAE webhook,
+    handler-derived; the Node.js OG-image generator, excluded by runtime).
+
+    Scoped to source files that resolve under lambdas/ — matching this
+    module's own `_LAMBDA_INDEX` (which only ever walked LAMBDAS_DIR).
+    `mcp_server.py` (the MCP entry point lives at repo root — a separate
+    domain per ADR-146, not part of the lambdas/ package tree) is out of
+    scope for the same reason, not an oversight.
+    """
+    out: dict[str, str] = {}
+    unresolved: list[str] = []
+    for fname in sorted(os.listdir(CDK_STACKS_DIR)):
+        if not fname.endswith(".py") or fname.startswith("__") or fname in _SKIP_STACK_FILES:
+            continue
+        path = os.path.join(CDK_STACKS_DIR, fname)
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        constants = _module_string_constants(tree)
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if _is_call_to(node, "create_platform_lambda"):
+                src_val = _resolve_str(_kw(node, "source_file"), constants)
+                if src_val is None:
+                    unresolved.append(f"{fname}:{node.lineno} create_platform_lambda(...) — source_file not statically resolvable")
+                    continue
+                if not src_val.startswith("lambdas/"):
+                    continue  # a different domain (e.g. mcp_server.py) — out of this ledger's scope
+                out.setdefault(os.path.basename(src_val), f"{fname}:{node.lineno}")
+            elif _is_call_to(node, "Function") and not _is_call_to(node, "create_platform_lambda"):
+                # Raw aws_lambda.Function(...) construct — only two exist today.
+                runtime_val = _kw(node, "runtime")
+                runtime_str = ast.unparse(runtime_val) if runtime_val is not None else ""
+                if "PYTHON" not in runtime_str:
+                    continue  # Node.js/other runtime — not a Python wiring target
+                handler_val = _resolve_str(_kw(node, "handler"), constants)
+                if handler_val is None or "." not in handler_val:
+                    unresolved.append(f"{fname}:{node.lineno} Function(...) — handler not statically resolvable")
+                    continue
+                # "ingestion.health_auto_export_lambda.lambda_handler" -> "health_auto_export_lambda.py"
+                module_path = handler_val.rsplit(".", 1)[0]
+                basename = module_path.split(".")[-1] + ".py"
+                out.setdefault(basename, f"{fname}:{node.lineno}")
+
+    assert not unresolved, (
+        "cdk/stacks/*.py has a Lambda construct the #2825 enumerator could not "
+        "statically resolve to a source file (a new wiring pattern? teach "
+        "_derive_all_lambdas() about it — do NOT let it silently vanish from "
+        "the wiring-coverage surface):\n  " + "\n  ".join(unresolved)
+    )
+    return out
+
+
+_ALL_LAMBDA_SITES = _derive_all_lambdas()
+
+# Every deployable Lambda (filename only, relative to lambdas/) — DERIVED, see above.
+ALL_LAMBDAS = sorted(_ALL_LAMBDA_SITES)
 
 # Ingestion Lambdas — must wire ingestion_validator (DATA-2)
 INGESTION_LAMBDAS = [
@@ -127,7 +201,7 @@ INGESTION_LAMBDAS = [
     "macrofactor_lambda.py",
     "health_auto_export_lambda.py",
     "dropbox_poll_lambda.py",
-    "weather_handler.py",
+    "weather_lambda.py",  # #2825: was the phantom "weather_handler.py" (renamed d50ef4d28)
     "enrichment_lambda.py",
     "journal_enrichment_lambda.py",
 ]
@@ -168,33 +242,83 @@ PROMPT_LAMBDAS = [
     "ai_calls.py",  # The main prompt module — always checked
 ]
 
-# ── Known gaps (update as each is closed) ────────────────────────────────────
-# W1 platform_logger gaps:
-W1_KNOWN_GAPS: set[str] = set()  # All Lambdas should have this — no known gaps
+# ── Known gaps (dated, reasoned, shrink-only — #2825 ratchet) ────────────────
+# Format: filename -> "YYYY-MM-DD: reason". Entries only ever come OUT once
+# wired; a gap surfaced by widening the scanned surface is recorded here, not
+# silently exempted and not mass-fixed in the PR that found it.
+
+# W1 platform_logger gaps.
+# #2825 widened ALL_LAMBDAS from a 40-entry hand-list (39 real + 1 phantom) to
+# the full CDK-derived surface (103). The 19 entries below are PRE-EXISTING —
+# they use stdlib `logging.getLogger` (or nothing at all) instead of
+# `platform_logger.get_logger` — and are newly IN SCOPE only because the
+# surface widened, not newly broken. Verified by direct read, not assumed.
+W1_KNOWN_GAPS: dict[str, str] = {
+    "ai_expert_analyzer_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "ai_review_pack_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "coach_daily_reflection_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "coach_memoir_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "coach_nudge_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "cover_pipeline_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "evening_nudge_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "field_notes_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "food_delivery_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "inter_coach_dialogue_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "journal_analyzer_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "milestone_digest_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "og_image_lambda.py": "2026-08-19: no logging at all (Pillow-only writer) — #2825 widened-surface debt",
+    "reading_recall_sweep_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "site_api_ai_lambda.py": "2026-08-19: stdlib logging.getLogger via web.site_api_common — #2825 widened-surface debt",
+    "site_api_lambda.py": "2026-08-19: stdlib logging.getLogger via web.site_api_common — #2825 widened-surface debt",
+    "site_stats_refresh_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "traffic_digest_lambda.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+    "voice_fidelity_harness.py": "2026-08-19: stdlib logging.getLogger, no platform_logger — #2825 widened-surface debt",
+}
 
 # W2 ingestion_validator gaps:
-W2_KNOWN_GAPS: set[str] = {
-    # weather_handler.py uses ingestion_framework.run_ingestion() which wraps validation
+W2_KNOWN_GAPS: dict[str, str] = {
+    # weather_lambda.py uses ingestion_framework.run_ingestion() which wraps validation
     # internally — the validator is called inside the framework, not directly by the Lambda.
-    "weather_handler.py",
+    # (#2825: was recorded against the phantom "weather_handler.py"; renamed to match the
+    # real file, weather_lambda.py, per commit d50ef4d28.)
+    "weather_lambda.py": "2026-03-11: validated inside ingestion_framework.run_ingestion(), not directly",
     # dropbox_poll_lambda.py: uses conditional put_item path — validator not yet wired.
-    "dropbox_poll_lambda.py",
+    "dropbox_poll_lambda.py": "2026-03-11: conditional put_item path — validator not yet wired",
     # enrichment_lambda.py: activity enrichment — validator wiring deferred (pre-existing gap).
-    "enrichment_lambda.py",
+    "enrichment_lambda.py": "2026-03-11: activity enrichment — validator wiring deferred",
     # health_auto_export_lambda.py: validator not yet wired (pre-existing gap).
-    "health_auto_export_lambda.py",
+    "health_auto_export_lambda.py": "2026-03-11: validator not yet wired (pre-existing gap)",
     # journal_enrichment_lambda.py: journal enrichment — validator wiring deferred.
-    "journal_enrichment_lambda.py",
+    "journal_enrichment_lambda.py": "2026-03-11: journal enrichment — validator wiring deferred",
 }
 
 # W3 ai_output_validator gaps:
-W3_KNOWN_GAPS: set[str] = {
+W3_KNOWN_GAPS: dict[str, str] = {
     # IC-8 makes a direct urllib Haiku call (not via ai_calls.py).
     # TODO: wrap IC-8 response with validate_ai_output (AI-3).
-    "daily_insight_compute_lambda.py",
+    "daily_insight_compute_lambda.py": "2026-03-11: IC-8 direct urllib Haiku call, not via ai_calls.py — TODO wrap with validate_ai_output",
     # adaptive_mode_lambda.py makes direct API calls — tracked for wiring.
-    "adaptive_mode_lambda.py",
+    "adaptive_mode_lambda.py": "2026-03-11: makes direct API calls — tracked for wiring",
 }
+
+
+def test_all_lambdas_surface_is_derived_and_nonempty():
+    """#2825: the derived surface itself must not be able to go quietly empty
+    (cdk/stacks/ moved, the AST walk broke) — the same GUARD THE SET, NOT THE
+    INSTANCE floor as test_pacific_today_guard_2414.py:195-209 and #2790's
+    _floored_site_files(). >= 90 is comfortably under the live count (103 as
+    of 2026-08-19) so ordinary fleet growth/shrinkage never flakes this."""
+    assert len(ALL_LAMBDAS) >= 90, f"suspiciously small CDK-derived Lambda surface: {ALL_LAMBDAS}"
+    for expected in (
+        "site_api_lambda.py",
+        "telegram_webhook_lambda.py",
+        "telegram_worker_lambda.py",
+        "chronicle_email_sender_lambda.py",
+        "coach_state_updater.py",
+        "weather_lambda.py",
+    ):
+        assert expected in ALL_LAMBDAS, f"derived ALL_LAMBDAS lost {expected}"
+    assert "weather_handler.py" not in ALL_LAMBDAS, "the #2825 phantom must never resurface"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -206,9 +330,13 @@ W3_KNOWN_GAPS: set[str] = {
 def test_w1_platform_logger_imported(filename):
     """W1: Every Lambda must import get_logger from platform_logger (OBS-1)."""
     if not _exists(filename):
-        pytest.skip(f"{filename} not present in lambdas/")
+        pytest.fail(
+            f"{filename}: ALL_LAMBDAS names a file that does not exist under lambdas/ "
+            f"(derived from cdk/stacks/ — see {_ALL_LAMBDA_SITES.get(filename, '?')}). "
+            "A phantom entry must FAIL, never skip to green (#2825)."
+        )
     if filename in W1_KNOWN_GAPS:
-        pytest.xfail(f"Known W1 gap: {filename} — see W1_KNOWN_GAPS")
+        pytest.xfail(f"Known W1 gap: {filename} — {W1_KNOWN_GAPS[filename]}")
     src = _src(filename)
     has_logger = "from platform_logger import" in src or "platform_logger" in src or "get_logger(" in src
     assert has_logger, (
@@ -231,9 +359,9 @@ def test_w1_platform_logger_imported(filename):
 def test_w2_ingestion_validator_wired(filename):
     """W2: Ingestion Lambdas must wire ingestion_validator before DDB writes (DATA-2)."""
     if not _exists(filename):
-        pytest.skip(f"{filename} not present in lambdas/")
+        pytest.fail(f"{filename}: INGESTION_LAMBDAS names a file that does not exist under lambdas/ (#2825 — must FAIL, not skip).")
     if filename in W2_KNOWN_GAPS:
-        pytest.xfail(f"Known W2 gap: {filename} — see W2_KNOWN_GAPS")
+        pytest.xfail(f"Known W2 gap: {filename} — {W2_KNOWN_GAPS[filename]}")
     src = _src(filename)
     has_validator = (
         "from ingestion_validator import" in src
@@ -262,9 +390,9 @@ def test_w2_ingestion_validator_wired(filename):
 def test_w3_ai_output_validator_wired(filename):
     """W3: Email and AI-compute Lambdas must wire ai_output_validator (AI-3)."""
     if not _exists(filename):
-        pytest.skip(f"{filename} not present in lambdas/")
+        pytest.fail(f"{filename}: AI_OUTPUT_LAMBDAS names a file that does not exist under lambdas/ (#2825 — must FAIL, not skip).")
     if filename in W3_KNOWN_GAPS:
-        pytest.xfail(f"Known W3 gap: {filename} — see W3_KNOWN_GAPS")
+        pytest.xfail(f"Known W3 gap: {filename} — {W3_KNOWN_GAPS[filename]}")
     src = _src(filename)
     # Valid wiring patterns:
     # (a) imports from ai_calls which has the middleware built in
@@ -341,7 +469,7 @@ def test_w4_no_causal_language_in_prompts(filename):
     increase the likelihood of causal outputs slipping past ai_output_validator.
     """
     if not _exists(filename):
-        pytest.skip(f"{filename} not present in lambdas/")
+        pytest.fail(f"{filename}: PROMPT_LAMBDAS names a file that does not exist under lambdas/ (#2825 — must FAIL, not skip).")
     src = _src(filename)
     violations = _find_causal_violations(src, filename)
     assert not violations, (
