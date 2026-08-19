@@ -2918,6 +2918,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2884"
         }
       ]
+    },
+    {
+      "id": "2026-08-18-september-base",
+      "date": "2026-08-18",
+      "title": "The budget ceiling stopped being a monthly argument",
+      "shipped": "The platform runs under a hard monthly spending ceiling, enforced in code: a governor reprojects month-end spend every 8 hours, publishes a degradation tier, and every AI feature reads that tier before it runs. That ceiling had been raised three months running, each time as a dated one-month window that expires on its own date. This week it became permanent instead: a base of $150, with a $176 ceiling that applies only while real reader traffic is high. Two other changes shipped alongside it — every one of the site's API routes now reports its own latency, and a recurring internal warning was reclassified so a long-stuck alarm can signal again.",
+      "why_it_mattered": "Three consecutive temporary raises are not three emergencies; they are evidence the base number was wrong. The tell was in how the number got picked. Previous raises were chosen against a projection — a forecast of where the month would end — and a projection is dominated by whatever happened most recently. A three-day spike had pushed it to $171 and falling. Measuring actual daily spend over six complete days gave $4.12/day, about $124/month, with a 95% confidence interval of $108–139. Those two instruments disagreed by nearly $50, and the projection was the one that had been driving decisions. Choosing against the measurement means the ceiling now sits where the platform actually lives, and the degradation ladder underneath it — which pauses internal tooling first, reader-facing writing second, and the daily brief last — keeps carrying information instead of pinning at its most severe setting.",
+      "gotcha": "Changing one number touched twenty-six files. The ceiling turned out to be hand-maintained in five separate places in the code plus roughly eighteen sentences of prose, and the automated check meant to catch stale copies missed three live statements while catching a fourth in the same file. Two files still described the August ceiling as $115 when it had been $200 for twelve days — guards had run over them the whole time. A number repeated in twenty-three places is not a number; it is twenty-three chances to be wrong.",
+      "honest_miss": "The change broke the build for an hour. Four tests still asserted the old figure, and the fast pre-merge check had skipped every one of them — it green-lit the change while silently not running about 11,500 tests. That gap is a known problem with a fix already in progress, but the compounding mistake was mine: the thorough search I ran before merging failed silently on a shell quirk, and instead of re-running it I proceeded on a shorter list I had typed by hand. Separately, the commit helper quietly deleted thirteen files of finished writing — including the entire written rationale for this decision — and reported success while doing it. Nothing was ultimately lost, but only because the text was still recoverable from the session.",
+      "prs": [
+        {
+          "label": "PR #2895",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2895"
+        },
+        {
+          "label": "PR #2882",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2882"
+        },
+        {
+          "label": "PR #2885",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2885"
+        },
+        {
+          "label": "PR #2896",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2896"
+        }
+      ]
     }
   ]
 }

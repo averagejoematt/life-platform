@@ -184,7 +184,10 @@ def _build_route_map():
     Sources, in the same precedence the dispatcher uses:
       1. ROUTES dict (non-None simple GET routes)
       2. _SIMPLE_ROUTES dispatch table (method-guarded delegates)
-      3. inline `if path == "/api/x": return handle_y(...)` branches in lambda_handler
+      3. inline `if path == "/api/x": return handle_y(...)` branches in
+         `_dispatch_route` (#2876 — the single dispatch exit point every route
+         now funnels through; these branches used to live in `lambda_handler`
+         itself)
     """
     import inspect
 
@@ -194,7 +197,7 @@ def _build_route_map():
             full[path] = handler.__name__
     for path, (_methods, fn) in L._SIMPLE_ROUTES.items():
         full[path] = fn.__name__
-    src = inspect.getsource(L.lambda_handler)
+    src = inspect.getsource(L._dispatch_route)
     pending = None
     for line in src.splitlines():
         m = re.search(r'path (?:==|\.startswith\() ?"(/api/[^"]+)"', line)

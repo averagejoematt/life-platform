@@ -450,7 +450,7 @@ class MonitoringStack(Stack):
         #                          threshold; ADR-105). #2378: chronic set
         #                          AST-guarded in test_qa_smoke_chronic_warns. No
         #                          ChronicWarnCount alarm; keep the 86400s
-        #                          Maximum window — load-bearing.
+        #                          Maximum window — load-bearing. #2670: receipt-replay's drift branch is chronic too (threshold UNCHANGED).
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",

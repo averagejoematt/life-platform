@@ -2,14 +2,14 @@
 
 The public /api/inference_receipt is the platform's flagship cost-honesty surface.
 It used to hardcode `"budget_ceiling_usd": 75` and a note "The $75 ceiling covers the
-WHOLE platform" while the real ceiling is $85 base (ADR-133) / $100 in surge mode — the
+WHOLE platform" while the real ceiling is $150 base (ADR-133, #2836) / $176 in surge mode — the
 receipt was off by $25 while surge was active. The fix derives the ceiling from the
 governor's /life-platform/budget-breakdown param (#822) and drops every hardcoded figure
 (here and in the bedrock_client tier-3 BudgetExceeded message).
 
 Two guards, both offline:
   1. Truth test: with SSM mocked, the receipt's budget_ceiling_usd == the breakdown's
-     ceiling (and falls back to the $85 base — never $75 — when the read fails).
+     ceiling (and falls back to the $150 base — never $75 — when the read fails).
   2. Source-scan non-vacuity: check_doc_facts._source_hits flags the exact defect shape
      planted in a scratch file, and does NOT flag the fixed or the legitimately-historical
      ($75 reference constant) shapes.
@@ -101,7 +101,7 @@ def test_receipt_ceiling_equals_breakdown_ceiling(monkeypatch):
     assert body["budget_surge_active"] is True
     # the note must never state the retired $75; it names the base + the $-in-effect.
     assert "$75" not in body["note"]
-    assert "$85" in body["note"] and "$100" in body["note"]
+    assert "$150" in body["note"] and "$100" in body["note"]
 
 
 def test_receipt_ceiling_tracks_base_when_not_surging(monkeypatch):
@@ -128,8 +128,8 @@ def test_receipt_ceiling_tracks_base_when_not_surging(monkeypatch):
     assert body["budget_surge_active"] is False
 
 
-def test_receipt_falls_back_to_85_never_75_on_ssm_failure(monkeypatch):
-    """A breakdown-read blip degrades to the ADR-133 base $85 — never the retired $75."""
+def test_receipt_falls_back_to_the_base_never_75_on_ssm_failure(monkeypatch):
+    """A breakdown-read blip degrades to the ADR-133 base ($150 since #2836) — never the retired $75."""
     ssm = _FakeSSM(
         {"/life-platform/budget-tier": "0"},
         raises_for=("/life-platform/budget-breakdown",),
@@ -137,7 +137,7 @@ def test_receipt_falls_back_to_85_never_75_on_ssm_failure(monkeypatch):
     _install(monkeypatch, ssm)
 
     body = _payload(sad.handle_inference_receipt())
-    assert body["budget_ceiling_usd"] == 85.0
+    assert body["budget_ceiling_usd"] == 150.0
     assert body["budget_ceiling_usd"] != 75
     assert body["budget_surge_active"] is False
 
@@ -205,9 +205,9 @@ def test_source_scan_flags_planted_defect_but_not_fixed_or_historical():
     good.write_text('def h(c):\n    return {"budget_ceiling_usd": ceiling_usd, "note": f"the ${c:.0f} base ceiling"}\n')
     assert gate._source_hits([good]) == []
 
-    # an ALLOWED value (the $85 base / $100 surge) — must pass.
+    # an ALLOWED value (the $150 base / $176 surge) — must pass.
     ok = d / "ok.py"
-    ok.write_text('    return {"budget_ceiling_usd": 85}  # base\n')
+    ok.write_text('    return {"budget_ceiling_usd": 150}  # base\n')
     assert gate._source_hits([ok]) == []
 
     # the legitimate historical reference constant ($75 = the ORIGINAL calibration

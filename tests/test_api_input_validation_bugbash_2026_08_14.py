@@ -69,7 +69,7 @@ def test_vitals_rejects_impossible_calendar_dates(bad):
     assert resp["statusCode"] == 400, f"date={bad!r} returned {resp['statusCode']}, expected 400"
 
 
-def test_vitals_still_accepts_a_real_date_shape():
+def test_vitals_still_accepts_a_real_date_shape(monkeypatch):
     """Non-vacuity, and a direct proof that rejection precedes data access.
 
     A real calendar date must get PAST the validator. With FAKE credentials the
@@ -77,12 +77,27 @@ def test_vitals_still_accepts_a_real_date_shape():
     dies on the token — whereas every date in IMPOSSIBLE_DATES above returns 400
     without touching AWS at all. If the guard ever over-rejected, this would
     return a 400 response instead of raising, and the test fails.
-    """
-    from botocore.exceptions import ClientError
 
-    with pytest.raises(ClientError) as exc:
-        _get("/api/vitals", {"date": "2026-08-12"})
-    assert "security token" in str(exc.value).lower()
+    #2876 changed how that DDB failure surfaces: `/api/vitals?date=` is one of
+    the 27 routes that used to `return` straight out of `lambda_handler`, so a
+    raised `ClientError` used to escape uncaught (an unhandled Lambda
+    invocation — no JSON response, no #2819 Handled5xx datapoint). Now every
+    route funnels through `_dispatch_route`'s single exit point, so the SAME
+    error is instead a clean handled 500 — worse response, better
+    observability — which is the whole point of #2876. The non-vacuity check
+    moves from "did it raise" to "did it reach the DDB call and get turned
+    into a handled 500", proven via the logged security-token message
+    (`logger` is a configured, non-propagating instance — caplog sees
+    nothing, so monkeypatch `logger.error` directly, per
+    test_board_route_refuses_2719.py's established technique).
+    """
+    logged = []
+    monkeypatch.setattr(L.logger, "error", lambda msg, *a, **k: logged.append(msg % a if a else msg))
+
+    resp = _get("/api/vitals", {"date": "2026-08-12"})
+
+    assert resp["statusCode"] == 500, f"expected a handled 500, got {resp['statusCode']}: {resp.get('body')}"
+    assert any("security token" in m.lower() for m in logged), logged
 
 
 # ── AC2 ───────────────────────────────────────────────────────────────────────

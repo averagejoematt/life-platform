@@ -594,7 +594,9 @@ def test_route_is_wired_to_the_handler():
 
     from web import site_api_lambda as L
 
-    src = inspect.getsource(L.lambda_handler)
+    # #2876 moved this inline branch from `lambda_handler` into `_dispatch_route`,
+    # the single dispatch exit point every route now funnels through.
+    src = inspect.getsource(L._dispatch_route)
     assert '"/api/diary_shelf"' in src and "handle_diary_shelf" in src
     assert callable(L.handle_diary_shelf)
 

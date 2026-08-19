@@ -17,8 +17,8 @@
   },
   "platform": {
     "monthly_usd_typical": "~$80",
-    "ceiling_usd": 85.0,
-    "surge_ceiling_usd": 100.0,
+    "ceiling_usd": 150.0,
+    "surge_ceiling_usd": 176.0,
     "non_ai_floor_monthly_usd": [
       36,
       43

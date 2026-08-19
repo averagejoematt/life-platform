@@ -204,7 +204,7 @@ def test_pre_1999_payload_falls_closed_to_the_literal(monkeypatch):
     _install(monkeypatch, _ssm_with(bd))
     d = _payload(sai.handle_receipts())
 
-    assert d["base_ceiling_usd"] == sai._ADR133_BASE_CEILING_USD == 85.0
+    assert d["base_ceiling_usd"] == sai._ADR133_BASE_CEILING_USD == 150.0
     assert d["surge_ceiling_usd"] is None, "a surge ceiling the governor never stated must not be invented"
     assert d["ceiling_window"] is None
 

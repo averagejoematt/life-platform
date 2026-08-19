@@ -86,7 +86,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | CloudWatch | Alarms + logs | **~104 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
 | CDK | Infrastructure as Code | `cdk/` — 9 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
-| AWS Budget | Cost guardrail | **$85/mo all-in cap** (ADR-063, raised from $75 + surge-to-$100 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
+| AWS Budget | Cost guardrail | **$150/mo all-in cap** (ADR-063; base $75 -> $85 -> $150, surge-to-$176 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
 | Concurrency quota | Account-level | **100** (raised 2026-05-19 from the account default of 10 — AWS Support case 177921309700709) |
 
 ---
@@ -427,7 +427,7 @@ table and bump `secret_count` when it is created.
 
 ## Cost Profile
 
-Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per ADR-133). The canonical spend ledger is [COST_TRACKER.md](COST_TRACKER.md) (~$80/mo projected at its last close); the **live** tier is never stated here — read it from SSM `/life-platform/budget-tier`, which `life-platform-cost-governor` rewrites every 8h.
+Target: within the **$150/mo all-in budget ceiling** (ADR-063; surge-to-$176 per ADR-133). The canonical spend ledger is [COST_TRACKER.md](COST_TRACKER.md) (~$80/mo projected at its last close); the **live** tier is never stated here — read it from SSM `/life-platform/budget-tier`, which `life-platform-cost-governor` rewrites every 8h.
 
 | Driver | Monthly Cost |
 |---|---|

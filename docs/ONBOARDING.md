@@ -62,7 +62,7 @@ MCP Lambda (76 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
 site-api Lambda (~134 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
-~104 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 9 CDK stacks. Run-rate: ~$25–40/mo against an $85 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
+~104 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 9 CDK stacks. Run-rate: ~$25–40/mo against a $150 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
 
 ---
 
@@ -247,7 +247,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 3. **`public_stats.json` is the website heartbeat.** Home, story, mission, observatory pages all read from this one S3 file, written by daily-brief at 17:00 UTC (10 AM PDT). Daily brief failure = stale website data.
 4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. PT times in docs are for humans only.
 5. **Pipeline ordering is strict.** Ingestion → Anomaly → Compute → Brief → OG. Changing schedules without preserving order produces stale results.
-6. **Budget is an $85/month enforced ceiling** (ADR-063 + the ADR-133 amendment; floats to $100 in reader-traffic surge mode). Steady-state run-rate ~$25–40/mo; the cost-governor projects month-end spend every 8h and degrades AI features by budget tier (`lambdas/ai/budget_guard.py`). See `docs/COST_TRACKER.md`.
+6. **Budget is a $150/month enforced ceiling** (ADR-063 + the ADR-133 amendment; floats to $176 in reader-traffic surge mode). Steady-state run-rate ~$25–40/mo; the cost-governor projects month-end spend every 8h and degrades AI features by budget tier (`lambdas/ai/budget_guard.py`). See `docs/COST_TRACKER.md`.
 7. **Coaches are stateful entities with persistent memory and cross-coach awareness over 12 months.** All math happens in the deterministic computation engine — the LLM never does math.
 8. **The KMS CMK (`alias/life-platform-s3`) was deleted on schedule in June 2026** — the alias no longer exists (live-verified 2026-07-19). The bucket stays AES256 (ADR-053/054); don't reintroduce default KMS.
 
