@@ -174,18 +174,26 @@ time-box). Flagged, not measured.
   projection numbers directly, not attempt to derive a whole-bill figure from the AI-only
   self-reported metric.
 
+## Box 2 resolved (2026-08-18, follow-up PR)
+
+`CostMetricDriftRatio` now compares AI-only to AI-only, unbuffered on both sides:
+`(ai / _AI_SAFETY_BUFFER) / self_reported_mtd` instead of `mtd / self_reported_mtd`
+(`cost_governor_lambda.py::_emit_metrics`). `AuthoritativeCostMTD` is unchanged — it still
+publishes `mtd` (the whole padded bill) for dashboards that want that figure; only the ratio's
+denominator/numerator scope moved. On the live sample in this doc (non_ai=$39.62 ai=$71.19
+self_reported=$45.32) the published ratio moves from 2.445 to 1.366, matching the "≈1.3–1.4x"
+figure above. Pinned by `tests/test_cost_governor.py::test_cost_metric_drift_ratio_compares_ai_only_not_whole_bill_2883`.
+The <1.15 sustained-7-day target and the alarm (box 3) are still open — see below.
+
 ## Left
 
 Per the brief, this issue's remaining acceptance boxes are explicitly follow-on work, not
 attempted here:
 
-- **`CostMetricDriftRatio` < 1.15 sustained over 7 days** — not attempted. The clear
-  highest-leverage fix suggested by this attribution is **redefining the ratio's scope**
-  (compare AI-only-buffered vs AI-only-self-reported, i.e. drop `non_ai` from the numerator,
-  and/or compare against the unbuffered `ai` rather than the padded one) — that alone would move
-  the *measured* ratio from 2.44x toward ~1.3–1.4x without changing any actual cost or any actual
-  telemetry accuracy. Then closing cache-token undercounting (Hypothesis 2) is what closes most
-  of the real remaining gap toward 1.15x. Neither change is made in this PR.
+- **`CostMetricDriftRatio` < 1.15 sustained over 7 days** — the scope fix (box 2, above) moves
+  the ratio from ~2.44x to ~1.3–1.4x but does not by itself reach 1.15x. Closing cache-token
+  undercounting (Hypothesis 2) is what closes most of the real remaining gap toward 1.15x. Not
+  attempted in the box-2 PR.
 - **A drift-ratio alarm** — not added. `CostMetricDriftRatio` is already published
   (`LifePlatform/Budget::CostMetricDriftRatio`, every 8h); wiring a CloudWatch alarm on it is
   small but is box 3's job, and doing it before box 2 (fixing the ratio's scope) would alarm on

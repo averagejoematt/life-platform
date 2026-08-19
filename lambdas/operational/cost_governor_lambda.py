@@ -767,7 +767,7 @@ def _self_reported_cost_mtd(start: datetime, now: datetime) -> float:
         return 0.0
 
 
-def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: float) -> None:
+def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: float, ai: float) -> None:
     data = [
         {"MetricName": "EstimatedMonthToDateSpend", "Value": mtd, "Unit": "None"},
         {"MetricName": "ProjectedMonthlySpend", "Value": projected, "Unit": "None"},
@@ -777,17 +777,27 @@ def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: fl
         # against the self-reported LifePlatform/AI::EstimatedCostUSD metric, which only
         # counts calls made through bedrock_client._emit_usage_metrics() and therefore
         # under-counts (dev sessions, MCP calls without EMF instrumentation, etc.).
+        # This stays the WHOLE-BILL, buffered figure — box 2 (#2883) only changed what
+        # CostMetricDriftRatio divides, not what this metric means.
         {"MetricName": "AuthoritativeCostMTD", "Value": mtd, "Unit": "None"},
     ]
-    # Drift metric: how much larger the authoritative estimate is vs self-reported.
-    # Values > 1.5 (50% gap) indicate significant under-counting in self-emitted metrics.
+    # Drift metric: how much the AI estimate under-counts self-reported AI spend.
+    # #2883 box 2: `mtd` (= non_ai + ai) and self_reported_mtd are NOT the same scope —
+    # mtd is the whole AWS bill (non-AI + AI) and self_reported_mtd is AI-only, so
+    # dividing mtd/self_reported_mtd mixed a scope mismatch (the non_ai dollars) and a
+    # deliberate padding (_AI_SAFETY_BUFFER, applied inside _ai_cost()) into what reads
+    # as "self-reported metrics are under-counting." Compare AI-only to AI-only,
+    # unbuffered on both sides, so the ratio measures the actual self-report gap —
+    # see docs/audits/AI_COST_DRIFT_ATTRIBUTION_2026-08-18.md ("## Left").
+    ai_unbuffered = ai / _AI_SAFETY_BUFFER
     if self_reported_mtd > 0:
-        drift_ratio = mtd / self_reported_mtd
+        drift_ratio = ai_unbuffered / self_reported_mtd
         data.append({"MetricName": "CostMetricDriftRatio", "Value": drift_ratio, "Unit": "None"})
         if drift_ratio > 1.5:
             logger.warning(
-                f"CostMetricDrift: authoritative ${mtd:.2f} vs self-reported ${self_reported_mtd:.2f} "
-                f"= {drift_ratio:.2f}x — self-emitted metrics are significantly under-counting"
+                f"CostMetricDrift: native AI (unbuffered) ${ai_unbuffered:.2f} vs self-reported "
+                f"${self_reported_mtd:.2f} = {drift_ratio:.2f}x — self-emitted AI metrics are "
+                f"significantly under-counting"
             )
     try:
         _cw.put_metric_data(Namespace="LifePlatform/Budget", MetricData=data)
@@ -871,7 +881,7 @@ def lambda_handler(event, context):
             f"self_reported_mtd=${self_reported:.2f} recent_uniques={recent_uniques} "
             f"surge_active={surge_active} effective_ceiling=${effective_ceiling:.0f}"
         )
-        _emit_metrics(mtd, projected, computed_tier, self_reported)
+        _emit_metrics(mtd, projected, computed_tier, self_reported, ai)
         # #2116: independent of OBSERVE_MODE/budget-tier enforcement — the
         # genesis-window gauge is a pure calendar fact, not a spend decision.
         _emit_token_alarm_window_gauge()

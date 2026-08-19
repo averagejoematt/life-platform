@@ -578,3 +578,58 @@ def test_emit_token_alarm_window_gauge_never_raises_on_put_failure(gov, monkeypa
     monkeypatch.setattr(gov, "_cw", _BrokenCW())
 
     gov._emit_token_alarm_window_gauge()  # must not raise
+
+
+# ── #2883 box 2: CostMetricDriftRatio scope fix ──────────────────────────────
+# The published 2.44x drift ratio was `mtd / self_reported_mtd` where
+# `mtd = non_ai + ai` (the WHOLE AWS bill, with `ai` carrying the deliberate
+# _AI_SAFETY_BUFFER pad) but `self_reported_mtd` is AI-only and unbuffered.
+# docs/audits/AI_COST_DRIFT_ATTRIBUTION_2026-08-18.md decomposed the live
+# $65.49 gap: $39.62 (60.5%) was the non_ai scope mismatch, $9.29 (14.2%) was
+# the buffer, and only ~$11-17 (25.3%) was genuine self-report undercount —
+# the real ratio is ~1.3-1.4x, not 2.44x. This test pins the live sample's
+# numbers from the audit doc (non_ai=$39.62 ai=$71.19 self_reported=$45.32)
+# and asserts the published ratio reflects AI-only-vs-AI-only, unbuffered on
+# both sides — it fails against the old `mtd / self_reported_mtd` form (which
+# would publish ~2.445) and passes against the fixed form (~1.366).
+
+
+def test_cost_metric_drift_ratio_compares_ai_only_not_whole_bill_2883(gov, monkeypatch):
+    fake_cw = _RecordingCW()
+    monkeypatch.setattr(gov, "_cw", fake_cw)
+
+    non_ai = 39.62
+    ai = 71.19  # buffered (as returned by _ai_cost — already × _AI_SAFETY_BUFFER)
+    mtd = non_ai + ai  # 110.81, the whole-bill figure AuthoritativeCostMTD publishes
+    self_reported_mtd = 45.32
+
+    gov._emit_metrics(mtd, projected=120.0, tier=1, self_reported_mtd=self_reported_mtd, ai=ai)
+
+    published = {d["MetricName"]: d["Value"] for d in fake_cw.calls[0]["MetricData"]}
+
+    # AuthoritativeCostMTD keeps meaning the whole padded bill — box 2 changes
+    # only what the ratio divides, not this metric's scope.
+    assert published["AuthoritativeCostMTD"] == mtd
+
+    # The old scope-mismatched ratio (mtd / self_reported_mtd) would be ~2.445 —
+    # assert the published ratio is NOT that number, and IS the AI-only,
+    # unbuffered comparison the audit calls for (~1.366).
+    old_scope_mismatched_ratio = mtd / self_reported_mtd
+    assert old_scope_mismatched_ratio == pytest.approx(2.445, abs=0.01)  # sanity: matches the audit doc's headline
+    assert published["CostMetricDriftRatio"] != pytest.approx(old_scope_mismatched_ratio, abs=0.01)
+
+    expected_ratio = (ai / gov._AI_SAFETY_BUFFER) / self_reported_mtd
+    assert published["CostMetricDriftRatio"] == pytest.approx(expected_ratio, abs=1e-9)
+    assert published["CostMetricDriftRatio"] == pytest.approx(1.366, abs=0.01)
+
+
+def test_cost_metric_drift_ratio_skipped_when_no_self_reported_data(gov, monkeypatch):
+    """Unchanged behavior: with no self-reported datapoints at all, no ratio is
+    published (avoids a division by zero / a misleading infinite drift)."""
+    fake_cw = _RecordingCW()
+    monkeypatch.setattr(gov, "_cw", fake_cw)
+
+    gov._emit_metrics(110.81, projected=120.0, tier=1, self_reported_mtd=0.0, ai=71.19)
+
+    names = {d["MetricName"] for d in fake_cw.calls[0]["MetricData"]}
+    assert "CostMetricDriftRatio" not in names
