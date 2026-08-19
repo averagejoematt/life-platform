@@ -149,7 +149,7 @@ FACT_SPECS = [
 # The $ amount must sit right next to a ceiling word — NOT merely share a line with
 # "month" (else a per-user cost projection like "$405/month" false-flags). Two
 # alternations (word→amount, amount→word); whichever group matched is the amount.
-BUDGET_OK = {85, 100}
+BUDGET_OK = {150, 176}
 BUDGET_NEAR = re.compile(
     r"(?:budget|ceiling|\bcap\b|guardrail)[^\n$]{0,20}\$(\d{2,3})\b(?!\.\d)"
     r"|\$(\d{2,3})\b(?!\.\d)[^\n$]{0,20}(?:budget|ceiling|\bcap\b|guardrail)",
@@ -270,7 +270,7 @@ def _source_hits(files) -> list[str]:
                     flagged.add(amt)
             for amt in sorted(flagged):
                 hits.append(
-                    f"{rel}:{lineno}: hardcoded ${amt} budget ceiling, truth is $85 base / $100 surge (ADR-133)\n"
+                    f"{rel}:{lineno}: hardcoded ${amt} budget ceiling, truth is $150 base / $176 surge (ADR-133)\n"
                     f"      | {stripped[:120]}"
                 )
     return hits
@@ -876,7 +876,7 @@ def main():
                 amt = int(mo.group(1) or mo.group(2))
                 if amt not in BUDGET_OK and amt >= 50:  # >=50 avoids cents/small figures
                     hits.append(
-                        f"{rel}:{lineno}: budget ceiling claims ${amt}, truth is $85 base / $100 surge (ADR-133)\n"
+                        f"{rel}:{lineno}: budget ceiling claims ${amt}, truth is $150 base / $176 surge (ADR-133)\n"
                         f"      | {line.strip()[:120]}"
                     )
 

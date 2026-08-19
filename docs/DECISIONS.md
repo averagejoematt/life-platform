@@ -3857,6 +3857,32 @@ Multiplying it out (ADR-103 complexity posture): the machinery to batch honestly
 
 **Amendment (2026-08-16, #2734 — August-2026 second raise: base $115 → $200, surge $135 → $235; the window's end date is UNCHANGED, still auto-reverting 2026-09-01).** Decided by Matthew interactively against the measured mid-month state the sustained-7d alarm forced onto the board (#2734): **$93.65 mtd, $230.58 projected — 171% of the $135 surge ceiling**, ai_daily $6.33, tier-1 the default operating state since Aug 5. The explicit call was **accept the overrun** rather than cut a named consumer or ride tier 2/3 through the back half of the month. $200 was chosen so the tier ladder keeps carrying information against the real projection (bands land at ≈$146/$174/$194) instead of pinning tier 3 from ~day 20; surge keeps the ~1.18 ratio ($235). The AWS Budgets backstop **again deliberately stays at $85** — three amendments in, that lagged independent signal is the only number the raise cannot silence, which is the point. Honest note: this is the second time in one month the ceiling moved toward a projection. The 2026-08-09 amendment called that direction of causation out and time-boxed it; this amendment inherits the same box (September reverts to $85/$100 on its own date, no deploy, no manual step) and adds the September question to the ledger explicitly: a $200-shaped August argues the BASE is mispriced for dev-heavy months, and that re-derivation — not a third mid-month scramble — is the decision September's first week owes.
 
+**Amendment (2026-08-18, #2836 — the September base: $85 → $150, surge $100 → $176; permanent, not a dated window).** Decided by Matthew interactively. This is the decision the 2026-08-16 amendment said September's first week owed, taken twelve days early and **deliberately not as a dated window** — three consecutive one-month raises were the evidence that the BASE was mispriced for dev-heavy months, not that August was exceptional.
+
+**Derived from measured steady state, not from a projection.** The prior framing ("no cheap option preserves current behaviour") was an artifact of a spike-inflated projection and is retracted. Unblended daily cost 2026-08-12 → 08-17, six complete days: **$4.12/day, sd $0.66, n=6 → ~$124/month, 95% CI $108–139**. Live `ProjectedMonthlySpend` at decision time read $171.72 and was *falling* ($239 on 08-12, a $36 step down at the 08-17 cycle-14 reset), which is why the projection was the wrong instrument for a permanent number. MTD $110.81 decomposed: Bedrock $61.35 (55%), CloudWatch $19.87 (18%), tax $9.45, Secrets Manager $6.62.
+
+**Why $150 and not more or less.** The bands are fixed fractions of the ceiling (≈73/87/97%), so the number was chosen by running `_tier_for` directly against the measured steady state rather than by rounding:
+
+| ceiling | steady state (~$124) | after #2882's CloudWatch saving (~$102) | an August-like spike (~$180) |
+|---|---|---|---|
+| $85 (the auto-revert) | tier 3 | tier 3 | tier 3 |
+| $125 | tier 3 | tier 1 | tier 3 |
+| **$150** | **tier 1** | **tier 0** | tier 3 |
+| $180 | tier 0 | tier 0 | tier 2 |
+
+$150 holds **tier 1 — the current normal, with no behaviour cuts** — at the measured steady state, and reaches tier 0 once #2882 lands. Money above $150 buys *spike headroom*, not steady-state behaviour, and that was the explicit trade Matthew declined. Bands at $150 trip at **$110.00 / $130.00 / $146.00**; at the $176 surge ceiling at **$129.07 / $152.53 / $171.31** (verified by executing `_tier_for`, not by arithmetic).
+
+**Honest note on the uncertainty.** n=6, CI $108–139, and one of the six days is the cycle-14 reset (2026-08-17) whose own $36 step down is inside the sample. A $150 base sits ~$11 above the top of that CI. It does **not** survive an August-like spike — the $35.70/3-day burn that included a single $20.57 day still lands tier 3, by design: the ladder is supposed to degrade before the ceiling, and buying spike-proofing would have meant paying ~$56/month of unused ceiling every normal month.
+
+**Surge moves with the base — it has to.** $100 → **$176**, preserving the ~1.18 ratio used by every prior amendment (85→100, 115→135, 200→235). `_effective_ceiling` returns the surge ceiling unconditionally and floors it at the base with `max()`, so a surge below the base is structurally impossible; keeping the pair coherent means that floor never fires.
+
+**The AWS Budgets backstop moves too — and this is the one thing that changes about the backstop's role.** Through July and August the backstop was deliberately pinned at $85 while the ceiling floated, precisely so a temporary raise could not silence the lagged independent signal. That reasoning expires with the window: a *permanent* base of $150 with an $85 backstop would page every single month by construction, which is an alarm that means nothing. `cdk/stacks/core_stack.py` moves to **$150**. The budget's name `life-platform-monthly-75` stays historical and is deliberately NOT renamed (`budget_name` is the CfnBudget replacement key — renaming deletes and recreates the budget).
+
+**The August window is untouched.** `_TEMP_CEILING_WINDOW = (2026-08-01, 2026-09-01)` at $200/$235 still stands and still auto-reverts on its own date with no deploy — it now reverts *to $150/$176* instead of $85/$100. No manual step, same property as every prior window.
+
+**Residual worth naming:** this number lives in five hand-maintained places (`cost_governor_lambda.MONTHLY_CEILING`, `SURGE_CEILING_USD`, `site_api_budget._ADR133_BASE_CEILING_USD`, `core_stack.py`'s budget amount, and `check_doc_facts.BUDGET_OK`) plus ~18 prose sites. That is a standing-rule-1 violation under `docs/CHARTER.md` (no hand-maintained enumeration without a dated exemption) and it made this amendment a sweep instead of an edit. Filed as a follow-up rather than refactored under a live decision.
+
+
 ## ADR-134: Character math v2 — XP zero-point at "a decent day", dark stretches hit the headline, uninstrumented pillars neither earn nor drag (epic #956)
 
 **Date:** 2026-07-11 · **Status:** Accepted · **Story:** #958/#959/#960/#961/#962/#963/#964 (epic #956) · **Amends:** the #913/#954/#957 neglect-honesty base (engine v1.5.0, config v1.4.0) · **Evidence:** `docs/engines/CHARACTER_MATH_AUDIT_2026-07.md` + `scripts/character_sim_year.py` (all numbers below reproduce from that harness)

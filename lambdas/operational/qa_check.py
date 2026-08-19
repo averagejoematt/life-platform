@@ -95,11 +95,13 @@ class Check:
         source with no record yesterday, the MCP cache-warm partial; #2378
         adds the optional-metric nulls of check_score_sanity — same class:
         the source is event-driven/sync-lagged and the null recurs on a
-        healthy platform), and (b) known-recurring warns PINNED TO A FILED
-        TRACKING ISSUE (#2378: the canary-log grant gap #1956, the
-        phase-stamp backfill gap #1970 — cite the issue in a call-site
-        comment and un-chronic the branch when it lands; the alarm firing
-        nightly over an already-filed issue carried zero marginal
+        healthy platform; #2670 adds check_receipt_replay's config/engine-
+        drift branch — measurement + rationale in docs/alarm_citations.json),
+        and (b) known-recurring
+        warns PINNED TO A FILED TRACKING ISSUE (#2378: the canary-log grant
+        gap #1956, the phase-stamp backfill gap #1970 — cite the issue in a
+        call-site comment and un-chronic the branch when it lands; the alarm
+        firing nightly over an already-filed issue carried zero marginal
         information, ADR-105). A chronic warn stays fully visible (email,
         logs, ChronicWarnCount metric) but does NOT increment the alarmed
         WarnCount, so qa-smoke-warnings can reach green and a NOVEL warn

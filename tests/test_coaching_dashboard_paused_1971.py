@@ -73,9 +73,14 @@ def test_catastrophic_fallback_omits_the_field_rather_than_claiming_not_paused()
     """The outer-exception shaped-empty response must NOT carry
     regeneration_paused: an error state is UNKNOWN, and fabricating `false`
     there would render a frozen board as merely dated — the exact dishonesty
-    #1971 removes. Asserted against the source (the fallback is a literal)."""
+    #1971 removes. Asserted against the source (the fallback is a literal).
+
+    #2876 moved the inline `/api/coaching-dashboard` branch (and every other
+    early-return route) out of `lambda_handler` and into `_dispatch_route`,
+    the single dispatch exit point — so the fallback literal now lives there.
+    """
     import inspect
 
-    src = inspect.getsource(L.lambda_handler)
+    src = inspect.getsource(L._dispatch_route)
     fallback = next(line for line in src.splitlines() if "coaching-dashboard failed" in line or ('"weekly_priority": {}' in line))
     assert "regeneration_paused" not in fallback

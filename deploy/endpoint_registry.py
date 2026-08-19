@@ -115,44 +115,51 @@ def _extract_routes_and_simple_routes(tree: ast.AST) -> dict[str, EndpointRecord
 
 
 def _extract_inline_paths(tree: ast.AST) -> dict[str, EndpointRecord]:
-    """Walk `lambda_handler`'s body for `path == "..."` / `path.startswith("...")`."""
-    handler_fn = None
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "lambda_handler":
-            handler_fn = node
-            break
-    if handler_fn is None:
+    """Walk for `path == "..."` / `path.startswith("...")`.
+
+    #2876 restructured the dispatch to a single exit point: every inline
+    `if path == "...":` branch that used to live directly in `lambda_handler`
+    now lives in `_dispatch_route`, the one function `lambda_handler` calls to
+    resolve a route (see lambdas/web/site_api_lambda.py's `_dispatch_route`
+    docstring). `/api/healthz` is the one branch that stayed in
+    `lambda_handler` itself (handled before dispatch, no auth needed) — so
+    both functions are walked and merged, keeping this discoverer correct
+    regardless of which of the two a future inline branch lands in.
+    """
+    fns = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name in ("lambda_handler", "_dispatch_route")]
+    if not fns:
         return {}
 
     out: dict[str, EndpointRecord] = {}
-    for node in ast.walk(handler_fn):
-        if (
-            isinstance(node, ast.Compare)
-            and isinstance(node.left, ast.Name)
-            and node.left.id == "path"
-            and len(node.ops) == 1
-            and isinstance(node.ops[0], ast.Eq)
-            and len(node.comparators) == 1
-            and isinstance(node.comparators[0], ast.Constant)
-            and isinstance(node.comparators[0].value, str)
-        ):
-            p = node.comparators[0].value
-            rec = out.setdefault(p, EndpointRecord(path=p))
-            rec.mechanisms.add("inline")
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "startswith"
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "path"
-            and len(node.args) == 1
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            p = node.args[0].value
-            rec = out.setdefault(p, EndpointRecord(path=p))
-            rec.mechanisms.add("inline")
-            rec.is_prefix = True
+    for handler_fn in fns:
+        for node in ast.walk(handler_fn):
+            if (
+                isinstance(node, ast.Compare)
+                and isinstance(node.left, ast.Name)
+                and node.left.id == "path"
+                and len(node.ops) == 1
+                and isinstance(node.ops[0], ast.Eq)
+                and len(node.comparators) == 1
+                and isinstance(node.comparators[0], ast.Constant)
+                and isinstance(node.comparators[0].value, str)
+            ):
+                p = node.comparators[0].value
+                rec = out.setdefault(p, EndpointRecord(path=p))
+                rec.mechanisms.add("inline")
+            elif (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "startswith"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "path"
+                and len(node.args) == 1
+                and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, str)
+            ):
+                p = node.args[0].value
+                rec = out.setdefault(p, EndpointRecord(path=p))
+                rec.mechanisms.add("inline")
+                rec.is_prefix = True
     return out
 
 

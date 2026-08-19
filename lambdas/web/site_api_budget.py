@@ -85,7 +85,7 @@ def _price_for_model(model_id: str):
 # from there. This literal is reached only when the payload is missing, unreadable, or
 # predates that schema (old payloads persist until the governor's next 8h run rewrites
 # them) — never as the published number when the governor has stated one.
-_ADR133_BASE_CEILING_USD = 85.0
+_ADR133_BASE_CEILING_USD = 150.0
 
 
 def _ceiling_envelope(breakdown):

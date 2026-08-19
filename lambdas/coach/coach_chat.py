@@ -38,7 +38,7 @@ grounding check cannot catch it. So:
   * a held reply still answers, with an honest "let me check that" — silence would
     read as the platform being broken, and an unanswered text is its own small lie.
 
-BUDGET. Chat is unbounded spend against an $85/month ceiling that sits at tier >=1 by
+BUDGET. Chat is unbounded spend against a $150/month ceiling that sits at tier >=1 by
 default (ADR-063/133). This module refuses BEFORE inference at tier >= _PAUSE_TIER
 and above a daily turn cap, and says so plainly. A coach that admits it is paused is
 honest; one that quietly eats the daily brief's budget is not.

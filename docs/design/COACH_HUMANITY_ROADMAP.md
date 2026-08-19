@@ -168,8 +168,8 @@ bash scripts/coach_sim_runall.sh <out-dir>                    # ~$2.88, ~25 min,
 python3 scripts/coach_sim_analyze.py --runs <out-dir> --report report.md   # ~$0.85 panel
 ```
 
-**Why it is not a per-PR CI gate.** A run is ~$3.73 and ~25 minutes. The AI ceiling is $85
-base (ADR-063/133 — an $115 dated window for August 2026 only, auto-reverting 2026-09-01)
+**Why it is not a per-PR CI gate.** A run is ~$3.73 and ~25 minutes. The AI ceiling is $150
+base (ADR-063/133 — a $200 dated window for August 2026 only, auto-reverting 2026-09-01)
 and the month is already projecting over it. Gating every PR would spend more measuring
 the coaches than running them, and would push the tier ladder into pausing reader-facing
 narratives to pay for a dev metric — the audience ordering ADR-125 exists to forbid.
