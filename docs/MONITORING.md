@@ -348,15 +348,23 @@ See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
 
 | Item | Cost / month |
 |---|---|
-| CloudWatch alarms (~50 × $0.10, first 10 free) | ~$4-5 |
+| CloudWatch alarms (103 × $0.10, first 10 free) | ~$9-10 |
 | CloudWatch metrics (custom, ~50 metrics) | included in alarms |
 | Logs storage (~1 GB across all Lambdas) | $0.50 |
 | Logs ingestion (~5 GB/mo) | $2.50 |
 | CloudTrail data events (raw/* + uploads/*) | ~$0.50 |
 | SES tracking events | $0 |
-| **TOTAL** | **~$14/month** |
+| **TOTAL** | **~$19/month** |
 
-Roughly half the platform's monthly cost. Worth it — most issues surface here before users notice.
+Alarm count is **live-measured, not estimated**: `aws cloudwatch describe-alarms` returned
+**103** metric alarms on 2026-08-19 (paginated — count the names, `length(MetricAlarms)`
+reports per-page and reads as 50). The estate deliberately re-grew from ~41 after COST-A;
+#2891 tracks deduping it under ADR-116's rule that silent-failure coverage is never traded
+for dollars.
+
+Monitoring is no longer "roughly half" the bill — at a ~$124/mo measured steady state it is
+closer to a sixth. Most issues still surface here before a reader notices, which is what the
+line buys.
 
 ---
 
