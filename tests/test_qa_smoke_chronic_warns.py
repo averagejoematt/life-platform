@@ -88,14 +88,8 @@ SANCTIONED_CHRONIC_SITES = {
     # non-alarming; it un-chronics itself the moment a weigh-in lands, because the branch
     # is chosen by `hero_weight_applicable`, not by a flag.
     ("qa_smoke_lambda.py", "check_hero_weight_arithmetic"),
-    # #2670, class (a) — qa-smoke-warnings sat structurally red 32+ days; measured 8 of 8
-    # consecutive nightly runs 2026-08-17->18 warned on check_receipt_replay's config/engine
-    # drift branch. The docstring's "expected once after a deliberate change" premise was
-    # false in practice: this platform redeploys core config/engine routinely (multiple times
-    # a week, often multiple times a day), so at least one of the last 7 daily receipts nearly
-    # always predates the live config/engine — a receipt is a snapshot, not a promise the
-    # engine stays still. The mismatched-with-UNCHANGED-config branch (real nondeterminism) is
-    # untouched and stays alarmed; only the expected/self-healing drift branch is chronic.
+    # #2670, class (a) — check_receipt_replay's config/engine-drift branch (mismatch branch
+    # untouched, stays alarmed). Measurement + rationale: docs/alarm_citations.json.
     ("qa_smoke_lambda.py", "check_receipt_replay"),
 }
 
@@ -383,11 +377,9 @@ def _receipt_replay_with(monkeypatch, verdict):
 
 
 def test_receipt_replay_config_drift_branch_is_chronic(monkeypatch):
-    """#2670: config/engine changed since a receipt was written is the
-    expected, self-healing state on a platform that redeploys routinely —
-    measured 8 of 8 consecutive nightly runs 2026-08-17->18. It must be
-    chronic so qa-smoke-warnings can actually reach 0 on an otherwise-clean
-    night."""
+    """#2670: config/engine drift since a receipt was written is expected and
+    self-healing on a platform that redeploys routinely — must be chronic so
+    qa-smoke-warnings can reach 0 (measurement: docs/alarm_citations.json)."""
     c = _receipt_replay_with(monkeypatch, {"verified": False, "config_drift": True, "engine_drift": False})
     assert c.passed is None
     assert c.chronic is True, "the config/engine-drift branch must be chronic (#2670)"

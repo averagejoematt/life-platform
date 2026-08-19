@@ -450,23 +450,7 @@ class MonitoringStack(Stack):
         #                          threshold; ADR-105). #2378: chronic set
         #                          AST-guarded in test_qa_smoke_chronic_warns. No
         #                          ChronicWarnCount alarm; keep the 86400s
-        #                          Maximum window — load-bearing.
-        #                          #2670: this alarm sat structurally red 32+
-        #                          days AFTER #2378's split because
-        #                          check_receipt_replay's config/engine-drift
-        #                          branch ("expected once after a deliberate
-        #                          change") fired on 8 of 8 consecutive
-        #                          nightly runs 2026-08-17->18 — that premise
-        #                          was false in practice: this platform
-        #                          redeploys core config/engine routinely, so
-        #                          a stored receipt nearly always predates the
-        #                          live engine. FIXED at the check (chronic=
-        #                          True on that branch only — the genuine-
-        #                          nondeterminism branch stays alarmed), NOT
-        #                          by widening this threshold: the alarm
-        #                          shape below (period/statistic/threshold)
-        #                          is deliberately UNCHANGED, asserted by
-        #                          test_qa_smoke_warnings_alarm_window_untouched.
+        #                          Maximum window — load-bearing. #2670: receipt-replay's drift branch is chronic too (threshold UNCHANGED).
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",

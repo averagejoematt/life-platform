@@ -463,27 +463,16 @@ def _advance_predict_dark_streak(today):
 
 
 def check_receipt_replay():
-    """#1373: progression-receipt drift alarm (nightly leg).
+    """#1373: progression-receipt drift alarm.
 
     Replays the last 7 stored character_receipt records through the LIVE
     bundled engine + the LIVE S3 config:
       - a mismatch with UNCHANGED config hash + engine version = real
-        nondeterminism (or a tampered receipt) → RED (the drift alarm, stays
-        fully alarmed — this is the one this check exists to catch);
+        nondeterminism → RED, stays alarmed (the fault this check exists to
+        catch);
       - config/engine changed since a receipt was written → YELLOW, CHRONIC
-        (#2670). The docstring used to say "expected exactly once after a
-        deliberate change" — measured wrong: on a platform that redeploys
-        core config/engine multiple times a WEEK (routinely multiple times a
-        DAY across concurrent sessions), at least one of the last 7 daily
-        receipts has an outdated snapshot on nearly every run — 8 of 8
-        consecutive nightly runs 2026-08-17→18 warned drift, the dominant
-        driver keeping qa-smoke-warnings permanently red (#2670). It is the
-        same "known-recurring TIMING condition" class #1958/#2378 already
-        carved out elsewhere: a receipt is a snapshot, the engine keeps
-        moving, and the next nightly compute re-baselines automatically — no
-        action is ever taken on this branch. Chronic-izing it does NOT touch
-        the mismatch branch above, which is where a real regression would
-        surface;
+        (#2670 — measurement + rationale in docs/alarm_citations.json and the
+        PR); the mismatch branch above is untouched;
       - all digests reproduce → green.
     No receipts at all is YELLOW (alarmed — rare/first-run) until the first
     post-#1373 compute lands.
