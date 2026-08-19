@@ -360,11 +360,6 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
         "Same shape: this week plus the prior week. Only the opening fortnight of a cycle straddles "
         "genesis, and a weekly digest is meant to be a current-cycle view."
     ),
-    "lambdas/web/site_api_lambda.py::lambda_handler": (
-        "The raw-source literal here is an UNFILTERED DynamoDB connectivity health-check get_item; "
-        "the function's phase-filtered queries read coach_actions and COACH# (EXPERIMENT_SCOPED). "
-        "Function-granularity co-location, not a phase-filtered raw read."
-    ),
     "lambdas/web/site_stats_refresh_lambda.py::_get_latest": (
         "Two-day bounded Limit:1 read: it means 'today's number', not 'is this pipe alive'. On a "
         "miss it falls back to the previously published S3 value rather than claiming no data."
