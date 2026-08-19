@@ -7,9 +7,14 @@ Last updated: 2026-08-19 (v8.6.0)
 > Budget ceiling: **$150/month all-in** base, floating to **$176 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated
 > $200 base / $235 surge window** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16
-> #2734, `_TEMP_CEILING_WINDOW`) that auto-reverts 2026-09-01 — the AWS Budgets
-> backstop deliberately stays at $85. The September base decision is #2836 (owed
-> before 09-01). History: $25 → $75 with the Bedrock migration + automated guardrails
+> #2734, `_TEMP_CEILING_WINDOW`) that auto-reverts 2026-09-01. The AWS Budgets
+> backstop moved $85 → $150 with the permanent base (#2836, `core_stack.py`
+> `budget_limit=150`): it was pinned at $85 only while the raises were temporary, and
+> a permanent $150 base against an $85 backstop would page every month by
+> construction. The September base decision is **settled** — $150 base / $176 surge,
+> permanent (#2895), derived from measured steady state ($4.12/day, sd 0.66, n=6 →
+> ~$124/mo, 95% CI $108–139) rather than the spike-inflated projection.
+> History: $25 → $75 with the Bedrock migration + automated guardrails
 > (2026-05-29), $75 → $85 on 2026-07-08 (ADR-133 amendment). Design constraint: every
 > feature must justify its cost.
 >
@@ -86,15 +91,19 @@ Three layers — `lambdas/ai/budget_guard.py`, `lambdas/operational/cost_governo
    payload persists until the governor's next 8h run rewrites it).
 3. **budget_guard** (graceful degradation, audience-ordered per ADR-125 — the daily
    brief is protected longest). The bands are **fixed fractions of the effective
-   ceiling** (≈73% / 87% / 97%), so they scale automatically between the $85 base and
+   ceiling** (≈73% / 87% / 97%), so they scale automatically between the $150 base and
    the $176 surge ceiling:
 
-   | Tier | Band (of effective ceiling) | Trips at ($85 base) | Trips at ($100 surge) | Effect |
+   | Tier | Band (of effective ceiling) | Trips at ($150 base) | Trips at ($176 surge) | Effect |
    |------|------------------------------|---------------------|-----------------------|--------|
-   | 0 Normal | < 73% | < $62.33 | < $73.33 | everything runs |
-   | 1 Caution | 73–87% | $62.33 | $73.33 | internal/dev AI paused (ensemble, chronicle editor, coherence-semantic) |
-   | 2 Restrict | 87–97% | $73.67 | $86.67 | + reader narratives paused (coach commentary, State of Matthew, chronicle) |
-   | 3 Hard stop | ≥ 97% | $82.73 | $97.33 | + website AI returns "paused", daily brief data-only; `bedrock_client` refuses |
+   | 0 Normal | < 73% | < $110.00 | < $129.07 | everything runs |
+   | 1 Caution | 73–87% | $110.00 | $129.07 | internal/dev AI paused (ensemble, chronicle editor, coherence-semantic) |
+   | 2 Restrict | 87–97% | $130.00 | $152.53 | + reader narratives paused (coach commentary, State of Matthew, chronicle) |
+   | 3 Hard stop | ≥ 97% | $146.00 | $171.31 | + website AI returns "paused", daily brief data-only; `bedrock_client` refuses |
+
+   Trip amounts computed by executing `cost_governor_lambda._tier_for`'s own band
+   scaling (thresholds `[(73,3),(65,2),(55,1)]` against the $75 reference ceiling),
+   not hand-multiplied — the bands are 73.3% / 86.7% / 97.3% exactly.
 
    Auto-resumes at month rollover. **Status: ENFORCING** (`OBSERVE_MODE=false` since
    2026-05-29). Harsh tiers (2/3) additionally require ACTUAL month-to-date dollars, not
@@ -172,7 +181,7 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 
 ## GitHub Actions / Repo Hosting (#1334, #1453 — added 2026-07-18)
 
-**The $85 AWS budget governor above covers AWS spend only.** GitHub became a
+**The $150 AWS budget governor above covers AWS spend only.** GitHub became a
 *metered production dependency* the moment the repo went private (2026-07-13,
 `project_repo_visibility.md`): CI (`ci-cd.yml`), the standing site-deploy path
 (`site-deploy.yml`), and the remediation agent (`remediation-agent.yml`) all now
@@ -255,7 +264,7 @@ Decisions where cost was a factor in the design:
 | 2026-06-16 | cost-governor CE polling every 4h → **every 8h** (second CE-self-cost trim) | ~−$1/mo | AI estimate stays fresh from CloudWatch token metrics; only the slow non-AI half is polled. |
 | 2026-06-08 | cost-governor CE polling hourly → every 4h (first trim) | ~−$2–3/mo | Same rationale. |
 | 2026-06 | **WAF deleted** (~−$8/mo; June+ shows $0) | −$8/mo | Rate limiting moved fully in-Lambda (DynamoDB atomic counters). |
-| 2026-05-29 | Bedrock migration + enforcing governor + budget guard (ADR-062/063) | AI spend became governable | $85 hard ceiling with graceful audience-ordered degradation. |
+| 2026-05-29 | Bedrock migration + enforcing governor + budget guard (ADR-062/063) | AI spend became governable | Hard ceiling with graceful audience-ordered degradation; the ceiling was $85 at the time. <!-- drift-ok: dated ledger row, states the ceiling in force on 2026-05-29 --> |
 | 2026-05-17 | V2 audit cost optimization (P5): 5-item sweep (power-tuning Lambdas, orphan IAM roles, duplicate alarms, orphan secrets) | −$3.65/mo | Full effect from June 2026 onward. |
 | 2026-03-10 | CloudWatch alarm consolidation (COST-A): 87 → ~41 alarms (14 CDK duplicates + ~32 pre-CDK orphans) | −$4.60/mo at the time | The estate has since deliberately re-grown to 74 with platform scope (see rate card). |
 | 2026-03-05 | Secrets Manager consolidation: 12 → 9 active secrets | −$1.20/mo | Later re-grew with new integrations to 21 — isolation per OAuth service is the accepted trade. |

@@ -37,6 +37,8 @@ USAGE
   python3 scripts/check_doc_facts.py --list     # print the ground-truth values and exit
 """
 
+import ast
+import datetime as _dt
 import importlib.util
 import re
 import sys
@@ -149,12 +151,108 @@ FACT_SPECS = [
 # The $ amount must sit right next to a ceiling word — NOT merely share a line with
 # "month" (else a per-user cost projection like "$405/month" false-flags). Two
 # alternations (word→amount, amount→word); whichever group matched is the amount.
-BUDGET_OK = {150, 176}
+#
+# #2899 widened the trigger vocabulary with `all-in`. The measured miss was
+# `docs/INFRASTRUCTURE.md:16` — "$85/month all-in, **enforced**" — where the figure
+# carries NO budget/ceiling/cap/guardrail word within 20 chars in either direction,
+# so the pattern found nothing at all and the gate reported green over a stale
+# ceiling. `all-in` is safe to add where a bare `/month` is not: it is this repo's
+# fixed idiom for the whole-platform ceiling, whereas "$405/month" is the exact
+# per-user projection shape the 20-char window exists to avoid false-flagging.
 BUDGET_NEAR = re.compile(
-    r"(?:budget|ceiling|\bcap\b|guardrail)[^\n$]{0,20}\$(\d{2,3})\b(?!\.\d)"
-    r"|\$(\d{2,3})\b(?!\.\d)[^\n$]{0,20}(?:budget|ceiling|\bcap\b|guardrail)",
+    r"(?:budget|ceiling|\bcap\b|guardrail|all-in)[^\n$]{0,20}\$(\d{2,3})\b(?!\.\d)"
+    r"|\$(\d{2,3})\b(?!\.\d)[^\n$]{0,20}(?:budget|ceiling|\bcap\b|guardrail|all-in)",
     re.I,
 )
+
+# ── #2899: the allowed ceiling SET, derived rather than hand-typed ────────────
+# This was the literal `{150, 176}`. Two things followed from that, both measured:
+#   1. Nothing checked the DATED-WINDOW pair. `BUDGET_OK` held only the permanent
+#      base/surge, which is how coach_sim_scoreboard.py and COACH_HUMANITY_ROADMAP.md
+#      sat at $115 for twelve days after #2734 raised the August window to $200 —
+#      the gate had no opinion about the number that was actually in force.
+#   2. Moving the ceiling meant hand-editing this line in lockstep with the governor,
+#      which is charter standing rule 1's "hand-maintained enumeration" exactly.
+#
+# So the set is now PARSED out of cost_governor_lambda.py — the module that actually
+# decides the ceiling. Parsed, never imported: this runs in the CI lint job, which
+# has no boto3.
+#
+# The window pair is allowed ONLY while its window is in effect, which is the half
+# that catches drift: a doc still quoting August's $200 on September 1st flags
+# itself, with no deploy and no one remembering — the same auto-revert the governor
+# already has.
+_GOVERNOR_SRC = ROOT / "lambdas" / "operational" / "cost_governor_lambda.py"
+
+
+def _const_number(node):
+    """A numeric literal out of `X = 5.0` or `X = float(os.environ.get("Y", "5"))`.
+
+    For a `.get(key, default)` call the DEFAULT is the last arg, not the first —
+    reading args[0] there would return the env-var name and silently yield nothing.
+    """
+    if isinstance(node, ast.Constant):
+        try:
+            return float(node.value)
+        except (TypeError, ValueError):
+            return None
+    if isinstance(node, ast.Call) and node.args:
+        is_get = isinstance(node.func, ast.Attribute) and node.func.attr == "get"
+        return _const_number(node.args[-1] if is_get else node.args[0])
+    return None
+
+
+def _const_date(node):
+    """`date(2026, 8, 1)` → datetime.date(2026, 8, 1); anything else → None."""
+    if isinstance(node, ast.Call) and len(node.args) == 3:
+        parts = [a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, int)]
+        if len(parts) == 3:
+            try:
+                return _dt.date(*parts)
+            except ValueError:
+                return None
+    return None
+
+
+def _governor_ceilings(today=None) -> tuple[set[int], str]:
+    """(allowed ceiling figures, provenance string), parsed from the cost governor.
+
+    `today` is injectable so the regression tests can stand inside and outside the
+    dated window without depending on wall-clock — the live gate passes None.
+    """
+    today = today or _dt.date.today()
+    if not _GOVERNOR_SRC.exists():
+        return set(), "cost_governor_lambda.py not found"
+    consts, window = {}, None
+    tree = ast.parse(_GOVERNOR_SRC.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or not isinstance(node.targets[0], ast.Name):
+            continue
+        name = node.targets[0].id
+        if name == "_TEMP_CEILING_WINDOW" and isinstance(node.value, ast.Tuple) and len(node.value.elts) == 2:
+            lo, hi = (_const_date(e) for e in node.value.elts)
+            if lo and hi:
+                window = (lo, hi)
+        else:
+            val = _const_number(node.value)
+            if val is not None:
+                consts[name] = val
+
+    allowed, why = set(), []
+    for key in ("MONTHLY_CEILING", "SURGE_CEILING_USD"):
+        if key in consts:
+            allowed.add(int(consts[key]))
+    why.append(f"base/surge {sorted(allowed)}")
+    if window and window[0] <= today < window[1]:
+        temp = {int(consts[k]) for k in ("_TEMP_CEILING_USD", "_TEMP_SURGE_CEILING_USD") if k in consts}
+        allowed |= temp
+        why.append(f"dated window {sorted(temp)} in effect {window[0]}..{window[1]}")
+    elif window:
+        why.append(f"dated window {window[0]}..{window[1]} NOT in effect")
+    return allowed, "; ".join(why)
+
+
+BUDGET_OK, BUDGET_PROVENANCE = _governor_ceilings()
 
 # A line framing a number as history is allowed to state the old value.
 # #1230: `original`/`reference`/`calibrat` cover the source scan's one legitimate $75 —
@@ -176,6 +274,56 @@ def line_is_exempt(line: str) -> bool:
     the gate share one definition of "this line is allowed to say that".
     """
     return bool(HISTORICAL.search(line))
+
+
+# ── #2899: the budget exemption is per-AMOUNT, not per-line ──────────────────
+_BUDGET_BEFORE_WINDOW = 40
+_BUDGET_AFTER_WINDOW = 20
+# The postfix frames. History is usually a PREFIX in English ("was $85"), but three
+# forms trail the figure and must not be read as current claims:
+#   "$85 -> $150"          the transition arrow, where the OLD value leads
+#   "$75 reference ceiling" the ADR-063 calibration anchor (_THRESHOLD_REFERENCE_CEILING)
+#   "$75 original cap"      the same idea spelled differently
+# These mirror the `\boriginal\b|\breference\b|calibrat` alternatives already in
+# HISTORICAL, which exist for precisely that live $75 constant.
+_BUDGET_POSTFIX_EXEMPT = re.compile(r"->|→|\breference\b|\boriginal\b|calibrat", re.I)
+
+
+def _budget_offenders(line: str, allowed=None) -> list[int]:
+    """Ceiling figures on `line` that claim to be CURRENT truth and are not.
+
+    #2899 root cause: the exemption used to be per-LINE — `HISTORICAL.search(line)`
+    skipped the whole line — so a line mixing a historical figure with a current one
+    was exempted by the historical half. The measured miss was
+    `docs/ARCHITECTURE.md:89`:
+
+        **$85/mo all-in cap** (ADR-063, raised from $75 + surge-to-$100 ...)
+
+    The word "raised" correctly frames $75 as history, and in doing so it exempted
+    the stale CURRENT $85 standing right next to it. The regex found $85 perfectly
+    well; the exemption threw it away.
+
+    Scoping rule: historical framing is a PREFIX phenomenon in English — "was $85",
+    "raised from $85", "up from $85" — so HISTORICAL is tested only against the text
+    immediately preceding the figure. The one postfix form that matters is the
+    transition arrow ("$85 -> $150"), where the OLD value leads, so that gets its own
+    short lookahead.
+    """
+    allowed = BUDGET_OK if allowed is None else allowed
+    if marker_is_exempt(line):  # the documented `<!-- drift-ok: reason -->` hatch
+        return []
+    out = set()
+    for mo in BUDGET_NEAR.finditer(line):
+        amt = int(mo.group(1) or mo.group(2))
+        if amt in allowed or amt < 50:  # >=50 avoids cents/small figures
+            continue
+        grp = 1 if mo.group(1) else 2
+        before = line[max(0, mo.start(grp) - _BUDGET_BEFORE_WINDOW) : mo.start(grp)]
+        after = line[mo.end(grp) : mo.end(grp) + _BUDGET_AFTER_WINDOW]
+        if HISTORICAL.search(before) or _BUDGET_POSTFIX_EXEMPT.search(after):
+            continue
+        out.add(amt)
+    return sorted(out)
 
 
 def marker_is_exempt(line: str) -> bool:
@@ -257,17 +405,19 @@ def _source_hits(files) -> list[str]:
             rel = src  # scratch file outside the repo (the non-vacuous test)
         for lineno, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
             stripped = line.lstrip()
-            if stripped.startswith("#") or HISTORICAL.search(line):
+            if stripped.startswith("#"):
                 continue
             flagged = set()
-            for mo in CEILING_LITERAL.finditer(line):
-                amt = _to_int(mo.group(1))
-                if amt is not None and amt not in BUDGET_OK and amt >= 50:
-                    flagged.add(amt)
-            for mo in BUDGET_NEAR.finditer(line):
-                amt = int(mo.group(1) or mo.group(2))
-                if amt not in BUDGET_OK and amt >= 50:
-                    flagged.add(amt)
+            # The CEILING_LITERAL half keeps the per-LINE exemption: a code literal
+            # like `"budget_ceiling_usd": 75` is a single assignment, so a historical
+            # frame anywhere on that line really does describe that one value.
+            if not HISTORICAL.search(line):
+                for mo in CEILING_LITERAL.finditer(line):
+                    amt = _to_int(mo.group(1))
+                    if amt is not None and amt not in BUDGET_OK and amt >= 50:
+                        flagged.add(amt)
+            # The prose half uses the per-AMOUNT exemption (#2899).
+            flagged.update(_budget_offenders(line))
             for amt in sorted(flagged):
                 hits.append(
                     f"{rel}:{lineno}: hardcoded ${amt} budget ceiling, truth is $150 base / $176 surge (ADR-133)\n"
@@ -801,12 +951,29 @@ def _cost_tracker_hits(doc_path: Path, today=None) -> list[str]:
     except ValueError:
         return [f"docs/COST_TRACKER.md: unparseable Verified stamp among {stamps!r} (#1354)"]
     age_days = (today - newest).days
+    hits = []
     if age_days > COST_TRACKER_VERIFIED_MAX_AGE_DAYS:
-        return [
+        hits.append(
             f"docs/COST_TRACKER.md: Verified stamp is {age_days}d stale ({newest}, today {today}) — "
             f"re-verify from live Cost Explorer within {COST_TRACKER_VERIFIED_MAX_AGE_DAYS}d (#1354)"
-        ]
-    return []
+        )
+    # #2899: this file sits in EXEMPT_FILES — correctly, because a spend LEDGER is
+    # allowed to state history, and its monthly-actuals rows are full of old dollar
+    # figures. But the wholesale skip also covered its HEADER, which states the
+    # current ceiling. So the one doc the gate itself names as canonical was the one
+    # doc whose ceiling claim nothing checked, and it sat at a retired $85.
+    #
+    # The ceiling scan is therefore run here explicitly. Only the ceiling scan: the
+    # ledger rows stay exempt from everything else, which is why this is a targeted
+    # re-inclusion rather than removing the file from EXEMPT_FILES.
+    for lineno, line in enumerate(text.splitlines(), 1):
+        for amt in _budget_offenders(line):
+            hits.append(
+                f"docs/COST_TRACKER.md:{lineno}: budget ceiling claims ${amt}, "
+                f"allowed is ${sorted(BUDGET_OK)} ({BUDGET_PROVENANCE}) (#2899)\n"
+                f"      | {line.strip()[:120]}"
+            )
+    return hits
 
 
 def _scan_files() -> list[Path]:
@@ -856,6 +1023,17 @@ def main():
     for doc in _scan_files():
         rel = doc.relative_to(ROOT)
         for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            # budget: a $NN sitting next to a ceiling word that isn't an allowed value.
+            # #2899: this runs BEFORE the per-line historical skip below, because it
+            # carries its own per-AMOUNT exemption. Under the old ordering a line that
+            # framed ANY figure as history ("raised from $75") was skipped whole, taking
+            # the stale current claim beside it with it — that is exactly how
+            # docs/ARCHITECTURE.md:89 stated a retired ceiling under a green gate.
+            for amt in _budget_offenders(line):
+                hits.append(
+                    f"{rel}:{lineno}: budget ceiling claims ${amt}, allowed is ${sorted(BUDGET_OK)} ({BUDGET_PROVENANCE})\n"
+                    f"      | {line.strip()[:120]}"
+                )
             if HISTORICAL.search(line):
                 continue
             approx = any(a in line for a in APPROX)
@@ -871,14 +1049,6 @@ def main():
                                 f"{' (±%d%%)' % round(tol*100) if tol else ''}\n"
                                 f"      | {line.strip()[:120]}"
                             )
-            # budget: a $NN sitting next to a ceiling word that isn't an allowed value
-            for mo in BUDGET_NEAR.finditer(line):
-                amt = int(mo.group(1) or mo.group(2))
-                if amt not in BUDGET_OK and amt >= 50:  # >=50 avoids cents/small figures
-                    hits.append(
-                        f"{rel}:{lineno}: budget ceiling claims ${amt}, truth is $150 base / $176 surge (ADR-133)\n"
-                        f"      | {line.strip()[:120]}"
-                    )
 
     # #1230: same ground truth, now over the SOURCE tree — no hardcoded ceiling in code.
     hits += _source_hits(_scan_source_files())
