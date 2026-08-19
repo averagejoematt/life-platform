@@ -6,7 +6,7 @@
 ![IaC](https://img.shields.io/badge/IaC-AWS_CDK-FF9900)
 ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
-A personal **health-intelligence platform** — it ingests data from ~20 wearables/apps/labs, stores it in a single-table data model, runs a deterministic computation pipeline plus an 8-agent AI coaching layer, and publishes the results (privately and at **[averagejoematt.com](https://averagejoematt.com)**) — all on a hard **$85/month enforced budget** (floats to $100 in reader-traffic surge mode — ADR-133).
+A personal **health-intelligence platform** — it ingests data from ~20 wearables/apps/labs, stores it in a single-table data model, runs a deterministic computation pipeline plus an 8-agent AI coaching layer, and publishes the results (privately and at **[averagejoematt.com](https://averagejoematt.com)**) — all on a hard **$150/month enforced budget** (floats to $176 in reader-traffic surge mode — ADR-133).
 
 > **N=1, in public, kept honest.** Everything is correlative (never causal), confidence-labelled, and the down weeks are shown, not hidden.
 

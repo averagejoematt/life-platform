@@ -4,7 +4,7 @@
 
 Last updated: 2026-08-19 (v8.6.0)
 
-> Budget ceiling: **$85/month all-in** base, floating to **$100 in surge mode** on real
+> Budget ceiling: **$150/month all-in** base, floating to **$176 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated
 > $200 base / $235 surge window** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16
 > #2734, `_TEMP_CEILING_WINDOW`) that auto-reverts 2026-09-01 — the AWS Budgets
@@ -87,7 +87,7 @@ Three layers — `lambdas/ai/budget_guard.py`, `lambdas/operational/cost_governo
 3. **budget_guard** (graceful degradation, audience-ordered per ADR-125 — the daily
    brief is protected longest). The bands are **fixed fractions of the effective
    ceiling** (≈73% / 87% / 97%), so they scale automatically between the $85 base and
-   the $100 surge ceiling:
+   the $176 surge ceiling:
 
    | Tier | Band (of effective ceiling) | Trips at ($85 base) | Trips at ($100 surge) | Effect |
    |------|------------------------------|---------------------|-----------------------|--------|
