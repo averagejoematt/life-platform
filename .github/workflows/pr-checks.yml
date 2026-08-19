@@ -97,7 +97,15 @@ jobs:
       # one selection, which is exactly the property #2258 bought.
       - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)
         if: always()
-        run: python3 -m pytest tests/ -m "premerge and not integration" -q --tb=short | tee /tmp/premerge_lane_output.txt
+        # `set -o pipefail` is LOAD-BEARING (#2746 class, caught by
+        # tests/test_gate_steps_cannot_swallow_status_2746.py): #2692 added the `| tee`
+        # so the deselection reporter below can read the summary line, and without
+        # pipefail this enforcing step exits with tee's status — 0 — so the whole
+        # pre-merge lane reports SUCCESS on failing tests. A gate that cannot fail is a
+        # green light wired to nothing.
+        run: |
+          set -o pipefail
+          python3 -m pytest tests/ -m "premerge and not integration" -q --tb=short | tee /tmp/premerge_lane_output.txt
 
       # #2692: the gap this closes is not "the lane is slow", it's that a green PR
       # check gave no signal about what it did NOT run — PR #2884 merged 7/7 green
