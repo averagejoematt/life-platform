@@ -1,165 +1,162 @@
-# Handover — 2026-08-18 (afternoon, ~12:20 → ~14:30 PT): unblock the publish path, then take the LLM out of a blocking alarm
+# Handover — 2026-08-18 (evening, ~17:15 → ~19:00 PT): the plan's Wednesday was 15 hours away, and the gauge was measuring itself
 
-**Session:** Opus, owner-directed (plan `swirling-singing-crown`, model ceiling Opus — no kernel
-builds; #2846/#2847 stay Fable-sequenced, every `model:fable` issue skipped). Boot was
-**charter + model** (#2845), not a prose re-read. Second Opus session of 2026-08-18 — the
-morning session's wrap is archived as `HANDOVER_2026-08-18_failure-that-looked-like-health.md`.
+**Session:** Opus, owner-directed (plan `boxes-close-and-the-ceiling-call.md`, model ceiling Opus —
+no kernel builds; #2846/#2847 stay Fable-sequenced, every `model:fable` issue skipped). Boot was
+**charter + model**, not a prose re-read. Third Opus session of 2026-08-18; the afternoon session's
+wrap is archived as `HANDOVER_2026-08-18_unblock-publish-path.md`.
 
-**Build beat:** `2026-08-18-the-reviewer-that-kept-changing-its-mind` — merged AND deployed, eligible.
-**Docs:** CONVENTIONS §9 (new gate-registry row for the day-number-proxy defect class), INCIDENT_LOG
-(amended the site-auto-rollback row's resolution — see Incidents). `sync_doc_metadata --apply` found
-everything else in sync; links/tombstones/index/ADR-index all green.
-**Decisions:** none needed — the two judgement calls (keying the carve-out on `/api/source_freshness`
-rather than a `/api/vitals` self-report; declining the cross-nightly n-of-m counter) are
-implementations of existing ADR-104/105 and are recorded in CONVENTIONS §9 and in the #2741 issue
-comment rather than as new governance.
-**Incidents:** none — no incident-class event this session. **Amended** the morning session's
-2026-08-18 site-auto-rollback row: it claimed "not resolved — owner-gated on a Withings weigh-in",
-which was wrong. It was resolved the same day by #2879 *without* a weigh-in. The missing Withings row
-was the trigger; the day-number proxy was the defect.
-**Main:** green — the last code sha `fcd78ceb` (#2880/#2741) ran **fully green**: Reconcile, Lint,
-Deploy-critical, Unit Tests, Plan, **Deploy**, Smoke, Post-deploy integration and Visual+AI-QA all
-success, rollback skipped. `check_main_green.py` then reds on the WRAP commit `475c50c9` itself,
-which is the expected **docs+site path-filter skip**, not the swallowed-push shape the gate warns
-about: `CLAUDE.md`, `handovers/`, `docs/` and `site/` are all outside `ci-cd.yml`'s `paths:`, so that
-sha correctly earns no CI/CD run (it did earn 4 others — Docs CI, CodeQL, v4 site gate, Site deploy).
-Same decode as the morning session's `9b089412d`. Re-run with `--decoded`.
-**Stash/hooks:** clean — `git stash list` empty, `session_postflight.py` hook freshness 🟢.
-**Closures:** #2878 commented (full ADR-099 contract, `Outcome: realized`). The nine other issues
-closed on 2026-08-18 belong to the morning session, which already wrapped them — not backfilled.
-**Backlog:** Now live at 12 (6 actionable, well above the 3 floor) — no refill needed; `later_staleness`
-clean, no stale `Later` issues, so no promote-or-close calls were owed.
-**Alarms:** clean — every alarm red >72h cites an incident row or issue, and every one red >14d cites
-a filed issue.
-**CI warnings:** 1 — Unit Tests wall-clock 1297s vs the 1200s budget on green main `9e3659a1`.
-Already filed as **#2692**; commented with the recurrence datapoint (1247s → 1297s, gap widened
-47s → 97s) and made an explicit no-action call this session, since #2692's own bar is *measure before
-raising it again*. Disclosed honestly that this session ADDED 12 tests, a marginal contribution.
+**Build beat:** `2026-08-18-the-number-that-was-measuring-the-wrong-thing` — merged, live, eligible.
+**Docs:** `docs/CONVENTIONS.md` §9 (new gate-registry row for the `deploy/**` path-filter defect
+class, then shortened to satisfy the 120-char pointer limit); `docs/audits/AI_COST_DRIFT_ATTRIBUTION_2026-08-18.md`
+added. `sync_doc_metadata --apply` found everything else in sync; links/tombstones/index/ADR-index/doc-facts all green.
+**Decisions:** none needed — flipping a frozen test assertion and widening a `paths:` filter are
+implementation calls with their reasoning recorded inline and in #2881's closure comment.
+**Main:** green (`bda59f73c`) — `check_main_green.py` exit 0.
+**Incidents:** none — main was red 55m02s (`00:59:51Z` → `01:54:53Z`, two consecutive failed runs
+from my own merge), which is under the >1h incident-class bar. Recorded here rather than omitted.
+**Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
+**Closures:** #2881 commented (ADR-099 two-line contract). #2883 was closed **in error** by #2886's
+merge and has been reopened with the cause recorded.
+**Backlog:** Now live at 12 actionable; no stale `Later` issues. No promotion needed.
+**Alarms:** 0 uncited — `check_alarm_citations.py` exit 0; the 8-alarm board is unchanged from the
+afternoon session, exactly as 24h-period aggregates should be.
+**CI warnings:** 1 — `test / Unit Tests` at **1443s vs the 1200s budget**. Already filed as **#2692**
+(1247s when filed); recorded the worse measurement there rather than filing a duplicate, and took the
+deliberate no-action call this session. Re-ran `--decoded`.
 
 ---
 
-## What drove the session
+## The instruction that mattered most, and why it fired again
 
-Two threads, in order. (1) The morning session's own wrap deploy auto-rolled-back and left the site
-**un-publishable**: the vitals smoke check keyed its genesis carve-out on `day_n <= 1` instead of on
-whether a weigh-in had happened, so every `site/**` merge deployed, failed smoke, and reverted. The
-build beat was on `main` but not served. (2) The Opus headline #2741: a blocking alarm's FAIL boundary
-was being decided by an LLM that disagreed with itself run-to-run about a string its own rubric
-already exempts.
+The owner built a date check into the prompt because the *previous* session inherited a Wednesday
+that had not arrived. It fired again, in a subtler form. Boot was **Tuesday 17:17 PDT — which is
+Wednesday 00:17 UTC.** UTC had rolled over seventeen minutes earlier, so a bare `date -u` says
+"Wednesday" and the plan reads live.
 
-## Two of the plan's premises were wrong, and it mattered
+It was not. Every Phase-0 cron sat **15–17 hours ahead**: #2669's chronicle (15:00Z), #2668's brief
+(17:00Z), and both alarm self-clear predictions (whoop ~08:00 PT, qa-smoke-failures ~14:16Z). Phase 0
+was unworkable, so it was re-sequenced rather than faked, and the fan-out plus the owner asks were
+brought forward. The alarm board was confirmed byte-identical to the afternoon snapshot, which is
+what a 24h-period aggregate *should* look like after seven hours.
 
-1. **The plan assumed the session would be Wednesday 2026-08-19. It was Tuesday 2026-08-18.**
-   So #2668's run 3 (the 08-19 17:00Z brief) and #2669's Wednesday chronicle box (the 08-19 15:00Z
-   cron) were **not observable** and neither box moved. Both remain the next session's first checks.
-2. **The Whoop owner-ask was already resolved.** The plan carried it as open ("no rows past 08-16").
-   Measured: `IngestAuthHealthy` for whoop flipped **0.0 → 1.0 at ~08:00 PT on 08-18**, and DDB holds
-   complete rows (29 fields each) for 08-16, 08-17 and 08-18 including workouts. **No #2085 latch-clear
-   and no backfill were needed.** `ingest-auth-unhealthy-whoop` is still ALARM only because it is
-   `Period 86400 / Eval 1 / Minimum` — a 24h lagging aggregate, structurally identical to the
-   `qa-smoke-failures` lag the plan describes. It self-clears ~08-19 08:00 PT. It is not stuck.
+**Reflex for the next cron-gated session:** print both clocks and compare against the cron's own
+timezone. "Is it Wednesday?" is ambiguous here for about seven hours of every day.
 
-## What shipped — 2 PRs merged AND deployed, 1 issue closed, 1 filed, 1 worker PR left open
+## The September base — the plan's headline inverted under re-measurement
 
-### #2879 → closes #2878 — the publish path, unblocked (merged `0bffc1ec`, deployed)
+The plan carried *"there is no cheap option that preserves current behaviour,"* derived from
+`ProjectedMonthlySpend = $180.25`. That projection is **spike-inflated and falling**: $239 (08-12) →
+$171.72, with a $36 step at the 08-17 reset.
 
-`PRE_START = pre_start or day_n <= 1` was a proxy for "no weigh-in yet". The proxy expired on Day 2
-while the condition it stood for was still true. The carve-out now reads the real predicate from
-`/api/source_freshness` — `experiment.genesis` against withings' `last_update`. That endpoint is a
-**different lambda module on an un-genesis-clamped query**, so the two sources must *agree*; that
-independence is what keeps the check able to fail instead of becoming a green light wired to nothing.
+Measured from Cost Explorer instead:
 
-**Mutation-proven both directions**, on the block extracted *verbatim* from the file (not a retyped
-copy) against a mock origin — 7 cases: honest absence PASSes; **a weigh-in present in DDB but absent
-from the payload FAILs**; a weigh-in on the genesis day FAILs; an absent withings row and a malformed
-freshness payload both fail closed. An unverifiable absence is not a pass.
+| | |
+|---|---|
+| Daily unblended, 08-12 → 08-17 (6 complete days) | **$4.12/day**, sd $0.66, n=6 |
+| Steady-state month | **$124** (95% CI $108–139) |
+| The 08-09 → 08-11 spike | $8.85 + **$20.57** + $6.29 = $35.70 in three days |
+| MTD split | **Bedrock $61.35 (55%)** · CloudWatch $19.87 (18%) · tax $9.45 · Secrets Manager $6.62 |
 
-Live proof: run `32177220989` on `0bffc1e` — Deploy, Site smoke, **and** Visual/AI-QA all green,
-auto-rollback skipped; `/version.json` == HEAD; `/story/build/beats.json` 113 → 114 with the morning
-beat served. Matthew had **not** weighed in, so it is proven against the failing state, not around it.
+Tier bands recomputed by running `_tier_for` directly, not by hand:
 
-Enumerated the other day-number proxies: `deploy/restart_verify_semantic.py` also uses `day_n <= 1`
-and was **left alone deliberately** — it runs at reset time to assert the site *reflects* a fresh
-genesis, where the day number is the thing being checked, not a stand-in for something else.
+| ceiling | steady state, no cut | after #2882 | August-like (w/ spike) |
+|---|---|---|---|
+| **$85 (auto-revert)** | tier 3 | tier 3 | tier 3 |
+| $125 | tier 3 | tier 1 | tier 3 |
+| **$150** | **tier 1** | **tier 0** | tier 3 |
+| $180 | tier 0 | tier 0 | tier 2 |
 
-### #2880 → #2741 (merged `fcd78ceb`, deployed + symbol-verified) — issue stays OPEN
+**Corrected finding: there IS a cheap option.** $150 holds tier 1 — the platform's current normal —
+with no cuts at all. What money above $150 buys is *spike headroom*, not steady-state behaviour.
+Stated with its uncertainty: n=6, CI $108–139, and one of those six days is the reset.
 
-**Measured before retiring**, per #2613's bar, from `/aws/lambda/life-platform-qa-smoke` over the ten
-days to 08-18, **at zero Bedrock cost** (logs already paid for — which matters while #2734 has
-month-end above ceiling): a home-page `temporal_contradiction` in **25 of 60 runs (42%)**, spanning
-Day 6 of cycle 13, the pre-start countdown, and Days 1–2 of cycle 14 — *every* phase, which is exactly
-the claim the exempt clause makes. Severity flipped on byte-identical copy (20:36Z `med`, 22:17Z `high`).
+## The 2.44x gauge was mostly measuring its own scope mismatch (#2883)
 
-Retired structurally, not with more prose: `DURABLE_DESIGN_COPY` is the registry (charter primitive 1);
-`build_prompt` **renders the rubric's example list from that tuple** so the clause the model reads and
-the clause code enforces cannot drift, asserted not assumed (primitive 2); `assess_prose` drops a
-finding only when *every* quoted span is registered copy, printed, sitting alongside the #2613/#2780
-drops. Scope pinned by the production record — the 22:17Z `high`, which also quotes two other
-sentences, is pinned as **KEPT**.
+Verified in source rather than taken from the worker's report:
 
-Deployed and **symbol-verified in the live bundle** (`is_durable_design_copy` at line 224, the drop
-call site at 642; function LastModified 21:01:18Z) — not inferred from a green run.
+```
+cost_governor_lambda.py:827   mtd = non_ai + ai      # ai carries _AI_SAFETY_BUFFER = 1.15 (:178)
+cost_governor_lambda.py:771   AuthoritativeCostMTD = mtd
+cost_governor_lambda.py:776   drift_ratio = mtd / self_reported_mtd   # Bedrock-ONLY, unbuffered
+```
 
-### #2881 filed — `deploy/**` is outside ci-cd's path filter
+`CostMetricDriftRatio` divides **the whole AWS bill, padded 15%** by **AI spend only, unpadded**. Of
+the $65.49 gap: **$39.62 scope mismatch, $9.29 the deliberate buffer, ~$11–17 genuine**. Real drift
+is **≈1.3–1.4x, not 2.44x**. The genuine part is mostly cache-token *under-counting* (the app sees
+21% of cache-write and 15% of cache-read tokens vs native `AWS/Bedrock`); prices verified correct,
+stale `_PRICES` ruled out, the ADR-062 chokepoint clean. `named + unknown == bare` to the cent, so
+`unknown` is a **tagging** gap, not missing money.
 
-`deploy/smoke_test_site.sh` — the script that can revert the public site — merged with **no lint, no
-tests, one Docs CI run**. It is a *legitimate* path-filter skip by config, which is what makes it
-dangerous: indistinguishable from a swallowed push at a glance. Same class DEVOPS-01 (2026-06-30)
-fixed for `cdk/ci/config` and missed here.
+**Consequence: #2883 is a much weaker blocker on the September base than the plan assumed**, and the
+base sizing should use `AuthoritativeCostMTD`/projection directly rather than deriving a whole-bill
+figure from the AI-only metric.
 
-### #2882 (worker, #2876) — OPEN, deliberately not merged
+## A 7/7-green PR red-mained twice
 
-The Sonnet worker delivered the right shape: a genuine **single dispatch exit point** (not the 27-call
-sprinkle the charter forbids) plus an AST-derived guard proven to bite. Held on cost. See owner asks.
+#2884 (`deploy/**` into ci-cd's `paths:` + a `bash -n` gate) merged green and broke main twice:
+
+1. `test_push_trigger_globs_match_workflows` — `PUSH_TRIGGER_GLOBS` in `deploy/sentinel_github.py`
+   is a sanctioned maintained literal mirroring the live filters. The derivation-guard primitive
+   caught it exactly as designed.
+2. `test_gate_registry_1349` — the CONVENTIONS §9 pointer cell was 147 chars against a 120 limit.
+3. `test_matches_push_trigger_semantics` asserted `not _matches_push_trigger("deploy/…")`, citing
+   "CONVENTIONS §deploy-from-main". That citation is a **misattribution** — §2 is about packaging
+   the working tree rather than the wrong branch, and never argued `deploy/` should skip CI. The
+   assertion had simply frozen the old filter state, so it was flipped with the reasoning inline.
+
+**The durable lesson: green PR ≠ green main.** The PR lane (`Collect + deploy-critical + format`)
+**deselects ~11,479 tests** that `test / Unit Tests` runs on push. That is now attached to #2692
+alongside the 1443s measurement, because the deselection that keeps the PR lane fast is actively
+leaking defects onto main.
+
+**Proven live in the process:** #2881's acceptance box 1, which the PR could not demonstrate
+pre-merge. Commit `34da61be0` touched only `deploy/` + `docs/` (the latter outside ci-cd's filter)
+and minted a CI/CD run. And `Deploy` was observed **`skipped`** on both main runs — the deploy matrix
+diffs only `lambdas/ mcp/ mcp_server.py` (`ci-cd.yml:614`), so widening `paths:` cannot strand an
+approval-gate lease. Measured, not argued.
 
 ## Gotchas
 
-- **The wire taught two things a retyped fixture would have missed.** The live model notes carry
-  **U+2011 NON-BREAKING HYPHEN** in `Day‑1` while the rubric writes ASCII — a raw comparison would have
-  matched nothing, forever, while hand-written tests passed and the check *looked* wired. And a real
-  note quotes the bare fragment `'starts at'` alongside the whole string, which the first rule rejected;
-  the suite went red on verbatim production text and forced containment in both directions.
-- **Trap 1 avoided, and it bites via the test file.** `agent_commit.sh` refused the commit; the pinned
-  `.venv-black` 26.3.1 then reformatted **only** the new test file. No unrelated drift.
-- **Trap 2 decoded correctly, twice.** `0bffc1ec` earned exactly 1 run. That is a *legitimate*
-  path-filter skip (`deploy/**` and `docs/**` are outside ci-cd's `paths:`), not a swallowed push —
-  and the fact that the two are indistinguishable without hand-reading the filter is what became #2881.
-- **A watcher exiting is not a run finishing.** The deploy watcher hit its 20-iteration cap and
-  returned while the run was still `in_progress`. Re-watched rather than reading the exit as terminal.
-- **The plan's cost figure for #2882 needed grounding, and the grounding changed the answer.** See below.
-
-## Owner asks — 3 open
-
-1. **#2882 needs a cost call before it merges.** Worst case is ~$26.40/mo, but CloudWatch custom
-   metrics are **prorated hourly**, proven two ways from your own bill: July's `MetricMonitorUsage`
-   quantity is a *fraction* (64.9, reconciling exactly to $16.46 after the 10-metric free tier), and
-   165 route metrics are defined while only **80 were active in the last 3h**. Applying that measured
-   48% active-rate gives **~$12–13/mo** realistic. Options: merge as-is; take the cheap
-   EMF-property-only redesign (~$0, loses direct per-route graphing, needs the `TOP_ROUTES` dashboard
-   touched); **merge the restructure and drop the metric** (recommended — the structural win is free
-   and item 2 is a live squeeze); or close it. Note CloudWatch is *already* climbing: $24.50 in July,
-   tracking ~$34/mo in August.
-2. **#2734 / #2836 — the September base, due 09-01.** Live: AWS Budgets limit $85, MTD **$100.82**,
-   forecast **$163.42**; tier currently 1. August's temporary $200 ceiling **auto-reverts 09-01 with no
-   deploy**, at which point ~$163 against $85 is ~190% → **tier 3 hard cutoff, reader-facing AI dark**,
-   on a date nobody is necessarily watching. Drivers measured: Bedrock ~$105/mo (Haiku $30.86 + Sonnet
-   $30.35 in 18d), CloudWatch ~$34/mo, Secrets Manager ~$11/mo.
-3. **A Withings weigh-in.** Still no in-cycle row (newest `DATE#2026-08-16`, `carried_from_cycle: 13`);
-   baseline is still the 321.01 override. **No longer blocks deploys** — it only gates the supersede
-   reflex in `project_monday_reset`. Matthew said he would double-check.
+- **A negated closing keyword still closes.** #2886's body said, in bold, *"This PR does NOT close
+  #2883"* — written precisely to prevent closure. GitHub matched `close #2883` inside it and closed
+  the issue on merge. The sentence written to prevent the closure caused it. Reopened by hand; a
+  closed issue silently leaves the ranked backlog.
+- **All three workers returned non-reports** ("I'll wait for the background poll") having pushed real
+  work. Trap 7 held for the third session running — verify against the branch, never the report.
+- **A `timeout:` above the 600000ms tool max is silently capped**, so a watcher sized for 21 minutes
+  exits at 10 and reads exactly like a finished run. Re-read status after every loop.
+- **One worker finding was rejected on verification:** the gate census's positional step-ids were
+  reported as warranting their own issue. The census already documents the behaviour and *refuses*
+  stale proofs rather than re-attaching them — it fails closed and loudly. Friction, not a defect.
 
 ## Residual / next picks
 
-- **#2668** — run 3 of 3 is the **08-19 17:00Z** brief; sample after ~17:10Z (the brief takes ~8 min).
-  Clean run → close with the ADR-099 two-line verdict.
-- **#2669** — the Wednesday chronicle box, after the **08-19 15:00Z** cron. One generation, <300s,
-  a persisted issue, no duplicate-generation lines → close.
-- **#2741** — box 5 only: one clean nightly against the now-deployed bundle, then observe
-  `qa-smoke-failures` **transitioning** to OK (it is `Period 86400 / Maximum`, so up to 24h lag).
-- **#2670** — now unblocked, #2741 having landed. Plan's measurements still hold; acceptance demands a
-  planted failure observed driving OK→ALARM, not assumed.
-- **#2881** — the `deploy/**` path-filter gap filed this session.
-- **#2692** — Unit Tests wall-clock, now 1297s and still climbing.
-- **#2820** — the Wednesday chronicle delivery dead-man; pairs with #2669.
-- **not-work — verify `ingest-auth-unhealthy-whoop` clears ~08-19 08:00 PT** as the 24h `Minimum`
-  window rolls past the last 0.0. A standing ops observation, not a backlog item.
+- **#2669** — the Wednesday chronicle box, fires 15:00Z on 08-19 (~08:00 PT). Unworked this session:
+  the cron had not run. Run 3 of 3.
+- **#2668** — the brief's IC-3 box, 17:00Z on 08-19; sample after ~17:10Z (the brief takes ~8 min and
+  a 17:06Z check once missed it by 13 seconds). A clean run CLOSES it.
+- **#2741** — box 5 only; needs `FailCount` at 0 **plus** `qa-smoke-failures` observed *transitioning*
+  to OK, not the condition. Everything else on it is deployed and symbol-verified.
+- **#2670** — PR **#2885 is green but deliberately NOT merged**: merging implies a
+  `life-platform-qa-smoke` Lambda deploy, and without deploy consent that would strand an
+  approval-gate lease. Its chronic reclassification was independently verified (8 of 8 invocations in
+  48h warned drift, always the same two receipts; the cron is daily, so those are mostly post-deploy
+  invocations — the conclusion is stronger than "nightly"). Acceptance boxes 2–3 need the 24h
+  rolling-Maximum window to turn over.
+- **#2883** — boxes 2–4 open. Highest leverage is fixing the ratio's **scope** before touching
+  telemetry; box 3's alarm must wait for box 2 or it alarms on the artifact.
+- **#2692** — the 1443s suite duration and the PR-lane/main-lane deselection gap.
+- **#2882** — verified, green apart from a 9-test literal bump; merging implies a CDK deploy +
+  site-api deploy. Owner decision.
+- **#2836 / #2734** — the September base. `not-work — owner decision; a number is required and
+  09-01 arrives by itself.`
+- A Withings weigh-in. `not-work — owner action; no longer blocks deploys, gates only the supersede
+  reflex.`
+
+## Owner asks at hand-off (4)
+
+1. **The September base number.** $150 buys tier 1 today and tier 0 after #2882; $85 auto-reverts to
+   tier 3 (reader AI dark) on 09-01. Above $150 buys spike headroom only.
+2. **Merge #2882?** Verified; implies `cdk_deploy.sh LifePlatformMonitoring` + the site-api deploy.
+3. **Merge + deploy #2885?** Green and held; implies `deploy_lambda.sh life-platform-qa-smoke`.
+4. **A Withings weigh-in** — newest row is still `DATE#2026-08-16`, `carried_from_cycle: 13`.

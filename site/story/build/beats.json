@@ -2899,6 +2899,25 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2879"
         }
       ]
+    },
+    {
+      "id": "2026-08-18-the-number-that-was-measuring-the-wrong-thing",
+      "date": "2026-08-18",
+      "title": "A gauge said the platform was underestimating its own AI spend by 2.44x. It was mostly measuring itself.",
+      "shipped": "This platform tracks what it spends on AI two ways: what the code thinks each call cost, and what Amazon actually bills. A built-in gauge divides one by the other, so if the code's guess drifts away from the real bill, the number climbs. It had been reading 2.44x — the code apparently seeing only 41% of the real money — and an earlier round of work had pushed it from 3x down to 2.44x and stopped. Nobody re-read it after that. Before cutting anything based on it, the numbers were pulled apart line by line, and the gauge turned out to be dividing two things that were never the same quantity: the top of the fraction is the WHOLE Amazon bill (storage, monitoring, tax, everything) with a deliberate 15% safety pad added, while the bottom is AI spend only, with no pad. Of the $65.49 gap, $39.62 was simply non-AI costs sitting in the numerator and $9.29 was the safety pad doing exactly what it was designed to do. Only about a quarter of it — roughly $11 to $17 — was a genuine measurement problem, and most of that traces to one specific thing: the code only counts about a fifth of the reusable-prompt tokens Amazon actually bills for. The real drift is about 1.3-1.4x, not 2.44x. Two other suspects were cleared outright: the price list the code uses is correct, and nothing is sneaking around the single approved path for AI calls.",
+      "why_it_mattered": "A budget decision was about to be made on top of this number. A monthly ceiling is coming up for renewal, and the honest question — 'where does the AI money actually go?' — could not be answered while the platform's own accounting appeared to be missing 59% of it. It turns out the accounting was roughly right and the gauge was wrong, which flips the decision from 'we cannot plan a cut until this is fixed' to 'we can plan a cut now.' The gauge is still on the wall reading 2.44x; what changed is that there is now a written explanation of what it is actually measuring, so the next person does not spend a day chasing $39.62 of storage costs through the AI code.",
+      "gotcha": "The write-up that recorded all this contained, in bold, the sentence 'This PR does NOT close #2883' — put there deliberately because only one of four tasks was finished. GitHub read the words 'close #2883' inside it, ignored the 'does NOT', and closed the issue on merge. The sentence written specifically to prevent the issue from closing is what closed it. It had to be reopened by hand. A closed issue silently drops out of the ranked work queue, so the remaining three tasks would not have been mis-described — they would have become invisible.",
+      "honest_miss": "Nothing was actually fixed. This was measurement only, and the gauge still reads the wrong number today. Separately, a small change to the build pipeline — making it check a folder of deploy scripts it had never been checking — was merged with a fully green set of checks and then broke the main branch twice in a row, because the checks that run on a proposed change are a deliberately trimmed-down subset of the ones that run after it lands. Both breakages were caught by the project's own guardrails rather than by the person merging, which is the system working, but it also means 'all checks green' on a proposal does not mean the main branch will survive it. That gap now has a measurement attached to it: the full test run has grown to 24 minutes, past its 20-minute budget, and that is filed.",
+      "prs": [
+        {
+          "label": "PR #2886",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2886"
+        },
+        {
+          "label": "PR #2884",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2884"
+        }
+      ]
     }
   ]
 }
