@@ -62,6 +62,7 @@ PUSH_TRIGGER_GLOBS = (
     "requirements*.txt",
     "pyproject.toml",
     ".flake8",
+    "deploy/**",  # #2881: gate scripts (smoke_test_site.sh et al.) are validated surface
     # docs-ci.yml
     "docs/**",
     "README.md",

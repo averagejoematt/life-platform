@@ -839,7 +839,7 @@ read that section for the incident narrative and the exact mechanics.
 | Defect class | Owning gate | Where |
 |---|---|---|
 | Unformatted/unsorted Python, a stale-typed module, a syntax error | Lint job (`black`/`ruff`/`mypy`/`py_compile`) | §4 above |
-| A `deploy/**`-only push (e.g. `smoke_test_site.sh`, the script that can auto-rollback the public site) reaches main with ZERO CI runs — a legitimate `paths:` skip indistinguishable from a swallowed push (#2881, DEVOPS-01 class) | `deploy/**` added to `ci-cd.yml`'s push `paths:`; a new `bash -n` syntax-check step in `ci-lint.yml` closes the gap black/ruff/py_compile never covered (shell scripts) | `.github/workflows/ci-cd.yml` push `paths:` (#2881 comment); `.github/workflows/ci-lint.yml`, step "Shell syntax check (bash -n) — deploy/ (#2881)" |
+| A `deploy/**`-only push (e.g. `smoke_test_site.sh`, the script that can auto-rollback the public site) reaches main with ZERO CI runs — a legitimate `paths:` skip indistinguishable from a swallowed push (#2881, DEVOPS-01 class) | `deploy/**` added to `ci-cd.yml`'s push `paths:`; a new `bash -n` syntax-check step in `ci-lint.yml` closes the gap black/ruff/py_compile never covered (shell scripts) | `.github/workflows/ci-cd.yml` push `paths:`; `ci-lint.yml` step "Shell syntax check (bash -n)" (#2881) |
 | A Lambda/CDK deploy artifact or its wiring is broken (IAM, handler names, DDB patterns, MCP registry) | `test-critical` deploy-critical lane (ADR-117) | §4a above |
 | A dependency/CDK toolchain version silently floats | Pinned-both-directions check | §4 above ("CDK toolchain is pinned both directions") |
 | A deprecated secret name still referenced | "Deprecated secrets scan" step | `.github/workflows/ci-cd.yml`, job `test` |
