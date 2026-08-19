@@ -11,7 +11,13 @@ class, then shortened to satisfy the 120-char pointer limit); `docs/audits/AI_CO
 added. `sync_doc_metadata --apply` found everything else in sync; links/tombstones/index/ADR-index/doc-facts all green.
 **Decisions:** none needed — flipping a frozen test assertion and widening a `paths:` filter are
 implementation calls with their reasoning recorded inline and in #2881's closure comment.
-**Main:** green (`bda59f73c`) — `check_main_green.py` exit 0.
+**Main:** green (`bda59f73c`) — `check_main_green.py` exit 0 on the last CI/CD-bearing sha. The wrap
+commit `24c297e54` itself is a **path-filter skip, not a swallowed push**: it touches only
+`CLAUDE.md`, `handovers/` and `site/**`, all outside `ci-cd.yml`'s `paths:`, so it correctly minted
+CodeQL + Docs CI + Site deploy + v4 site gate (`total_count=4`) and no CI/CD run. Re-ran `--decoded`.
+Its `site/**` path did fire a real **Site deploy: deploy + smoke + Visual/AI QA all green,
+auto-rollback skipped**, and `/version.json` reads `24c297e` == HEAD with beat 116 served — the first
+`site/**` publish since #2879 unblocked that path, so the fix holds under a live merge.
 **Incidents:** none — main was red 55m02s (`00:59:51Z` → `01:54:53Z`, two consecutive failed runs
 from my own merge), which is under the >1h incident-class bar. Recorded here rather than omitted.
 **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
