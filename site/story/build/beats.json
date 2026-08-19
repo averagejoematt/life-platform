@@ -2945,6 +2945,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2896"
         }
       ]
+    },
+    {
+      "id": "2026-08-19-tools-that-lied",
+      "date": "2026-08-19",
+      "title": "Three tools reported success while doing nothing, or worse",
+      "shipped": "A batch of repair work aimed at the platform's own tooling. The commit helper no longer destroys unsaved writing: handed a folder name instead of a list of files, it used to quietly discard every edited file underneath and print a success message. It now covers the folder properly, and refuses rather than discarding anything it wasn't told to keep. A documentation checker that verifies the site's stated numbers against reality was walking past stale statements it should have caught; it now reads its own budget figures from the code that enforces them, rather than from a number typed in by hand. Two test suites that could pass while inspecting nothing at all were given floors. And a timezone check that the platform relies on was blind to one of its own common spellings, so it had never once fired.",
+      "why_it_mattered": "These are all the same failure wearing different clothes: a check that cannot fail is not a check, it is a green light wired to nothing. The commit helper is the sharpest version, because it did not merely fail to help — it deleted about thirteen files of finished writing, including a completed decision record, and then exited reporting that it had committed them. Every other guard in this system fails loudly. This one failed silently, on the most natural way to use it. The documentation checker had reported that no live page stated a retired budget figure, across 122 documents and 416 source files, while three pages did exactly that. Once widened it immediately found four more stale statements that two previous cleanup passes had missed — including one hiding behind a genuinely historical note on the same line, where a phrase framing an old number as history was silently excusing the wrong current number sitting beside it.",
+      "gotcha": "The fix for the timezone blindness was easy to describe and easy to get wrong. The check looked for code calling for today's date without saying which timezone it meant, but it only recognised the two most obvious spellings. The codebase's own habit of renaming that function on import made it invisible — fifteen files write it that way, including the very file a previous fix had been written to protect. So the check had been reporting a clean surface it was never able to see.",
+      "honest_miss": "The repair to the documentation checker came with a hole I chose to leave open and say so: one common phrasing of the budget figure is still not matched. Widening the pattern far enough to catch it also flagged about ten sentences of genuine historical analysis in the spending ledger, which is exactly the kind of noise that gets a checker ignored. Better a narrower check that is trusted than a loud one that is not. Separately, my own fix for the paste-only social channels shipped a test that imported a deployment library the build machines do not install — it passed on my machine and broke the main branch for twenty-nine minutes. And a measurement I recorded earlier the same day, claiming the test suite's runtime had stopped growing, was contradicted by the very next run. I withdrew it rather than leaving it standing.",
+      "prs": [
+        {
+          "label": "PR #2902",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2902"
+        },
+        {
+          "label": "PR #2903",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2903"
+        },
+        {
+          "label": "PR #2904",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2904"
+        },
+        {
+          "label": "PR #2907",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2907"
+        },
+        {
+          "label": "PR #2908",
+          "url": "https://github.com/averagejoematt/life-platform/pull/2908"
+        }
+      ]
     }
   ]
 }
