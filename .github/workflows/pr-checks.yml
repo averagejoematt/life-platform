@@ -97,7 +97,19 @@ jobs:
       # one selection, which is exactly the property #2258 bought.
       - name: Pre-merge test lane (premerge marker — behaviour + deploy-critical + structural gates)
         if: always()
-        run: python3 -m pytest tests/ -m "premerge and not integration" -q --tb=short
+        run: python3 -m pytest tests/ -m "premerge and not integration" -q --tb=short | tee /tmp/premerge_lane_output.txt
+
+      # #2692: the gap this closes is not "the lane is slow", it's that a green PR
+      # check gave no signal about what it did NOT run — PR #2884 merged 7/7 green
+      # here and red-mained main twice on tests this lane never selected. Pytest's
+      # own summary line already reports the deselected count for free (no extra
+      # collection pass needed) whenever a marker excludes items, so this step is
+      # just a parse + a step-summary line — the durable instrument, cheap because
+      # it rides the test lane step above rather than re-running collection.
+      - name: Report pre-merge deselection (#2692 — a green check states what it skipped)
+        if: always()
+        run: |
+          python3 scripts/report_premerge_deselection.py /tmp/premerge_lane_output.txt >> "$GITHUB_STEP_SUMMARY"
 
       # The SAME command ci-lint.yml's "Mypy gate" runs, against the same authoritative
       # module list (tests/mypy_clean_set.py). It is duplicated as an explicit step rather

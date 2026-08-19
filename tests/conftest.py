@@ -303,6 +303,26 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # mentions the three sweep idioms, so it self-matches; it belongs pre-merge
         # regardless (it IS the structural gate this whole entry is about).
         "test_premerge_extra_files_derivation_2372.py",
+        # #2692: PR #2884 merged 7/7 green on pr-checks.yml and red-mained main TWICE
+        # on these two files — neither is caught by the #2372 tree-sweep derivation
+        # above (discover_tree_sweeping_test_files() only matches os.walk(/.rglob(/
+        # `git ls-files`), so nothing forced a classification decision. Both are
+        # structural/derivation guards by the CHARTER's own primitives (registry +
+        # derivation guard), just shaped differently than the tree-sweep detector:
+        #   - test_drift_sentinel.py's test_push_trigger_globs_match_workflows()
+        #     sweeps .github/workflows/ via os.listdir(), an idiom the #2372 pattern
+        #     doesn't recognize — the exact PUSH_TRIGGER_GLOBS-vs-workflow-paths
+        #     literal that drifted and reddened main.
+        #   - test_gate_registry_1349.py reads ONE file (docs/CONVENTIONS.md) and
+        #     checks it against a declared structure — not a tree sweep at all, but
+        #     still a registry gate whose verdict depends only on repo state.
+        # Both are cheap (102 tests / 0.31s measured) and cost nothing meaningful
+        # against the lane's ten-minute budget. This is a deliberate, hand-added
+        # pair, not a derivation-pattern widening: os.listdir( alone appears in 20
+        # test files, most of them genuine behaviour suites, and sorting those is a
+        # separate classification pass, not this fix.
+        "test_drift_sentinel.py",
+        "test_gate_registry_1349.py",
     }
 )
 
