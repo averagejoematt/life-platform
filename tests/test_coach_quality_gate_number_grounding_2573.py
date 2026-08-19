@@ -257,3 +257,44 @@ def test_none_allowlist_is_not_attached():
     must see absence, not an empty list it would treat as authoritative."""
     out = brief_with_grounding({"narrative_beat": "x"}, {}, None)
     assert GROUNDING_ALLOWLIST_KEY not in out
+
+
+# ── 6. #2815 — the wire event's clock agrees with the gate's own default ────────
+def test_quality_gate_event_falls_back_to_the_pacific_day_at_a_pt_evening_instant(monkeypatch):
+    """#2815: `quality_gate_event`'s `generation_date` fallback used naive
+    `date.today()` (Lambda TZ=UTC). Production reaches this exact fallback —
+    `ai_calls.py:1316` calls `quality_gate_event(coach_id, output_text, brief)`
+    with NO generation_date. Pin a PT-evening instant (still today in Pacific,
+    already tomorrow in UTC) and prove the stamped date is the PACIFIC day."""
+    from datetime import datetime as _dt
+
+    from ai.quality_gate_contract import quality_gate_event
+    from common import pacific_time
+
+    # 2026-03-04 20:00 PT (PST, UTC-8) == 2026-03-05 04:00 UTC — inside the 17:00-24:00 PT
+    # window, and deliberately far from "today" so a naive `date.today()` regression
+    # (which ignores this mock and reads the real wall clock) cannot pass by coincidence.
+    monkeypatch.setattr(pacific_time, "pacific_now", lambda: _dt(2026, 3, 4, 20, 0))
+    event = quality_gate_event("sleep_coach", "text", {"narrative_beat": "x"})
+    assert event["generation_date"] == "2026-03-04", "stamped tomorrow's (UTC) date instead of today's (Pacific)"
+
+
+def test_ai_calls_to_cycle_gate_params_chain_agrees_at_a_pt_evening_instant(monkeypatch):
+    """The full chain the acceptance box names: `ai_calls.py:1316` (no explicit
+    date) -> `coach_quality_gate.py:812` passes the wire event's date into
+    `_number_grounding_report` -> `cycle_gate_params(generation_date)`. Before
+    the fix, the wire event carried the naive-UTC day while `cycle_gate_params`'s
+    OWN no-argument default (#2675) already used Pacific — so an event-supplied
+    date silently OUTRANKED and desynced from the gate's Pacific default during
+    this exact PT-evening window. Prove they now agree."""
+    from datetime import datetime as _dt
+
+    from ai.grounding_gate_params import cycle_gate_params
+    from ai.quality_gate_contract import quality_gate_event
+    from common import pacific_time
+
+    monkeypatch.setattr(pacific_time, "pacific_now", lambda: _dt(2026, 3, 4, 20, 0))
+    wire_event = quality_gate_event("sleep_coach", "text", {"narrative_beat": "x"})  # mirrors ai_calls.py:1316
+    from_event = cycle_gate_params(wire_event["generation_date"])  # mirrors coach_quality_gate.py:812
+    bare_default = cycle_gate_params(None)  # the gate's own #2675 Pacific default
+    assert from_event["generation_date_iso"] == bare_default["generation_date_iso"] == "2026-03-04"

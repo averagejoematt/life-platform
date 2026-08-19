@@ -302,6 +302,15 @@ def _self_repetition_report(coach_id, output_text):
             scan_forward=False,
             limit=repdet.TRAILING_WINDOW + 1,
         )
+        # utc-exempt(#2815): the OUTPUT# frame, consumer side. This ONLY excludes
+        # THIS run's own same-day draft from the repetition history — it does not
+        # judge day-phase content. Every OUTPUT# writer keys the sk from the SAME
+        # naive-UTC clock (ai_calls.py's coach-state-updater invoke,
+        # coach_state_updater.py:1041's own fallback, inter_coach_dialogue_lambda.py:291),
+        # so producer and consumer share one frame by construction. Converting
+        # this read alone to Pacific would desync it from the sk it's matching
+        # against and BREAK the same-day-draft exclusion — either the whole
+        # OUTPUT# frame moves together, or (as here) it stays UTC on purpose.
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         history = []
         for it in items:

@@ -433,6 +433,23 @@ def test_cycle_boundary_violations_defaults_day_n_to_the_live_helper(monkeypatch
     assert bqg.cycle_boundary_violations(_UNFRAMED_GRADED_CALL) == []
 
 
+def test_day_n_today_uses_the_pacific_calendar_day_not_utc(monkeypatch):
+    """#2812: `_day_n_today()` used `date.today()` (naive, Lambda TZ=UTC) via the
+    `from datetime import date as _date` idiom that evaded the #2414 guard's
+    alias-blind matcher. Pin an instant in the 17:00-24:00 PT window — genesis
+    EVENING, still Day 1 in Pacific but already past midnight (tomorrow, Day 2)
+    in UTC — the exact shape that mis-armed cycle_boundary_violations live."""
+    bqg = _bqg()
+    from datetime import datetime as _dt
+
+    from common import pacific_time
+
+    # 2026-08-17 20:30 PT (genesis day evening) == 2026-08-18 03:30 UTC.
+    monkeypatch.setattr(pacific_time, "pacific_now", lambda: _dt(2026, 8, 17, 20, 30))
+    monkeypatch.setattr("common.constants.EXPERIMENT_START_DATE", "2026-08-17")
+    assert bqg._day_n_today() == 1  # Pacific "today" == genesis day, not UTC's Day 2
+
+
 def test_enforce_fires_the_gate_on_an_unframed_graded_call_day_one(monkeypatch):
     """Integration proof: the LLM-scored verdict alone says passed=True with
     zero findings (the exact live-failure shape — nothing in the anti-pattern/

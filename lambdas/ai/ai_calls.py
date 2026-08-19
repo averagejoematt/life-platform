@@ -25,6 +25,7 @@ from typing import Any, Optional, Union
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.pacific_time import pacific_today
 
 # God-module split slices 2+3: pure context/scoring + domain-data builders moved
 # to ai_context.py. Re-exported so callers + the coach functions keep working.
@@ -1877,13 +1878,11 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         except Exception as _gf_e:
             print(f"[COACH-V2:{coach_id}] canonical facts unavailable (non-blocking): {_gf_e}")
 
-        # #1384: retrieve precedents whose signal resembles the CURRENT state. The
-        # query is the authoritative facts + journal-mood text (the coach's own
-        # current-state summary); exclude today's date so a period never matches
-        # itself. Fail-soft — ("", []) leaves the render identical to pre-recall.
+        # #1384: retrieve precedents whose signal resembles the CURRENT state (facts + journal-mood text); exclude
+        # today's date (Pacific, #2815 — was naive UTC) so a period never matches itself. Fail-soft — ("", []) leaves render as-is.
         try:
             _recall_query = "\n".join(s for s in (_facts_block, _journal_mood_block) if s).strip()
-            _recall_gen_date = (brief.get("generation_date") if isinstance(brief, dict) else None) or _date_cls.today().isoformat()
+            _recall_gen_date = (brief.get("generation_date") if isinstance(brief, dict) else None) or pacific_today()
             _recall_block, _recall_precedents = _semantic_recall_for_coach(
                 coach_id, _recall_query, exclude_dates={_recall_gen_date} if _recall_gen_date else None
             )
@@ -2183,8 +2182,8 @@ Write your {domain_label} coaching section now."""
         # surfaced in the weekly review pack; generation is NOT held. PROMOTION HOOK:
         # to make it fail-closed later (ADR-104/105 — the deterministic layer CAN
         # block), regenerate-or-hold on `_freshness_findings` here exactly like the
-        # presence-ack gate above. Fail-soft: never raises into the generation path.
-        _gen_date = _date_cls.today().isoformat()
+        # presence-ack gate above. Fail-soft: never raises. #2815: was naive `date.today()` — Pacific frame now.
+        _gen_date = pacific_today()
         _freshness_findings = []
         try:
             from ai import grounded_generation as _gg_fresh
@@ -2342,6 +2341,7 @@ Write your {domain_label} coaching section now."""
                         "coach_id": coach_id,
                         "output_text": output,
                         "output_type": output_type,
+                        # utc-exempt(#2815): OUTPUT# frame — coach_state_updater.py:1041/coach_quality_gate.py:305 share this clock; converting only here would desync the sk.
                         "generation_date": _date_cls.today().isoformat(),
                     }
                 ).encode(),

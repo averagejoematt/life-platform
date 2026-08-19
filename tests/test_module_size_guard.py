@@ -236,7 +236,7 @@ BASELINE = {
     # seam caller. A considered raise, not a reflexive one; the NEXT growth extracts.
     "lambdas/compute/hypothesis_engine_lambda.py": 1637,
     "lambdas/ai/ai_context.py": 1415,
-    "lambdas/content/output_writers.py": 1387,
+    "lambdas/content/output_writers.py": 1340,  # #2816: extracted _dedup_activities (51 lines) to digest_utils.py; banked 10
     # 1369 -> 1370 by #2299: one `from intelligence.weight_recency import week_ago_weight`
     # import. That module exists because the compute Lambda and the daily brief had two
     # different definitions of "last week's weight" and the compute one was wrong (it took

@@ -10,16 +10,18 @@ Why it is its own module rather than a helper inside `ai_calls`: `ai_calls` is a
 baselined god-module under the #1665 size ratchet, and this is exactly the
 "cohesive helper module beside it" that ratchet asks for. It is also genuinely
 separable — a call contract, not generation logic — and importing it costs nothing
-(stdlib `date` only, no boto3, no clients), which is what lets a test harness pull
-the production payload shape without dragging the generation stack in behind it.
+(stdlib + `common.pacific_time`, no boto3, no clients), which is what lets a test
+harness pull the production payload shape without dragging the generation stack
+in behind it.
 
 The drift this prevents is specific and has bitten before: a harness that
 hand-rebuilds a production call slowly diverges from it and then manufactures
 findings about an instrument nothing actually uses.
 """
 
-from datetime import date
 from typing import Any, Iterable, Optional
+
+from common.pacific_time import pacific_today
 
 # The deployed function name the coach pipeline invokes synchronously (ADR-108/#390).
 QUALITY_GATE_FUNCTION_NAME = "coach-quality-gate"
@@ -62,7 +64,13 @@ def quality_gate_event(
         "coach_id": coach_id,
         "output_text": output_text,
         "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
-        "generation_date": generation_date or date.today().isoformat(),
+        # #2815: was naive `date.today()` (Lambda TZ=UTC). `ai_calls.py:1316` calls
+        # this with NO generation_date, so the naive clock stamped the wire event
+        # on every production quality-gate call; `coach_quality_gate.py` then
+        # passed that explicit date into `cycle_gate_params`, BYPASSING the #2675
+        # Pacific default it would otherwise fall back to. An evening-PT
+        # generation was judged against tomorrow's cycle position.
+        "generation_date": generation_date or pacific_today(),
     }
 
 

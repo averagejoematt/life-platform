@@ -48,6 +48,13 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 _SKIP_PATH_MARKERS = ("__pycache__", "_staging", "cdk.out", "layer-build")
 
+# Whole packages OUTSIDE lambdas/web/ that are reader-bound writer code end to
+# end, scanned like lambdas/web/ itself (glob, not a hand-list). lambdas/content/
+# joined 2026-08-19 (#2816): site_writer.py/output_writers.py bake day counts
+# into public_stats.json — the homepage mirror — which regrew the #2414 class
+# because lambdas/content/ sat outside the guarded surface entirely.
+_ADDITIONAL_SURFACE_DIRS = ("lambdas/content",)
+
 # Reader-bound writers OUTSIDE lambdas/web/: modules whose output is served to
 # readers even though they live in another package. The observatory renderer
 # assembles the /coaching observatory cards (#2392's original defect family).
@@ -69,8 +76,12 @@ _TIME_MARKERS = ("%H", "%M", "%S", "%X", "%c")
 
 
 def _surface_files() -> list[pathlib.Path]:
-    """The DERIVED scan surface: lambdas/web/**/*.py + the reader-bound writers."""
+    """The DERIVED scan surface: lambdas/web/**/*.py + the additional whole-package
+    dirs (lambdas/content/, #2816) + the reader-bound writers + the PT-frame
+    instruments — never a hand-list."""
     files = [p for p in (ROOT / "lambdas" / "web").rglob("*.py") if not any(m in str(p) for m in _SKIP_PATH_MARKERS)]
+    for rel_dir in _ADDITIONAL_SURFACE_DIRS:
+        files += [p for p in (ROOT / rel_dir).rglob("*.py") if not any(m in str(p) for m in _SKIP_PATH_MARKERS)]
     files += [ROOT / rel for rel in _READER_BOUND_WRITERS + _PT_FRAME_INSTRUMENTS]
     return sorted(files)
 
@@ -85,25 +96,56 @@ def _is_timezone_utc(node) -> bool:
     return isinstance(node, ast.Name) and node.id == "utc"
 
 
-def _is_utc_anchored_now(node) -> bool:
-    """`datetime.now(timezone.utc)` / `datetime.now(tz=timezone.utc)`."""
+def _import_aliases(tree: ast.AST) -> dict:
+    """Map a local alias name to its canonical `datetime`/`date` name (#2812).
+
+    THE FIX. The repo idiom ``from datetime import date as _date`` (15 files
+    across lambdas/+mcp/) makes a naive-clock call site's AST owner literally
+    ``_date`` — the matchers below used to compare that owner against the
+    string ``"date"``/``"datetime"`` directly, so the alias made the call
+    invisible. Walk every ``ImportFrom`` of ``datetime`` in the file first and
+    resolve `date`/`datetime` aliases to their canonical name; every matcher
+    then looks up the receiver through this map before comparing, so
+    ``_date.today()`` is treated exactly like ``date.today()``.
+    """
+    aliases: dict = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "datetime":
+            for alias in node.names:
+                if alias.name in ("date", "datetime"):
+                    aliases[alias.asname or alias.name] = alias.name
+    return aliases
+
+
+def _owner_name(node, aliases: dict):
+    """The alias-resolved canonical owner of a `<node>.attr(...)` receiver, or
+    None if the receiver isn't a plain name (e.g. a call or subscript)."""
+    if not isinstance(node, ast.Name):
+        return None
+    return aliases.get(node.id, node.id)
+
+
+def _is_utc_anchored_now(node, aliases: dict) -> bool:
+    """`datetime.now(timezone.utc)` / `datetime.now(tz=timezone.utc)`, alias-resolved."""
     if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "now"):
         return False
-    if not (isinstance(node.func.value, ast.Name) and node.func.value.id == "datetime"):
+    if _owner_name(node.func.value, aliases) != "datetime":
         return False
     if node.args and _is_timezone_utc(node.args[0]):
         return True
     return any(kw.arg == "tz" and _is_timezone_utc(kw.value) for kw in node.keywords)
 
 
-def _is_naive_clock(node) -> bool:
-    """`datetime.utcnow()` / `datetime.today()` / `date.today()` / no-arg `datetime.now()`."""
+def _is_naive_clock(node, aliases: dict) -> bool:
+    """`datetime.utcnow()` / `datetime.today()` / `date.today()` / no-arg
+    `datetime.now()`, alias-resolved (#2812) so `_date.today()` etc. fire too."""
     if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
         return False
     func = node.func
-    if not isinstance(func.value, ast.Name):
+    owner = _owner_name(func.value, aliases)
+    if owner is None:
         return False
-    owner, attr = func.value.id, func.attr
+    attr = func.attr
     if owner == "datetime" and attr == "utcnow":
         return True
     if attr == "today" and owner in ("datetime", "date"):
@@ -117,21 +159,21 @@ def _is_day_only_fmt(value) -> bool:
     return isinstance(value, str) and _DAY_FMT in value and not any(t in value for t in _TIME_MARKERS)
 
 
-def _subtree_dirty(node, tainted: set) -> bool:
+def _subtree_dirty(node, tainted: set, aliases: dict) -> bool:
     """True if `node` derives from a UTC/naive now (directly or via a tainted name)
     and shows NO explicit `.astimezone(...)` — the deliberate-frame escape hatch."""
     dirty = False
     for sub in ast.walk(node):
         if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute) and sub.func.attr == "astimezone":
             return False
-        if _is_utc_anchored_now(sub) or _is_naive_clock(sub):
+        if _is_utc_anchored_now(sub, aliases) or _is_naive_clock(sub, aliases):
             dirty = True
         elif isinstance(sub, ast.Name) and sub.id in tainted:
             dirty = True
     return dirty
 
 
-def _tainted_names(tree: ast.AST) -> set:
+def _tainted_names(tree: ast.AST, aliases: dict) -> set:
     """Names assigned (anywhere in the file) from an expression containing a
     UTC-anchored or naive now. Single-file, scope-blind on purpose — a guard
     over-approximates and the exemption marker is the pressure valve."""
@@ -139,7 +181,7 @@ def _tainted_names(tree: ast.AST) -> set:
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign):
             continue
-        value_has_now = any(_is_utc_anchored_now(s) or _is_naive_clock(s) for s in ast.walk(node.value))
+        value_has_now = any(_is_utc_anchored_now(s, aliases) or _is_naive_clock(s, aliases) for s in ast.walk(node.value))
         if not value_has_now:
             continue
         for target in node.targets:
@@ -147,7 +189,9 @@ def _tainted_names(tree: ast.AST) -> set:
                 tainted.add(target.id)
             elif isinstance(target, ast.Tuple) and isinstance(node.value, ast.Tuple) and len(target.elts) == len(node.value.elts):
                 for t_elt, v_elt in zip(target.elts, node.value.elts):
-                    if isinstance(t_elt, ast.Name) and any(_is_utc_anchored_now(s) or _is_naive_clock(s) for s in ast.walk(v_elt)):
+                    if isinstance(t_elt, ast.Name) and any(
+                        _is_utc_anchored_now(s, aliases) or _is_naive_clock(s, aliases) for s in ast.walk(v_elt)
+                    ):
                         tainted.add(t_elt.id)
     return tainted
 
@@ -156,7 +200,8 @@ def naive_utc_today_sites(source: str, filename: str = "<source>") -> list[str]:
     """Every reader-'today'-shaped derivation from a UTC/naive clock in `source`."""
     tree = ast.parse(source, filename=filename)
     lines = source.splitlines()
-    tainted = _tainted_names(tree)
+    aliases = _import_aliases(tree)
+    tainted = _tainted_names(tree, aliases)
     findings: list[str] = []
 
     def _exempt(lineno: int) -> bool:
@@ -170,21 +215,21 @@ def naive_utc_today_sites(source: str, filename: str = "<source>") -> list[str]:
             findings.append(f"{filename}:{node.lineno}: {ast.unparse(node)}  [{why}]")
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and _is_naive_clock(node):
+        if isinstance(node, ast.Call) and _is_naive_clock(node, aliases):
             _flag(node, "naive clock — no timezone at all")
             continue
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             attr = node.func.attr
             if attr == "strftime" and node.args and _is_day_only_fmt(getattr(node.args[0], "value", None)):
-                if _subtree_dirty(node.func.value, tainted):
+                if _subtree_dirty(node.func.value, tainted, aliases):
                     _flag(node, "date-only strftime on a UTC-anchored now")
-            elif attr == "date" and not node.args and _subtree_dirty(node.func.value, tainted):
+            elif attr == "date" and not node.args and _subtree_dirty(node.func.value, tainted, aliases):
                 _flag(node, ".date() on a UTC-anchored now")
-            elif attr == "isocalendar" and _subtree_dirty(node.func.value, tainted):
+            elif attr == "isocalendar" and _subtree_dirty(node.func.value, tainted, aliases):
                 _flag(node, ".isocalendar() on a UTC-anchored now")
         if isinstance(node, ast.FormattedValue) and node.format_spec is not None:
             spec = "".join(str(v.value) for v in ast.walk(node.format_spec) if isinstance(v, ast.Constant))
-            if _is_day_only_fmt(spec) and _subtree_dirty(node.value, tainted):
+            if _is_day_only_fmt(spec) and _subtree_dirty(node.value, tainted, aliases):
                 _flag(node, "date-only f-string format on a UTC-anchored now")
     return findings
 
@@ -205,6 +250,8 @@ def test_surface_is_derived_and_nonempty():
         "lambdas/web/og_image_lambda.py",
         "lambdas/coach/coach_observatory_renderer.py",
         "lambdas/operational/coherence_sentinel_lambda.py",
+        "lambdas/content/site_writer.py",
+        "lambdas/content/output_writers.py",
     ):
         assert expected in rels, f"derived surface lost {expected}"
     for p in files:
@@ -261,6 +308,38 @@ def test_fires_on_every_naive_clock_face():
     for face in ("datetime.utcnow()", "datetime.today()", "date.today()", "datetime.now()"):
         src = f"x = {face}\n"
         assert len(naive_utc_today_sites(src)) == 1, f"matcher missed naive face: {face}"
+
+
+def test_fires_on_the_aliased_date_import_shape():
+    """#2812 — THE MUTATION TEST the issue requires. `from datetime import date
+    as _date; x = _date.today()` is the repo idiom (15 files across lambdas/+
+    mcp/, including the live `board_quality_gate.py:148` site) that evaded the
+    plain-owner-name check entirely: `_date` never equals the string `"date"`.
+    This must fire exactly like the unaliased form."""
+    src = "from datetime import date as _date\nx = _date.today()\n"
+    assert len(naive_utc_today_sites(src)) == 1
+
+
+def test_fires_on_the_aliased_datetime_import_shape():
+    """The `datetime as _dt` sibling alias (also a live repo idiom) must fire too —
+    both for the bare naive-clock call and for a date-only rendering of it."""
+    src = "from datetime import datetime as _dt\nx = _dt.utcnow()\n"
+    assert len(naive_utc_today_sites(src)) == 1
+    src2 = "from datetime import datetime as _dt, timezone as _tz\ntoday = _dt.now(_tz.utc).strftime('%Y-%m-%d')\n"
+    assert len(naive_utc_today_sites(src2)) == 1
+
+
+def test_aliased_pt_idiom_is_still_clean():
+    """Alias resolution must not turn the PT idiom into a false positive merely
+    because the file also imports `date`/`datetime` under an alias elsewhere."""
+    src = (
+        "from datetime import date as _date\n"
+        "from web.site_api_common import PT\n"
+        "import datetime as _dt_mod\n"
+        'today = _dt_mod.datetime.now(PT).strftime("%Y-%m-%d")\n'
+        "n = _date.fromisoformat('2026-08-19')\n"
+    )
+    assert naive_utc_today_sites(src) == []
 
 
 def test_pt_idiom_and_utc_instants_are_clean():
