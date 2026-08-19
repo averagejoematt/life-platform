@@ -17,15 +17,22 @@
 # strip again — which is where the 2026-08-08 session lost five PRs.
 #
 # This script keeps the gate and drops the sweep: it runs black + ruff itself,
-# restores any doc-literal file the agent did not explicitly name, stages ONLY the
-# named paths, and commits with --no-verify. The driver reconciles the literals
-# once per merge on main, which is the only place that arithmetic is stable.
+# stages ONLY the named paths, and commits with --no-verify. The driver reconciles
+# the literals once per merge on main, which is the only place that arithmetic is
+# stable.
 #
 # Usage:
 #   bash deploy/agent_commit.sh "<commit message>" <path> [<path> ...]
 #
+# A DIRECTORY argument covers the files under it (#2897). If a changed doc-literal
+# file is not covered by any argument, the script REFUSES and names it rather than
+# reverting it — see the long note at the restore block for why that default
+# flipped. `ALLOW_LITERAL_RESTORE=1` opts back into auto-restoring those files,
+# writing a recovery patch first.
+#
 # Refuses to commit if: no paths given, an unresolved merge conflict (UU) exists,
-# a named path is a doc-sync literal file, or black/ruff reject the staged Python.
+# a named path is a doc-sync literal file, a changed doc-literal file is unnamed,
+# or black/ruff reject the staged Python.
 # EVERY refusal exits nonzero and prints a terminal "REFUSED" line (#2464) — a
 # success is exit 0 plus the "✅ committed N path(s)" line, nothing else is.
 set -uo pipefail
@@ -91,17 +98,61 @@ done
 
 # ── Undo the hook's prior sweep ────────────────────────────────────────────────
 # If an earlier commit attempt let the hook run, these files carry regenerated
-# literals. Restore every literal-bearing file the agent did NOT name.
-named=" ${PATHS[*]} "
-restored=""
+# literals. The agent did not ask for those, and carrying them conflicts with
+# every sibling PR — so they have to come off the commit somehow.
+#
+# #2897: the way this USED to happen was `git checkout HEAD --` on every changed
+# literal-bearing file the agent did not name, and the "did the agent name it?"
+# test was a literal substring match on the joined argument list. Passing the
+# DIRECTORY `docs/` therefore made every file under it "unnamed", and the script
+# silently destroyed ~13 files of authored prose (including a finished ADR
+# amendment) while printing "✅ committed" and exiting 0. `git diff` is the
+# source, so the work was not recoverable from the index.
+#
+# Two changes close that. First, a directory argument now genuinely COVERS the
+# files under it, which removes the footgun from the happy path. Second, anything
+# still unnamed is a REFUSAL, not a discard: this script's job is to keep literals
+# off a branch, and destroying authored content to achieve that has the
+# cost/benefit backwards. The caller decides, and gets told how.
+
+# Expand every named path to the concrete tracked files it covers. `git ls-files`
+# echoes a plain file argument straight back, so this is a no-op for file args;
+# the untracked-but-named case is covered because ${p} itself is kept too.
+named=""
+for p in "${PATHS[@]}"; do
+  named="${named} ${p}"
+  while IFS= read -r _f; do
+    [ -n "${_f}" ] && named="${named} ${_f}"
+  done < <(git ls-files -- "${p}" 2>/dev/null)
+done
+named=" ${named} "
+
+unnamed=""
 while IFS= read -r f; do
   [ -n "${f}" ] || continue
   case "${named}" in *" ${f} "*) continue ;; esac
-  git checkout HEAD -- "${f}" 2>/dev/null && restored="${restored} ${f}"
+  unnamed="${unnamed} ${f}"
 done < <(git diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/site_api_common.py)
 
-if [ -n "${restored}" ]; then
-  echo "[agent-commit] ↩ restored doc-literal files to HEAD:${restored}"
+if [ -n "${unnamed}" ]; then
+  if [ "${ALLOW_LITERAL_RESTORE:-0}" = "1" ]; then
+    # Deliberate, opt-in discard. Still save a recovery patch first — the thing
+    # being thrown away may be authored prose no test can regenerate.
+    _bak="$(git rev-parse --git-dir)/agent_commit_restored_$(date +%Y%m%dT%H%M%S).patch"
+    git diff -- ${unnamed} > "${_bak}" 2>/dev/null || true
+    git checkout HEAD -- ${unnamed} 2>/dev/null
+    echo "[agent-commit] ↩ restored doc-literal files to HEAD:${unnamed}"
+    echo "[agent-commit]    recovery patch: ${_bak}"
+  else
+    echo "[agent-commit] ❌ these changed doc-literal files were not named:" >&2
+    for f in ${unnamed}; do echo "[agent-commit]      ${f}" >&2; done
+    echo "[agent-commit]    Refusing to discard them (#2897 — silently reverting these destroyed 13 files of authored work)." >&2
+    echo "[agent-commit]    Pick one:" >&2
+    echo "[agent-commit]      • keep them:    add them to the argument list (a directory covers its files)" >&2
+    echo "[agent-commit]      • discard them: git checkout HEAD -- <files>" >&2
+    echo "[agent-commit]      • auto-restore: re-run with ALLOW_LITERAL_RESTORE=1 (writes a recovery patch first)" >&2
+    refuse 1
+  fi
 fi
 
 # ── Stage exactly what was asked for ──────────────────────────────────────────
