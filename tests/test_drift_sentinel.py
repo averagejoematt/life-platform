@@ -664,7 +664,12 @@ def test_matches_push_trigger_semantics():
     assert ds._matches_push_trigger("site/index.html")
     assert not ds._matches_push_trigger("handovers/HANDOVER_LATEST.md")
     assert not ds._matches_push_trigger("MEMORY.md")
-    assert not ds._matches_push_trigger("deploy/drift_sentinel.py")  # deploy/ is not push-triggered (CONVENTIONS §deploy-from-main)
+    # #2881: deploy/ IS push-triggered as of 2026-08-19. It holds smoke_test_site.sh — the
+    # gate that can auto-roll-back the public site — so a deploy/-only push earning zero runs
+    # was a legitimate path-filter skip indistinguishable from a swallowed push. The prior
+    # assertion cited CONVENTIONS §2 (deploy-from-main), which is about packaging the working
+    # tree rather than the wrong branch; it never argued deploy/ should skip CI validation.
+    assert ds._matches_push_trigger("deploy/drift_sentinel.py")
 
 
 def test_github_config_fires_on_live_gateless_environment(monkeypatch):
