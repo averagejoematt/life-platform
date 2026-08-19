@@ -120,33 +120,6 @@ jobs:
           fi
           echo "✅ All files pass syntax check"
 
-      - name: Shell syntax check (bash -n) — deploy/ (#2881)
-        # Nothing else parses deploy/*.sh: black/ruff above only understand Python.
-        # deploy/ holds smoke_test_site.sh (gates every site deploy and can
-        # auto-rollback the public site), agent_commit.sh, and the rollback scripts
-        # themselves — a syntax error there previously reached main unvalidated and
-        # would only surface at the next site deploy that invokes it. `deploy/archive/`
-        # is excluded — same precedent as the black/ruff `extend-exclude` above
-        # (retired one-time scripts, pyproject.toml).
-        if: always()
-        run: |
-          echo "::group::Shell syntax checking deploy/**/*.sh"
-          FAILED=0
-          while IFS= read -r -d '' f; do
-            if bash -n "$f" 2>&1; then
-              echo "  ✅ $f"
-            else
-              echo "  ❌ SYNTAX ERROR: $f"
-              FAILED=$((FAILED + 1))
-            fi
-          done < <(find deploy -name '*.sh' -not -path '*/archive/*' -print0)
-          echo "::endgroup::"
-          if [ "$FAILED" -gt 0 ]; then
-            echo "::error::$FAILED shell script(s) under deploy/ failed syntax check"
-            exit 1
-          fi
-          echo "✅ All deploy/ shell scripts pass syntax check"
-
       - name: Dependency Security Scan (pip-audit — ENFORCED, allowlisted)
         # pip-audit for known CVEs across BOTH dependency manifests. 2026-06-09
         # (Tier-1 hardening): broadened from cdk-only to both manifests. #1661: flipped
@@ -309,6 +282,38 @@ jobs:
         run: |
           python3 scripts/content_policy_scan.py
           python3 deploy/pii_surface_guard.py --tracked
+
+      - name: Shell syntax check (bash -n) — deploy/ (#2881)
+        # Nothing else parses deploy/*.sh: black/ruff above only understand Python.
+        # deploy/ holds smoke_test_site.sh (gates every site deploy and can
+        # auto-rollback the public site), agent_commit.sh, and the rollback scripts
+        # themselves — a syntax error there previously reached main unvalidated and
+        # would only surface at the next site deploy that invokes it. `deploy/archive/`
+        # is excluded — same precedent as the black/ruff `extend-exclude` above
+        # (retired one-time scripts, pyproject.toml).
+        #
+        # Appended as the LAST step in this job deliberately (#2578 gate-census
+        # incident): the census keys recorded mutation proofs by positional step
+        # index, so a mid-job insertion shifts every later index and invalidates
+        # proofs it has nothing to do with. Appending shifts nothing.
+        if: always()
+        run: |
+          echo "::group::Shell syntax checking deploy/**/*.sh"
+          FAILED=0
+          while IFS= read -r -d '' f; do
+            if bash -n "$f" 2>&1; then
+              echo "  ✅ $f"
+            else
+              echo "  ❌ SYNTAX ERROR: $f"
+              FAILED=$((FAILED + 1))
+            fi
+          done < <(find deploy -name '*.sh' -not -path '*/archive/*' -print0)
+          echo "::endgroup::"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED shell script(s) under deploy/ failed syntax check"
+            exit 1
+          fi
+          echo "✅ All deploy/ shell scripts pass syntax check"
 
       # ── Doc-drift + wiki gates: MOVED to docs-ci.yml (#1908) ──────────────────
       # The literal-drift gate (sync_doc_metadata --check, #389) and the wiki drift
