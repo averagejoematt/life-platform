@@ -269,6 +269,73 @@ def dedup_activities(activities):
     return kept + no_time
 
 
+def dedup_activities_multidevice(activities):
+    """Remove duplicate activities from multi-device recording (WHOOP + Garmin).
+
+    #2816 relocation (module-size ratchet, #1665): moved verbatim out of
+    `content/output_writers.py` (a full baselined file, zero headroom) to make
+    room for the Pacific-timezone import that PR needed. Distinct from
+    `dedup_activities` above — same JOB, a DIFFERENT algorithm (device-priority
+    + strava_id grouping vs. richness-score + sport-type grouping) — kept as a
+    separate function rather than unified, since reconciling the two dedup
+    strategies is an unrelated, unverified behavior change this move must not make.
+    """
+    if len(activities) <= 1:
+        return activities
+
+    def parse_start(a):
+        try:
+            return datetime.strptime(a.get("start_date", "")[:19], "%Y-%m-%dT%H:%M:%S")
+        except Exception:
+            return None
+
+    def device_priority(a):
+        dev = (a.get("device_name") or "").lower()
+        if "garmin" in dev:
+            return 3
+        if "apple" in dev:
+            return 2
+        if "whoop" in dev:
+            return 1
+        return 0
+
+    sorted_acts = sorted(activities, key=lambda a: a.get("start_date", ""))
+    keep = []
+    skip_ids = set()
+
+    for i, a in enumerate(sorted_acts):
+        aid = a.get("strava_id", str(i))
+        if aid in skip_ids:
+            continue
+        start_a = parse_start(a)
+        dur_a = float(a.get("moving_time_seconds") or 0)
+        for j in range(i + 1, len(sorted_acts)):
+            b = sorted_acts[j]
+            bid = b.get("strava_id", str(j))
+            if bid in skip_ids:
+                continue
+            start_b = parse_start(b)
+            dur_b = float(b.get("moving_time_seconds") or 0)
+            if not start_a or not start_b:
+                continue
+            gap = abs((start_b - start_a).total_seconds())
+            if gap > 900:
+                break
+            if dur_a > 0 and dur_b > 0:
+                ratio = min(dur_a, dur_b) / max(dur_a, dur_b)
+                if ratio < 0.6:
+                    continue
+            if device_priority(a) >= device_priority(b):
+                skip_ids.add(bid)
+            else:
+                skip_ids.add(aid)
+                break
+        if aid not in skip_ids:
+            keep.append(a)
+
+    return keep
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # WHOOP SLEEP NORMALISATION  (SOT: v2.55.0)
 # ══════════════════════════════════════════════════════════════════════════════

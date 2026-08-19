@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.pacific_time import PACIFIC
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -75,7 +76,7 @@ def _safe_float(rec, field, default=None):
     return default
 
 
-from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.digest_utils import d2f as _d2f, dedup_activities_multidevice as _dedup_activities  # shared bundled helpers (#970, #2816)
 
 
 def _get_current_phase(profile, current_weight_lbs):
@@ -365,7 +366,7 @@ def write_public_stats_json(data, profile, streak_data=None):
     Fields are deliberately minimal and narrative-focused.
     """
     try:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(timezone.utc).astimezone(PACIFIC).date()
 
         journey_start_date = profile.get("journey_start_date", EXPERIMENT_START_DATE)
         journey_start_weight = float(profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
@@ -438,7 +439,7 @@ def write_dashboard_json(
     if component_details is None:
         component_details = {}
     try:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(timezone.utc).astimezone(PACIFIC).date()
 
         # Sparklines
         sleep_7d = [_normalize_whoop_sleep(i) for i in _fetch_range("whoop", (today - timedelta(days=7)).isoformat(), yesterday)]
@@ -648,7 +649,7 @@ def write_dashboard_json(
 def write_clinical_json(data, profile, yesterday):
     """Write dashboard/clinical.json to S3 for the clinical summary view."""
     try:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(timezone.utc).astimezone(PACIFIC).date()
 
         # Vitals: 30-day averages
         whoop_30d = _fetch_range("whoop", (today - timedelta(days=30)).isoformat(), yesterday)
@@ -1044,68 +1045,10 @@ def _buddy_friendly_name(name, sport_type):
     return name
 
 
-def _dedup_activities(activities):
-    """Remove duplicate activities from multi-device recording (WHOOP + Garmin)."""
-    if len(activities) <= 1:
-        return activities
-
-    def parse_start(a):
-        try:
-            return datetime.strptime(a.get("start_date", "")[:19], "%Y-%m-%dT%H:%M:%S")
-        except Exception:
-            return None
-
-    def device_priority(a):
-        dev = (a.get("device_name") or "").lower()
-        if "garmin" in dev:
-            return 3
-        if "apple" in dev:
-            return 2
-        if "whoop" in dev:
-            return 1
-        return 0
-
-    sorted_acts = sorted(activities, key=lambda a: a.get("start_date", ""))
-    keep = []
-    skip_ids = set()
-
-    for i, a in enumerate(sorted_acts):
-        aid = a.get("strava_id", str(i))
-        if aid in skip_ids:
-            continue
-        start_a = parse_start(a)
-        dur_a = float(a.get("moving_time_seconds") or 0)
-        for j in range(i + 1, len(sorted_acts)):
-            b = sorted_acts[j]
-            bid = b.get("strava_id", str(j))
-            if bid in skip_ids:
-                continue
-            start_b = parse_start(b)
-            dur_b = float(b.get("moving_time_seconds") or 0)
-            if not start_a or not start_b:
-                continue
-            gap = abs((start_b - start_a).total_seconds())
-            if gap > 900:
-                break
-            if dur_a > 0 and dur_b > 0:
-                ratio = min(dur_a, dur_b) / max(dur_a, dur_b)
-                if ratio < 0.6:
-                    continue
-            if device_priority(a) >= device_priority(b):
-                skip_ids.add(bid)
-            else:
-                skip_ids.add(aid)
-                break
-        if aid not in skip_ids:
-            keep.append(a)
-
-    return keep
-
-
 def write_buddy_json(data, profile, yesterday, character_sheet=None):
     """Generate buddy/data.json for accountability partner page."""
     try:
-        today_dt = datetime.now(timezone.utc).date()
+        today_dt = datetime.now(timezone.utc).astimezone(PACIFIC).date()
         lookback_start = (today_dt - timedelta(days=_BUDDY_LOOKBACK_DAYS)).isoformat()
         lookback_end = today_dt.isoformat()
 

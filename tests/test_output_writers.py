@@ -680,6 +680,19 @@ def test_write_public_stats_json_reraises_on_write_failure():
         ow.write_public_stats_json({"latest_weight": 300.0}, PROFILE)
 
 
+def test_write_public_stats_json_uses_the_pacific_day_at_a_pt_evening_instant(monkeypatch):
+    """#2816: `today = datetime.now(timezone.utc).date()` (no frame conversion) baked the
+    WRONG cycle day count into public_stats.json — the homepage hero — for the last ~7h of
+    every Pacific day. Pin 2026-03-04 19:30 PST (evening PT, PST is UTC-8 in March before
+    DST): the UTC calendar day is already March 5, one day AHEAD of the Pacific day the
+    site's day boundary uses. `.astimezone(PACIFIC)` must land on March 4, not March 5."""
+    _freeze_at(monkeypatch, datetime(2026, 3, 5, 3, 30, tzinfo=timezone.utc))
+    s3, _, _ = _init()
+    ow.write_public_stats_json({"latest_weight": 300.0}, PROFILE)
+    stats = s3.written("generated/public_stats.json")
+    assert stats["days_in"] == 62, "counted the UTC day (63) instead of the Pacific day (62)"
+
+
 # ==============================================================================
 # write_dashboard_json
 # ==============================================================================

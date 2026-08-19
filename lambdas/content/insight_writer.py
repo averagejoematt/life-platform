@@ -51,6 +51,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from common.pacific_time import pacific_today
+
 logger = logging.getLogger(__name__)
 
 # ── Module state (set by init) ──
@@ -124,7 +126,10 @@ def write_insight(
     ts = _now_iso()
     truncated = text[:800]
     thash = _text_hash(truncated)
-    date_val = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #2816: was `datetime.now(timezone.utc)` — the site's day boundary is
+    # Pacific, so an evening-PT write (daily brief, board answers) keyed itself
+    # to tomorrow's date for the last ~7 hours of every Pacific day.
+    date_val = date or pacific_today()
 
     if slug:
         # Deterministic key: (date, digest_type, slug) — idempotent under
@@ -206,7 +211,11 @@ def get_recent_insights(digest_type=None, days=14, pillars=None, max_results=20)
         logger.warning("[insight_writer] Not initialized — call init() first")
         return []
 
-    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    # #2816: was `datetime.now(timezone.utc)` — must match the Pacific frame
+    # `write_insight`'s `date_val` now keys records with, or the lookback window
+    # silently drifts a day short/long against the same-frame comparison it's
+    # meant to bound.
+    cutoff_date = (datetime.strptime(pacific_today(), "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
 
     try:
         # Query all insights, filter by date

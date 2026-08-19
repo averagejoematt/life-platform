@@ -41,6 +41,7 @@ from coach import persona_registry
 from common import quarter_utils
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
 from common.numeric import decimals_to_float, floats_to_decimal
+from common.pacific_time import pacific_today
 from experiment import calibration_core
 from experiment.phase_filter import with_phase_filter
 from privacy import memoir_gate
@@ -275,7 +276,11 @@ def gate_check(text, facts, generation_date_iso=None):
         text,
         allowed=grounded_generation.allowed_numbers(facts),
         allowed_dates=grounded_generation.allowed_dates(facts),
-        generation_date_iso=generation_date_iso or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        # #2815: was naive `date.today()` (Lambda TZ=UTC) — the same day-phase
+        # class quality_gate_contract.py:65 carried: this feeds the "Day N"/span
+        # grounding check, so an evening-PT run judged the memoir's cycle claims
+        # against tomorrow's phase.
+        generation_date_iso=generation_date_iso or pacific_today(),
         start_date_iso=EXPERIMENT_START_DATE,
     )
     for f in findings:

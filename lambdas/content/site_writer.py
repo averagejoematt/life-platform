@@ -31,8 +31,10 @@ v1.3.0 — 2026-03-22 (D10): baseline param added. Day 1 historical constants
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+from common.pacific_time import pacific_day_n, pacific_today
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +100,10 @@ def _days_until_start() -> int:
     """
     try:
         start = datetime.strptime(JOURNEY_START_DATE, "%Y-%m-%d").date()
-        return max(0, (start - datetime.now(timezone.utc).date()).days)
+        # #2816: was `datetime.now(timezone.utc)` — bakes the WRONG cycle's
+        # numbers into public_stats.json for the last ~7h of every Pacific day.
+        today = datetime.strptime(pacific_today(), "%Y-%m-%d").date()
+        return max(0, (start - today).days)
     except Exception:
         return 0
 
@@ -125,7 +130,8 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
     - The narrative paragraph
     - Scroll invitation line
     """
-    today = datetime.now(timezone.utc).date()
+    # #2816: was `datetime.now(timezone.utc)` — same class as _days_until_start above.
+    today = datetime.strptime(pacific_today(), "%Y-%m-%d").date()
     try:
         start = datetime.strptime(JOURNEY_START_DATE, "%Y-%m-%d").date()
         days_on_journey = max(1, (today - start).days + 1)
@@ -182,9 +188,10 @@ def _get_latest_chronicle_headline(table_client, user_id: str) -> dict | None:
     if table_client is None:
         return None
     try:
-        from datetime import timedelta
-
-        today = datetime.now(timezone.utc).date()
+        # #2816: was `datetime.now(timezone.utc)` — chronicle DATE# keys are
+        # Pacific (the platform's day boundary), so a UTC upper bound could
+        # both miss the freshest entry and admit a not-yet-Pacific-"today" one.
+        today = datetime.strptime(pacific_today(), "%Y-%m-%d").date()
         week_ago = (today - timedelta(days=7)).isoformat()
         from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -225,9 +232,9 @@ def _get_recent_chronicles(table_client, user_id: str, count: int = 3) -> list:
     if table_client is None:
         return []
     try:
-        from datetime import timedelta
-
-        today = datetime.now(timezone.utc).date()
+        # #2816: was `datetime.now(timezone.utc)` — same chronicle-key frame fix
+        # as `_get_latest_chronicle_headline` above.
+        today = datetime.strptime(pacific_today(), "%Y-%m-%d").date()
         d90 = (today - timedelta(days=90)).isoformat()
         from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -520,14 +527,16 @@ def _compute_pulse(
     brief_excerpt: str = None,
 ) -> dict:
     """Compute the full pulse object from daily brief data."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #2816: was `datetime.now(timezone.utc)` — pulse.json's "as_of" fields are
+    # reader-facing (the homepage pulse widget), so the site's Pacific day
+    # boundary applies here exactly like the rest of public_stats.json.
+    today = pacific_today()
 
     try:
-        from datetime import date as _date
-
-        started = _date.fromisoformat(JOURNEY_START_DATE)
         # #949 pre-start: a staged future genesis is Day 0, not a clamped "Day 1".
-        day_number = 0 if _date.today() < started else max(1, (_date.today() - started).days + 1)
+        # pacific_day_n already returns 0 for a pre-genesis date — the one
+        # canonical Day-N formula (#1955), so this no longer hand-rolls its own.
+        day_number = pacific_day_n(JOURNEY_START_DATE, today)
     except Exception:
         day_number = 0
 
@@ -735,7 +744,10 @@ def write_pulse_json(
         logger.info("[site_writer] pulse.json written to S3")
 
         if table_client is not None:
-            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            # #2816: was `datetime.now(timezone.utc)` — the PULSE#DATE record's
+            # day must match the same Pacific "today" the pulse content above
+            # (glyph as_of fields, day_number) already carries.
+            today_str = pacific_today()
             try:
                 pulse_json = json.dumps(pulse["pulse"], default=str)
                 pulse_item = json.loads(pulse_json, parse_float=Decimal)

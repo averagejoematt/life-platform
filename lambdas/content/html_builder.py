@@ -1742,14 +1742,19 @@ def _brief_journal_coaches(
             # BS-05: confidence badge — daily brief BoD insight confidence from data volume
             # Henning: n = days since journey start (observation count proxy)
             try:
-                from datetime import datetime as _dt, timezone as _tz
+                from datetime import datetime as _dt
+
+                from common.pacific_time import pacific_today
 
                 _start = (
                     data.get("profile", profile).get("journey_start_date", EXPERIMENT_START_DATE)
                     if isinstance(data.get("profile", profile), dict)
                     else profile.get("journey_start_date", EXPERIMENT_START_DATE)
                 )
-                _days = (_dt.now(_tz.utc).date() - _dt.strptime(_start, "%Y-%m-%d").date()).days
+                # #2816: was `datetime.now(timezone.utc).date()` — the site's day
+                # boundary is Pacific, so an evening-PT brief render undercounted
+                # the observation-count proxy by a day.
+                _days = (_dt.strptime(pacific_today(), "%Y-%m-%d").date() - _dt.strptime(_start, "%Y-%m-%d").date()).days
                 _sources_active = sum(1 for s in ["whoop", "macrofactor", "habitify", "strava", "apple"] if data.get(s))
                 _conf = compute_confidence(days_of_data=_days, sources=list(range(_sources_active)))
                 _badge = _conf["badge_html"]

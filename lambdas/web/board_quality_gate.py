@@ -139,13 +139,19 @@ def _day_n_today():
     """Live Day-N under the current EXPERIMENT_START_DATE, resolved at CALL
     time (never import-time-frozen — mirrors `weight_recency._resolve_genesis`,
     #2104). Returns None if constants can't be read (fail-soft: the rule this
-    feeds is then skipped, never mis-armed on a bad day count)."""
+    feeds is then skipped, never mis-armed on a bad day count).
+
+    #2812: was `date.today()` (naive, Lambda TZ=UTC) — every 17:00-24:00 PDT a
+    reader board request armed `cycle_boundary_violations` (#1973) with
+    TOMORROW's Day-N while the #2414 guard reported green (the `date as _date`
+    import alias evaded the matcher's plain-owner-name check). The site's day
+    boundary is Pacific by owner decision — use the same helper #2675 already
+    established for this exact class."""
     try:
-        from datetime import date as _date
-
         from common.constants import day_n as _day_n
+        from common.pacific_time import pacific_today
 
-        return _day_n(_date.today().isoformat())
+        return _day_n(pacific_today())
     except Exception:
         return None
 
