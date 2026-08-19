@@ -348,15 +348,30 @@ See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
 
 | Item | Cost / month |
 |---|---|
-| CloudWatch alarms (~50 × $0.10, first 10 free) | ~$4-5 |
+| CloudWatch alarms (103 × $0.10, first 10 free) | ~$9-10 |
 | CloudWatch metrics (custom, ~50 metrics) | included in alarms |
 | Logs storage (~1 GB across all Lambdas) | $0.50 |
 | Logs ingestion (~5 GB/mo) | $2.50 |
 | CloudTrail data events (raw/* + uploads/*) | ~$0.50 |
 | SES tracking events | $0 |
-| **TOTAL** | **~$14/month** |
+| **TOTAL** | **~$19/month** |
 
-Roughly half the platform's monthly cost. Worth it — most issues surface here before users notice.
+Alarm count here is **live-measured, not estimated**: `aws cloudwatch describe-alarms`
+returned **103** metric alarms in us-west-2 on 2026-08-19. Two traps in that measurement:
+
+- The call **paginates**. `--query 'length(MetricAlarms)'` reports per-page and prints
+  `50 / 50 / 3`, which reads as "~50" at a glance — plausibly how the retired estimate
+  survived. Count the names, not the page length.
+- It is **not** the same number as the generated inventory above, which says **104**
+  alarms *defined in `cdk/stacks/*.py`*. CDK-defined and live-deployed are different
+  measures and are expected to differ by small amounts; billing follows the live count.
+
+The estate deliberately re-grew from ~41 after COST-A; #2891 tracks deduping it under
+ADR-116's rule that silent-failure coverage is never traded for dollars.
+
+Monitoring is no longer "roughly half" the bill — at a ~$124/mo measured steady state it is
+closer to a sixth. Most issues still surface here before a reader notices, which is what the
+line buys.
 
 ---
 

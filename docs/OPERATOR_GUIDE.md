@@ -19,7 +19,9 @@ The Life Platform is a personal health intelligence system. It pulls data from ~
 - 15:05 UTC `anomaly-detector` → 16:30 `character-sheet-compute` → 16:35 `adaptive-mode-compute` → 16:40 `daily-metrics-compute` → 16:45 `daily-insight-compute` → 17:00 `daily-brief`
 - 19:30 UTC (12:30 PM PDT) OG images
 
-AWS run-rate (real CE, 2026-06-08 sweep): steady-state **~$25-40/mo** against a **$150/mo enforced ceiling** (ADR-063 + ADR-133 amendment; $176 in reader-traffic surge mode; cost-governor degrades AI by tier). Bedrock AI is the swing factor and is in-budget. See `docs/COST_TRACKER.md`.
+AWS run-rate: measured steady state **~$124/mo** ($4.12/day, sd 0.66, n=6; 95% CI $108–139 — the derivation behind the ADR-133 2026-08-18 amendment, #2895) against a **$150/mo enforced ceiling** ($176 in reader-traffic surge mode; cost-governor degrades AI by tier). August 2026 runs a dated $200/$235 window that auto-reverts 2026-09-01. Bedrock AI is the swing factor: live governor breakdown 2026-08-19 reads AI $2.93/day vs non-AI $1.88/day, MTD $113.13, projected $172.27. See `docs/COST_TRACKER.md`.
+
+> The long-standing "~$25-40/mo" figure here was a 2026-06-08 CE sweep that went stale by ~3x — July 2026 closed at **$98.35**, the first month over the then-$85 base. Restated 2026-08-19 (#2838) from the live governor parameter, not from a re-stamped date.
 
 All infrastructure is CDK-managed across 9 stacks (`cdk/stacks/`).
 
