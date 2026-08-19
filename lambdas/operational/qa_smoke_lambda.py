@@ -463,17 +463,19 @@ def _advance_predict_dark_streak(today):
 
 
 def check_receipt_replay():
-    """#1373: progression-receipt drift alarm (nightly leg).
+    """#1373: progression-receipt drift alarm.
 
     Replays the last 7 stored character_receipt records through the LIVE
     bundled engine + the LIVE S3 config:
       - a mismatch with UNCHANGED config hash + engine version = real
-        nondeterminism (or a tampered receipt) → RED (the drift alarm);
-      - config/engine changed since a receipt was written → YELLOW (expected
-        exactly once after a deliberate change; new receipts re-baseline on
-        the next compute);
+        nondeterminism → RED, stays alarmed (the fault this check exists to
+        catch);
+      - config/engine changed since a receipt was written → YELLOW, CHRONIC
+        (#2670 — measurement + rationale in docs/alarm_citations.json and the
+        PR); the mismatch branch above is untouched;
       - all digests reproduce → green.
-    No receipts at all is YELLOW until the first post-#1373 compute lands.
+    No receipts at all is YELLOW (alarmed — rare/first-run) until the first
+    post-#1373 compute lands.
     """
     c = Check("character:receipt_replay", "Character Receipts", DEPLOY_HEALTH)
     try:
@@ -515,8 +517,10 @@ def check_receipt_replay():
             )
         elif drifted:
             c.warn(
-                f"config/engine changed since receipt(s) {drifted} were written — expected once after a deliberate "
-                f"change; nightly computes re-baseline going forward"
+                f"config/engine changed since receipt(s) {drifted} were written — expected on a platform that "
+                f"redeploys routinely; nightly computes re-baseline going forward (#2670: chronic, not a "
+                f"one-time event)",
+                chronic=True,
             )
         else:
             c.ok(f"{len(items)} receipt(s) replay clean against the live engine + config")

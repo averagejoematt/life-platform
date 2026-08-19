@@ -88,6 +88,9 @@ SANCTIONED_CHRONIC_SITES = {
     # non-alarming; it un-chronics itself the moment a weigh-in lands, because the branch
     # is chosen by `hero_weight_applicable`, not by a flag.
     ("qa_smoke_lambda.py", "check_hero_weight_arithmetic"),
+    # #2670, class (a) — check_receipt_replay's config/engine-drift branch (mismatch branch
+    # untouched, stays alarmed). Measurement + rationale: docs/alarm_citations.json.
+    ("qa_smoke_lambda.py", "check_receipt_replay"),
 }
 
 
@@ -350,6 +353,51 @@ def test_phase_stamp_gap_is_chronic_but_check_error_stays_alarmed(monkeypatch):
     (c,) = qa.check_coach_ensemble_phase_stamp_coverage()
     assert c.passed is None
     assert c.chronic is False, "the check ERRORING must stay on the alarmed side"
+
+
+# --- #2670: qa-smoke-warnings sat structurally red 32+ days — the dominant driver ---
+
+
+class _ReceiptTable:
+    """DDB table stub: one stored character_receipt, non-tombstoned."""
+
+    def query(self, **kw):  # noqa: N803 — boto3 surface
+        return {"Items": [{"pk": "USER#matthew#character_receipt", "sk": "DATE#2026-08-17", "date": "2026-08-17"}]}
+
+
+def _receipt_replay_with(monkeypatch, verdict):
+    from health import character_engine, personal_baselines, progression_receipts as pr
+
+    monkeypatch.setattr(qa, "table", _ReceiptTable())
+    monkeypatch.setattr(character_engine, "load_character_config", lambda *a, **kw: {"fake": "config"})
+    monkeypatch.setattr(personal_baselines, "effective_character_config", lambda config, table, user_prefix: config)
+    monkeypatch.setattr(pr, "replay", lambda receipt, config, engine=None: verdict)
+    (c,) = qa.check_receipt_replay()
+    return c
+
+
+def test_receipt_replay_config_drift_branch_is_chronic(monkeypatch):
+    """#2670: config/engine drift since a receipt was written is expected and
+    self-healing on a platform that redeploys routinely — must be chronic so
+    qa-smoke-warnings can reach 0 (measurement: docs/alarm_citations.json)."""
+    c = _receipt_replay_with(monkeypatch, {"verified": False, "config_drift": True, "engine_drift": False})
+    assert c.passed is None
+    assert c.chronic is True, "the config/engine-drift branch must be chronic (#2670)"
+
+
+def test_receipt_replay_mismatch_stays_alarmed(monkeypatch):
+    """Genuine nondeterminism — a replay mismatch with UNCHANGED config/engine
+    — is the real fault this check exists to catch and must stay alarmed;
+    chronic-izing the drift branch must not swallow it."""
+    c = _receipt_replay_with(monkeypatch, {"verified": False, "config_drift": False, "engine_drift": False})
+    assert c.passed is False
+    assert c.chronic is False, "a genuine replay mismatch must never be chronic"
+
+
+def test_receipt_replay_clean_is_ok(monkeypatch):
+    c = _receipt_replay_with(monkeypatch, {"verified": True, "config_drift": False, "engine_drift": False})
+    assert c.passed is True
+    assert c.chronic is False
 
 
 # ---------------------------------------------------------------------------
