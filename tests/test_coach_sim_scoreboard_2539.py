@@ -138,7 +138,12 @@ def test_cadence_records_the_budget_reason_it_is_not_a_ci_gate():
     assert cadence["mode"] == "on_demand"
     reason = cadence["not_a_ci_gate_because"]
     assert "ADR-063" in reason and "ADR-125" in reason
-    assert "85" in reason, "the ceiling the cost is measured against must be named"
+    # Derived, not pinned (#2836): the base moved $85 -> $150 and this literal was
+    # one of ~18 prose sites that had to be swept by hand. Read the number from the
+    # governor so the next base change moves it here for free.
+    from operational.cost_governor_lambda import MONTHLY_CEILING
+
+    assert f"${MONTHLY_CEILING:.0f}" in reason, "the ceiling the cost is measured against must be named"
     assert cadence["cost_usd_per_run"] > 0
     # The $0 layer is the one that repeats, and it is advisory until explicitly promoted.
     subset = cadence["deterministic_subset"]
