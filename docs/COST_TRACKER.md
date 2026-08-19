@@ -162,7 +162,7 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 |---------|-----------|-------|
 | **Bedrock (AI)** | ~$44–61 (Jun–Aug observed range; steady state ~$1.9/day ≈ $58, spikes on top) | Haiku (structured) + Sonnet (narrative), prompt-cached; tracked near-real-time by the governor; CE lags 24–48h. Token shape Aug MTD: **uncached input $30.81** / output $18.53 / cache-read $6.33 / cache-write $5.67 — half the bill is input that never hits the cache (the #2801 input-diet story). |
 | **CloudWatch** | ~$20–25 | The driver FLIPPED (#2837): **custom metrics now beat alarms** — MetricMonitorUsage $16.46 (Jul) from **741 live custom series** (SiteAPI 328, MCP 156; `aws cloudwatch list-metrics`, 2026-08-18) vs AlarmMonitorUsage ~$9–10 from **103 metric alarms live** (`describe-alarms`, 2026-08-18; 35 per-Lambda). Logs ingestion ≈ $0 at this volume. |
-| **Secrets Manager** | ~$9.6–11.6 | **29 active secrets** (26 us-west-2 + 3 us-east-1) × $0.40/secret/month (live count 2026-08-18: `aws secretsmanager list-secrets` both regions; inventory: docs/SECRETS_MAP.md). Jul billed 24.0 secret-months = $9.60 (proration). Consolidation story filed under #2801. |
+| **Secrets Manager** | $10.40 | 26 active secrets × $0.40/secret/month (us-west-2; live-listed 2026-08-18 — PLUS 3 us-east-1 secrets ≈ $1.20/mo the sync literal doesn't count, 29 total; inventory: docs/SECRETS_MAP.md). Jul billed 24.0 secret-months = $9.60 with proration. Consolidation story #2890. |
 | **Tax** | ~$4.6–7.6 | Scales with the bill. |
 | **Cost Explorer API** | ~$1.3–3.0 | The governor's own CE polling (1 DAILY query per 8h run) + ad-hoc queries. |
 | **KMS** | ~$0.6–1.0 | DynamoDB CMK. |
