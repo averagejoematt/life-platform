@@ -120,6 +120,33 @@ jobs:
           fi
           echo "✅ All files pass syntax check"
 
+      - name: Shell syntax check (bash -n) — deploy/ (#2881)
+        # Nothing else parses deploy/*.sh: black/ruff above only understand Python.
+        # deploy/ holds smoke_test_site.sh (gates every site deploy and can
+        # auto-rollback the public site), agent_commit.sh, and the rollback scripts
+        # themselves — a syntax error there previously reached main unvalidated and
+        # would only surface at the next site deploy that invokes it. `deploy/archive/`
+        # is excluded — same precedent as the black/ruff `extend-exclude` above
+        # (retired one-time scripts, pyproject.toml).
+        if: always()
+        run: |
+          echo "::group::Shell syntax checking deploy/**/*.sh"
+          FAILED=0
+          while IFS= read -r -d '' f; do
+            if bash -n "$f" 2>&1; then
+              echo "  ✅ $f"
+            else
+              echo "  ❌ SYNTAX ERROR: $f"
+              FAILED=$((FAILED + 1))
+            fi
+          done < <(find deploy -name '*.sh' -not -path '*/archive/*' -print0)
+          echo "::endgroup::"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED shell script(s) under deploy/ failed syntax check"
+            exit 1
+          fi
+          echo "✅ All deploy/ shell scripts pass syntax check"
+
       - name: Dependency Security Scan (pip-audit — ENFORCED, allowlisted)
         # pip-audit for known CVEs across BOTH dependency manifests. 2026-06-09
         # (Tier-1 hardening): broadened from cdk-only to both manifests. #1661: flipped
