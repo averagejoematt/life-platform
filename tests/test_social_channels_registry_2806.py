@@ -26,7 +26,7 @@ above is not a guard on nothing.
 
 from __future__ import annotations
 
-import sys
+import ast
 from pathlib import Path
 
 import pytest
@@ -34,17 +34,40 @@ from ingestion.source_registry import INBOUND_PASTE_ONLY, paste_only_source_ids,
 from web import site_api_social as social
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "cdk"))
 
-# tests/test_role_policies.py stubs `sys.modules["aws_cdk.aws_iam"]` with a bare
-# aws_cdk-shaped module to keep itself dependency-free — but that stub, once in
-# sys.modules, poisons every LATER `import aws_cdk` in the same pytest process
-# (jsii's lazy module loader can't resolve `Duration` etc. through it). Collection
-# order isn't guaranteed, so purge any aws_cdk* entry before importing the real
-# package here rather than depending on which test file ran first.
-for _mod in [_m for _m in list(sys.modules) if _m == "aws_cdk" or _m.startswith("aws_cdk.")]:
-    del sys.modules[_mod]
-import stacks.ingestion_stack as ingestion_stack  # noqa: E402
+
+def _cdk_social_channels_env() -> list[str]:
+    """`SOCIAL_CHANNELS_ENV` as `cdk/stacks/ingestion_stack.py` renders it — read by
+    AST, never by importing the stack.
+
+    Importing the stack pulls in `aws_cdk`, which is NOT installed in the
+    Deploy-critical / Unit Tests CI jobs. That `ModuleNotFoundError` red-mained on
+    2026-08-19: the import passed locally (aws_cdk present) and failed in CI, the
+    classic green-here/red-there shape. AST is also the established repo idiom for
+    reading CDK facts — `tests/test_heartbeat_completeness.py` and
+    `scripts/check_doc_facts.py` both walk the stacks rather than import them.
+
+    This asserts the DERIVATION, not merely the value: the assignment must be a call
+    into `social_channel_source_ids()`, never a string literal. A hand-typed literal
+    is the exact #2806 defect, and it fails here on SHAPE — before any value
+    comparison could paper over it by coincidentally agreeing.
+    """
+    src = (ROOT / "cdk" / "stacks" / "ingestion_stack.py").read_text(encoding="utf-8")
+    for node in ast.parse(src).body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "SOCIAL_CHANNELS_ENV" for t in node.targets):
+            continue
+        assert isinstance(node.value, ast.Call), (
+            "SOCIAL_CHANNELS_ENV must be DERIVED from the registry at synth time, not hand-typed — " f"got a {type(node.value).__name__}"
+        )
+        assert "social_channel_source_ids" in ast.dump(node.value), (
+            "SOCIAL_CHANNELS_ENV must derive from social_channel_source_ids(); " "any other source can drift from the registry"
+        )
+        # Shape proven derived — the rendered value IS that derivation.
+        return [c for c in ",".join(social_channel_source_ids()).split(",") if c]
+    raise AssertionError("SOCIAL_CHANNELS_ENV not found at module level in cdk/stacks/ingestion_stack.py")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. paste_only_source_ids() ⊆ social_channel_source_ids()  (#2806 AC2)
@@ -103,8 +126,7 @@ def test_cdk_social_channels_env_is_in_lockstep_with_the_registry():
     """#2806 AC1: the enrichment lambda's deployed SOCIAL_CHANNELS env is DERIVED at
     synth time (`ingestion_stack.SOCIAL_CHANNELS_ENV = ",".join(social_channel_source_ids())`),
     not a literal — this asserts the two can never disagree, by construction."""
-    env_channels = [c.strip() for c in ingestion_stack.SOCIAL_CHANNELS_ENV.split(",") if c.strip()]
-    _assert_in_lockstep(env_channels, "cdk/stacks/ingestion_stack.py SOCIAL_CHANNELS_ENV")
+    _assert_in_lockstep(_cdk_social_channels_env(), "cdk/stacks/ingestion_stack.py SOCIAL_CHANNELS_ENV")
 
 
 def test_site_broadcast_sources_is_in_lockstep_with_the_registry():
@@ -135,7 +157,7 @@ def test_daily_brief_default_channel_set_matches_the_enrichment_lambdas_deployed
     (previous test). Both being registry-derived is exactly why they can't disagree —
     this pins that equivalence so a future hand-edit of either can't quietly reopen it."""
     brief_channels = set(social_channel_source_ids())  # what fetch_social_posts uses by default (#2808 fix)
-    enrichment_channels = {c.strip() for c in ingestion_stack.SOCIAL_CHANNELS_ENV.split(",") if c.strip()}
+    enrichment_channels = set(_cdk_social_channels_env())
     assert brief_channels == enrichment_channels
 
 
