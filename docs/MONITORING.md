@@ -356,11 +356,18 @@ See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
 | SES tracking events | $0 |
 | **TOTAL** | **~$19/month** |
 
-Alarm count is **live-measured, not estimated**: `aws cloudwatch describe-alarms` returned
-**103** metric alarms on 2026-08-19 (paginated — count the names, `length(MetricAlarms)`
-reports per-page and reads as 50). The estate deliberately re-grew from ~41 after COST-A;
-#2891 tracks deduping it under ADR-116's rule that silent-failure coverage is never traded
-for dollars.
+Alarm count here is **live-measured, not estimated**: `aws cloudwatch describe-alarms`
+returned **103** metric alarms in us-west-2 on 2026-08-19. Two traps in that measurement:
+
+- The call **paginates**. `--query 'length(MetricAlarms)'` reports per-page and prints
+  `50 / 50 / 3`, which reads as "~50" at a glance — plausibly how the retired estimate
+  survived. Count the names, not the page length.
+- It is **not** the same number as the generated inventory above, which says **104**
+  alarms *defined in `cdk/stacks/*.py`*. CDK-defined and live-deployed are different
+  measures and are expected to differ by small amounts; billing follows the live count.
+
+The estate deliberately re-grew from ~41 after COST-A; #2891 tracks deduping it under
+ADR-116's rule that silent-failure coverage is never traded for dollars.
 
 Monitoring is no longer "roughly half" the bill — at a ~$124/mo measured steady state it is
 closer to a sixth. Most issues still surface here before a reader notices, which is what the
