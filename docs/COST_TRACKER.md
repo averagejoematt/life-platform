@@ -1,13 +1,17 @@
 # Life Platform — Cost Tracker
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-18
 
-Last updated: 2026-08-18 (v8.6.0)
+Last updated: 2026-08-19 (v8.6.0)
 
 > Budget ceiling: **$85/month all-in** base, floating to **$100 in surge mode** on real
-> reader traffic (≥900 trailing-7d uniques — ADR-133). History: $25 → $75 with the
-> Bedrock migration + automated guardrails (2026-05-29), $75 → $85 on 2026-07-08 (ADR-133
-> amendment). Design constraint: every feature must justify its cost.
+> reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated
+> $200 base / $235 surge window** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16
+> #2734, `_TEMP_CEILING_WINDOW`) that auto-reverts 2026-09-01 — the AWS Budgets
+> backstop deliberately stays at $85. The September base decision is #2836 (owed
+> before 09-01). History: $25 → $75 with the Bedrock migration + automated guardrails
+> (2026-05-29), $75 → $85 on 2026-07-08 (ADR-133 amendment). Design constraint: every
+> feature must justify its cost.
 >
 > **Freshness contract (#1354):** every number below was read from live Cost Explorer /
 > SSM / CloudWatch on the Verified: date. `scripts/check_doc_facts.py` fails CI when the
@@ -16,23 +20,24 @@ Last updated: 2026-08-18 (v8.6.0)
 
 ---
 
-## Live posture snapshot — 2026-07-19
+## Live posture snapshot — 2026-08-18
 
 From SSM `/life-platform/budget-tier` + `/life-platform/budget-breakdown` (the governor's
-own output, computed 2026-07-19T16:00Z):
+own output, computed 2026-08-19T00:00Z):
 
 | Fact | Value |
 |------|-------|
 | Tier | **1** (Caution — internal/dev AI paused) |
-| MTD estimated total | $50.40 |
-| Projected month-end | $80.11 |
-| Effective ceiling | **$100 — surge mode ACTIVE** (972 trailing-7d uniques ≥ the 900 threshold) |
-| Burn (trailing 7d) | AI ~$1.20/day + non-AI ~$1.21/day |
+| MTD estimated total | $110.81 (governor; carries the deliberate 1.15x AI buffer — CE actual MTD-18d is $100.98) |
+| Projected month-end | $171.72 (governor, spike-contaminated) vs **measured spike-free run-rate $4.12/day (sd 0.66, n=6) ≈ $124/mo, 95% CI $108–139** |
+| Effective ceiling | **$200 — August window** (surge inactive: 773 trailing-7d uniques < 900) |
+| Burn (trailing 7d) | AI ~$2.97/day + non-AI ~$1.71/day |
 
 ## The real monthly bill (Cost Explorer, unblended)
 
-Mar **$20.04** → Apr **$35.01** → May **$48.19** → Jun **$79.80** (the true peak — 94% of
-the $85 base) → Jul MTD (through 2026-07-19) **$49.59**, governor-projected **$80.11**.
+Mar **$20.04** → Apr **$35.01** → May **$48.19** → Jun **$79.80** (94% of the $85 base)
+→ Jul **$98.35 closed** (first month over the $85 base — the fact forcing the #2836
+September decision) → Aug MTD-18d **$100.98** inside the $200 window.
 
 **The bill is two things:**
 
@@ -148,15 +153,16 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 | Apr 2026 | **$35.01** (CE actual) | — | Infra grew: CloudWatch $9.56, WAF $9.04, Secrets $6.90, CE-API $4.25. AI still negligible. |
 | May 2026 | **$48.19** (CE actual) | 3 (metric began May 29) | + Bedrock $14.29 (Sonnet $9.31 + Haiku $4.98) — Bedrock-cutover marathon + v4 launch. WAF deleted at month end (~−$8/mo). |
 | Jun 2026 | **$79.80** (CE actual, peak) | **19 / 30** | Bedrock $43.98 (Haiku $26.91 + Sonnet $17.07), CloudWatch $14.87, Secrets $7.98, Tax $7.56. Coaching-door launch + QA marathons; tier-2/3 excursion Jun 15–18; 94% of the $85 base — held. |
-| Jul 2026 (MTD 19d) | **$49.59** (CE actual) | **14 / 19** | Projected $80.11. Bedrock MTD $24.43; non-AI MTD $25.16. Continuous tier-1 since Jul 6; surge mode ACTIVE 2026-07-19 (972 uniques → $100 ceiling). |
+| Jul 2026 | **$98.35** (CE actual — first close over the $85 base) | **26 / 31** | Bedrock $49.51 (Haiku $28.47 + Sonnet $21.04), CloudWatch $24.50, Secrets $9.83, Tax $9.26. Continuous tier-1 from Jul 6; surge first activated 2026-07-19 (972 uniques). Cost per reader-week ≈ $98.35 ÷ (972 × 4.43) ≈ **$0.023**. |
+| Aug 2026 (MTD 18d) | **$100.98** (CE actual, interim — $200 window month) | **13 / 18** | Bedrock $61.35 (Haiku $31.00 + Sonnet $30.35 — dev spikes 08-10 $18.33, 08-09 $6.49), CloudWatch $19.87, Tax $9.45, Secrets $6.62. Spike-free run-rate $4.12/day (sd 0.66, n=6) ≈ $124/mo. 773 trailing-7d uniques (surge off). Close this row at month end. |
 
-## Current cost structure (rate card, verified 2026-07-19)
+## Current cost structure (rate card, verified 2026-08-18)
 
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
-| **Bedrock (AI)** | ~$24–44 (dev-heavy months' observed range) | Haiku (structured) + Sonnet (narrative), prompt-cached; tracked near-real-time by the governor; CE lags 24–48h. |
-| **CloudWatch** | ~$11.5–14.9 | Dominated by the alarm estate: **74 metric alarms live** (`aws cloudwatch describe-alarms`, 2026-07-19; the CDK stacks define 75 — one not yet deployed). ~$0.10/alarm ≈ $7.40, + logs/metrics/dashboard. The old claim "consolidated to ~25, no safe consolidation remains" was stale: the estate re-grew with the platform (per-Lambda error alarms are deliberate, ADR-scoped coverage). |
-| **Secrets Manager** | $10.40 | 26 active secrets × $0.40/secret/month (live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md). Jul MTD shows $5.48 (partial month). Mostly irreducible per-service OAuth isolation. |
+| **Bedrock (AI)** | ~$44–61 (Jun–Aug observed range; steady state ~$1.9/day ≈ $58, spikes on top) | Haiku (structured) + Sonnet (narrative), prompt-cached; tracked near-real-time by the governor; CE lags 24–48h. Token shape Aug MTD: **uncached input $30.81** / output $18.53 / cache-read $6.33 / cache-write $5.67 — half the bill is input that never hits the cache (the #2801 input-diet story). |
+| **CloudWatch** | ~$20–25 | The driver FLIPPED (#2837): **custom metrics now beat alarms** — MetricMonitorUsage $16.46 (Jul) from **741 live custom series** (SiteAPI 328, MCP 156; `aws cloudwatch list-metrics`, 2026-08-18) vs AlarmMonitorUsage ~$9–10 from **103 metric alarms live** (`describe-alarms`, 2026-08-18; 35 per-Lambda). Logs ingestion ≈ $0 at this volume. |
+| **Secrets Manager** | $10.40 | 26 active secrets × $0.40/secret/month (us-west-2; live-listed 2026-08-18 — PLUS 3 us-east-1 secrets ≈ $1.20/mo the sync literal doesn't count, 29 total; inventory: docs/SECRETS_MAP.md). Jul billed 24.0 secret-months = $9.60 with proration. Consolidation story #2890. |
 | **Tax** | ~$4.6–7.6 | Scales with the bill. |
 | **Cost Explorer API** | ~$1.3–3.0 | The governor's own CE polling (1 DAILY query per 8h run) + ad-hoc queries. |
 | **KMS** | ~$0.6–1.0 | DynamoDB CMK. |
@@ -172,6 +178,11 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 (`site-deploy.yml`), and the remediation agent (`remediation-agent.yml`) all now
 run on GitHub Actions minutes billed against the account's plan allowance — a
 private repo has no unlimited-minutes free tier the way a public repo does.
+
+**Update 2026-08-18: the repo has been PUBLIC again since 2026-07-20**, so current
+Actions cost is **$0** — but the exposure below is a live **contingent liability**:
+at the observed ~11,790 min/mo, flipping private again ≈ **$53/mo** overage
+((11,790 − 3,000) × $0.006). Any repo-privacy remediation plan must carry this line.
 
 **Account-specific facts — RESOLVED 2026-07-26 (#1613): the owner's user-scoped
 PAT is stored at Secrets Manager `life-platform/github-billing` and as the
@@ -265,10 +276,15 @@ Decisions where cost was a factor in the design:
 
 ---
 
-**Verified:** 2026-07-19 (full rewrite from live Cost Explorer + SSM + CloudWatch — #1354.
-Sources: `aws ce get-cost-and-usage` Mar–Jul grouped by SERVICE; SSM
-`/life-platform/budget-tier` + `budget-breakdown`; `aws cloudwatch describe-alarms`;
-`LifePlatform/Budget::BudgetTier` daily history 2026-05-29 → 2026-07-19.)
+**Verified:** 2026-08-18 (cost-diligence session — July close + Aug MTD + rate card
+re-read from live sources. Sources: `aws ce get-cost-and-usage` Jan–Aug by SERVICE,
+Jul–Aug by USAGE_TYPE (CloudWatch/Secrets/KMS/CE and Bedrock token classes), Aug DAILY
+by Bedrock model; SSM `/life-platform/budget-tier` + `budget-breakdown`;
+`describe-alarms` (103) + `list-metrics` (741 custom series); `list-secrets` both
+regions (29); `LifePlatform/Budget::BudgetTier` daily Jul 1 → Aug 18;
+`LifePlatform/Traffic::UniqueVisitors7d` (773). Prior full rewrite: 2026-07-19, #1354.
+The tier-residence and guardrail prose above the close ritual was NOT re-derived this
+pass — its Verified date remains 2026-07-19 per the #2838 stamp-honesty rule.)
 
 ## What degrades when (the tier ladder)
 

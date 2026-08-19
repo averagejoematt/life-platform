@@ -55,6 +55,26 @@ on:
       - 'requirements*.txt'
       - 'pyproject.toml'
       - '.flake8'
+      # #2881 (AUDIT 2026-08-18): deploy/** is the same DEVOPS-01 class, missed in
+      # that sweep. It holds deploy/smoke_test_site.sh (gates every site deploy and
+      # can auto-rollback the public site), agent_commit.sh, rollback_lambda.sh/
+      # rollback_site.sh (the rollback path itself), sync_doc_metadata.py, and the
+      # restart pipeline — site-deploy.yml's own filter already treats two deploy/
+      # modules (config_twin_sync.py, config_twin_registry.py) as shippable surface.
+      # Observed live: 0bffc1ec (#2879/#2878's smoke-test fix) merged to main having
+      # earned exactly one workflow run (Docs CI) — no lint, no syntax check, no
+      # tests — a legitimate path-filter skip indistinguishable from a swallowed push.
+      #
+      # Deploy-vs-Lint-only decision: left IN the full Lint+Test+Plan lane rather than
+      # carved out to a narrower Lint+Test-only path. `plan`'s own deploy-matrix diff
+      # (`git diff … -- lambdas/ mcp/ mcp_server.py`, below) never looks at deploy/, so
+      # `has_deploys` computes false for a deploy/-only push and the `deploy` job still
+      # does not fire — the added cost is one `plan` run (CDK diff + read-only AWS
+      # resource checks, ~1-2 min) for a change that ships nothing, not an actual
+      # deploy. Building a second early change-detection pass just to skip `plan` for
+      # this one path was judged not worth the added graph surface for a cost that
+      # already resolves to "no deploy" downstream.
+      - 'deploy/**'
   workflow_dispatch:
     inputs:
       deploy_all:
