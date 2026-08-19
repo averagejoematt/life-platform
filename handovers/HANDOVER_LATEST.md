@@ -12,12 +12,16 @@ builds; **every `model:fable` issue untouchable — 36 of 110, Matthew's explici
 **Decisions:** none needed — no governance-consequential choice was made; the ceiling decision was
 settled last session (ADR-133 amendment, #2895) and this session only corrected prose that still
 disagreed with it. The Later-sweep dispositions are ADR-099 triage, not new policy.
-**Main:** green (`f5582dd1`) — HEAD is `98d6e13d`, a `chore(reconcile)` commit that structurally
-**never earns its own CI/CD run**: reconcile pushes use `GITHUB_TOKEN`, and GitHub does not dispatch
-workflows for those. Verified across three samples (`98d6e13d`, `b45f590f`, `06b5bd44` → 0 CI/CD runs
-each). Its only code change is a machine-generated `test_count` literal (15749 → 15757) in
-`site_api_common.py`. Deliberately did **not** dispatch a run for it: that file is a shared module, so
-a dispatch would open another fleet-deploy approval gate for a literal-only change.
+**Main:** green (`f5582dd1`) — HEAD is `3772cfea` (this wrap commit), a **path-filter skip, not a
+swallowed push**: it touches only `handovers/`, `CLAUDE.md`, `docs/**` and `site/**`, none of which are
+in `ci-cd.yml`'s `paths:`. Its `site/**` change did fire a real **Site deploy — fully green** (deploy +
+smoke + Visual/AI-QA, auto-rollback skipped), and `/version.json` reads `3772cfe` == HEAD with the beat
+live at 118. The commit before it, `98d6e13d`, was a `chore(reconcile)` commit that structurally
+**never earns a CI/CD run** either: reconcile pushes use `GITHUB_TOKEN`, and GitHub does not dispatch
+workflows for those — verified across three samples (`98d6e13d`, `b45f590f`, `06b5bd44` → 0 runs each);
+its only code change was a machine-generated `test_count` literal (15749 → 15757). Deliberately did
+**not** dispatch a run for either: `site_api_common.py` is a shared module, so a dispatch would open
+another fleet-deploy approval gate for a literal-only change.
 **Incidents:** 2 rows added — main red 29m on an `aws_cdk` import CI does not install; a 6h22m
 production-deploy wedge behind a stranded approval gate.
 **Closures:** #2668, #2669, #2790, #2807, #2808, #2812, #2816, #2825, #2897, #2899, #2740, #2541, #1374
