@@ -17,16 +17,29 @@ Proves, with synthetic input, that:
     clients / drift_report dependency).
 """
 
+import importlib.util
 import json
 import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import check_alarm_citations as cac  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_sync():
+    """deploy/sync_doc_metadata.py by path — it is not importable by name, and this
+    avoids putting deploy/ on sys.path for the whole suite."""
+    path = os.path.join(REPO, "deploy", "sync_doc_metadata.py")
+    spec = importlib.util.spec_from_file_location("_sync_doc_metadata", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def _alarm(name, hours_old, now):
@@ -213,14 +226,38 @@ def test_real_registry_file_is_well_formed():
         ), f"{name}: citation should reference an issue/incident: {entry['citation']!r}"
 
 
-def test_real_registry_known_long_reds_present():
-    """As of this filing (#1959), three alarms are the documented >72h reds
-    (ingest-auth-unhealthy-24h -> #1934, qa-paused-by-budget -> #1927,
-    qa-smoke-warnings -> #1958) — pin their presence so a future edit can't
-    silently drop a live citation without the test noticing."""
+def test_real_registry_entries_all_name_a_real_alarm():
+    """Every citation must name an alarm that actually exists in the CDK-declared
+    inventory — so a typo, a rename, or an entry left behind after an alarm is
+    deleted fails here instead of sitting in the registry looking like coverage.
+
+    REPLACES a pin on three hardcoded names (2026-08-20). The old form asserted
+    that `qa-paused-by-budget`, `qa-smoke-warnings` and `ingest-auth-unhealthy-24h`
+    were always present, describing them as "the documented >72h reds" **as of its
+    filing (#1959)**. All three have since recovered — qa-paused-by-budget OK since
+    2026-08-03, ingest-auth-unhealthy-24h since 2026-08-19, qa-smoke-warnings the
+    same week — and their issues (#1927, #1934, #2670) are closed. The registry's
+    own header says an entry is removed "once the underlying issue closes AND the
+    alarm has actually cleared live", so the pin had come to gate *against* the
+    documented lifecycle: pruning correctly (#2917) made it red.
+
+    A snapshot of which alarms happen to be red rots by construction. The invariant
+    that does not is: an entry may only cite an alarm that exists. Live *coverage*
+    — every >72h red having a citation — is enforced against real CloudWatch by
+    `scripts/check_alarm_citations.py` at wrap time, which is where it belongs;
+    the flag-the-uncited behaviour itself is pinned by the unit tests above.
+    """
+    names = _load_sync()._auto_discover_alarm_names()
+    if not names:  # AST discovery unavailable — do not manufacture a false pass
+        pytest.skip("alarm-name discovery returned nothing; cannot verify entries")
     data = cac.load_citations()
-    for name in ("qa-paused-by-budget", "qa-smoke-warnings", "ingest-auth-unhealthy-24h"):
-        assert name in data, f"expected citation entry for {name}"
+    entries = [n for n in data if n != "_comment"]
+    assert entries, "docs/alarm_citations.json has no citation entries"
+    unknown = sorted(n for n in entries if n not in names)
+    assert not unknown, (
+        f"citation entries name alarms not declared in cdk/stacks/*.py: {unknown} — "
+        "either the alarm was renamed/deleted (drop the entry) or the name is a typo"
+    )
 
 
 # ── constant-drift guard (no import of remediation/agent.py) ───────────────────
