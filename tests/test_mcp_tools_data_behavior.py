@@ -390,6 +390,91 @@ def test_find_days_unknown_operator_raises_naming_it_and_the_supported_set(fake_
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Tier-2 privacy strip (#2809) — the generic row dumpers must never hand withings'
+# owner-only trio (vascular_age / metabolic_age / afib_result) into conversation
+# context. docs/SCHEMA.md:327 previously (and falsely) recorded every consumer as
+# field-selective; these four ARE the dumpers that weren't. Field NAMES only below —
+# no real measurement values, per the public-repo privacy discipline.
+# ──────────────────────────────────────────────────────────────────────────────
+
+TIER2_TRIO = {"vascular_age", "metabolic_age", "afib_result"}
+
+
+def _withings_row(**extra):
+    row = {"date": "2026-08-15", "weight_lbs": 180, "vascular_age": 40, "metabolic_age": 38, "afib_result": 0}
+    row.update(extra)
+    return row
+
+
+def test_get_sources_derived_tier2_fixture_actually_carries_the_trio():
+    """Vacuity guard: if the fixture didn't carry the trio, every assertion below
+    would pass whether or not the strip exists."""
+    assert TIER2_TRIO <= set(_withings_row())
+
+
+def test_latest_view_strips_tier2_fields_for_withings(fake_table):
+    def responder(kwargs, n):
+        return {"Items": [{"date": "2026-08-07", "recovery_score": 55}]} if n == 1 else {"Items": [_withings_row()]}
+
+    fake_table(responder)
+    out = td.tool_get_daily_snapshot({"view": "latest"})
+    assert out["withings"]["weight_lbs"] == 180, "non-Tier-2 fields must survive the strip"
+    assert not (TIER2_TRIO & set(out["withings"])), out["withings"]
+    assert not (TIER2_TRIO & set(out["whoop"])), "the strip must not touch a source with no Tier-2 facet's own fields"
+
+
+def test_summary_view_strips_tier2_fields_for_withings(fake_table):
+    def responder(kwargs, n):
+        return {"Items": [_withings_row()]} if n == 2 else {"Items": []}
+
+    fake_table(responder)
+    out = td.tool_get_daily_snapshot({"view": "summary", "date": "2026-08-15"})
+    assert list(out) == ["withings"]
+    assert not (TIER2_TRIO & set(out["withings"][0])), out["withings"][0]
+    assert out["withings"][0]["weight_lbs"] == 180
+
+
+def test_get_date_range_strips_tier2_fields_in_the_raw_path(fake_table, fake_query_source):
+    fake_table()
+    fake_query_source([_withings_row()])
+    out = td.tool_get_date_range({"source": "withings", "start_date": "2026-08-01", "end_date": "2026-08-15"})
+    assert out["note"] == "Raw daily data."
+    assert not (TIER2_TRIO & set(out["items"][0])), out["items"][0]
+    assert out["items"][0]["weight_lbs"] == 180
+
+
+def test_get_date_range_does_not_strip_a_source_with_no_tier2_facet(fake_table, fake_query_source):
+    """The control: a source outside TIER2_STRIP_FIELDS is untouched by the strip."""
+    fake_table()
+    rows = [{"date": "2026-08-07", "recovery_score": 55}]
+    fake_query_source(rows)
+    out = td.tool_get_date_range({"source": "whoop", "start_date": "2026-08-01", "end_date": "2026-08-15"})
+    assert out["items"] == rows
+
+
+def test_find_days_strips_tier2_fields_from_matched_rows(fake_query_source):
+    fake_query_source([_withings_row()])
+    got = td.tool_find_days(
+        {
+            "source": "withings",
+            "start_date": "2026-08-01",
+            "end_date": "2026-08-15",
+            "filters": [{"field": "weight_lbs", "op": ">", "value": 0}],
+        }
+    )
+    assert len(got) == 1
+    assert not (TIER2_TRIO & set(got[0])), got[0]
+    assert got[0]["weight_lbs"] == 180
+
+
+def test_tier2_strip_fields_registry_names_exactly_the_documented_trio():
+    """Structural guard: the strip set matches docs/SCHEMA.md's PhenoAge-posture
+    trio exactly — not a subset (a partial strip is still a leak) and not a
+    superset (a wider strip would silently start hiding non-Tier-2 data)."""
+    assert td.TIER2_STRIP_FIELDS["withings"] == TIER2_TRIO
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # tool_search_activities
 # ──────────────────────────────────────────────────────────────────────────────
 
