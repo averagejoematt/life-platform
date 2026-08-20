@@ -35,6 +35,12 @@ def _check_run(name, conclusion, status="COMPLETED"):
     return {"name": name, "status": status, "conclusion": conclusion}
 
 
+def _bucket_check(name, bucket):
+    """`gh pr checks --json name,bucket` shape — the dialect people paste in
+    by hand (the issue's own precedent, and the PR #2915 near-miss)."""
+    return {"name": name, "bucket": bucket}
+
+
 # ── shape 1: empty check list (total == 0) ──────────────────────────────────
 def test_empty_check_list_exits_nonzero():
     state = apg.classify_rollup([], expected=None)
@@ -155,6 +161,125 @@ def test_skip_is_not_silently_treated_as_green_either():
     assert state["green_names"] == []
     assert state["red"] == []
     assert len(state["skipped"]) == 1
+
+
+# ── dual dialect: `gh pr checks --json name,bucket` shape ──────────────────
+def test_bucket_pass_is_green():
+    entry = _bucket_check("Collect + deploy-critical + format", "pass")
+    kind, _ = apg._entry_kind(entry)
+    assert kind == "green"
+    state = apg.classify_rollup([entry], expected=None)
+    code, _ = apg.render(state)
+    assert code == 0
+
+
+def test_bucket_fail_is_red():
+    entry = _bucket_check("gitleaks (PR commit range only, not full history)", "fail")
+    kind, _ = apg._entry_kind(entry)
+    assert kind == "red"
+    state = apg.classify_rollup([entry], expected=None)
+    code, message = apg.render(state)
+    assert code != 0
+    assert "NOT GREEN" in message
+
+
+def test_bucket_pending_is_red():
+    """A `pending` bucket is in-flight, not green — mirrors the CheckRun
+    QUEUED/IN_PROGRESS reasoning: hasn't reported a verdict yet."""
+    entry = _bucket_check("Collect + deploy-critical + format", "pending")
+    kind, _ = apg._entry_kind(entry)
+    assert kind == "red"
+    state = apg.classify_rollup([entry], expected=None)
+    code, _ = apg.render(state)
+    assert code != 0
+
+
+def test_bucket_skipping_is_skip():
+    entry = _bucket_check("validate", "skipping")
+    kind, _ = apg._entry_kind(entry)
+    assert kind == "skip"
+    # Same skip semantics as the statusCheckRollup dialect: never a failure...
+    state = apg.classify_rollup([entry], expected=None)
+    code, _ = apg.render(state)
+    assert code == 0
+    # ...but also never silently satisfies an expected-check requirement.
+    state_expected = apg.classify_rollup([entry], expected={"validate"})
+    code_expected, message_expected = apg.render(state_expected)
+    assert code_expected != 0
+    assert state_expected["not_green_expected"] == ["validate"]
+    assert "present but NOT GREEN" in message_expected
+
+
+# ── dual-dialect replay: the actual PR #2915 near-miss, both shapes ────────
+_PR2915_EXPECTED = {
+    "Collect + deploy-critical + format",
+    "gitleaks (PR commit range only, not full history)",
+}
+
+
+def _pr2915_rollup_shape_entries():
+    """The statusCheckRollup-dialect baseline: 7 checks reported, all
+    pass/skip, but the REQUIRED fast-lane check ('Collect + deploy-critical
+    + format') has not registered into the rollup at all yet."""
+    return [
+        _check_run("gitleaks (PR commit range only, not full history)", "SUCCESS"),
+        _check_run("CodeQL analysis (python)", "SUCCESS"),
+        _check_run("CodeQL analysis (javascript-typescript)", "SUCCESS"),
+        _check_run("Wiki drift gates", "SUCCESS"),
+        _check_run("Surface-drift gate (new pages/routes/crons/JS land registered)", "SUCCESS"),
+        {"name": "CodeQL", "state": "SUCCESS", "context": "CodeQL"},
+        _check_run("validate", "SKIPPED"),
+    ]
+
+
+def _pr2915_bucket_shape_entries():
+    """The SAME PR #2915 near-miss scenario, expressed in the
+    `gh pr checks --json name,bucket` shape instead of statusCheckRollup."""
+    return [
+        _bucket_check("gitleaks (PR commit range only, not full history)", "pass"),
+        _bucket_check("CodeQL analysis (python)", "pass"),
+        _bucket_check("CodeQL analysis (javascript-typescript)", "pass"),
+        _bucket_check("Wiki drift gates", "pass"),
+        _bucket_check("Surface-drift gate (new pages/routes/crons/JS land registered)", "pass"),
+        _bucket_check("CodeQL", "pass"),
+        _bucket_check("validate", "skipping"),
+    ]
+
+
+def test_pr2915_rollup_shape_missing_required_check():
+    state = apg.classify_rollup(_pr2915_rollup_shape_entries(), expected=_PR2915_EXPECTED)
+    code, message = apg.render(state)
+    print("\n--- dual-dialect replay: PR #2915 near-miss, statusCheckRollup shape ---")
+    print(f"exit code: {code}")
+    print(message)
+    assert code != 0
+    assert state["red"] == []
+    assert state["missing_expected"] == ["Collect + deploy-critical + format"]
+    assert "MISSING from the rollup entirely" in message
+
+
+def test_bucket_shape_pr2915_replay_matches_rollup_shape():
+    """The decisive dual-dialect test: the IDENTICAL PR #2915 near-miss
+    scenario, expressed in the `gh pr checks --json name,bucket` shape,
+    must produce the SAME verdict (exit 1, the same check reported MISSING)
+    as the statusCheckRollup-shape version above. Same input scenario, same
+    verdict, either dialect."""
+    bucket_state = apg.classify_rollup(_pr2915_bucket_shape_entries(), expected=_PR2915_EXPECTED)
+    bucket_code, bucket_message = apg.render(bucket_state)
+
+    rollup_state = apg.classify_rollup(_pr2915_rollup_shape_entries(), expected=_PR2915_EXPECTED)
+    rollup_code, rollup_message = apg.render(rollup_state)
+
+    print("\n--- dual-dialect replay: PR #2915 near-miss, bucket shape ---")
+    print(f"exit code: {bucket_code}")
+    print(bucket_message)
+
+    assert bucket_code != 0
+    assert bucket_code == rollup_code
+    assert bucket_state["red"] == rollup_state["red"] == []
+    assert bucket_state["missing_expected"] == rollup_state["missing_expected"] == ["Collect + deploy-critical + format"]
+    assert "MISSING from the rollup entirely" in bucket_message
+    assert bucket_message == rollup_message  # identical wording too, not just identical verdict
 
 
 # ── derivation source (posture-file, not a live gh/network call) ───────────

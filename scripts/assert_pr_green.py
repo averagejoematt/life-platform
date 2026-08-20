@@ -27,6 +27,23 @@ thin `main()` that shells out to `gh` via a `_gh_json` helper. No import from
 check_main_green.py — this file is standalone by design (a different worker
 may be editing that file concurrently this session).
 
+## Two supported input dialects
+
+`main()` fetches via `gh pr view --json statusCheckRollup` (the GraphQL
+CheckRun/StatusContext shape — `status`+`conclusion`, or `context`+`state`).
+But `classify_rollup()`'s entry classifier ALSO understands the OTHER shape
+people reach for by hand: `gh pr checks --json name,bucket`, whose `bucket`
+field is already `pass`/`fail`/`pending`/`skipping`/`cancel`. This is
+deliberate, not incidental completeness — it's the exact dialect this
+issue's own precedent used (`gh pr checks | grep -c`, and the PR #2915
+`gh pr checks 2915 --json bucket` near-miss that showed
+`{"notgreen":0,"total":7}` while a required check was simply absent). A tool
+that only understands the shape its own `main()` happens to fetch, and
+reports "NOT GREEN" (or silently passes) on the shape an operator actually
+pastes into a test or a one-off script, gets distrusted and bypassed within
+a week. Shape detection is unambiguous, not a heuristic: a `bucket` key's
+presence on an entry is decisive — see `_entry_kind()`.
+
 ## Skipped checks — a deliberate third state, not a coin-flip
 
 A `skipped` conclusion is common and legitimate on this repo: e.g. the
@@ -118,13 +135,34 @@ SKIP_CONCLUSIONS = {"SKIPPED"}
 # for a handful of third-party integrations alongside CheckRun entries.
 GREEN_STATES = {"SUCCESS"}
 
+# `gh pr checks --json name,bucket` dialect — gh's own coarse classification.
+# `cancel` reads as red: a cancelled check proves nothing ran to completion.
+BUCKET_KIND = {
+    "pass": "green",
+    "skipping": "skip",
+    "fail": "red",
+    "pending": "red",  # in-flight is not green — same reasoning as CheckRun QUEUED/IN_PROGRESS below
+    "cancel": "red",
+}
+
 
 def _entry_name(entry: dict) -> str:
     return entry.get("name") or entry.get("context") or "<unnamed check>"
 
 
 def _entry_kind(entry: dict) -> tuple[str, str]:
-    """(`"green" | "skip" | "red"`, human label) for one rollup entry. Pure."""
+    """(`"green" | "skip" | "red"`, human label) for one rollup entry. Pure.
+
+    Detects the input dialect by an unambiguous key check, never a heuristic:
+    a `bucket` key means the `gh pr checks --json name,bucket` shape (the
+    dialect people paste in by hand — see the module docstring); its absence
+    falls through to the GraphQL `statusCheckRollup` shape (CheckRun
+    status+conclusion, or StatusContext context+state).
+    """
+    if "bucket" in entry:
+        bucket = (entry.get("bucket") or "").lower()
+        return BUCKET_KIND.get(bucket, "red"), bucket.upper() or "UNKNOWN"
+
     if "context" in entry and "conclusion" not in entry and "status" not in entry:
         # StatusContext shape: no status/conclusion, just a flat `state`.
         state = (entry.get("state") or "").upper()
