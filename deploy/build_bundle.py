@@ -158,6 +158,57 @@ def stage_build_info(out_dir, info=None):
     return path
 
 
+# ── Bundled non-lambda config trigger registry (#2920) ─────────────────────
+# stage_tree() copies a handful of files from OUTSIDE lambdas/ into every
+# bundle (food_vocabulary.json, config/personas.json, config/coaches/*.json,
+# redirects.map — see below). CI's Plan job used to hand-type a SEPARATE
+# pathspec to decide whether one of those changes should trigger a fleet
+# deploy: food_vocabulary.json got an explicit special case, personas.json
+# never did, and they diverged (ac185e1c shipped an a11y fix nowhere, #2920).
+# bundled_extra_paths() is the single derivation both CI and the guard test
+# (tests/test_bundle_deploy_trigger_registry.py) read — a file that
+# stage_tree() starts copying becomes a deploy trigger by construction, not
+# by someone remembering to add a second hand-typed line.
+#
+# Two files stage_tree() ALSO writes are generated at build time, not copied
+# from a fixed repo source path, so they can't be a git-diff pathspec entry —
+# they're dated exemptions instead, with the guard test proving every extra
+# file a staged bundle contains is accounted for one way or the other.
+GENERATED_BUNDLE_EXEMPTIONS = {
+    BUILD_INFO_NAME: "2026-08-20 #2920: per-build fingerprint (#2377), generated at stage time — no fixed source path to diff",
+    "qa_coverage_stats.json": (
+        "2026-08-20 #2920: fail-soft derived snapshot of tests/qa_manifest.py (#1446) — "
+        "not a runtime-behavior file, not addressed by this issue"
+    ),
+}
+
+
+def bundled_extra_paths(repo_root=REPO_ROOT):
+    """Repo-relative source paths stage_tree()/stage_mcp() copy from OUTSIDE
+    lambdas/ — the derived deploy-trigger set for #2920.
+
+    Discovered by listing the real config/ directory (same logic stage_tree()
+    uses below), not a hand-typed enumeration — a new file dropped into
+    config/coaches/ becomes a trigger automatically, no second edit required.
+    """
+    paths = []
+    vocab = os.path.join(repo_root, "config", "food_vocabulary.json")
+    if os.path.isfile(vocab):
+        paths.append("config/food_vocabulary.json")
+    personas = os.path.join(repo_root, "config", "personas.json")
+    if os.path.isfile(personas):
+        paths.append("config/personas.json")
+    coaches_src = os.path.join(repo_root, "config", "coaches")
+    if os.path.isdir(coaches_src):
+        for name in sorted(os.listdir(coaches_src)):
+            if name.endswith(".json") and not name.endswith("_stance.json"):
+                paths.append(f"config/coaches/{name}")
+    redirects_map = os.path.join(repo_root, "redirects.map")
+    if os.path.isfile(redirects_map):
+        paths.append("redirects.map")
+    return sorted(paths)
+
+
 def stage_tree(out_dir):
     """Stage the full lambdas/ tree + food_vocabulary.json into out_dir (fresh)."""
     if os.path.exists(out_dir):
@@ -261,7 +312,7 @@ def verify_boot(out_dir, shape):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", required=True, help="staging directory (recreated fresh)")
+    ap.add_argument("--out", help="staging directory (recreated fresh)")
     ap.add_argument("--mcp", action="store_true", help="stage the MCP bundle shape")
     ap.add_argument("--zip", dest="zip_path", help="also produce a zip at this path")
     ap.add_argument(
@@ -269,7 +320,20 @@ def main():
         action="store_true",
         help="skip the #2632 bundle-boot gate (the bundle is then NOT proven to import)",
     )
+    ap.add_argument(
+        "--print-bundled-config-paths",
+        action="store_true",
+        help="print the #2920 derived bundled-config deploy-trigger paths (one per line) and exit — no staging performed",
+    )
     args = ap.parse_args()
+
+    if args.print_bundled_config_paths:
+        for p in bundled_extra_paths():
+            print(p)
+        return
+
+    if not args.out:
+        ap.error("--out is required unless --print-bundled-config-paths is given")
 
     out = stage_mcp(args.out) if args.mcp else stage_tree(args.out)
     n_files = sum(len(f) for _, _, f in os.walk(out))

@@ -640,15 +640,32 @@ jobs:
 
           LAMBDA_MAP_FILE="${{ env.LAMBDA_MAP }}"
 
+          # #2920: the bundled non-lambda config trigger set is DERIVED from
+          # deploy/build_bundle.py — the one place that actually stages files
+          # into the bundle root (config/food_vocabulary.json, config/personas.json,
+          # config/coaches/*.json, redirects.map — see bundled_extra_paths()).
+          # This replaces the old hand-typed food_vocabulary.json-ONLY special
+          # case: that one file had a trigger, config/personas.json didn't, and
+          # they diverged (ac185e1c shipped an a11y fix nowhere). The guard test
+          # tests/test_bundle_deploy_trigger_registry.py proves this list stays
+          # in sync with what stage_tree() actually copies.
+          BUNDLED_CONFIG_PATHS=$(python3 deploy/build_bundle.py --print-bundled-config-paths)
+          echo "Bundled config paths (derived from build_bundle.py):"
+          echo "$BUNDLED_CONFIG_PATHS" | sed 's/^/    /'
+
           # #781: the shared layer is retired. A changed file under lambdas/ that
           # is NOT a mapped per-function source is a shared module — it ships to
           # every function, so the FLEET redeploys (deploy/deploy_fleet.sh: one
           # bundle, one S3 upload, N update-function-code calls). This also
           # closes the old silent gap where an unmapped helper module deployed
-          # to nobody. food_vocabulary.json rides inside the bundle too.
+          # to nobody.
           FLEET_CHANGED="false"
-          VOCAB_CHANGED=$(git diff --name-only "${GITHUB_SHA}~1" HEAD -- config/food_vocabulary.json 2>/dev/null || true)  # #1173: same base as CHANGED above
-          [ -n "$VOCAB_CHANGED" ] && FLEET_CHANGED="true" && echo "⚡ food_vocabulary.json changed → fleet deploy"
+          CONFIG_CHANGED=$(git diff --name-only "${GITHUB_SHA}~1" HEAD -- $BUNDLED_CONFIG_PATHS 2>/dev/null || true)  # #1173: same base as CHANGED above
+          if [ -n "$CONFIG_CHANGED" ]; then
+            FLEET_CHANGED="true"
+            echo "⚡ bundled config changed → fleet deploy:"
+            echo "$CONFIG_CHANGED" | sed 's/^/    /'
+          fi
           for file in $CHANGED; do
             case "$file" in
               lambdas/*)
@@ -694,6 +711,15 @@ jobs:
           HAS_DEPLOYS="false"
           if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ] || [ "$FLEET_CHANGED" = "true" ]; then
             HAS_DEPLOYS="true"
+          fi
+
+          # #2920 safety net — independent of the FLEET_CHANGED wiring above (a
+          # future edit to that logic could silently decouple it from this
+          # check). If a bundled config path changed but the plan still ends
+          # with NO deploys, shout instead of shipping the ac185e1c class again:
+          # a green run with `Deploy: skipped` that silently kept the old file live.
+          if [ "$HAS_DEPLOYS" = "false" ] && [ -n "$CONFIG_CHANGED" ]; then
+            echo "::warning title=Deploy skipped but bundled config changed::$CONFIG_CHANGED rides inside every Lambda bundle (deploy/build_bundle.py) but Deploy is about to be SKIPPED. Ship it: bash deploy/deploy_fleet.sh (or re-run this workflow with deploy_all=true)."
           fi
 
           echo "has_deploys=$HAS_DEPLOYS" >> "$GITHUB_OUTPUT"
