@@ -304,3 +304,124 @@ All four are substantively verified against their branches; only CI lanes remain
   permanent noise.
 - **#2761** — the wrap gate that has never fired, now startable.
 - **#2692** — `pytest --durations=25` **on CI**, not locally; the 3.4x local/CI gap is still unexplained.
+
+---
+
+# POST-WRAP ADDENDUM — 2026-08-20 ~17:30–18:40Z: the plan for the *next* session was executed in this one
+
+Matthew approved `quizzical-wandering-dawn.md` and said "execute it." Phase 0 ran in full. **The
+pipeline is unstranded and nothing is `partial` for want of a deploy any more.**
+
+## Phase 0(a) — the unstranding
+
+`cdk diff LifePlatformOperational` read before approving, and it was exactly the predicted shape:
+**13** `[+] DeadLetterConfig`, **13** `[+] "Action": "sqs:SendMessage"` (one per role, scoped to the
+ingestion DLQ), 24 S3Key rehashes, **zero destructions, zero replacements, zero other IAM actions**.
+
+`cdk_deploy.sh` stops at a changeset when IAM is involved and no TTY is attached; the sanctioned path
+is the script's own documented `-- --require-approval never`. Deployed 17:39:57Z, 40/40
+`UPDATE_COMPLETE` in 46.9s. All 13 Lambdas carry the DLQ at `17:39:45Z`.
+
+**The gate cleared.** The next CI/CD run's `Plan deployments` returned **success** for the first time
+since 15:55Z — that is the proof the strand is over, not an inference.
+
+## Phase 0(b) — the code half
+
+`workflow_dispatch deploy_all=true` → approved at the production gate → `Deploy`, `Smoke test` and
+`Post-deploy integration checks` all **success**, auto-rollback skipped. `daily-debrief` 17:51:57Z,
+`life-platform-site-api` 17:56:20Z, `life-platform-mcp` 18:00:16Z — every one post-dating its merge.
+
+## Phase 0(c) — four `realized`, two honest `partial`, one **reopen**
+
+- **#2694 `realized`** — 13/13 live `DeadLetterConfig`.
+- **#2804 `realized`** — dry-run invoke (no mail sent) returns `"training_load_zone": "safe"`, and the
+  narrative now says *"you're sitting in that safe zone."* The defect was proven at the data layer
+  first: every `computed_metrics` row carries `acwr_zone` and **none has ever carried a bare `zone`**.
+- **#2755 `realized`** — `get_sources` and `get_freshness_status` now agree on **withings (4d vs a 7d
+  threshold)** and **notion (10d vs 14d)**. Both would have read `stale`/`fresh` under the old
+  hardcoded 2-day default. `ai_expert_analyzer_lambda.py` untouched, as briefed.
+- **#2757 `realized`** — the issue's own repro diff returns **empty**; both surfaces serve `#8b5cf6`.
+- **#2809 `partial`, deliberately.** The dumpers return **nothing** for withings — not because the
+  strip ran, but because **every withings row is `phase=pilot`** (cycle-14 genesis is 2026-08-17; the
+  newest row is 08-16) and ADR-058's filter hides them. **The one row carrying the Tier-2 trio is
+  invisible to the dumpers for an unrelated reason**, so an empty result proves nothing reached the
+  strip. Confirmed it is *not* a regression: `_strip_tier2` only `pop`s keys and returns the same list.
+  It becomes verifiable on the **next post-genesis weigh-in** — which is owner-ask #2.
+- **#2708 `partial`** — sole caller is the chronicle, which runs **Wednesdays**; next 2026-08-26, and
+  `chronicle-email-sender` has no dry-run gate (#2111) so it cannot be forced safely.
+- **#2829 REOPENED** — see below.
+
+## #2829: the merged change is not deployable, and `cdk synth` could never have caught it
+
+```
+Early validation failed: Resource of type 'AWS::CloudWatch::Alarm' with identifier
+  'life-platform-cf-auth-errors' / 'life-platform-dash-5xx-rate' /
+  'life-platform-dash-total-errors'  already exists.
+```
+
+`web_alarms.py` declares the three orphans with their **existing physical names**, so CloudFormation
+treats it as a Create and pre-validates the name is free. Adoption requires **`cdk import`**.
+**Nothing was damaged** — stack `UPDATE_COMPLETE`, both changesets `FAILED` and unexecuted, all six
+alarms byte-identical.
+
+**The transferable lesson: `cdk synth` renders a template from source and never consults live AWS
+state. A green synth means well-formed, not deployable.** One level earlier than "merged ≠ deployed."
+
+I verified the CDK definitions against live config field-by-field *before* deploying — metric,
+namespace, statistic, period, eval periods, threshold, operator, missing-data, dimensions all match.
+So the worker's "codified byte-for-byte" claim is accurate; the mechanism is the only problem.
+
+**The premise is also partly stale: only 2 of 6 alarms fire into the void, not 5.**
+`dash-5xx-rate` and `dash-total-errors` **already** route to `life-platform-alerts-us-east-1`. The
+genuinely-silent pair is `email-subscriber-errors` and `life-platform-cf-auth-errors`.
+
+## I red-mained main, found it, and fixed it
+
+`test / Unit Tests` failed on three consecutive runs. Bisected by comparing runs: green at
+`492eea37`, red from `33583ad8` — the #2913 merge.
+
+```
+AssertionError: PLATFORM_FACTS alarm_count fallback (99) has drifted >5 from discovery (107)
+```
+
+`test_platform_stats_truth.py` carries a **fallback-hygiene** assertion with a ±5 tolerance, and
+#2913's +3 alarms pushed a drift of 5 to 8. The test's own docstring names this class as having
+redded main three times in one week. **The 5-suite structural set (168 passed) does not include this
+test**, which is why the PR was green — the same blind-spot shape as the `aws_cdk`-import incident.
+Fixed by refreshing the fallback 99 → 107 (value-only; `sync_doc_metadata.py` is at 1780/1780, zero
+headroom) and appending to its documented refresh history. Pushed as `7514cce2`.
+
+## Two new findings, filed
+
+- **#2918** — `validate_daily_brief_outputs` creates six validation results and reports `BLOCKED` for
+  only **four**. AST-verified: `jc_result` (journal coach) and `tldr_result` (**the brief's headline**)
+  never have `.blocked` checked. Observed live at 17:08:27Z: **two** outputs blocked, **one** reported.
+  A blocked TL;DR would log *"All AI outputs passed validation."*
+- **#2912** (filed pre-wrap) got an unexpected corroboration — see below.
+
+## The alarm work validated itself, twice, unprompted
+
+A monitor left armed by an earlier session caught the **demote leg of `_confirm_high_findings` firing
+in production for the first time** (18:02:57Z) — the arm #2741's record said had never been observed.
+It did its job: `0 failures` that run, and `qa-smoke-failures` **stayed OK**. A flaky `high` that would
+have re-armed a blocking alarm was demoted instead.
+
+And `qa-smoke-warnings` went **OK→ALARM organically at 11:03:27 PDT** with `2 alarmed, 8 chronic` —
+matching the *planted* transition I used to close #2670 that morning, ~2.5h earlier. The planted proof
+predicted the organic event exactly, and the chronic classification did the work it was built for.
+
+## Count
+
+**84 → 86 open.** Not a regression: **+1 #2918** (a real, code-verified defect) and **+1 #2829
+reopened** (because its merged change does not deploy). Six of seven closures held; four moved
+`partial` → `realized` on the live wire. `model:fable` unchanged at **25**.
+
+## Owner asks — updated
+
+1. ~~Deploy authorization~~ — **done**, all three attempted; two succeeded, `LifePlatformWeb` blocked
+   by the #2829 import problem above.
+2. **A Withings weigh-in** — now also the verification trigger for **#2809**, whose fix cannot be
+   proven live until a post-genesis row exists.
+3. The one-line coach-colour taste call (`config/personas.json`) — now live to look at.
+4. `gate:owner`: #1738, #1571, #1677, #1631; #2833/#2834 startable with you.
+5. Two duplicate us-east-1 billing alarms still to retire (decision in #2829, unexecuted).
