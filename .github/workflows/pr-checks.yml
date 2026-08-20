@@ -153,3 +153,35 @@ jobs:
       - name: Bundle-boot gate (every module imports out of a STAGED bundle)
         if: always()
         run: python3 scripts/verify_bundle_boot.py --compare deploy/bundle_boot_baseline.json
+
+  # ════════════════════════════════════════════════════════════════
+  # #2831 — API-before-frontend sequencing check.
+  #
+  # site/** merges auto-deploy with NO approval gate (#750); site-api's
+  # deploy is a separate pipeline behind manual production approval. A PR
+  # that adds a new site-api route AND the site/ page consuming it in the
+  # SAME PR has fired this class >=5 times (docs/INCIDENT_LOG.md: 07-09 #900
+  # x2 rollbacks, 07-12, 07-19, 07-23 #1704 "a recurrence of the 2026-07-09
+  # class", 08-02 #2040) with only reflex-level fixes each time. This job is
+  # the first PRE-merge machinery — see scripts/check_api_before_frontend.py
+  # for the full mechanism and deploy/api_deploy_sequencing.json for the
+  # declaration registry it (and tests/visual_qa.py + deploy/smoke_test_site.sh's
+  # runtime deferral) reads.
+  #
+  # ADVISORY, not required, on landing (ADR-139 default posture) — promoting
+  # it to a required check needs deploy/github_posture.json +
+  # `python3 scripts/apply_branch_protection.py --apply`, an owner action;
+  # see the header of the `fast-lane` job above for why that file is the one
+  # to edit, never branch-protection settings by hand.
+  # ════════════════════════════════════════════════════════════════
+  api-before-frontend:
+    name: API-before-frontend sequencing check (#2831)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # full history: needs a real merge-base diff against origin/main
+
+      - name: Check API-before-frontend sequencing
+        run: python3 scripts/check_api_before_frontend.py --base-ref "origin/${{ github.base_ref }}" --head-ref HEAD

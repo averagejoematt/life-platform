@@ -297,6 +297,23 @@ echo ""
 # the coverage ratchet, which scripts/qa_audit.py computes from this section's
 # presence (see qa_audit.smoke_checked_endpoints).
 echo "── Manifest api_deps (distinct union, JSON health, #1586) ────"
+# #2831: routes explicitly deferred in deploy/api_deploy_sequencing.json's
+# pending_deploy_routes (the #2050 pattern, generalized — the SAME registry
+# scripts/check_api_before_frontend.py's PR-time check and tests/visual_qa.py
+# both read). A 404 on one of these is the known merged-but-not-deployed-yet
+# window, not a broken page — downgrade to a warning instead of failing the
+# whole smoke run (and triggering rollback_site.sh) out from under a PR that
+# already declared the sequencing risk. REMOVE the registry entry once the
+# route is confirmed live; a lingering entry hides a genuinely dead route.
+PENDING_DEPLOY_ROUTES=$(python3 -c "
+import json
+try:
+    with open('$(dirname "$0")/api_deploy_sequencing.json') as f:
+        data = json.load(f)
+    print(' '.join(e['route'] for e in data.get('pending_deploy_routes', []) if isinstance(e, dict) and e.get('route')))
+except Exception:
+    pass
+" 2>/dev/null)
 check_json_endpoint() {
   local dep_path="$1"
   local url="${BASE}${dep_path}"
@@ -320,6 +337,10 @@ check_json_endpoint() {
   status="${out##*$'\n'}"
   body="${out%$'\n'*}"
   if [[ "$status" != "200" ]]; then
+    if [[ "$status" == "404" && " $PENDING_DEPLOY_ROUTES " == *" $dep_path "* ]]; then
+      echo "  ⚠️  api_dep $dep_path — 404, but DEFERRED via deploy/api_deploy_sequencing.json pending_deploy_routes (#2831) — not counted as a failure ($cb_url)"
+      return
+    fi
     echo "  ❌ api_dep $dep_path — expected 200, got $status ($cb_url)"
     FAIL=$((FAIL + 1))
     return
