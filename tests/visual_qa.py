@@ -117,6 +117,28 @@ import a11y_audit  # noqa: E402  (#1433 — pure module, no Playwright import)
 import leak_token_sweep  # noqa: E402  (#1448 — pure module, no Playwright import)
 from qa_manifest import leak_scan_paths, visual_pages  # noqa: E402
 
+_API_SEQUENCING_REGISTRY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "deploy", "api_deploy_sequencing.json")
+
+
+def _pending_deploy_routes() -> set:
+    """#2831: the routes deferred via deploy/api_deploy_sequencing.json's
+    `pending_deploy_routes` — the generalized, dated replacement for the old
+    hand-edited-during-an-incident bare-`set()` literal (#2050's manual
+    reflex). scripts/check_api_before_frontend.py (a PR-time
+    check, .github/workflows/pr-checks.yml) requires a PR that adds a route a
+    touched site/ page consumes to register an entry here (or in
+    sequenced_routes) before merge — this is the SAME file, read at sweep
+    time, so the deferral it declared actually takes effect. Fail-soft: a
+    missing/malformed registry reads as "nothing deferred", never a crash.
+    """
+    try:
+        with open(_API_SEQUENCING_REGISTRY, encoding="utf-8") as f:
+            data = json.load(f)
+        return {e["route"] for e in data.get("pending_deploy_routes", []) if isinstance(e, dict) and e.get("route")}
+    except Exception:
+        return set()
+
+
 PAGES = visual_pages()
 
 # Text that should never be visible (stuck/placeholder states).
@@ -888,12 +910,13 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         failed_responses = _kept
         # Routes merged on main but not yet deployed to site-api — a 404 there is the
         # known merged-but-dark window, not a broken page (the callers are fail-soft).
-        # Dated entries only; EMPTY this set at each post-deploy schema capture — a
-        # lingering entry hides a genuinely dead route.
-        pending_deploy_apis: set = set()  # emptied 2026-08-03 post-deploy (#2050 re-arm)
+        # #2831: sourced from deploy/api_deploy_sequencing.json's pending_deploy_routes
+        # instead of a hand-edited-per-incident literal — REMOVE the registry entry once
+        # the route is confirmed live; a lingering entry hides a genuinely dead route.
+        pending_deploy_apis: set = _pending_deploy_routes()
         _pending = [(s, u) for s, u in failed_responses if s == 404 and any(p in u for p in pending_deploy_apis)]
         for s, u in _pending:
-            warnings.append(f"pending-deploy API 404 (known, #1972): {u.replace(SITE_URL, '')[:90]}")
+            warnings.append(f"pending-deploy API 404 (known, #2831/#2050): {u.replace(SITE_URL, '')[:90]}")
         failed_responses = [su for su in failed_responses if su not in _pending]
         api_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" in u})
         other_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" not in u})

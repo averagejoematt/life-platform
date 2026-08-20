@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "Registry for #2831 — the API-before-frontend ordering class (fired >=5 times:",
+    "07-09 #900 x2 rollbacks, 07-12 edge-cache, 07-19 IAM-gate, 07-23 #1704 'recurrence",
+    "of the 2026-07-09 class', 08-02 #2040 gate-registration). site/** auto-deploys on",
+    "merge with NO approval gate (#750); site-api deploy goes through the production",
+    "approval gate separately. A PR that adds a NEW site-api route AND a site/ page",
+    "consuming it in the SAME PR ships the page before the API is confirmed live.",
+    "",
+    "scripts/check_api_before_frontend.py (a PR-time check, .github/workflows/pr-checks.yml)",
+    "requires an entry here for any newly-added route it finds referenced by a touched",
+    "site/ file. tests/visual_qa.py and deploy/smoke_test_site.sh both read",
+    "pending_deploy_routes to downgrade that route's 404 from a gating failure to a",
+    "warning until it's re-armed (removed) post-deploy — the #2050 pattern, generalized",
+    "to ONE registry instead of a hand-edited inline set per incident.",
+    "",
+    "Add an entry BEFORE merging. sequenced_routes = 'the API is already deployed, no",
+    "risk' (informational). pending_deploy_routes = 'defer smoke/visual enforcement",
+    "until the next post-deploy schema capture re-arms it' (the #2050 fix path).",
+    "REMOVE the pending_deploy_routes entry once the API is confirmed live — a stale",
+    "entry hides a genuinely dead route (same discipline as the old inline set)."
+  ],
+  "sequenced_routes": [],
+  "pending_deploy_routes": []
+}
