@@ -35,7 +35,9 @@ STATE_PAUSED = "paused"
 STATE_RATE_LIMITED = "rate_limited"
 STATE_STALE = "stale"
 
-DEFAULT_STALE_DAYS = 2
+DEFAULT_STALE_DAYS = 2  # last-resort fallback ONLY — used when the registry is unreadable
+# or a source carries no `stale_hours` facet at all (matches source_registry's own
+# DEFAULT_STALE_HOURS=48, read live below rather than hand-copied here).
 
 # Sub-key markers that signal a source is being throttled upstream (state = rate_limited
 # when not fresh). Garmin writes REFRESH_RATELIMIT when the 429 defeats its OAuth refresh.
@@ -80,19 +82,58 @@ def is_paused(source):
     return source in DECLARED_PAUSED_SOURCES or source in _registry_paused()
 
 
-def resolve_source_state(source, latest_date, today, *, rate_limited=False, stale_days=DEFAULT_STALE_DAYS):
+def _registry_stale_days(source):
+    """Registry-derived staleness threshold for ``source``, in days.
+
+    #2755: the registry's ``stale_hours`` facet (`source_registry.py`) is the one place
+    a source's staleness threshold is supposed to live (charter primitive 1 — the
+    registry owns the vocabulary, consumers derive). This resolver used to carry a
+    second, hardcoded copy of that fact — ``DEFAULT_STALE_DAYS=2`` — applied uniformly
+    to every source. `get_sources` (which never passed a threshold) therefore called
+    slow-cadence sources like withings (168h/7d) and notion (336h/14d) 'stale' on their
+    normal cadence, while `get_freshness_status` read the registry threshold separately
+    and called the same row 'fresh'. Deriving the threshold HERE, once, keeps every
+    caller of `resolve_source_state` in agreement without threading a value through
+    each call site.
+
+    Imported lazily for the same reason `_registry_paused` is: this module is imported
+    by handlers that only want the constants, and `source_registry` is a large module.
+    An unreadable registry, an unknown source, or a source with no override (``None``)
+    all fall back to `DEFAULT_STALE_HOURS` / `DEFAULT_STALE_DAYS` — a conservative
+    2-day default is the safe failure mode, never a silently-lenient one.
+    """
+    try:
+        from ingestion.source_registry import DEFAULT_STALE_HOURS, SOURCE_REGISTRY
+
+        entry = SOURCE_REGISTRY.get(source)
+        hours = entry.get("stale_hours") if entry else None
+        if hours is None:
+            hours = DEFAULT_STALE_HOURS
+        return hours / 24
+    except Exception:  # noqa: BLE001 — never let a registry read decide staleness
+        return DEFAULT_STALE_DAYS
+
+
+def resolve_source_state(source, latest_date, today, *, rate_limited=False, stale_days=None):
     """Operational state for an ingest source. Freshness wins for ``live``.
 
     source:       normalized source id (e.g. 'strava', 'garmin').
     latest_date:  newest DATE# present for the source ('YYYY-MM-DD'), or None.
     today:        'YYYY-MM-DD'.
     rate_limited: True if a rate-limit marker is present (e.g. Garmin REFRESH_RATELIMIT).
+    stale_days:   explicit threshold override, in days. Omit (None, the sanctioned
+                  default since #2755) to derive the threshold from the registry's
+                  `stale_hours` facet for `source` — see `_registry_stale_days`. Pass
+                  an explicit value only when a caller has its own threshold that
+                  deliberately differs from the registry (no caller does today).
 
     Returns one of: live / rate_limited / paused / stale. The order matters — fresh
     data is 'live' even for a source still in DECLARED_PAUSED_SOURCES (the re-enable
     flip); a rate-limit marker outranks the paused/stale labels; a declared-paused
     source with no fresh data is 'paused'; everything else is 'stale'.
     """
+    if stale_days is None:
+        stale_days = _registry_stale_days(source)
     gap = _gap_days(latest_date, today)
     if gap is not None and gap <= stale_days:
         return STATE_LIVE
