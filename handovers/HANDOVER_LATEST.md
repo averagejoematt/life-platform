@@ -180,8 +180,11 @@ reversal.
 
 ## Residual / next picks
 
-- **#2806** — run `bash deploy/cdk_deploy.sh LifePlatformIngestion`, then verify the env reads
-  `bluesky,instagram,mastodon,tiktok,x,youtube`. The only thing between this and closed.
+- ~~**#2806**~~ — **DONE post-wrap (owner-approved).** `cdk_deploy.sh LifePlatformIngestion` ran
+  00:47:48Z; live env now reads `bluesky,instagram,mastodon,tiktok,x,youtube`, byte-identical to the
+  derived value. `cdk diff` was 22 functions, **21 S3Key rehashes and exactly one semantic change**,
+  **zero IAM**; deploy 24/24 in 26.3s. #2806 closed `realized` with live evidence. **Final count:
+  110 → 95, 15 net closed.**
 - **#2815** — the OUTPUT# frame conversion as a whole (`coach_quality_gate.py:305` +
   `coach_state_updater.py` + `inter_coach_dialogue_lambda.py`); the annotated exemption is correct but
   temporary.
