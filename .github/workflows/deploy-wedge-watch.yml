@@ -26,6 +26,24 @@
 # alert/maybe_alert — offline-tested in tests/test_deploy_wedge_alert_2149.py); it holds
 # no AWS credentials for this and gains none — `contents: write` (dispatch the event) and
 # `issues: write` (the throttle marker) below are the only permission additions.
+#
+# SCHEDULED HEAD-COVERAGE CHECK (#2826): `scripts/check_main_green.py::head_coverage()`
+# (#2762) detects the swallowed-push shape — a push to main that mints ZERO CI/CD runs —
+# but until this step it only ever ran inside a session's `/wrap` gate, so an unattended
+# merge (dependabot-automerge, remediation automerge) whose push was swallowed had no
+# detector until a human happened to run it. This cron is the natural scheduled home:
+# read-only, no AWS, same "red scheduled run pages the owner" channel as the wedge check
+# above. `--head-coverage-check` tells a GENUINE swallow apart from an ORDINARY
+# path-filter skip (ci-cd.yml's own `paths:` filter legitimately declining a docs-only or
+# handover-only push) — proven live in the session that added this: main's HEAD 8cbf075f
+# read `uncovered` for ci-cd.yml (neither of its two files is in the filter) while `Docs
+# CI` had run at that exact sha. Wiring the naive "uncovered ⇒ page" version would fire on
+# every docs-only/wrap commit — most of them — and be muted inside a week. Three-way exit
+# code (0 OK / 1 CONFIRMED swallow / 2 indeterminate — an API read failed, so neither
+# verdict was provable) so the check itself cannot fail dark (#2753 class): both 1 and 2
+# fail this job, with visibly DIFFERENT step names and step-summary content, so an
+# operator glancing at the run instantly knows "swallowed push, page" from "the check
+# broke, decode manually" rather than reading one red run as the other.
 
 name: Deploy wedge watch
 
@@ -97,5 +115,62 @@ jobs:
             echo "or locally: \`python3 scripts/check_deploy_wedge.py --recover\`."
             echo
             echo "Background: \`docs/CONVENTIONS.md\` §4d (five recurrences and what was tried each time)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Check main's HEAD has CI/CD coverage (#2826)
+        id: head_coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          # #2746: the default runner shell is `bash -e {0}` — a nonzero exit from the
+          # piped command below would otherwise abort the script on THIS line and
+          # `code=$?` would never run. `set +e` is the same deliberate, recognized
+          # opt-out ci-cd.yml's own cdk-diff step uses for the identical reason: this
+          # step captures-and-forwards the verdict, it is not itself the gate — the two
+          # steps below are, keyed on the exact code this one writes to $GITHUB_OUTPUT.
+          set +e
+          python3 scripts/check_main_green.py --head-coverage-check | tee head_coverage_verdict.txt
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Fail loudly on a swallowed push (#2826)
+        if: steps.head_coverage.outputs.code == '1'
+        run: |
+          echo "::error title=Swallowed push (#2826)::main's HEAD minted ZERO CI/CD-relevant workflow runs — this is NOT an expected path-filter skip."
+          {
+            echo "## 🛑 Swallowed push — main's HEAD has no CI/CD coverage"
+            echo
+            echo '```'
+            cat head_coverage_verdict.txt
+            echo '```'
+            echo
+            echo "This was proven to be the GENUINE #2662 shape, not the DEVOPS-01 path-filter-skip"
+            echo "shape ci-cd.yml's own \`paths:\` block documents (a docs-only/handover-only push is"
+            echo "expected to skip ci-cd.yml and stays silent here — see #2826)."
+            echo
+            echo "Recovery: \`gh workflow run ci-cd.yml --ref main -f deploy_all=true\` (or re-push) so"
+            echo "HEAD earns a real CI/CD verdict."
+            echo
+            echo "Background: #2826, #2762, #2662."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Flag an indeterminate head-coverage read (#2826)
+        if: steps.head_coverage.outputs.code == '2'
+        run: |
+          echo "::error title=Head-coverage check could not verify (#2826)::an API read failed or the commit's changed files were unreadable — this is NOT a confirmed swallowed push."
+          {
+            echo "## ⚠️ Head-coverage check ran but could not reach a verdict"
+            echo
+            echo '```'
+            cat head_coverage_verdict.txt
+            echo '```'
+            echo
+            echo "The #2753 class this epic exists to close: an execution error must never read as"
+            echo "'coverage OK'. It is ALSO not a confirmed swallow — decode manually before assuming"
+            echo "an incident: \`python3 scripts/check_main_green.py --head-coverage-check\`."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
