@@ -97,7 +97,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_freshness_checker(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -129,6 +129,11 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_dlq_consumer(),
             table=local_table,
             bucket=local_bucket,
+            # DLQ exemption (2026-08-20, #2694): this IS the consumer that drains
+            # life-platform-ingestion-dlq. Wiring dlq=local_dlq here would let a
+            # terminal failure of the sweep loop its own event back into the queue
+            # it exists to empty — self-referential and structurally exempt, not
+            # an oversight. (Named "obviously exempt" in #2694's own issue text.)
             dlq=None,
             alerts_topic=None,
         )
@@ -167,7 +172,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_alert_digest(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=None,
         )
         cdk.CfnOutput(self, "AlertDigestQueueUrl", value=digest_queue.queue_url)
@@ -210,12 +215,32 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_traffic_digest(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            # #2694 (2026-08-20): dlq=local_dlq — a terminal async EventBridge failure
+            # now lands a durable envelope in the DLQ digest instead of evaporating
+            # after Lambda's automatic retry-twice-then-drop (dead-man primitive,
+            # #809/ADR-116). This is orthogonal to the alerts_topic=None call below:
+            # a DLQ answers "what failed, with the event"; an error alarm answers
+            # "that it failed, right now" — this Lambda still opts out of the latter.
+            dlq=local_dlq,
             # No error alarm by design — a weekly digest failing is low-stakes (you miss
             # one traffic email; the CF logs are retained, so the next run still sees the
             # window). Consistent with the other alerts_topic=None operational Lambdas
             # (canary, qa_smoke, cost_governor). To add a failure signal later, pass
             # alerts_topic=local_alerts_topic + digest_topic=local_digest_topic + digest=True.
+            #
+            # DLQ EXEMPTION RULE (2026-08-20, #2694): every scheduled, asynchronously-
+            # invoked operational Lambda in this stack must pass dlq=local_dlq so a
+            # terminal failure (raises, retried twice by EventBridge, then dropped)
+            # leaves an envelope for life-platform-dlq-consumer instead of just
+            # tracebacks in CloudWatch (charter primitive 5, dead-man: absence/silent-
+            # failure must be louder than a log line). The two remaining dlq=None
+            # scheduled exceptions in this file are dated, named exemptions at their
+            # own call sites, not the default:
+            #   * life-platform-dlq-consumer — self-referential (see its own comment).
+            # A NEW create_platform_lambda(schedule=..., dlq=None) is therefore a
+            # decision, not an oversight — tests/test_dlq_coverage_2694.py enforces
+            # this on shape (every scheduled construct here must pass dlq= or be in
+            # its dated EXEMPT registry).
             alerts_topic=None,
         )
         cdk.CfnOutput(self, "CfLogBucketName", value=cf_log_bucket.bucket_name)
@@ -254,7 +279,7 @@ class OperationalStack(Stack):
             custom_policies=rpp.operational_permanence(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -343,7 +368,12 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_cost_governor(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            # #2694 (2026-08-20): cost-governor is the SOLE writer of the budget tier
+            # that gates every AI feature — a terminal failure here previously left
+            # the platform reading a frozen tier while spend kept accruing, with only
+            # the heartbeat alarm (which catches a STOPPED governor, not a FAILING
+            # one) as a signal. dlq=local_dlq closes exactly that gap.
+            dlq=local_dlq,
             alerts_topic=None,
         )
 
@@ -448,7 +478,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_key_rotator(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async invoke failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -558,7 +588,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_coherence_sentinel(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=None,
         )
 
@@ -818,7 +848,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_og_image_generator(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -842,7 +872,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_reading_cover_pipeline(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async invoke failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -864,7 +894,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_reading_recall_sweep(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -890,7 +920,7 @@ class OperationalStack(Stack):
             custom_policies=rp.pipeline_health_check(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -960,7 +990,7 @@ class OperationalStack(Stack):
             custom_policies=rp.hevy_routine_cron(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async invoke failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
@@ -1013,7 +1043,7 @@ class OperationalStack(Stack):
             custom_policies=rp.hevy_restamp(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #2694: terminal async EventBridge failures -> DLQ digest (dead-man primitive, #809/ADR-116)
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
