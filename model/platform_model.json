@@ -76,9 +76,21 @@
       "routing": "digest",
       "stack": "operational_stack"
     },
+    "life-platform-cf-auth-errors": {
+      "routing": "urgent",
+      "stack": "web_alarms"
+    },
     "life-platform-daily-brief-memory-high": {
       "routing": "digest",
       "stack": "monitoring_stack"
+    },
+    "life-platform-dash-5xx-rate": {
+      "routing": "urgent",
+      "stack": "web_alarms"
+    },
+    "life-platform-dash-total-errors": {
+      "routing": "urgent",
+      "stack": "web_alarms"
     },
     "life-platform-data-export-errors": {
       "routing": "digest",
@@ -6074,7 +6086,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 46,
+      "alarms": 49,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,

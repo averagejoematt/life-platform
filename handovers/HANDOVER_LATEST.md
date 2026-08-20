@@ -425,3 +425,17 @@ reopened** (because its merged change does not deploy). Six of seven closures he
 3. The one-line coach-colour taste call (`config/personas.json`) — now live to look at.
 4. `gate:owner`: #1738, #1571, #1677, #1631; #2833/#2834 startable with you.
 5. Two duplicate us-east-1 billing alarms still to retire (decision in #2829, unexecuted).
+
+## Residual / next picks
+
+- #2829 — reopened: the merged us-east-1 alarm change does not deploy (`already exists`); needs `cdk import` or a scope split.
+- #2920 — `config/personas.json` ships in every bundle but is not a deploy trigger; the a11y fix went green with `Deploy: skipped` and needed a manual `deploy_all` dispatch.
+- #2921 — `/api/sleep_detail` interleaves Eight Sleep and Whoop in one object; confirmed by the reader-truth oracle on a second pass.
+- #2918 — two of six AI validation results never report their `BLOCKED` state, including the TL;DR headline.
+- #2919 — `pattern_coach` (3.89:1) and `career_coach` (3.69:1) fail the WCAG AA contrast floor; pre-existing, invisible to the NEW-violations gate.
+- #2809 — `partial`: verifiable only once a post-genesis Withings weigh-in exists (every current row is `phase=pilot`).
+- #2708 — `partial`: sole caller is the Wednesday chronicle; next run 2026-08-26.
+- #1221 — the live P1: all 21 CloudFront behaviours still use legacy `ForwardedValues`, so `CloudFront-Viewer-Address` never reaches the origin and per-IP limits stay evadable.
+- A Withings weigh-in — not-work — an owner action that also unblocks #2809's verification.
+- The coach-colour palette call — not-work — a taste decision for Matthew; `sleep_coach` is now `#818cf8` on accessibility grounds (6.21:1), and the value is a one-line registry edit.
+- Two duplicate us-east-1 billing alarms to delete — not-work — an AWS mutation recorded in #2829, deliberately not executed from a PR.
