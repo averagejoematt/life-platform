@@ -214,9 +214,17 @@ def test_registry_display_map_is_the_source_of_the_repro_values():
     title, color = _registry_style("nutrition_coach")
     assert color == "#22c55e", f"nutrition_coach registry color drifted from the issue's stated fix value: {color}"
     assert color != "#10b981", "nutrition_coach registry color regressed to the retired layne_norton palette value"
+    # sleep_coach is the ONE exception to "the roster-v2 registry value wins", and it is
+    # an accessibility ruling, not a palette preference. #8b5cf6 measures **4.37:1**
+    # against the page background token (#16130E) — below the WCAG AA 4.5:1 floor for
+    # normal text — and axe flagged it as a NEW *serious* color-contrast violation on
+    # /coaching/ and /method/board/ in the 2026-08-20 post-deploy visual-QA sweep
+    # (`li[data-coach="sleep_coach"] … .rd-name`, `button[data-coach="sleep"] > div > h3`).
+    # #818cf8 measures 6.21:1 and had been serving those surfaces for months.
+    # Contrast is not negotiable against palette lineage, so the lighter value stands.
+    # This pin is the ruling; changing it needs a colour that clears 4.5:1, not a preference.
     _, sleep_color = _registry_style("sleep_coach")
-    assert sleep_color == "#8b5cf6"
-    assert sleep_color != "#818cf8"
+    assert sleep_color == "#818cf8"
 
 
 def test_coach_observatory_renderer_derives_from_the_registry():

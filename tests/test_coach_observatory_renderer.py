@@ -350,14 +350,19 @@ def test_card_renders_output_content_and_coach_identity(monkeypatch):
     #     registry's own `title` field (registry held the shorter "Sleep &
     #     Recovery" before) rather than discarding it — this assertion is
     #     therefore unchanged from before this issue's fix landed.
-    #   - color: intentionally NOT reverted to the pre-fix literal ("#818cf8").
-    #     The issue itself (#2757) names that exact value as the stale one —
-    #     "#818cf8" was the hand-typed copy that had drifted from the registry's
-    #     "#8b5cf6", which is what /api/coaches (registry-derived, never
-    #     overridden) already served live. Reverting the registry to "#818cf8"
-    #     to make this pin pass unmodified would re-open the issue's own repro.
+    #   - color: "#818cf8", and the reasoning here CHANGED on 2026-08-20 — recorded
+    #     rather than quietly edited. #2757 first moved the registry to the roster-v2
+    #     "#8b5cf6" (this pin briefly asserted that). The post-deploy visual-QA sweep
+    #     then failed /coaching/ and /method/board/ with a NEW *serious* axe
+    #     color-contrast violation on exactly the sleep nodes. Measured against the
+    #     page background token #16130E: "#8b5cf6" = 4.37:1, under the WCAG AA 4.5:1
+    #     floor for normal text; "#818cf8" = 6.21:1. So the registry now carries
+    #     "#818cf8" on ACCESSIBILITY grounds, not palette lineage — and #2757's
+    #     structural fix is untouched, because both surfaces still derive this one
+    #     value from the registry. That the colour was a one-line change is exactly
+    #     what the issue set out to achieve.
     assert card["coach_title"] == "Sleep & Circadian Rhythm Specialist"
-    assert card["coach_color"] == "#8b5cf6"
+    assert card["coach_color"] == "#818cf8"
     assert card["generated_at"] == "2026-08-09T12:00:00Z"
     assert card["confidence_language"] == "preliminary"  # no CONFIDENCE# rows yet
     assert card["themes"] == []

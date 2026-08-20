@@ -21,7 +21,7 @@
       "domain": "sleep_science",
       "short_bio": "Sleep scientist & circadian specialist. Reads sleep architecture, timing, and recovery; talks in sleep debt and circadian phase.",
       "emoji": "😴",
-      "color": "#8b5cf6",
+      "color": "#818cf8",
       "coach_config_key": "sleep_coach",
       "engine_id": "sleep_coach",
       "short_id": "sleep",
