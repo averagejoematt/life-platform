@@ -56,6 +56,7 @@ from stacks.csp import (  # ADR-149 (#1678) — the CSP is built in one place, f
 )
 from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
+from stacks.web_alarms import add_web_alarms  # #2829: the us-east-1 alarm estate, extracted sibling
 
 BUCKET = _CONSTANTS_BUCKET
 
@@ -1060,7 +1061,7 @@ class WebStack(Stack):
         # ══════════════════════════════════════════════════════════════
         GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
 
-        cloudwatch.Alarm(
+        subscriber_errors_alarm = cloudwatch.Alarm(
             self,
             "SubscriberErrors",
             alarm_name="email-subscriber-errors",
@@ -1076,3 +1077,8 @@ class WebStack(Stack):
             comparison_operator=GTE,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
+
+        # #2829: the rest of the us-east-1 alarm estate (adopted orphans + this alarm's
+        # missing action) lives in the sibling module — see web_alarms.py's docstring
+        # for the full per-alarm disposition.
+        add_web_alarms(self, subscriber_errors_alarm)
