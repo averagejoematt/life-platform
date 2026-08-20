@@ -202,6 +202,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_chat_behavioral_gate_2564.py",  # #2564: every build_grounder call site supplies available_logs
         "test_observatory_summary_grounding_2418.py",  # same registry, derived-prose surface (#2418)
+        "test_coach_identity_drift_2757.py",  # #2757: AST sweep — no lambda module may hand-type a persona title/color map
         "test_api_schema_completeness.py",
         "test_vlog_mode_contract_1571.py",  # #1571: prose mode file <-> TEMPLATE_SK / date-key / abort semantics
         "test_og_card_coverage.py",

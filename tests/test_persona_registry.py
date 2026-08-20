@@ -98,6 +98,47 @@ def test_operational_names_are_distinct():
     assert len(names) == len(set(names)), "two operational coaches share a display name"
 
 
+def test_operational_personas_have_unique_colors():
+    """#2757: `labs_coach` and `physical_coach` both carried `color: "#f59e0b"` in
+    the registry (a pre-existing collision `/api/coaches` — which reads `color`
+    straight off the registry with no override — was already serving live). The
+    three lambda surfaces that used to hand-type their own title/color maps
+    happened to give labs a distinct color (`#5ba4cf`), so the collision was
+    invisible everywhere except `/api/coaches` itself; converging those three
+    surfaces onto a registry read (#2757's fix) would otherwise have PROPAGATED
+    the collision to every surface instead of removing it — the exact "two
+    different coaches render the same color" shape this issue exists to prevent,
+    just inverted.
+
+    Scoped to `operational` only: guest/board personas (`peter_attia`,
+    `rhonda_patrick`, `eli_marsh`, `margaret_calloway`, `elena_voss`, ...) are a
+    separate id-space with their own reused-palette conventions (e.g.
+    `layne_norton`/`nutrition_coach` sharing "Dr. Marcus Webb" intentionally) and
+    are never rendered side-by-side with the operational roster the way the
+    coaching dashboard/observatory/coach-analysis surfaces render all 7 at once.
+    """
+    ops = _operational()
+    colors: dict = {}
+    for pid, p in ops.items():
+        colors.setdefault(p.get("color"), []).append(pid)
+    dupes = {c: pids for c, pids in colors.items() if len(pids) > 1}
+    assert not dupes, f"operational persona(s) share a color — two coaches would render identically: {dupes}"
+
+
+def test_color_uniqueness_guard_catches_a_planted_collision():
+    """Mutation evidence: a copy of the real registry with labs_coach's color
+    reverted to physical_coach's must trip the guard above."""
+    ops = dict(_operational())
+    mutated = dict(ops)
+    mutated["labs_coach"] = {**ops["labs_coach"], "color": ops["physical_coach"]["color"]}
+    colors: dict = {}
+    for pid, p in mutated.items():
+        colors.setdefault(p.get("color"), []).append(pid)
+    dupes = {c: pids for c, pids in colors.items() if len(pids) > 1}
+    assert dupes, "the color-uniqueness guard's own detector did not fire on a planted collision"
+    assert sorted(dupes[ops["physical_coach"]["color"]]) == ["labs_coach", "physical_coach"]
+
+
 # ── no orphans: registry <-> config/coaches/*.json ───────────────────────────
 
 

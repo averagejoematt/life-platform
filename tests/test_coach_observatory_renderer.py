@@ -343,8 +343,21 @@ def test_card_renders_output_content_and_coach_identity(monkeypatch):
     assert card["analysis"] == "Full-length coach output."
     assert card["coach_name"] == "Dr. Lisa Park"
     assert card["coach_initials"] == "LP"
+    # #2757: title/color now derive from the persona registry (config/personas.json)
+    # rather than a hand-typed copy that had drifted from it.
+    #   - title: the PRE-FIX literal "Sleep & Circadian Rhythm Specialist" is the
+    #     descriptive title readers actually saw, so #2757 PROMOTED it into the
+    #     registry's own `title` field (registry held the shorter "Sleep &
+    #     Recovery" before) rather than discarding it — this assertion is
+    #     therefore unchanged from before this issue's fix landed.
+    #   - color: intentionally NOT reverted to the pre-fix literal ("#818cf8").
+    #     The issue itself (#2757) names that exact value as the stale one —
+    #     "#818cf8" was the hand-typed copy that had drifted from the registry's
+    #     "#8b5cf6", which is what /api/coaches (registry-derived, never
+    #     overridden) already served live. Reverting the registry to "#818cf8"
+    #     to make this pin pass unmodified would re-open the issue's own repro.
     assert card["coach_title"] == "Sleep & Circadian Rhythm Specialist"
-    assert card["coach_color"] == "#818cf8"
+    assert card["coach_color"] == "#8b5cf6"
     assert card["generated_at"] == "2026-08-09T12:00:00Z"
     assert card["confidence_language"] == "preliminary"  # no CONFIDENCE# rows yet
     assert card["themes"] == []

@@ -687,19 +687,27 @@ def _dispatch_route(event, path, method):
         return handle_coach(event)
     if path == "/api/coaching-dashboard":
         try:
-            # Registry-derived (coaching-team v2) + this dashboard's links/styling. The
-            # retired training seat stays renderable for history; live iteration below
-            # keys off whatever this dict carries, so the registry decides the roster.
+            # Registry-derived (coaching-team v2). The retired training seat stays
+            # renderable for history; live iteration below keys off whatever this dict
+            # carries, so the registry decides the roster.
+            #
+            # #2757: title/color used to be re-typed per coach here (a THIRD hand-typed
+            # copy alongside site_api_coach_narrative.py and coach_observatory_renderer.py
+            # — all three had already drifted apart, e.g. nutrition_coach '#10b981' here
+            # vs the registry's '#22c55e'). display_map() already carries title/color, so
+            # only `observatory_link` is still hand-typed — it is a ROUTING fact (which
+            # page a domain's card links to), not a persona-identity fact, so it stays a
+            # small local map rather than moving into the persona registry.
             from coach.persona_registry import display_map as _registry_display_map
 
-            _cd_style = {
-                "sleep": {"title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8", "observatory_link": "/sleep/"},
-                "nutrition": {"title": "Evidence-Based Nutrition", "color": "#10b981", "observatory_link": "/nutrition/"},
-                "mind": {"title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa", "observatory_link": "/mind/"},
-                "physical": {"title": "Performance — Training, Cardio & Mobility", "color": "#f59e0b", "observatory_link": "/physical/"},
-                "glucose": {"title": "Metabolic Health & CGM", "color": "#2dd4bf", "observatory_link": "/glucose/"},
-                "labs": {"title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf", "observatory_link": "/labs/"},
-                "explorer": {"title": "Research & Longevity — Evidence Appraisal", "color": "#e879f9", "observatory_link": "/explorer/"},
+            _cd_observatory_link = {
+                "sleep": "/sleep/",
+                "nutrition": "/nutrition/",
+                "mind": "/mind/",
+                "physical": "/physical/",
+                "glucose": "/glucose/",
+                "labs": "/labs/",
+                "explorer": "/explorer/",
             }
             _cd_names = _registry_display_map(include=("operational",))
             _cd_coach_display = {
@@ -707,9 +715,11 @@ def _dispatch_route(event, path, method):
                     "coach_id": short,
                     "name": _cd_names[f"{short}_coach"]["name"],
                     "initials": _cd_names[f"{short}_coach"]["initials"],
-                    **style,
+                    "title": _cd_names[f"{short}_coach"]["title"],
+                    "color": _cd_names[f"{short}_coach"]["color"],
+                    "observatory_link": link,
                 }
-                for short, style in _cd_style.items()
+                for short, link in _cd_observatory_link.items()
                 if f"{short}_coach" in _cd_names
             }
             _cd_coach_id_map = {
