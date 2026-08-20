@@ -289,9 +289,21 @@ def path_matches_ci_filter(changed_paths: list[str], patterns: list[str]) -> boo
 ZR_SWALLOWED = "swallowed"
 ZR_PATH_FILTER_SKIP = "path-filter-skip"
 ZR_INDETERMINATE = "indeterminate"
+# #2826 follow-up (2026-08-20): a push made with GITHUB_TOKEN never dispatches
+# workflows — GitHub suppresses it by design to prevent recursion. The nightly
+# `chore(reconcile)` commit is exactly this shape AND touches lambdas/** (it
+# regenerates site_api_common.py's literals), so without this state it reads as
+# a PARTIAL SWALLOW and the 15-minute cron fires after every single merge.
+ZR_BOT_PUSH_NO_DISPATCH = "bot-push-no-dispatch"
+BOT_COMMITTERS = {"github-actions[bot]", "web-flow"}
 
 
-def classify_zero_run_head(all_runs_at_head: list[dict], changed_paths: list[str] | None, ci_paths: list[str]) -> dict:
+def classify_zero_run_head(
+    all_runs_at_head: list[dict],
+    changed_paths: list[str] | None,
+    ci_paths: list[str],
+    committer_login: str | None = None,
+) -> dict:
     """Given `head_coverage() == "uncovered"`, decide swallowed-push vs an
     expected path-filter-skip. Pure — the only impure part (fetching
     `all_runs_at_head`/`changed_paths`/`ci_paths`) lives in the caller.
@@ -311,6 +323,14 @@ def classify_zero_run_head(all_runs_at_head: list[dict], changed_paths: list[str
                             could not be read) — neither verdict is provable;
                             NEVER silently folded into either
     """
+    # A GITHUB_TOKEN push cannot dispatch workflows (GitHub anti-recursion), so a
+    # zero-run HEAD is EXPECTED here and must never page — checked before every
+    # other branch because it holds regardless of what the diff touched.
+    if committer_login and committer_login in BOT_COMMITTERS:
+        return {
+            "state": ZR_BOT_PUSH_NO_DISPATCH,
+            "reason": f"HEAD was pushed by {committer_login}; a GITHUB_TOKEN push never dispatches workflows",
+        }
     if not all_runs_at_head:
         return {"state": ZR_SWALLOWED, "reason": "no workflow run of any kind references head_sha"}
     names = sorted({r.get("name") or r.get("path") or "?" for r in all_runs_at_head})
@@ -764,9 +784,13 @@ def main_head_coverage() -> int:
         return 2
 
     changed_paths = None
+    committer_login = None
     try:
         commit = _gh_json(["api", f"repos/{REPO}/commits/{head_sha}"])
         changed_paths = [f.get("filename") for f in (commit.get("files") or []) if f.get("filename")]
+        # Same payload — no extra request. Used to spot a GITHUB_TOKEN push,
+        # which never dispatches workflows (the reconcile-commit false positive).
+        committer_login = ((commit.get("committer") or {}).get("login")) or ((commit.get("author") or {}).get("login"))
     except Exception as e:  # noqa: BLE001 - degrades to indeterminate via classify_zero_run_head, never to a false OK
         print(f"⚠️  head-coverage-check: could not read changed files for {head_sha[:8]} ({e}) — paths treated as unreadable.")
 
@@ -777,8 +801,11 @@ def main_head_coverage() -> int:
         print(f"⚠️  head-coverage-check: could not read ci-cd.yml's paths: filter ({e}) — treating as unrestricted.")
         ci_paths = []
 
-    verdict = classify_zero_run_head(all_runs, changed_paths, ci_paths)
+    verdict = classify_zero_run_head(all_runs, changed_paths, ci_paths, committer_login=committer_login)
     state = verdict["state"]
+    if state == ZR_BOT_PUSH_NO_DISPATCH:
+        print(f"✅ head-coverage-check: {head_sha[:8]} minted no CI/CD run — expected: {verdict['reason']}")
+        return 0
     if state == ZR_PATH_FILTER_SKIP:
         print(f"✅ head-coverage-check: {head_sha[:8]} minted no CI/CD run — expected path-filter skip: {verdict['reason']}")
         return 0
