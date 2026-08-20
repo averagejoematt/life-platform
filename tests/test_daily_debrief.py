@@ -16,6 +16,7 @@ Pins the contract:
 No real Bedrock, DDB, or Google TTS calls anywhere in this file.
 """
 
+import ast
 import json
 import os
 import sys
@@ -31,7 +32,9 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
+import acwr_compute_lambda as acwr_mod  # noqa: E402 — conftest puts lambdas/compute on sys.path
 import daily_debrief_lambda as dd  # noqa: E402
+import daily_metrics_compute_lambda as dmc  # noqa: E402
 from ai import (
     bedrock_client,  # noqa: E402
     budget_guard,  # noqa: E402
@@ -99,7 +102,12 @@ def _computed_metrics():
         "hrv_ms": Decimal("88"),
         "rhr_bpm": Decimal("54"),
         "acwr": Decimal("1.1"),
-        "zone": "optimal",
+        # #2804: the writer (acwr_compute_lambda._write_acwr) stores this
+        # prefixed as acwr_zone — a bare "zone" key is not the real wire shape
+        # and a fixture using it would mask the dead-read bug (see
+        # TestGatherFactsFieldContract below, which pins this against the
+        # REAL writers rather than a hand-typed fixture).
+        "acwr_zone": "optimal",
         "tier0_streak": Decimal("9"),
     }
 
@@ -272,3 +280,120 @@ class TestHandler:
         assert body["dry_run"] is True
         assert body["facts"]["day_grade"] == "B"
         assert fake.puts == {}  # nothing synthesized or indexed
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #2804: gather_facts's read field-set pinned against the writers' REAL wire
+# shape (not a hand-typed fixture — the "zone" fixture above was itself wrong
+# until this issue: `cm.get("zone")` read a field acwr_compute_lambda never
+# wrote, and the fixture happened to define a "zone" key too, so the dead
+# read passed silently). This class runs the actual writer functions against
+# fake tables and asserts every literal key gather_facts reads off `cm`/`hs`
+# is a key one of the real writers actually put in the item — so a future
+# consumer-writer field-name drift fails loud instead of yielding a
+# permanent, silent None (the epic #2797 SAW/EXCLUDED class).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _gather_facts_read_keys() -> dict[str, set[str]]:
+    """AST-parses `gather_facts` in daily_debrief_lambda.py and returns the
+    literal string keys it passes to `cm.get(...)` / `hs.get(...)`, grouped
+    by source variable. Static parsing (not import+introspect) so this stays
+    a pure source-fact read, same idiom as the CDK-fact tests."""
+    src_path = os.path.join(_REPO, "lambdas", "emails", "daily_debrief_lambda.py")
+    with open(src_path, encoding="utf-8") as f:
+        tree = ast.parse(f.read(), filename=src_path)
+
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "gather_facts")
+    reads: dict[str, set[str]] = {"cm": set(), "hs": set()}
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Attribute) and func.attr == "get" and isinstance(func.value, ast.Name)):
+            continue
+        var = func.value.id
+        if var not in reads or not node.args:
+            continue
+        key_arg = node.args[0]
+        if isinstance(key_arg, ast.Constant) and isinstance(key_arg.value, str):
+            reads[var].add(key_arg.value)
+    return reads
+
+
+def _component_details_2804(t0_done=5, t0_total=6, t1_done=2, t1_total=4):
+    return {
+        "habits_mvp": {
+            "composite_method": "tier_weighted",
+            "tier0": {"done": t0_done, "total": t0_total},
+            "tier1": {"done": t1_done, "total": t1_total},
+            "vices": {"held": 0, "total": 1},
+            "tier_status": {0: {f"h{i}": i < t0_done for i in range(t0_total)}, 1: {}},
+        }
+    }
+
+
+class TestGatherFactsFieldContract:
+    def test_computed_metrics_reads_are_all_writer_emitted_fields(self, monkeypatch):
+        """Every literal key gather_facts reads off `cm` must land on the
+        computed_metrics record one of the two REAL writers actually
+        produces: daily_metrics_compute_lambda.store_computed_metrics (the
+        primary record) merged with acwr_compute_lambda._write_acwr (the
+        ACWR UpdateItem merge, #2243/#2804's precedent)."""
+        cm_table = FakeDdbTable()
+        monkeypatch.setattr(dmc, "table", cm_table, raising=False)
+        dmc.store_computed_metrics(
+            "2026-08-06",
+            day_grade_score=81,
+            grade="B",
+            component_scores={"sleep": 80.0},
+            component_details={},
+            readiness_score=70,
+            readiness_colour="green",
+            streak_data={"tier0_streak": 3},
+            tsb=None,
+            hrv_7d=None,
+            hrv_30d=None,
+            sleep_debt_7d_hrs=1.2,
+            latest_weight=None,
+            week_ago_weight=None,
+            avatar_weight=None,
+            vitals={"recovery_pct": 62, "hrv_ms": 88, "rhr_bpm": 54},
+        )
+        assert cm_table.puts, "store_computed_metrics wrote nothing — cannot pin the contract"
+        emitted = set(cm_table.puts[-1].keys())
+
+        acwr_table = FakeDdbTable()
+        monkeypatch.setattr(acwr_mod, "table", acwr_table, raising=False)
+        acwr_mod._write_acwr(
+            "2026-08-06",
+            acwr=1.1,
+            acute_7d=300.0,
+            chronic_28d=280.0,
+            zone="optimal",
+            alert=False,
+            alert_reason=None,
+            n_days_acute=7,
+            n_days_chronic=28,
+        )
+        assert acwr_table.updates, "_write_acwr wrote nothing — cannot pin the contract"
+        update_expr = acwr_table.updates[-1]["UpdateExpression"]
+        assert update_expr.startswith("SET ")
+        for part in update_expr[len("SET ") :].split(","):
+            emitted.add(part.split("=")[0].strip())
+
+        reads = _gather_facts_read_keys()["cm"]
+        missing = reads - emitted
+        assert not missing, f"gather_facts reads {missing} off computed_metrics, but no writer ever emits it (dead read — #2804 class)"
+
+    def test_habit_scores_reads_are_all_writer_emitted_fields(self, monkeypatch):
+        table = FakeDdbTable()
+        monkeypatch.setattr(dmc, "table", table, raising=False)
+        profile = {"habit_registry": {"h0": {"status": "active", "tier": 0}}}
+        dmc.store_habit_scores("2026-08-06", _component_details_2804(), {"habits_mvp": 92.0}, {}, profile, tier0_streak=3)
+        assert table.puts, "store_habit_scores wrote nothing — cannot pin the contract"
+        emitted = set(table.puts[-1].keys())
+
+        reads = _gather_facts_read_keys()["hs"]
+        missing = reads - emitted
+        assert not missing, f"gather_facts reads {missing} off habit_scores, but the writer never emits it (dead read — #2804 class)"
