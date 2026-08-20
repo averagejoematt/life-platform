@@ -425,38 +425,98 @@ class CorpusTable(FakeTable):
 def test_a_real_precedent_produces_a_card():
     table = CorpusTable([_inst(WEEK_1)])
     _precedent_corpus(table, WEEK_1)
-    card = ri.recall_card_for_text(table, "this week", embed=lambda _t: [1.0, 0.0, 0.0])
-    assert card is not None
-    assert card["resembles_date"] == WEEK_1
-    assert card["similarity"] >= sr.DEFAULT_THRESHOLD
-    assert card["link"] == "/journal/posts/week-01/"
+    outcome = ri.recall_card_for_text(table, "this week", embed=lambda _t: [1.0, 0.0, 0.0])
+    assert outcome.reason == ri.RECALL_FOUND
+    assert outcome.found is True
+    assert outcome.cannot_see is False
+    assert outcome.card["resembles_date"] == WEEK_1
+    assert outcome.card["similarity"] >= sr.DEFAULT_THRESHOLD
+    assert outcome.card["link"] == "/journal/posts/week-01/"
 
 
-def test_no_precedent_above_threshold_produces_no_card():
-    """ADR-104: the card must be ABSENT, not a weak match dressed up as a resemblance."""
+# ── #2708: recall_card_for_text returns a TYPED outcome, not a bare card-or-None. ──
+# None used to collapse four structurally different causes into one face — a genuine
+# no-match (a finding) and three coverage gaps (we could not check) all rendered
+# identically. Each cause below must land on its OWN reason, and `.cannot_see` must be
+# True for exactly the three coverage-gap causes, never for the honest no-match.
+def test_no_precedent_above_threshold_is_a_finding_not_a_coverage_gap():
+    """ADR-104: a real search that found nothing is an honest negative — .cannot_see is
+    False, and the caller must not treat this the same as 'could not check'."""
     table = CorpusTable([_inst(WEEK_1)])
     _precedent_corpus(table, WEEK_1)
-    assert ri.recall_card_for_text(table, "this week", embed=lambda _t: [0.0, 1.0, 0.0]) is None
+    outcome = ri.recall_card_for_text(table, "this week", embed=lambda _t: [0.0, 1.0, 0.0])
+    assert outcome.reason == ri.RECALL_NO_PRECEDENT
+    assert outcome.card is None
+    assert outcome.found is False
+    assert outcome.cannot_see is False
 
 
-def test_an_empty_corpus_produces_no_card():
-    assert ri.recall_card_for_text(CorpusTable(), "this week", embed=lambda _t: [1.0, 0.0, 0.0]) is None
+def test_an_empty_corpus_is_a_coverage_gap_not_a_finding():
+    """THE #2708 defect: an empty reader-visible corpus used to render identically to a
+    real no-match. It must now be its own reason, and .cannot_see must be True — the
+    lookup never happened, so it cannot be reported as 'no precedent'."""
+    outcome = ri.recall_card_for_text(CorpusTable(), "this week", embed=lambda _t: [1.0, 0.0, 0.0])
+    assert outcome.reason == ri.RECALL_NO_CORPUS
+    assert outcome.card is None
+    assert outcome.cannot_see is True
+    assert outcome.reason != ri.RECALL_NO_PRECEDENT
 
 
-def test_a_budget_pause_produces_no_card(monkeypatch):
+def test_a_budget_pause_says_paused_not_no_precedent(monkeypatch):
     import ai.budget_guard as bg
 
     monkeypatch.setattr(bg, "allow", lambda feature: False)
     table = CorpusTable([_inst(WEEK_1)])
     _precedent_corpus(table, WEEK_1)
-    assert ri.recall_card_for_text(table, "this week", embed=lambda _t: [1.0, 0.0, 0.0]) is None
+    outcome = ri.recall_card_for_text(table, "this week", embed=lambda _t: [1.0, 0.0, 0.0])
+    assert outcome.reason == ri.RECALL_PAUSED
+    assert outcome.card is None
+    assert outcome.cannot_see is True
+    assert outcome.reason != ri.RECALL_NO_PRECEDENT
 
 
-def test_a_failing_embedder_produces_no_card_and_never_raises():
+def test_a_failing_embedder_reports_error_not_no_precedent_and_never_raises():
+    """A non-empty, reader-visible corpus (so this actually exercises the embed call,
+    not the earlier NO_CORPUS short-circuit) whose embedder breaks."""
+
     def _boom(_t):
         raise RuntimeError("bedrock is having a day")
 
-    assert ri.recall_card_for_text(CorpusTable([_inst(WEEK_1)]), "this week", embed=_boom) is None
+    table = CorpusTable([_inst(WEEK_1)])
+    _precedent_corpus(table, WEEK_1)
+    outcome = ri.recall_card_for_text(table, "this week", embed=_boom)
+    assert outcome.reason == ri.RECALL_ERROR
+    assert outcome.card is None
+    assert outcome.cannot_see is True
+    assert outcome.reason != ri.RECALL_NO_PRECEDENT
+
+
+def _boom_embed(_t):
+    raise RuntimeError("bedrock is having a day")
+
+
+def test_the_four_causes_do_not_collapse_to_the_same_outcome():
+    """The acceptance line, literally: run all four causes and assert the reasons are
+    four DISTINCT values — the class of bug this issue closes is exactly a silent
+    collapse to one shape."""
+    from unittest import mock
+
+    import ai.budget_guard as bg
+
+    found_table = CorpusTable([_inst(WEEK_1)])
+    _precedent_corpus(found_table, WEEK_1)
+    outcomes = {
+        ri.recall_card_for_text(found_table, "this week", embed=lambda _t: [1.0, 0.0, 0.0]).reason,
+        ri.recall_card_for_text(found_table, "this week", embed=lambda _t: [0.0, 1.0, 0.0]).reason,
+        ri.recall_card_for_text(CorpusTable(), "this week", embed=lambda _t: [1.0, 0.0, 0.0]).reason,
+        ri.recall_card_for_text(found_table, "this week", embed=_boom_embed).reason,
+    }
+    assert outcomes == {ri.RECALL_FOUND, ri.RECALL_NO_PRECEDENT, ri.RECALL_NO_CORPUS, ri.RECALL_ERROR}
+
+    with mock.patch.object(bg, "allow", lambda feature: False):
+        paused = ri.recall_card_for_text(found_table, "this week", embed=lambda _t: [1.0, 0.0, 0.0])
+    assert paused.reason == ri.RECALL_PAUSED
+    assert paused.reason not in outcomes
 
 
 # ── AC3 render: the card reaches the published page ─────────────────────────
@@ -470,18 +530,26 @@ def _render():
     return m
 
 
+def _found(card: dict):
+    """An outcome wrapping a card dict, the shape `_recall_card_html` now expects
+    (#2708: recall_card_for_text returns a RecallOutcome, never a bare card)."""
+    return ri.RecallOutcome(ri.RECALL_FOUND, card)
+
+
 def test_the_card_renders_the_score_and_refuses_to_claim_causation():
     """ADR-105: similarity is a hypothesis generator. The copy says 'resembles', shows the
     number, and says so explicitly — it must never assert that one week caused another."""
     cr = _render()
     html = cr._recall_card_html(
-        {
-            "resembles_date": WEEK_1,
-            "similarity": 0.87,
-            "link": "/journal/posts/week-01/",
-            "snippet": "the week the sleep debt caught up",
-            "provenance": "cosine similarity 0.87 vs the chronicle of " + WEEK_1,
-        }
+        _found(
+            {
+                "resembles_date": WEEK_1,
+                "similarity": 0.87,
+                "link": "/journal/posts/week-01/",
+                "snippet": "the week the sleep debt caught up",
+                "provenance": "cosine similarity 0.87 vs the chronicle of " + WEEK_1,
+            }
+        )
     )
     assert "resembles" in html
     assert "0.87" in html
@@ -492,13 +560,33 @@ def test_the_card_renders_the_score_and_refuses_to_claim_causation():
 
 
 def test_no_card_renders_nothing_at_all():
-    """Honest absence is an empty string, not an empty box saying 'no precedent found'."""
-    assert _render()._recall_card_html(None) == ""
+    """Honest absence is an empty string, not an empty box saying 'no precedent found' —
+    both for a totally missing outcome (a belt-and-suspenders import failure) and for
+    the typed RECALL_NO_PRECEDENT reason (a real search, honestly nothing found)."""
+    cr = _render()
+    assert cr._recall_card_html(None) == ""
+    assert cr._recall_card_html(ri.RecallOutcome(ri.RECALL_NO_PRECEDENT)) == ""
+
+
+# ── #2708: a coverage gap must NOT render the same silence as an honest no-match ──
+@pytest.mark.parametrize("reason", [ri.RECALL_NO_CORPUS, ri.RECALL_PAUSED, ri.RECALL_ERROR])
+def test_a_coverage_gap_renders_a_distinct_note_not_silence(reason):
+    """The literal acceptance line: 'no precedent' and 'cannot see that window' render as
+    DIFFERENT reader-facing text. A coverage gap gets a quiet, honest note; an honest
+    no-match (above) gets nothing. The two must never be the same string."""
+    html = _render()._recall_card_html(ri.RecallOutcome(reason))
+    no_precedent_html = _render()._recall_card_html(ri.RecallOutcome(ri.RECALL_NO_PRECEDENT))
+    assert html != ""
+    assert html != no_precedent_html
+    assert "no comparison run" in html.lower()
+    # never claims a resemblance or "no precedent" when it could not even look
+    assert "resembles" not in html.lower()
+    assert "no precedent" not in html.lower()
 
 
 def test_a_precedent_with_no_page_is_cited_by_date_without_a_link():
     """#1827: a wiped prior-cycle installment has no reader page. Cite the date alone."""
-    html = _render()._recall_card_html({"resembles_date": WEEK_1, "similarity": 0.9, "link": "", "provenance": "p"})
+    html = _render()._recall_card_html(_found({"resembles_date": WEEK_1, "similarity": 0.9, "link": "", "provenance": "p"}))
     assert f"the week of {WEEK_1}" in html
     assert "<a href=" not in html
 
@@ -506,7 +594,7 @@ def test_a_precedent_with_no_page_is_cited_by_date_without_a_link():
 def test_the_card_escapes_its_snippet():
     """The snippet is installment prose flowing into a published page."""
     html = _render()._recall_card_html(
-        {"resembles_date": WEEK_1, "similarity": 0.9, "link": "", "snippet": "<script>x</script>", "provenance": "p"}
+        _found({"resembles_date": WEEK_1, "similarity": 0.9, "link": "", "snippet": "<script>x</script>", "provenance": "p"})
     )
     assert "<script>" not in html
 

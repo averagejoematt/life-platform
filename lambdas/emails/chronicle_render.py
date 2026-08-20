@@ -251,8 +251,14 @@ def display_stats_line(stats_line, date_str, *, _g):
 
 
 def recall_card_for(table, text):
-    """#1384 AC3 — the recall card for this installment, or None. Fail-soft wrapper so a
-    missing bundle path can never break a publish."""
+    """#1384 AC3 — the recall card outcome for this installment. Fail-soft wrapper so a
+    missing bundle path can never break a publish.
+
+    Returns the `RecallOutcome` (#2708) `recall_card_for_text` produces — that function
+    itself never raises and already distinguishes the four causes (see its docstring).
+    This wrapper only guards a total import failure (a missing bundle path), which falls
+    back to `None` — `_recall_card_html` renders that the same as an honest no-match,
+    since this is not one of the #2708 causes, just belt-and-suspenders on the import."""
     try:
         from ai.recall_indexer import recall_card_for_text
 
@@ -261,15 +267,26 @@ def recall_card_for(table, text):
         return None
 
 
-def _recall_card_html(card):
-    """Render the recall card, or "" when there is no precedent.
+def _recall_card_html(outcome):
+    """Render the recall outcome (#2708: a typed `RecallOutcome`, not a bare card).
 
     ADR-105: similarity is a HYPOTHESIS GENERATOR, never a claim of sameness. The copy is
     "resembles" and the score is shown in full next to it — a reader can see how strong
     the match actually is instead of being told two weeks were the same. The date links
     to the installment it names when that page exists, and carries no link at all when it
     does not (#1827: a precedent's link is openable or absent, never a guess).
+
+    ADR-104 (#2708): an honest no-match (`RECALL_NO_PRECEDENT`) renders nothing — the
+    common, non-newsworthy case, unchanged since #1384. A coverage gap (no reader-visible
+    corpus, a paused budget, or a broken lookup — `.cannot_see`) is a DIFFERENT reader
+    fact and renders a distinct, quiet note instead of the same silence: silence there
+    would let a system fault masquerade as "nothing similar ever happened".
     """
+    if outcome is None:
+        return ""
+    if getattr(outcome, "cannot_see", False):
+        return '  <p class="post-recall-unavailable">No comparison run for this week.</p>'
+    card = getattr(outcome, "card", None)
     if not card:
         return ""
     import html as _html
@@ -425,7 +442,9 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # #1384 AC3: the recall card. Computed here, during the render, so the corpus it
     # searches holds strictly EARLIER weeks — this installment is indexed at publish,
     # after this runs, so it cannot match itself. Renders nothing at all when no earlier
-    # week clears the cosine floor, which is the honest state and the common one.
+    # week clears the cosine floor (the honest state and the common one), but a quiet
+    # "no comparison run" note instead when the lookup couldn't happen at all — a
+    # coverage gap must not render the same as an honest no-match (#2708, ADR-104).
     recall_card_html = _recall_card_html(recall_card_for(_g.get("table"), f"{title} {body_html}"))
     post_html = f"""<!DOCTYPE html>
 <html lang="en" data-door="story">
@@ -511,6 +530,10 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     .post-recall__lede {{ font-family:var(--font-serif);font-size:var(--fs-h3);color:var(--ink);margin:0 0 var(--sp-2); }}
     .post-recall__snippet {{ color:var(--ink-muted);font-style:italic;margin:0 0 var(--sp-2); }}
     .post-recall__provenance {{ font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);margin:0; }}
+    /* #2708 — a coverage gap (no reader-visible corpus / paused budget / broken lookup)
+       is NOT an honest no-match, so it gets its own quiet line rather than the same
+       silence a real no-match renders as (ADR-104: absence must not read as a finding). */
+    .post-recall-unavailable {{ font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);margin:var(--sp-6) 0 0; }}
     /* #1620 — outbound social follow row: the off-site next action at the end of the
        crawlable post (the page a shared/viral link actually lands on). Line-art marks
        from the shared sprite via inline <use> — renders with no JS. */

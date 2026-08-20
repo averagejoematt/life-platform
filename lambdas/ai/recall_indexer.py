@@ -44,6 +44,7 @@ re-embed, so re-running the hook on an already-indexed week is free and writes n
 from __future__ import annotations
 
 import logging
+from typing import NamedTuple, Optional
 
 from ai import recall_consent as rc, semantic_recall as sr
 
@@ -75,6 +76,43 @@ SKIPPED_CONSENT = "skipped:consent"
 FAILED = "failed"
 
 CHRONICLE_SOURCE = "chronicle"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #2708: the READ side had the same collapsed-absence shape #2705 fixed on the
+# WRITE side. `recall_card_for_text` returned a bare `None` for four causes its
+# own docstring named but never distinguished: no reader-visible corpus, a
+# paused budget, an embedding failure, and a genuine no-match. Only the last is
+# a finding ("nothing similar happened"); the other three are coverage gaps
+# ("we could not check") — collapsing them lets a system fault read exactly
+# like an honest negative (ADR-104). `RecallOutcome` makes the distinction
+# structural: callers branch on `.reason`, not on truthiness of a card.
+# ─────────────────────────────────────────────────────────────────────────────
+
+RECALL_FOUND = "found"  # a real match at/above the cosine floor — .card is set
+RECALL_NO_PRECEDENT = "no_precedent"  # searched a real, reader-visible corpus; nothing matched — a finding
+RECALL_NO_CORPUS = "no_corpus"  # the reader-visible corpus is empty — we could not look at anything
+RECALL_PAUSED = "paused"  # budget band 2 (ADR-125) — deliberately not looked
+RECALL_ERROR = "error"  # bad input, an unusable table, or the embed call raised — the lookup broke
+
+# The causes that mean "we cannot see", never to be rendered as "no precedent found".
+RECALL_ABSENT_REASONS = (RECALL_NO_CORPUS, RECALL_PAUSED, RECALL_ERROR)
+
+
+class RecallOutcome(NamedTuple):
+    """The typed return of `recall_card_for_text` — see the #2708 note above."""
+
+    reason: str
+    card: Optional[dict] = None
+
+    @property
+    def found(self) -> bool:
+        return self.reason == RECALL_FOUND
+
+    @property
+    def cannot_see(self) -> bool:
+        """True for the three coverage-gap causes — distinct from an honest no-match."""
+        return self.reason in RECALL_ABSENT_REASONS
 
 
 def snippet(text: str, n: int = 240) -> str:
@@ -296,28 +334,30 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
     return INDEXED
 
 
-def recall_card_for_text(table, text: str, *, exclude_dates=None, embed=None):
-    """The AC3 recall card for `text`, or None. Never raises.
+def recall_card_for_text(table, text: str, *, exclude_dates=None, embed=None) -> RecallOutcome:
+    """The AC3 recall card for `text`, typed (#2708). Never raises.
 
     `semantic_recall.recall_card` has existed since #1384 with ZERO production callers —
     the reader-facing half of the story ("the chronicle gains a 'this week resembles the
     week of …' card") was written, tested, and never wired to anything. This is the
     function that gives it a caller.
 
-    None is a first-class answer: no corpus, a paused budget, an embedding failure, or no
-    precedent at/above the 0.75 cosine floor all return None, and the caller renders
-    nothing. A card that appears only when there is a real match is the ADR-104 contract —
-    the alternative, a card that always renders with whatever scored highest, would
-    manufacture a resemblance for every week.
+    Returns a `RecallOutcome`, not a bare card-or-None (#2708): `.reason` is one of the
+    RECALL_* constants above. `RECALL_FOUND` is the only reason with `.card` set — a card
+    that appears only when there is a real match is the ADR-104 contract, the alternative
+    (always rendering whatever scored highest) would manufacture a resemblance for every
+    week. `RECALL_NO_PRECEDENT` searched a real, reader-visible corpus and found nothing —
+    an honest negative. `RECALL_NO_CORPUS` / `RECALL_PAUSED` / `RECALL_ERROR` are coverage
+    gaps: we did not get to look, so a caller must not render them as "no precedent".
 
     Ordering note for the chronicle: this runs during the render, BEFORE the week is
     indexed at publish, so the corpus contains strictly earlier weeks. The week cannot
     match itself and no `exclude_dates` gymnastics are needed to prevent it.
     """
     if table is None or not (text or "").strip():
-        return None
+        return RecallOutcome(RECALL_ERROR)
     if not _budget_allows():
-        return None
+        return RecallOutcome(RECALL_PAUSED)
     try:
         if embed is None:
             from ai import bedrock_client as _bc
@@ -326,10 +366,19 @@ def recall_card_for_text(table, text: str, *, exclude_dates=None, embed=None):
         # #2587: READER_KINDS, not the coach allowlist — this card renders into a
         # published chronicle installment, so it may only cite a kind that has a page a
         # reader can open. Same decision as `ask_retrieval.PUBLISHED_KINDS`, derived from
-        # the same registry.
-        return sr.recall_card(sr.retrieve(table, embed(text), exclude_dates=exclude_dates, resolve=True, kinds=sr.READER_KINDS))
+        # the same registry. Checked BEFORE ranking so an empty reader-visible corpus is
+        # reported as RECALL_NO_CORPUS ("could not look"), never RECALL_NO_PRECEDENT
+        # ("looked, found nothing") — the #2708 distinction.
+        visible_corpus = sr.filter_kinds(sr.load_corpus(table), sr.READER_KINDS)
+        if not visible_corpus:
+            return RecallOutcome(RECALL_NO_CORPUS)
+        candidates = sr.retrieve(table, embed(text), exclude_dates=exclude_dates, resolve=True, kinds=sr.READER_KINDS)
     except Exception:  # noqa: BLE001 — a card is decoration; its absence is honest, its failure is not fatal
-        return None
+        return RecallOutcome(RECALL_ERROR)
+    card = sr.recall_card(candidates)
+    if card is None:
+        return RecallOutcome(RECALL_NO_PRECEDENT)
+    return RecallOutcome(RECALL_FOUND, card)
 
 
 def index_chronicle_installment(table, chronicle_pk: str, date_str: str, *, sk: str = "", embed=None, now=None) -> str:
