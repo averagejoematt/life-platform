@@ -1,57 +1,5 @@
 {
   "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Add an entry the same session a new long-red alarm is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live.",
-  "freshness-interior-gap": {
-    "citation": "#2643",
-    "note": "Eight Sleep missing 2026-08-09 — an interior gap behind the high-water mark, so freshness reads OK while trailing windows are short a night. True positive, found at the 2026-08-13 wrap."
-  },
-  "ingest-auth-unhealthy-24h": {
-    "citation": "#1934",
-    "note": "Whoop OAuth 401, auth breaker latched since 2026-08-01 12:00Z. Needs Matthew's interactive re-auth (setup/setup_whoop_auth.py --backfill) — gate:owner, cannot be automated."
-  },
-  "ingest-auth-unhealthy-whoop": {
-    "citation": "#1934",
-    "note": "Same event as ingest-liveness-unhealthy below — whoop's third credential loss, latched 2026-08-04T00:00Z; clears on the owner re-auth (owner-list item 1, HANDOVER_LATEST 2026-08-06)."
-  },
-  "ingest-consecutive-failures-whoop": {
-    "citation": "#1934",
-    "note": "Same event — the hourly ConsecutiveFailures counter on the latched whoop breaker; clears on the owner re-auth + backfill."
-  },
-  "ingest-liveness-unhealthy": {
-    "citation": "#1934",
-    "note": "Whoop's THIRD credential loss: breaker latched 2026-08-04T00:00Z ('refresh 400, unchanged refresh_token' — the post-#2076 classifier reading it correctly), ConsecutiveFailures climbing hourly, no data since 08-03. Same owner re-auth path as the citation (setup_whoop_auth.py --backfill + delete the AUTH_FAILURE marker row, #2085). Owner-list item 1 on HANDOVER_LATEST 2026-08-06; a fourth loss makes the rotation root-cause its own issue."
-  },
-  "life-platform-dlq-depth-warning": {
-    "citation": "#2069",
-    "note": "Same underlying cause and same message set as life-platform-ingestion-dlq-messages above (duplicate alarm on the identical AWS/SQS ApproximateNumberOfMessagesVisible metric/dimension, routed to the digest topic instead of urgent) — ALARM since 2026-08-03T12:04:56Z, confirmed fired correctly."
-  },
-  "life-platform-ingestion-dlq-messages": {
-    "citation": "#2069",
-    "note": "ALARM since 2026-08-03T12:04:26Z (verified via describe-alarm-history) — the whoop-data-ingestion EventBridge events that failed every hour from 12:00Z onward (first a 502 on the token endpoint, then repeated 'genuine auth failure' 400s the pre-fix breaker classifier never recognized) land here. The alarm + its urgent SNS route ('life-platform-alerts') worked correctly the whole time — remediation-dispatcher logged 'dispatched urgent_alarm' at 12:04:59Z — this was never a missing-machinery gap. Messages clear once #2069's classifier/rotation fix is deployed AND the credential is interactively re-authorized (owner action, concurrent with this filing) restores clean hourly runs; until then they are an accounted-for, expected byproduct of the known root cause, not a separate incident."
-  },
-  "life-platform-s3-bucket-size-high": {
-    "citation": "#2642",
-    "note": "74.3 GB StandardStorage vs 7.2 GB of live objects — ~67 GB of noncurrent versions. deploys/ and site/ have no NoncurrentVersionExpiration. True positive, found at the 2026-08-13 wrap."
-  },
-  "qa-paused-by-budget": {
-    "citation": "#1927",
-    "note": "budget-tier cutoff-1 band (incl. qa-paused-by-budget's own AI gates) was off 26 of the last 30 days; fires whenever a qa-smoke run overlaps a paused feature. Red continuously since 2026-07-18."
-  },
-  "qa-smoke-failures": {
-    "citation": "#2741 (was #1934 + #1968)",
-    "note": "RE-MEASURED 2026-08-19 00:20Z. #2741's driver landed and deployed 2026-08-18 (#2880, merged 19:50Z) — reader_truth:verdict is confirmed absent from the FAIL set in every run since. FailCount has been 0 on every datapoint since 2026-08-18 14:05Z (last breach: 2.0). The board caught 3 GENUINE new FAILs organically on 2026-08-17 18:32Z right after its prior OK (Whoop auth-breaker vitals staleness, a redirect 404, recall-corpus freshness — all triaged separately), which is the exact 'signal a NEW failure' property #2670 exists to restore, proven on production traffic. Currently ALARM only because the rolling-24h Maximum still carries the 08-18 14:05Z datapoint; earliest possible OK ~2026-08-19 14:05Z with no further deploy needed, provided no new genuine FAIL lands first. Remove this entry once actually observed clearing."
-  },
-  "qa-smoke-warnings": {
-    "citation": "#2670",
-    "note": "RE-MEASURED 2026-08-19 00:20Z: with #2741's fix landed, reader_truth findings are gone from recent runs, and the ONLY non-chronic warn across 8 sampled invocations in the trailing 48h (2026-08-17->18) was character:receipt_replay's config/engine-drift branch, EVERY time naming the same two receipts ['2026-08-17','2026-08-16'] — the scheduled cron is daily 11:30 PT (cron(30 18 ? * * *)), so most of those 8 are post-deploy CI invocations, not separate nightly runs; the finding is stronger for it — this branch warns on every invocation, not merely once a night. That branch's own docstring premise — 'expected exactly once after a deliberate change' — was measured false: this platform redeploys core config/engine routinely (often multiple times a day across concurrent sessions), so at least one of the last 7 daily receipts predates the live engine on nearly every run. FIXED, not threshold-widened (box 1): reclassified chronic=True in the same #1958/#2378 'known-recurring TIMING condition' class (PR fixing #2670, lambdas/operational/qa_smoke_lambda.py::check_receipt_replay + tests/test_qa_smoke_chronic_warns.py's AST-guarded SANCTIONED_CHRONIC_SITES). The mismatched-with-UNCHANGED-config branch (real replay nondeterminism) is untouched and stays alarmed. The alarm's shape itself (period=86400/Maximum/threshold=1/notBreaching) is UNCHANGED — test_qa_smoke_warnings_alarm_window_untouched still asserts it. Needs a Lambda deploy of qa-smoke (not CDK) before the effect is live; then the usual rolling-24h wait for the current breaching datapoint to age out. mcp:get_todoist_snapshot's 'No Todoist data available' warn also appeared intermittently (3 of 8 sampled invocations, self-resolved by 08-18 15:00Z) — left alarmed as a real, if transient, finding, not chronic-ized without more evidence."
-  },
-  "coherence-overall": {
-    "citation": "#2735",
-    "note": "Went red 2026-08-15 11:46 PT and was, briefly, the only alarm on the board carrying information — but what it said was wrong. Sole offender: endpoint_shape:nutrition_overview 'degenerate payload'. The payload is empty because Matthew has not logged food in MacroFactor since 2026-06-24 (52d); dropbox-poll is healthy and the stored record is intact. source_registry classifies macrofactor behavioral:True/posture:load-bearing and the #2326 block is explicit that such a source must never page, because that pages on a CORRECT REST STATE — yet the sentinel had no notion of 'behavioral' at all (zero grep hits in both modules). POST_RESET_GRACE_DAYS=5 masked it on days 0-3 of cycle 13, which is why it reads as 'broke on 08-15' when nothing broke on 08-15. FIXED and deployed (#2735/PR #2737): a behaviour-explained empty payload is now WARN naming the source and duration, and _emit_overall trips only on ALARM, so the gauge emitted 0.0 at 14:52 PT. Still ALARM only because the alarm is Maximum over a rolling 24h window and today's 1.0 landed at 18:45Z — earliest possible OK is ~2026-08-16 18:45Z, with no further deploy needed. Remove this entry once it has actually cleared."
-  },
-  "slo-source-freshness": {
-    "citation": "incident 2026-08-08 — measured, no code defect (see note)",
-    "note": "Red since 2026-08-05. MEASURED live 2026-08-08 against each source's own stale_hours in ingestion/source_registry.py, not inherited from a prior handover: food_delivery 133d (thr 14), measurements 132d (thr 60), macrofactor 45d (thr 4), strava 5d (thr 2), supplements 5d (thr 2), garmin 54d but PAUSED by ADR-074. Every one is a manual-drop or behavioural source with no writer running - i.e. the alarm is telling the truth and there is no code defect to fix. Kept RED on purpose: suppressing it would make the freshness SLO unable to report the condition it exists for. Re-measure before carrying this note forward; the set changes as Matthew drops files."
-  },
   "token-alarm-genesis-window-active": {
     "citation": "#2116",
     "note": "NOT A FAULT — by design. This is a boolean gauge sub-alarm carrying NO SNS action of its own (cdk/stacks/monitoring_stack.py, the TokenAlarmGenesisWindowActive block). ALARM means literally 'we are inside the genesis window', which the two composite alarms combine with the token-threshold breach so a genesis-week breach is digested rather than paged (#2116, after #1961's post-genesis rebuild pages). Cycle 13's genesis is 2026-08-10, so red since 2026-08-07 is the correct state. Expected to return to OK when the window closes; treat_missing_data=NOT_BREACHING so a stale gauge can never silently suppress a real page. If it is still ALARM well after the genesis window ends, THAT is the finding — file it, don't re-cite."
