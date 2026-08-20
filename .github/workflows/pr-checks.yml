@@ -184,4 +184,9 @@ jobs:
           fetch-depth: 0  # full history: needs a real merge-base diff against origin/main
 
       - name: Check API-before-frontend sequencing
+        # #749: every pre-merge gate step reports independently — without this an
+        # earlier red masks it, and a gate whose verdict can be swallowed is the
+        # exact "reads green while telling you nothing" class #2831 exists to close.
+        # Enforced by tests/test_premerge_lane.py::test_the_lane_gates_report_independently.
+        if: always()
         run: python3 scripts/check_api_before_frontend.py --base-ref "origin/${{ github.base_ref }}" --head-ref HEAD
