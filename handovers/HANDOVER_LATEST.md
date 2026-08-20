@@ -426,6 +426,35 @@ reopened** (because its merged change does not deploy). Six of seven closures he
 4. `gate:owner`: #1738, #1571, #1677, #1631; #2833/#2834 startable with you.
 5. Two duplicate us-east-1 billing alarms still to retire (decision in #2829, unexecuted).
 
+## Closing the loop — main is GREEN, after three self-inflicted reds
+
+`check_main_green.py` exits **0** on `f023bf4d` — "latest completed CI/CD run succeeded", no decode
+needed. Every job success or legitimately skipped.
+
+Getting there took three fixes, and **CI found all three; my local 168-test structural set found none**:
+
+1. **`alarm_count` fallback (99)** drifted past `test_platform_stats_truth.py`'s ±5 hygiene tolerance
+   when #2913 added 3 alarms (→107). Value-only fix (`sync_doc_metadata.py` is 1780/1780).
+2. **`DEPENDENCY_GRAPH.md` went stale** (the merges changed the model) **and my wrap failed its own
+   #1340 gate** — I wrote `## Next` where the contract requires `## Residual / next picks`, with every
+   bullet either citing `#N` or tagged `not-work —`. *The session wrapped and the wrap was invalid.*
+3. **The #2917 citation prune redded a pin.** `test_real_registry_known_long_reds_present` asserted
+   three names were always present, describing them as "the documented >72h reds **as of this filing
+   (#1959)**". All three have recovered (`qa-paused-by-budget` OK since 08-03, `ingest-auth-unhealthy-24h`
+   since 08-19, `qa-smoke-warnings` in ALARM ~1h). The pin had come to gate **against** the registry's
+   own documented lifecycle, so pruning *correctly* is what broke it.
+
+**On (3) I did not restore the entries or re-pin today's lit alarms** — a snapshot of which alarms
+happen to be red rots by construction, and re-dating it just resets the clock. Replaced with the
+invariant that cannot rot: **every citation must name an alarm the CDK actually declares** (AST-derived
+over the 107-name inventory), which catches typos, renames, and entries orphaned by a deleted alarm.
+Live *coverage* stays in `check_alarm_citations.py` against real CloudWatch, where it belongs.
+**Mutation-proved**: a planted bogus entry reds it; restoring turns it green.
+
+**The transferable one:** the 5-suite structural set (168) is not a proxy for the unit lane. It missed
+an `aws_cdk` import last session and three separate reds today. Anything that changes a *count*, a
+*derived artifact*, or a *registry* needs the real lane or a targeted run before it is called done.
+
 ## Residual / next picks
 
 - #2829 — reopened: the merged us-east-1 alarm change does not deploy (`already exists`); needs `cdk import` or a scope split.
