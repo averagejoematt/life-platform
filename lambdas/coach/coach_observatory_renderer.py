@@ -71,21 +71,17 @@ DOMAIN_COACH_MAP = {
     "explorer": "explorer_coach",
 }
 
-# Registry-derived names/initials (coaching-team v2) + this surface's styling.
+# Registry-derived names/initials/title/color (coaching-team v2). #2757: this used to
+# re-type its own title/color per coach, and it had already drifted from the registry
+# (nutrition_coach's color here was the pre-roster-v2 '#10b981' while the registry —
+# and every other consumer of it — had moved to '#22c55e'). display_map() already
+# carries title/color (falls back to board_role when a persona has no dedicated
+# `title`), so this surface now derives entirely rather than keeping its own copy.
+# `include=("operational", "retired")` keeps the retired training_coach entry
+# resolvable, for cross-coach references inside historical OUTPUT#/ENSEMBLE# records.
 from coach.persona_registry import display_map as _registry_display_map
 
-_OBS_STYLE = {
-    "sleep_coach": {"title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
-    "nutrition_coach": {"title": "Evidence-Based Nutrition", "color": "#10b981"},
-    "training_coach": {"title": "Exercise Physiology & Strength (retired seat)", "color": "#3db88a"},
-    "mind_coach": {"title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa"},
-    "physical_coach": {"title": "Performance — Training, Cardio & Mobility", "color": "#f59e0b"},
-    "glucose_coach": {"title": "Metabolic Health & CGM", "color": "#2dd4bf"},
-    "labs_coach": {"title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
-    "explorer_coach": {"title": "Research & Longevity — Evidence Appraisal", "color": "#e879f9"},
-}
-_reg = _registry_display_map(include=("operational", "retired"))
-COACH_DISPLAY = {cid: {**(_reg.get(cid) or {}), **style} for cid, style in _OBS_STYLE.items() if _reg.get(cid)}
+COACH_DISPLAY = _registry_display_map(include=("operational", "retired"))
 
 # Domain → source mapping for statistical guardrails lookup
 DOMAIN_SOURCE_MAP = {

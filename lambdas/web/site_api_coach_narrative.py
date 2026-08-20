@@ -255,19 +255,15 @@ def handle_coach_analysis(event, *, _g):
             return _ok({"coach_id": None, "domain": raw_domain, "analysis": None}, cache_seconds=600)
         return _error(400, f"Invalid domain. Use one of: {', '.join(sorted(_coach_map))}")
 
-    # Registry-derived names/initials (coaching-team v2) + surface-local styling.
-    _reg = _registry_display_map(include=("operational", "retired"))
-    _style = {
-        "sleep_coach": {"title": "Sleep & Circadian Rhythm Specialist", "color": "#818cf8"},
-        "nutrition_coach": {"title": "Evidence-Based Nutrition", "color": "#10b981"},
-        "training_coach": {"title": "Exercise Physiology & Strength (retired seat)", "color": "#3db88a"},
-        "mind_coach": {"title": "Psychiatrist — Behavioral Patterns", "color": "#a78bfa"},
-        "physical_coach": {"title": "Performance — Training, Cardio & Mobility", "color": "#f59e0b"},
-        "glucose_coach": {"title": "Metabolic Health & CGM", "color": "#2dd4bf"},
-        "labs_coach": {"title": "Clinical Pathology & Preventive Labs", "color": "#5ba4cf"},
-        "explorer_coach": {"title": "Research & Longevity — Evidence Appraisal", "color": "#e879f9"},
-    }
-    _coach_display = {cid: {**(_reg.get(cid) or {}), **style} for cid, style in _style.items() if _reg.get(cid)}
+    # Registry-derived names/initials/title/color (coaching-team v2). #2757: this used
+    # to re-type its own title/color per coach and had already drifted from the
+    # registry (nutrition_coach's color here was the pre-roster-v2 '#10b981' while
+    # /api/coaches — registry-derived — served '#22c55e'). display_map() already
+    # carries title/color (falls back to board_role when a persona has no dedicated
+    # `title`), so this surface now derives entirely. `include=("operational",
+    # "retired")` keeps the retired training_coach entry resolvable for cross-coach
+    # references inside historical OUTPUT#/ENSEMBLE# records.
+    _coach_display = _registry_display_map(include=("operational", "retired"))
 
     try:
         coach_pk = f"COACH#{coach_id}"
