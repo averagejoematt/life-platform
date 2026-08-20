@@ -218,6 +218,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_budget_guard_ladder.py",
         # ── tree hygiene + safety sweeps ──────────────────────────────────────
         "test_lambdas_packaging_guard.py",  # ADR-146: no loose modules at the lambdas/ root
+        "test_bundle_deploy_trigger_registry.py",  # #2920: every path build_bundle.py stages is a deploy trigger or a dated exemption
         "test_root_clutter_guard.py",
         "test_no_conflict_markers.py",  # a merge marker reached main once already
         "test_no_dead_intelligence_functions.py",
