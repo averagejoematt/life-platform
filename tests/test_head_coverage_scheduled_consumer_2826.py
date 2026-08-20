@@ -265,3 +265,53 @@ def test_exit_codes_are_pairwise_distinct():
     that checks the code itself must never confuse 'broken check' with
     'confirmed incident'."""
     assert len({0, 1, 2}) == 3
+
+
+# ── #2826 follow-up: the reconcile-commit false positive (2026-08-20) ──────────
+#
+# Found live, minutes after #2925 merged: `check_main_green.py --head-coverage-check`
+# called main's HEAD a SWALLOWED PUSH and exited 1. The HEAD was a routine
+# `chore(reconcile)` commit — pushed with GITHUB_TOKEN, which GitHub deliberately
+# never dispatches workflows for (anti-recursion), AND touching
+# lambdas/web/site_api_common.py, which IS in ci-cd.yml's paths: filter. So it hit
+# the "partial swallow" branch. A reconcile commit follows EVERY merge, so the
+# 15-minute cron would have paged forever — the exact false-positive-generator
+# failure this issue's design was supposed to avoid.
+
+
+def _ci_paths():
+    import os
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, ".github", "workflows", "ci-cd.yml")) as f:
+        return cmg.ci_cd_push_paths(f.read())
+
+
+def test_reconcile_commit_by_bot_is_expected_not_swallowed():
+    """The live false positive: bot push + zero runs + a diff that DOES hit the filter."""
+    v = cmg.classify_zero_run_head(
+        [], ["docs/TESTING.md", "lambdas/web/site_api_common.py"], _ci_paths(), committer_login="github-actions[bot]"
+    )
+    assert v["state"] == cmg.ZR_BOT_PUSH_NO_DISPATCH, v
+
+
+def test_bot_push_check_precedes_every_other_branch():
+    """It holds regardless of runs present or paths touched — a GITHUB_TOKEN push
+    cannot dispatch, so no other signal can make it a swallow."""
+    ci = _ci_paths()
+    for runs, paths in (([], ["lambdas/x.py"]), ([{"name": "Docs CI"}], ["lambdas/x.py"]), ([], ["CLAUDE.md"])):
+        v = cmg.classify_zero_run_head(runs, paths, ci, committer_login="github-actions[bot]")
+        assert v["state"] == cmg.ZR_BOT_PUSH_NO_DISPATCH, (runs, paths, v)
+
+
+def test_a_human_push_with_zero_runs_still_pages():
+    """The regression guard: the fix must not mute a genuine swallow."""
+    v = cmg.classify_zero_run_head([], ["lambdas/web/foo.py"], _ci_paths(), committer_login="averagejoematt")
+    assert v["state"] == cmg.ZR_SWALLOWED, v
+
+
+def test_omitting_committer_preserves_the_original_behaviour():
+    """Back-compat: callers that pass no committer get exactly the pre-fix verdicts."""
+    ci = _ci_paths()
+    assert cmg.classify_zero_run_head([], ["lambdas/web/foo.py"], ci)["state"] == cmg.ZR_SWALLOWED
+    assert cmg.classify_zero_run_head([{"name": "Docs CI"}], ["CLAUDE.md"], ci)["state"] == cmg.ZR_PATH_FILTER_SKIP
