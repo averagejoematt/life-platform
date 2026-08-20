@@ -140,7 +140,11 @@ def gather_facts(date_str: str) -> dict:
     # Training load (BS-09 ACWR, merged onto computed_metrics by acwr-compute).
     if cm.get("acwr") is not None:
         put("training_load_acwr", _num(cm.get("acwr")))
-        put("training_load_zone", cm.get("zone"))
+        # #2804 (precedent: #2243): writer (acwr_compute_lambda._write_acwr)
+        # stores this prefixed as acwr_zone — the bare "zone" name never
+        # existed on the record, so this read was dead and training_load_zone
+        # never reached the debrief.
+        put("training_load_zone", cm.get("acwr_zone"))
     # Habit completion — the effort surface.
     if hs.get("tier0_total"):
         put("core_habits_done", _int(hs.get("tier0_done")))
