@@ -95,7 +95,7 @@ answers are "nothing yet" — write that down too):
 | Character engine inputs | `lambdas/compute/` character sheet |
 | Coach fact pack | `ai_expert_analyzer` + `lambdas/web/site_api_ai_context.py` |
 | Site surfaces | `/data/` pages, cockpit vitals, `/api/vitals` |
-| MCP tools | `mcp/tools_health.py` (+ registry wiring test) |
+| MCP tools | `mcp/tools_health.py` (+ registry wiring test) — **and `mcp/tools_data.py`'s generic row dumpers** (`_get_latest`, `_get_daily_summary`, `tool_get_date_range`, `_find_days_filter`): they return whatever fields a partition holds, so a new Tier-2 field lands in them with NO code change on their side — check whether it needs adding to `TIER2_STRIP_FIELDS` (#2809: the #2782 sweep checked `tools_health.py` and missed `tools_data.py`, so `vascular_age`/`metabolic_age`/`afib_result` reached conversation context through the generic path for 4 days) |
 | Daily brief | `lambdas/emails/` |
 | OG share cards | OG image lambda |
 

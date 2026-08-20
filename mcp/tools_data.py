@@ -14,6 +14,37 @@ from mcp.config import RAW_DAY_LIMIT, SOURCES, USER_PREFIX, table
 from mcp.core import date_diff_days, decimal_to_float, get_sot, query_source, resolve_field
 from mcp.helpers import aggregate_items, flatten_strava_activity
 
+# #2809: Tier-2 owner-only fields (docs/SCHEMA.md:327 — PhenoAge posture) — never on a
+# public surface, never quoted into an AI narrative context. MCP IS the sanctioned
+# owner-only surface (a field-selective tool like get_labs's genome view may return
+# Tier-2 data on purpose), but the GENERIC row dumpers below never picked fields — they
+# hand back the whole DDB row, so a `get_date_range`/`get_daily_snapshot`/`find_days`
+# call on withings put the Tier-2 trio into Claude conversation context by accident,
+# which is exactly the distinction SCHEMA.md's "field-selective, never dump rows" line
+# is about. Stripped once, here, rather than re-implemented per row-returning path.
+TIER2_STRIP_FIELDS = {
+    "withings": {"vascular_age", "metabolic_age", "afib_result"},
+}
+
+
+def _strip_tier2(source, item):
+    """Remove `source`'s Tier-2 owner-only fields from one DDB row dict, in place.
+    Returns the same dict for call-site chaining. A source with no Tier-2 facet (the
+    common case) is a no-op — this only ever REMOVES keys already present, never
+    invents, renames, or adds one. Keyed on the `source` the caller already queried
+    (the row itself may not carry its own `source` attribute), never on the row."""
+    if isinstance(item, dict):
+        for f in TIER2_STRIP_FIELDS.get(source, ()):
+            item.pop(f, None)
+    return item
+
+
+def _strip_tier2_many(source, items):
+    """`_strip_tier2` applied over a list of rows for one known `source`."""
+    for item in items:
+        _strip_tier2(source, item)
+    return items
+
 
 def _date_of(items):
     """The day a partition-edge row belongs to — from the sk, which is authoritative.
@@ -106,7 +137,7 @@ def _get_latest(args):
         )
         response = table.query(**kwargs)
         items = decimal_to_float(response.get("Items", []))
-        result[source] = items[0] if items else None
+        result[source] = _strip_tier2(source, items[0]) if items else None
     return result
 
 
@@ -127,7 +158,7 @@ def _get_daily_summary(args):
         response = table.query(**kwargs)
         items = decimal_to_float(response.get("Items", []))
         if items:
-            result[source] = items
+            result[source] = _strip_tier2_many(source, items)
     return result
 
 
@@ -141,7 +172,7 @@ def tool_get_date_range(args):
         raise ValueError(f"Unknown source '{source}'. Valid: {SOURCES}")
 
     days = date_diff_days(start_date, end_date)
-    items = query_source(source, start_date, end_date)
+    items = _strip_tier2_many(source, query_source(source, start_date, end_date))
 
     if days > RAW_DAY_LIMIT:
         period = "year" if days > 365 * 2 else "month"
@@ -401,7 +432,7 @@ def _find_days_filter(args):
         }
         matched = [{k: v for k, v in m.items() if k in key_fields} for m in matched]
 
-    return matched
+    return _strip_tier2_many(source, matched)
 
 
 def tool_find_days(args):
