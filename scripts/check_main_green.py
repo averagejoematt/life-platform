@@ -79,12 +79,51 @@ fact about a pipeline that is no longer able to ship.
 Cancelled runs are skipped (superseded pushes carry no signal); the newest
 run that actually finished is the completed-run verdict.
 
+#2826 gives `head_coverage()` (above) a SCHEDULED consumer, because #2762 only
+ever ran it inside a session's `/wrap` gate — an unattended merge (dependabot-
+automerge, remediation automerge) whose push is swallowed had no detector
+until a human happened to run this file. `--head-coverage-check` (see
+`main_head_coverage()` below) is invoked from `deploy-wedge-watch.yml`'s
+existing 15-minute cron.
+
+The naive wiring — "uncovered ⇒ page" — was tried and rejected LIVE in this
+same session: main's HEAD (8cbf075f) touched only `CLAUDE.md` and
+`handovers/HANDOVER_LATEST.md`, neither in ci-cd.yml's `paths:` filter, so
+`head_coverage()` correctly read `uncovered` — but `Docs CI` HAD run at that
+sha (`gh api .../actions/runs?head_sha=...` — total_count 1). That is an
+ordinary, EXPECTED path-filter skip, not a swallowed push, and ci-cd.yml's own
+`paths:` block (see the DEVOPS-01 comment at 0bffc1ec) already documents this
+exact shape as "indistinguishable from a swallowed push" by `head_coverage()`
+alone. Wiring the naive version into a 15-minute cron would page on every
+docs-only or wrap commit — most of them — and be muted inside a week.
+
+`classify_zero_run_head()` is the discriminator, run only when `head_coverage`
+says `uncovered`:
+
+  swallowed        — ZERO runs of ANY workflow reference head_sha (nothing ran
+                      at all — #2662 class), OR some other workflow(s) ran but
+                      the commit's changed paths DO intersect ci-cd.yml's
+                      `paths:` filter (ci-cd.yml should have run and did not,
+                      even though siblings did — a partial swallow)
+  path-filter-skip  — some other workflow(s) ran, and the changed paths do NOT
+                      intersect the filter — the expected, silent shape
+  indeterminate     — the changed-files read failed; neither verdict is provable
+
+`main_head_coverage()` maps these to three DISTINCT exit codes so the check
+can never fail dark (the #2753 class this epic exists to close): an execution
+error (API read failure) returns 2, never 0 — "could not verify" must never
+read as "coverage OK", and must not be conflated with a CONFIRMED swallow (1)
+either, since only the latter should page.
+
 Usage:
-  python3 scripts/check_main_green.py             # gate: not-green main → exit 1
-  python3 scripts/check_main_green.py --decoded   # operator wrote the decode line → exit 0 with reminder
+  python3 scripts/check_main_green.py                    # gate: not-green main → exit 1
+  python3 scripts/check_main_green.py --decoded           # operator wrote the decode line → exit 0 with reminder
+  python3 scripts/check_main_green.py --head-coverage-check  # #2826 scheduled consumer (see above)
 """
 
 import json
+import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -98,6 +137,10 @@ STRANDED_WAIT_HOURS = 2.0
 # that rejects a run per merge stacks several in a row; an unbounded walk would
 # turn one gate check into dozens of API calls.
 REJECTION_PROBE_LIMIT = 8
+
+# Repo root, for reading ci-cd.yml's own `paths:` filter (#2826) — never guess
+# a relative path from the caller's cwd.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Verdict kinds (module constants so tests and consumers share the vocabulary).
 GREEN = "green"
@@ -165,6 +208,123 @@ def head_coverage(runs: list[dict], head_sha: str | None) -> dict:
     if at_head:
         return {"state": "pending", "pending": at_head[0]}
     return {"state": "uncovered", "pending": None}
+
+
+# ── #2826: the swallowed-push / path-filter-skip discriminator ──────────────
+#
+# `head_coverage() == "uncovered"` means no ci-cd.yml run references head_sha —
+# but ci-cd.yml's OWN `paths:` filter can legitimately decline a push (a
+# docs-only or handover-only commit, e.g.), and that is indistinguishable from
+# a genuine swallow using ci-cd.yml's run list alone. The discriminator below
+# is fleet-level (queries runs of ALL workflows at head_sha, not just ci-cd.yml)
+# — same shape as check_deploy_wedge.holders() needing a fleet view to tell a
+# real holder from a phantom.
+
+CI_CD_WORKFLOW_FILE = "ci-cd.yml"
+
+
+def ci_cd_push_paths(yaml_text: str) -> list[str]:
+    """The push `paths:` filter from ci-cd.yml's own trigger block. Pure —
+    parses YAML text the caller supplies (never reads the file itself, so this
+    is independently testable against a frozen fixture).
+
+    NB: PyYAML's default (YAML 1.1) resolver reads the bare `on:` key as the
+    boolean `True`, not the string `"on"` — a real gotcha every workflow-
+    parsing script in this repo (`gate_census.py`, `apply_branch_protection.py`)
+    has to account for. Both spellings are checked so this does not silently
+    return `[]` if PyYAML's behavior ever changes.
+    """
+    import yaml  # local: keeps the module importable where PyYAML is absent
+
+    try:
+        doc = yaml.safe_load(yaml_text) or {}
+    except yaml.YAMLError:
+        return []
+    on = doc.get("on")
+    if on is None:
+        on = doc.get(True)
+    push = (on or {}).get("push") or {}
+    return [p for p in (push.get("paths") or []) if isinstance(p, str)]
+
+
+def _pattern_to_regex(pattern: str) -> re.Pattern:
+    """Translate ONE GitHub Actions path-filter glob to a regex. Not a general
+    glob engine — covers exactly the constructs ci-cd.yml's filter actually
+    uses: `dir/**` (any depth under dir, including nothing), a bare `*` within
+    one path segment, and literal filenames/extensions."""
+    parts = []
+    i, n = 0, len(pattern)
+    while i < n:
+        if pattern.startswith("**", i):
+            parts.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            parts.append("[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            parts.append("[^/]")
+            i += 1
+        else:
+            parts.append(re.escape(pattern[i]))
+            i += 1
+    return re.compile("^" + "".join(parts) + "$")
+
+
+def path_matches_ci_filter(changed_paths: list[str], patterns: list[str]) -> bool:
+    """True iff any changed path matches any of ci-cd.yml's `paths:` globs. Pure.
+
+    An EMPTY `patterns` list means "could not read the filter" (not "the
+    filter matches nothing") — fail toward treating the push as IN-SCOPE, so a
+    parse failure can never manufacture a false path-filter-skip.
+    """
+    if not patterns:
+        return True
+    regexes = [_pattern_to_regex(p) for p in patterns]
+    return any(rx.match(path) for path in changed_paths for rx in regexes)
+
+
+# Verdict kinds for classify_zero_run_head — module constants so tests and the
+# CLI share one vocabulary (the #1901 lesson: a decode contract retyped per
+# consumer drifts).
+ZR_SWALLOWED = "swallowed"
+ZR_PATH_FILTER_SKIP = "path-filter-skip"
+ZR_INDETERMINATE = "indeterminate"
+
+
+def classify_zero_run_head(all_runs_at_head: list[dict], changed_paths: list[str] | None, ci_paths: list[str]) -> dict:
+    """Given `head_coverage() == "uncovered"`, decide swallowed-push vs an
+    expected path-filter-skip. Pure — the only impure part (fetching
+    `all_runs_at_head`/`changed_paths`/`ci_paths`) lives in the caller.
+
+    `all_runs_at_head` — runs of ANY workflow at head_sha (NOT filtered to
+    ci-cd.yml; `head_coverage` already proved no ci-cd.yml run exists there).
+
+      swallowed         — zero runs of ANY workflow at head_sha (nothing ran,
+                           period — the #2662 class), OR other workflow(s) DID
+                           run but the diff intersects ci-cd.yml's own filter
+                           (it should have run too and did not — a PARTIAL
+                           swallow, not an expected skip)
+      path-filter-skip   — other workflow(s) ran, and the diff touches none of
+                            ci-cd.yml's `paths:` filter — the expected shape
+                            (observed live: 8cbf075f, CLAUDE.md + a handover)
+      indeterminate       — `changed_paths` is None (the commit's file list
+                            could not be read) — neither verdict is provable;
+                            NEVER silently folded into either
+    """
+    if not all_runs_at_head:
+        return {"state": ZR_SWALLOWED, "reason": "no workflow run of any kind references head_sha"}
+    names = sorted({r.get("name") or r.get("path") or "?" for r in all_runs_at_head})
+    if changed_paths is None:
+        return {"state": ZR_INDETERMINATE, "reason": f"could not read the commit's changed files (other workflow(s) ran: {names})"}
+    if path_matches_ci_filter(changed_paths, ci_paths):
+        return {
+            "state": ZR_SWALLOWED,
+            "reason": f"other workflow(s) ran ({names}) but NOT ci-cd.yml, even though the diff touches its paths: filter",
+        }
+    return {
+        "state": ZR_PATH_FILTER_SKIP,
+        "reason": f"diff touches none of ci-cd.yml's paths: filter; other workflow(s) ran instead: {names}",
+    }
 
 
 def latest_main_conclusion(runs: list[dict]) -> tuple[str | None, str | None]:
@@ -547,5 +707,90 @@ def main() -> int:
     return 1
 
 
+def main_head_coverage() -> int:
+    """#2826: the SCHEDULED consumer of `head_coverage()` — run unattended from
+    `deploy-wedge-watch.yml`'s 15-minute cron so a swallowed push pages without
+    waiting for a session to happen to run `main()`'s `/wrap` gate.
+
+    Exit codes are deliberately THREE-WAY so this check cannot fail dark (the
+    #2753 class the epic exists to close — an execution error must never read
+    as "coverage OK", and must not be conflated with a CONFIRMED swallow either,
+    since only the latter should page):
+
+      0 = OK             — covered, pending, or a proven path-filter-skip
+      1 = SWALLOWED PUSH  — confirmed: the caller (the workflow step) should
+                            fail loudly
+      2 = INDETERMINATE   — an API read failed or the paths data was
+                            unreadable; neither OK nor a confirmed swallow was
+                            provable. Still non-zero (never silently "OK") but
+                            distinct from exit 1 so an operator reading the run
+                            history does not mistake "the check itself broke"
+                            for "a push was actually swallowed."
+    """
+    try:
+        ci_runs = _gh_json(
+            [
+                "run",
+                "list",
+                "--branch",
+                "main",
+                "--workflow",
+                "CI/CD",
+                "--limit",
+                "20",
+                "--json",
+                "status,conclusion,headSha,databaseId,createdAt",
+            ]
+        )
+    except Exception as e:  # noqa: BLE001 - execution error, never a false "OK"
+        print(f"⚠️  head-coverage-check: could not read the CI/CD run list ({e}) — INDETERMINATE, not OK.")
+        return 2
+
+    try:
+        head_sha = _gh_json(["api", f"repos/{REPO}/branches/main"])["commit"]["sha"]
+    except Exception as e:  # noqa: BLE001
+        print(f"⚠️  head-coverage-check: could not read main's HEAD ({e}) — INDETERMINATE, not OK.")
+        return 2
+
+    cov = head_coverage(ci_runs, head_sha)
+    if cov["state"] != "uncovered":
+        print(f"✅ head-coverage-check: HEAD {head_sha[:8]} is {cov['state']} — no action needed.")
+        return 0
+
+    try:
+        all_runs = _gh_json(["api", f"repos/{REPO}/actions/runs?head_sha={head_sha}&per_page=100"])["workflow_runs"]
+    except Exception as e:  # noqa: BLE001
+        print(f"⚠️  head-coverage-check: could not read all-workflow runs at {head_sha[:8]} ({e}) — INDETERMINATE, not OK.")
+        return 2
+
+    changed_paths = None
+    try:
+        commit = _gh_json(["api", f"repos/{REPO}/commits/{head_sha}"])
+        changed_paths = [f.get("filename") for f in (commit.get("files") or []) if f.get("filename")]
+    except Exception as e:  # noqa: BLE001 - degrades to indeterminate via classify_zero_run_head, never to a false OK
+        print(f"⚠️  head-coverage-check: could not read changed files for {head_sha[:8]} ({e}) — paths treated as unreadable.")
+
+    try:
+        with open(os.path.join(_REPO_ROOT, ".github", "workflows", CI_CD_WORKFLOW_FILE)) as f:
+            ci_paths = ci_cd_push_paths(f.read())
+    except Exception as e:  # noqa: BLE001 - an empty filter reads as "everything matches" (fail toward in-scope)
+        print(f"⚠️  head-coverage-check: could not read ci-cd.yml's paths: filter ({e}) — treating as unrestricted.")
+        ci_paths = []
+
+    verdict = classify_zero_run_head(all_runs, changed_paths, ci_paths)
+    state = verdict["state"]
+    if state == ZR_PATH_FILTER_SKIP:
+        print(f"✅ head-coverage-check: {head_sha[:8]} minted no CI/CD run — expected path-filter skip: {verdict['reason']}")
+        return 0
+    if state == ZR_SWALLOWED:
+        print(f"🛑 SWALLOWED PUSH (#2826 class) at {head_sha[:8]}: {verdict['reason']}")
+        print("   Recovery: workflow_dispatch ci-cd.yml on main (or re-push) so HEAD earns a real verdict.")
+        return 1
+    print(f"⚠️  head-coverage-check: {head_sha[:8]} — {verdict['reason']} — INDETERMINATE, not OK, not a confirmed swallow.")
+    return 2
+
+
 if __name__ == "__main__":
+    if "--head-coverage-check" in sys.argv:
+        sys.exit(main_head_coverage())
     sys.exit(main())
