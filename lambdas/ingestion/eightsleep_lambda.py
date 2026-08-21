@@ -35,6 +35,15 @@ Derived clinical fields (computed at ingestion, queryable by all MCP tools):
   rem_pct                  – REM as % of TST  (norm 20–25%)
   deep_pct                 – Deep as % of TST (norm 15–25%)
   light_pct                – Light as % of TST (norm 40–60%)
+                             NB: rem/deep/light_pct are OMITTED as a set — with
+                             `stage_pct_omitted_reason` stating why — on nights where
+                             the vendor's stage hours do not reconcile with TST (they
+                             sometimes carry awake time TST excludes). Percent-of-TST
+                             is undefined there; publishing it produced a live
+                             light_pct of 106.7 on 2026-08-20 (ADR-104: absence, not
+                             a clamped or fabricated figure).
+  stage_pct_omitted_reason – present ONLY when the three above are omitted; states the
+                             stage sum, the TST it was measured against, and the ratio
   sleep_onset_hour         – Local fractional hour of sleep onset  (e.g. 23.5 = 11:30 pm)
   wake_hour                – Local fractional hour of wake         (e.g. 7.25 = 7:15 am)
   sleep_midpoint_hour      – Midpoint of sleep session in local time (circadian marker;
@@ -394,14 +403,68 @@ def compute_derived_fields(record: dict, tz_offset: int = _DEFAULT_TZ_OFFSET) ->
         derived["waso_hours"] = waso
 
     # ── Stage percentages ─────────────────────────────────────────────────────
+    #
+    # THE DENOMINATOR CAN BE WRONG, AND THEN SO IS EVERY PERCENTAGE (2026-08-21).
+    # These are "% of TST" by definition (see the field block at the top of this
+    # module), and that only holds while the vendor's stage hours actually sum to
+    # TST. On 2026-08-20 they did not: deep 0.15 + rem 0.42 + light 1.44 = 2.01h
+    # against `sleep_duration_hours` 1.35h — the stages carried the 0.61h of
+    # `awake_hours`, TST did not. Dividing anyway published **light_pct 106.7** to
+    # /api/sleep_detail, a live reader-facing impossibility (the row read
+    # deep 11.1 + rem 31.1 + light 106.7 = 148.9%).
+    #
+    # Note this is NOT a light-sleep problem: all three percentages come off the
+    # same bad denominator, so `deep_pct` 11.1 was equally wrong (7.5% of the real
+    # stage total) — it merely landed inside a plausible range and so read as fine.
+    # Clamping light to 100 would have hidden the defect and fabricated a figure;
+    # per ADR-104 the honest output for "we cannot compute this" is ABSENCE.
+    #
+    # So: reconcile first, and omit all three when the stages and TST disagree by
+    # more than rounding. `stage_pct_omitted_reason` carries WHY, because a field
+    # that silently vanishes is the failure mode this platform keeps re-learning —
+    # a consumer must be able to tell "not measured" from "measured and dropped".
     if sleep_h and float(sleep_h) > 0:
         sh = float(sleep_h)
-        if rem_h is not None:
-            derived["rem_pct"] = round(float(rem_h) / sh * 100, 1)
-        if deep_h is not None:
-            derived["deep_pct"] = round(float(deep_h) / sh * 100, 1)
-        if light_h is not None:
-            derived["light_pct"] = round(float(light_h) / sh * 100, 1)
+        stages = {"rem_pct": rem_h, "deep_pct": deep_h, "light_pct": light_h}
+        present = {k: float(v) for k, v in stages.items() if v is not None}
+        computed = {k: round(v / sh * 100, 1) for k, v in present.items()}
+
+        # GUARD THE INVARIANT, NOT A PROXY FOR IT. The obvious check — "do the stage
+        # hours reconcile with TST?" — over-fires badly: measured across all 991 stored
+        # rows, 45 have stages exceeding TST (mostly 105-124%, a systematic vendor skew
+        # where brief wake epochs land inside a stage), and only ONE of those 45 ever
+        # produced a percentage over 100. Omitting on the reconciliation test would
+        # therefore strip 44 nights of individually-plausible figures to fix one live
+        # defect — trading a real regression for a cosmetic one.
+        #
+        # So the condition is the thing that actually cannot be true: a published
+        # percentage outside [0,100]. All three go together when it trips, because they
+        # share the denominator that produced it — on 2026-08-20 `light_pct` was 106.7
+        # AND `deep_pct` was 11.1 when the honest figure against the stage total was
+        # 7.5%. Fixing only the one that visibly broke would leave two wrong numbers
+        # published and reading as correct.
+        #
+        # The systematic skew is real and separately tracked; it is an accuracy question
+        # about the vendor's stage accounting, not a "this number is impossible" question.
+        impossible = {k: v for k, v in computed.items() if not (0 <= v <= 100)}
+        if impossible:
+            stage_sum = sum(present.values())
+            derived["stage_pct_omitted_reason"] = (
+                f"{', '.join(f'{k}={v}' for k, v in sorted(impossible.items()))} is not a possible percentage — "
+                f"stage hours sum to {round(stage_sum, 2)}h against TST {round(sh, 2)}h "
+                f"({round(stage_sum / sh * 100)}%, stages appear to include awake time), so percent-of-TST is "
+                "undefined for this night; rem/deep/light_pct are all omitted rather than published wrong"
+            )
+            logger.warning(
+                "eightsleep stage percentages omitted (%s): stage_sum=%.2fh TST=%.2fh (%.0f%%) — %s",
+                ", ".join(f"{k}={v}" for k, v in sorted(impossible.items())),
+                stage_sum,
+                sh,
+                stage_sum / sh * 100,
+                record.get("date") or record.get("sleep_start") or "unknown date",
+            )
+        else:
+            derived.update(computed)
 
     # ── Circadian timing ──────────────────────────────────────────────────────
     onset_h = _hour_of_day(sleep_start, tz_offset) if sleep_start else None

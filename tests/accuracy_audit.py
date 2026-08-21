@@ -193,6 +193,63 @@ def sanity_scan(run_dir):
     return findings
 
 
+# Percent fields that are legitimately signed. `progress_pct`: weight above the cycle
+# baseline is honest negative progress (ADR-104 down-weeks-shown), bounded at -100 (the
+# full goal distance regained). Keep this set SMALL and evidence-driven — a broad
+# pre-exemption is how a real impossible number gets waved through.
+_SIGNED_PCT_FIELDS = frozenset({"progress_pct"})
+
+
+def _pct_bounds(key):
+    return (-100, 100) if key in _SIGNED_PCT_FIELDS else (0, 100)
+
+
+def scan_impossible_pcts(payload, source="payload"):
+    """Recursively flag every `*_pct` outside its legal range, anywhere in `payload`.
+
+    WHY RECURSIVE, AND WHY THIS EXISTS (2026-08-21). The rubric below was already
+    correct — `_pct` fields belong in [0,100] — but it only ever read two top-level
+    blocks of ONE document (`public_stats`). Meanwhile `/api/sleep_detail` served
+
+        2026-08-20  deep 11.1 + rem 31.1 + light 106.7 = 148.9%
+
+    to the public site, and nothing looked: the bad value sat inside a `sleep_trend`
+    LIST, on an endpoint this scan never fetched. A correct rule with a denominator
+    narrower than the live surface is #2652's defect, and this is it in the numeric
+    gate — so the walk is now structure-agnostic (dicts, lists, any depth) and the
+    caller decides which documents to feed it.
+
+    Returns findings with a dotted `field` path so an operator can locate the value
+    rather than re-derive where it came from.
+    """
+    findings = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                here = f"{path}.{k}" if path else k
+                if k.endswith("_pct") and isinstance(v, (int, float)) and not isinstance(v, bool):
+                    lo, hi = _pct_bounds(k)
+                    if not (lo <= v <= hi):
+                        findings.append(
+                            {
+                                "check": "impossible_value",
+                                "severity": "high",
+                                "source": source,
+                                "field": here,
+                                "value": v,
+                                "note": f"pct out of [{lo},{hi}]",
+                            }
+                        )
+                walk(v, here)
+        elif isinstance(node, list):
+            for i, item in enumerate(node):
+                walk(item, f"{path}[{i}]")
+
+    walk(payload, "")
+    return findings
+
+
 def impossible_values(ps):
     """Scan a public_stats dict for impossible computed values.
 
@@ -201,6 +258,10 @@ def impossible_values(ps):
     render gate (tests/pr_render_gate.py) can run the exact same numeric rubric
     against a locally-served public_stats without a live deploy. Returns findings
     (severity high/warn); an empty list means every value is in range.
+
+    The percentage half now delegates to `scan_impossible_pcts`, so public_stats and
+    every swept API payload are graded by ONE rubric — the two cannot drift into
+    disagreeing about what a legal percentage is.
     """
     findings = []
     if not isinstance(ps, dict):
@@ -210,24 +271,7 @@ def impossible_values(ps):
         v = t.get(k)
         if isinstance(v, (int, float)) and v < 0:
             findings.append({"check": "impossible_value", "severity": "high", "field": f"training.{k}", "value": v, "note": "must be >= 0"})
-    for blk_name in ("journey", "vitals"):
-        for k, v in (ps.get(blk_name, {}) or {}).items():
-            if not (k.endswith("_pct") and isinstance(v, (int, float))):
-                continue
-            # progress_pct is signed: weight above the cycle baseline is honest negative
-            # progress (ADR-104 down-weeks-shown), bounded at -100 (the full goal distance
-            # regained). All other _pct fields stay strictly [0,100].
-            lo = -100 if k == "progress_pct" else 0
-            if not (lo <= v <= 100):
-                findings.append(
-                    {
-                        "check": "impossible_value",
-                        "severity": "high",
-                        "field": f"{blk_name}.{k}",
-                        "value": v,
-                        "note": f"pct out of [{lo},100]",
-                    }
-                )
+    findings.extend(scan_impossible_pcts(ps, source="public_stats"))
     return findings
 
 
@@ -263,6 +307,49 @@ def live_checks():
         findings.extend(impossible_values(_fetch_json("/public_stats.json")))
     except Exception as e:  # noqa: BLE001
         findings.append({"check": "impossible_value", "severity": "warn", "note": f"public_stats fetch failed: {e}"})
+
+    # ── the API surface, DERIVED — not a hand-list (#2652's lesson) ──────────────
+    #
+    # Until 2026-08-21 this whole check read ONE document, `public_stats.json`. The
+    # rubric was right and its denominator was wrong, so `/api/sleep_detail` served
+    # `sleep_trend[3].light_pct = 106.7` to the public site and nothing looked.
+    #
+    # The endpoint set comes from `tests/qa_manifest.py`'s declared `api_deps` — the
+    # same registry the rest of the QA harness derives from — so an endpoint a page
+    # starts depending on joins this sweep by construction. Hand-listing the endpoints
+    # here would rebuild the exact defect one layer over.
+    #
+    # Measured before arming (2026-08-21, live): 59 of 59 endpoints fetched, ONE high
+    # finding — the known `light_pct` defect. So this does not arrive pre-red.
+    #
+    # A fetch failure is a WARN, not HIGH: this is a post-deploy gate and a transient
+    # 5xx on an unrelated endpoint must not auto-rollback a healthy deploy (the #2841
+    # false-red class). A genuinely dead endpoint is already caught as `page_resolves`.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import qa_manifest as QM
+
+        endpoints = sorted({dep for pg in QM.MANIFEST for dep in (pg.get("api_deps") or [])})
+    except Exception as e:  # noqa: BLE001
+        findings.append({"check": "impossible_value", "severity": "warn", "note": f"api_deps derivation failed: {e}"})
+        endpoints = []
+
+    if not endpoints:
+        # Blindness detector (#2578's rule): a derivation returning nothing must say so.
+        # Silently sweeping zero endpoints would report exactly like a clean sweep.
+        findings.append(
+            {
+                "check": "impossible_value",
+                "severity": "warn",
+                "note": "api_deps derivation yielded ZERO endpoints — this sweep checked nothing",
+            }
+        )
+
+    for dep in endpoints:
+        try:
+            findings.extend(scan_impossible_pcts(_fetch_json(dep), source=dep))
+        except Exception as e:  # noqa: BLE001
+            findings.append({"check": "impossible_value", "severity": "warn", "source": dep, "note": f"fetch failed: {e}"})
     return findings
 
 

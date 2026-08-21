@@ -165,6 +165,107 @@ def is_wake_frame_correct(finding):
     return (max(dates) - min(dates)).days == 1
 
 
+# ── the model does UTC→Pacific arithmetic, and gets the DST offset wrong ──────
+#
+# THE OBSERVED FAILURE (2026-08-21, confirmed on a second pass, so not a one-off).
+# `/api/sleep_detail` carries UTC instants (`sleep_start`, trailing Z) alongside
+# Pacific calendar dates. The model converted, and got it wrong by exactly one hour:
+#
+#   "sleep_start at 2026-08-21T07:02:51.150Z (7:02 AM UTC = ~11:02 PM prior Pacific
+#    evening, but this is bedtime on the morning of Day 5, not the night before)"
+#
+# 07:02Z in August is **00:02 PDT (UTC-7)**, not 23:02. It applied PST (UTC-8). That
+# hour is load-bearing: it moves the instant back across midnight onto the previous
+# calendar day, which is the entire substance of the "contradiction" it then reported.
+# The finding was rated `high` — the severity that FAILs a blocking gate.
+#
+# This is not a new class for this repo. `deploy/backfill_eightsleep_hours.py` exists
+# because ingestion once "converted UTC timestamps to local hours with a FIXED
+# standard-time offset (-8)", corrupting every PDT-season night. Same arithmetic, same
+# off-by-one-hour, different actor — there it was our code, here it is the model.
+#
+# WHY A SUPPRESSOR RATHER THAN A BETTER PROMPT. #2741 measured what prose achieves
+# here: a clause the model was told to honour was ignored in 25 of 60 runs, with
+# severity flipping run-to-run on byte-identical input. The payload ALREADY ships
+# `figure_scope.trend_sleep_start_note` spelling out the UTC-vs-Pacific split, and the
+# model read it and still miscomputed. Per ADR-105 and charter primitive 4,
+# deterministic computation precedes the LLM verdict: if the model's own arithmetic is
+# demonstrably wrong, the conclusion resting on it is unsound and does not get to fail
+# a gate. The finding is PRINTED, never silently swallowed.
+#
+# SCOPE — narrow on purpose. This fires only when the note quotes a UTC instant, states
+# at least one local clock time, and NONE of the times it states is the correct Pacific
+# rendering of that instant. A note that converts correctly and still objects is a real
+# finding and survives untouched.
+_UTC_INSTANT_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?Z\b")
+# Clock times as prose renders them: "11:02 PM", "7:02 AM", "23:02", "00:02".
+_CLOCK_RE = re.compile(r"\b(\d{1,2}):(\d{2})\s*(AM|PM)?\b", re.I)
+
+
+def _pacific_renderings(iso_date, hh, mm):
+    """Every spelling of the correct America/Los_Angeles time for a UTC instant.
+
+    Converts at the instant's OWN date, so DST is exact rather than a fixed offset —
+    which is the whole bug this guards.
+
+    The frame comes from `common.pacific_time.PACIFIC`, the ONE canonical definition
+    (#1964), never a locally-constructed `ZoneInfo`. Re-deriving it here is how the
+    platform ends up with two Pacific frames that can disagree — and it would be an
+    especially poor look inside the function whose entire job is catching a wrong
+    Pacific conversion. The #1964 guard caught exactly that in this file's first draft.
+    """
+    from datetime import datetime, timezone
+
+    from common.pacific_time import PACIFIC
+
+    utc_dt = datetime(int(iso_date[:4]), int(iso_date[5:7]), int(iso_date[8:10]), hh, mm, tzinfo=timezone.utc)
+    local = utc_dt.astimezone(PACIFIC)
+    h24, minute = local.hour, local.minute
+    h12 = h24 % 12 or 12
+    ampm = "AM" if h24 < 12 else "PM"
+    return {
+        f"{h24}:{minute:02d}",
+        f"{h24:02d}:{minute:02d}",
+        f"{h12}:{minute:02d} {ampm}",
+        f"{h12}:{minute:02d}{ampm}",
+    }
+
+
+def is_utc_offset_misread(finding):
+    """True when the note's own UTC→Pacific arithmetic is wrong (2026-08-21).
+
+    Structural conditions, all required: a temporal_contradiction; on a surface whose
+    temporal grading code already owns; the note quotes a UTC instant; the note states
+    at least one clock time; and none of the clock times it states matches the correct
+    Pacific rendering of that instant.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    if finding.get("page") not in CODE_OWNED_TEMPORAL_SURFACES:
+        return False
+    note = finding.get("note") or ""
+    instants = _UTC_INSTANT_RE.findall(note)
+    if not instants:
+        return False
+    # Scan for STATED clock times in the prose only — with the instants removed first.
+    # An ISO instant contains its own "07:02", and counting that as the model's stated
+    # conversion made a note that offers NO conversion look like a wrong one. The
+    # timestamp is the input to the arithmetic, never its output.
+    prose = _UTC_INSTANT_RE.sub(" ", note)
+    stated = {f"{int(h)}:{m}" + (f" {ap.upper()}" if ap else "") for h, m, ap in _CLOCK_RE.findall(prose)}
+    if not stated:
+        return False
+    correct = set()
+    for iso_date, hh, mm in instants:
+        try:
+            correct |= _pacific_renderings(iso_date, int(hh), int(mm))
+        except Exception:  # noqa: BLE001 — an unparseable instant is not this class
+            return False
+    normalized_stated = {s.upper().replace("  ", " ").strip() for s in stated}
+    normalized_correct = {c.upper().replace("  ", " ").strip() for c in correct}
+    return not (normalized_stated & normalized_correct)
+
+
 # ── durable design copy: the rubric's exempt vocabulary, enforced (#2741) ─────
 #
 # THE REGISTRY. These strings were named as exempt in the prompt's DO-NOT-FLAG
@@ -631,6 +732,16 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     print(
                         f"  ↩ reader-truth: dropped a wake-frame-correct night finding on {f['page']} "
                         f"(night_of + 1 = as_of IS the convention, #2780): {f['note'][:120]}"
+                    )
+                    continue
+                # 2026-08-21: the model's own UTC→Pacific arithmetic is wrong (it
+                # applied PST in August), so the contradiction it reports rests on a
+                # timestamp that does not exist. Deterministic computation precedes the
+                # LLM verdict (ADR-105) — printed, never silently swallowed.
+                if is_utc_offset_misread(f):
+                    print(
+                        f"  ↩ reader-truth: dropped a finding on {f['page']} whose own UTC→Pacific "
+                        f"conversion is wrong (DST offset misapplied): {f['note'][:120]}"
                     )
                     continue
                 # #2741: the durable-design-copy retirement, enforced. Every quoted
