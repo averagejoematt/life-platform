@@ -24,7 +24,11 @@ prose; this makes it a checked fact).
 from __future__ import annotations
 
 import tests.conftest as conftest
-from tests.premerge_derivation import TESTS_DIR, discover_tree_sweeping_test_files
+from tests.premerge_derivation import (
+    TESTS_DIR,
+    discover_sweeping_helper_modules,
+    discover_tree_sweeping_test_files,
+)
 
 
 def test_every_tree_sweeping_file_is_classified():
@@ -90,6 +94,59 @@ def test_a_synthetic_tree_sweeping_file_is_flagged(tmp_path):
     assert sweeper.name in derived, "the derivation missed a plain os.walk( sweep — it cannot be trusted to catch the next #2339"
     assert non_sweeper.name not in derived, "the derivation flagged a file with no tree sweep at all"
     assert behaviour.name not in derived, "the derivation must exclude the *_behavior.py suite — that is covered by the OTHER marker"
+
+
+def test_a_sweep_one_import_away_is_flagged(tmp_path):
+    """#2924's mutation proof. Write a HELPER module that sweeps and a test file whose
+    only connection to a sweep is importing it, and confirm the derivation catches the
+    importer. Before #2924 this returned nothing: the sweep idiom is in the helper, so
+    reading the test file's own text — all the detector ever did — could not see it.
+    That blind spot is how `test_conformance_guard_2844.py` ran post-merge-only."""
+    helper = tmp_path / "synthetic_sweep_lib_2924.py"
+    helper.write_text(
+        "from pathlib import Path\n\n" "def sweep():\n" "    return sorted(Path('lambdas').rglob('*.py'))\n",
+        encoding="utf-8",
+    )
+    importer = tmp_path / "test_synthetic_helper_importer_2924.py"
+    importer.write_text(
+        "import synthetic_sweep_lib_2924 as lib\n\n" "def test_uses_the_helper():\n" "    assert lib.sweep() is not None\n",
+        encoding="utf-8",
+    )
+    unrelated = tmp_path / "test_synthetic_no_helper_2924.py"
+    unrelated.write_text("import json\n\ndef test_arithmetic():\n    assert 1 + 1 == 2\n", encoding="utf-8")
+
+    assert "synthetic_sweep_lib_2924" in discover_sweeping_helper_modules(root=tmp_path)
+
+    derived = discover_tree_sweeping_test_files(root=tmp_path)
+    assert importer.name in derived, (
+        "the derivation missed a file whose sweep lives one import away in a helper — "
+        "this is the #2924 blind spot that let the charter conformance guard run post-merge-only"
+    )
+    assert unrelated.name not in derived, "the derivation flagged a file that imports nothing that sweeps"
+
+
+def test_helper_discovery_ignores_conftest_and_the_derivation_itself():
+    """Both would otherwise be counted as sweeping helpers and wreck the signal:
+    `conftest.py` is in scope for every test file (so it would flag the whole tree and
+    classify nothing), and this module matches only because it CONTAINS the sweep
+    pattern as a regex literal. Neither may ever be treated as a helper."""
+    helpers = discover_sweeping_helper_modules()
+    assert "conftest" not in helpers, "conftest.py as a sweeping helper flags every test file — the signal becomes noise"
+    assert (
+        "premerge_derivation" not in helpers
+    ), "premerge_derivation.py self-matches on its own regex literal; it globs tests/, it does not sweep the source tree"
+
+
+def test_the_real_sweeping_helpers_are_still_discovered():
+    """A blindness detector for the helper half (#2578's rule: a derivation that
+    returns [] must red). If this ever empties, every helper-inherited sweep silently
+    stops being classified and the #2924 blind spot is back with the guard still green."""
+    helpers = discover_sweeping_helper_modules()
+    assert helpers, "helper discovery returned NOTHING — the #2924 detection path is dead and cannot flag anything"
+    assert "conformance_guard_lib" in helpers, (
+        "conformance_guard_lib is the helper whose invisibility #2924 was filed for; "
+        "if it is no longer discovered, re-check the detector before editing this test"
+    )
 
 
 def test_an_unregistered_synthetic_sweeper_would_fail_the_classification_gate():

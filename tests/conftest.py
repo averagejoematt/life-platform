@@ -154,6 +154,12 @@ def _hermetic_aws_credentials(request, monkeypatch):
 # ~4,600 tests / ~22s locally (measured 2026-08-08), against a lane that took 117s
 # with a 10-minute timeout.
 #
+# THAT AFFORDABILITY NUMBER HAS MOVED — re-measure it, never quote it (#2924,
+# 2026-08-21): the whole `premerge` selection is now 8,813 tests in 155s locally,
+# not the ~6,075-in-30s this comment block used to claim further down. Still ~26%
+# of the 10-minute budget, so the posture holds; but the next person to add a slow
+# file should measure, not trust a number a previous session stamped and left.
+#
 # DERIVED, NOT HAND-LISTED. Marking 34 files by hand would rot the moment someone
 # adds the 35th. This hook keys on the filename, so a new `*_behavior.py` joins the
 # pre-merge lane automatically — and `tests/test_premerge_lane.py` asserts both
@@ -325,6 +331,45 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # separate classification pass, not this fix.
         "test_drift_sentinel.py",
         "test_gate_registry_1349.py",
+        # ── #2924: the sweep can live ONE IMPORT away ─────────────────────────
+        # The pair above was hand-added because the #2372 detector reads only
+        # tests/test_*.py source text. That blind spot had a second, larger half:
+        # a guard whose sweep lives in a sibling HELPER module contains no sweep
+        # idiom itself, only an import. `test_conformance_guard_2844.py` — the
+        # charter conformance guard, the fleet-wide derivation-guard primitive
+        # docs/CHARTER.md names — is exactly that shape (its sweep is in
+        # tests/conformance_guard_lib.py). It landed 2026-08-17, was classified
+        # nowhere, and ran POST-MERGE ONLY: the #2339 failure mode reproduced by
+        # the derivation's own blind spot, while sitting in the 168-test command
+        # every agent brief called a pre-merge check.
+        #
+        # premerge_derivation.py now sweeps tests/*.py for non-test helpers that
+        # sweep (conformance_guard_lib, grounding_wiring, qa_manifest) and flags
+        # any test file importing one, so this class joins BY CONSTRUCTION rather
+        # than by another hand-addition. That found 22 unclassified files; the 20
+        # below are registry/derivation gates whose covered population changes
+        # when the registry does, measured together at 363 tests in 12.4s against
+        # the lane's ten-minute budget. The other two are in the exclusion dict.
+        "test_analyzer_gate_all_paths_2421.py",
+        "test_behavioral_availability_2056.py",
+        "test_compression_gate_2428.py",
+        "test_conformance_guard_2844.py",
+        "test_design_sync_capture.py",
+        "test_field_notes_grounding.py",
+        "test_hypothesis_prose_grounding_2420.py",
+        "test_partial_gate_cluster_2430.py",
+        "test_prereg_seal_1980.py",
+        "test_qa_archive.py",
+        "test_qa_audit.py",
+        "test_qa_live_endpoint_coverage_2652.py",
+        "test_qa_manifest.py",
+        "test_reading_grounding_2425.py",
+        "test_smoke_structural.py",
+        "test_stance_behavioral_gate_2195.py",
+        "test_traffic_green_report.py",
+        "test_visual_ai_qa.py",
+        "test_visual_qa_units.py",
+        "test_webkit_weekly_qa.py",
     }
 )
 
@@ -341,6 +386,19 @@ _PREMERGE_EXTRA_FILES = frozenset(
 _PREMERGE_TREE_SWEEP_EXCLUDED = {
     "test_diary_publish_1845.py": (
         "behaviour suite over diary-publishing semantics (63 tests), not a repo-shape " "ratchet — #2345's own call, made explicit here"
+    ),
+    # #2924: both inherit qa_manifest's sweep by import, but each looks up exactly
+    # ONE hardcoded page and asserts about that page alone — so unlike their 20
+    # siblings above, their covered population CANNOT change when the registry
+    # grows. That is precisely the property that makes a file a repo-shape ratchet,
+    # and it is absent here. Behaviour suites in substance; post-merge is their job.
+    "test_mirror_parity.py": (
+        "imports qa_manifest.MANIFEST only to look up the single fixed /method/mirror/ "
+        "entry (#1392); the rest is JS-vs-Python numeric-parity behaviour, not a sweep"
+    ),
+    "test_diary_shelf_1846.py": (
+        "imports qa_manifest.MANIFEST only to assert the single fixed /story/diary/ page "
+        "is registered (AC4 of #1846); the other 29 tests are diary-shelf behaviour"
     ),
 }
 
