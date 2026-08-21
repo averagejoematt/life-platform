@@ -57,6 +57,7 @@ from stacks.csp import (  # ADR-149 (#1678) — the CSP is built in one place, f
 from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
 from stacks.web_alarms import add_web_alarms  # #2829: the us-east-1 alarm estate, extracted sibling
+from stacks.web_cloudfront_policies import build_api_policies  # #1221: /api cache + origin-request policies
 
 BUCKET = _CONSTANTS_BUCKET
 
@@ -476,6 +477,12 @@ class WebStack(Stack):
         #   2. Lambda Function URL  → /api/* (real-time data, TTL-cached)
         # ══════════════════════════════════════════════════════════════
 
+        # #1221: CloudFront-Viewer-Address only reaches the origin through an
+        # origin-request policy, and ForwardedValues is mutually exclusive with one.
+        # Built here, applied to the six /api/* behaviours below. See the sibling
+        # module's docstring for why the header is banned from every cache policy.
+        _api_pol = build_api_policies(self)
+
         amj_dist = cloudfront.CfnDistribution(
             self,
             "AmjDistribution",
@@ -650,14 +657,10 @@ class WebStack(Stack):
                         path_pattern="/api/subscribe*",
                         target_origin_id="SubscriberLambdaOrigin",
                         viewer_protocol_policy="https-only",
-                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                            query_string=True,  # confirm token + action param
-                            headers=["Origin", "Content-Type"],
-                            cookies=cloudfront.CfnDistribution.CookiesProperty(forward="none"),
-                        ),
-                        default_ttl=0,  # never cache subscribe responses
-                        max_ttl=0,
-                        min_ttl=0,
+                        # #1221: policies replace ForwardedValues so CloudFront-Viewer-Address
+                        # reaches the origin. TTLs moved into the cache policy (0/0/0, unchanged).
+                        cache_policy_id=_api_pol["no_cache"].cache_policy_id,
+                        origin_request_policy_id=_api_pol["origin_qs"].origin_request_policy_id,
                         allowed_methods=[
                             "GET",
                             "HEAD",
@@ -688,12 +691,9 @@ class WebStack(Stack):
                         path_pattern="/api/verify_subscriber",
                         target_origin_id="LambdaApiOrigin",
                         viewer_protocol_policy="https-only",
-                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                            query_string=True, headers=["Origin", "Content-Type"]
-                        ),
-                        default_ttl=0,
-                        max_ttl=0,
-                        min_ttl=0,
+                        # #1221: 0/0/0 preserved in the cache policy.
+                        cache_policy_id=_api_pol["no_cache"].cache_policy_id,
+                        origin_request_policy_id=_api_pol["origin_qs"].origin_request_policy_id,
                         allowed_methods=["GET", "HEAD", "OPTIONS"],
                         cached_methods=["GET", "HEAD"],
                     ),
@@ -702,12 +702,9 @@ class WebStack(Stack):
                         path_pattern="/api/board_ask",
                         target_origin_id="AiLambdaOrigin",
                         viewer_protocol_policy="https-only",
-                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                            query_string=False, headers=["Origin", "Content-Type"]
-                        ),
-                        default_ttl=0,
-                        max_ttl=0,
-                        min_ttl=0,
+                        # #1221: 0/0/0 preserved; query strings still withheld from the origin.
+                        cache_policy_id=_api_pol["no_cache"].cache_policy_id,
+                        origin_request_policy_id=_api_pol["origin_no_qs"].origin_request_policy_id,
                         allowed_methods=["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
                         cached_methods=["GET", "HEAD"],
                     ),
@@ -717,13 +714,9 @@ class WebStack(Stack):
                         path_pattern="/api/explain",
                         target_origin_id="AiLambdaOrigin",
                         viewer_protocol_policy="https-only",
-                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                            query_string=False,
-                            headers=["Origin", "Content-Type", "X-Subscriber-Token"],
-                        ),
-                        default_ttl=0,
-                        max_ttl=0,
-                        min_ttl=0,
+                        # #1221: 0/0/0 preserved; query strings still withheld from the origin.
+                        cache_policy_id=_api_pol["no_cache"].cache_policy_id,
+                        origin_request_policy_id=_api_pol["origin_no_qs"].origin_request_policy_id,
                         allowed_methods=["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
                         cached_methods=["GET", "HEAD"],
                     ),
@@ -732,13 +725,9 @@ class WebStack(Stack):
                         path_pattern="/api/ask",
                         target_origin_id="AiLambdaOrigin",
                         viewer_protocol_policy="https-only",
-                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                            query_string=False,
-                            headers=["Origin", "Content-Type", "X-Subscriber-Token"],
-                        ),
-                        default_ttl=0,  # never cache AI responses
-                        max_ttl=0,
-                        min_ttl=0,
+                        # #1221: 0/0/0 preserved; query strings still withheld from the origin.
+                        cache_policy_id=_api_pol["no_cache"].cache_policy_id,
+                        origin_request_policy_id=_api_pol["origin_no_qs"].origin_request_policy_id,
                         allowed_methods=[
                             "GET",
                             "HEAD",
@@ -971,13 +960,11 @@ class WebStack(Stack):
                         path_pattern="/api/*",
                         target_origin_id="LambdaApiOrigin",
                         viewer_protocol_policy="https-only",
-                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
-                            query_string=True,
-                            headers=["Origin", "Content-Type"],
-                        ),
-                        default_ttl=300,
-                        max_ttl=3600,
-                        min_ttl=0,
+                        # #1221: the ONLY cached /api behaviour. api_default_cache reproduces
+                        # 0/300/3600 + query strings + Origin/Content-Type EXACTLY, and deliberately
+                        # omits CloudFront-Viewer-Address — in a cache key that shatters it per viewer.
+                        cache_policy_id=_api_pol["default_cache"].cache_policy_id,
+                        origin_request_policy_id=_api_pol["origin_qs"].origin_request_policy_id,
                         allowed_methods=[
                             "GET",
                             "HEAD",

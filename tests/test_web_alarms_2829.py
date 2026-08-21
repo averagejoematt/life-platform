@@ -125,9 +125,22 @@ def test_every_web_alarms_construct_has_an_action():
     not on a hand-maintained name list."""
     func = _find_func(_tree(WEB_ALARMS), "add_web_alarms")
     status = _alarm_action_status(func.body)
-    assert status, "no cloudwatch.Alarm(...) construct found in add_web_alarms() — parser broke, investigate"
+    # The three orphan adoptions were REMOVED on 2026-08-20 (see the module docstring):
+    # CloudFormation pre-validates a CREATE against existing names and they all exist, so
+    # they blocked the entire LifePlatformWeb deploy. Adoption needs `cdk import`, tracked
+    # on #2829. So zero locally-constructed alarms is the CORRECT state right now — but the
+    # rule still binds the moment one returns.
     unrouted = [name for name, has_action in status.items() if not has_action]
     assert not unrouted, f"web_alarms.py alarm(s) with no .add_alarm_action(...): {unrouted}"
+
+    # …and because "zero constructs" would make the above vacuous, pin what the module
+    # ACTUALLY does now: route the alarm web_stack.py hands in. That is the #2829 title bug
+    # (`email-subscriber-errors` fired into the void) and the only part that ships today.
+    src = open(WEB_ALARMS, encoding="utf-8").read()
+    assert "subscriber_alarm.add_alarm_action(" in src, (
+        "web_alarms.py no longer routes the handed-in subscriber alarm — that is the one "
+        "thing #2829 actually fixes, and with the adoptions deferred it is all this module does."
+    )
 
 
 def test_web_alarms_adopts_exactly_the_expected_names():
@@ -140,12 +153,21 @@ def test_web_alarms_adopts_exactly_the_expected_names():
     """
     func = _find_func(_tree(WEB_ALARMS), "add_web_alarms")
     status = _alarm_action_status(func.body)
-    assert set(status) == {
+    # Rescoped 2026-08-20: the adoption set is EMPTY until #2829 resolves create-vs-import.
+    # These three are asserted ABSENT precisely because re-adding one without `cdk import`
+    # re-breaks every LifePlatformWeb deploy — including #1221's, which is what surfaced it.
+    collide_on_create = {
         "life-platform-dash-5xx-rate",
         "life-platform-dash-total-errors",
         "life-platform-cf-auth-errors",
     }
-    assert all(status.values()), "every adopted alarm must be routed"
+    readded = collide_on_create & set(status)
+    assert not readded, (
+        f"{sorted(readded)} re-added as a CREATE. These alarms already exist in us-east-1, so "
+        "CloudFormation fails early validation and the whole stack deploy is blocked. Adopt them "
+        "with `cdk import`, not by declaring them — and note `cdk synth` cannot catch this."
+    )
+    assert all(status.values()), "every alarm constructed here must be routed"
 
 
 def test_alerts_topic_is_imported_not_created():
