@@ -83,7 +83,6 @@ exactly the orphan class this file exists to close.
 """
 
 from aws_cdk import (
-    Duration,
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_sns as sns,
@@ -120,82 +119,27 @@ def add_web_alarms(scope: Construct, subscriber_alarm: cloudwatch.Alarm) -> None
     subscriber_alarm.add_alarm_action(cw_actions.SnsAction(topic))
 
     # ADOPT — CloudFront 5xx rate on the dash distribution. Codified from live config.
-    dash_5xx_rate = cloudwatch.Alarm(
-        scope,
-        "DashCf5xxRate",
-        alarm_name="life-platform-dash-5xx-rate",
-        alarm_description=(
-            "CloudFront dash.averagejoematt.com 5xx error rate >5% — dashboard may be "
-            "broken. Check: CloudFront distribution EM5NPX6NJN095 error pages + "
-            "Lambda@Edge logs."
-        ),
-        metric=cloudwatch.Metric(
-            namespace="AWS/CloudFront",
-            metric_name="5xxErrorRate",
-            dimensions_map={"DistributionId": "EM5NPX6NJN095", "Region": "Global"},
-            period=Duration.minutes(5),
-            statistic="Average",
-        ),
-        threshold=5,
-        evaluation_periods=2,
-        comparison_operator=GTE,
-        treat_missing_data=NOT_BREACHING,
-    )
-    dash_5xx_rate.add_alarm_action(cw_actions.SnsAction(topic))
-
-    # ADOPT — CloudFront TotalErrorRate. Live dimension is E3S424OXQZ8NBE (the main
-    # averagejoematt.com distribution) — see the module docstring's naming-mismatch
-    # note. Codified byte-for-byte against live config, mismatch and all.
-    dash_total_errors = cloudwatch.Alarm(
-        scope,
-        "DashCfTotalErrors",
-        alarm_name="life-platform-dash-total-errors",
-        alarm_description=(
-            "ADR-058 (2026-05-24): threshold 10%->25%, eval 1->3 periods (15 min "
-            "sustained). Was flapping on bot 404s on low-traffic site."
-        ),
-        metric=cloudwatch.Metric(
-            namespace="AWS/CloudFront",
-            metric_name="TotalErrorRate",
-            dimensions_map={"DistributionId": "E3S424OXQZ8NBE"},
-            period=Duration.minutes(5),
-            statistic="Average",
-        ),
-        threshold=25,
-        evaluation_periods=3,
-        datapoints_to_alarm=3,
-        comparison_operator=GT,
-        treat_missing_data=NOT_BREACHING,
-    )
-    dash_total_errors.add_alarm_action(cw_actions.SnsAction(topic))
-
-    # ADOPT + ROUTE — Lambda@Edge cf-auth invocation errors. A real functional signal
-    # (auth failures lock dashboard/blog out entirely) that was born action-less only
-    # because no us-east-1 topic existed at the time (see module docstring). One does
-    # now — wire it, closing the second "no-action alarm" the issue's live evidence
-    # named (life-platform-cf-auth-errors, AlarmActions=[]).
-    cf_auth_errors = cloudwatch.Alarm(
-        scope,
-        "CfAuthErrors",
-        alarm_name="life-platform-cf-auth-errors",
-        alarm_description=(
-            "Lambda@Edge cf-auth invocation errors — dashboard/blog may be "
-            "inaccessible. Check: aws logs tail /aws/lambda/us-east-1.life-platform-cf-auth "
-            "--region us-east-1"
-        ),
-        metric=cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Errors",
-            dimensions_map={"FunctionName": "life-platform-cf-auth"},
-            period=Duration.minutes(5),
-            statistic="Sum",
-        ),
-        threshold=5,
-        evaluation_periods=2,
-        comparison_operator=GTE,
-        treat_missing_data=NOT_BREACHING,
-    )
-    cf_auth_errors.add_alarm_action(cw_actions.SnsAction(topic))
+    # ── The three orphan adoptions are DEFERRED (#2829, rescoped 2026-08-20) ──
+    #
+    # `life-platform-dash-5xx-rate`, `life-platform-dash-total-errors` and
+    # `life-platform-cf-auth-errors` already EXIST in us-east-1, created outside CDK.
+    # Declaring them here with their real names makes CloudFormation attempt a CREATE,
+    # and it pre-validates the name is free. It is not:
+    #
+    #     Early validation failed for change set cdk-deploy-change-set:
+    #       Resource of type 'AWS::CloudWatch::Alarm' with identifier
+    #       'life-platform-dash-5xx-rate' already exists.
+    #
+    # That blocked the whole LifePlatformWeb deploy on 2026-08-20. Bringing an existing
+    # resource under stack management needs `cdk import`, not synth-and-deploy — and
+    # crucially, a green `cdk synth` cannot catch this, because synth renders a template
+    # from source and never consults live AWS state.
+    #
+    # Deferring costs almost nothing: measured live, `dash-5xx-rate` and
+    # `dash-total-errors` ALREADY route to this topic. Only `cf-auth-errors` is genuinely
+    # silent, and it is tracked on #2829 along with the `cdk import` decision. The issue's
+    # "5 of 6 alarms are IaC orphans" is true; the implied "so they fire into the void" is
+    # not — only 2 of 6 have no AlarmActions.
 
     # life-platform-cost-alert and life-platform-ai-cost-soft-alarm are deliberately
     # NOT constructed here — see the module docstring's RETIRE disposition. Adopting an
