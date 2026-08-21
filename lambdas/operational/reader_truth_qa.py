@@ -205,14 +205,21 @@ _CLOCK_RE = re.compile(r"\b(\d{1,2}):(\d{2})\s*(AM|PM)?\b", re.I)
 def _pacific_renderings(iso_date, hh, mm):
     """Every spelling of the correct America/Los_Angeles time for a UTC instant.
 
-    Uses zoneinfo at the instant's OWN date, so DST is exact rather than a fixed
-    offset — which is the whole bug this guards.
+    Converts at the instant's OWN date, so DST is exact rather than a fixed offset —
+    which is the whole bug this guards.
+
+    The frame comes from `common.pacific_time.PACIFIC`, the ONE canonical definition
+    (#1964), never a locally-constructed `ZoneInfo`. Re-deriving it here is how the
+    platform ends up with two Pacific frames that can disagree — and it would be an
+    especially poor look inside the function whose entire job is catching a wrong
+    Pacific conversion. The #1964 guard caught exactly that in this file's first draft.
     """
     from datetime import datetime, timezone
-    from zoneinfo import ZoneInfo
+
+    from common.pacific_time import PACIFIC
 
     utc_dt = datetime(int(iso_date[:4]), int(iso_date[5:7]), int(iso_date[8:10]), hh, mm, tzinfo=timezone.utc)
-    local = utc_dt.astimezone(ZoneInfo("America/Los_Angeles"))
+    local = utc_dt.astimezone(PACIFIC)
     h24, minute = local.hour, local.minute
     h12 = h24 % 12 or 12
     ampm = "AM" if h24 < 12 else "PM"
