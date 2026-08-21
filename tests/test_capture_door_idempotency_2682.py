@@ -94,10 +94,19 @@ def table(monkeypatch):
 
 
 def _post(idea=IDEA, source=SOURCE, ip="203.0.113.9"):
+    """The envelope is the one production actually produces (#1221).
+
+    `CloudFront-Viewer-Address` is carried ALONGSIDE the forgeable pair rather than
+    instead of it, so these tests prove the trusted header *wins* — not merely that it
+    works unopposed. It is `address:port` on the wire; the port is stripped by
+    `client_ip`, which is why the hand-derived hash below is over the bare address.
+    Without it every reader collapses to the fail-closed sentinel and two distinct
+    readers dedupe onto one moderation row.
+    """
     event = {
         "body": json.dumps({"idea": idea, "source": source}),
-        "headers": {"x-forwarded-for": ip},
-        "requestContext": {"http": {"method": "POST", "sourceIp": ip}},
+        "headers": {"cloudfront-viewer-address": f"{ip}:41234", "x-forwarded-for": "198.51.100.99"},
+        "requestContext": {"http": {"method": "POST", "sourceIp": "198.51.100.99"}},
     }
     return mod._handle_experiment_suggest(event, _g=vars(facade))
 
