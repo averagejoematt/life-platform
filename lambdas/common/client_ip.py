@@ -75,6 +75,12 @@ observable rather than silent.
 _VIEWER_ADDRESS_HEADER = "cloudfront-viewer-address"
 
 
+# #1221: the single bucket every caller collapses into when the trusted header is
+# absent. A constant on purpose — anything derived from the request would be
+# attacker-chosen, which is the bypass itself.
+_FAIL_CLOSED_IDENTITY = "no-trusted-client-ip"
+
+
 def _headers(event: dict) -> dict:
     return {str(k).lower(): v for k, v in (event.get("headers") or {}).items()}
 
@@ -157,11 +163,28 @@ def extract_client_ip(event: dict, default: str = "unknown") -> str:
     if viewer:
         return viewer
 
-    # #1221 interim — forgeable, and knowingly so. It is kept above `sourceIp` because
-    # it is the only remaining value that is STABLE per caller, and an unstable
-    # identity does not rate-limit anyone at all (measured 2026-08-14).
-    hops = [hop.strip() for hop in (headers.get("x-forwarded-for") or "").split(",") if hop.strip()]
-    if hops:
-        return hops[-1]
-
-    return _source_ip(event) or default
+    # ── FAIL CLOSED (#1221 box 2, 2026-08-21) ────────────────────────────────
+    # The interim that used to live here returned the last `X-Forwarded-For` hop.
+    # That value is chosen by the caller, so rotating it minted a FRESH rate-limit
+    # bucket every request — the bypass this issue is about. It was retained only
+    # while `CloudFront-Viewer-Address` could not reach the origin.
+    #
+    # It can now. The origin request policies attached on 2026-08-21 forward it on
+    # every /api/* behaviour, verified live: six POSTs with six DIFFERENT forged
+    # X-Forwarded-For values were limited at exactly 3/hour (400 400 400 429 429 429),
+    # where before every rotation reset the bucket.
+    #
+    # So absence no longer means "not deployed yet" — it means something is wrong
+    # (a behaviour added without the policy, or the policy reverted). Returning an
+    # attacker-chosen value in that state is strictly worse than returning nothing,
+    # so every such caller collapses into ONE shared bucket.
+    #
+    # The trade-off, stated because it is real: if the header genuinely stops
+    # arriving, legitimate callers share a single limit and IP-gated writes throttle
+    # site-wide. That is the intended direction of failure for a security control,
+    # and it is loud rather than silent — `client_ip_is_trusted()` returns False and
+    # `site_api_ai_lambda.py:920` already reports it. `sourceIp` is deliberately NOT
+    # used as a middle ground: measured 2026-08-14 it is the CloudFront edge address,
+    # not stable per viewer, and gave almost no enforcement (6 requests against a
+    # 3/hour limit -> 400 429 400 400 400 400).
+    return _FAIL_CLOSED_IDENTITY

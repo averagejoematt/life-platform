@@ -394,10 +394,23 @@ class Harness:
 
     @staticmethod
     def event(path, method="POST", body=None, ip=IP_A, qs=None):
+        """An envelope shaped like the WIRE.
+
+        #1221 (2026-08-21): `/api/*` now carries an origin request policy forwarding
+        `CloudFront-Viewer-Address`, and `extract_client_ip` FAILS CLOSED — an
+        `x-forwarded-for` is caller-chosen, so it is deliberately ignored. A fixture
+        that supplies the IP only via `x-forwarded-for`/`sourceIp` therefore models a
+        request production no longer produces: every caller collapses into the shared
+        fail-closed bucket and per-IP assertions stop meaning anything.
+
+        All three are set, because CloudFront sends all three — and keeping the
+        forgeable two present is what makes these tests prove the trusted header WINS,
+        rather than proving it merely works when nothing competes with it.
+        """
         return {
             "rawPath": path,
             "requestContext": {"http": {"method": method, "sourceIp": ip}},
-            "headers": {"x-forwarded-for": ip},
+            "headers": {"x-forwarded-for": ip, "CloudFront-Viewer-Address": f"{ip}:16225"},
             "queryStringParameters": qs,
             "body": json.dumps(body) if body is not None else None,
         }
