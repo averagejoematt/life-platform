@@ -51,10 +51,17 @@ def check_rate_limit(
     limit: int,
     window_seconds: int = 3600,
     fail_open: bool = True,
+    cost: int = 1,
 ) -> Tuple[bool, int, int]:
     """Atomic per-IP rate check via DynamoDB.
 
     Returns: (allowed, remaining, retry_after_seconds).
+    `cost` is how many tokens THIS request consumes (default 1). It exists because a
+    per-REQUEST limit does not bound a per-request FAN-OUT: `/api/board_ask` makes one
+    Bedrock call per persona, and the caller chooses the persona list, so a 5/hour limit
+    bought one Haiku call per coach — 35/hour against a limit of 5 (#1221 box 5). Charging the fan-out
+    makes the limit mean what it says. Every other caller keeps cost=1 and is unaffected.
+
     On any DDB error, returns (fail_open, …). Fail-open is the default — safer
     for a personal platform than blocking legit traffic on an infrastructure
     hiccup. Cost-bearing endpoints (each /api/board_ask fans out multiple
@@ -75,7 +82,7 @@ def check_rate_limit(
             Key={"pk": pk, "sk": sk},
             UpdateExpression="ADD #c :inc SET #t = if_not_exists(#t, :ttl)",
             ExpressionAttributeNames={"#c": "count", "#t": "ttl"},
-            ExpressionAttributeValues={":inc": 1, ":ttl": ttl},
+            ExpressionAttributeValues={":inc": max(1, int(cost)), ":ttl": ttl},
             ReturnValues="UPDATED_NEW",
         )
     except Exception as e:
