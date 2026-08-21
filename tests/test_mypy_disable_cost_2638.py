@@ -1,8 +1,14 @@
 """#2638 — the mypy disable list is retained with its cost measured, not implied-absent.
 
-`mypy.ini` globally disables four error codes: `assignment`, `arg-type`, `return-value`,
+STATE AS OF 2026-08-21 — read this before the history below, which is written in the
+present tense of the day it was filed. `mypy.ini` now disables **three** codes:
+`assignment`, `arg-type`, `operator`. `return-value` was ENABLED on 2026-08-15 (tranche 1)
+and RE-PROVED red on 2026-08-21. The narrative below describes the four-code world the
+issue was filed into; it is kept because the measurement trap at the bottom is still live.
+
+`mypy.ini` globally disabled four error codes: `assignment`, `arg-type`, `return-value`,
 `operator`. #2578's verdict slice mutation-proved the gate CAN fail — on `name-defined` and
-`attr-defined` — and that a function returning the wrong type (`return-value`) passes it
+`attr-defined` — and that a function returning the wrong type (`return-value`) passed it
 **silently** across the clean set. So "mypy passed" means a narrower thing than it reads as.
 
 The tracker said otherwise. **#1656 — "mypy strict-clean globally (empty the disable list)"
@@ -25,9 +31,20 @@ whole tree that `mypy.ini`'s pre-existing counts describe):
 change does the part that can be done honestly tonight: it measures, records the numbers
 where the decision gets made, moves the residual to an owner that is open, and says plainly
 that the gate's name overclaims. **Boxes 2 and 3 — enable tier by tier, mutation-prove each
-newly-enabled code — are deliberately NOT done here**, because `mypy.ini`'s own comment is
-right that fixing `operator`/`return-value` means correcting latent-Optional signatures on
-the scoring path, and that is behaviour-adjacent surgery belonging in its own reviewable PR.
+newly-enabled code — were deliberately NOT done in that first PR**, because `mypy.ini`'s own
+comment is right that fixing `operator`/`return-value` means correcting latent-Optional
+signatures on the scoring path, and that is behaviour-adjacent surgery belonging in its own
+reviewable PR.
+
+BOTH LANDED SINCE. Tranche 1 (2026-08-15) enabled `return-value`: all 32 sites turned out
+to be annotations under-describing already-correct code, so the predicted behaviour-adjacent
+surgery never materialised and no returned value moved. Box 3 (2026-08-21) re-ran all three
+mutations against the current config — `(a)`/`(b)`/`(c)` are now **all exit 1** — and found
+that the census's recorded proof had been quietly WRONG for six days: it still observed
+`(c) exit 0 — SILENT` and quoted a four-code `disable_error_code` line that no longer
+existed. Nothing checked it, because the census's staleness guard compares gate IDs, not
+claims. The guards at the bottom of this file close that gap and are mutation-proved against
+the real stale text, not a synthetic stand-in.
 
 THE MEASUREMENT TRAP, pinned below because it produced a confident wrong answer first.
 Passing 436 filenames on the command line overflows the shell's argument limit, mypy aborts
@@ -174,3 +191,98 @@ def test_the_config_says_what_mypy_passed_actually_means():
     are checked — not an error-code one. Both are partial and neither implies the other."""
     assert "overclaims" in MYPY_INI or "narrower" in MYPY_INI.lower()
     assert "tier-2" in MYPY_INI, "the specific phrase that overclaims should be named"
+
+
+# ── box 3: the proof stays true as tranches land (#2638 / epic #2578) ────────
+#
+# The gate census records a mutation proof per gate precisely so "can-fail" cannot
+# quietly read as "fully armed" — `scope` is a required field for that reason. But a
+# proof is a DATED OBSERVATION, and nothing re-checked its CONTENT against the config
+# it describes. The census's own staleness guard
+# (test_no_recorded_proof_is_stale_against_the_live_census) compares gate IDs, not
+# claims.
+#
+# That gap bit here. The mypy proof was recorded 2026-08-13 observing
+# `(c) exit 0 — SILENT` for return-value, with a scope reading "returning the wrong type
+# from an annotated function passes this gate green". #2638's tranche 1 ENABLED
+# return-value two days later. For six days the ledger under-claimed the gate and quoted
+# a `disable_error_code` line that no longer existed — the epic's own failure shape,
+# inside the artifact built to prevent it, pointing the safe direction only by luck.
+#
+# So: the proof's scope must name exactly the codes mypy.ini actually disables. The next
+# tranche (assignment / arg-type / operator) reds this until the proof is re-run.
+
+
+def _mypy_proof():
+    import gate_census as gc
+
+    return gc.PROVEN_CAN_FAIL["ci::ci-lint.yml::lint::7"]
+
+
+def test_the_mypy_proof_scope_names_the_live_disable_list():
+    """A proof that quotes a config value must be checked against that value, or landing a
+    tranche silently leaves a false record behind."""
+    import re
+
+    scope = _mypy_proof().scope
+    quoted = re.search(r"disable_error_code\s*=\s*([a-z, \-]+)", scope)
+    assert quoted, "the mypy proof's scope no longer quotes a disable_error_code list — re-point this guard"
+
+    claimed = {c.strip() for c in quoted.group(1).split(",") if c.strip()}
+    live = set(cost.disabled_codes())
+    assert claimed == live, (
+        f"the recorded mutation proof says mypy disables {sorted(claimed)}, but mypy.ini "
+        f"disables {sorted(live)}. A tranche landed and the proof was not re-run, so the "
+        "ledger now describes a gate that no longer exists. Re-run the three mutations "
+        "against the current config and update PROVEN_CAN_FAIL — do not just edit the text."
+    )
+
+
+def test_every_enabled_code_is_recorded_as_RED_not_silent():
+    """The specific 2026-08-13→21 defect, pinned. `return-value` is enabled; a proof whose
+    CURRENT observation for it is 'exit 0 — SILENT' tells the next reader the gate is
+    blinder than it is.
+
+    Checks the outcome recorded immediately before the code's own `[code]` tag, so a proof
+    may still narrate its history ("this was exit 0 when first proved...") without tripping
+    a naive substring match on the word SILENT."""
+    proof = _mypy_proof()
+    for code in sorted(_ORIGINAL_DISABLED - set(cost.disabled_codes())):
+        tag = f"[{code}]"
+        assert tag in proof.observed, f"{code} was enabled by a tranche but the proof's `observed` never records a {tag} outcome"
+        window = proof.observed[: proof.observed.index(tag)][-30:]
+        assert "exit 1" in window, (
+            f"{code} is ENABLED in mypy.ini but the proof's recorded outcome for it is "
+            f"{window.strip()!r} — not 'exit 1'. Re-run the mutation against the current config."
+        )
+
+
+def test_the_proof_was_re_run_after_the_most_recent_tranche():
+    """`proved_on` must post-date the tranche, or the record is an observation of a
+    config that has since changed."""
+    proof = _mypy_proof()
+    assert proof.proved_on >= "2026-08-15", (
+        f"the mypy proof is dated {proof.proved_on}, before #2638's tranche 1 enabled "
+        "return-value on 2026-08-15 — it observes a configuration that no longer exists"
+    )
+
+
+def test_the_staleness_guards_are_not_vacuous():
+    """Mutation proof, against the text that ACTUALLY sat in the ledger from 2026-08-13 to
+    2026-08-21 — not a synthetic stand-in. Both guards must red on it, or they are
+    decoration that would sleep through the next tranche exactly as the census did through
+    this one."""
+    import re
+
+    stale_scope = (
+        "mypy.ini's `disable_error_code = assignment, arg-type, return-value, operator` means the single most intuitive type defect ..."
+    )
+    quoted = re.search(r"disable_error_code\s*=\s*([a-z, \-]+)", stale_scope)
+    claimed = {c.strip() for c in quoted.group(1).split(",") if c.strip()}
+    assert claimed != set(cost.disabled_codes()), "the scope guard would NOT have caught the real six-day staleness — it is vacuous"
+
+    stale_observed = (
+        "(a) exit 1 [name-defined]. (b) exit 1 [attr-defined]. (c) exit 0 — SILENT [return-value]. Clean baseline 0, reverted 0."
+    )
+    window = stale_observed[: stale_observed.index("[return-value]")][-30:]
+    assert "exit 1" not in window, "the observed-outcome guard would NOT have caught 'exit 0 — SILENT' — it is vacuous"
