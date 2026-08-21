@@ -65,11 +65,23 @@ def _wire(ai, monkeypatch, table, bedrock_text="Steady progress — keep the rou
 
 
 def _post(body, ip="203.0.113.7"):
+    """A board_ask event shaped like the WIRE, not like a convenient stub.
+
+    #1221 (2026-08-21): every real /api/board_ask request arrives through CloudFront,
+    which now forwards `CloudFront-Viewer-Address` (`address:port`) — and since
+    `extract_client_ip` FAILS CLOSED, that header is the only thing that yields a
+    per-caller identity. This fixture used to supply the IP via `sourceIp` only, a
+    shape production no longer produces: under fail-closed it collapses to the shared
+    bucket, the session's ip_hash binding stops matching, and the follow-up 403s.
+
+    `sourceIp` is kept as well, so the fixture still mirrors a real envelope (CloudFront
+    sets both) and so nothing silently starts depending on its absence.
+    """
     return {
         "rawPath": "/api/board_ask",
         "requestContext": {"http": {"method": "POST", "sourceIp": ip}},
         "body": json.dumps(body),
-        "headers": {},
+        "headers": {"CloudFront-Viewer-Address": f"{ip}:16225"},
     }
 
 

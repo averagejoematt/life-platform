@@ -34,15 +34,16 @@ The contract that follows, and that this file pins:
        provably sufficient to close the bypass with no further code change.
   AC2  `CloudFront-Viewer-Address` — set by CloudFront from the TCP peer and not
        client-influenceable — is preferred, with its port stripped (v4 and v6).
-  AC3  Until that header arrives, identity falls back to the `X-Forwarded-For` last hop
-       — stable per caller but FORGEABLE, so **#1221 remains open**. This is a measured
-       interim, not an oversight: preferring the un-forgeable `sourceIp` instead was
-       shipped on 2026-08-14 and measured WORSE, because the edge address is not stable
-       per viewer (6 requests against a 3/hour limit gave `400 429 400 400 400 400`,
-       i.e. almost no enforcement). Forgeability was unchanged by that swap — edge churn
-       already handed attackers fresh buckets — so the only thing it changed was to stop
-       limiting ordinary traffic. The degraded state is reportable via
-       `client_ip_is_trusted()` rather than silent.
+  AC3  When `CloudFront-Viewer-Address` is ABSENT, identity FAILS CLOSED: every such
+       caller collapses into one shared bucket. `X-Forwarded-For` is not consulted at
+       all, because it is caller-chosen and rotating it is the bypass. `sourceIp` is
+       not used either — measured 2026-08-14 it is the CloudFront EDGE address, not
+       stable per viewer (6 requests against a 3/hour limit gave
+       `400 429 400 400 400 400`, i.e. almost no enforcement), so it fails OPEN in
+       practice. Absence is loud, not silent: `client_ip_is_trusted()` returns False.
+       Superseded the forgeable interim on 2026-08-21, once the origin request policy
+       was deployed and the header verified arriving (six POSTs, six DIFFERENT forged
+       `X-Forwarded-For` values, limited at exactly 3/hour).
   AC4  GUARD THE SET: no handler anywhere may derive an identity from a raw
        `sourceIp` or `X-Forwarded-For` read. Derived by AST, so a NEW handler that
        keys on either fails this suite the day it lands.
@@ -124,37 +125,6 @@ def test_the_trusted_header_collapses_every_adversarial_chain_to_one_identity():
 # ── The interim, stated out loud so it cannot be mistaken for a guarantee ──────
 
 
-@pytest.mark.parametrize("chain,expected", [("1.1.1.1", "1.1.1.1"), ("9.9.9.9, 2.2.2.2", "2.2.2.2")])
-def test_without_the_trusted_header_forwarded_for_is_used_and_is_forgeable(chain, expected):
-    """#1221 IS STILL OPEN, and this test says so rather than hiding it.
-
-    With no `CloudFront-Viewer-Address` (the live state until the origin request policy
-    is attached), identity falls back to the last X-Forwarded-For hop, which the caller
-    controls. This is a KNOWN, MEASURED interim, not an oversight:
-
-      * Dropping X-Forwarded-For and using `sourceIp` instead was tried, deployed, and
-        measured worse — `sourceIp` is the CloudFront edge address and is not stable per
-        viewer, so 6 requests against a 3/hour limit produced `400 429 400 400 400 400`
-        and the limiter enforced essentially nothing.
-      * Keeping it does NOT widen the bypass: edge-address churn already handed out
-        fresh buckets, so an attacker was unmetered either way. It restores enforcement
-        against ordinary traffic, which is the part that actually regressed.
-
-    When the policy lands, `test_forwarded_for_cannot_override_the_trusted_header` above
-    is what holds, and this path becomes unreachable. Delete this test then — not before.
-    """
-    assert extract_client_ip(_event(xff=chain)) == expected
-
-
-def test_forwarded_for_outranks_source_ip_because_source_ip_is_not_stable():
-    """Pins the ORDER, which is the whole point of the 2026-08-14 correction.
-
-    If a later edit "hardens" this by preferring sourceIp again, it silently disables
-    rate limiting on every IP-gated write. That regression shipped once already.
-    """
-    assert extract_client_ip(_event(xff="1.1.1.1", source_ip=EDGE)) == "1.1.1.1"
-
-
 # ── AC2: the trustworthy header wins, port stripped ───────────────────────────
 
 
@@ -205,14 +175,38 @@ def test_viewer_address_beats_a_forged_forwarded_for():
 # ── AC3: the fallback, and its observability ──────────────────────────────────
 
 
-def test_falls_back_to_source_ip_when_the_policy_is_not_attached():
-    """Today's live state: OriginRequestPolicyId is null, so the header never arrives."""
-    assert extract_client_ip(_event()) == EDGE
+def test_absent_trusted_header_fails_closed_to_one_shared_bucket():
+    """The point of the whole issue: without the trusted header, an attacker must not
+    be able to mint a fresh bucket. Every shape collapses to the SAME identity."""
+    derived = {
+        extract_client_ip(_event()),
+        extract_client_ip(_event(xff="1.1.1.1")),
+        extract_client_ip(_event(xff="9.9.9.9, 2.2.2.2")),
+        extract_client_ip({"headers": {}, "requestContext": {}}),
+    }
+    assert len(derived) == 1, f"fail-closed leaked {len(derived)} distinct buckets: {derived}"
 
 
-def test_default_only_when_there_is_nothing_at_all():
-    assert extract_client_ip({"headers": {}, "requestContext": {}}) == "unknown"
-    assert extract_client_ip({}, default="sentinel") == "sentinel"
+def test_fail_closed_identity_is_not_caller_derived():
+    """A constant, not anything read off the request — anything request-derived is
+    attacker-chosen, which is the bypass itself."""
+    for xff in ("evil", "1.1.1.1", "9.9.9.9, 2.2.2.2", "", "   "):
+        got = extract_client_ip(_event(xff=xff))
+        assert xff.strip() not in got or not xff.strip(), f"fail-closed identity echoed caller input: {got!r}"
+
+
+def test_source_ip_is_not_used_as_a_middle_ground():
+    """`sourceIp` is the CloudFront EDGE address — un-forgeable but not stable per
+    viewer, so it fails OPEN in practice (measured 2026-08-14). Pinning its absence
+    so a future 'safer fallback' refactor cannot quietly reintroduce it."""
+    assert extract_client_ip(_event()) != EDGE
+
+
+def test_the_default_argument_no_longer_silently_applies():
+    """`default=` used to surface when nothing at all was present. Under fail-closed
+    the trusted header is the ONLY thing that changes the answer, so a caller-supplied
+    default must not become a second identity source."""
+    assert extract_client_ip({}, default="sentinel") == extract_client_ip({})
 
 
 def test_trust_is_reported_not_silent():
