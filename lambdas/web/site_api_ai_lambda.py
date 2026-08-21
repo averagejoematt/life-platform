@@ -169,7 +169,8 @@ CORS_HEADERS = {
 # Old stores kept as fallbacks if rate_limiter import fails.
 _ask_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
 _board_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
-BOARD_RATE_LIMIT = 5  # 5 req/IP/hr — matches WAF rate limit tier; each call makes up to 6 Haiku calls
+BOARD_RATE_LIMIT = 5  # 5 Bedrock calls/IP/hr. #1221 box 5: this is now a FAN-OUT budget, not a
+# request count — a panel charges one token per persona (cap 8), so it can no longer buy 8x its price.
 
 # ── #546: board follow-up sessions (short-lived, server-side, opaque token) ──
 # A board_ask response mints an opaque session token; a follow-up carrying that
@@ -1241,8 +1242,12 @@ def _handle_board_ask(event: dict) -> dict:
     source_ip = _rate_limit_identity(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
     # Phase 2.1: DDB-backed rate limit (was in-memory dict — didn't survive
-    # warm-container distribution). Each board_ask costs ~6 Haiku calls,
-    # so global enforcement is critical to bound the worst-case bill.
+    # warm-container distribution).
+    #
+    # #1221 box 5: this charges ONE token, which covers the follow-up path (one
+    # Bedrock call) and the first persona of a panel. The REST of a panel's fan-out
+    # is charged after the persona list is resolved, below — the caller picks that
+    # list, so it cannot be priced here.
     if _RATE_LIMITER_READY:
         _board_allowed, _board_remaining, _board_retry = _ddb_rate_check(
             table,
@@ -1305,6 +1310,39 @@ def _handle_board_ask(event: dict) -> dict:
         if pid not in personas:
             personas.append(pid)
     personas = personas[:8]
+
+    # ── #1221 box 5: charge the fan-out, not just the request ────────────────
+    # One request = one Bedrock call PER PERSONA, and `personas` comes from the
+    # caller. So BOARD_RATE_LIMIT=5 was bounding requests while the actual spend
+    # ceiling was 5 x 7 = 35 Haiku calls/IP/hour. One token was charged above;
+    # charge the rest now, BEFORE any paid call, so the limit means what it says.
+    _extra = len(personas) - 1
+    if _extra > 0:
+        if _RATE_LIMITER_READY:
+            _fan_allowed, _fan_remaining, _fan_retry = _ddb_rate_check(
+                table,
+                endpoint="board_ask",
+                ip_hash=ip_hash,
+                limit=BOARD_RATE_LIMIT,
+                window_seconds=3600,
+                fail_open=False,  # a cost-bearing charge must never go unmetered
+                cost=_extra,
+            )
+        else:
+            _now = int(time.time())
+            _hour_ago = _now - 3600
+            _ts = [t for t in _board_rate_store.get(ip_hash, []) if t > _hour_ago]
+            _ts.extend([_now] * _extra)
+            _board_rate_store[ip_hash] = _ts[-40:]
+            _fan_allowed = len(_ts) <= BOARD_RATE_LIMIT
+            _fan_retry = 3600
+        if not _fan_allowed:
+            _emit_rate_limit_metric("board_ask")
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": str(_fan_retry or 3600)},
+                "body": json.dumps({"error": "Rate limit reached — a panel costs one request per coach. Try again in an hour."}),
+            }
 
     api_key = _get_anthropic_key()
     if not api_key:
