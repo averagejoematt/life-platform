@@ -862,6 +862,27 @@ unchanged) — spellings the fix's own regex never tried.
 
 ---
 
+### 8b. A class with a live residual keeps an OPEN tracker (#2841)
+
+Closing the last per-symptom issue is not closing the class. Between 2026-08-01 and
+2026-08-18, **eight** incidents recorded a QA oracle red-flagging or rolling back a
+**healthy** deploy — and every named structural issue for that class was `CLOSED`
+(#1526, #1931, #1917, #2051, #1911). #1526 in particular closed COMPLETED on 07-19 and
+the same race recurred on 08-04 and again on 08-16. A sweep of every open issue found
+**nothing** covering the class. Each closure was individually defensible; their sum was a
+live, recurring, unowned defect that read as solved.
+
+**The rule:** when a defect class has a *live residual* — the symptom recurs after its
+fix, or the fix addressed one trigger of several — the class keeps an **open** tracker
+even when every per-symptom issue closes. Close the symptom; do not let the symptom's
+closure stand in for the class. If you judge the residual acceptable, that is fine — but
+it must be a **dated acceptance with the measured rate and its rent**, not silence.
+Silence is what makes a closed tracker read as a solved class.
+
+Corollary for `/wrap` and any review sweep: before closing the last open issue in a
+recurring class, check the incident log for post-fix recurrences
+(`python3 scripts/incident_log_patterns.py` prints the per-class counts).
+
 ## 9. Gate registry — defect class → owning gate (#1349)
 
 The standing gates (wrap-time, CI, pre-commit) have grown one incident at a time —
