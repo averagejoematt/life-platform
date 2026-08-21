@@ -9,7 +9,9 @@ AI fan-out charge. Per `docs/content/BUILD_DISPATCH_CHECKLIST.md` a beat must be
 deployed work a reader can see. A reader sees nothing here; the only user-visible effect is that a
 full coach panel now costs its true price (below).
 
-**Main:** green. **Closures:** #1221 (P1) `realized`, #2931 (auto-filed, cleared). **Count: 86 → 84.**
+**Main:** green. **Closures:** #1221 (P1) `realized`, #2931 (auto-filed, cleared). **Count: 86 → 85**
+— two closed, but **#2931 was itself auto-filed mid-session**, so the net is **1**, not 2. Counting it
+as a closure without counting it as a filing would have overstated the drain.
 `model:fable` **25, untouched.** **PRs:** #2928, #2929, #2930 merged.
 **Deploys: TWO, both owner-approved** — `LifePlatformWeb` (02:10Z) and a deliberate fleet
 `deploy_all=true` (09:00Z). **Gates: 4 rejected, none left parked.** Stash clean. Alarms 0 uncited.
