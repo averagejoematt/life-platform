@@ -1,180 +1,148 @@
-# Handover — 2026-08-20 (afternoon/evening, ~13:32 → ~16:4x PT): the deploy plane stops lying, and it lied about my own fix twice
+# Handover — 2026-08-20 eve → 2026-08-21 (~17:07 PT → ~07:3x PT): the only P1 is closed, and I closed it once by accident first
 
 **Session:** Opus, owner-directed (plan `quizzical-wandering-dawn.md`, model ceiling Opus). Boot was
-**charter + `blast_radius.py`**. **No `model:fable` issue was touched** — by design; the whole plan was
-built from the 59 workable non-fable issues. Previous wrap archived as
-`HANDOVER_2026-08-20_fable-triage-and-the-unstranding.md`.
+**charter + `blast_radius.py`**. **No `model:fable` issue touched** — by design. Previous wrap archived
+as `HANDOVER_2026-08-20_deploy-plane-cluster.md`.
 
-**Build beat:** none — every merge is internal CI machinery (a rollup assertion, a scheduled detector,
-derived deploy triggers, a pre-merge ordering check). Per `docs/content/BUILD_DISPATCH_CHECKLIST.md` a
-beat must be merged **and** deployed work a reader can see. Nothing here is reader-visible.
+**Build beat:** none — the work is a CloudFront policy migration, a rate-limit identity change and an
+AI fan-out charge. Per `docs/content/BUILD_DISPATCH_CHECKLIST.md` a beat must be merged **and**
+deployed work a reader can see. A reader sees nothing here; the only user-visible effect is that a
+full coach panel now costs its true price (below).
 
-**Main:** green — but it took two fixes found *during the wrap* to get there (below).
-**Closures:** #2830, #2826, #2920, #2831 (4). **Filed:** #2924 (1). **Rescoped, not closed:** #2829.
-**Count: 89 → 86.** `model:fable` **25, unchanged and untouched.**
-**Deploys:** none. Every merge is CI-logic-only — no Lambda code, no CDK, no bundled-config *content* —
-so a fleet redeploy would be a no-op. **Four production gates rejected**, one of which I let strand
-(below). **Stash/hooks:** clean. **Alarms:** 0 uncited.
+**Main:** green. **Closures:** #1221 (P1) `realized`, #2931 (auto-filed, cleared). **Count: 86 → 84.**
+`model:fable` **25, untouched.** **PRs:** #2928, #2929, #2930 merged.
+**Deploys: TWO, both owner-approved** — `LifePlatformWeb` (02:10Z) and a deliberate fleet
+`deploy_all=true` (09:00Z). **Gates: 4 rejected, none left parked.** Stash clean. Alarms 0 uncited.
 
 ---
 
-## The cluster, and why these four
+## #1221 closed `realized` — the bypass is shut in production
 
-Epic **#2799** — "the silent-failure floor: nothing user- or data-facing may fail dark." I picked
-these four because **I had personally hit three of them in the preceding session** without knowing
-they were already filed:
+The only P1 on the board, and live-exploitable when the session started: per-IP rate limits on every
+IP-gated write (subscribe, votes, follows, nudges, checkins, board_ask) could be defeated by rotating
+one header.
 
-| issue | what it prevents now |
-|---|---|
-| **#2830** | an empty **or incomplete** check rollup reading as green |
-| **#2826** | a swallowed push going undetected between sessions |
-| **#2920** | a bundled file changing while the deploy plan doesn't notice |
-| **#2831** | a page shipping before the API route it calls |
+**The code half had already shipped.** `client_ip.py` preferred `CloudFront-Viewer-Address` — a header
+CloudFront sets from the TCP peer that a client cannot forge. **Its preferred source never arrived:**
+all 21 cache behaviours used legacy `ForwardedValues`, which forwards only the headers it names, and
+that was not one of them. So it always fell through to `X-Forwarded-For`, which this distribution
+forwards **unchanged from the client**.
 
-All four are now rows in **`docs/CONVENTIONS.md` §9**, landed as **one consolidated commit** — every
-worker was told to put its entry in the PR body as text and not touch the file, so four PRs could not
-pile up on it and the rows would read as a set. (The registry then rejected my first attempt:
-`test_gate_registry_is_pointers_not_restatements` caps the pointer cell at 120 chars and mine was 135.
-Its own rule is *pointers, not restatements*.)
+### Box 1 — proved by behaviour, not by template
 
-## Phase 0 paid for itself twice, before any worker started
-
-**A false positive that would have made #2826 actively harmful.** `check_main_green` reported main's
-HEAD as the swallowed-push shape. It wasn't: `8cbf075f` touched only `CLAUDE.md` + a handover, and
-**`Docs CI` ran on that exact sha**. Wired into a 15-minute cron unchanged it would have paged on every
-docs commit and been muted inside a week. Worker 2's brief was rewritten to require the discriminator
-*and* a silent-on-`8cbf075f` proof.
-
-**#2920's premise — my own filing from three hours earlier — was wrong.** I had blamed the workflow
-`paths:` filter; `config/**` is **already** in it, so my stated fix was a no-op. The real skip is at
-`ci-cd.yml:634`, where the Plan job diffs only `lambdas/ mcp/ mcp_server.py`. And sixteen lines below:
-
-```bash
-VOCAB_CHANGED=$(git diff … -- config/food_vocabulary.json)
-[ -n "$VOCAB_CHANGED" ] && FLEET_CHANGED="true"   # ⚡ fleet deploy
-```
-
-**One bundled config file had a hand-written trigger; the other was forgotten** — though
-`build_bundle.py` stages both identically. Corrected and retitled the issue rather than editing the
-body quietly. That is four wrong premises in two sessions, and this one was mine.
-
-## The derivation found 15 files nobody knew about
-
-Worker 3 replaced the hand-typed list with `build_bundle.py --print-bundled-config-paths`. It returns
-**17 paths**, not the 2 I assumed:
+Six POSTs, six **different** forged `X-Forwarded-For` values, after the policy deploy:
 
 ```
-config/coaches/{sleep,nutrition,mind,physical,glucose,labs,explorer,pattern,career,training}_coach.json
-config/coaches/{_shared_standard,influence_graph,tuning_log,eli_marsh}.json
-config/food_vocabulary.json      ← the one with a hand-written trigger
-config/personas.json             ← the bug I filed
-redirects.map
+203.0.113.11  400      203.0.113.14  429   <-- armed, despite a brand-new forged IP
+203.0.113.12  400      203.0.113.15  429
+203.0.113.13  400      203.0.113.16  429
 ```
 
-Every `config/coaches/*.json` ships in every bundle and had **no deploy trigger** — a coach-config
-change would have gone green with `Deploy: skipped`, exactly as the personas a11y fix did. Verified the
-`VOCAB_CHANGED` special case is genuinely **removed** (0 occurrences on the branch, 2 on main), not
-left alongside the derived set.
+Re-confirmed in a second independent hourly window. Before the deploy every rotation minted a fresh
+bucket and `429` never appeared at all.
 
-## I replayed my own near-miss through #2830, in both dialects
+### The design constraint that shaped the whole PR
 
-```
-what I computed that day: total=7 notgreen=0  ->  "GREEN, merge it"
+**`CloudFront-Viewer-Address` is in both origin-request policies and in NO cache policy.** Under
+`ForwardedValues` one header list did both jobs; policies split them. The value is unique per viewer,
+and `/api/*` is the **only cached** `/api` behaviour (`0/300/3600`) and the busiest read path — putting
+it in the cache key would have turned one cached object into one-per-client. A latency and cost
+regression, shipped in the name of a security fix. `tests/test_cloudfront_viewer_address_policies_1221.py`
+enforces both halves with mutation proof.
 
-assert_pr_green.py:  bucket dialect -> exit 1
-                     rollup dialect -> exit 1
-                     identical verdict: True
+Six behaviours, four distinct cache-key shapes, three Lambda-FURL origins (so
+`OriginRequestHeaderBehavior.all()` was unusable — it forwards `Host`). `web_stack.py` went
+**1084 → 1071**; the migration removed more than it added.
 
-❌ 1 expected check(s) MISSING from the rollup entirely:
-   - Collect + deploy-critical + format
-   (absent, not failed — it has not registered yet, or will never run on this PR)
-```
+### Box 5 was larger than filed, and the code disagreed with itself
 
-Worker 1 derived the expected set from `deploy/github_posture.json`'s required-checks ruleset — its own
-call, and the reason this lands: that file holds exactly two entries and the missing one is the first.
-I sent it back once to accept the `gh pr checks --json bucket` dialect too, because that is the shape
-the near-miss and the issue's own precedent both used; a tool that cries "7 NOT GREEN out of 7" on a
-green PR gets bypassed.
-
-## I shipped a live false positive and caught it 20 minutes later
-
-**The worst thing in this session, and it was mine.** #2925 wired `head_coverage()` into a 15-minute
-cron. Running it against real main immediately after:
+`BOARD_RATE_LIMIT = 5` bounded *requests*. One board_ask makes one Bedrock call **per persona**, the
+**caller** picks the persona list, and the rate check ran *before* that list was resolved:
 
 ```
-🛑 SWALLOWED PUSH (#2826 class) at 33a40b93: other workflow(s) ran (['Dependabot Auto-merge'])
-   but NOT ci-cd.yml, even though the diff touches its paths: filter
+COACH_ROSTER    7 coaches
+OLD ceiling     5 x 7 = 35 Haiku calls/IP/hour   for 5 tokens
+NEW ceiling     5     =  5 Haiku calls/IP/hour
 ```
 
-`33a40b93` is a routine `chore(reconcile)` commit. It hit the **partial-swallow** branch because it
-satisfies both halves: it is pushed with `GITHUB_TOKEN`, which **GitHub never dispatches workflows
-for** (anti-recursion, by design — `total_count: 0` confirmed), *and* it regenerates
-`lambdas/web/site_api_common.py`, so its diff hits the filter's first entry.
+Two numbers in the code were wrong: the constant's comment said "up to 6 Haiku calls", and the
+`personas[:8]` cap never binds because the roster holds 7. The limiter's own docstring already flagged
+board_ask as cost-bearing (`fail_open=False`, *"never unmetered"*) while the metering was off by 7x.
 
-**A reconcile commit follows every merge**, so the cron would have paged forever — the exact
-false-positive-generator I had warned Worker 2 about, arriving through the one case neither of us
-enumerated. Worker 2's discriminator handled path-filter-skip correctly; it had no state for *"the push
-could not have dispatched in the first place."*
+**The fix is not "move the rate check down"** — that would leave the follow-up path uncharged, and a
+follow-up genuinely *is* one Bedrock call. So one token is still charged up front and the remaining
+fan-out is charged once the list is final, via a new `cost=1`-default on the shared limiter.
 
-Fixed in **#2927**: `ZR_BOT_PUSH_NO_DISPATCH`, checked before every other branch since it holds
-regardless of diff or sibling runs. The committer comes from a payload the caller already fetches — no
-extra request. Verified on merged main, with a regression guard that a **human** zero-run push still
-pages.
+**Verified live at zero cost:** a full 7-coach panel costs 7 against a limit of 5, so it is refused
+*before* any paid call — `HTTP 429`, `{"Endpoint": "board_ask", "RateLimitHit": 1}`, and **no Bedrock
+invocation in the window**.
 
-## The wrap itself found two more — including a gate I had let strand
+**User-facing effect, stated plainly:** a full panel now consumes 7 of 5 hourly tokens — one panel per
+hour, where before it was five. If that proves too tight, raise `BOARD_RATE_LIMIT` deliberately with
+the cost visible; do not un-meter the fan-out.
 
-I only discovered the record was stale because Matthew asked "did we wrap". The honest answer was no,
-and checking turned up two live problems:
+## What I deliberately did NOT verify
 
-1. **A production approval gate parked 2.6h** — past the #1901 threshold, queueing every later CI/CD
-   run behind it. I had swept for waiting gates twice and rejected two, and this one still slipped
-   through; a third appeared behind it. **Sweeping once is not enough** — drain in a loop until the
-   query returns empty on a second pass.
-2. **Main was genuinely red**, and not merely from my rejection: Worker 3's new gate step lacked
-   `if: always()`, so `test_premerge_lane.py::test_the_lane_gates_report_independently` failed —
-   *"pre-merge gate step(s) without `if: always()` will be masked by an earlier red."* **The gate built
-   to stop silent failures could itself be silently masked** (#749). Fixed on main.
+- **Box 2's fail-closed branch is not externally reachable.** Every request arrives through CloudFront
+  with the header, and direct Function-URL access returns **403** (origin-secret guard armed,
+  verified). Covered by unit tests, not a live probe. Said so on the issue rather than implying
+  end-to-end proof.
+- **Box 4's other two limiter families are structural, not live.** Arming `/api/ask` costs real Bedrock
+  calls and posts junk questions to a live site; `/api/nudge` validates category *before* the rate
+  check, so any probe reaching the limiter writes real data. Spending the AI budget to re-prove a
+  property of the identity function already proved at the edge was not a trade worth making unasked.
+  All three consume the same helper, enforced fleet-wide by AC4's AST guard.
 
-## The recurring lesson, now at five instances
+## Four self-inflicted failures, all caught
 
-**The 168-test "structural set" is not a proxy for CI.** It went green through every failure in the
-last two sessions: the `aws_cdk` collection error, the `alarm_count` ±5 drift, the stale
-`DEPENDENCY_GRAPH` + a wrap failing its own #1340 gate, the citation-pin prune, and now the
-`if: always()` miss. It is **not in `CONVENTIONS.md`, not a script, not a workflow** — oral tradition
-with a number attached, underived from anything that actually gates `main`. Filed as **#2924** with the
-evidence; it belongs near the front of the next session.
+1. **I closed #1221 by accident, mid-series.** PR #2928's body read *"`Fixes #1221` is **not** claimed
+   here"* — **a negated closing keyword still closes**; the parser does not see the negation. Reopened
+   within a minute. The trap is in my own memory and I briefed three workers on it the same day. The
+   remaining PRs used `Part of #N`.
+2. **A production gate sat 2.1h** and the platform **auto-filed #2931** about it — the wedge detector,
+   urgent-alarm dispatch and issue-filing all worked with no human involved. I was the human who did
+   not action it. This was the **second** time in two sessions, after I wrote *"sweep in a loop, not
+   once"* into the last wrap and then swept once. Applying it properly found a **second** gate queued
+   behind the first — the exact shape a single sweep misses.
+3. **#2930's real lane failed on a docstring.** `THE FIX` is seven characters, so its `=======`
+   underline is **byte-identical to a git conflict marker** and `test_no_conflict_markers` fired. The
+   gate was right; it cannot distinguish them and should not try.
+4. **`DEPENDENCY_GRAPH.md` went stale again** at wrap time — the sixth instance of the #2924 class.
 
-Also worth keeping: the **#2372 tree-sweep gate fired on two different workers' new tests** in one
-session. It works correctly, but "adds a tree-sweeping test" is a predictable trap no brief warned
-about — it belongs in the standing worker brief.
+## Two premises were stale, one of them mine
 
-And I nearly filed a bug against working code: `ci_cd_push_paths` looked missing and
-`--head-coverage-check` looked ignored. My local checkout was four commits stale.
+- **Box 3's** — the guard test supposedly "encodes the false premise". It did not; it had already been
+  rewritten and says so. What it still pinned was the forgeable interim, which box 2 replaced. The real
+  wire problem was two **fixtures** (`test_board_followup_sessions.py`, `test_e2e_write_paths.py`)
+  supplying the caller IP only via `sourceIp`/`x-forwarded-for` — a shape production no longer
+  produces. Both now carry the trusted header **alongside** the forgeable pair, so they prove it
+  *wins* rather than that it works unopposed.
+- **#2829's**, from the previous session — reading the `cdk diff` showed it tried to CREATE three
+  alarms that already exist, which **blocked #1221's own deploy**. Applying the rescope (drop the three
+  adoptions, keep the `email-subscriber-errors` routing) unblocked it, and that routing — #2829's
+  actual title bug — shipped in the same deploy. The alarm now carries its SNS action.
 
 ## Residual / next picks
 
-- #2924 — the 168-test pre-merge proxy is undocumented, underived, and green through five main-reds.
-- #2829 — rescoped on measured ownership: CDK owns **one** of the six us-east-1 alarms
-  (`email-subscriber-errors`). Route that (pure modify, deploys clean); the three orphan adoptions need
-  `cdk import` and two of them already route correctly.
-- #2921 — `/api/sleep_detail` interleaves Eight Sleep and Whoop in one object; confirmed by the oracle.
+- #2924 — the 168-test pre-merge proxy is undocumented, underived, and has now gone green through
+  **six** main-reds, including this session's `DEPENDENCY_GRAPH` staleness.
+- #2829 — still open: the three orphan adoptions need `cdk import`, not synth-and-deploy. Two of the
+  three already route; only `cf-auth-errors` is genuinely silent.
+- #2921 — `/api/sleep_detail` interleaves Eight Sleep and Whoop in one object.
 - #2918 — two of six AI validation results never report `BLOCKED`, including the TL;DR headline.
 - #2919 — `pattern_coach` (3.89:1) and `career_coach` (3.69:1) fail the WCAG AA contrast floor.
 - #2912 — an alarm that flaps for 60s is invisible to the >72h citation gate.
-- #1221 — the live P1: 21/21 CloudFront behaviours still on legacy `ForwardedValues`, so
-  `CloudFront-Viewer-Address` never reaches the origin and per-IP limits stay evadable. Wants its own
-  session — it is a public-distribution migration.
-- #2809 — `partial`; verifiable only once a post-genesis Withings weigh-in exists.
+- #2809 — `partial`; needs a post-genesis Withings weigh-in (every current row is `phase=pilot`).
 - #2708 — `partial`; the chronicle runs Wednesdays, next 2026-08-26.
-- The #2831 gate is advisory, not required — not-work — promoting it needs an owner-run
-  `python3 scripts/apply_branch_protection.py --apply`.
-- A Withings weigh-in — not-work — owner action; also unblocks #2809's verification.
-- Two duplicate us-east-1 billing alarms to delete — not-work — an AWS mutation recorded in #2829.
+- `BOARD_RATE_LIMIT` may want raising now that a panel costs its true price — not-work — a product
+  call for Matthew, deliberately not made unilaterally.
+- A Withings weigh-in — not-work — owner action; also unblocks #2809.
+- The #2831 API-before-frontend check is advisory — not-work — promoting it needs an owner-run
+  `scripts/apply_branch_protection.py --apply`.
 
 ## Owner asks
 
 1. **A Withings weigh-in** — newest row is still `DATE#2026-08-16`.
-2. The one-line coach-colour call: `sleep_coach` is `#818cf8` on accessibility grounds (6.21:1 vs the
-   roster-v2 value's 4.37:1, under the AA floor). One line in `config/personas.json`.
-3. `gate:owner`: **#1738, #1571, #1677, #1631**; **#2833/#2834** are `model:opus` + `gate:owner`.
-4. Promote the #2831 API-before-frontend check from advisory to required, if wanted.
+2. **`BOARD_RATE_LIMIT`** — 5 Bedrock calls/IP/hour now means one full panel per hour. Raise it?
+3. The coach-colour call: `sleep_coach` is `#818cf8` on accessibility grounds (6.21:1 vs 4.37:1).
+4. `gate:owner`: **#1738, #1571, #1677, #1631**; **#2833/#2834** are `model:opus` + `gate:owner`.
