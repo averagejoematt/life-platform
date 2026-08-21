@@ -238,7 +238,7 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
     # ── high-consequence: the blocking type gate (ADR-107 tier 2) ────────────────
     "ci::ci-lint.yml::lint::7": Proof(
         gate_name="lint / Mypy gate (ENFORCED — clean-module set, ADR-080)",
-        command="python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)   # 435 files",
+        command="python -m mypy --config-file mypy.ini $(python tests/mypy_clean_set.py)   # 440 files",
         mutation=(
             "appended to lambdas/common/auth_breaker.py (a clean-set module), one error code "
             "at a time: (a) `def p() -> int: return _undefined_symbol` [name-defined]; "
@@ -246,19 +246,24 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
             "(c) `def p(x: int) -> str: return x` [return-value]."
         ),
         observed=(
-            "(a) exit 1 — 'Name \"_census_undefined_symbol_2578\" is not defined [name-defined]'. "
-            '(b) exit 1 — \'"str" has no attribute "no_such_attr_2578" [attr-defined]\'. '
-            "(c) exit 0 — SILENT. Clean baseline 0, reverted 0."
+            "RE-PROVED 2026-08-21 (#2638), all three now RED: (a) exit 1 [name-defined]. "
+            "(b) exit 1 [attr-defined]. (c) exit 1 [return-value] — this was 'exit 0 — SILENT' "
+            "when first proved on 2026-08-13, and #2638's tranche 1 enabled the code on "
+            "2026-08-15. Clean baseline 'Success: no issues found in 440 source files', "
+            "reverted likewise."
         ),
         scope=(
-            "mypy.ini's `disable_error_code = assignment, arg-type, return-value, operator` "
-            "means the single most intuitive type defect — returning the wrong type from an "
-            "annotated function — passes this gate green. The disable list is documented and "
-            "deliberate (#1656 tranches, measured counts in mypy.ini), so this is scope, not "
-            "rot; recorded here because 'mypy is green' reads as 'types are checked' and the "
-            "four disabled codes are 367 of the measured findings."
+            "mypy.ini's `disable_error_code = assignment, arg-type, operator` — three codes, "
+            "down from four. `return-value` LEFT the list on 2026-08-15 (#2638 tranche 1: all "
+            "32 sites were annotations under-describing already-correct code, so no returned "
+            "value moved), and the re-proof above confirms the gate now reds on it. The three "
+            "that remain are documented and deliberate, with per-code counts over the clean set "
+            "measured in mypy.ini and recomputable via scripts/mypy_disable_cost.py — so this "
+            "is scope, not rot. Recorded because 'mypy is green' reads as 'types are checked'. "
+            "Orthogonally narrow: ADR-107's 'mypy tier-2' names a FILE-SCOPE ratchet (which "
+            "modules are checked), not an error-code one; neither implies the other."
         ),
-        proved_on="2026-08-13",
+        proved_on="2026-08-21",
     ),
     # ── the named lead from slice 1 ──────────────────────────────────────────────
     "ci::ci-lint.yml::lint::3": Proof(
