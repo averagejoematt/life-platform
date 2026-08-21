@@ -266,6 +266,62 @@ content/data-correctness. Adding a file to the lane = add `pytestmark =
 pytest.mark.deploy_critical` **and** a row here; keep the two in sync. Confirm the lane
 after any change: `python3 -m pytest tests/ -m "deploy_critical and not integration" -q`.
 
+### 4a1. What to run BEFORE opening a PR — and what it does not tell you (#2924)
+
+**The command:**
+
+```bash
+python3 -m pytest tests/ -m "premerge and not integration" -q
+```
+
+That is the *same selection* `pr-checks.yml` runs as `Collect + deploy-critical + format` —
+the required merge gate from §4a0. One marker, named by both, so a local green here and
+the PR check cannot drift apart by construction (#2258). Membership is **derived**, not
+listed: `tests/conftest.py` applies `premerge` to every `tests/*_behavior.py` file, to
+everything `deploy_critical`, and to the structural gates in `_PREMERGE_EXTRA_FILES`.
+**8,813 tests in 155s** (measured locally 2026-08-21) against the job's 10-minute timeout.
+
+**What it does NOT do: predict main.** It covers the *merge* gate. The lane that reds
+`main` is the full `Unit Tests` job — ~1,320s (#2692) — and no cheap local subset honestly
+predicts it. A green run here means "the required check should pass," never "main will
+stay green."
+
+**Retired here: the five-file "168-test structural set."** Until 2026-08-21 every agent
+brief and session plan told the implementer to run five hand-listed paths
+(`test_drift_sentinel`, `test_gate_registry_1349`, `test_gate_census_2578`,
+`test_module_size_guard`, `test_conformance_guard_2844`) and treated `168 passed` as
+licence to merge. That set was written down nowhere in the repo — oral tradition with a
+number attached — and was **not derived from anything**, so it could not notice a sixth
+gating test appearing. It went green through four consecutive main-reds in two sessions:
+
+| date | what the 168 missed |
+|---|---|
+| 2026-08-19 | a test `import`ing `aws_cdk`; CI does not install it, so the job died at *collection* |
+| 2026-08-20 | `alarm_count` drifted past `test_platform_stats_truth.py`'s ±5 tolerance |
+| 2026-08-20 | stale `docs/DEPENDENCY_GRAPH.md` (`test_platform_model_drift`) |
+| 2026-08-20 | `test_check_alarm_citations.py`'s three-name pin, redded by a *correct* registry prune |
+
+Four for four the failing test was outside the five, and the misses cluster on counts,
+derived artifacts and registries — exactly what a "structural set" *sounds* like it
+covers, which is why the green read as reassuring. Use the `premerge` marker instead; it
+is a strict superset of all five.
+
+**The blind spot that widened the derivation (#2924).** `_PREMERGE_EXTRA_FILES` is
+guarded by a derivation (`tests/premerge_derivation.py`, #2372) that flags any
+non-behaviour `test_*.py` file sweeping the tree. It read only each test file's **own**
+source text — so a guard that factors its sweep into a sibling helper module was
+invisible, containing no sweep idiom, only an import. `test_conformance_guard_2844.py`
+— the charter conformance guard, the fleet-wide derivation-guard primitive
+`docs/CHARTER.md` names — is that shape, landed 2026-08-17, was classified nowhere, and
+**ran post-merge-only while sitting inside the command everyone called a pre-merge
+check.** The detector now also follows imports into sweeping `tests/` helpers; that
+found 22 unclassified files (20 added to the lane, 2 excluded with reasons).
+
+**Owner:** whoever changes the pre-merge lane owns this section. Adding a structural gate
+= add it to `_PREMERGE_EXTRA_FILES` **in the same PR** (a guard whose verdict depends only
+on the repo tree has no business running after the merge). If you find yourself hand-listing
+test paths in a brief again, that is the defect this section exists to stop.
+
 ### 4b. Visual-QA fires independently of the pipeline (#749)
 
 The reader-facing regression net (Playwright sweep + Bedrock vision QA + the accuracy

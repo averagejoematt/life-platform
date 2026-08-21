@@ -86,8 +86,10 @@ jobs:
       # #2258: the pre-merge lane must not be a strict SUBSET of the post-merge one.
       # `premerge` is applied automatically by tests/conftest.py to every
       # tests/*_behavior.py test PLUS everything deploy_critical — so this is a strict
-      # superset of the old ADR-117 subset, not a swap. ~6,075 tests in ~30s (measured
-      # 2026-08-08) against this job's timeout-minutes: 10.
+      # superset of the old ADR-117 subset, not a swap. 8,813 tests in 155s (measured
+      # locally 2026-08-21, #2924) against this job's timeout-minutes: 10. The prior
+      # "~6,075 in ~30s" here was an 2026-08-08 measurement left to go stale as the
+      # lane grew; re-measure before adding anything slow rather than trusting it.
       #
       # The marker's THIRD source (2026-08-09) is tests/conftest.py's
       # `_PREMERGE_EXTRA_FILES` — the structural gates (both size ceilings, the two
