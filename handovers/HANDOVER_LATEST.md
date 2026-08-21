@@ -9,9 +9,11 @@ AI fan-out charge. Per `docs/content/BUILD_DISPATCH_CHECKLIST.md` a beat must be
 deployed work a reader can see. A reader sees nothing here; the only user-visible effect is that a
 full coach panel now costs its true price (below).
 
-**Main:** green. **Closures:** #1221 (P1) `realized`, #2931 (auto-filed, cleared). **Count: 86 → 85**
-— two closed, but **#2931 was itself auto-filed mid-session**, so the net is **1**, not 2. Counting it
-as a closure without counting it as a filing would have overstated the drain.
+**Closures:** #1221 (P1) `realized`, #2931 (auto-filed, cleared). **Count: 86 → 86 — a net drain of
+ZERO.** Two closed, two filed: **#2931 was auto-filed mid-session** and **#2932 I filed at wrap**.
+Reporting "two closures" without the two filings would have claimed a drain that did not happen. What
+actually changed is the *composition*: the only P1 is gone, and a latent silent-data-loss hazard that
+was invisible before is now on the board.
 `model:fable` **25, untouched.** **PRs:** #2928, #2929, #2930 merged.
 **Deploys: TWO, both owner-approved** — `LifePlatformWeb` (02:10Z) and a deliberate fleet
 `deploy_all=true` (09:00Z). **Gates: 4 rejected, none left parked.** Stash clean. Alarms 0 uncited.
@@ -110,6 +112,16 @@ the cost visible; do not un-meter the fan-out.
    underline is **byte-identical to a git conflict marker** and `test_no_conflict_markers` fired. The
    gate was right; it cannot distinguish them and should not try.
 4. **`DEPENDENCY_GRAPH.md` went stale again** at wrap time — the sixth instance of the #2924 class.
+5. **A third fixture-not-the-wire file, found only because I dispatched a CI run I did not strictly
+   need.** `test_capture_door_idempotency_2682.py` went red on the fail-closed flip: its `_post`
+   helper supplied the caller IP only via `x-forwarded-for`/`sourceIp`, so every reader collapsed to
+   the sentinel. I had fixed exactly this in two other files earlier in the session and did not sweep
+   for a third. Fixed; the fixture now carries the trusted header **alongside** a *different*
+   forgeable value, so it proves the trusted one wins.
+6. **A gate sweep returned a false "empty"** — the unquoted `?` in `gh api ".../runs?status=waiting"`
+   made zsh glob-fail, so the variable was empty because the command never ran. Re-ran quoted: still
+   empty, genuinely. *An empty result from a command that did not execute reads exactly like a clean
+   state* — the same instrument-defect class I keep filing against.
 
 ## Two premises were stale, one of them mine
 
@@ -124,8 +136,29 @@ the cost visible; do not un-meter the fan-out.
   adoptions, keep the `email-subscriber-errors` routing) unblocked it, and that routing — #2829's
   actual title bug — shipped in the same deploy. The alarm now carries its SNS action.
 
+## The wrap found a real hazard — #2932
+
+Chasing failure 5 above past "make the test green" turned up a genuine second-order consequence of
+box 2. Fail-closed is right for a **rate limiter** — one shared bucket is a safe failure. It is wrong
+for the three **capture doors**, which key their idempotency id on the same identity
+(`sha256(f"{ip_hash}:{content}")[:12]`) and write with `attribute_not_exists(sk)`. Under the sentinel
+every caller shares one `ip_hash`, so **two different readers submitting the same idea collapse onto
+one row** and the second is silently swallowed as a duplicate.
+
+**Latent, not live** — verified on `E3S424OXQZ8NBE` that the `/api/*` behaviour serving all three
+doors carries ORP `833950c4-…` (whitelists `CloudFront-Viewer-Address`; the paired cache policy
+`8dad644a-…` correctly does not). So identities are real today. **Nothing enforces that coupling**:
+the 15 behaviours still on `ForwardedValues` do not forward the header, and a future `/api/` write
+route added under one of them degrades to one-identity-for-everyone with no test, alarm or log. Filed
+**#2932** with both candidate fixes — a derivation guard for the coupling, and making the sentinel
+non-colliding for id derivation so the failure is loud rather than silent.
+
+*One helper, two callers, opposite needs from the same failure mode.* Worth carrying: a safe default
+for one consumer can be a silent-data-loss default for another.
+
 ## Residual / next picks
 
+- #2932 — the capture-door identity collapse above; latent today, silent when it fires.
 - #2924 — the 168-test pre-merge proxy is undocumented, underived, and has now gone green through
   **six** main-reds, including this session's `DEPENDENCY_GRAPH` staleness.
 - #2829 — still open: the three orphan adoptions need `cdk import`, not synth-and-deploy. Two of the
