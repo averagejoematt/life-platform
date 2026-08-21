@@ -1,7 +1,7 @@
 """#1221 box 5 — /api/board_ask charges its Bedrock FAN-OUT, not just the request.
 
 THE DEFECT
-==========
+----------
 `BOARD_RATE_LIMIT = 5` reads as "5 board_asks per IP per hour". It was not bounding
 what it exists to bound. One board_ask makes **one Bedrock call per persona**, and the
 persona list comes from the CALLER (`body["personas"]`, capped at 8). The rate check
@@ -13,7 +13,7 @@ numbers in the code were wrong about this: the constant's comment said "up to 6 
 calls", and the `personas[:8]` cap never binds because COACH_ROSTER holds 7.
 
 THE FIX
-=======
+-------
 One token is still charged up front (it covers the follow-up path, which really is one
 Bedrock call, and a panel's first persona). The REST of the fan-out is charged after the
 list is final and **before any paid call**, via the shared limiter's new `cost=`.
