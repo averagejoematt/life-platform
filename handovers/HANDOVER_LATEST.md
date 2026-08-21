@@ -9,6 +9,11 @@ AI fan-out charge. Per `docs/content/BUILD_DISPATCH_CHECKLIST.md` a beat must be
 deployed work a reader can see. A reader sees nothing here; the only user-visible effect is that a
 full coach panel now costs its true price (below).
 
+**Main:** green — the last CI/CD run (`7d1abf93`, the capture-door fixture fix) passed every job,
+Deploy correctly skipped on a tests-only diff. HEAD `e90a4f65` is docs-only and therefore mints no
+CI/CD run: a **path-filter skip**, classified as such by `--head-coverage-check` (`Docs CI` and
+`Remediation Agent` both ran and both passed), not the swallowed-push shape.
+
 **Closures:** #1221 (P1) `realized`, #2931 (auto-filed, cleared). **Count: 86 → 86 — a net drain of
 ZERO.** Two closed, two filed: **#2931 was auto-filed mid-session** and **#2932 I filed at wrap**.
 Reporting "two closures" without the two filings would have claimed a drain that did not happen. What
