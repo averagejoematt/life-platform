@@ -4,6 +4,11 @@
     "citation": "#2116",
     "note": "NOT A FAULT — by design. This is a boolean gauge sub-alarm carrying NO SNS action of its own (cdk/stacks/monitoring_stack.py, the TokenAlarmGenesisWindowActive block). ALARM means literally 'we are inside the genesis window', which the two composite alarms combine with the token-threshold breach so a genesis-week breach is digested rather than paged (#2116, after #1961's post-genesis rebuild pages). Cycle 13's genesis is 2026-08-10, so red since 2026-08-07 is the correct state. Expected to return to OK when the window closes; treat_missing_data=NOT_BREACHING so a stale gauge can never silently suppress a real page. If it is still ALARM well after the genesis window ends, THAT is the finding — file it, don't re-cite."
   },
+  "cost-metric-drift-sustained": {
+    "citation": "#2883",
+    "note": "Expected RED from ~7 days after its first deploy: the alarm states a true, known condition. CostMetricDriftRatio has held ~1.37 since 2026-08-19 (measured live, #2883's 2026-08-20 comment) against the 1.15 acceptance bar — the residual self-report undercount (#2883 box 2: un-instrumented Bedrock callers outside Lambda, e.g. CI runners without AWS_LAMBDA_FUNCTION_NAME, plus partial cache-token capture) is still open. The alarm exists precisely so this residual cannot rot silently the way #357's regression did. Remove this entry when box 2 lands the ratio < 1.15 for a full week AND the alarm has actually cleared live.",
+    "added": "2026-08-21"
+  },
   "budget-tier-sustained-7d": {
     "citation": "#2734",
     "note": "Working as designed and saying something true: it can only fire when the tier NEVER returned to 0 across a full week, so it announces that band 1 has become the default operating state. Measured 2026-08-15: tier pinned at 1 since Aug 5, mtd $93.65, projected $230.58 against a $135 ceiling that auto-reverts to $85/$100 on 2026-09-01. The tier being 1 rather than 3 is CORRECT — _decide_tier caps the projection one tier above actual mtd (N-08). Remove this entry when the alarm clears."

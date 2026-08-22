@@ -633,3 +633,63 @@ def test_cost_metric_drift_ratio_skipped_when_no_self_reported_data(gov, monkeyp
 
     names = {d["MetricName"] for d in fake_cw.calls[0]["MetricData"]}
     assert "CostMetricDriftRatio" not in names
+
+
+# ── #2883 box 3: the governor's own log warns at the SAME bar the alarm uses ──
+# The old log threshold was 1.5 — above the 1.15 acceptance bar — so the
+# governor's log stayed quiet through a breaching 1.37 while the CloudWatch
+# alarm (cost-metric-drift-sustained, monitoring_stack.py) would have been
+# counting toward ALARM. One bar, everywhere: DRIFT_RATIO_BAR.
+
+
+class _RecordingLogger:
+    def __init__(self):
+        self.warnings = []
+
+    def warning(self, msg, *a, **k):
+        self.warnings.append(msg)
+
+    def info(self, msg, *a, **k):
+        pass
+
+    def debug(self, msg, *a, **k):
+        pass
+
+
+def test_drift_warning_fires_at_the_acceptance_bar_not_at_1_5(gov, monkeypatch):
+    """A ratio of ~1.37 (the live 2026-08-19 residual) is a breach of the 1.15
+    bar and must WARN — under the old 1.5 threshold it was silent."""
+    fake_cw = _RecordingCW()
+    monkeypatch.setattr(gov, "_cw", fake_cw)
+    rec = _RecordingLogger()
+    monkeypatch.setattr(gov, "logger", rec)
+
+    ai = 71.19  # buffered; unbuffered 61.90 → ratio 61.90/45.32 ≈ 1.366 (> 1.15, < 1.5)
+    gov._emit_metrics(110.81, projected=120.0, tier=1, self_reported_mtd=45.32, ai=ai)
+
+    drift_warns = [w for w in rec.warnings if "CostMetricDrift" in w]
+    assert drift_warns, "a 1.37 ratio breaches the 1.15 bar and must warn (#2883 box 3)"
+    assert f"{gov.DRIFT_RATIO_BAR}" in drift_warns[0], "the warning should name the bar it measured against"
+
+
+def test_drift_warning_silent_below_the_bar(gov, monkeypatch):
+    """Below the bar (the #2883 target state) the governor logs no drift warning."""
+    fake_cw = _RecordingCW()
+    monkeypatch.setattr(gov, "_cw", fake_cw)
+    rec = _RecordingLogger()
+    monkeypatch.setattr(gov, "logger", rec)
+
+    # unbuffered 61.90 vs self-reported 56.00 → ratio ≈ 1.105 < 1.15
+    gov._emit_metrics(110.81, projected=120.0, tier=1, self_reported_mtd=56.00, ai=71.19)
+
+    assert not [w for w in rec.warnings if "CostMetricDrift" in w]
+    # the ratio itself is still published — the bar gates the WARNING, never the metric
+    names = {d["MetricName"] for d in fake_cw.calls[0]["MetricData"]}
+    assert "CostMetricDriftRatio" in names
+
+
+def test_drift_bar_is_the_issue_2883_acceptance_bar(gov):
+    """< 1.15 is #2883's acceptance line; a silent change here must be deliberate.
+    (tests/test_cost_drift_alarm_2883.py separately pins the CloudWatch alarm's
+    threshold to this same constant by AST.)"""
+    assert gov.DRIFT_RATIO_BAR == 1.15
