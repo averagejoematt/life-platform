@@ -2013,36 +2013,16 @@ Write your {domain_label} coaching section now."""
         output_type = f"daily_brief_{domain_label.lower().replace(' ', '_')}"
         _gen_cache = None
         _cache_tbl = None
-        _brief_fp = None
-        _fp_parts = None
+        _brief_fp = _fp_parts = None
         try:
             from common import generation_cache as _gen_cache
 
             _cache_tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
-            # #1697: the corrections block is fingerprinted so a newly-logged (or
-            # resolved) correction busts the hash-and-reuse and forces a fresh,
-            # corrections-aware generation — reuse can never be stale-but-fresh.
-            #
-            # #2889: fingerprint the STRUCTURED inputs, not `user_message_full`.
-            # `canonicalize()` strips bookkeeping by dict KEY, so hashing the
-            # already-rendered prompt (which bakes in `json.dumps(brief)`, carrying
-            # `generation_date`) made the whole `_VOLATILE_KEYS` strip a no-op — the
-            # digest changed daily and `GenerationSkippedUnchanged` was never emitted
-            # once between ADR-126 and 2026-08-22 (all 8 live cache rows: reuse_count
-            # 0, first_generated == last_generated). These parts are the same semantic
-            # inputs the rendered message carries; `trends` is passed whole rather than
-            # at the prompt's [:2000] truncation, which over-covers — the sanctioned
-            # safe direction (a missed strip costs a regeneration, never a stale reuse).
-            _fp_parts = {
-                "system_prompt": system_prompt,
-                "brief": brief,
-                "domain_data": domain_data,
-                "trends": comp_results.get("trends", {}),
-                "data_inventory": _data_inventory,
-                "corrections": corrections_block,
-            }
-            _brief_fp = _gen_cache.brief_fingerprint(_fp_parts)
-            _reuse, _unchanged_since = _gen_cache.check_reuse(_cache_tbl, coach_id, output_type, _brief_fp)
+            # #2889: STRUCTURE, never rendered prose — canonicalize strips by dict KEY. See generation_cache.
+            _fp_parts = _gen_cache.brief_parts(
+                system_prompt, brief, domain_data, comp_results.get("trends", {}), _data_inventory, corrections_block
+            )
+            _brief_fp, _reuse, _unchanged_since = _gen_cache.check_reuse_or_explain(_cache_tbl, coach_id, output_type, _fp_parts)
             if _reuse:
                 print(f"[COACH-V2:{coach_id}] brief unchanged since {_unchanged_since} — reusing gated output, skipping generation")
                 _today = _date_cls.today().isoformat()
@@ -2068,16 +2048,6 @@ Write your {domain_label} coaching section now."""
                 except Exception as e:
                     print(f"[COACH-V2:{coach_id}] State updater invoke (reuse) failed (non-blocking): {e}")
                 return _reuse
-            # #2889: a MISS used to be silent, so "the metric never fired" could not
-            # distinguish a wrong fingerprint from genuinely-changing inputs. Name the
-            # parts that differ. A log line, not a metric — #2837 is an open finding
-            # about 743 EMF series and a dimensioned miss-reason would add ~40 more.
-            try:
-                _prev = _gen_cache.load_entry(_cache_tbl, coach_id, output_type) or {}
-                _diff = _gen_cache.changed_parts(_prev.get("part_hashes") or {}, _gen_cache.part_fingerprints(_fp_parts))
-                print(f"[GEN-CACHE-MISS:{coach_id}] {output_type} regenerating — parts changed: {', '.join(_diff) or 'none (first run)'}")
-            except Exception as _md_e:
-                print(f"[GEN-CACHE-MISS:{coach_id}] miss-reason unavailable (non-blocking): {_md_e}")
         except Exception as _gc_e:
             print(f"[COACH-V2:{coach_id}] generation cache unavailable (non-blocking): {_gc_e}")
             _gen_cache = None
@@ -2201,17 +2171,7 @@ Write your {domain_label} coaching section now."""
         # fingerprint so an unchanged brief tomorrow reuses it. Only reached on a
         # cache MISS, so first_generated resets the unchanged-since clock.
         if _gen_cache is not None and _cache_tbl is not None and _brief_fp and output:
-            # #2889: store per-part digests too, so the NEXT miss names the part that
-            # changed instead of being unmeasurable.
-            _gen_cache.store_entry(
-                _cache_tbl,
-                coach_id,
-                output_type,
-                _brief_fp,
-                output,
-                _date_cls.today().isoformat(),
-                part_hashes=_gen_cache.part_fingerprints(_fp_parts) if _fp_parts else None,
-            )
+            _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, _date_cls.today().isoformat(), parts=_fp_parts)
 
         # #1691 (epic #1687): baseline-freshness gate — ADVISORY. The DATA-grounding
         # gates above pass a brief that is digit-grounded yet cites a STALE cycle

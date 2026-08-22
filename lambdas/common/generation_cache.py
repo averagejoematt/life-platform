@@ -97,6 +97,48 @@ def brief_fingerprint(*parts) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def brief_parts(system_prompt, brief, domain_data, trends, data_inventory, corrections) -> dict:
+    """The named semantic parts of a coach daily-brief generation (#2889).
+
+    The NAMES live here, not at the call site, so a caller cannot quietly drop or
+    rename one — dropping a part narrows the fingerprint, which is the direction
+    that could serve stale output as fresh.
+    """
+    return {
+        "system_prompt": system_prompt,
+        "brief": brief,
+        "domain_data": domain_data,
+        "trends": trends,
+        "data_inventory": data_inventory,
+        "corrections": corrections,
+    }
+
+
+def check_reuse_or_explain(table, coach_id: str, output_type: str, parts: dict):
+    """Fingerprint `parts`, try reuse, and on a MISS say which part changed.
+
+    Returns `(fingerprint, reused_output_or_None, unchanged_since_or_None)`.
+
+    THIS IS THE ENTRY POINT CALLERS SHOULD USE (#2889). It exists so the caller
+    hands over STRUCTURE and never a rendered prompt — see `brief_fingerprint` for
+    what that mistake cost — and so the miss reason lives with the cache rather than
+    at each call site. `lambdas/ai/ai_calls.py` is baselined by the #1665 module-size
+    guard, and the guard was right: this logic belongs here.
+
+    The miss line is a `print`, deliberately not a dimensioned metric — #2837 is an
+    open finding about 743 EMF series across 35 namespaces, and a per-coach
+    miss-reason dimension would have added ~40 more for a diagnostic that a log
+    search answers just as well.
+    """
+    fingerprint = brief_fingerprint(parts)
+    entry = load_entry(table, coach_id, output_type)
+    if entry and entry.get("brief_hash") == fingerprint and entry.get("output"):
+        return fingerprint, entry["output"], entry.get("first_generated")
+    diff = changed_parts((entry or {}).get("part_hashes") or {}, part_fingerprints(parts))
+    print(f"[GEN-CACHE-MISS:{coach_id}] {output_type} regenerating — parts changed: {', '.join(diff) or 'none (first run)'}")
+    return fingerprint, None, None
+
+
 def part_fingerprints(parts: dict) -> dict:
     """Per-part digests, so a MISS can say WHICH part changed (#2889).
 
@@ -147,13 +189,14 @@ def check_reuse(table, coach_id: str, output_type: str, fingerprint: str):
     return None, None
 
 
-def store_entry(table, coach_id: str, output_type: str, fingerprint: str, output: str, today: str, part_hashes: dict | None = None) -> bool:
+def store_entry(table, coach_id: str, output_type: str, fingerprint: str, output: str, today: str, parts: dict | None = None) -> bool:
     """Persist a freshly generated, gate-passed output under its brief fingerprint.
     Reached only on a cache MISS, so `first_generated` resets the unchanged-since
-    clock. `part_hashes` (#2889) is optional and additive — the next miss can then
-    name which part changed instead of leaving the miss reason unmeasurable.
-    Best-effort."""
+    clock. Pass the same `parts` dict the fingerprint came from (#2889) and the
+    per-part digests are stored alongside, so the NEXT miss names what changed
+    instead of leaving the miss reason unmeasurable. Best-effort."""
     try:
+        part_hashes = part_fingerprints(parts) if parts else None
         item = {
             "pk": CACHE_PK,
             "sk": cache_sk(coach_id, output_type),
