@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-25
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-08-22
 
 **Version:** v8.6.0 | **Last updated:** 2026-08-22 | **Total tools:** 76
 
@@ -16,23 +16,24 @@
 
 ---
 
-## All 72 Tools — by module
+## All 76 Tools — by module
 
 | Module | Tools |
 |---|---|
 | `mcp/tools_training_notes.py` | 1 |
 | `mcp/tools_data.py` | 6 |
-| `mcp/tools_coach_intelligence.py` | 4 |
+| `mcp/tools_coach_intelligence.py` | 5 |
 | `mcp/tools_training.py` | 2 |
 | `mcp/tools_health.py` | 3 |
 | `mcp/tools_benchmark.py` | 1 |
 | `mcp/tools_strength.py` | 1 |
 | `mcp/tools_nutrition.py` | 2 |
 | `mcp/tools_correlation.py` | 1 |
-| `mcp/tools_lifestyle.py` | 12 |
-| `mcp/tools_journal.py` | 2 |
+| `mcp/tools_lifestyle.py` | 11 |
+| `mcp/tools_journal.py` | 4 |
 | `mcp/tools_labs.py` | 2 |
 | `mcp/tools_cgm.py` | 1 |
+| `mcp/tools_social_connection.py` | 1 |
 | `mcp/tools_sick_days.py` | 1 |
 | `mcp/tools_social.py` | 1 |
 | `mcp/tools_todoist.py` | 4 |
@@ -43,7 +44,7 @@
 | `mcp/tools_reading.py` | 11 |
 | `mcp/registry.py` | 1 |
 | `mcp/tools_habits.py` | 2 |
-| `mcp/tools_coach_checkin.py` | 2 |
+| `mcp/tools_coach_checkin.py` | 3 |
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
 
@@ -60,7 +61,7 @@
 | `get_sources` | — | List all available data sources and their date ranges in the life platform. |
 | `get_daily_snapshot` | view=, date=, sources=[] | Unified daily data access. 'summary' (default) = all available data across every source for a specific date. Best for 'how was my day/yesterday?' questions. Requires date=. 'latest' = most recent record for each source — useful for current status checks. Use for: 'how was yesterday?', 'what's my latest data?', 'show me today's readings', 'all data for 2026-03-10'. |
 | `get_date_range` | source, start_date, end_date | Get time-series records for a single source. Returns raw daily data for windows up to 90 days, monthly aggregates beyond that. |
-| `find_days` | source, start_date, end_date, filters=[] | Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet'. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. |
+| `find_days` | source, start_date, end_date, mode=, target_date=, features=[], k=, filters=[] | Find days within a date range where numeric fields meet filter conditions. For Strava, use field names: 'total_distance_miles', 'total_elevation_gain_feet'. For Whoop: 'hrv', 'recovery_score', 'strain'. Great for correlations. IMPORTANT: This tool operates on day-level aggregates only — it cannot search inside individual activity names or sport types. For any query involving specific activity names, first/longest/highest achievements, named events, or sport-type filtering, you MUST use search_activities instead. mode='similar' (#2351) answers 'the days most like this one': ranks the window's days by RMS z-distance to target_date over a feature vector (deterministic arithmetic, no AI), reports each match's similarity plus a what-happened-next distribution with its n, and honestly returns no matches when nothing is within the similarity floor. |
 | `get_intelligence_quality` | days=, severity=, coach= | Query intelligence quality validation results from the post-generation validator. Shows flags where coaches made claims contradicted by actual data, used overconfident language for early-stage data, or cited wrong source-of-truth values. Use for: 'are the coaches accurate?', 'any quality issues?', 'intelligence validation results'. |
 | `search_activities` | start_date=, end_date=, name_contains=, sport_type=, min_distance_miles=, min_elevation_gain_feet=, sort_by=, limit= | Search Strava activities by name keyword, sport type, minimum distance, or minimum elevation gain. ALWAYS use this tool (not find_days) for: named activities ('first century', 'mailbox peak', 'machu picchu'), achievement queries (longest run, biggest hike, first 100-mile ride), or sorting by distance/elevation to find top efforts. CRITICAL: Do NOT filter by sport_type when looking for longest/biggest/most impressive efforts — long walks and hikes count equally to runs and should be included. Only pass sport_type if the user explicitly asks for a specific type (e.g. 'my longest run' vs 'my longest activity'). Results include an all-time percentile rank and a context flag for exceptional values so you can narrate how remarkable the effort was. |
 
@@ -71,6 +72,7 @@
 | `get_coach_thread` | coach_id, limit= | Read a coach's persistent thread — their running memory of positions, predictions, surprises, and emotional investment. Use for: 'what has Dr. Park been saying?', 'show me the glucose coach's predictions', 'how invested is the training coach?' |
 | `get_predictions` | status=, coach_id=, limit= | Cross-coach prediction ledger — all predictions from all coaches with statuses. Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. #726: reads the canonical COACH#/PREDICTION# store (evaluator-graded, code-stamped IDs per #725 — the SAME store the public site serves); the legacy SOURCE#coach_thread# embedded predictions were tombstoned. For hit-rate + calibration analysis, use get_coach_track_record. |
 | `get_coach_track_record` | coach_id, days=, subdomain= | Hit-rate track record for a single coach over a configurable window — reads the COACH#{coach_id}/LEARNING# audit trail written daily by the prediction evaluator. Returns by_outcome counts (confirmed/refuted/inconclusive/expired), hit_rate_pct (confirmed / decided), per-subdomain and per-metric breakdowns, and 10 most-recent evaluations. Use for: 'how accurate has the glucose coach been?', 'which subdomain does the sleep coach get right most often?', 'show me recent verdicts on metabolic predictions'. |
+| `audit_coach_dossier` | coach_id, action=, record_sk=, note= | #1387: Matthew's PRIVATE audit + correction affordance over a coach's public dossier ('what this coach knows' on /coaching/by-coach/, rendered verbatim from COACH# memory). action='view' (default) returns the FULL UNFILTERED memory — commitments, learnings (including the ADR-141 conversation-channel rows the public dossier must never show, flagged), quality trail, relationship state — plus any dossier corrections already logged. action='retract' removes a record from the public dossier; action='correct' renders a dated correction note under it. Both write a dated row to the #1689 corrections ledger (item_ref.surface='coach_dossier') and NEVER edit the memory record in place — the memory stays auditable, corrections are themselves on the record. Args: coach_id (required), action (view\|retract\|correct), record_sk + note (required for retract/correct; get the record_sk from action=view). |
 | `evaluate_prediction` | prediction_id, status, outcome_note= | Manually resolve a coach prediction — mark as confirmed or refuted with an outcome note. |
 
 ### Training Intelligence (`mcp/tools_training.py`)
@@ -120,13 +122,12 @@
 | `save_insight` | text, tags=[], source= | Save a new insight to the personal coaching log. Use whenever Claude or Matthew identifies something worth tracking and following up on — a hypothesis, a behavioural change to try, a pattern noticed, or a recommendation to act on. Returns the insight_id needed for update_insight_outcome. Use for: 'save this insight', 'track this idea', 'add this to the coaching log', 'remember to follow up on this'. |
 | `log_evening_intake` | count, date= | PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) to the Matthew-private intake ledger. One tap, no free text. Idempotent: re-logging the same evening updates it (returns previous_count), never double-counts. Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). |
 | `get_intake_response` | window_days= | PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 nonzero evenings exist. Reports arming progress below the floors (ADR-105). Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'. |
-| `get_insights` | status_filter=, limit= | List insights from the personal coaching log. Returns all insights newest-first with days_open calculated. Stale flag is set for open insights older than 14 days. Use for: 'what insights are open?', 'show my coaching log', 'what have I been meaning to act on?', 'any stale insights?', 'show me resolved insights'. |
+| `get_insights` | status_filter=, limit= | List insights from the personal coaching log, newest-first, with days_open calculated. `total` is the whole corpus, `returned` the page, `truncated` says if they differ (#2221). Stale flag is set for open insights older than 14 days. Use for: 'what insights are open?', 'show my coaching log', 'what have I been meaning to act on?', 'any stale insights?', 'show me resolved insights'. |
 | `update_insight_outcome` | insight_id, outcome_notes=, status= | Close the loop on a saved insight — record what happened when you acted on it. Updates the insight's status and adds outcome notes. Use for: 'I tried the caffeine cutoff — it worked', 'mark this insight as resolved', 'update the outcome for insight X', 'close out this coaching log item'. |
 | `create_experiment` | name, hypothesis, start_date=, tags=[], notes=, library_id=, duration_tier=, experiment_type=, planned_duration_days=, why_now=, priority=, hoped_outcome=, measurement=, evidence_links=[], source_hypothesis_id=, matthew_note=, design= | Start tracking a new N=1 experiment. An experiment is a specific protocol change (supplement, diet shift, sleep hygiene tweak, training adjustment) with a hypothesis and start date. The system will automatically compare before/after metrics when you call get_experiment_results. Board rules: one variable at a time, minimum 14 days, define success criteria upfront. Use for: 'I'm starting creatine today', 'track my no-caffeine-after-10am experiment', 'create experiment for cold plunge protocol', 'I want to test if X improves Y'. |
 | `list_experiments` | status= | List all N=1 experiments with their status, duration, and whether minimum data threshold (14 days) has been met. Filter by status. Use for: 'what experiments am I running?', 'show active experiments', 'list completed experiments', 'any experiments ready to evaluate?'. |
 | `get_experiment_results` | experiment_id | Auto-compare before vs during metrics for an N=1 experiment. Automatically queries sleep, recovery, stress, body composition, nutrition, movement, and glucose metrics for both the pre-experiment baseline period and the experiment period. Reports deltas, % changes, and direction (improved/worsened). Board of Directors evaluates results against hypothesis. Use for: 'how is my creatine experiment going?', 'did cutting caffeine help my sleep?', 'show experiment results', 'evaluate my N=1', 'did this actually work?'. |
 | `end_experiment` | experiment_id, outcome=, status=, end_date=, grade=, compliance_pct=, reflection=, matthew_note= | End an active N=1 experiment and record the outcome. Run get_experiment_results first to review the data. Status can be 'completed' (ran full course) or 'abandoned' (stopped early). Use for: 'end my creatine experiment', 'I'm stopping the no-caffeine experiment', 'mark experiment as completed', 'abandon experiment X'. |
-| `get_social_connection_trend` | start_date=, end_date= | Social connection quality trend from journal entries. Tracks enriched_social_quality (alone/surface/meaningful/deep) over time with rolling averages, streaks, and PERMA wellbeing model context. Correlates social quality with recovery, HRV, sleep, stress. Seligman: Relationships are the #1 predictor of sustained wellbeing. Use for: 'social connection trend', 'meaningful connections', 'PERMA score'. |
 | `get_field_notes` | week= | Retrieve the weekly Field Notes entry — AI Lab Notes (present/lookback/focus paragraphs) and any existing Matthew response. Defaults to current week if no week specified. Use for: 'show me this week's field notes', 'what did the AI say this week', 'read field notes for week 14', 'get my lab notebook'. |
 | `log_field_note_response` | week, notes, agreement=, disputed=[], added= | Write Matthew's response to the right page of a Field Notes entry. The AI Lab Notes must already exist for that week. Uses update_item to never overwrite AI fields. Use for: 'respond to field notes', 'write my side of the lab notebook', 'I disagree with the AI notes this week', 'add my response to week 14'. |
 
@@ -136,12 +137,14 @@
 |------|-----------|-------------|
 | `get_flourishing_trend` | days=, ema_span= | EMA trends of the daily PERMA signals LLM-coded from the journal (#1403: values lived, gratitude, flow, growth signals, ownership, social quality — SOURCE#flourishing). Every payload carries model provenance and anti-rumination framing. Use for: 'how are my values trending?', 'flourishing signals this month', 'social quality trend'. |
 | `get_mood` | view=, start_date=, end_date=, days= | Unified mood and state-of-mind intelligence. 'trend' (default) = journal-derived mood, energy, and stress scores with 7-day rolling averages, trend direction. 'state_of_mind' = Apple Health How We Feel (HWF) valence data — objective emotional state tracking. Use for: 'how has my mood been?', 'mood trend', 'energy levels', 'stress trend', 'state of mind', 'emotional wellbeing', 'How We Feel data', 'mood vs training'. |
+| `mark_journal_quote` | action=, date=, quote=, approved=, channel=, sk= | #1568 (ADR-142): mark ONE verbatim journal line explicitly publishable — the consent-per-line 'from the journal, in his words' channel. Use ONLY during a journal-interview / vlog close, after nominating at most 2 quote-worthy lines and getting Matthew's explicit per-line yes; pass approved=true only when he said yes to THIS exact line. The tool refuses (fail-closed) any line touching the mark-time taboo list (substances / family-specifics / age / private events / real names — the ELENA brief's omit list, enforced in code), any paraphrase that isn't verbatim in that day's entry (ADR-104 grounding), and a third line on a day (cap 0–2). Marked lines surface on the story hub archive + at most one featured line per week on home, dated, with a receipts link. action='unmark' revokes a line (consent is revocable); action='list' shows what's marked. The chronicle's never-quote rule is untouched — never quote unmarked journal text anywhere. |
+| `manage_diary_claims` | action=, date=, source_sk=, claims=[], status=, sk=, today= | #1841: the on-tape claims ledger — the diary's half of the prediction machinery. action='due' (default, ZERO args) is a /vlog STEP-0 call: the claims whose stated deadline has landed, to be called back ON TAPE in his own words before anything new is asked. action='log' registers claims at the route-the-takeaways close: propose 0-3 falsifiable claims he actually made this session, take his explicit yes PER CLAIM (consent=true per claim, silence means no, never auto), and pass them with the entry's source_sk. The gate is deterministic and will REFUSE anything not falsifiable — the metric must resolve through measurable_metrics, and the claim needs either a number to beat (threshold + condition) or an unambiguous direction plus an integer horizon_days (14-365). Say refusals out loud rather than retrying them (ADR-105). Admitted claims are graded by the same daily evaluator as every coach prediction; nothing here grades and nothing here calls an LLM. action='list' shows the ledger + track record; action='called_back' marks a due claim worked so it stops resurfacing. PRIVATE — no public surface reads this partition. |
 
 ### Labs & Freshness (`mcp/tools_labs.py`)
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_labs` | view=, biomarker=, category=, start_date=, end_date= | Unified lab intelligence. Use 'view' to select the analysis: 'results' (default) = latest blood work values across all 7 draws with reference ranges and trend direction. 'trends' = biomarker trajectory over time — slope, direction, clinical threshold crossings. 'out_of_range' = all historically out-of-range biomarkers with persistence classification (chronic/recurring/occasional). Use for: 'show my blood work', 'lab results', 'biomarker trends', 'what's out of range?', 'cholesterol history', 'which labs are chronic issues?'. |
+| `get_labs` | view=, biomarker=, category=, start_date=, end_date= | Unified lab intelligence. Use 'view' to select the analysis: 'results' (default) = latest blood work values across all 7 draws with reference ranges and trend direction. 'trends' = biomarker trajectory over time — slope, direction, clinical threshold crossings. 'out_of_range' = out-of-range biomarkers with persistence (chronic/recurring/occasional/single_observation). Use for: 'show my blood work', 'lab results', 'biomarker trends', 'what's out of range?', 'cholesterol history', 'which labs are chronic issues?'. |
 | `get_freshness_status` | sources=[] | Per-source data freshness summary (WR-48 Enhancement 4). Returns overall status (green / yellow / orange / red) plus per-source last-date / age-days / threshold. Use for: 'are we OK?', 'what sources are stale?', 'data status check', 'why isn't my dashboard updating?'. Independent of freshness-checker Lambda — reads DDB directly so it works even if the Lambda's silently failing (which is what happened during the Apr–May 2026 silence). |
 
 ### Blood Glucose / CGM (`mcp/tools_cgm.py`)
@@ -149,6 +152,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_cgm` | view=, start_date=, end_date=, days= | Unified CGM (continuous glucose monitor) intelligence. 'dashboard' (default) = time-in-range (target >90%), variability (SD target <20), mean glucose, time above 140, fasting proxy, clinical flags, trend. Warmed nightly. 'fasting' = overnight nadir-based fasting glucose validation — avoids dawn phenomenon by using 2-5 AM nadir. Cross-validates CGM accuracy. Use for: 'glucose overview', 'blood sugar', 'time in range', 'CGM dashboard', 'am I pre-diabetic?', 'fasting glucose', 'glucose variability', 'metabolic health'. |
+
+### mcp.tools_social_connection (`mcp/tools_social_connection.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_social_connection_trend` | start_date=, end_date= | Social connection quality trend from journal entries. Tracks enriched_social_quality (alone/surface/meaningful/deep) over time with rolling averages, streaks, and PERMA wellbeing model context. Correlates social quality with recovery, HRV, sleep, stress. Seligman: Relationships are the #1 predictor of sustained wellbeing. Use for: 'social connection trend', 'meaningful connections', 'PERMA score'. |
 
 ### Sick Days (`mcp/tools_sick_days.py`)
 
@@ -175,7 +184,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `write_platform_memory` | category, content, date=, overwrite=, privacy_tier=, domains=[] | Store a structured memory record in the platform_memory partition. The compounding intelligence substrate — routes durable takeaways from conversation (life events, constraints/preferences, failure patterns, episodic wins, coaching calibration) into the store that coach prompt assembly injects (#1482). Conversation-writable categories: life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. Writes are validated against the code taxonomy (lambdas/ai/platform_memory.py) and stamped channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — that is what reaches coach prompts. Call list_memory_categories for the full taxonomy. |
+| `write_platform_memory` | category, content, date=, overwrite=, privacy_tier=, domains=[] | Store a structured memory record in the platform_memory partition. The compounding intelligence substrate — routes durable takeaways from conversation (life events, constraints/preferences, failure patterns, episodic wins, coaching calibration) into the store that coach prompt assembly injects (#1482). Conversation-writable categories: life_context, constraints_preferences, coaching_calibration, failure_patterns, what_worked. Writes are validated against the code taxonomy (lambdas/platform_memory.py) and stamped channel=conversation + provenance=mcp. Put the human-readable core in a 'summary' field — that is what reaches coach prompts. Call list_memory_categories for the full taxonomy. |
 | `read_platform_memory` | category, days=, limit= | Retrieve recent memory records for a given category from the platform_memory partition. Use to pull coaching calibration, failure patterns, or episodic wins into context. |
 | `list_memory_categories` | days= | List all platform_memory categories that have records (counts + date ranges), plus the full sanctioned category taxonomy (#1482: descriptions, channels, privacy tiers, retention windows). Use to understand what the platform has accumulated and where a conversation takeaway should be filed. |
 | `delete_platform_memory` | category, date | Delete a specific platform_memory record by category + date. Use to correct bad memories or remove stale records. |
@@ -214,7 +223,7 @@
 | `get_constellation` | idea_id= | The Constellation idea-graph (Mind pillar signature). Honest empty state below the node threshold; pass idea_id to fetch one node + its edges. Whole-graph enumeration ships in Phase E. |
 | `manage_reading` | action, dry_run=, bookId=, title=, author=, isbn13=, olid=, pageCount=, status=, abandon_reason=, minutes=, pages=, date=, type=, text=, public=, takeaway=, prompt_id=, answer=, next_due=, ts=, resolved_outcome=, answers= | Write fat-tool for the reading library (draft -> dry_run -> commit). Every mutating action PREVIEWS by default (dry_run=true) and writes only on an explicit dry_run=false. Actions: add_book, update_status (abandon requires abandon_reason), log_session, add_note, answer_recall, debrief, log_outcome, update_profile, onboard (taste-archaeology interview). |
 | `get_horizons` | limit= | Horizons (Mind pillar): the weekly coach-curated media pick that broadens Matthew's horizons across all pillars (article\|podcast\|video\|paper\|news\|longform\|essay\|song). Returns the current pick + past picks (newest first). Honest empty state before the first pick. |
-| `curate_horizon` | url, title, format, rationale_tag, pitch=, source=, week=, dry_run= | Author the week's Horizons pick (the Mind coach, curating broadly across all pillars). Runs the link-verification gate (ADR-104: no fabricated links) and stores the pick ONLY if its URL resolves to real content — fail-closed. draft->dry_run->commit: verifies in both modes; writes only on explicit dry_run=false. An unverified link is rejected and never stored. |
+| `curate_horizon` | url, title, format, rationale_tag, pitch=, source=, week=, dry_run=, follow_up_question=, handoff_to_coach= | Author the week's Horizons pick (the Mind coach, curating broadly across all pillars). Runs the link-verification gate (ADR-104: no fabricated links) and stores the pick ONLY if its URL resolves to real content — fail-closed. draft->dry_run->commit: verifies in both modes; writes only on explicit dry_run=false. An unverified link is rejected and never stored. |
 | `archive_horizon` | week=, dry_run= | Archive a prior Horizons pick with the Mind coach's grounded retrospective (the week AFTER the pick): why you recommended it and what you hoped it would do for Matthew. GROUNDED (ADR-104 — built only from the stored pick, never Matthew's private reactions), budget-gated (reader-narrative), and passed through the #1673 fail-closed sensitivity gate before it can publish. draft->dry_run->commit: writes only on explicit dry_run=false. Defaults to last week. |
 
 ### Meta (`mcp/registry.py`)
@@ -236,6 +245,7 @@
 |------|-----------|-------------|
 | `get_coach_checkin_queue` | coach_id=, count= | #915: Up to 3 open check-in questions FROM Matthew's AI coaches — qualitative questions whose verbatim answers pair with (or explain the absence of) the quantitative data. Open questions persist: re-calls return the SAME queue; fresh questions are generated (Bedrock, in the asking coach's persona, grounded in live presence/adaptive-mode/manual-source context) only when the queue is empty. Ask conversationally, one at a time, then call log_coach_checkin. Skipping is always valid with zero penalty — never nag. Use for: 'what do my coaches want to know?', 'coach check-in', periodic qualitative catch-ups. |
 | `log_coach_checkin` | checkin_id, coach_id=, answer=, skip=, tags=[] | #915: Record Matthew's answer to a coach check-in question VERBATIM (his words, never a paraphrase — ADR-104), or an explicit skip (always valid, zero penalty). The answer becomes durable qualitative context stored with the coach's records. Use after get_coach_checkin_queue, once Matthew has responded (or declined). |
+| `log_coach_calibration` | checkin_id, coach_id=, subdomain, direction, takeaway, answer_excerpt=, weight= | #1481: After a check-in answer is logged, the ASKING coach updates its own read of Matthew — a bounded per-subdomain confidence move (source=conversation) plus a LEARNING# record (channel=conversation) that quotes the verbatim answer by checkin_id (ADR-104/ADR-141). Rules: only an ANSWERED check-in qualifies (never a skip); max 2 subdomains per answer; one write per (answer, subdomain) — replays are idempotent; one conversation can never move confidence more than one graded prediction would. Prefer the coach's existing CONFIDENCE# subdomain vocabulary (e.g. sleep_quality, protein_intake, mood, training_load). Use after log_coach_checkin, when the answer genuinely changed (or confirmed) the coach's read. |
 
 ### mcp.tools_capture (`mcp/tools_capture.py`)
 
@@ -273,20 +283,4 @@ and hide `phase=pilot` records: `get_date_range`, `find_days`, and
 filter; the `get_daily_snapshot` dispatcher applies the same filter via
 `mcp.core._apply_phase_filter`. To access pre-genesis data, pass
 `include_pilot=True` (most tools accept this keyword via the args dict). See
-`lambdas/experiment/phase_filter.py::with_phase_filter()`.
-
-
-### Phase-filter behavior (ADR-058)
-
-The following tools default to `phase=experiment`-only results and hide
-phase=pilot records:
-
-- `get_date_range`, `find_days`, `get_aggregated_summary`, `search_activities`,
-  `get_field_stats`, `compare_periods`, `get_weekly_summary` — route through
-  `mcp.core.query_source` which applies the filter.
-- `get_latest`, `get_daily_summary` — apply the filter directly.
-- `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
-
-To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
-keyword via the args dict. See `lambdas/experiment/phase_filter.py::with_phase_filter()`
-for the underlying mechanism.
+`lambdas/phase_filter.py::with_phase_filter()`.

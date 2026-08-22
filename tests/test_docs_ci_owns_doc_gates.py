@@ -51,6 +51,11 @@ _DOC_GATES = [
     # docs/** edit (every wrap adds incident rows), and it used to gate only in CI/CD's
     # Unit Tests, where the red always landed on a later, innocent commit.
     "scripts/incident_log_patterns.py --check",
+    # #2986 — the two generators the derived-artifact registry found unwired. Both write a
+    # doc, both had a --check nobody ran, and Docs CI already triggers on their inputs
+    # (mcp/**, lambdas/**, cdk/**) while ALSO running pre-merge on a PR.
+    "scripts/generate_mcp_tool_catalog.py --check",
+    "scripts/generate_platform_model.py --check",
 ]
 
 

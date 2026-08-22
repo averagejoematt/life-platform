@@ -207,6 +207,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
+        # #2986: the derived-artifact registry. Verdict is pure repo shape — a new
+        # generator writing a committed artifact must be classified BEFORE the merge,
+        # and a guard placed in the wrong lane must red on the PR that placed it there.
+        # Post-merge-only is the exact defect this registry was filed about.
+        "test_derived_artifact_registry_2986.py",
         "test_chat_behavioral_gate_2564.py",  # #2564: every build_grounder call site supplies available_logs
         "test_observatory_summary_grounding_2418.py",  # same registry, derived-prose surface (#2418)
         "test_coach_identity_drift_2757.py",  # #2757: AST sweep — no lambda module may hand-type a persona title/color map
