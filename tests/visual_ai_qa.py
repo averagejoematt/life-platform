@@ -50,6 +50,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import truth_baseline_audit  # the reader-truth debt ledger (#2956) — same dir
+
 # Haiku cross-region profile (vision-capable, cheap). bedrock_client maps the short name.
 _VISION_MODEL = os.environ.get("VISUAL_AI_MODEL", "claude-haiku-4-5-20251001")
 _MAX_IMAGES_PER_PAGE = int(os.environ.get("VISUAL_AI_MAX_IMAGES", "3"))
@@ -323,6 +326,13 @@ def assess_reader_truth(results):
     for err in errors:
         print(f"  ⚠ Reader-truth batch error (fail-soft): {err}")
 
+    # The debt ledger (#2956): a high finding on a baselined (page, category)
+    # is standing, triaged debt — surfaced every run with its issue ref, never
+    # gating. Only NEW high findings FAIL. See tests/truth_baseline_audit.py
+    # for why (the #2941 aftermath: 16 pre-existing content findings blocked
+    # every site deploy regardless of its diff).
+    truth_baseline = truth_baseline_audit.load_baseline()
+
     for f in findings:
         r = by_path.get(f["page"])
         if r is None:
@@ -331,12 +341,29 @@ def assess_reader_truth(results):
             f = dict(f, note=f"(claimed page {f['page']!r}) {f['note']}"[:300])
         r.setdefault("truth_findings", []).append(f)
         line = _truth_line(f)
-        print(f"  {_ICON.get(f['severity'], '?')} truth · {f['page']}: [{f['category']}] {f['note'][:96]}")
-        if f["severity"] == "high":
+        verdict = truth_baseline_audit.gate_finding(f, truth_baseline)
+        if verdict == "new":
+            print(f"  {_ICON.get(f['severity'], '?')} truth · {f['page']}: [{f['category']}] {f['note'][:96]}")
             r.setdefault("issues", []).append(line)
             r["status"] = "FAIL"
+        elif verdict == "baselined":
+            issue_ref = truth_baseline_audit.baselined_issue(f, truth_baseline)
+            print(f"  🟡 truth · {f['page']}: BASELINED debt ({issue_ref}) [{f['category']}] {f['note'][:80]}")
+            r.setdefault("warnings", []).append(f"BASELINED truth debt ({issue_ref}): {line}")
         else:
+            print(f"  {_ICON.get(f['severity'], '?')} truth · {f['page']}: [{f['category']}] {f['note'][:96]}")
             r.setdefault("warnings", []).append(line)
+
+    # Shrink report (#1990's lesson): baselined entries not observed this run,
+    # scoped to the pages this sweep drove so a --page run never claims fixes.
+    swept = {s["path"] for s in surfaces}
+    shrink = {p: cats for p, cats in truth_baseline_audit.shrink_candidates(findings, truth_baseline).items() if p in swept}
+    if shrink:
+        n = sum(len(c) for c in shrink.values())
+        print(
+            f"  📉 truth ledger: {n} shrink candidate(s) — baselined but not observed: "
+            + "; ".join(f"{p} ({', '.join(c)})" for p, c in sorted(shrink.items()))
+        )
 
     if not findings:
         phase = reader_truth_qa.phase_context()
