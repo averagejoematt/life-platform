@@ -378,11 +378,6 @@ advisory only (a next-picks note, no `describe-alarms` enumeration, no fail
 condition). At the 2026-07-28 review 6 alarms were red simultaneously against one
 incident row in the session ledger; a new red could hide among the chronic ones.
 
-**Proportionality ledger gate (#2380):** if this session landed a NEW standing CI gate,
-scheduled writer, or watcher, the wrap names its `docs/PROPORTIONALITY.md` row (posture +
-rent + demote trigger) or writes an explicit "ledger: omitted — <reason>" line in the
-handover. Silent omission is how the ledger became a snapshot.
-
 - Run:
   ```bash
   python3 scripts/check_alarm_citations.py
@@ -438,6 +433,40 @@ sat unactioned for a week with nothing obligated to look at it.
 - The handover carries one line either way: `**CI warnings:** none`, `**CI warnings:**
   <N> — <one-line triage per warning>`, or `**CI warnings:** unverified — GitHub
   unreachable`.
+
+### (e12) Proportionality-ledger gate — a wrap gate, same shape as (d)/(e)/(e2)–(e11) (#2380, enforced by #2761)
+
+The first version of this gate (#2380) was four lines of prose wedged into step (e10)'s
+header — no step letter, no script, no required handover line, no guardrail bullet, and
+a conditional trigger ("IF this session landed standing machinery ...") that nothing
+evaluated. Measured result (#2761): zero `docs/PROPORTIONALITY.md` commits in its first
+week while four standing subsystems shipped with real rent (#2572, #2552, #2527, #2578).
+A check that cannot fail is a check that never ran. Same fix as (d)/(e3): the line is
+unconditional, the assertion is a script.
+
+- Run (after the new handover from step (a) is written):
+  ```bash
+  python3 scripts/check_proportionality_ledger.py
+  ```
+  It must exit 0. It passes only when the session shows a `docs/PROPORTIONALITY.md`
+  diff (working tree/index, or committed since the previous `docs(wrap)` commit) OR the
+  handover carries an explicit `**Ledger:**` line.
+- **If this session landed a NEW standing subsystem** (CI gate, scheduled writer,
+  watcher, alarm, workflow): add its row to `docs/PROPORTIONALITY.md` — posture + rent +
+  demote trigger, ADR-103/144 — in the wrap commit, and write
+  `**Ledger:** <subsystem> row added` in the handover. A line claiming a row while the
+  ledger shows no diff this session FAILS the gate: writing the line without landing the
+  row is the exact silent pass this step replaces.
+- **If standing machinery shipped but the row is deliberately deferred:**
+  `**Ledger:** omitted — <reason>` (explicit and auditable; a bare `omitted` without a
+  reason fails).
+- **If nothing standing shipped:** `**Ledger:** none — no standing machinery shipped`.
+- **Git-unreachable degrade:** the script prints `UNVERIFIED` for the diff leg and only
+  an explicit `**Ledger:**` line can pass — note the degrade in the handover (mirrors
+  (e7)/(e10)'s shape).
+- The handover carries one line either way: `**Ledger:** <subsystem> row added`,
+  `**Ledger:** omitted — <reason>`, or `**Ledger:** none — no standing machinery
+  shipped`.
 
 ### (f) Commit the wrap
 
@@ -504,3 +533,8 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
   (#1966).** Step (e11): `scripts/check_ci_warnings.py` must exit 0 (clean or
   `--decoded`) before the wrap commit; a warning printed untriaged gets an issue or an
   explicit named decision in the handover — never left both unfixed and unacknowledged.
+- **Standing machinery gets a `docs/PROPORTIONALITY.md` row, or the wrap says why not,
+  never silence (#2380, enforced by #2761).** Step (e12):
+  `scripts/check_proportionality_ledger.py` must exit 0 before the wrap commit — a
+  ledger diff this session or an explicit `**Ledger:**` line, and a line claiming a row
+  the ledger never saw fails loudly.
