@@ -48,7 +48,9 @@ jobs:
           python-cache: 'pip'
 
       - name: Install dependencies
-        run: pip install boto3 botocore
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)   # versions from requirements-dev.txt (CQ-01/#2609, #2760)
+          pip install $PINS
 
       # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
       - name: Configure AWS (read-only harvest role)

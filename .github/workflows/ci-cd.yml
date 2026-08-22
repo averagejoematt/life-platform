@@ -452,8 +452,11 @@ jobs:
           node --version
           # Pinned exactly (#814, R22-MOD-01) — an unpinned `npm install -g aws-cdk`
           # always pulls whatever released today, so a routine push can red CI on an
-          # untested CDK release. Bump deliberately, in lockstep with cdk/requirements.txt;
-          # Dependabot bumps that file but NOT this line — bump it by hand when those land.
+          # untested CDK release. The version of record is cdk/package.json's
+          # `aws-cdk` devDependency (#2760): Dependabot's npm ecosystem bumps it and
+          # this step resolves it at install time — one copy, no hand-bump (the #2609
+          # pattern applied to the npm leg; this line used to carry a literal pin
+          # guarded only by a "bump it by hand" comment).
           #
           # CORRECTION (#2468 postmortem, 2026-08-16): PR #2751's comment here blamed the
           # CLI for the LogRetention runtime — wrong, decoded the same night from template
@@ -463,7 +466,8 @@ jobs:
           # aws-cdk-lib while this venv honors the pin. The durable guard lives in
           # deploy/cdk_deploy.sh, which now builds cdk/.venv from cdk/requirements.txt
           # and synths through it — the exact toolchain this step builds fresh each run.
-          npm install -g aws-cdk@2.1135.1 --quiet
+          CDK_CLI_VERSION=$(node -p "require('./cdk/package.json').devDependencies['aws-cdk']")
+          npm install -g "aws-cdk@${CDK_CLI_VERSION}" --quiet
 
           cd cdk
           python3 -m venv .venv
@@ -1066,7 +1070,12 @@ jobs:
           python-cache: 'pip'
 
       - name: Install boto3 + pytest
-        run: pip install boto3 pytest --quiet
+        run: |
+          # Versions from requirements-dev.txt via ci_pins.py (CQ-01/#2609) — this
+          # installed UNPINNED (floating latest) until #2760, invisible to the pin
+          # guard because there was no `tool==X` literal to compare.
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore pytest)
+          pip install $PINS --quiet
 
       - name: Configure AWS credentials (OIDC)
         uses: ./.github/actions/setup-ci

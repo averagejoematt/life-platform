@@ -34,8 +34,8 @@ playwright==1.62.0
 # black + ruff versions MUST equal ci-lint.yml's pins (CQ-01) — the ENFORCED gate.
 # (Corrected #1963: these moved out of ci-cd.yml into ci-lint.yml when #1655 split
 # the reusable lint workflow out; the old comment still pointed at ci-cd.yml.)
-# flake8's CI install is intentionally UNPINNED (ci-lint.yml) — out of the CQ-01
-# pin-parity guard's scope (tests/test_ci_pin_consistency.py), tracked separately.
+# flake8: ci-lint.yml installed it UNPINNED until #2760 — it now resolves this pin
+# via scripts/ci_pins.py like every other gate tool.
 flake8==7.3.0
 ruff==0.14.14
 black==26.3.1
@@ -49,6 +49,21 @@ mypy==2.3.1
 # pins (CQ-01, #1963) — read from ci-test.yml / ci-cd.yml, not quoted here.
 boto3==1.43.72
 botocore==1.43.72
+
+# CI supply-chain gates (#2760 — the one-legged-pin class): both were pinned as
+# workflow literals with NO Dependabot leg, so the pins could only rot. This file
+# is the single copy now; ci-lint.yml resolves them via scripts/ci_pins.py.
+# pip-audit — the BLOCKING dependency-CVE gate (#1661).
+# pip-licenses — the advisory license inventory (#1352).
+# (The scheduled pip_audit_lambda's runtime /tmp install pins its own copy — the
+# Lambda bundle does not carry this file; ledgered in tests/test_ci_pin_consistency.py.)
+pip-audit==2.10.1
+pip-licenses==5.0.0
+
+# Remediation-agent runtime (remediation-agent.yml, ADR-064/065). Installed
+# UNPINNED (floating latest) until #2760; now pinned here and Dependabot-bumped,
+# resolved by the workflow via scripts/ci_pins.py.
+claude-agent-sdk==0.2.144
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release

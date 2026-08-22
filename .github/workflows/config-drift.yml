@@ -81,7 +81,10 @@ jobs:
 
       - name: Drift check (read-only, blocking)
         run: |
-          pip install --quiet boto3   # setup-ci installs no packages; without this the check dies on import, not on drift
+          # setup-ci installs no packages; without this the check dies on import, not
+          # on drift. Versions from requirements-dev.txt via ci_pins.py (#2760).
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)
+          pip install --quiet $PINS
           python3 deploy/config_twin_sync.py --strict
 
       # #2057 — the inverse question. The drift check above walks REPO files and
@@ -96,5 +99,6 @@ jobs:
       - name: Mirror ownership + freshness audit (read-only, blocking)
         if: always()
         run: |
-          pip install --quiet boto3
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)   # versions from requirements-dev.txt (#2760)
+          pip install --quiet $PINS
           python3 deploy/config_mirror_audit.py --strict

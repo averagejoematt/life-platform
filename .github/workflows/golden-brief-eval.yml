@@ -57,7 +57,11 @@ jobs:
           python-cache: 'pip'
 
       - name: Install dependencies
-        run: pip install pytest boto3 botocore
+        run: |
+          # Versions from requirements-dev.txt via ci_pins.py (CQ-01/#2609) — this
+          # gate installed UNPINNED (floating latest) until #2760.
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore)
+          pip install $PINS
 
       - name: Deterministic verdict (gating, free)
         run: |

@@ -1,6 +1,6 @@
 # CONVENTIONS — the load-bearing reflexes
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-08
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-21
 
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
@@ -196,11 +196,14 @@ ecosystem, different pin syntax, no second copy — and is untouched by this.
 **The CDK toolchain is pinned both directions too (#814, R22-MOD-01).** Before this
 fix, `ci-cd.yml`'s `npm install -g aws-cdk` had no version (always latest CLI) and
 `cdk/requirements.txt` was floor-only (`aws-cdk-lib>=X`), so a fresh CI install could
-silently pick up an untested CDK release and red a routine push. Both are now exact
-pins — `grep -E 'aws-cdk@|aws-cdk-lib==|constructs==' .github/workflows/ci-cd.yml
-cdk/requirements.txt requirements-dev.txt`. Bump the CLI pin, `cdk/requirements.txt`,
-and `requirements-dev.txt` together as one deliberate PR (Dependabot proposes the
-`cdk/requirements.txt` half; the CLI pin in `ci-cd.yml` is manual).
+silently pick up an untested CDK release and red a routine push. Both are exact pins,
+and since #2760 the CLI's version of record is `cdk/package.json` (`aws-cdk`
+devDependency): `ci-cd.yml` resolves it at install time and Dependabot's npm
+ecosystem bumps it — one copy, no hand-bump (the old "bump the `ci-cd.yml` literal by
+hand" step let the pin sit months stale, the #2468 incident). Discover them all —
+`grep -E 'aws-cdk|constructs==' cdk/package.json cdk/requirements.txt
+requirements-dev.txt .github/workflows/ci-cd.yml`. Dependabot proposes both halves
+(`chore(deps-cdk)`); land lib and CLI bumps as deliberate PRs.
 
 **CI-parity test runs need FAKE creds, not absent ones.** CI's runner has no valid AWS
 credentials, but `env -u` alone lets boto3 fall back to the `[default]` profile and
@@ -910,6 +913,7 @@ read that section for the incident narrative and the exact mechanics.
 | A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
 | A CloudWatch alarm sits in ALARM >72h with no citation, normalizing among the chronic reds | Alarm-citation gate (#1959), step (e10) | `scripts/check_alarm_citations.py`; `docs/alarm_citations.json` |
 | A `::warning::` annotation on green main (e.g. the duration-budget warner below) goes untriaged | Standing-warning triage gate (#1966), step (e11) | `scripts/check_ci_warnings.py` |
+| A session ships standing machinery (gate/writer/watcher) and `docs/PROPORTIONALITY.md` never hears about it | Proportionality-ledger gate (#2380/#2761), step (e12) | `scripts/check_proportionality_ledger.py`; `docs/PROPORTIONALITY.md` |
 
 **CI gates** (`.github/workflows/ci-cd.yml` unless noted — every push to `main` or a PR):
 
