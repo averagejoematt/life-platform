@@ -713,6 +713,8 @@ def validate_daily_brief_outputs(
     jc_result = validate_ai_output(journal_coach_text, AIOutputType.JOURNAL_COACH, ctx)
     results["journal_coach_text"] = jc_result.sanitized_text
     all_warnings.extend([f"[journal_coach] {w}" for w in jc_result.warnings])
+    if jc_result.blocked:
+        all_warnings.append(f"[journal_coach] BLOCKED: {jc_result.block_reason}")
 
     # TL;DR + guidance JSON
     tg = tldr_guidance or {}
@@ -722,6 +724,8 @@ def validate_daily_brief_outputs(
         "guidance": [],
     }
     all_warnings.extend([f"[tldr] {w}" for w in tldr_result.warnings])
+    if tldr_result.blocked:
+        all_warnings.append(f"[tldr] BLOCKED: {tldr_result.block_reason}")
     for i, g_item in enumerate(tg.get("guidance", [])):
         g_result = validate_ai_output(g_item, AIOutputType.GUIDANCE, ctx, min_length=5)
         results["tldr_guidance"]["guidance"].append(g_result.sanitized_text)
