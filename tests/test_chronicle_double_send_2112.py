@@ -132,6 +132,10 @@ def _run_handler_with(installment_item, subscribers):
         mock.patch.object(cel.ses, "send_email", side_effect=_fake_send_email),
         mock.patch.object(cel, "time") as fake_time,
         mock.patch.object(cel.table, "update_item") as upd,
+        # #2820: the delivery-heartbeat emit is exercised by its own test file
+        # (test_chronicle_delivery_deadman_2820.py); silenced here so these
+        # offline tests never attempt a real CloudWatch call.
+        mock.patch.object(cel, "_emit_sent_metric"),
     ):
         fake_time.sleep.return_value = None
         result = cel.lambda_handler({}, None)
@@ -185,6 +189,7 @@ def test_handler_does_not_mark_delivered_on_total_send_failure(monkeypatch):
         mock.patch.object(cel.ses, "send_email", side_effect=RuntimeError("SES down")),
         mock.patch.object(cel, "time") as fake_time,
         mock.patch.object(cel.table, "update_item") as upd,
+        mock.patch.object(cel, "_emit_sent_metric"),  # #2820: covered in its own test file
     ):
         fake_time.sleep.return_value = None
         result = cel.lambda_handler({}, None)

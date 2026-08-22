@@ -73,6 +73,55 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 ses = boto3.client("sesv2", region_name=REGION)
 _s3 = boto3.client("s3", region_name=REGION)
+cw = boto3.client("cloudwatch", region_name=REGION)
+
+# ── #2820: the delivery dead-man's datapoint ─────────────────────────────────
+# The Wednesday chronicle is a public subscriber promise, and before #2820 a
+# silent no-send produced zero signal on every channel: the Viktor guard is a
+# clean no-op, DLQ alarms need a crash, and qa_check_subscriber_promise verifies
+# the SWITCH, not delivery. Every non-dry-run invocation now emits ONE datapoint
+# on this metric; `chronicle-delivery-heartbeat` (email_stack.py) pages when the
+# trailing 7 daily Sums are all < 1 — i.e. no delivery (and no sanctioned pause)
+# reached subscribers for a week. Value semantics (ADR-104 — honest numbers):
+#   N >= 1  actual SES sends delivered to subscribers this run
+#   1       sanctioned budget-pause datapoint (tier >= 2 pauses generation per
+#           ADR-125, so an absent installment is a sanctioned state, not a
+#           failure — the #2490 emit-and-skip pattern; logged loudly as such)
+#   0       the promise was NOT fulfilled by this run (no-op, kill-switch,
+#           zero subscribers, or a total send failure)
+# A dead cron emits nothing at all — treat_missing=BREACHING makes that the
+# loudest state of all. These two names are the contract the email_stack alarm
+# is built against (tests/test_chronicle_delivery_deadman_2820.py).
+METRIC_NAMESPACE = "LifePlatform/Email"
+SENT_METRIC_NAME = "ChronicleSent"
+
+
+def _emit_sent_metric(value: float, reason: str) -> None:
+    """Emit the delivery-heartbeat datapoint. Fail-soft: a metrics outage must
+    never fail (or retry-loop) an otherwise-successful send — but a failed emit
+    is exactly a missing datapoint, so the dead-man still pages if it persists."""
+    try:
+        cw.put_metric_data(
+            Namespace=METRIC_NAMESPACE,
+            MetricData=[{"MetricName": SENT_METRIC_NAME, "Value": float(value), "Unit": "Count"}],
+        )
+        logger.info("[dead-man] %s=%s (%s)", SENT_METRIC_NAME, value, reason)
+    except Exception as exc:
+        logger.warning("[dead-man] %s emit failed (non-fatal): %s", SENT_METRIC_NAME, exc)
+
+
+def _chronicle_budget_paused() -> bool:
+    """True when chronicle generation is budget-paused (tier >= 2, ADR-125) —
+    the one state where an absent installment is sanctioned rather than a
+    missed promise. Fail direction on any error: NOT paused, so a broken tier
+    read makes the dead-man MORE likely to page, never less (#2820)."""
+    try:
+        from ai.budget_guard import allow
+
+        return not allow("chronicle")
+    except Exception as exc:
+        logger.warning("[dead-man] budget tier unreadable, treating week as NOT sanctioned: %s", exc)
+        return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -526,6 +575,10 @@ def lambda_handler(event, context):
     try:
         if not dry_run and os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
             logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Chronicle subscriber send")
+            # #2820: a switched-off week is still an unfulfilled promise from the
+            # reader's side — emit 0, not a sanctioned datapoint. The #1951
+            # kill-switch alarm names the CAUSE; this dead-man tracks the OUTCOME.
+            _emit_sent_metric(0, "kill-switch skip")
             return {"statusCode": 200, "body": "skipped: external emails disabled", "sent": 0, "skipped": True}
 
         logger.info("Chronicle Email Sender v1.0.0 — BS-03 — starting")
@@ -534,6 +587,17 @@ def lambda_handler(event, context):
         installment = _get_this_weeks_installment()
         if not installment:
             logger.info("No installment found this week — clean no-op")
+            # #2820: the no-op stays clean but no longer SILENT. On a budget-paused
+            # week (tier >= 2 pauses generation, ADR-125) the absence is sanctioned
+            # — emit the #2490-style emit-and-skip datapoint so the dead-man stays
+            # quiet. Any other absent/draft/undelivered state emits 0: if no later
+            # run delivers within the week, chronicle-delivery-heartbeat pages.
+            # (An already-delivered installment also lands here on the second
+            # trigger — its 0 is absorbed by the real send's earlier datapoint.)
+            if _chronicle_budget_paused():
+                _emit_sent_metric(1, "sanctioned budget pause — generation paused at tier >= 2")
+            else:
+                _emit_sent_metric(0, "no deliverable installment this week")
             return {
                 "statusCode": 200,
                 "body": "No Chronicle installment found this week — no-op",
@@ -569,6 +633,12 @@ def lambda_handler(event, context):
 
         if not subscribers:
             logger.info("No confirmed subscribers yet — no-op")
+            # #2820: deliberately 0, NOT a sanctioned datapoint. The subscriber
+            # query fail-softs to [] on a DDB error — treating an empty list as
+            # sanctioned would let a broken read mask a missed delivery, the exact
+            # silent class this dead-man exists to kill. A genuine zero-subscriber
+            # state paging weekly is the operator learning something real.
+            _emit_sent_metric(0, "no confirmed subscribers")
             return {"statusCode": 200, "body": "No confirmed subscribers", "sent": 0}
 
         logger.info("Sending to %d confirmed subscriber(s)", len(subscribers))
@@ -618,6 +688,11 @@ def lambda_handler(event, context):
         # generator's preview. Written on any successful send (dry-run returns earlier).
         if sent > 0:
             _record_email_send(sent)
+
+        # #2820: the delivery datapoint — the actual send count, honestly 0 on a
+        # total failure (every SES call failed), in which case the installment is
+        # also left unmarked above and a later trigger (or the dead-man) takes over.
+        _emit_sent_metric(sent, f"SES sends completed ({sent}/{len(subscribers)})")
 
         return {
             "statusCode": 200,

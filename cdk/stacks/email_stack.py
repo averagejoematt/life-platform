@@ -17,7 +17,10 @@ Lambdas (11):
 
 import aws_cdk as cdk
 from aws_cdk import (
+    Duration,
     Stack,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
@@ -445,6 +448,76 @@ class EmailStack(Stack):
             custom_policies=rp.email_chronicle_sender(),
             **shared,
         )
+
+        # ══════════════════════════════════════════════════════════════
+        # #2820: subscriber-promise delivery dead-men (the charter's 5th
+        # primitive). "Every Wednesday" / weekly-Sunday are PUBLIC promises, and
+        # before this a silent no-send produced zero signal on every channel:
+        # the Viktor guard is a clean no-op, DLQ alarms need a crash, and
+        # qa_check_subscriber_promise verifies the SWITCH, not delivery. Each
+        # sender now emits one LifePlatform/Email datapoint per non-dry-run
+        # invocation (value = real SES sends; 1 = sanctioned budget-pause skip,
+        # #2490 pattern; 0 = ran-but-unfulfilled), and these page URGENT when
+        # the trailing 7 daily Sums are all < 1 — no delivery and no sanctioned
+        # pause for a week. Absence is the loudest state: a dead cron emits
+        # nothing, and treat_missing=BREACHING catches it.
+        #
+        # 7 days, not the issue's 8: CloudWatch caps evaluation_periods x period
+        # at 604800s (7d, same cap noted in monitoring_stack._alarm). 7 still
+        # never false-fires on a healthy weekly cadence — a fixed UTC-day send
+        # leaves at most 6 empty daily buckets between sends — and a missed
+        # send pages at the next midnight-UTC bucket close, within the week.
+        #
+        # Deliberately co-located with the senders rather than monitoring_stack
+        # (the #2490 serve_stack precedent): the alarm and the code that emits
+        # its metric ship in ONE deploy, and monitoring_stack sits at its
+        # module-size ratchet where an alarm is the most routine change it takes.
+        _chronicle_delivery_heartbeat = cloudwatch.Alarm(
+            self,
+            "ChronicleDeliveryHeartbeat",
+            alarm_name="chronicle-delivery-heartbeat",
+            alarm_description=(
+                "#2820: no Wednesday chronicle delivery (ChronicleSent Sum < 1, no sanctioned "
+                "budget-pause datapoint) for 7 consecutive days — the subscriber promise was "
+                "silently missed. Check wednesday-chronicle generation, the unapproved-draft "
+                "queue (chronicle-approve), and chronicle-email-sender logs."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Email",
+                metric_name="ChronicleSent",
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            threshold=1,
+            evaluation_periods=7,
+            datapoints_to_alarm=7,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        _chronicle_delivery_heartbeat.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
+
+        _weekly_signal_delivery_heartbeat = cloudwatch.Alarm(
+            self,
+            "WeeklySignalDeliveryHeartbeat",
+            alarm_name="weekly-signal-delivery-heartbeat",
+            alarm_description=(
+                "#2820: no Sunday Weekly Signal delivery (WeeklySignalSent Sum < 1) for 7 "
+                "consecutive days — the subscriber promise was silently missed. Check the "
+                "weekly-signal Lambda's schedule and logs."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Email",
+                metric_name="WeeklySignalSent",
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            threshold=1,
+            evaluation_periods=7,
+            datapoints_to_alarm=7,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        _weekly_signal_delivery_heartbeat.add_alarm_action(cw_actions.SnsAction(local_alerts_topic))
 
         # #398: Between-chronicle note — the machine's mid-gap findings for
         # subscribers, assembled purely from already-computed records (monthly
