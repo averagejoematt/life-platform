@@ -101,6 +101,24 @@ SEGMENT_POSITIONS = {
     12: "torso",
 }
 
+
+def requested_meastypes() -> list[int]:
+    """Every meastype the transform can parse, as the `getmeas` request asks for it.
+
+    #2994: `_fetch_range` used to build `meastypes` from `MEAS_TYPES` alone, so the
+    segmental types added by #2794 were never requested — the transform grew a branch
+    for data the fetch could not return, and the wire-shaped fixture in
+    `tests/test_ingestion_transforms.py` mirrored the spike's *unfiltered* exploratory
+    call rather than the filtered request production issues. Green tests, 15 fields
+    permanently absent from every row.
+
+    Derived from the two handler tables so a new type is requested by construction;
+    `test_withings_requests_every_type_it_can_parse` guards the equality in both
+    directions.
+    """
+    return sorted(set(MEAS_TYPES) | set(SEGMENTAL_TYPES))
+
+
 # ── Withings API helpers ───────────────────────────────────────────────────────
 
 
@@ -263,7 +281,7 @@ def _fetch_range(secret: dict, start_dt: datetime, end_dt: datetime) -> tuple[di
     return. Returns (by_date, possibly-updated secret)."""
     params = {
         "action": "getmeas",
-        "meastypes": ",".join(str(k) for k in MEAS_TYPES.keys()),
+        "meastypes": ",".join(str(k) for k in requested_meastypes()),
         "category": "1",
         "startdate": int(start_dt.timestamp()),
         "enddate": int(end_dt.timestamp()),
