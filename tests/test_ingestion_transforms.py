@@ -40,7 +40,12 @@ from ingestion.whoop_lambda import (  # noqa: E402
     _extract_sleep,
     _extract_workout,
 )
-from ingestion.withings_lambda import _parse_measurements  # noqa: E402
+from ingestion.withings_lambda import (  # noqa: E402
+    MEAS_TYPES,
+    SEGMENTAL_TYPES,
+    _parse_measurements,
+    requested_meastypes,
+)
 
 
 def _f(v):
@@ -258,6 +263,94 @@ def test_withings_bodyscan2_scalars_and_segments():
     assert _f(out["muscle_mass_torso_kg"]) == 28.0
     # segmental fields get no _lbs twins (the lbs list is the scalar five only)
     assert "fat_free_mass_torso_lbs" not in out
+
+
+# ── #2994: the fetch must ask for everything the transform can parse ─────────
+# #2794 added SEGMENTAL_TYPES + the position-aware branch and left the `getmeas`
+# request built from MEAS_TYPES alone, so types 173/174/175 were never requested
+# and the 15 segmental fields were absent from every live row while the fixture
+# above stayed green — the fixture mirrored the spike's *unfiltered* exploratory
+# call, not the filtered request production issues. Guard the SET, not the
+# instance: the equality below fails in both directions, and the AST derivation
+# catches a *third* lookup table added later, which is the actual recurrence.
+
+
+def _meastype_tables_in(source: str) -> set[str]:
+    """Module-level dict names `_parse_measurements` consults to decide it knows a
+    meastype (`mtype in NAME` / `NAME[mtype]`), derived from source rather than
+    hand-listed — so a new table cannot join the transform without joining the
+    request. Takes source text so the real check and its mutation proof run the
+    same code."""
+    import ast
+
+    tree = ast.parse(source)
+    module_dicts = {
+        t.id
+        for node in tree.body
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict)
+        for t in node.targets
+        if isinstance(t, ast.Name)
+    }
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_parse_measurements")
+    used: set[str] = set()
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Compare) and any(isinstance(op, ast.In | ast.NotIn) for op in node.ops):
+            for cmp_node in node.comparators:
+                if isinstance(cmp_node, ast.Name) and cmp_node.id in module_dicts:
+                    used.add(cmp_node.id)
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id in module_dicts:
+            used.add(node.value.id)
+    return used
+
+
+def _meastype_tables_consulted_by_parse() -> set[str]:
+    import inspect
+
+    from ingestion import withings_lambda
+
+    return _meastype_tables_in(inspect.getsource(withings_lambda))
+
+
+def test_withings_requests_every_type_it_can_parse():
+    requested = set(requested_meastypes())
+    parseable = set(MEAS_TYPES) | set(SEGMENTAL_TYPES)
+    assert (
+        requested == parseable
+    ), f"request/transform disagree: only-requested={requested - parseable}, only-parseable={parseable - requested}"
+    # the #2994 instance, named so a silent removal is legible in the diff
+    assert {173, 174, 175} <= requested
+    assert len(requested) == len(MEAS_TYPES) + len(SEGMENTAL_TYPES)  # the two tables are disjoint
+
+
+def test_withings_meastype_tables_are_all_folded_into_the_request():
+    tables = _meastype_tables_consulted_by_parse()
+    assert tables, "AST derivation found no meastype table — the scan is vacuous, not clean"
+    assert tables == {"MEAS_TYPES", "SEGMENTAL_TYPES"}, (
+        f"_parse_measurements consults {sorted(tables)}; requested_meastypes() folds in "
+        "MEAS_TYPES|SEGMENTAL_TYPES only — a new table must join the request too (#2994)"
+    )
+
+
+def test_the_table_derivation_can_fail():
+    """Mutation proof: a third lookup table in the transform is detected.
+
+    Without this, `test_withings_meastype_tables_are_all_folded_into_the_request`
+    would read as coverage while only ever seeing the two tables it names. Runs the
+    same `_meastype_tables_in` the real check uses, against a mutated source.
+    """
+    src = (
+        "THIRD_TYPES = {999: 'nope'}\n"
+        "MEAS_TYPES = {1: 'weight_kg'}\n"
+        "def _parse_measurements(raw):\n"
+        "    mtype = 1\n"
+        "    if mtype in THIRD_TYPES:\n"
+        "        return THIRD_TYPES[mtype]\n"
+        "    return MEAS_TYPES[mtype]\n"
+    )
+    used = _meastype_tables_in(src)
+    assert "THIRD_TYPES" in used, "the derivation missed a third table — it cannot fail, so it proves nothing"
+    # and the real check's assertion would reject it
+    assert used != {"MEAS_TYPES", "SEGMENTAL_TYPES"}
 
 
 def test_withings_spo2_zero_is_absence_not_a_reading():
