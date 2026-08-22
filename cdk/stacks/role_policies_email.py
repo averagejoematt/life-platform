@@ -440,12 +440,26 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
     Separate from wednesday-chronicle IAM by design (Board: independent failure domains).
     UpdateItem is scoped to the delivered_at/sent_to_count marker on the installment
     row (the #2112 double-send guard) — the handler's only write.
+    #2820: + cloudwatch:PutMetricData (the ChronicleSent delivery-heartbeat datapoint;
+    PutMetricData only accepts "*" as a resource) and ssm:GetParameter on budget-tier
+    (the sanctioned budget-pause check — tier >= 2 pauses generation per ADR-125, so
+    an absent installment on a paused week must not page the delivery dead-man).
     """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DeliveryHeartbeatMetric",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="BudgetTierRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
         ),
         iam.PolicyStatement(
             sid="KMS",
@@ -518,12 +532,19 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
     """Weekly Signal subscriber email (PB-06): reads DDB (insights + subscribers),
     S3 (generated/public_stats.json, generated/journal/posts.json), KMS, SES send, DLQ.
     No ai-keys — reads pre-computed data only.
+    #2820: + cloudwatch:PutMetricData for the WeeklySignalSent delivery-heartbeat
+    datapoint (PutMetricData only accepts "*" as a resource).
     """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DeliveryHeartbeatMetric",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
         ),
         iam.PolicyStatement(
             sid="S3Read",

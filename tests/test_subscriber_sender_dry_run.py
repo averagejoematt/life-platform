@@ -178,6 +178,9 @@ def test_chronicle_email_sender_dry_run_sends_zero_normal_path_sends(monkeypatch
         return {"MessageId": "test-id"}
 
     monkeypatch.setattr(cel.ses, "send_email", _record_send)
+    # #2820: the live path now emits the delivery-heartbeat datapoint; silenced
+    # here (its own contract lives in test_chronicle_delivery_deadman_2820.py).
+    monkeypatch.setattr(cel, "_emit_sent_metric", lambda *a, **k: None)
     live = cel.lambda_handler({}, None)
     assert live["sent"] == 1
     assert len(sent_calls) == 1
@@ -209,6 +212,8 @@ def test_weekly_signal_dry_run_sends_zero_normal_path_sends(monkeypatch):
         return {"MessageId": "test-id"}
 
     monkeypatch.setattr(wsl.ses, "send_email", _record_send)
+    # #2820: silenced as above — the emit contract lives in its own test file.
+    monkeypatch.setattr(wsl, "_emit_sent_metric", lambda *a, **k: None)
     live = wsl.lambda_handler({}, None)
     assert live["sent"] == 1
     assert len(sent_calls) == 1
