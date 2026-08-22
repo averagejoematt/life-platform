@@ -451,6 +451,29 @@ class MonitoringStack(Stack):
         #                          AST-guarded in test_qa_smoke_chronic_warns. No
         #                          ChronicWarnCount alarm; keep the 86400s
         #                          Maximum window — load-bearing. #2670: receipt-replay's drift branch is chronic too (threshold UNCHANGED).
+        #
+        # #2912 — ALARM STATE IS NOT A RELIABLE AUDIT SURFACE for these (or any
+        # Period=86400/EvaluationPeriods=1 alarm on a sparse custom metric). An
+        # operator seeing OK may NOT conclude "no failure fired today":
+        #   (a) the alarm evaluates a SLIDING 24h window about once a minute
+        #       (history startDate == queryDate - 86400s, never midnight-
+        #       aligned), so a single breaching datapoint ages out of the
+        #       window ~24h after emission — the observed organic 24h+3min
+        #       clearances — and any breach older than that is invisible in
+        #       current state;
+        #   (b) measured live 2026-08-20 (15:34->18:03Z): for ~2.5h after a
+        #       freshly published datapoint, successive one-minute evaluations
+        #       of near-identical windows returned MUTUALLY EXCLUSIVE sample
+        #       sets — alternating [max 1.0, n=1] (the fresh point only) and
+        #       [max 0.0, n=2] (the older zeros only) — flapping the state
+        #       OK<->ALARM 35 times with 1-3 min dwells. TreatMissingData never
+        #       engaged (sampleCount >= 1 throughout); this is aggregation
+        #       inconsistency for fresh data in long-period sliding reads.
+        # The SNS action fires per transition, so notifications survive; the
+        # STATE does not carry the signal. The honest audit surface is the
+        # transition history: scripts/check_alarm_citations.py (the /wrap e10
+        # gate) reads describe-alarm-history and forces every fired-and-cleared
+        # episode in its 72h window to be cited or explicitly decoded.
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",

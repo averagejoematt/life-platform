@@ -909,6 +909,7 @@ read that section for the incident narrative and the exact mechanics.
 | A memory topic file exists un-indexed from `MEMORY.md`/`project_shipped_archive.md` | Orphan/broken-link gate (#1259), step (c) | inline bash loop, `.claude/commands/wrap.md` step (c) |
 | A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
 | A CloudWatch alarm sits in ALARM >72h with no citation, normalizing among the chronic reds | Alarm-citation gate (#1959), step (e10) | `scripts/check_alarm_citations.py`; `docs/alarm_citations.json` |
+| A CloudWatch alarm fires and clears between wraps — invisible to current-state duration by construction (a 24h-window alarm can flap with 1–3 min dwells; measured 35 cycles off one planted datapoint) | Fired-and-cleared flap detector folded into the alarm-citation gate (#2912), step (e10) — reads `describe-alarm-history` transitions over the same 72h window; a transition count is the honest signal, current-state duration is not (ADR-104) | `scripts/check_alarm_citations.py::flapped_uncited`; `docs/alarm_citations.json` |
 | A `::warning::` annotation on green main (e.g. the duration-budget warner below) goes untriaged | Standing-warning triage gate (#1966), step (e11) | `scripts/check_ci_warnings.py` |
 
 **CI gates** (`.github/workflows/ci-cd.yml` unless noted — every push to `main` or a PR):

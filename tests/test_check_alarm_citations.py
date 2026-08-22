@@ -333,3 +333,238 @@ def test_render_clean_board_mentions_both_contracts():
     code, message = cac.render([], unreachable_error=None, ancient=[])
     assert code == 0
     assert "filed issue" in message
+
+
+# ── flapped_uncited — fired-and-cleared visibility (#2912) ─────────────────────
+#
+# The class: an alarm that fires and clears between wraps never appears in
+# describe_alarms(StateValue="ALARM"), so the >72h citation gate was structurally
+# blind to it. Measured live 2026-08-20: qa-smoke-warnings cycled OK->ALARM 35
+# times off ONE planted datapoint, each ALARM standing 1-3 minutes. These tests
+# plant that shape synthetically — the #2912 "prove it can fail" requirement.
+
+
+def _transition(name, hours_ago, old, new, now):
+    return {
+        "name": name,
+        "timestamp": (now - timedelta(hours=hours_ago)).isoformat(),
+        "old": old,
+        "new": new,
+    }
+
+
+def test_planted_fired_then_cleared_alarm_is_surfaced():
+    """THE planted proof: a 60-second ALARM dwell inside the window — invisible to
+    current-state duration by construction — is flagged with its counts."""
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [
+        _transition("flappy-alarm", 10.0, "OK", "ALARM", now),
+        _transition("flappy-alarm", 10.0 - (60 / 3600.0), "ALARM", "OK", now),  # cleared 60s later
+    ]
+    out = cac.flapped_uncited(history, citations={}, now=now)
+    assert out == [("flappy-alarm", 1, 1)]
+
+
+def test_flap_storm_counts_every_cycle():
+    """The live 08-20 storm shape: dozens of OK->ALARM->OK cycles report their
+    full transition counts, not a boolean — the count IS the honest signal."""
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = []
+    for i in range(35):
+        history.append(_transition("stormy", 30.0 - i * 0.05, "OK", "ALARM", now))
+        history.append(_transition("stormy", 30.0 - i * 0.05 - 0.02, "ALARM", "OK", now))
+    out = cac.flapped_uncited(history, citations={}, now=now)
+    assert out == [("stormy", 35, 35)]
+
+
+def test_cited_flap_is_not_flagged():
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [
+        _transition("explained", 10, "OK", "ALARM", now),
+        _transition("explained", 9, "ALARM", "OK", now),
+    ]
+    citations = {"explained": {"citation": "#2912", "note": "planted breach, synthetic"}}
+    assert cac.flapped_uncited(history, citations, now=now) == []
+
+
+def test_blank_citation_does_not_clear_a_flap():
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [
+        _transition("half-entered", 10, "OK", "ALARM", now),
+        _transition("half-entered", 9, "ALARM", "OK", now),
+    ]
+    citations = {"half-entered": {"citation": "   ", "note": "placeholder"}}
+    assert cac.flapped_uncited(history, citations, now=now) == [("half-entered", 1, 1)]
+
+
+def test_transitions_older_than_window_are_not_flagged():
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [
+        _transition("ancient-flap", 100, "OK", "ALARM", now),
+        _transition("ancient-flap", 99, "ALARM", "OK", now),
+    ]
+    assert cac.flapped_uncited(history, citations={}, now=now) == []
+
+
+def test_clear_only_recovery_of_pre_window_red_is_not_flagged():
+    """An alarm that entered ALARM before the window and cleared inside it is a
+    RECOVERY — its red was visible to prior wraps via current state, and its
+    registry entry is correctly pruned on recovery (#2917). Flagging it would
+    demand the entry back the moment it is rightly removed."""
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [_transition("recovered", 10, "ALARM", "OK", now)]  # no in-window fire
+    assert cac.flapped_uncited(history, citations={}, now=now) == []
+
+
+def test_open_episode_fired_but_not_cleared_is_owned_by_current_state_paths():
+    """Fired in-window, still red: describe_alarms sees it — the >72h/tenure
+    paths own it. The flap detector must not double-flag an open episode."""
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [_transition("still-red", 10, "OK", "ALARM", now)]
+    assert cac.flapped_uncited(history, citations={}, now=now) == []
+
+
+def test_currently_red_alarm_with_earlier_cleared_episode_is_still_flagged():
+    """The storm's tail shape: cycles that fired AND cleared, then a final still-
+    open episode. The cleared episodes must not hide behind a young current red."""
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [
+        _transition("storm-tail", 12, "OK", "ALARM", now),
+        _transition("storm-tail", 11, "ALARM", "OK", now),
+        _transition("storm-tail", 10, "OK", "ALARM", now),  # still open
+    ]
+    assert cac.flapped_uncited(history, citations={}, now=now) == [("storm-tail", 2, 1)]
+
+
+def test_alarm_to_insufficient_data_counts_as_episode_end():
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [
+        _transition("data-gap", 10, "OK", "ALARM", now),
+        _transition("data-gap", 9, "ALARM", "INSUFFICIENT_DATA", now),
+    ]
+    assert cac.flapped_uncited(history, citations={}, now=now) == [("data-gap", 1, 1)]
+
+
+def test_ok_insufficient_data_churn_never_flags():
+    """State churn that never touches ALARM is not an episode."""
+    now = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    history = [
+        _transition("quiet", 10, "OK", "INSUFFICIENT_DATA", now),
+        _transition("quiet", 9, "INSUFFICIENT_DATA", "OK", now),
+    ]
+    assert cac.flapped_uncited(history, citations={}, now=now) == []
+
+
+def test_unparseable_history_timestamp_never_manufactures_a_flag():
+    history = [
+        {"name": "bad-ts", "timestamp": "not-a-date", "old": "OK", "new": "ALARM"},
+        {"name": "bad-ts", "timestamp": "not-a-date", "old": "ALARM", "new": "OK"},
+    ]
+    assert cac.flapped_uncited(history, citations={}) == []
+
+
+def test_flap_window_matches_citation_window():
+    """One constant story on purpose: an episode is answerable at the first wrap
+    within 72h whether the alarm is still red or already cleared."""
+    assert cac.FLAP_WINDOW_HOURS == cac.ALARM_AGE_CITATION_HOURS
+
+
+# ── render() — flap section contract ───────────────────────────────────────────
+
+
+def test_render_flapped_is_gate_failure_with_transition_counts():
+    code, message = cac.render([], unreachable_error=None, flapped=[("flappy-alarm", 35, 35)])
+    assert code == 1
+    assert "FIRED AND CLEARED" in message
+    assert "flappy-alarm" in message
+    assert "x35" in message
+    assert "transition count is the honest signal" in message
+
+
+def test_render_clean_board_mentions_flap_contract():
+    code, message = cac.render([], unreachable_error=None, flapped=[])
+    assert code == 0
+    assert "fired-and-cleared" in message
+
+
+def test_render_history_error_on_clean_board_is_unverified_not_silent():
+    """A history read that failed must never let the flap check read as clean —
+    the same degrade-honestly shape as the describe_alarms path."""
+    code, message = cac.render([], unreachable_error=None, flapped=[], history_error="AccessDenied")
+    assert code == 0
+    assert "UNVERIFIED" in message
+    assert "AccessDenied" in message
+
+
+def test_render_history_error_is_also_reported_alongside_a_red_board():
+    code, message = cac.render([("some-alarm", 96.0)], unreachable_error=None, history_error="Throttling")
+    assert code == 1
+    assert "Throttling" in message
+    assert "UNVERIFIED" in message
+
+
+# ── main() — flap wiring, no live AWS/creds required ───────────────────────────
+
+
+def test_main_flapped_exits_nonzero_and_decoded_overrides(monkeypatch, capsys):
+    now = datetime.now(timezone.utc)
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: ([], None))
+    monkeypatch.setattr(
+        cac,
+        "fetch_alarm_history",
+        lambda window_hours=cac.FLAP_WINDOW_HOURS: (
+            [
+                _transition("flappy-alarm", 10, "OK", "ALARM", now),
+                _transition("flappy-alarm", 9, "ALARM", "OK", now),
+            ],
+            None,
+        ),
+    )
+    monkeypatch.setattr(cac, "load_citations", lambda: {})
+
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 1
+    out = capsys.readouterr().out
+    assert "flappy-alarm" in out
+
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py", "--decoded"])
+    assert cac.main() == 0
+    out = capsys.readouterr().out
+    assert "--decoded acknowledged" in out
+
+
+def test_main_alarm_fetch_error_never_reads_history(monkeypatch):
+    """When the board itself is UNVERIFIED there is nothing the flap check could
+    honestly add — and it must not crash the degrade path."""
+
+    def _no_history(*_a, **_k):
+        raise AssertionError("fetch_alarm_history must not be called when describe_alarms failed")
+
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: ([], "NoCredentialsError"))
+    monkeypatch.setattr(cac, "fetch_alarm_history", _no_history)
+    monkeypatch.setattr(cac, "load_citations", lambda: {})
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 0
+
+
+def test_main_history_fetch_error_degrades_honestly(monkeypatch, capsys):
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: ([], None))
+    monkeypatch.setattr(cac, "fetch_alarm_history", lambda window_hours=cac.FLAP_WINDOW_HOURS: ([], "AccessDenied"))
+    monkeypatch.setattr(cac, "load_citations", lambda: {})
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 0
+    out = capsys.readouterr().out
+    assert "UNVERIFIED" in out
+
+
+def test_fetch_alarm_history_degrades_on_any_exception(monkeypatch):
+    class _FakeBoto3Module:
+        @staticmethod
+        def client(*_a, **_k):
+            raise RuntimeError("Unable to locate credentials")
+
+    monkeypatch.setitem(sys.modules, "boto3", _FakeBoto3Module())
+    items, err = cac.fetch_alarm_history()
+    assert items == []
+    assert err is not None
+    assert "credentials" in err.lower()
