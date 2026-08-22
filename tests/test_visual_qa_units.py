@@ -11,6 +11,33 @@ def test_payload_is_empty_discriminates_affirmative_absence():
     assert _payload_is_empty("nonsense") is False
 
 
+def test_payload_is_empty_recognizes_declared_absence():
+    """2026-08-22 (run 32547631137): /api/autonomic_balance's engine-declared
+    absence — `available: false` + a non-empty `reason`, the exact shape the
+    front-end renderers branch on — was unrecognized (no lists, no count keys),
+    so the genesis discrimination refused it and a healthy site deploy
+    auto-rolled-back on cycle Day 5 of a 7-day minimum. The declared-absence
+    arm is scoped: available must be literal False and reason a non-empty
+    string; everything else keeps the fail-closed default."""
+    from visual_qa import _payload_is_empty
+
+    # the live 2026-08-22 payload shape
+    assert (
+        _payload_is_empty(
+            {"_meta": {}, "available": False, "reason": "Need at least 7 days — 5 so far.", "days_with_data": 5, "min_days": 7}
+        )
+        is True
+    )
+    # scoping: truthy available, missing/blank reason, or non-bool shapes stay gating
+    assert _payload_is_empty({"available": True, "reason": "x"}) is False
+    assert _payload_is_empty({"available": False}) is False
+    assert _payload_is_empty({"available": False, "reason": ""}) is False
+    assert _payload_is_empty({"available": False, "reason": "  "}) is False
+    assert _payload_is_empty({"available": 0, "reason": "x"}) is False  # falsy-but-not-False stays gating
+    # declared absence wins even when count-shaped keys ride along non-zero
+    assert _payload_is_empty({"available": False, "reason": "warming up", "days_with_data": 5, "min_days": 7, "total_count": 5}) is True
+
+
 def test_visual_pages_carry_api_deps():
     """The sweep can only probe honest emptiness if the manifest rides the deps."""
     from qa_manifest import visual_pages

@@ -148,13 +148,23 @@ _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Load
 def _payload_is_empty(data) -> bool:
     """True only for an AFFIRMATIVELY empty collection payload.
 
-    A top-level empty list, or a dict whose every list value is empty and whose
-    numeric counts are zero. Anything unrecognized returns False — an API we
-    can't read stays a gating failure, never a silent pass.
+    A top-level empty list, a dict whose every list value is empty and whose
+    numeric counts are zero, or a dict DECLARING absence — the engine's own
+    `available: false` + non-empty `reason` contract (the exact shape
+    renderAutonomic/renderZone2 branch on). The declared-absence arm was
+    missing until 2026-08-22: on cycle Day 5, /api/autonomic_balance honestly
+    answered `{"available": false, "reason": "Need at least 7 days … 5 so
+    far"}` — no lists, no count keys — so the genesis discrimination refused
+    it and the deterministic FAIL auto-rolled-back a healthy site deploy
+    (run 32547631137, the #2841 instrument class). Anything unrecognized
+    still returns False — an API we can't read stays a gating failure,
+    never a silent pass.
     """
     if isinstance(data, list):
         return len(data) == 0
     if isinstance(data, dict):
+        if data.get("available") is False and isinstance(data.get("reason"), str) and data["reason"].strip():
+            return True
         lists = [v for v in data.values() if isinstance(v, list)]
         counts = [v for k, v in data.items() if isinstance(v, (int, float)) and ("count" in k or "total" in k)]
         if not lists and not counts:
