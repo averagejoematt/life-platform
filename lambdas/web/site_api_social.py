@@ -56,7 +56,10 @@ from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.client_ip import (
+    extract_client_ip,  # #1221 — the ONE edge-observed client-IP helper
+    extract_idempotency_identity,  # #2932 — fail-OPEN identity for the capture doors' content-keyed ids
+)
 from content.social_signals import coach_route_of  # #1671 — training/mind coach-route classifier, reused read-side (#1674)
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from ingestion.source_registry import (  # #1679 — inbound channel live/dormant, read from the canonical registry
@@ -102,7 +105,18 @@ from web.site_api_common import (
 # (`_g["<name>"]`, where `_g` is a delegator's globals()), and tests read/patch them on
 # THIS module (social.extract_client_ip, social.with_phase_filter, …). Referenced here
 # so the linter counts them as used. Never prune one without checking the `_g` reads.
-__reexport__ = (copy, hashlib, timezone, Decimal, extract_client_ip, coach_route_of, with_phase_filter, _error, _ok)
+__reexport__ = (
+    copy,
+    hashlib,
+    timezone,
+    Decimal,
+    extract_client_ip,
+    extract_idempotency_identity,
+    coach_route_of,
+    with_phase_filter,
+    _error,
+    _ok,
+)
 
 # DynamoDB-backed rate limiting (survives warm-container distribution + cold
 # starts). The site_api role already permits UpdateItem on the RATE#* partition

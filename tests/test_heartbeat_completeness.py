@@ -451,7 +451,10 @@ COVERAGE = {
     # sanctioned no-op states all still emit; only a dead cron is silent.
     "telegram-coach-worker": (ALARM, "telegram-event-sweep-heartbeat"),
     "weekly-plate": (EXEMPT, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
-    "weekly-signal": (EXEMPT, "2026-07-19", "Operator email (weekly signal summary); a missing Sunday issue is noticed by its reader."),
+    # #2820: the stale "Operator email" rationale predated #1951 lifting this to a
+    # real subscriber send (2026-08-03). Same one-metric delivery dead-man as the
+    # chronicle sender.
+    "weekly-signal": (ALARM, "weekly-signal-delivery-heartbeat"),
     "partner-weekly-email": (
         EXEMPT,
         "2026-07-19",
@@ -479,26 +482,34 @@ COVERAGE = {
         "Accepted residual: the 4x-daily synthetic prober alerts on FAILING paths (metric + SES) but its own silent death is "
         "uncaught; every path it probes (DDB, S3, MCP) also has independent alarms. Revisit with a heartbeat if canary scope grows.",
     ),
+    # #2820 re-dated the whole chronicle family. The 2026-07-19 "noticed by its
+    # reader" rationales predated 2026-08-03, when #1951 lifted the senders to
+    # real subscriber delivery — a reader who never gets an issue notices
+    # nothing. The delivery legs now have a REAL dead-man each (the sender emits
+    # a ChronicleSent/WeeklySignalSent datapoint on every non-dry-run run; the
+    # email_stack heartbeat pages when a week passes with neither a delivery
+    # nor a sanctioned budget-pause datapoint). The upstream generation/approval
+    # legs stay exempt because their failure mode CONVERGES on the same absent
+    # delivery: whichever leg dies, no installment reaches subscribers, and the
+    # delivery dead-man pages at the promise boundary.
     "wednesday-chronicle": (
         EXEMPT,
-        "2026-07-19",
-        "Weekly chronicle generation leg; a missed week breaks the visible weekly rhythm on /story/ and in subscriber inboxes.",
+        "2026-08-21",
+        "#2820: generation leg — a dead/failed generation means no published installment, so chronicle-email-sender emits "
+        "ChronicleSent=0 and chronicle-delivery-heartbeat pages within the week. Crash mode separately reaches the DLQ digest.",
     ),
     "chronicle-approve": (
         EXEMPT,
-        "2026-07-19",
-        "Approval-window sweep in the chronicle preview workflow; a dead sweep stalls publication, "
-        "which the weekly chronicle rhythm surfaces.",
+        "2026-08-21",
+        "#2820: approval/auto-publish sweep leg — a dead sweep leaves the draft unpublished, so no delivery datapoint lands and "
+        "chronicle-delivery-heartbeat pages at the weekly promise boundary; delivery-side coverage, not invocation-side.",
     ),
-    "chronicle-email-sender": (
-        EXEMPT,
-        "2026-07-19",
-        "Weekly subscriber send leg of the chronicle flow; a missing issue is visible to subscribers and to Matthew (also a recipient).",
-    ),
+    "chronicle-email-sender": (ALARM, "chronicle-delivery-heartbeat"),
     "between-chronicle": (
         EXEMPT,
-        "2026-07-19",
-        "Between-issue reader touchpoint; absence degrades cadence polish only — the flagship weekly chronicle legs carry the rhythm.",
+        "2026-08-21",
+        "#2820: subscriber-facing mid-gap note, but explicitly cadence POLISH, not the every-Wednesday promise — the promise "
+        "carries the delivery dead-man; a deliberate pause here is separately visible via its #1951 kill-switch-skip alarm.",
     ),
     "coach-panel-podcast": (
         EXEMPT,

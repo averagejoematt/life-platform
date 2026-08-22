@@ -369,6 +369,27 @@ else
 fi
 echo ""
 
+# ── Live-route sweep — the #2652 long tail (router-derived, status + JSON) ────
+# The api_deps section above sweeps what pages DECLARE; this sweeps what the
+# router REGISTERS and no page declares — the 69 routes that were grandfathered
+# by nothing looking at the standing set (the `light_pct: 106.7` hole). Rows
+# derive from qa_manifest.api_sweep_records() → deploy/endpoint_registry's AST
+# walk, so a new route auto-enters this sweep the commit it lands. Per-route
+# expectations were MEASURED against live before this section was armed
+# (2026-08-22: 71/71 pass — the 2026-07-17 rule). Transport flakes WARN inside
+# the checker (the #2841 posture); wrong statuses and malformed JSON FAIL.
+# The numeric impossible-value scan over these same rows runs in
+# tests/accuracy_audit.py --live, whose denominator includes them.
+echo "── Live-route sweep (#2652 — router-derived long tail) ───────"
+if python3 "$(dirname "$0")/../scripts/api_sweep_check.py" --base "$BASE"; then
+  echo "  ✅ live-route sweep — every router /api GET route swept or excepted with a reason"
+  PASS=$((PASS + 1))
+else
+  echo "  ❌ live-route sweep failed — see rows above (scripts/api_sweep_check.py)"
+  FAIL=$((FAIL + 1))
+fi
+echo ""
+
 if [[ "$QUICK" != "--quick" ]]; then
   echo "── Content markers (v4 structure) ───────────────────────"
   # #1526: both checks take the page URL as a 4th arg — a failed needle re-fetches

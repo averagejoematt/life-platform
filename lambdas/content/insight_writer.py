@@ -142,6 +142,14 @@ def write_insight(
     item = {
         "pk": _PK,
         "sk": sk,
+        # #2678: every reader of the insights partition (mcp get_insights /
+        # update_insight_outcome, weekly digest staleness) keys off insight_id
+        # and date_saved — the mcp + email-parser writers always set them, but
+        # this writer didn't, so 32 of 33 stored insights were unreferenceable
+        # and ageless. insight_id is the sk minus its "INSIGHT#" prefix, so
+        # update_insight_outcome's `sk = f"INSIGHT#{insight_id}"` round-trips.
+        "insight_id": sk[len("INSIGHT#") :],
+        "date_saved": date_val,
         "date": date_val,
         "created_at": ts,
         "digest_type": digest_type,

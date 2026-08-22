@@ -182,13 +182,24 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
 
 
 def operational_alert_digest() -> list[iam.PolicyStatement]:
-    """Alert digest Lambda (ADR-050): drains digest queue, sends one SES summary daily."""
+    """Alert digest Lambda (ADR-050): drains digest queue, sends one SES summary daily.
+
+    #2827: + cloudwatch:DescribeAlarms (read-only) so every daily run can append
+    the STILL-IN-ALARM section — SNS only notifies on transitions, so standing
+    reds are otherwise invisible to the digest. DescribeAlarms has no useful
+    resource-level scoping (same posture as the cost governor's CloudWatch
+    statement)."""
     digest_queue_arn = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-alerts-digest-queue"
     return [
         iam.PolicyStatement(
             sid="SQSDrain",
             actions=["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:DeleteMessageBatch", "sqs:GetQueueAttributes"],
             resources=[digest_queue_arn],
+        ),
+        iam.PolicyStatement(
+            sid="StandingAlarmSweep",
+            actions=["cloudwatch:DescribeAlarms"],
+            resources=["*"],
         ),
         iam.PolicyStatement(
             sid="SES",

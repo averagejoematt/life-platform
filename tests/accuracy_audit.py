@@ -329,10 +329,25 @@ def live_checks():
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import qa_manifest as QM
 
-        endpoints = sorted({dep for pg in QM.MANIFEST for dep in (pg.get("api_deps") or [])})
+        endpoints = {dep for pg in QM.MANIFEST for dep in (pg.get("api_deps") or [])}
     except Exception as e:  # noqa: BLE001
         findings.append({"check": "impossible_value", "severity": "warn", "note": f"api_deps derivation failed: {e}"})
-        endpoints = []
+        endpoints = set()
+
+    # #2652 box 3: widen the denominator to the router-derived long tail — the routes
+    # NO page declares, where the original `light_pct` defect actually lived. Only the
+    # rows a healthy bare GET answers with 200 (a param-gated route's validator 400 has
+    # no numbers to scan). Derived from the same endpoint_registry walk qa_audit counts
+    # coverage against, so this sweep and the coverage ledger cannot disagree.
+    # Measured before arming (2026-08-22, live): all long-tail rows fetched, ZERO
+    # impossible-pct findings — this widening does not arrive pre-red.
+    # Derived separately from api_deps above so one broken derivation cannot silently
+    # take the other half of the denominator down with it.
+    try:
+        endpoints |= {r["fetch"] for r in QM.api_sweep_records() if r["expect"] == "200"}
+    except Exception as e:  # noqa: BLE001
+        findings.append({"check": "impossible_value", "severity": "warn", "note": f"api_sweep derivation failed: {e}"})
+    endpoints = sorted(endpoints)
 
     if not endpoints:
         # Blindness detector (#2578's rule): a derivation returning nothing must say so.

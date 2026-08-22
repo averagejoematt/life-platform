@@ -8,6 +8,10 @@ Covers:
   - Grouping dedupes by AlarmName and tracks fire count
   - Empty queue → no SES send, statusCode 200, sent=False
   - Non-empty queue → exactly one SES send with subject + body containing alarm names
+  - #2827 STILL-IN-ALARM: standing reds (describe_alarms StateValue=ALARM) render
+    with ages on every run, a digest sends on standing reds even when the
+    transition queue is empty, and a CloudWatch failure fails OPEN (the
+    transition digest still sends)
 
 Run:  python3 -m pytest tests/test_alert_digest.py -v
 """
@@ -15,6 +19,7 @@ Run:  python3 -m pytest tests/test_alert_digest.py -v
 import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -43,21 +48,35 @@ def _alarm(name, reason="threshold breached", state="ALARM", t="2026-05-16T15:00
     )
 
 
+def _standing(name, age=timedelta(days=29), reason="threshold breached"):
+    """A describe_alarms MetricAlarms entry as boto3 returns it (datetime, not str)."""
+    return {
+        "AlarmName": name,
+        "StateValue": "ALARM",
+        "StateReason": reason,
+        "StateTransitionedTimestamp": datetime.now(timezone.utc) - age,
+    }
+
+
 def _import_module():
     """Import alert_digest_lambda fresh, patching boto3 first."""
     sys.modules.pop("alert_digest_lambda", None)
     with patch("boto3.client") as mock_client:
         sqs_mock = MagicMock()
         ses_mock = MagicMock()
+        cw_mock = MagicMock()
+        # Default: nothing standing in ALARM (#2827 section absent).
+        cw_mock.describe_alarms.return_value = {"MetricAlarms": [], "CompositeAlarms": []}
 
         def _factory(svc, **kw):
-            return sqs_mock if svc == "sqs" else ses_mock
+            return {"sqs": sqs_mock, "sesv2": ses_mock, "cloudwatch": cw_mock}[svc]
 
         mock_client.side_effect = _factory
         import alert_digest_lambda
 
         alert_digest_lambda._sqs_mock = sqs_mock
         alert_digest_lambda._ses_mock = ses_mock
+        alert_digest_lambda._cw_mock = cw_mock
     return alert_digest_lambda
 
 
@@ -184,3 +203,112 @@ def test_qa_paused_by_budget_alarm_reaches_the_digest_email(env):
     call_kwargs = mod._ses_mock.send_email.call_args.kwargs
     body_text = call_kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
     assert "qa-paused-by-budget" in body_text  # the AI QA pause reaches the digest, never silent
+
+
+# ---------------------------------------------------------------------------
+# #2827 — STILL IN ALARM: standing reds re-surface daily with ages
+# ---------------------------------------------------------------------------
+
+
+def test_long_red_alarm_renders_in_still_in_alarm_section_with_age(env):
+    """#2827: a 29-day-old standing red injected into the REAL assembly path
+    (lambda_handler → _fetch_standing_alarms → _format_email) renders in a
+    STILL IN ALARM section with its age, alongside a normal transition digest."""
+    mod = _import_module()
+    mod._sqs_mock.receive_message.side_effect = [
+        {"Messages": [{"MessageId": "1", "ReceiptHandle": "h1", "Body": _alarm("ingestion-error-whoop")}]},
+        {"Messages": []},
+    ]
+    mod._cw_mock.describe_alarms.return_value = {
+        "MetricAlarms": [
+            _standing("qa-smoke-content-alarm", age=timedelta(days=29, hours=4), reason="3 of 12 checks failing"),
+            _standing("slo-source-freshness", age=timedelta(hours=7, minutes=30)),
+        ],
+        "CompositeAlarms": [],
+    }
+    result = mod.lambda_handler({}, None)
+    assert result["sent"] is True
+    assert result["standing"] == 2
+    call_kwargs = mod._ses_mock.send_email.call_args.kwargs
+    body_text = call_kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    subject = call_kwargs["Content"]["Simple"]["Subject"]["Data"]
+    assert "STILL IN ALARM (2)" in body_text
+    assert "qa-smoke-content-alarm" in body_text
+    assert "red for 29d 4h" in body_text  # the age is rendered, not just the name
+    assert "red for 7h 30m" in body_text
+    assert "3 of 12 checks failing" in body_text
+    assert "2 still red" in subject
+    # Oldest red first, and the section is separate from the transition summary.
+    assert body_text.index("qa-smoke-content-alarm") < body_text.index("slo-source-freshness")
+    assert body_text.index("ingestion-error-whoop") < body_text.index("STILL IN ALARM")
+
+
+def test_empty_queue_with_standing_red_still_sends_digest(env):
+    """#2827 acceptance: today's empty-queue = no-email path must NOT swallow
+    standing reds — a digest sends when nothing transitioned but reds stand."""
+    mod = _import_module()
+    mod._sqs_mock.receive_message.return_value = {"Messages": []}
+    mod._cw_mock.describe_alarms.return_value = {
+        "MetricAlarms": [_standing("qa-smoke-content-alarm", age=timedelta(days=29))],
+        "CompositeAlarms": [],
+    }
+    result = mod.lambda_handler({}, None)
+    assert result["sent"] is True
+    assert result["drained"] == 0
+    assert result["standing"] == 1
+    mod._ses_mock.send_email.assert_called_once()
+    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    assert "No new alarm state transitions" in body_text
+    assert "STILL IN ALARM (1)" in body_text
+    assert "red for 29d 0h" in body_text
+
+
+def test_empty_queue_and_no_standing_reds_sends_nothing(env):
+    """The no-news day stays silent: empty queue + zero standing reds = no email."""
+    mod = _import_module()
+    mod._sqs_mock.receive_message.return_value = {"Messages": []}
+    result = mod.lambda_handler({}, None)
+    assert result["sent"] is False
+    assert result["standing"] == 0
+    mod._ses_mock.send_email.assert_not_called()
+
+
+def test_describe_alarms_failure_fails_open(env):
+    """#2827: a CloudWatch error must never block the transition digest that
+    already works — the sweep logs, returns [], and the email still sends
+    (without the STILL IN ALARM section)."""
+    mod = _import_module()
+    mod._sqs_mock.receive_message.side_effect = [
+        {"Messages": [{"MessageId": "1", "ReceiptHandle": "h1", "Body": _alarm("ingestion-error-whoop")}]},
+        {"Messages": []},
+    ]
+    mod._cw_mock.describe_alarms.side_effect = Exception("throttled")
+    result = mod.lambda_handler({}, None)
+    assert result["sent"] is True
+    assert result["standing"] == 0
+    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    assert "ingestion-error-whoop" in body_text
+    assert "STILL IN ALARM" not in body_text
+
+
+def test_standing_sweep_paginates_and_includes_composite_alarms(env):
+    """The sweep follows NextToken and carries CompositeAlarms too."""
+    mod = _import_module()
+    mod._sqs_mock.receive_message.return_value = {"Messages": []}
+    mod._cw_mock.describe_alarms.side_effect = [
+        {
+            "MetricAlarms": [_standing("page-1-metric", age=timedelta(days=2))],
+            "CompositeAlarms": [_standing("composite-red", age=timedelta(days=5))],
+            "NextToken": "t1",
+        },
+        {"MetricAlarms": [_standing("page-2-metric", age=timedelta(hours=3))], "CompositeAlarms": []},
+    ]
+    result = mod.lambda_handler({}, None)
+    assert result["standing"] == 3
+    assert mod._cw_mock.describe_alarms.call_count == 2
+    assert mod._cw_mock.describe_alarms.call_args_list[1].kwargs["NextToken"] == "t1"
+    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    for name in ("page-1-metric", "composite-red", "page-2-metric"):
+        assert name in body_text
+    # Oldest first: composite-red (5d) before page-1-metric (2d) before page-2-metric (3h).
+    assert body_text.index("composite-red") < body_text.index("page-1-metric") < body_text.index("page-2-metric")

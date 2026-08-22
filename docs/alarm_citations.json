@@ -1,8 +1,13 @@
 {
-  "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Add an entry the same session a new long-red alarm is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live.",
+  "_comment": "Curated alarm-name -> citation registry read by scripts/check_alarm_citations.py (#1959). Every CloudWatch alarm that has been in ALARM >72h must have an entry here (exact AlarmName key) naming the incident row or issue that explains it, or the /wrap gate flags it by name. Since #2912 the same holds for an alarm that FIRED AND CLEARED within the last 72h (episode start and end both in-window, read from describe-alarm-history) — a flap between wraps is invisible to current-state duration by construction, so it needs an entry or an explicit --decoded line just like a standing red. Add an entry the same session a new long-red alarm (or flap) is triaged; remove/replace one once the underlying issue closes AND the alarm has actually cleared live.",
   "token-alarm-genesis-window-active": {
     "citation": "#2116",
     "note": "NOT A FAULT — by design. This is a boolean gauge sub-alarm carrying NO SNS action of its own (cdk/stacks/monitoring_stack.py, the TokenAlarmGenesisWindowActive block). ALARM means literally 'we are inside the genesis window', which the two composite alarms combine with the token-threshold breach so a genesis-week breach is digested rather than paged (#2116, after #1961's post-genesis rebuild pages). Cycle 13's genesis is 2026-08-10, so red since 2026-08-07 is the correct state. Expected to return to OK when the window closes; treat_missing_data=NOT_BREACHING so a stale gauge can never silently suppress a real page. If it is still ALARM well after the genesis window ends, THAT is the finding — file it, don't re-cite."
+  },
+  "cost-metric-drift-sustained": {
+    "citation": "#2883",
+    "note": "Expected RED from ~7 days after its first deploy: the alarm states a true, known condition. CostMetricDriftRatio has held ~1.37 since 2026-08-19 (measured live, #2883's 2026-08-20 comment) against the 1.15 acceptance bar — the residual self-report undercount (#2883 box 2: un-instrumented Bedrock callers outside Lambda, e.g. CI runners without AWS_LAMBDA_FUNCTION_NAME, plus partial cache-token capture) is still open. The alarm exists precisely so this residual cannot rot silently the way #357's regression did. Remove this entry when box 2 lands the ratio < 1.15 for a full week AND the alarm has actually cleared live.",
+    "added": "2026-08-21"
   },
   "budget-tier-sustained-7d": {
     "citation": "#2734",

@@ -47,6 +47,34 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
+cw = boto3.client("cloudwatch", region_name=REGION)
+
+# ── #2820: the delivery dead-man's datapoint (same one-metric pattern as the
+# chronicle sender — see chronicle_email_sender_lambda.py for the full note).
+# The Sunday Weekly Signal is the other subscriber promise with no delivery
+# signal: every non-dry-run invocation emits ONE datapoint here (value = actual
+# SES sends; 0 on kill-switch / zero-subscriber / total-failure runs), and
+# `weekly-signal-delivery-heartbeat` (email_stack.py) pages when the trailing 7
+# daily Sums are all < 1. No sanctioned-pause branch: this sender makes no AI
+# calls and degrades sections instead of skipping, so it has no budget-paused
+# no-op state — a quiet week is never sanctioned, only delivered or missed.
+METRIC_NAMESPACE = "LifePlatform/Email"
+SENT_METRIC_NAME = "WeeklySignalSent"
+
+
+def _emit_sent_metric(value: float, reason: str) -> None:
+    """Emit the delivery-heartbeat datapoint. Fail-soft — a metrics outage must
+    never fail a send; a persistently failed emit IS a missing datapoint, so the
+    dead-man still pages (#2820)."""
+    try:
+        cw.put_metric_data(
+            Namespace=METRIC_NAMESPACE,
+            MetricData=[{"MetricName": SENT_METRIC_NAME, "Value": float(value), "Unit": "Count"}],
+        )
+        logger.info("[dead-man] %s=%s (%s)", SENT_METRIC_NAME, value, reason)
+    except Exception as exc:
+        logger.warning("[dead-man] %s emit failed (non-fatal): %s", SENT_METRIC_NAME, exc)
+
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
@@ -273,6 +301,9 @@ def lambda_handler(event, context):
     try:
         if not dry_run and os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
             logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Weekly Signal subscriber send")
+            # #2820: an unfulfilled promise emits 0 — the #1951 kill-switch alarm
+            # names the cause, this dead-man tracks the outcome.
+            _emit_sent_metric(0, "kill-switch skip")
             return {"statusCode": 200, "body": "skipped: external emails disabled", "sent": 0, "skipped": True}
 
         logger.info("Weekly Signal v1.0.0 — PB-06 — starting")
@@ -308,6 +339,10 @@ def lambda_handler(event, context):
 
         if not subscribers:
             logger.info("No confirmed subscribers — no-op")
+            # #2820: deliberately 0, never sanctioned — the subscriber query
+            # fail-softs to [] on a DDB error, and a sanctioned datapoint there
+            # would let a broken read mask a missed delivery.
+            _emit_sent_metric(0, "no confirmed subscribers")
             return {"statusCode": 200, "body": "No confirmed subscribers", "sent": 0}
 
         logger.info("Sending Weekly Signal (week %d) to %d subscribers", week_num, len(subscribers))
@@ -344,6 +379,10 @@ def lambda_handler(event, context):
                 time.sleep(rate_delay)
 
         logger.info("Weekly Signal complete: sent=%d, failed=%d, total=%d", sent, failed, len(subscribers))
+
+        # #2820: the delivery datapoint — actual send count, honestly 0 on a
+        # total failure so the dead-man can page within the week.
+        _emit_sent_metric(sent, f"SES sends completed ({sent}/{len(subscribers)})")
 
         return {
             "statusCode": 200,

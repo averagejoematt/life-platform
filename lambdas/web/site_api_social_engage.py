@@ -200,6 +200,7 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
     boto3 = _g["boto3"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
+    extract_idempotency_identity = _g["extract_idempotency_identity"]
     hashlib = _g["hashlib"]
     json = _g["json"]
     logger = _g["logger"]
@@ -248,7 +249,15 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
     # Content-based id (no timestamp): a same-day network retry of the identical
     # submission overwrites the same S3 object instead of creating a duplicate
     # pending finding for Matt to triage.
-    finding_id = hashlib.sha256(f"{ip_hash}:{metric_a}:{metric_b}:{finding}".encode()).hexdigest()[:12]
+    # #2932: the id derives from the IDEMPOTENCY identity, not the rate-limit one.
+    # They are the same trusted viewer address when CloudFront-Viewer-Address
+    # arrives; when it doesn't, `ip_hash` is the shared fail-closed sentinel and
+    # keying the id on it would collapse two DIFFERENT readers' identical findings
+    # onto one S3 object — the second reader's submission silently lost. The
+    # idempotency identity is per-request unique in that state (dedup off, loudly
+    # logged) so both persist.
+    id_hash = hashlib.sha256(extract_idempotency_identity(event).encode()).hexdigest()[:16]
+    finding_id = hashlib.sha256(f"{id_hash}:{metric_a}:{metric_b}:{finding}".encode()).hexdigest()[:12]
     record = {
         "id": finding_id,
         "metric_a": metric_a,
@@ -595,6 +604,7 @@ def _handle_board_question(event: dict, *, _g) -> dict:
     boto3 = _g["boto3"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
+    extract_idempotency_identity = _g["extract_idempotency_identity"]
     hashlib = _g["hashlib"]
     json = _g["json"]
     logger = _g["logger"]
@@ -632,7 +642,12 @@ def _handle_board_question(event: dict, *, _g) -> dict:
 
     timestamp = datetime.now(timezone.utc).isoformat()
     # Content-based id so a same-month retry overwrites rather than duplicating.
-    qid = hashlib.sha256(f"{ip_hash}:{question}".encode()).hexdigest()[:12]
+    # #2932: derived from the idempotency identity, not the rate-limit `ip_hash` —
+    # under the fail-closed sentinel that hash is shared by every identity-less
+    # reader, and two strangers asking the same question would collapse onto one
+    # S3 object. See _handle_submit_finding.
+    id_hash = hashlib.sha256(extract_idempotency_identity(event).encode()).hexdigest()[:16]
+    qid = hashlib.sha256(f"{id_hash}:{question}".encode()).hexdigest()[:12]
     record = {
         "id": qid,
         "question": question,
