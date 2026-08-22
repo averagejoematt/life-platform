@@ -27,9 +27,11 @@ filename), `docs/DATA_GOVERNANCE.md` (inbound-social retention row), `docs/INCID
 "do not accept the false-red rate", which is a *measurement-driven scope call* recorded on the issue
 and as a CONVENTIONS §8b rule, not an architecture/data/deploy-posture change.
 
-**Incidents:** 3 rows added — the deploy-plane wedge (two gates, ~6h and ~2.5h, auto-filed #2937);
+**Incidents:** 4 rows added — the deploy-plane wedge (two gates, ~6h and ~2.5h, auto-filed #2937);
 the dark AI gates on the deploy path (#2938); the live impossible `light_pct: 106.7` on
-`/api/sleep_detail` (#2939).
+`/api/sleep_detail` (#2939); and — **found after the wrap commit** — a site auto-rollback where the
+gate was RIGHT: the newly-armed reader-truth check caught a live wrong Day number on its FIRST run
+(#2941, below).
 
 **Closures:** #2924, #2810, #2638, #2840, #2938, #2937 commented (ADR-099 shape). #2938 is
 deliberately **partial**, not realized — see below.
@@ -95,8 +97,8 @@ Not one of the four epic-tail issues was what it said on the tin.
   been **wrong for six days** (`return-value: exit 0 — SILENT`, enabled two days later). `scope`
   exists so "can-fail" cannot read as "fully armed" — but the staleness guard compares **gate IDs,
   not claims**.
-- **#2840**'s silence axis **does not reproduce**. Medians 23.5 vs 12.0 min, means within 10%, and
-  58 of 149 TTD cells unparseable. The direction holds; "days-scale vs minutes" came from the worst
+- **#2840**'s silence axis **does not reproduce**. Medians 19 vs 12 min, means within 10%, and
+  58 of 150 TTD cells unparseable. The direction holds; "days-scale vs minutes" came from the worst
   ~10 rows. Said so in the doc and enforced it with a test.
 - **#2841** I deliberately did **not** close. Measured 13 false-red rows in 21 August days — 1 per
   1.6 days, *not improving*. A dated acceptance would have been optimising for a tidy count while
@@ -156,3 +158,30 @@ job reported **success** — while CLAUDE.md and ADR-076 describe them as gating
 - #2938's unclaimed box — *not-work — sweep for other CI steps invoking a flag whose dependency the
   job never installs; named in the closure comment as a real residual, no issue filed yet*
 - #2692 — Unit Tests wall-clock, now 1517s; commented, not raised
+
+---
+
+## Post-wrap: the armed gate earned its keep in four minutes, and blocked the deploy path
+
+Found while confirming it was safe to close the session. #2940 armed `--reader-truth`; its **first
+live run** (`32541686196`) reported `Visual QA: 16 passed, 77 failed across 93 pages` and the site
+**auto-rollback fired**.
+
+**The gate is right.** `/method/ask/` and `/method/kitchen/` rendered `DAY 6 · WEEK 1, SINCE AUGUST 17
+2026`. At 18:32 PT the Pacific day was **5**; UTC was **6**. `coach_popover.js:24-28` computes
+`Math.floor((Date.now() - GENESIS.getTime()) / 86400000) + 1` — `Date.now()` is a UTC instant while
+`GENESIS` is parsed as browser-**local** midnight. A Pacific reader sees the correct number; everyone
+east of Pacific sees a day ahead. 77 pages share the stamp. The #2675 class, moved to the client.
+
+**Live site is healthy** — all 200s, serving the rollback target `8b0940d`. Auto-rollback did its job.
+
+**But the site deploy path is blocked** until #2941 lands: every `site/**` merge will now deploy, fail
+visual-QA, and roll back.
+
+**What I got wrong in my own verification:** I wrote "measured before arming — this does not arrive
+pre-red". That was true of the **numeric** gate (`accuracy_audit`, 59/59 endpoints swept live). I did
+**not** measure the reader-truth gate's finding count across the 93-page site before arming it — I
+reasoned from the two defects I had just fixed and assumed the rest was clean. The sequencing
+instinct was right and the sample was too small.
+
+- #2941 — the day-stamp clock bug; **blocks the site deploy path**, first pick next session
