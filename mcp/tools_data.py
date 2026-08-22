@@ -9,22 +9,26 @@ from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
 from ingestion.strava_population import DISTANCE_POPULATION_LABEL, ELEVATION_POPULATION_LABEL
+from privacy.field_tiers import strip_map
 
 from mcp.config import RAW_DAY_LIMIT, SOURCES, USER_PREFIX, table
 from mcp.core import date_diff_days, decimal_to_float, get_sot, query_source, resolve_field
 from mcp.helpers import aggregate_items, flatten_strava_activity
 
-# #2809: Tier-2 owner-only fields (docs/SCHEMA.md:327 — PhenoAge posture) — never on a
-# public surface, never quoted into an AI narrative context. MCP IS the sanctioned
-# owner-only surface (a field-selective tool like get_labs's genome view may return
-# Tier-2 data on purpose), but the GENERIC row dumpers below never picked fields — they
-# hand back the whole DDB row, so a `get_date_range`/`get_daily_snapshot`/`find_days`
-# call on withings put the Tier-2 trio into Claude conversation context by accident,
-# which is exactly the distinction SCHEMA.md's "field-selective, never dump rows" line
-# is about. Stripped once, here, rather than re-implemented per row-returning path.
-TIER2_STRIP_FIELDS = {
-    "withings": {"vascular_age", "metabolic_age", "afib_result"},
-}
+# #2809: Tier-2 owner-only fields (PhenoAge posture) — never on a public surface, never
+# quoted into an AI narrative context. MCP IS the sanctioned owner-only surface (a
+# field-selective tool like get_labs's genome view may return Tier-2 data on purpose),
+# but the GENERIC row dumpers below never picked fields — they hand back the whole DDB
+# row, so a `get_date_range`/`get_daily_snapshot`/`find_days` call on withings put the
+# Tier-2 trio into Claude conversation context by accident, which is exactly the
+# distinction SCHEMA.md's "field-selective, never dump rows" line is about. Stripped
+# once, here, rather than re-implemented per row-returning path.
+#
+# #2803: DERIVED from `lambdas/privacy/field_tiers.py`, not restated. Before this there
+# was a literal trio here and a paragraph in SCHEMA.md and nothing compared them — the
+# same one-copy rule the rest of the platform applies to counts and pins. Adding a
+# Tier-2 field to the registry now strips it here with no edit to this file.
+TIER2_STRIP_FIELDS = strip_map()
 
 
 def _strip_tier2(source, item):
