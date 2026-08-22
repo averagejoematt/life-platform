@@ -260,6 +260,10 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # black/ruff/mypy pins were invisible to the hand-list). That makes it a
         # repo-shape ratchet: a new file declaring a pin must be caught pre-merge.
         "test_ci_pin_consistency.py",
+        # #2759: the npm leg of the same class — derives its workflow surface from
+        # `git ls-files` exactly like the pip guard above, so a new workflow with a
+        # bare `npm install -g` must red BEFORE the merge, not after.
+        "test_npm_pin_consistency_2759.py",
         # ── #2372: the hand-list becomes a derivation — every file
         # tests/premerge_derivation.py finds below, classified in this same PR ──
         "test_blocked_vice_screen_set_2212.py",

@@ -60,7 +60,14 @@ jobs:
       - name: Install agent runtime
         run: |
           pip install --quiet boto3 claude-agent-sdk pytest flake8
-          npm install -g @anthropic-ai/claude-code
+          # claude-code CLI: the version of record is remediation/package.json's
+          # devDependency (#2759) — Dependabot's npm ecosystem bumps it and this
+          # step resolves it at install time, so there is one copy and no hand-bump
+          # (the #2609 pattern, npm leg; same shape as the CDK CLI's cdk/package.json
+          # treatment in #2760). Before this it installed UNPINNED — floating to
+          # whatever released today in a job holding OIDC creds and a PR token.
+          CLAUDE_CODE_VERSION=$(node -p "require('./remediation/package.json').devDependencies['@anthropic-ai/claude-code']")
+          npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 
       - name: Ensure auto-fix-safe label exists
         env:

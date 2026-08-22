@@ -1,0 +1,8 @@
+{
+  "name": "life-platform-remediation-toolchain",
+  "private": true,
+  "description": "Version of record for the claude-code CLI the remediation agent runs (#2759). remediation-agent.yml resolves `npm install -g @anthropic-ai/claude-code@X` from this devDependency at install time, and Dependabot's npm ecosystem (.github/dependabot.yml, /remediation) bumps it — the structural second leg the pin lacked (the #2468 one-legged-pin class, npm shape; before this the CLI installed UNPINNED in a job holding OIDC creds and a PR-writing token). Exact version, no range: guarded by tests/test_npm_pin_consistency_2759.py. The pip half of the agent's toolchain (boto3/claude-agent-sdk/pytest/flake8) is pinned in requirements-dev.txt (#2760).",
+  "devDependencies": {
+    "@anthropic-ai/claude-code": "2.1.239"
+  }
+}
