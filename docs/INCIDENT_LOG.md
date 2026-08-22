@@ -228,6 +228,15 @@ than one, and 21 match none):
 | 4 | data quality / scoring |
 | 21 | *(unclassified)* |
 
+> **The QA-oracle false-positive rows have an owner: #2978** (the #2841 decision — umbrella,
+> not acceptance). Do not read the five closed per-symptom issues (#1526, #1931, #1917,
+> #2051, #1911) as class closure; that misreading is what #2841 was filed to end, and the
+> rule is CONVENTIONS §8b. Note the keyword class spans **two** sub-shapes: the deploy-race
+> shape (smoke/visual-QA measuring the edge before an invalidation lands, or a cold Lambda)
+> which #2978 owns, and the newer semantic-oracle shape (the reader-truth oracle raising
+> sanctioned content shapes) which #2959 and the #2956 debt ledger own. Measured
+> 2026-08-22: 14 rows in July (1 per 2.2 days), 15 in 2026-08-01→22 (1 per 1.5 days).
+
 The three classes the old list omitted entirely — **QA-oracle false positives (30)**,
 **lane-subset/union-breach main reds (23)**, and **deploy-plane wedges/strands/races
 (18)** — are now the 3rd, 4th and 6th largest. They are the shape of this platform's
