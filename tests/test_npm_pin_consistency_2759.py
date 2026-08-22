@@ -37,7 +37,12 @@ import os
 import re
 import subprocess
 
-import yaml
+import pytest
+
+# yaml is outside the deploy-critical lane's dep set (#2699/#2732 class) —
+# importorskip so collection in the minimal lane never crashes; the full
+# Unit Tests lane (PyYAML installed) still runs every test here.
+yaml = pytest.importorskip("yaml")
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CLAUDE_CODE = "@anthropic-ai/claude-code"
