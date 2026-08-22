@@ -1,214 +1,189 @@
-# Handover — 2026-08-22 ~11:45 → ~16:45 PT: machinery first — the class #2753 vacated now has an owner, and the publish path took two rounds because the oracle moved under it
+# Handover — 2026-08-22 ~15:45 → ~17:15 PT: max opus paydown — and every closure I tried to make honest found a defect underneath it
 
-**Session:** Opus 5, autonomous, full merge + deploy authority. The driving instruction was
-*"machinery first, then opus paydown"*, against the approved plan
-`~/.claude/plans/golden-forging-hickey.md`, whose premise was measured rather than felt: of
-120 post-July incident rows, **98 (82%) are self-inflicted delivery-machinery failures**,
-and the largest class inside that had no owning epic since #2753 closed. Previous wrap
-archived as `HANDOVER_2026-08-22_plan-then-execute.md`.
+**Session:** Opus 5, interactive, with merge + deploy authority granted twice. The driving
+instruction was *"max pay down of opus issues without shortcutting on quality"*, against a plan
+I presented and Matthew approved as-is. Previous wrap archived as
+`HANDOVER_2026-08-22_machinery-first.md`.
 
-**Build beat:** none — nothing reader-visible shipped. Six merges: a QA ledger fix, a doc
-generator's writer, a CI trigger change, a test-side registry, an alarm citation, and two
-baselined oracle findings. `docs/content/BUILD_DISPATCH_CHECKLIST.md` wants reader-facing
-work, and the one reader-facing thing touched (#2972) is still open by design.
+**The plan's premise was right and its cost estimate was wrong.** 30 open `model:opus` issues
+decomposed cleanly: 7 epics, 6 not session-startable (`gate:owner` / `blocked:dep`), 17
+startable — and **7 of those 17 were one cluster**, the cost epic #2801. Lane 0 was budgeted as
+"verification work, no new code": three issues sitting at the finish line. It produced **three
+live defects instead**, consumed most of the session, and never reached #2892 or #2888. That is
+the honest trade — three shipped-and-verified fixes plus two epics' worth of acceptance
+verification, instead of four cost stories touched and none proven.
 
-**Docs:** `docs/INCIDENT_LOG.md` (+2 rows, Patterns section regenerated 155→157 — by the
-writer this session shipped, not by hand), `docs/CONVENTIONS.md` §4a1 (what a test-adding
-branch owes: nothing), `docs/PROPORTIONALITY.md` (derived-artifact registry row),
-`docs/MCP_TOOL_CATALOG.md` (regenerated — it was a month stale), `docs/alarm_citations.json`
-(the #2734 entry rewritten; it had rotted).
+**Build beat:** none — nothing reader-visible shipped. The four merges are an ingestion request
+fix, a wrap-gate check, an AI cost seam and a SCHEMA correction; `docs/content/BUILD_DISPATCH_CHECKLIST.md`
+wants reader-facing work, and the one reader-facing thing in play (#3003) is deliberately still open.
 
-**Decisions:** none needed — #2982's option-A choice is recorded in CONVENTIONS §4a1 and on
-the issue; #2986's registry is an implementation of ADR-103/144 and the charter, not a new
-governance rule.
+**Docs:** `docs/SCHEMA.md` (the segmental paragraph — PR #3004), `docs/engines/COACH_STANCE.md`
+(#973 re-verify against the #2889 change), `docs/alarm_citations.json` (the whole registry
+re-baselined), `docs/INCIDENT_LOG.md` (+4 rows, Patterns regenerated 157→161 by its own writer).
 
-**Incidents:** 2 rows — post-deploy visual-QA red on two NEW reader-truth findings the
-deploy did not cause (`/method/board/` was among the 91 passes); and a ~5 min Docs CI red
-from a `test_count` stamp dropped during a rebase, healed unattended by the reconcile bot.
+**Decisions:** none needed — no governance-consequential choice. The closest was scoping
+`dead_citations()` to lit alarms and exempting prose citations, which is a design detail
+recorded in the script header and the registry `_comment`, not an architecture posture.
 
-**Main:** green at `5f5069f6` — the latest completed CI/CD run succeeded. The gate still
-exits 1, and its objection is fair rather than wrong: HEAD is the docs-only wrap commit
-`f2628761`, which is outside `ci-cd.yml`'s path filter and so mints no CI/CD run **by
-design** — not the swallowed-push shape (#2762) the gate flags it as, but genuinely
-unwatched all the same. Docs CI is green on it. The earlier red (`32594947913` on
-`564efa0c`) was its **visual-QA leg only** — Deploy, smoke and the I1/I2/I5 checks all
-SUCCESS, auto-rollback SKIPPED — and both its findings are baselined in `#2990`.
+**Main:** red — CI/CD run `32601989142` (sha `67b5fa1e`) concluded failure on `Visual + AI-vision
+QA`: two NEW high reader-truth findings the deploy did not cause (`/story/timeline/`,
+`/data/habits/`), filed as **#3003** and deliberately not baselined. Deploy, Smoke and the
+post-deploy integration checks all passed; auto-rollback correctly skipped (its `needs` excludes
+visual-qa).
 
-**Alarms:** clean — every alarm red >72h cites an issue, no uncited flaps in the window.
-The `budget-tier-sustained-7d` citation was rewritten (it stated a ceiling that no longer
-exists).
+**Incidents:** 4 rows added — the 6-day silent segmental-field drop (P2), the post-deploy
+visual-QA red on two new reader-truth findings (P3), `report.json` storing its own evidence
+truncated (P4), and a production-approval lease found waiting 1.3h by the wrap gate rather than
+by anyone watching (P4).
 
-**CI warnings:** 3, all triaged — two `Plan deployments` warnings claiming a "Lambda config
-change (handler/runtime/memory/timeout/env/layer) CI cannot ship" on `LifePlatformOperational`
-and `LifePlatformEmail`; I ran the diff they describe and **only `Code.S3Key` moved, on 7
-functions** — an asset-hash change CI's code-deploy path does ship. Filed as **#2993**. The
-third is the Unit Tests duration budget (1329s vs 1200s), the fifth crossing of a trend
-`157 → 294 → 688 → 830 → 1247 → 1329`; recorded on the issue that already owns it (**#2692**)
-rather than re-filed, noting this session added 63 tests to the suite.
+**Alarms:** 0 red >72h uncited — and the registry itself was the session's second finding (below).
+
+**CI warnings:** unverified — the latest completed main run isn't green, so `check_ci_warnings.py`
+has nothing to triage; (e2) owns that state.
 
 **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
 
-**Backlog:** Now live at 12 actionable; no stale `Later`. Fixed two hygiene violations —
-epic #2799's `## Stories` missing #2989 and #2992, and the platform's own auto-filer
-(#2991, the standalone visual-QA advisory) which is the same condition #2992 diagnoses in
-full; closed to it.
+**Backlog:** Now live at 14 actionable; no refill needed. No stale `Later` issues printed. Four
+hygiene violations appeared — all on issues filed this session — and all four were fixed before
+the wrap commit (#3003 gained `## Outcome` + `## Acceptance`; #2578 and #2799 gained the five new
+stories in their `## Stories` lists).
 
-**Closures:** #2981, #2975, #2982 and #2991 each carry the ADR-099 two-line verdict.
+**Closures:** #2994, #2996, #2797, #2734 commented.
 
-**Ledger:** omitted — from the wrap commit only. The derived-artifact registry row shipped
-**with its subsystem** in `#2987` (`564efa0c9`), which is the better place for it, so
-`docs/PROPORTIONALITY.md` has no diff in the wrap window. The row is live and carries
-posture, rent (one build-time AST scan + `git ls-files`, one classification line per new
-generator), and a demote trigger of a full quarter with no registry change.
+**Ledger:** none — no standing machinery shipped. `dead_citations()` is a new check inside the
+existing `check_alarm_citations.py` subsystem, which already carries its row; it adds no new
+schedule, no new alarm and no new artifact.
 
 ---
 
 ## What shipped
 
-| PR | what | state |
-|---|---|---|
-| **#2984** | #2975 — the incident-log derivation gets a writer, and its guard moves to the lane that stales it | merged `3997b0f10` |
-| **#2985** | #2982 — a test-adding PR stops paying a round-trip to a literal it may not stamp | merged `97ae3aed9` |
-| **#2983** | #2981 — the truth ledger records a pair at any severity, and the update path stops lying | merged `9d7a99e03` |
-| **#2987** | #2986 — a registry for derived artifacts and the lanes their guards run in | merged `564efa0c9` |
-| **#2988** | #2734 — re-measure the budget alarm; the projection half is resolved | merged `985dc935e` |
-| **#2990** | #2959 — baseline the two `/story/` oracle findings holding the publish path | merged `5f5069f63` |
+| PR | Issue | What | State |
+|---|---|---|---|
+| #2995 | #2994 | withings `getmeas` requests every meastype the transform can parse | merged, **deployed 23:15:18Z, verified live** |
+| #2998 | #2996 | a lit alarm's cited `#N` must be OPEN + the full registry baseline | merged |
+| #3001 | #2889 | fingerprint the STRUCTURED brief, not the rendered prompt | merged |
+| #3004 | #2994 | SCHEMA.md: the 15 segmental fields are verified-live | merged |
 
-**Closed:** #2981, #2975, #2982, #2991. **Filed:** epic **#2986** (derived artifacts and
-their lanes), **#2989** (the budget alarm's cut), **#2992** (the finding still holding the
-publish path) and **#2993** (the Plan job's asset-hash-vs-config-change misread).
-**Open: 78 → 79** — four closed, four filed, plus one the platform's own auto-filer opened
-mid-session and I closed to #2992. The count went up; every issue filed names something
-that was already broken and unmeasured.
+### The flagship — a documented signal that was never once written
 
-**Deployed + verified:** `life-platform-site-api` 20:06:53Z and `life-platform-mcp`
-20:09:49Z against a 19:51:19Z merge — both post-date it. Verified by **reading the deployed
-artifact**, not the deploy status: live `/api/platform_stats` returns `test_count: 16136`,
-matching `lambdas/web/site_api_common.py:220` exactly.
+Verifying epic #2797's last folded finding (*"nothing automated confirms the next weigh-in row
+carries the 15 segmental fields"*) found something worse than unverified. `_fetch_range` built the
+`getmeas` request from `MEAS_TYPES` alone; PR #2794 had put types 173/174/175 in a **separate**
+`SEGMENTAL_TYPES` dict and never touched the request. The transform grew a branch for data the
+fetch could not return.
 
-## The critical path, and where it actually ended
+Measured, not inferred: the last weigh-in's raw payload — `fetched_at 2026-08-17T05:05:45Z`,
+**after** #2794 merged — contains no 173/174/175, and its DDB row had 34 fields and zero
+segmental. `docs/SCHEMA.md` documented all 15 as shipped the entire time.
 
-The plan's forced ordering was `#2981 → baseline #2972 → publish path unblocked`. The first
-two links held exactly as designed. The third did not, and the reason is worth carrying.
+**The fixture was not the wire.** `test_withings_bodyscan2_scalars_and_segments` fed a fixture
+with 173/174/175 inline and passed continuously — it mirrored the spike's *unfiltered exploratory*
+`getmeas`, not the filtered request production issues.
 
-`#2981` was real and cheap: the ledger's write path recorded only `high` findings while the
-oracle grades the same finding non-deterministically, so a deliberate baselining pass on a
-`med`-graded night recorded **nothing and printed "rewritten" anyway**. Fixed by making the
-write path severity-free — the gate key already was (#2613) — with gating unchanged at read
-time. `/method/board/`'s `audience_violation` baselined, ledger 26 → 27, and the re-run
-reported `2 passed, 0 failed`.
+The guard is the deliverable, not the one-line fix: SET-equality in both directions **plus** an
+AST derivation of every module-level meastype table `_parse_measurements` consults, so a *third*
+table cannot join the transform without joining the request. Both mutation-proved, and the
+mutation proof calls the same derivation the real check does rather than a re-implementation.
 
-Then the **full-surface** post-deploy sweep came back `91 passed, 2 failed across 93 pages`
-— and `/method/board/` was among the **passes**. Two entirely different pages had picked up
-high findings in the meantime. That is the oracle's non-stationary population doing exactly
-what #2981's own issue body predicted, one level up: fixing the baselining mechanism does
-not stop the target from moving while you aim at it.
+Live verification after deploy (`LastModified 2026-08-22T23:15:18Z`, post-dating the 22:16Z
+merge) via a `date_override` re-fetch of `2026-08-16`: **34 → 49 fields, all 15 present**, and the
+device invariant holds exactly — the five type-173 values sum to **92.08 = the scalar
+`fat_free_mass_kg`**. The magnitude-inferred `SEGMENT_POSITIONS` map is confirmed against its own
+prediction: #2782 reasoned the torso would carry ~48.76 of 92.08 before any of it was reachable;
+live it is torso 48.76, legs 15.48/15.35, arms 6.33/6.16.
 
-Both new findings checked against the **live pages**, not the CI log line — which truncates
-the note at ~96 chars and has produced a confident wrong root cause here before. Neither is
-a defect: `/story/chronicle/` lists a 2026-08-18 post titled *Day One Actually Happened*,
-which is ordinary Day-2 retrospective publishing, and `/story/build/agent-review/` states
-its own span (`2026-05-29 → 2026-08-17`) and never claims to be current. Baselined under
-#2959, 27 → 29.
+### A citation string is not an owner
 
-And then it moved **again**. The local full-surface sweep after those merges returned
-`92 passed, 1 failed` with a single high finding on `/method/` that the CI sweep 90 minutes
-earlier had not seen — a third distinct high-finding population in one day. **The publish
-path is therefore still held**, by #2992, and this time the finding may be a real render
-defect rather than a sanctioned shape, so it is filed rather than baselined.
+Trying to close #2734 honestly meant checking whether the alarm citing it would be left pointing
+at a closed issue. Nothing could see that: the #1959 gate asserts a citation *string* exists and,
+past 14 days, that it contains a `#N`. Neither asks whether the issue is open.
 
-I nearly missed it. My first read of the sweep grepped a `tail -30` capture, found no 🔴,
-and I wrote *zero high findings* — the exact truncation trap this repo already has a rule
-for. `qa-screenshots/report.json` is the complete artifact and says `FAIL count: 1`. The
-correction came from reading the whole record instead of the tail of it.
+**4 of 7 registry entries pointed at closed issues; 3 of those were on alarms lit at that moment**,
+two past the gate's own 72h threshold. Two were not merely dead but semantically wrong —
+`qa-smoke-failures` cited an August 1st decision about oracle partitioning while its live cause
+(`recall:corpus_freshness`, `FailCount ≥ 1` on all 8 days measured) was owned by the **open**
+#2977 all along.
 
-## The flagship: three broken triples, and one stale behind a fresh timestamp
+`dead_citations()` is narrow by construction so it cannot manufacture a red: prose citations with
+no `#N` are exempt (a dated self-clearing state — `token-alarm-genesis-window-active`'s window
+expires 2026-08-24 — is honestly cited in prose, and the registry-shape test now makes that prose
+carry a concrete ISO date), an unreadable issue is UNKNOWN rather than dead, and a stale entry on
+a **recovered** alarm is a pruning chore. Baselined in the same change, each disposition measured.
 
-Epic #2986 exists because a derived artifact needs four things — a generator, a writer that
-can self-heal it, a guard, and that guard **placed in a lane the artifact's inputs trigger**
-— and nothing declared which of the four each one had. Discovery finds 28 scripts writing a
-git-tracked artifact.
+**A correction found by shipping:** pruning the recovered `weekly-signal-delivery-heartbeat` entry
+immediately red the #2912 flap gate — its only episode (the arming transition of the #2820
+dead-man) was inside the 72h flap window. Two rules disagreed. The prune rule is now *"OK for
+longer than the flap window"*, not *"the moment it clears"*.
 
-The one worth reading twice is `docs/MCP_TOOL_CATALOG.md`. It was not merely stale — it was
-**stale behind a fresh timestamp**. The reconcile bot touched the file *daily*, because
-`sync_doc_metadata` owns its `Total tools:` literal; the generated body had not been re-run
-since **2026-07-25**. The doc contradicted itself two lines apart:
+### ADR-126's cache could never hit
 
-```
-**Version:** v8.6.0 | **Last updated:** 2026-08-22 | **Total tools:** 76
-## All 72 Tools — by module
-```
+`canonicalize()` strips bookkeeping by dict **key**; the only production call site hashed
+`system_prompt` + `user_message_full` — rendered strings with `json.dumps(brief)` baked in. So
+`generation_date` (already in `_VOLATILE_KEYS`, beside `as_of` and `computed_at`) rode into the
+digest as text, the strip list was a no-op where it mattered, and the digest changed daily by
+construction. Live: `GenerationSkippedUnchanged` never emitted, all 8 cache rows `reuse_count = 0`,
+`first_generated == last_generated`.
 
-That is #2840's defect with a bot stamping it fresh every day, and no guard anywhere: its
-`--check` was wired into no workflow step, no pytest, and no `run_generators()`. Both gaps
-the registry found — this one and `generate_platform_model`'s post-merge-only guard — were
-closed in the same change.
+The honesty invariant is not weakened, and its **ceiling is now asserted rather than assumed**: a
+test pins that `gap_days` still busts. A brief saying *"it has been 4 days"* may never be reused on
+day 5 — and `gap_days` ticks daily during exactly the quiet stretches the feature exists to save
+on, so the achievable skip rate is bounded well below 100%.
 
-## Things that were not what they looked like
+The miss reason is no longer unmeasurable — *"the metric never fired"* could not distinguish a
+wrong fingerprint from genuinely-changing inputs, which is why this sat two months behind a green
+suite. Per-part digests are stored and a miss now logs which parts changed. A **log line, not a
+dimensioned metric**, because #2837 is an open 743-series finding and this would have added ~40.
 
-- **`GenerationSkippedUnchanged` has never been emitted** — zero metric *variants* in
-  CloudWatch, not zero datapoints. The DDB cache writes fine (8 rows, all 8 coaches) but
-  `reuse_count == 0` and `first_generated == last_generated` on every one: not a single hit
-  since ADR-126 landed. Root cause: `canonicalize()` strips volatile *dict keys*, and the
-  only call site passes two **rendered strings**, where a key-based strip cannot reach the
-  embedded date. The whole `_VOLATILE_KEYS` list is inert in production. Recorded on #2889
-  with the executed proof; not fixed, because normalizing volatile spans out of prose is
-  the exact fragile path the module's own docstring warns against.
-- **The guard meant to keep docs-ci's two path lists identical was comparing six-element
-  prefixes.** Its regex terminated each block at the first entry carrying a trailing
-  comment — the 7th of 15 — so it would have stayed green through #2982's change either
-  way. Found only because I was deliberately making the tails diverge.
-- **The `#2734` alarm citation had rotted.** It cited a `$135` ceiling reverting to
-  `$85/$100`; #2836 superseded both on 08-18. A citation whose whole job is to explain a
-  lit alarm, stating a ceiling that no longer exists, is worse than none.
-- **#2734's trilemma had no live premise.** Measured by executing the shipped `_tier_for`:
-  projected `$162.60` vs the `$200` August ceiling (81%), and `$121.50` vs the `$150`
-  September base (81%). Neither month overruns. What remains is the alarm's *cut*, and it
-  is derived rather than taste: **ADR-133 set the $150 base *from* a measured steady state
-  of $4.12/day, which lands at 82.4% of it — inside band 1 by construction.** Filed as
-  #2989 rather than re-cut as a tail-end edit to a paging surface.
+## Two epics judged on acceptance, not on their children
 
-## Two things I got wrong, and how
+**#2797 CLOSED.** All 13 children closed, but each of the four Done-when boxes was re-checked
+against live state: the privacy-tier gate is 17 tests that collect under `-m premerge` and is
+mutation-proved by construction; `_BROADCAST_SOURCES`/`SOCIAL_CHANNELS_ENV`/daily-brief are all
+registry-derived; the AST edge map shipped at 99.4% against an 85% bar; SCHEMA carries both new
+signals. Both folded findings dispositioned rather than dropped on closure — one was already
+corrected by PR #2914, the other became #2994.
 
-- **`git checkout tests/visual_qa.py` to clean up a mutation probe destroyed the fix I had
-  just written there.** The edit was unstaged; checkout restored it from HEAD. Caught
-  immediately by re-grepping, but the reflex is the lesson: never use `git checkout <path>`
-  to revert a probe in a file you are also editing — copy to `/tmp` and copy back.
-- **Discovery's first cut was useless in both directions.** A substring check for `open(`
-  turned 9 real generators into **59** candidates, most of them `check_*.py` scripts that
-  only READ a `site/` path. Tightening it to AST-resolved write targets then missed
-  `deploy/sync_doc_metadata.py` — the largest generator in the repo — because it writes
-  through a loop. The shipped version is strict on *whether a module writes* and wide on
-  *which artifacts to attribute*, and it names its remaining blind spot (`DISCOVERY_BLIND`,
-  5 generators writing through computed paths) rather than hiding it.
+**#2578 did NOT close**, as predicted. Every child is closed and the acceptance is **7 proven
+verdicts out of 490 gates — 1.4%** — while `gate_census` appears in **zero** workflows, so a newly
+added gate still enters unverified. Boxes 1 and 3 are genuinely met (and box 3 is better than
+asked: error bars in both directions, 41 unadjudicated workflow steps published by label, and a
+list of the five failure shapes the census structurally cannot see). Filed #2999 and #3000.
+
+## Gotchas worth carrying
+
+- **Two gates made the work better by refusing it.** The #1665 module-size guard rejected the
+  first #2889 cut (+40 lines on a file baselined at 2396 as debt being drained); rather than raise
+  the ceiling the seam moved into `generation_cache.py`, where it belonged, and `ai_calls.py`
+  landed at **exactly 2396**. The #973 engine-doc gate then fired on `COACH_STANCE.md`; its
+  checklist was worked rather than date-bumped — read the change, ruled not material, AST-re-derived
+  all four citations, **none moved**, and verified them byte-identical against `origin/main` because
+  an equal line count can still hide a shifted span.
+- **A piped gate reports the pipe's exit.** `python3 scripts/check_alarm_citations.py | head` printed
+  `EXIT=0` while the script itself exited 1. Re-ran unpiped to get the real code.
+- **`agent_commit.sh` refuses doc-literal files by design**; `ALLOW_DOC_LITERALS=1` is the documented
+  opt-out and was needed four times (`docs/TESTING.md`, `site_api_common.py`, `alarm_citations.json`,
+  `SCHEMA.md`). The `test_count` literal drifted on every one of the three test-adding PRs.
+- **The registry prevented a self-inflicted wrong turn.** I constructed
+  `raw/matthew/withings/2026/08/…` and got a 404; the real prefix is
+  `raw/matthew/withings/measurements/…`, which is exactly what the `raw_layout` facet exists to stop
+  me doing.
 
 ## Residual / next picks
 
-- **#2992 — the publish path is NOT clear, and this is the one thing holding it.** I
-  expected run `32597212151` to confirm it; it could not — its Deploy was **skipped** (the
-  #2990 merge touched only `tests/truth_baseline.json`, nothing deployable), so visual-QA
-  skipped with it. So I ran the full surface locally instead: `92 passed, 1 failed across
-  93 pages`, and the single high finding is a NEW one on `/method/` that was absent from
-  the CI sweep 90 minutes earlier. The API is right in every particular
-  (`current_cycle = 14`, cycle 14 `is_current: True`), so it is either a wrong-row `· NOW`
-  binding or an oracle misread — **do not baseline it until that is settled.**
-- **#2889** — the generation cache has never hit once; root cause measured and posted. The
-  fix is fingerprinting the structured brief before rendering, where `canonicalize` already
-  works as designed. Do NOT start box 2 (extend to other surfaces) first — extending a gate
-  that has never fired multiplies zero.
-- **#2989** — the budget alarm's cut; three costed options on the issue, needs a monitoring
-  CDK deploy and a rewrite of three hard assertions in `tests/test_budget_tier_alarms.py`.
-- **#2986** — the registry's own folded findings: `test_platform_model_drift.py` is outside
-  the `premerge` marker, and the 11 `v4_build_*` BUILDERs are classified but unaudited.
-  Also worth noting: `/story/build/agent-review/`'s oracle finding lands on a BUILDER whose
-  output ages with nobody responsible — the class the registry documented, showing up the
-  same day.
-- **#2974** — the visual-qa CI role still cannot `PutMetricData`; the failure log is wall-to-wall
-  `AccessDenied` on every Bedrock call, confirming the bill-without-record class live.
-- **#2972** — unchanged and still correctly open: no producer anywhere writes reader-facing
-  coach prose, so it is new generation work. Now baselined as debt, which is the point.
-- **#2893**, **#2832** — the remaining ranked opus paydown, untouched this session.
-- **`training_coach`'s cache row last stored 2026-08-09**, 13 days behind its seven
-  siblings. Flagged on #2889, *not diagnosed* — two partition-key guesses returned 0 rows,
-  which measures nothing, so I recorded the observation rather than a conclusion.
-  — *not-work — an observation attached to #2889, not a separate claim*
+- **#3003** — render `/story/timeline/` and `/data/habits/`, then baseline-or-fix; also make
+  `report.json` store the untruncated note. This holds the publish path.
+- **#2889** — open by design: the fix makes the cache *able* to hit; the first honest observation is
+  tomorrow's 17:00 UTC daily brief. Either `GenerationSkippedUnchanged` fires for the first time in
+  two months, or the `[GEN-CACHE-MISS]` lines name which part changed and the ceiling question gets
+  answered with data.
+- **#2837** — the inventory landed as a comment (734 series / 30 namespaces; 65% of the estate is two
+  dimension choices; SiteAPI's 322 series carry ONE alarm and MCP's 153 carry none). The active-series
+  measurement and the namespace ledger remain.
+- **#3002** — the `SiteAPI`/`SiteApi` casing twin, with `ContentFilterFallback` stranded unwatched in
+  the twin. Do this before #2892.
+- **#2892** — hold until **#2974** lands: the CI caller class is exactly the one currently missing from
+  the metric, so shipping the dimension first gives a dimension with a known hole.
+- **#2999 / #3000** — epic #2578's remaining half.
+- Cycle 14 has had **no weigh-in since 2026-08-16** (6 days) — *not-work — an observation for Matthew,
+  not a backlog item.*
