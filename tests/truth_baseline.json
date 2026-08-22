@@ -6,6 +6,12 @@
   "pages": {
     "/coaching/": [
       {
+        "category": "audience_violation",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "coaches address Matthew by name/second person \u2014 the coaching surface's designed content; adjudicate the audience rubric for coach pages"
+      },
+      {
         "category": "temporal_contradiction",
         "issue": "#2959",
         "added": "2026-08-22",
@@ -21,6 +27,12 @@
       }
     ],
     "/coaching/by-coach/#physical_coach": [
+      {
+        "category": "audience_violation",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "same coach-addressing class as /coaching/"
+      },
       {
         "category": "temporal_contradiction",
         "issue": "#2959",
@@ -84,12 +96,28 @@
         "note_sample": "Essay is dated JULY 8, 2026 with a snapshot from 2026-07-06, but the experiment phase indicates today is 2026-08-21 (Day 5 of current cycle starting 2026-08-17). The essay claims to describe current p"
       }
     ],
+    "/method/board/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "'quiet for three days, Matthew' \u2014 the inclusive-day-counting coaching class"
+      }
+    ],
     "/method/calibration/": [
       {
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
         "note_sample": "States 'THIS SEASON \u00b7 CYCLE 14' with '26 GRADED FORECASTS' on Day 5, but only 5 days of data can exist in the current cycle (started 2026-08-17). On Day 5, a maximum of 5 days of in-cycle data is poss"
+      }
+    ],
+    "/method/data/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "pipeline footer 'updated 2026-08-09' pre-cycle \u2014 verify staleness under the triage issue"
       }
     ],
     "/method/postmortems/": [
@@ -122,6 +150,22 @@
         "issue": "#2957",
         "added": "2026-08-22",
         "note_sample": "States 'NEXT ON THE LOOP the coaching \u2014 See what the AI team makes of it' but this appears to be navigational chrome. However, the surface shows 'N=16' voice-fidelity judgments with 11 correct on Day "
+      }
+    ],
+    "/protocols/supplements/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "'AS OF 2026-08-10' + 'carried from prep' \u2014 labeled pre-cycle framing"
+      }
+    ],
+    "/story/about/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "origin-story prose ('In early 2026 I turned that thinking on myself') \u2014 dated-narrative class"
       }
     ],
     "/story/attempts/": [
