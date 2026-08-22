@@ -980,6 +980,35 @@ def ai_qa_targets(results, max_tier=None):
     return [r for r in results if (r.get("tier") if r.get("tier") is not None else 0) <= max_tier]
 
 
+# The ONLY sanctioned non-run of a requested AI gate: a deliberate budget-tier pause
+# (ADR-125 tier 3), which already reports itself three separate ways (#1440/#1927).
+# Every other non-"ok" state means the gate was asked for and graded nothing.
+_SANCTIONED_AI_STATES = frozenset({"ok", "skipped_by_budget"})
+
+
+def requested_ai_gate_failures(gates):
+    """Which REQUESTED AI gates failed to actually run (#2938).
+
+    `gates` is an iterable of (label, requested, status_dict). Returns a list of
+    human-readable failure strings — empty when every requested gate either ran or
+    was honestly paused by budget.
+
+    Extracted from run_sweep so the decision the exit code depends on is directly
+    testable. It was previously inline and unreachable by any test, which is part of
+    why `⚠ unavailable` + exit 0 survived on the deploy path for months.
+    """
+    failures = []
+    for label, requested, status in gates:
+        if not requested:
+            continue
+        state = (status or {}).get("status")
+        if state in _SANCTIONED_AI_STATES:
+            continue
+        detail = (status or {}).get("detail") or state or "no status returned"
+        failures.append(f"{label}: {detail}")
+    return failures
+
+
 def run_sweep(
     pages=None,
     save_screenshots=False,
@@ -1190,6 +1219,42 @@ def run_sweep(
             f"a11y ledger: {total_rules} shrink candidate(s) across {len(shrink_candidates)} page(s) "
             f"— run --update-baseline and review the diff (#1990)"
         )
+    # ── #2938: a REQUESTED AI gate that graded nothing is a FAILURE, not a warning ──
+    #
+    # Until 2026-08-21 this was the shape of a green run:
+    #
+    #   ── AI-vision QA (Claude / Bedrock) — tier <= 1: 6/92 pages ──
+    #     ⚠ AI-QA unavailable — could not import bedrock_client: No module named 'boto3'
+    #   ── Reader-truth QA (phase-aware, Claude / Bedrock) ──
+    #     ⚠ AI-QA unavailable — could not import bedrock_client: No module named 'boto3'
+    #
+    # …and the job concluded SUCCESS, because the exit code read only page failures.
+    # `boto3` was never installed in ANY of the three visual-qa workflow copies, so both
+    # AI gates had been structurally dark on the deploy path while CLAUDE.md and ADR-076
+    # described them as gating since 2026-06-05. A green light wired to nothing.
+    #
+    # The missing dependency is the trigger; the DEFECT is `⚠ … unavailable` + exit 0.
+    # Installing boto3 without this would leave the same silent-pass one outage away.
+    #
+    # `skipped_by_budget` is deliberately NOT a failure — it is a designed, honest pause
+    # (ADR-125 tier 3, #1440/#1927) that already reports itself three ways. Everything
+    # else means "you asked for this gate and it graded nothing", which must not be a
+    # pass: `unavailable` (dependency/import gone) and `no_surfaces` (asked for
+    # reader-truth, captured no prose) are both blindness, not health.
+    ai_gate_failures = requested_ai_gate_failures(
+        [("AI-vision QA", ai_qa, ai_vision_status), ("Reader-truth QA", reader_truth, reader_truth_status)]
+    )
+
+    if ai_gate_failures:
+        print(f"\n{'=' * 56}")
+        for msg in ai_gate_failures:
+            print(f"❌ REQUESTED AI GATE DID NOT RUN — {msg}")
+        print("   This is a FAILURE, not a warning: the gate was asked for and graded nothing (#2938).")
+        print("   (A budget-tier pause is the ONLY sanctioned non-run, and reports separately.)")
+        if os.environ.get("GITHUB_ACTIONS"):
+            for msg in ai_gate_failures:
+                print(f"::error title=AI gate did not run::{msg}")
+
     if save_screenshots:
         print(f"Screenshots: {screenshot_dir}/")
 
@@ -1216,7 +1281,7 @@ def run_sweep(
     if summary_path:
         _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status, ai_vision_status)
 
-    return failed == 0
+    return failed == 0 and not ai_gate_failures
 
 
 if __name__ == "__main__":

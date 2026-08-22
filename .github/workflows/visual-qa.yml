@@ -88,7 +88,12 @@ jobs:
       - name: Install Playwright + Chromium
         run: |
           python -m pip install --upgrade pip
-          PINS=$(python3 scripts/ci_pins.py playwright)   # version from requirements-dev.txt (CQ-01, #2609)
+          # #2938: boto3 is LOAD-BEARING here, not incidental. visual_ai_qa imports
+          # lambdas/ai/bedrock_client, which needs it — without it BOTH --ai-qa and
+          # --reader-truth printed "⚠ unavailable" and the job still reported success,
+          # so the gates CLAUDE.md/ADR-076 call gating were structurally dark. Pinned
+          # via ci_pins.py from requirements-dev.txt (CQ-01, #2609), never a literal.
+          PINS=$(python3 scripts/ci_pins.py playwright boto3 botocore)
           python -m pip install $PINS
           python -m playwright install --with-deps chromium
 
