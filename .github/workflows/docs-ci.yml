@@ -142,3 +142,14 @@ jobs:
       - name: ADR index current
         if: always()
         run: python3 scripts/generate_adr_index.py --check
+
+      # #2975. This check used to live ONLY in CI/CD's Unit Tests, via
+      # tests/test_incident_log_patterns_2840.py. A wrap adds incident rows, touches
+      # docs/** only, and therefore triggers THIS workflow and not CI/CD — so main read
+      # green and the next unrelated push touching tests/** went red on four assertions
+      # about a doc it never touched. Every wrap adds rows by design, so the
+      # misattribution was structural. Here, a stale section reds the commit that staled
+      # it. (The pytest guard stays where it is; this is the lane fix, not a move.)
+      - name: Incident-log Patterns section current
+        if: always()
+        run: python3 scripts/incident_log_patterns.py --check
