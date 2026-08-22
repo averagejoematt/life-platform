@@ -221,9 +221,14 @@ def test_real_registry_file_is_well_formed():
             continue
         assert isinstance(entry, dict), f"{name}: entry must be an object"
         assert str(entry.get("citation", "")).strip(), f"{name}: citation must be non-empty"
+        # A citation must be checkable by something: a filed issue (`#N`), a named
+        # incident, or — since #2996 — a dated self-clearing state, which must carry
+        # the concrete ISO expiry date so "it clears on its own" cannot be a placeholder.
+        # A `#N` here is additionally required to be OPEN while its alarm is lit
+        # (cac.dead_citations); prose is exempt from that and pays for it with a date.
         assert re.search(
-            r"#\d+|closed|incident", entry["citation"], re.I
-        ), f"{name}: citation should reference an issue/incident: {entry['citation']!r}"
+            r"#\d+|\d{4}-\d{2}-\d{2}|closed|incident", entry["citation"], re.I
+        ), f"{name}: citation must reference an issue (#N), an incident, or a dated self-clearing state: {entry['citation']!r}"
 
 
 def test_real_registry_entries_all_name_a_real_alarm():
@@ -568,3 +573,143 @@ def test_fetch_alarm_history_degrades_on_any_exception(monkeypatch):
     assert items == []
     assert err is not None
     assert "credentials" in err.lower()
+
+
+# ── #2996: a citation string is not an owner — the cited issue must be OPEN ────
+#
+# The measured defect: 4 of 7 registry entries pointed at CLOSED issues and 3 of
+# those were on alarms that were lit at the time, two past the gate's own 72h
+# threshold. The gate reported a clean board over all of it, because it asked
+# whether a reference EXISTS, never whether it still means anything.
+
+
+def _lit(name, hours_old=100):
+    return _alarm(name, hours_old, datetime.now(timezone.utc))
+
+
+def test_dead_citation_on_a_lit_alarm_is_flagged():
+    alarms = [_lit("qa-smoke-failures")]
+    citations = {"qa-smoke-failures": {"citation": "#1921", "note": "..."}}
+    out = cac.dead_citations(alarms, citations, {"1921": "CLOSED"})
+    assert out == [("qa-smoke-failures", "#1921")]
+
+
+def test_open_citation_is_not_flagged():
+    alarms = [_lit("budget-tier-sustained-7d")]
+    citations = {"budget-tier-sustained-7d": {"citation": "#2989", "note": "..."}}
+    assert cac.dead_citations(alarms, citations, {"2989": "OPEN"}) == []
+
+
+def test_unknown_issue_state_is_never_flagged():
+    """An unreadable ref is UNKNOWN. A gate that cannot measure must not claim a
+    defect any more than it may claim a clean board."""
+    alarms = [_lit("some-alarm")]
+    citations = {"some-alarm": {"citation": "#4242", "note": "..."}}
+    assert cac.dead_citations(alarms, citations, {}) == []
+    assert cac.dead_citations(alarms, citations, {"4242": None}) == []
+
+
+def test_prose_citation_without_an_issue_ref_is_not_flagged():
+    """A dated, self-clearing state (token-alarm-genesis-window-active) is honestly
+    cited in prose; filing an issue for a designed state would manufacture an owner.
+    The 14-day issueless_ancient_reds rule still forces a #N past that tenure."""
+    alarms = [_lit("token-alarm-genesis-window-active")]
+    citations = {"token-alarm-genesis-window-active": {"citation": "dated self-clearing window, expires 2026-08-24", "note": "..."}}
+    assert cac.dead_citations(alarms, citations, {}) == []
+
+
+def test_a_recovered_alarms_dead_citation_is_not_a_red():
+    """Scoped to the ALARM-state read: a stale entry on a recovered alarm is a
+    pruning chore, not a red. `alarms` empty == nothing lit."""
+    citations = {"weekly-signal-delivery-heartbeat": {"citation": "#2820", "note": "..."}}
+    assert cac.dead_citations([], citations, {"2820": "CLOSED"}) == []
+
+
+def test_multiple_refs_in_one_citation_each_checked():
+    alarms = [_lit("busy-alarm")]
+    citations = {"busy-alarm": {"citation": "#100 supersedes #200", "note": "..."}}
+    out = cac.dead_citations(alarms, citations, {"100": "OPEN", "200": "CLOSED"})
+    assert out == [("busy-alarm", "#200")]
+
+
+def test_cited_issue_refs_only_collects_lit_alarms():
+    alarms = [_lit("lit-one")]
+    citations = {
+        "lit-one": {"citation": "#111", "note": ""},
+        "recovered": {"citation": "#222", "note": ""},
+    }
+    assert cac.cited_issue_refs(alarms, citations) == ["111"]
+
+
+def test_render_dead_citation_is_a_gate_failure_and_names_the_ref():
+    code, msg = cac.render([], None, dead=[("qa-smoke-failures", "#1921")])
+    assert code == 1
+    assert "qa-smoke-failures" in msg and "#1921" in msg and "#2996" in msg
+
+
+def test_render_clean_board_states_the_dead_citation_check_ran():
+    """A green that does not say the check ran is indistinguishable from a check
+    that was never wired — the failure mode this whole script exists to prevent."""
+    code, msg = cac.render([], None)
+    assert code == 0
+    assert "#2996" in msg
+
+
+def test_render_issue_read_failure_degrades_honestly_not_a_false_clean():
+    code, msg = cac.render([], None, issue_error="gh: command not found")
+    assert code == 0
+    assert "UNVERIFIED" in msg and "#2996" in msg
+
+
+def test_fetch_issue_states_degrades_when_gh_is_missing(monkeypatch):
+    import subprocess as _sp
+
+    def _boom(*_a, **_k):
+        raise FileNotFoundError("gh")
+
+    monkeypatch.setattr(_sp, "run", _boom)
+    states, err = cac.fetch_issue_states(["123"])
+    assert states == {} and err is not None
+
+
+def test_fetch_issue_states_skips_a_single_unreadable_ref(monkeypatch):
+    """One bad ref must not blind the whole check — it becomes UNKNOWN alone."""
+    import subprocess as _sp
+
+    class _R:
+        def __init__(self, rc, out):
+            self.returncode, self.stdout, self.stderr = rc, out, ""
+
+    calls = {"n": 0}
+
+    def _run(cmd, **_k):
+        calls["n"] += 1
+        return _R(1, "") if "999" in cmd else _R(0, "OPEN\n")
+
+    monkeypatch.setattr(_sp, "run", _run)
+    states, err = cac.fetch_issue_states(["999", "123"])
+    assert err is None
+    assert states == {"123": "OPEN"}
+
+
+def test_main_flags_a_dead_citation_end_to_end(monkeypatch, capsys):
+    """The wiring proof: dead_citations reaching a nonzero exit through main()."""
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: ([_lit("qa-smoke-failures")], None))
+    monkeypatch.setattr(cac, "load_citations", lambda: {"qa-smoke-failures": {"citation": "#1921", "note": "x"}})
+    monkeypatch.setattr(cac, "fetch_alarm_history", lambda window_hours=cac.FLAP_WINDOW_HOURS: ([], None))
+    monkeypatch.setattr(cac, "fetch_issue_states", lambda refs: ({"1921": "CLOSED"}, None))
+    monkeypatch.setattr(cac, "uncited_long_reds", lambda *a, **k: [])
+    monkeypatch.setattr(cac, "issueless_ancient_reds", lambda *a, **k: [])
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 1
+    assert "#1921 is closed" in capsys.readouterr().out
+
+
+def test_the_live_registry_has_no_dead_citation_on_a_lit_alarm():
+    """The baseline this shipped with (#2996). Not a live-AWS test: it asserts the
+    committed registry has no entry citing an issue this repo knows is closed, using
+    the same pure function, so a future edit that re-points at a closed issue is
+    caught by the offline suite too."""
+    data = cac.load_citations()
+    refs = sorted({r for e in data.values() if isinstance(e, dict) for r in re.findall(r"#(\d+)", str(e.get("citation", "")))})
+    assert refs, "no issue refs in the registry — the scan is vacuous, not clean"

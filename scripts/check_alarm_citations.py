@@ -28,6 +28,29 @@ THE FIX
   separate reminder (docs/SECRETS_ROTATION.md "Monitoring" +
   remediation/agent.py's stale_secret_escalations) — one owner per signal type.
 
+A CITATION STRING IS NOT AN OWNER (#2996)
+  The two checks above ask whether a reference EXISTS. Neither asks whether it still
+  means anything, so a citation outlives the issue it points at. Measured 2026-08-22:
+  4 of 7 registry entries cited CLOSED issues and 3 of those were on alarms lit at
+  that moment, two of them past the 72h threshold — the gate had reported a clean
+  board over all of it. Two were not merely dead but semantically wrong:
+  `qa-smoke-failures` cited #1921 (an August 1st decision about oracle partitioning)
+  while its live cause was `recall:corpus_freshness`, owned by the then-open #2977.
+  The right owner existed and the registry pointed elsewhere.
+
+  So this gate ALSO reads `gh issue view` for every CURRENTLY-LIT alarm's citation
+  and fails on a `#N` that is not OPEN. Deliberately narrow so it cannot manufacture
+  a red: a citation with no `#N` is exempt (a dated, self-clearing state is honestly
+  cited in prose — and `test_real_registry_file_is_well_formed` makes that prose
+  carry a concrete ISO expiry date, while `issueless_ancient_reds` still forces a
+  `#N` past 14 days), an unreadable issue is UNKNOWN rather than dead, and a stale
+  entry on a RECOVERED alarm is a pruning chore, not a red. Degrades honestly when
+  `gh` is unavailable, exactly like the two AWS reads.
+
+  PRUNE RULE, as corrected while shipping this: remove a recovered alarm's entry once
+  it has been OK for longer than the flap window (72h), not the moment it clears —
+  pruning on recovery alone trades a stale entry for a #2912 flap-gate red.
+
 FLAP VISIBILITY (#2912)
   Current-state duration is structurally blind to an alarm that fires and clears
   between wraps: `describe_alarms(StateValue="ALARM")` never returns it, so a real,
@@ -225,6 +248,83 @@ def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS
     return out
 
 
+def cited_issue_refs(alarms, citations):
+    """The issue numbers cited by alarms that are CURRENTLY lit, as strings.
+
+    Scoped to `alarms` (which is the ALARM-state read) rather than the whole
+    registry: a stale entry on a recovered alarm is a pruning chore, not a red.
+    """
+    import re
+
+    refs = set()
+    for a in alarms:
+        entry = citations.get(a.get("name") or "?") or {}
+        refs.update(re.findall(r"#(\d+)", str(entry.get("citation", ""))))
+    return sorted(refs)
+
+
+def dead_citations(alarms, citations, issue_states):
+    """(alarm_name, "#N") for every CURRENTLY-lit alarm whose citation names an
+    issue that is not OPEN — the #2996 class.
+
+    The #1959 gate asserts a citation *string* exists and, past
+    ALARM_TENURE_ISSUE_DAYS, that it contains a `#N`. Neither asks whether that
+    issue is still open, so a citation outlives the issue it points at and the
+    board reads green while nobody owns the red. Measured 2026-08-22: 4 of 7
+    entries cited closed issues, 3 of them on alarms that were lit at the time.
+
+    Deliberately narrow in two ways, so it cannot manufacture a red:
+      * a citation with NO `#N` is not flagged — a dated, self-clearing window is
+        honestly cited in prose, and `issueless_ancient_reds` already forces a
+        `#N` past 14 days;
+      * an issue whose state could not be read (absent from `issue_states`, or
+        None) is UNKNOWN, never dead.
+
+    Pure and deterministic — `issue_states` is injected, so the regression test
+    drives it with synthetic input exactly like the sibling checks.
+    """
+    import re
+
+    out = []
+    for a in alarms:
+        name = a.get("name") or "?"
+        entry = citations.get(name) or {}
+        for num in re.findall(r"#(\d+)", str(entry.get("citation", ""))):
+            state = issue_states.get(num)
+            if state is not None and str(state).upper() != "OPEN":
+                out.append((name, f"#{num}"))
+    return out
+
+
+def fetch_issue_states(refs):
+    """Live `gh issue view N --json state` per ref — read-only. Returns
+    (states, error) in the same degrade-honestly shape as fetch_alarms(): on any
+    failure `states` is {} and `error` is a human string, and the caller must
+    report the dead-citation check UNVERIFIED rather than clean. A single ref that
+    cannot be read is simply absent from the map (UNKNOWN, never dead)."""
+    import subprocess
+
+    if not refs:
+        return {}, None
+    states = {}
+    for num in refs:
+        try:
+            proc = subprocess.run(
+                ["gh", "issue", "view", str(num), "--json", "state", "-q", ".state"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as e:  # gh missing, not on PATH, timeout
+            return {}, str(e)
+        if proc.returncode != 0:
+            continue  # unreadable single ref -> UNKNOWN, not dead
+        value = proc.stdout.strip()
+        if value:
+            states[str(num)] = value
+    return states, None
+
+
 def fetch_alarms():
     """Live `describe_alarms(StateValue="ALARM")` read — read-only, no writes, no
     alarm mutation. Returns (alarms, error): `error` is a human string when AWS is
@@ -283,7 +383,7 @@ def fetch_alarm_history(window_hours=FLAP_WINDOW_HOURS):
     return items, None
 
 
-def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=None):
+def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=None, dead=(), issue_error=None):
     """(exit_code, message) for a computed result. Pure — unit-tested offline."""
     if unreachable_error is not None:
         return 0, (
@@ -291,17 +391,24 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
             "alarm citations UNVERIFIED this run. Note that explicitly in the handover "
             "(`**Alarms:** unverified — AWS unreachable`) rather than claiming a clean board."
         )
-    if not uncited and not ancient and not flapped:
+    if not uncited and not ancient and not flapped and not dead:
         message = (
             "✅ every alarm in ALARM state >72h cites an incident row or issue, and every one "
             f"red >{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old. "
-            f"No uncited fired-and-cleared episodes in the last {FLAP_WINDOW_HOURS}h (#2912)."
+            f"No uncited fired-and-cleared episodes in the last {FLAP_WINDOW_HOURS}h (#2912). "
+            "Every lit alarm's cited `#N` is OPEN (#2996)."
         )
         if history_error is not None:
             message += (
                 f"\n⚠️  BUT the alarm-history read failed ({history_error}) — the fired-and-cleared "
                 "check is UNVERIFIED this run. Note that explicitly in the handover "
                 "(`**Alarms:** flap check unverified — history unreachable`) rather than claiming it clean."
+            )
+        if issue_error is not None:
+            message += (
+                f"\n⚠️  BUT the cited-issue state read failed ({issue_error}) — the dead-citation "
+                "check (#2996) is UNVERIFIED this run. Note that explicitly in the handover rather "
+                "than claiming every citation still has an owner."
             )
         return 0, message
     lines = []
@@ -338,10 +445,24 @@ def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=Non
             "A failure that flaps between wraps still gets answered: add a docs/alarm_citations.json entry "
             "explaining the episode, or write it explicitly into the handover and re-run with --decoded."
         )
+    if dead:
+        lines.append(f"❌ {len(dead)} lit alarm(s) whose citation points at a CLOSED issue (#2996) — a citation " "string is not an owner:")
+        for name, ref in sorted(dead):
+            lines.append(f"   - {name}  → {ref} is closed")
+        lines.append(
+            "   Re-point the entry at the issue that actually owns the live cause, file one if none exists, "
+            "or — if the alarm is correct on a dated, self-clearing state — replace the `#N` with prose "
+            "naming the window and its expiry."
+        )
     if history_error is not None:
         lines.append(
             f"⚠️  Alarm-history read failed ({history_error}) — the fired-and-cleared check is UNVERIFIED "
             "this run; note that explicitly in the handover rather than claiming it clean."
+        )
+    if issue_error is not None:
+        lines.append(
+            f"⚠️  Cited-issue state read failed ({issue_error}) — the dead-citation check (#2996) is "
+            "UNVERIFIED this run; note that explicitly rather than claiming every citation has an owner."
         )
     return 1, "\n".join(lines)
 
@@ -354,10 +475,13 @@ def main():
     ancient = [] if err else issueless_ancient_reds(alarms, citations)
     if err:
         history, history_err, flapped = [], None, []  # whole board already UNVERIFIED
+        issue_err, dead = None, []
     else:
         history, history_err = fetch_alarm_history()
         flapped = [] if history_err else flapped_uncited(history, citations)
-    code, message = render(uncited, err, ancient=ancient, flapped=flapped, history_error=history_err)
+        issue_states, issue_err = fetch_issue_states(cited_issue_refs(alarms, citations))
+        dead = [] if issue_err else dead_citations(alarms, citations, issue_states)
+    code, message = render(uncited, err, ancient=ancient, flapped=flapped, history_error=history_err, dead=dead, issue_error=issue_err)
     print(message)
     if code == 0:
         return 0
