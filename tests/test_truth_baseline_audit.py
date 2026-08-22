@@ -101,13 +101,97 @@ class TestUpdatePath(unittest.TestCase):
     def test_clean_page_is_removed(self):
         p = self._tmp()
         tba.update_baseline({"/x/": [_finding(page="/x/")]}, path=p)
-        tba.update_baseline({"/x/": []}, path=p)
+        report = tba.update_baseline({"/x/": []}, path=p)
         self.assertNotIn("/x/", tba.load_baseline(p)["pages"])
+        # A drop is never self-evidently a fix — the fail-soft oracle (#2973)
+        # makes an errored page look exactly like a clean one, so say it.
+        self.assertEqual(report["dropped"], ["/x/ [temporal_contradiction]"])
+        self.assertIn("dropped 1 entry", " ".join(tba.update_summary(report)))
 
-    def test_only_gating_severities_written(self):
+
+class TestSeverityFreeWritePath(unittest.TestCase):
+    """#2981 — the write path records a pair at ANY severity; only READ gates."""
+
+    def _tmp(self):
+        import tempfile
+
+        return os.path.join(tempfile.mkdtemp(), "truth_baseline.json")
+
+    def test_sub_gating_severity_is_recorded(self):
+        p = self._tmp()
+        report = tba.update_baseline({"/x/": [_finding(page="/x/", severity="med")]}, path=p)
+        base = tba.load_baseline(p)
+        self.assertIn("/x/", base["pages"], "a med finding on an unbaselined page must still be recorded (#2981)")
+        self.assertEqual(base["pages"]["/x/"][0]["severity_observed"], "med")
+        self.assertEqual(report["added"], ["/x/ [temporal_contradiction]"])
+        self.assertTrue(report["changed"])
+
+    def test_recording_at_med_pre_authorizes_the_high_grade(self):
+        """The whole point: the same pair graded high on a later run must NOT gate.
+
+        This is the #2981 loop with no exit — baseline it while the oracle says
+        med, and the next high grade still failed the deploy.
+        """
         p = self._tmp()
         tba.update_baseline({"/x/": [_finding(page="/x/", severity="med")]}, path=p)
-        self.assertNotIn("/x/", tba.load_baseline(p)["pages"])
+        base = tba.load_baseline(p)
+        base["pages"]["/x/"][0]["issue"] = "#2972"
+        with open(p, "w") as f:
+            json.dump(base, f)
+        self.assertEqual(tba.gate_finding(_finding(page="/x/", severity="high"), tba.load_baseline(p)), "baselined")
+
+    def test_highest_observed_severity_wins_per_pair(self):
+        p = self._tmp()
+        tba.update_baseline(
+            {"/x/": [_finding(page="/x/", severity="low", note="a"), _finding(page="/x/", severity="high", note="b")]},
+            path=p,
+        )
+        row = tba.load_baseline(p)["pages"]["/x/"][0]
+        self.assertEqual(row["severity_observed"], "high")
+        self.assertEqual(row["note_sample"], "b")
+
+    def test_gating_is_unchanged_at_read_time(self):
+        """A recorded sub-gating pair must not make med/low findings gate."""
+        base = _baseline({"/x/": [{"category": "temporal_contradiction", "issue": "#1", "severity_observed": "med"}]})
+        self.assertEqual(tba.gate_finding(_finding(page="/x/", severity="med"), base), "advisory")
+        self.assertEqual(tba.gate_finding(_finding(page="/x/", severity="high"), base), "baselined")
+
+
+class TestUpdateIsNeverABareSuccessLine(unittest.TestCase):
+    """#2981 — 'truth baseline rewritten' printed over a no-op cost a deploy plane."""
+
+    def _tmp(self):
+        import tempfile
+
+        return os.path.join(tempfile.mkdtemp(), "truth_baseline.json")
+
+    def test_a_no_op_run_says_nothing_was_recorded(self):
+        p = self._tmp()
+        tba.update_baseline({"/x/": [_finding(page="/x/")]}, path=p)
+        report = tba.update_baseline({"/x/": [_finding(page="/x/")]}, path=p)  # identical re-sweep
+        self.assertFalse(report["changed"])
+        text = " ".join(tba.update_summary(report))
+        self.assertIn("NOTHING was recorded", text)
+        self.assertNotIn("rewritten", text)
+
+    def test_an_empty_sweep_is_reported_and_writes_nothing(self):
+        p = self._tmp()
+        tba.update_baseline({"/x/": [_finding(page="/x/")]}, path=p)
+        stamp = tba.load_baseline(p)["_meta"]["captured_at"]
+        report = tba.update_baseline({}, path=p)
+        self.assertIn("NOT updated", " ".join(tba.update_summary(report)))
+        self.assertEqual(tba.load_baseline(p)["_meta"]["captured_at"], stamp, "a 0-page sweep must not restamp captured_at")
+
+    def test_untriaged_entries_are_named_in_the_summary(self):
+        p = self._tmp()
+        report = tba.update_baseline({"/x/": [_finding(page="/x/")]}, path=p)
+        self.assertIn("UNTRIAGED", " ".join(tba.update_summary(report)))
+
+    def test_the_caller_renders_the_report_rather_than_its_own_success_line(self):
+        """visual_qa.py must print update_summary's lines, not a literal of its own."""
+        src = open(os.path.join(os.path.dirname(__file__), "visual_qa.py"), encoding="utf-8").read()
+        self.assertIn("truth_baseline_audit.update_summary(report)", src)
+        self.assertNotIn("truth baseline rewritten", src)
 
 
 class TestCommittedFileIsTriaged(unittest.TestCase):
