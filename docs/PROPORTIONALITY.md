@@ -1,6 +1,6 @@
 # The Proportionality Ledger — does this complexity earn its keep?
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-21
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-22
 
 > **The maintained home of the complexity-posture ledger** (ADR-103 established it;
 > ADR-144 made it legible and moved it here). Consult BEFORE adding or removing
@@ -79,6 +79,10 @@ standing subsystem names what it costs, what it earns, and what would demote it.
 | Social membrane inbound (youtube RSS ingestion, #1668) | Portfolio | surface (small) | Keyless by design; retire if no captures used by a public surface in 90 days |
 | /legacy preserved v3 site | Portfolio (archive) | none | Zero maintenance; retire only if storage/privacy cost appears |
 | State of Mind subsystem (HAE How-We-Feel) | Kept (load-bearing-pending-data) | mind | ADR-121: habit restart chosen over prune; flips to retire if habit not resumed by 2026-Q4 review |
+| Reader-truth debt ledger (`tests/truth_baseline.json`, #2956) | **Load-bearing (small)** | one triaged entry per standing finding; an UNTRIAGED entry reds the unit suite | It is the only thing separating "this deploy broke truth" from "the site carries truth debt" — without it the armed gate rolled back 3 healthy deploys. **Demote when** the ledger reaches zero entries and stays there for a month: at that point the gate can go back to bare. |
+| Chronicle / Weekly-Signal delivery dead-men (#2820) | Load-bearing (small) | 2 alarms + one metric emission per send | The subscriber promise is a *promise*; a silent no-send was previously invisible on every channel. **Demote when** delivery moves to a platform that reports its own failures. |
+| Alarm flap detector in the wrap citation gate (#2912) | Load-bearing (small) | one `describe-alarm-history` read per wrap | Caught 3 invisible fired-and-cleared episodes on its first live run. **Demote when** alarm periods stop producing sliding-window flap (i.e. the Period=86400 alarms are re-cut). |
+| Producer↔gate cron mirror check (#2818) | Load-bearing (small) | one AST diff per `cdk/**`/`lambdas/**` PR | A moved cron silently drifted the QA window for a full winter. **Demote when** QA windows are read from the schedule at runtime rather than mirrored. |
 | chronicle-podcast season-1 lambda (unscheduled zombie) | **Retire-candidate** | surface | Delete after one further back-catalogue re-render window (2026-Q3 review) |
 
 ## Retired (the prunes are the proof)
