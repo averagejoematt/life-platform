@@ -28,15 +28,29 @@ THE FIX
   separate reminder (docs/SECRETS_ROTATION.md "Monitoring" +
   remediation/agent.py's stale_secret_escalations) — one owner per signal type.
 
+FLAP VISIBILITY (#2912)
+  Current-state duration is structurally blind to an alarm that fires and clears
+  between wraps: `describe_alarms(StateValue="ALARM")` never returns it, so a real,
+  recurring, once-a-day failure could fire and clear every night indefinitely and
+  never once be surfaced at a wrap. Measured live 2026-08-20: qa-smoke-warnings
+  oscillated OK->ALARM 28 times in ~2.5h off ONE planted datapoint (each ALARM
+  standing 1-3 min), then held — every episode invisible to the >72h path. So this
+  gate ALSO reads `describe_alarm_history` (read-only) over the same 72h window and
+  flags every alarm with an ALARM episode that ENDED inside the window
+  (old ALARM -> new not-ALARM) but no citation entry. A transition count is the
+  honest signal; current-state duration is not (ADR-104).
+
 DEGRADE HONESTLY
   If CloudWatch can't be reached (no creds, offline, throttled) this prints a clear
   UNVERIFIED notice and exits 0 — a gate that can't measure anything must not claim
   a clean board (mirrors the gh-unavailable fail-open shape in check_backlog_hygiene.py
   ). The handover should still say so rather than silently
-  skipping the line.
+  skipping the line. The same shape applies independently to the alarm-HISTORY read:
+  if only that call fails, the current-state checks still gate and the flap check is
+  explicitly reported UNVERIFIED rather than silently skipped.
 
 USAGE
-  python3 scripts/check_alarm_citations.py             # gate: uncited long-red -> exit 1
+  python3 scripts/check_alarm_citations.py             # gate: uncited long-red or fired-and-cleared -> exit 1
   python3 scripts/check_alarm_citations.py --decoded    # operator named the shortfall; exit 0
 """
 
@@ -64,6 +78,18 @@ ALARM_AGE_CITATION_HOURS = 72
 # sufficing here: qa-smoke-warnings sat structurally red 21+ days with a tidy
 # citation the whole time, which is exactly how a red board normalizes.
 ALARM_TENURE_ISSUE_DAYS = 14
+
+# #2912: the fired-and-cleared lookback shares the citation gate's 72h window on
+# purpose — one constant story: an ALARM episode is answerable at the first wrap
+# within 72h of it, whether the alarm is still red (current-state path) or already
+# cleared (history path). Wraps run far more often than every 72h, so no episode
+# can slip between the two.
+FLAP_WINDOW_HOURS = ALARM_AGE_CITATION_HOURS
+
+# Bounded pagination for describe_alarm_history — 20 pages x 100 records is far
+# beyond any observed 72h board (the worst measured storm was 56 items), and a
+# bound means a pathological history can never hang the wrap.
+_HISTORY_MAX_PAGES = 20
 
 _ISSUE_REF = r"#\d+"
 
@@ -146,6 +172,59 @@ def issueless_ancient_reds(alarms, citations, now=None, threshold_days=ALARM_TEN
     return out
 
 
+def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS):
+    """(alarm_name, fired_count, cleared_count) for every alarm with an ALARM
+    episode that both STARTED (a transition INTO ALARM) and ENDED (a transition
+    FROM ALARM to any other state) within the window, and no entry in `citations`.
+
+    #2912: `describe_alarms(StateValue="ALARM")` is blind to these by construction
+    (the alarm is no longer in ALARM when the wrap looks), so a QA failure that
+    fires and clears between wraps was never forced to be answered. The condition
+    deliberately also catches an alarm that is *currently* red but young: its
+    earlier fired-and-cleared episodes in the window are still surfaced instead of
+    hiding behind a <72h current state (the 08-20 storm shape: 35 cleared episodes,
+    then a final still-open one).
+
+    Requiring BOTH a fire and a clear in-window is deliberate: a clear-only entry
+    is the recovery of a red that predates the window — visible to prior wraps via
+    current state, and whose registry entry is correctly PRUNED on recovery
+    (the #2917 lifecycle). Flagging recoveries would demand the entry back the
+    moment it is rightly removed — a re-cite treadmill that trains reflexive
+    --decoded. Cross-wrap coverage holds anyway: wraps run far more often than the
+    72h window, so any episode's fire lands inside some wrap's window.
+
+    `history` items are dicts with `name`, `timestamp` (ISO), `old`, `new` state
+    values, as returned by fetch_alarm_history(). Pure and deterministic — no I/O —
+    exercised directly by the regression test with a planted fired-then-cleared
+    history (the #2912 planted-proof requirement).
+    """
+    now = now or datetime.now(timezone.utc)
+    fired = {}
+    cleared = {}
+    for item in history:
+        dt = _parse_ts(item.get("timestamp"))
+        if dt is None:
+            continue  # an unparseable stamp must never manufacture a flag
+        age_hours = (now - dt).total_seconds() / 3600.0
+        if age_hours > window_hours or age_hours < 0:
+            continue
+        name = item.get("name") or "?"
+        if item.get("new") == "ALARM":
+            fired[name] = fired.get(name, 0) + 1
+        elif item.get("old") == "ALARM":
+            cleared[name] = cleared.get(name, 0) + 1
+    out = []
+    for name in sorted(set(fired) | set(cleared)):
+        if fired.get(name, 0) < 1:
+            continue  # clear-only: recovery of a pre-window red — see docstring
+        if cleared.get(name, 0) < 1:
+            continue  # episode still open -> the current-state paths above own it
+        entry = citations.get(name)
+        if not entry or not str(entry.get("citation", "")).strip():
+            out.append((name, fired.get(name, 0), cleared.get(name, 0)))
+    return out
+
+
 def fetch_alarms():
     """Live `describe_alarms(StateValue="ALARM")` read — read-only, no writes, no
     alarm mutation. Returns (alarms, error): `error` is a human string when AWS is
@@ -163,7 +242,48 @@ def fetch_alarms():
     return alarms, None
 
 
-def render(uncited, unreachable_error, ancient=()):
+def fetch_alarm_history(window_hours=FLAP_WINDOW_HOURS):
+    """Live `describe_alarm_history(HistoryItemType="StateUpdate")` over the flap
+    window — read-only, no writes, no alarm mutation. Returns (items, error) in the
+    same degrade-honestly shape as fetch_alarms(): on any AWS failure `items` is []
+    and `error` is a human string — callers must report the flap check UNVERIFIED,
+    never as a clean history."""
+    from datetime import timedelta
+
+    try:
+        import boto3
+
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        start = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+        items = []
+        token = None
+        for _ in range(_HISTORY_MAX_PAGES):
+            kwargs = {"HistoryItemType": "StateUpdate", "StartDate": start, "MaxRecords": 100}
+            if token:
+                kwargs["NextToken"] = token
+            resp = cw.describe_alarm_history(**kwargs)
+            for it in resp.get("AlarmHistoryItems", []):
+                try:
+                    data = json.loads(it.get("HistoryData") or "{}")
+                except (json.JSONDecodeError, TypeError):
+                    data = {}
+                items.append(
+                    {
+                        "name": it.get("AlarmName", "?"),
+                        "timestamp": str(it.get("Timestamp", "")),
+                        "old": (data.get("oldState") or {}).get("stateValue", ""),
+                        "new": (data.get("newState") or {}).get("stateValue", ""),
+                    }
+                )
+            token = resp.get("NextToken")
+            if not token:
+                break
+    except Exception as e:  # noqa: BLE001 — any AWS/boto3 failure must degrade, not crash
+        return [], str(e)
+    return items, None
+
+
+def render(uncited, unreachable_error, ancient=(), flapped=(), history_error=None):
     """(exit_code, message) for a computed result. Pure — unit-tested offline."""
     if unreachable_error is not None:
         return 0, (
@@ -171,11 +291,19 @@ def render(uncited, unreachable_error, ancient=()):
             "alarm citations UNVERIFIED this run. Note that explicitly in the handover "
             "(`**Alarms:** unverified — AWS unreachable`) rather than claiming a clean board."
         )
-    if not uncited and not ancient:
-        return 0, (
+    if not uncited and not ancient and not flapped:
+        message = (
             "✅ every alarm in ALARM state >72h cites an incident row or issue, and every one "
-            f"red >{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old."
+            f"red >{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old. "
+            f"No uncited fired-and-cleared episodes in the last {FLAP_WINDOW_HOURS}h (#2912)."
         )
+        if history_error is not None:
+            message += (
+                f"\n⚠️  BUT the alarm-history read failed ({history_error}) — the fired-and-cleared "
+                "check is UNVERIFIED this run. Note that explicitly in the handover "
+                "(`**Alarms:** flap check unverified — history unreachable`) rather than claiming it clean."
+            )
+        return 0, message
     lines = []
     if uncited:
         lines.append(f"❌ {len(uncited)} alarm(s) in ALARM >72h with no citation in {CITATIONS_PATH.relative_to(ROOT)}:")
@@ -198,6 +326,23 @@ def render(uncited, unreachable_error, ancient=()):
             "docs/alarm_citations.json citation. Prose/incident-row citations stop counting at this tenure — "
             "that is how qa-smoke-warnings stayed structurally red 21+ days behind a tidy citation."
         )
+    if flapped:
+        lines.append(
+            f"❌ {len(flapped)} alarm(s) FIRED AND CLEARED within the last {FLAP_WINDOW_HOURS}h with no citation "
+            f"in {CITATIONS_PATH.relative_to(ROOT)} (#2912) — invisible to current-state duration by construction:"
+        )
+        for name, fired_n, cleared_n in sorted(flapped):
+            lines.append(f"   - {name}  (entered ALARM x{fired_n}, cleared x{cleared_n} in the window)")
+        lines.append(
+            "   A transition count is the honest signal; current-state duration is not (ADR-104). "
+            "A failure that flaps between wraps still gets answered: add a docs/alarm_citations.json entry "
+            "explaining the episode, or write it explicitly into the handover and re-run with --decoded."
+        )
+    if history_error is not None:
+        lines.append(
+            f"⚠️  Alarm-history read failed ({history_error}) — the fired-and-cleared check is UNVERIFIED "
+            "this run; note that explicitly in the handover rather than claiming it clean."
+        )
     return 1, "\n".join(lines)
 
 
@@ -207,7 +352,12 @@ def main():
     citations = load_citations()
     uncited = [] if err else uncited_long_reds(alarms, citations)
     ancient = [] if err else issueless_ancient_reds(alarms, citations)
-    code, message = render(uncited, err, ancient=ancient)
+    if err:
+        history, history_err, flapped = [], None, []  # whole board already UNVERIFIED
+    else:
+        history, history_err = fetch_alarm_history()
+        flapped = [] if history_err else flapped_uncited(history, citations)
+    code, message = render(uncited, err, ancient=ancient, flapped=flapped, history_error=history_err)
     print(message)
     if code == 0:
         return 0

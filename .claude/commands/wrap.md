@@ -391,7 +391,14 @@ incident row in the session ledger; a new red could hide among the chronic ones.
   (#2378): any alarm in ALARM >14 days is a MANDATORY issue-or-fix — its citation
   must reference a filed issue (`#N`), or the gate red-flags it; a prose/incident-row
   citation line stops counting at that tenure (qa-smoke-warnings sat structurally red
-  21+ days behind a tidy citation).**
+  21+ days behind a tidy citation).** **Flap visibility (#2912): the gate also reads
+  `describe-alarm-history` (read-only) over the same 72h window and flags every alarm
+  whose ALARM episode both fired and cleared inside it — such an episode never appears
+  in `describe_alarms(StateValue="ALARM")`, so current-state duration is structurally
+  blind to it (measured: 35 OK→ALARM cycles with 1–3 min dwells off one planted
+  datapoint). A transition count is the honest signal (ADR-104); a flagged flap needs a
+  registry entry or an explicit named handover line + `--decoded`, same as a standing
+  red.**
 - If a printed alarm is a genuine gap: add a `docs/alarm_citations.json` entry (file
   the issue first if none exists yet, ADR-099 shape) — or, if it's not really
   actionable this session, write the shortfall explicitly into the handover and
@@ -528,7 +535,10 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
   Step (e10): `scripts/check_alarm_citations.py` must exit 0 (clean or `--decoded`)
   before the wrap commit; an alarm printed uncited gets a `docs/alarm_citations.json`
   entry or an explicit named line in the handover — never left both unfixed and
-  unacknowledged.
+  unacknowledged. Since #2912 the same step also names every alarm that FIRED AND
+  CLEARED within the last 72h (read from alarm history — a flap between wraps never
+  appears in current state); a flagged flap is answered the same way, never waved
+  through because the board "looks green now".
 - **A `::warning::` on green main gets triaged, or the wrap names it, never silence
   (#1966).** Step (e11): `scripts/check_ci_warnings.py` must exit 0 (clean or
   `--decoded`) before the wrap commit; a warning printed untriaged gets an issue or an
