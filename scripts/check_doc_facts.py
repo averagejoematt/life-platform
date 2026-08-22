@@ -577,6 +577,81 @@ def _cron_hits(files, cdk_map: dict) -> list[str]:
     return hits
 
 
+# ── #2818: producer-cron mirror literals (lambdas/ vs cdk/stacks/) ────────────
+# The #1205 rule above polices crons quoted in DOCS. #2818 is the same drift class in
+# CODE: a QA/operational module that derives a window expectation from a producer's
+# schedule ("which day may this artifact honestly carry at this hour") necessarily
+# carries a copy of that producer's cron — the Lambda bundle cannot read cdk/ at
+# runtime. #2670's fix hand-typed the derived cutoff (10:30 PT) with the cron in a
+# comment, and nothing asserted the literal pair compute_stack.py ↔
+# qa_check_outputs.py agreed — 16:40Z is 08:40 PST in winter: safe the day it was
+# written, unguarded from then on.
+#
+# The convention this rule enforces: the mirroring module declares the cron ONCE in a
+# module-level dict named `PRODUCER_CRON_MIRRORS` ({function_name: "cron(...)"}) and
+# derives its windows from that entry. This rule sweeps ALL of lambdas/ for such
+# declarations (the SET — any future producer-gate pair joins by using the same name,
+# never by being enumerated here) and diffs every entry against the function's real
+# schedule(s) in the CDK — ground truth is `generate_platform_model.extract_lambdas()`
+# (#2845), the same AST walk as the #1205 rule, never an aws_cdk import.
+#
+# PRECISION: only a dict literal assigned (Assign OR AnnAssign — the #1677 blind-walk
+# lesson) to exactly that name is read, and only str->str entries are compared; a
+# function absent from the CDK map is itself a hit (the producer was renamed/removed
+# or its schedule went dynamic — either way the mirror no longer describes reality).
+PRODUCER_MIRROR_NAME = "PRODUCER_CRON_MIRRORS"
+
+
+def _collect_producer_mirrors(files) -> list[tuple]:
+    """(path, lineno, function_name, cron) for every entry of every module-level
+    `PRODUCER_CRON_MIRRORS` dict in `files`. AST-read as text, never imported, so the
+    sweep can't drag in a lambda's runtime deps. Exposed so the regression test can
+    plant a drifted mirror in a scratch file and prove the rule bites (#1189)."""
+    out = []
+    for src in files:
+        try:
+            text = src.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if PRODUCER_MIRROR_NAME not in text:
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                target, value = node.targets[0].id, node.value
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                target, value = node.target.id, node.value
+            else:
+                continue
+            if target != PRODUCER_MIRROR_NAME or not isinstance(value, ast.Dict):
+                continue
+            for k, v in zip(value.keys, value.values):
+                if isinstance(k, ast.Constant) and isinstance(k.value, str) and isinstance(v, ast.Constant) and isinstance(v.value, str):
+                    out.append((src, k.lineno, k.value, v.value))
+    return out
+
+
+def _producer_mirror_hits(mirrors, cdk_map: dict) -> list[str]:
+    """Mirror entries that disagree with the function's real CDK schedule(s)."""
+    hits = []
+    for src, lineno, name, cron in mirrors:
+        try:
+            rel = src.relative_to(ROOT)
+        except ValueError:
+            rel = src  # scratch file outside the repo (the non-vacuous test)
+        if name not in cdk_map:
+            hits.append(
+                f"{rel}:{lineno}: {PRODUCER_MIRROR_NAME} names `{name}`, which has no resolvable cron in "
+                f"cdk/stacks/ — renamed, removed, or its schedule went dynamic (#2818)"
+            )
+        elif cron not in cdk_map[name]:
+            hits.append(f"{rel}:{lineno}: mirror for `{name}` claims {cron}, " f"CDK schedules {' or '.join(cdk_map[name])} (#2818)")
+    return hits
+
+
 # ── #1260: reader-facing "N data sources" scan (lambdas/web/og_*.py) ──────────
 # The OG card lambda draws share-preview PNGs quoted on 72 pages — the platform's most
 # distributed surface. og_image_lambda.py hardcoded "One man. 25 data sources." while the
@@ -1060,6 +1135,24 @@ def main():
     # cron table is the highest-stakes operational claim — it drifted 2 months stale).
     cdk_map = _cdk_cron_map()
     hits += _cron_hits(_scan_files(), cdk_map)
+
+    # #2818: schedule literals that appear in TWO files — every PRODUCER_CRON_MIRRORS
+    # entry in lambdas/ must match that function's real CDK schedule. Both floors are
+    # blindness detectors (#2578's rule: a derivation that returns [] must red, never
+    # silently pass): qa_check_outputs.py declares one mirror today, so an empty sweep
+    # means a refactor moved/renamed the declaration out from under this gate.
+    mirrors = _collect_producer_mirrors(_scan_source_files())
+    if not mirrors:
+        print(
+            f"error: found no {PRODUCER_MIRROR_NAME} declaration anywhere in lambdas/ — the #2818 mirror sweep went blind "
+            "(qa_check_outputs.py declares one; a refactor moved or renamed it without updating this gate)",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if not cdk_map:
+        print("error: could not derive the CDK cron map to verify PRODUCER_CRON_MIRRORS (#2818)", file=sys.stderr)
+        sys.exit(2)
+    hits += _producer_mirror_hits(mirrors, cdk_map)
 
     # #1254/#1347: no live doc/source/site line claims the cost-governor runs hourly —
     # generalized past #1254's 3-enumerated-file test to the whole corpus (docs +

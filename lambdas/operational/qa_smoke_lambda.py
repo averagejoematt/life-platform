@@ -1,11 +1,13 @@
 """
 qa_smoke_lambda.py — Life Platform QA Smoke Test
 
-Runs at 10:30 AM PT daily (30 min after the pipeline completes).
-Checks data freshness, score sanity, link integrity, and key output files.
-Sends a concise email report — green summary if all pass, red alert if anything fails.
+Runs daily at 18:30 UTC — 11:30 AM PDT / 10:30 AM PST (the cron is fixed UTC;
+a single hand-typed "PT" label here was the #2818 drift class), after the
+morning compute + brief pipeline completes. Checks data freshness, score
+sanity, link integrity, and key output files. Sends a concise email report —
+green summary if all pass, red alert if anything fails.
 
-Trigger: EventBridge cron(30 18 ? * * *)  (10:30 AM PT = 18:30 UTC)
+Trigger: EventBridge cron(30 18 ? * * *)
 Handler: qa_smoke_lambda.lambda_handler
 Runtime: python3.12, 256 MB, timeout 120s
 Env vars: TABLE_NAME, S3_BUCKET, EMAIL_RECIPIENT, EMAIL_SENDER

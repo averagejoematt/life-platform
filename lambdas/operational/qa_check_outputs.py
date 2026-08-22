@@ -48,17 +48,67 @@ def _two_days_ago_str():
     return (pacific_now() - timedelta(days=2)).strftime("%Y-%m-%d")
 
 
-# daily-metrics-compute cron is 16:40Z / 09:40 PT (compute_stack.py, ADR-052);
-# 10:30 PT = compute end + slack, safely before the 11:30 PT scheduled sweep.
-_COMPUTE_CUTOFF_PT_HOUR, _COMPUTE_CUTOFF_PT_MINUTE = 10, 30
+# ── #2818: the QA window DERIVES from the producer's schedule ─────────────────
+# daily-metrics-compute stamps PT-yesterday when its EventBridge cron fires
+# (cdk/stacks/compute_stack.py, ADR-052). #2670's fix hand-typed the resulting
+# cutoff as "10:30 PT" next to a comment mirroring the cron — right under PDT,
+# wrong under PST (16:40Z is 08:40 PST), and NOTHING asserted the literal pair
+# compute_stack.py ↔ this file agreed. Now the producer's cron is declared ONCE
+# below as a machine-checked mirror and the Pacific cutoff is DERIVED from it, so
+# a cron move either moves the window with it or reds CI before the merge.
+#
+# The mirror is asserted equal to the CDK's live schedule by scripts/
+# check_doc_facts.py (`_producer_mirror_hits` — Docs CI runs it on every cdk/**
+# and lambdas/** PR) and by tests/test_qa_window_derivation_2818.py (pre-merge
+# lane). Neither imports aws_cdk: both read compute_stack.py by AST through the
+# #2845 model generator (`generate_platform_model.extract_lambdas`).
+PRODUCER_CRON_MIRRORS = {
+    # producer function name -> its EventBridge cron, verbatim from cdk/stacks/.
+    "daily-metrics-compute": "cron(40 16 * * ? *)",
+}
+
+# Producer runtime + slack: the honest-D-2 window closes this many minutes after
+# the producer's cron fires. 50 preserves the pre-#2818 boundary exactly under PDT
+# (16:40Z + 50m = 17:30Z = 10:30 PDT) and keeps the cutoff before the scheduled
+# qa-smoke sweep (operational_stack.py), so that sweep still enforces D-1 strictly
+# the same day a compute genuinely breaks — the ordering is asserted from the CDK
+# truth in tests/test_qa_window_derivation_2818.py, not hand-mirrored here.
+_COMPUTE_SLACK_MINUTES = 50
 
 
-def _before_compute_window():
-    """True before 10:30 PT — the window where the dashboard honestly carries D-2 (#2670)."""
+def _cron_utc_hhmm(cron_expr: str) -> tuple[int, int]:
+    """(hour, minute) at which a fixed-UTC daily EventBridge cron fires — `cron(M H * * ? *)`.
+
+    Deliberately strict: platform crons are UTC-fixed by convention (CLAUDE.md), so a
+    non-numeric minute/hour field means the mirror no longer describes a daily
+    fixed-time producer and the derivation must fail loudly, not guess a window.
+    """
+    fields = cron_expr.strip()[len("cron(") : -1].split()
+    return int(fields[1]), int(fields[0])
+
+
+def _compute_cutoff_pt() -> datetime:
+    """Today's D-2→D-1 honesty cutoff as a Pacific datetime, derived from the mirror.
+
+    Anchors on the Pacific calendar date (pacific_now — the one #1964 frame) and
+    converts the producer's fixed-UTC fire time for that date, so the cutoff is
+    correct under both PST and PDT without either wall-clock literal appearing here.
+    """
+    from common.pacific_time import PACIFIC, pacific_now
+
+    hour, minute = _cron_utc_hhmm(PRODUCER_CRON_MIRRORS["daily-metrics-compute"])
+    ref = pacific_now().date()
+    fire_utc = datetime(ref.year, ref.month, ref.day, hour, minute, tzinfo=timezone.utc)
+    return (fire_utc + timedelta(minutes=_COMPUTE_SLACK_MINUTES)).astimezone(PACIFIC)
+
+
+def _before_compute_window() -> bool:
+    """True before the derived cutoff — the window where the dashboard honestly carries D-2 (#2670/#2818)."""
     from common.pacific_time import pacific_now
 
     now = pacific_now()
-    return (now.hour, now.minute) < (_COMPUTE_CUTOFF_PT_HOUR, _COMPUTE_CUTOFF_PT_MINUTE)
+    cutoff = _compute_cutoff_pt()
+    return (now.hour, now.minute) < (cutoff.hour, cutoff.minute)
 
 
 # ---------------------------------------------------------------------------
@@ -148,14 +198,16 @@ def check_score_sanity():
         # early) is never data loss; self-heals at the next scheduled brief.
         c.warn(f"Dashboard dated {actual_date}, ahead of expected {expected_date} — pre-start/Day-1 regen artifact, self-heals")
     elif actual_date == _two_days_ago_str() and _before_compute_window():
-        # #2670: daily-metrics-compute stamps PT-yesterday at 09:40 PT (compute
-        # stack cron 16:40Z, ADR-052). Before that lands, D-2 is the HONEST latest
-        # date — an off-schedule sweep (CI post-deploy smoke ran 08:45 PT
-        # 2026-08-16) must not read the gap as staleness and inject a FAIL that
-        # saturates qa-smoke-failures for a rolling 24h. The 11:30 PT scheduled
-        # sweep sits after the cutoff and still enforces D-1 strictly, so a
-        # genuinely broken compute is caught the same day it breaks.
-        c.ok(f"Date = {actual_date} (D-2, pre-compute morning window — compute stamps {expected_date} at 09:40 PT)")
+        # #2670: daily-metrics-compute stamps PT-yesterday when its cron fires
+        # (the PRODUCER_CRON_MIRRORS entry above — #2818 derives the window from
+        # it). Before that lands, D-2 is the HONEST latest date — an off-schedule
+        # sweep (CI post-deploy smoke ran 08:45 PT 2026-08-16) must not read the
+        # gap as staleness and inject a FAIL that saturates qa-smoke-failures for
+        # a rolling 24h. The scheduled sweep sits after the derived cutoff and
+        # still enforces D-1 strictly, so a genuinely broken compute is caught
+        # the same day it breaks.
+        _fire_pt = _compute_cutoff_pt() - timedelta(minutes=_COMPUTE_SLACK_MINUTES)
+        c.ok(f"Date = {actual_date} (D-2, pre-compute morning window — compute stamps {expected_date} at {_fire_pt.strftime('%H:%M')} PT)")
     elif actual_date:
         c.fail(f"Stale date — expected {expected_date}, got {actual_date}")
     else:
