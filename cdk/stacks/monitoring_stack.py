@@ -417,63 +417,40 @@ class MonitoringStack(Stack):
             "BudgetTier",
         )
 
-        # #1445: qa-smoke was previously silent unless a check FAILED — a green
-        # run and a dead Lambda both produced zero signal, so "the nightly
-        # data-health layer stopped running" was indistinguishable from "the
-        # site is healthy." qa_smoke_lambda.py now emits a
-        # LifePlatform/QaSmoke EMF summary (PassCount/WarnCount/FailCount/
-        # PausedCount/RunCompleted) on EVERY run, including all-green. Three
-        # alarms close the loop, all digest — matching the dispatcher's own
-        # "the daily sweep already handles routine ... QA smoke" posture
-        # (remediation_dispatcher_lambda.py), so a routine QA finding stays
+        # #1445: qa-smoke was previously silent unless a check FAILED — a green run and a dead
+        # Lambda both produced zero signal, so "the nightly data-health layer stopped running"
+        # was indistinguishable from "the site is healthy." qa_smoke_lambda.py now emits a
+        # LifePlatform/QaSmoke EMF summary (PassCount/WarnCount/FailCount/PausedCount/
+        # RunCompleted) on EVERY run, including all-green. Three alarms close the loop, all
+        # digest — matching the dispatcher's own "the daily sweep already handles routine ...
+        # QA smoke" posture (remediation_dispatcher_lambda.py), so a routine QA finding stays
         # off the urgent page while still being real, queryable signal:
-        #   qa-smoke-heartbeat   — RunCompleted absent 2 straight days (the
-        #                          Lambda stopped running / died before its
-        #                          EMF line, mirrors the REL-01 heartbeats).
-        #   qa-smoke-failures    — FailCount >= 1 (was already emailed
-        #                          directly; this also makes it a queryable
-        #                          alarm the remediation agent's
-        #                          `describe_alarms(StateValue="ALARM")`
-        #                          sweep ingests as a source, same mechanism
-        #                          every other alarm class already uses).
-        #   qa-smoke-warnings    — WarnCount >= 1: a warnings-only run was
-        #                          previously fully silent (no email, no
-        #                          alarm); now it surfaces in the next daily
-        #                          digest — visible, not a full alert.
-        #                          #1958: WarnCount is the ALARMED warn count
-        #                          only — the known-recurring timing warns
-        #                          (optional-source no-record days, cache-warm
-        #                          partial) emit as ChronicWarnCount, which is
-        #                          DELIBERATELY unalarmed (their honest daily
-        #                          floor was 4-11, which held this alarm red 15+
-        #                          consecutive nights against the >= 1
-        #                          threshold; ADR-105). #2378: chronic set
-        #                          AST-guarded in test_qa_smoke_chronic_warns. No
-        #                          ChronicWarnCount alarm; keep the 86400s
-        #                          Maximum window — load-bearing. #2670: receipt-replay's drift branch is chronic too (threshold UNCHANGED).
+        #   qa-smoke-heartbeat — RunCompleted absent 2 straight days (the Lambda stopped
+        #     running / died before its EMF line, mirrors the REL-01 heartbeats).
+        #   qa-smoke-failures  — FailCount >= 1 (was already emailed directly; this also makes
+        #     it a queryable alarm the remediation agent's describe_alarms(StateValue="ALARM")
+        #     sweep ingests as a source, same mechanism every other alarm class already uses).
+        #   qa-smoke-warnings  — WarnCount >= 1: a warnings-only run was previously fully
+        #     silent (no email, no alarm); now it surfaces in the next daily digest — visible,
+        #     not a full alert. #1958: WarnCount is the ALARMED warn count only — the known-
+        #     recurring timing warns (optional-source no-record days, cache-warm partial) emit
+        #     as ChronicWarnCount, DELIBERATELY unalarmed (their honest daily floor was 4-11,
+        #     which held this alarm red 15+ consecutive nights against the >= 1 threshold;
+        #     ADR-105). #2378: chronic set AST-guarded in test_qa_smoke_chronic_warns. No
+        #     ChronicWarnCount alarm; keep the 86400s Maximum window — load-bearing. #2670:
+        #     receipt-replay's drift branch is chronic too (threshold UNCHANGED).
         #
-        # #2912 — ALARM STATE IS NOT A RELIABLE AUDIT SURFACE for these (or any
-        # Period=86400/EvaluationPeriods=1 alarm on a sparse custom metric). An
-        # operator seeing OK may NOT conclude "no failure fired today":
-        #   (a) the alarm evaluates a SLIDING 24h window about once a minute
-        #       (history startDate == queryDate - 86400s, never midnight-
-        #       aligned), so a single breaching datapoint ages out of the
-        #       window ~24h after emission — the observed organic 24h+3min
-        #       clearances — and any breach older than that is invisible in
-        #       current state;
-        #   (b) measured live 2026-08-20 (15:34->18:03Z): for ~2.5h after a
-        #       freshly published datapoint, successive one-minute evaluations
-        #       of near-identical windows returned MUTUALLY EXCLUSIVE sample
-        #       sets — alternating [max 1.0, n=1] (the fresh point only) and
-        #       [max 0.0, n=2] (the older zeros only) — flapping the state
-        #       OK<->ALARM 35 times with 1-3 min dwells. TreatMissingData never
-        #       engaged (sampleCount >= 1 throughout); this is aggregation
-        #       inconsistency for fresh data in long-period sliding reads.
-        # The SNS action fires per transition, so notifications survive; the
-        # STATE does not carry the signal. The honest audit surface is the
-        # transition history: scripts/check_alarm_citations.py (the /wrap e10
-        # gate) reads describe-alarm-history and forces every fired-and-cleared
-        # episode in its 72h window to be cited or explicitly decoded.
+        # #2912 — ALARM STATE IS NOT A RELIABLE AUDIT SURFACE for these (or any Period=86400/
+        # EvaluationPeriods=1 alarm on a sparse custom metric); OK does NOT mean "no failure fired today":
+        # (a) it evaluates a SLIDING 24h window about once a minute (history startDate == queryDate -
+        # 86400s, never midnight-aligned), so a breaching datapoint ages out ~24h after emission (the
+        # observed organic 24h+3min clearances); (b) measured live 2026-08-20 15:34->18:03Z: for ~2.5h
+        # after a fresh datapoint, one-minute evaluations of near-identical windows returned MUTUALLY
+        # EXCLUSIVE sample sets ([max 1.0, n=1] fresh point only, alternating [max 0.0, n=2] older zeros
+        # only), flapping OK<->ALARM 35 times with 1-3 min dwells; TreatMissingData never engaged
+        # (sampleCount >= 1 throughout). SNS fires per transition so notifications survive; the STATE
+        # does not carry the signal. The honest audit surface is transition history:
+        # scripts/check_alarm_citations.py (the /wrap e10 gate) reads describe-alarm-history and forces every fired-and-cleared episode in 72h to be answered.
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",
