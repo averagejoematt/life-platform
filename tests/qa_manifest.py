@@ -59,6 +59,7 @@ Emitters (for the bash smoke script and ad-hoc use):
     python3 tests/qa_manifest.py --emit structural  # "fetch_path|name|marker" (#1429)
     python3 tests/qa_manifest.py --emit ai-screens  # screenshot slugs of ai_surface pages (#1441)
     python3 tests/qa_manifest.py --emit api_deps    # distinct union of every declared api_dep (#1586)
+    python3 tests/qa_manifest.py --emit api_sweep   # router-derived long-tail rows 'route|fetch|status' (#2652)
     python3 tests/qa_manifest.py --check            # internal consistency self-check
 
 No third-party deps. Importable by tests/* (sibling) and deploy/* scripts
@@ -1006,6 +1007,140 @@ def api_dep_endpoints():
     return sorted({d for p in MANIFEST for d in (p.get("api_deps") or [])})
 
 
+# ── #2652 box 3: the live-route sweep facet ──────────────────────────────────
+# Every /api route the router registers that no page declares as an api_dep gets
+# a GENERIC probe: status + JSON shape (scripts/api_sweep_check.py, run by the
+# smoke) and the numeric impossible-value scan (tests/accuracy_audit.py widens
+# its denominator to these rows). The route LIST derives from
+# deploy/endpoint_registry — the same AST walk sync_doc_metadata publishes the
+# endpoint count from — so a new router route auto-enters the sweep the commit
+# it lands, and hand-typing 69 entries here (the grandfathering this issue is
+# about, wearing a different hat) never happens.
+#
+# Overrides are PER-ROUTE DATA, only where the generic 200-JSON probe is wrong,
+# and each carries its written reason (the #2652 rule: swept, or a reason — no
+# third state). Two shapes:
+#   fetch    probe a different URL (prefix routes have no bare page: a naked
+#            GET on the prefix 404s, which is not coverage)
+#   expect   the status a healthy bare GET returns. Param-gated routes 400 by
+#            design — the validator's structured JSON error IS the alive
+#            signal; probing with real params would couple the sweep to data
+#            (a roster id, an experiment id, a subscriber token).
+# All expectations below were MEASURED against live 2026-08-22 before this
+# sweep was allowed to gate (the 2026-07-17 lesson: never arm an unmeasured
+# widened gate).
+_API_SWEEP_OVERRIDES = {
+    "/api/coach/": {
+        "fetch": "/api/coach/eli_marsh",
+        "expect": "200",
+        "reason": "prefix route — a bare GET on the prefix is a 404 by design; probed via the head coach's "
+        "detail route, the same representative instance the smoke's #1112 hand check pins.",
+    },
+    "/api/board_ask": {
+        "expect": "405",
+        "reason": "POST-only AI door served by site_api_ai_lambda — a DIFFERENT Lambda this router's AST walk "
+        "never parses, so the write-door derivation cannot see its methods. A GET must 405; a POST would spend "
+        "Bedrock tokens and a per-IP rate-limit slot on every sweep. The 405 probe proves routing + the method guard.",
+    },
+    "/api/changes-since": {
+        "expect": "400",
+        "reason": "param-gated (?ts= required): the validator's structured 400 is the alive signal; "
+        "a real timestamp would make the probe's response window data-dependent.",
+    },
+    "/api/coach_timeline": {
+        "expect": "400",
+        "reason": "param-gated (?coach_id= required): the validator's structured 400 is the alive signal; "
+        "a real coach_id would couple the probe to the live roster.",
+    },
+    "/api/experiment_detail": {
+        "expect": "400",
+        "reason": "param-gated (?id= required): the validator's structured 400 is the alive signal; "
+        "a real id would couple the probe to the experiment library's contents.",
+    },
+    "/api/ritual_log": {
+        "expect": "400",
+        "reason": "param-gated (?metric= from a fixed whitelist required): the validator's structured 400 "
+        "is the alive signal for the read side of the #769 evening-ritual route.",
+    },
+    "/api/social_context": {
+        "expect": "400",
+        "reason": "param-gated (?route= in {mind, training} required): the validator's structured 400 is " "the alive signal.",
+    },
+    "/api/verify_subscriber": {
+        "expect": "400",
+        "reason": "param-gated (valid ?email= + token required): the validator's structured 400 is the "
+        "alive signal; a real verification token is a secret and single-use.",
+    },
+}
+
+
+def api_sweep_records():
+    """[{route, fetch, expect, reason}] — the #2652 generic sweep tier, DERIVED.
+
+    route universe = deploy/endpoint_registry's /api walk, minus the two classes
+    already adjudicated elsewhere:
+      - POST-only write doors (scripts/qa_audit.py's derived out-of-scope class:
+        a GET is a 405 and a POST would mutate real data on every deploy sweep)
+      - manifest-declared api_deps (already swept: JSON health by the #1586
+        smoke section, numeric scan by accuracy_audit)
+
+    Raises on a prefix route without a probe override, and on a stale override
+    (its route left the router, became an api_dep, or became a write door) —
+    the structural_rows() precedent: adjudication is forced, never silent.
+    """
+    deploy_dir = os.path.join(_REPO, "deploy")
+    if deploy_dir not in sys.path:
+        sys.path.insert(0, deploy_dir)
+    import endpoint_registry  # noqa: E402
+
+    records = endpoint_registry.discover_endpoint_records()
+    deps = set(api_dep_endpoints())
+    out, missing_probe = [], []
+    for path in sorted(records):
+        if not path.startswith("/api/"):
+            continue
+        r = records[path]
+        if r.methods and set(r.methods) <= {"POST"}:
+            continue  # derived write door — carries its reason in qa_audit.OUT_OF_SCOPE_ROUTES
+        if path in deps:
+            continue  # already swept as a declared page dependency
+        ov = _API_SWEEP_OVERRIDES.get(path, {})
+        if r.is_prefix and not ov.get("fetch"):
+            missing_probe.append(path)
+            continue
+        out.append(
+            {
+                "route": path,
+                "fetch": ov.get("fetch", path),
+                "expect": ov.get("expect", "200"),
+                "reason": ov.get("reason", ""),
+            }
+        )
+    if missing_probe:
+        raise AssertionError(
+            f"prefix /api routes need a probe override in _API_SWEEP_OVERRIDES "
+            f"(#2652 — a bare GET on a prefix path 404s, which is not coverage): {missing_probe}"
+        )
+    swept_routes = {rec["route"] for rec in out}
+    stale = sorted(p for p in _API_SWEEP_OVERRIDES if p not in swept_routes)
+    if stale:
+        raise AssertionError(
+            f"stale _API_SWEEP_OVERRIDES entries — the route left the router, became a declared "
+            f"api_dep, or became a POST-only write door; remove the override (#2652): {stale}"
+        )
+    return out
+
+
+def api_sweep_rows():
+    """scripts/api_sweep_check.py — 'route|fetch_path|expected_status' per row."""
+    return [f"{r['route']}|{r['fetch']}|{r['expect']}" for r in api_sweep_records()]
+
+
+def api_sweep_routes():
+    """scripts/qa_audit.py's coverage ledger — the ROUTE names this sweep covers."""
+    return [r["route"] for r in api_sweep_records()]
+
+
 def site_files():
     """Every page-shaped file under site/ (repo truth for the completeness gate)."""
     site = os.path.join(_REPO, "site")
@@ -1074,7 +1209,9 @@ def self_check():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage", "ai-screens", "api_deps"])
+    ap.add_argument(
+        "--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage", "ai-screens", "api_deps", "api_sweep"]
+    )
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.check:
@@ -1115,6 +1252,9 @@ def main():
     elif args.emit == "api_deps":
         for d in api_dep_endpoints():
             print(d)
+    elif args.emit == "api_sweep":
+        for row in api_sweep_rows():
+            print(row)
     else:
         ap.print_help()
 

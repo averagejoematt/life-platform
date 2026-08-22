@@ -20,13 +20,15 @@ POST-only write doors, where a GET is a 405 and a POST would mutate Matthew's da
 deploy sweep. That set is derived from the router's own declared methods, never hand-listed,
 so a door that stops being POST-only re-enters the uncovered set by itself.
 
-WHAT THIS CLOSES AND WHAT IT DOES NOT. Boxes 1, 2 and 4 are done: the denominator is live,
-the audit names every uncovered route, and the check is mutation-proved below. **Box 3 — each
-of the remaining routes registered or marked out-of-scope with a reason — is not**, and
-inventing 69 reasons in one pass would be the grandfathering this issue is about wearing a
-different hat. What changes is that they are now a **named, finite, printed queue** instead of
-an invisible 82. That is the same shape #2639 takes with its non-gate residual, and for the
-same reason: an instrument's job is to hand over the list, not to assert it away.
+WHAT THIS CLOSES. Boxes 1, 2 and 4: the denominator is live, the audit names every uncovered
+route, and the check is mutation-proved below. Box 3 closed with the router-derived long-tail
+sweep (`qa_manifest.api_sweep_records()` + `scripts/api_sweep_check.py` + the widened
+`accuracy_audit` numeric denominator — see tests/test_api_sweep_2652.py): every live route is
+now swept or carries a written, derived reason, and `uncovered` must stay EMPTY. The zero is
+not grandfathering-in-reverse: the sweep rows were not hand-adjudicated en masse — the generic
+tier derives from the router, and only the 8 routes where a bare 200-JSON GET is the wrong
+expectation carry per-route overrides, each with its written reason, each measured against
+live (2026-08-22) before the sweep was allowed to gate.
 """
 
 from __future__ import annotations
@@ -82,19 +84,31 @@ def test_uncovered_routes_are_enumerated_not_merely_counted():
     assert all(r.startswith("/api/") for r in COV["uncovered"])
 
 
-def test_the_report_prints_every_uncovered_route():
-    """A count with no names is not actionable; the queue has to be readable."""
+def test_the_report_prints_every_uncovered_route(monkeypatch):
+    """A count with no names is not actionable; the queue has to be readable.
+
+    The healthy uncovered set is EMPTY since box 3 landed, so iterating it would make
+    this test vacuous (#2790's lesson) — plant a route that falls out of every sweep
+    and require the report to name it.
+    """
+    victim = COV["swept"][0]
+    orig_smoke = [p for p in qa_audit.smoke_checked_endpoints() if p != victim]
+    import qa_manifest
+
+    orig_deps = [p for p in qa_manifest.api_dep_endpoints() if p != victim]
+    monkeypatch.setattr(qa_audit, "smoke_checked_endpoints", lambda: orig_smoke)
+    monkeypatch.setattr(qa_manifest, "api_dep_endpoints", lambda: orig_deps)
     report = qa_audit.render(qa_audit.build_audit())
     assert "LIVE /api COVERAGE" in report
-    for route in COV["uncovered"][:5]:
-        assert route in report, f"{route} is counted but never named in the report"
+    assert f"UNCOVERED (no sweep, no written reason): {victim}" in report, f"{victim} fell out of every sweep and the report never named it"
 
 
-def test_the_report_says_the_residual_is_unadjudicated():
-    """Box 3 is open, and the instrument must say so rather than implying a verdict."""
+def test_the_report_says_the_zero_is_a_ratchet_not_a_verdict():
+    """Box 3 is closed; the note must now say `uncovered` is required to stay empty —
+    a name appearing there is a worked queue, not an accepted state."""
     report = qa_audit.render(qa_audit.build_audit())
-    assert "UNADJUDICATED" in report
-    assert "the queue, not a verdict" in report
+    assert "must stay EMPTY" in report
+    assert "the queue to work, not an accepted state" in report
 
 
 def test_every_route_is_in_exactly_one_bucket():
@@ -162,7 +176,16 @@ def test_an_unavailable_registry_reports_not_derived_rather_than_full_coverage(m
     assert "NOT DERIVED" in report and "no coverage claim is made" in report
 
 
-def test_the_uncovered_count_is_still_the_real_gap():
-    """A canary on the number itself — if this drops to 0, either the queue was worked or
-    the denominator broke, and those must not look the same."""
-    assert COV["uncovered_count"] > 0, "uncovered is 0 — confirm the routes were registered, not that the walk broke"
+def test_the_zero_uncovered_came_from_registration_not_a_broken_walk():
+    """This test's previous body asserted `uncovered_count > 0` with the instruction:
+    'if this drops to 0, either the queue was worked or the denominator broke, and those
+    must not look the same.' The queue WAS worked (box 3, the api_sweep long tail) — so
+    now prove the zero is the worked kind: the walk still sees the full route table and
+    the sweep facet is carrying the long tail, not an empty derivation."""
+    import qa_manifest
+
+    assert COV["uncovered_count"] == 0, f"routes fell back out of the sweeps: {COV['uncovered']}"
+    assert COV["live_routes"] > 100, "a shrunken denominator would fake a clean zero"
+    sweep = qa_manifest.api_sweep_routes()
+    assert len(sweep) > 50, f"api_sweep carries only {len(sweep)} routes — the long tail is not being swept"
+    assert set(sweep).isdisjoint(qa_manifest.api_dep_endpoints()), "the sweep double-counts declared api_deps"

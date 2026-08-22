@@ -182,6 +182,18 @@ def smoke_checked_endpoints():
     )
     if "--emit" in text and "api_deps" in text:
         checked |= set(qa_manifest.api_dep_endpoints())
+    # #2652 box 3: the router-derived long-tail sweep counts iff the smoke actually
+    # invokes it — same presence rule as the #1586 section above. A derivation failure
+    # (a prefix route without a probe, a stale override, a broken route walk) degrades
+    # to NOT-swept rather than crashing the audit: every sweep-tier route then reads
+    # UNCOVERED in the ledger below — loud in the right direction — while the ratchet
+    # itself is enforced where it can name the culprit (tests/test_api_sweep_2652.py,
+    # and the smoke section failing when the checker cannot derive its rows).
+    if "api_sweep_check.py" in text:
+        try:
+            checked |= set(qa_manifest.api_sweep_routes())
+        except Exception:  # noqa: BLE001 — degrade to uncovered, never to a dead audit
+            pass
     return sorted(checked)
 
 
@@ -241,8 +253,10 @@ def live_api_coverage():
         "note": (
             "denominator = the live site-api route table (endpoint_registry.discover_endpoint_records), "
             "NOT the manifest — a route that was never registered must still be able to read as uncovered "
-            "(#2652). Every name in `uncovered` is a route nothing sweeps; each needs a manifest entry or a "
-            "written out-of-scope reason. UNADJUDICATED until then: this list is the queue, not a verdict."
+            "(#2652). Since box 3 landed, every route is swept (a declared api_dep, a smoke hand check, or "
+            "the router-derived api_sweep long tail) or carries the derived write-door reason — `uncovered` "
+            "must stay EMPTY. A name appearing here is a route that fell out of every sweep (or a new "
+            "unadjudicated mechanism) and is the queue to work, not an accepted state."
         ),
     }
 
