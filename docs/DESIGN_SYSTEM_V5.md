@@ -583,8 +583,12 @@ violations (advisory).
 
 The triad's jobs are unchanged on mobile; only the register tightens. Data tables use `--fs-small`
 (14px) cells with `--fs-label` (11px, uppercase, tracked) headers — the **11px mono label** is the
-smallest register that ships, and only for machine-voice labels, never body copy. Door labels drop
-to `.66rem` in the app-bar (icon-over-label gives them the width to stay legible).
+smallest register that ships, and only for machine-voice labels, never body copy. App-bar door
+labels sit at `--fs-label` too (#2674 retired their `.66rem` = 10.56px drop — measured @360px the
+five doors + toggle still fit at 11px with no wrap; icon-over-label gives them the width). The
+floor is enforced in the browser: `tests/visual_qa.py` measures every rendered text node on the
+three highest-traffic pages (`/`, `/cockpit/`, `/data/`) and fails the sweep below 11px — the
+HTML-text sibling of the #1210 SVG-text audit.
 
 ### 10.6 The responsive-table primitive (#1008)
 

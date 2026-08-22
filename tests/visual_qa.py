@@ -482,6 +482,66 @@ def _svg_text_floor_findings(page, width):
         return []
 
 
+# ── HTML-text legibility floor (#2674) ────────────────────────────────────────
+# The #1210 audit sweeps `svg text` ONLY — the vitals-ring labels that shipped at
+# 8.8–9.3px were HTML <span>s (`.vr-l`/`.vr-sub`), invisible to it, and the static
+# CSS gate (check_css_tokens.py) had blessed them via free-text `fs-ok:` sanctions
+# (a sanction can bless ANY literal; nothing checked the rendered result). This is
+# the rendered-px arbiter for HTML text: every visible text node must compute
+# >= the §10.5 11px floor. Gating on the three highest-traffic pages (the #2674
+# scope, measured clean before arming — the 2026-07-17 lesson: never arm a widened
+# gate on surfaces still carrying live findings); extending a page into TEXT_FLOOR_PAGES
+# requires measuring it clean first.
+TEXT_FLOOR_PAGES = {"/", "/cockpit/", "/data/"}
+
+_HTML_TEXT_AUDIT_JS = """(floor) => {
+    const out = [];
+    const seen = new Set();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walker.nextNode())) {
+        if (!(n.textContent || '').trim()) continue;        // whitespace-only node
+        const el = n.parentElement;
+        if (!el || seen.has(el)) continue;
+        seen.add(el);
+        if (el.closest('svg')) continue;                    // #1210's audit owns svg text
+        let box; try { box = el.getBoundingClientRect(); } catch (e) { continue; }
+        if (!box || box.width < 1 || box.height < 1) continue;   // not laid out / off the tree
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        const fs = parseFloat(cs.fontSize) || 0;
+        if (fs > 0 && fs < floor - 0.05) {
+            const cls = (typeof el.className === 'string' && el.className.trim())
+                ? '.' + el.className.trim().split(/\\s+/).join('.') : '';
+            out.push({
+                sel: el.tagName.toLowerCase() + cls,
+                txt: (n.textContent || '').trim().slice(0, 24),
+                eff: Math.round(fs * 100) / 100,
+            });
+        }
+    }
+    return out;
+}"""
+
+
+def _html_text_floor_findings(page, width):
+    """Set `width`, then return every visible HTML text node whose computed
+    font-size is below the 11px floor — deduped by (selector, size)."""
+    page.set_viewport_size({"width": width, "height": 900 if width >= 1000 else 844})
+    page.wait_for_timeout(300)
+    try:
+        raw = page.evaluate(_HTML_TEXT_AUDIT_JS, SVG_TEXT_FLOOR_PX) or []
+    except Exception:
+        return []
+    agg = {}
+    for f in raw:
+        key = (f.get("sel"), f.get("eff"))
+        if key not in agg:
+            agg[key] = {**f, "n": 0}
+        agg[key]["n"] += 1
+    return sorted(agg.values(), key=lambda x: (x.get("eff") or 0, x.get("sel") or ""))
+
+
 def gha_paused_gate_annotation(gate, status, env=None, stream=None):
     """Emit a GitHub Actions `::warning::` when an AI gate was budget-paused (#1927).
 
@@ -890,6 +950,15 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
                     f"SVG text below 11px floor @{_floor_w}px (#1210): .{f['cls']} '{f['txt']}' = "
                     f"{f['fs']}px x scale {f['scale']} = {f['eff']}px effective"
                 )
+            # ── HTML-text legibility floor (#2674): the vitals-ring labels that shipped
+            #    at ~9px were HTML spans, invisible to the svg-only #1210 audit and
+            #    fs-ok-sanctioned past the static CSS gate. Rendered-px is the arbiter;
+            #    gating on the three highest-traffic pages (measured clean before arming).
+            if path in TEXT_FLOOR_PAGES:
+                for f in _html_text_floor_findings(page, _floor_w):
+                    issues.append(
+                        f"HTML text below 11px floor @{_floor_w}px (#2674): {f['sel']} '{f['txt']}' = " f"{f['eff']}px computed x{f['n']}"
+                    )
 
         # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
         # A 429 is throttle noise, not a broken endpoint: the sweep's parallel

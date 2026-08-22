@@ -262,7 +262,7 @@
   --voice-human-ink:    var(--ink);
 
   --voice-who-font:     var(--font-mono);  /* the speaker label */
-  --voice-who-size:     0.5625rem;         /* 9px */
+  --voice-who-size:     var(--fs-label);   /* the §10.5 11px floor — was 9px, sub-register (#2674) */
   --voice-who-ink:      var(--ink-faint);
   --voice-who-tracking: var(--tracking-label);
 }
@@ -755,7 +755,7 @@ td .evb .evb-tip { left: auto; right: 0; }
 .pa-younger .pa-d-dir { color: var(--ember); }
 .pa-older .pa-d-dir { color: var(--ink-muted); }
 .pa-neutral .pa-d-dir { color: var(--ink-faint); }
-.pa-derived { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 5px; }
+.pa-derived { font-family: var(--font-mono); font-size: var(--fs-label); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 5px; }
 /* P1.6 — full-scan expander + the suppressed-artifact flag (muted ember, never red). */
 .fs-exp { margin: var(--sp-2) 0; }
 .fs-body { margin-top: var(--sp-3); }
@@ -765,7 +765,7 @@ td .evb .evb-tip { left: auto; right: 0; }
 .cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--sp-3); margin: var(--sp-3) 0; }
 .cap-card { border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-3); }
 .cap-h { margin: 0 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--fs-small); }
-.cap-tag { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 6px; white-space: nowrap; }
+.cap-tag { font-family: var(--font-mono); font-size: var(--fs-label); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); border: 1px solid var(--rule); border-radius: var(--radius-xs); padding: 0 6px; white-space: nowrap; }
 .cap-tag.cap-private { color: var(--ember); border-color: var(--ember-line); }
 /* RQA-05 — deficit-sustainability five-channel read. Strain = ember (look here), holding =
    muted ink, too-few = faint. Verdict header ember-toned on attention, calm otherwise. No red. */
@@ -857,7 +857,7 @@ td .evb .evb-tip { left: auto; right: 0; }
 .vr-v { font-size: var(--fs-h4, 1.05rem); }
 .vr-ember .vr-v { color: var(--ember); }
 .vr-alert .vr-v { color: var(--alert); }
-.vr-sub { color: var(--ink-faint); font-size: 0.6rem; }
+.vr-sub { color: var(--ink-faint); font-size: var(--fs-label); /* §10.5 floor — 0.6rem rendered 9.6px inside the ring (#2674) */ }
 .vr-l { text-transform: lowercase; color: var(--ink-muted); }
 @media (max-width: 600px) { .vr-row { grid-template-columns: repeat(2, 1fr); } }
 /* P0.2 — now/7d/30d ladder, aligned under the ring grid. */
@@ -1300,7 +1300,7 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
       flex: 1 1 0; display: flex; flex-direction: column; gap: 2px;
       align-items: center; justify-content: center;
       min-width: 0; min-height: 52px; padding: .5rem 0;
-      font-size: .66rem; letter-spacing: .02em; text-align: center;
+      font-size: var(--fs-label); /* §10.5 floor — .66rem was 10.56px; measured @360px: 5 doors + toggle still fit, no wrap, bar 67px < the 68px clearance (#2674) */ letter-spacing: .02em; text-align: center;
     }
     .doors a:not(.nav-follow) .ico-door { margin: 0 0 1px 0; }
     .doors a[aria-current="page"] { border-bottom: 0; color: var(--ember); }
