@@ -124,12 +124,28 @@
         "note_sample": "States 'NEXT ON THE LOOP the coaching \u2014 See what the AI team makes of it' but this appears to be navigational chrome. However, the surface shows 'N=16' voice-fidelity judgments with 11 correct on Day "
       }
     ],
+    "/story/attempts/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2958",
+        "added": "2026-08-22",
+        "note_sample": "Attempt #14 marked 'SHOWED UP 0 OF 5 DAYS' (past-tense finality) beside 'live \u2014 day 5' \u2014 the live-cycle-as-closed class, sibling of /method/postmortems/"
+      }
+    ],
     "/story/diary/": [
       {
         "category": "temporal_contradiction",
         "issue": "#2959",
         "added": "2026-08-22",
         "note_sample": "Surface 2 states 'DAY 5 \u00b7 CYCLE 10' and 'JULY 26, 2026 \u00b7 VIDEO DIARY', but the experiment phase confirms today is 2026-08-21 (Day 5 of Cycle 10 starting 2026-08-17). July 26, 2026 is 56 days before th"
+      }
+    ],
+    "/story/journal/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "Journal entry dated 2026-07-08 listed under 'DAY 5 \u00b7 WEEK 1' header \u2014 the dated-archival-content class, sibling of the essay finding"
       }
     ]
   }
