@@ -26,6 +26,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "scripts"))
 
@@ -86,9 +88,12 @@ def test_the_post_june_count_in_the_doc_matches():
 
 def test_every_month_row_matches_the_derived_count():
     """The per-month table is where staleness shows up first: a new incident lands and the
-    month count moves."""
+    month count moves. An EMPTY month is rendered `**0**` — April's zero is the single most
+    load-bearing number in the section (the FLOORS finding is exactly that), so it is
+    stated, not omitted."""
     for month, n in DERIVED["by_month"].items():
-        assert f"| {month} | {n} |" in DOC, f"the month table says something other than {n} for {month} — re-run the derivation"
+        cell = "**0**" if n == 0 else str(n)
+        assert f"| {month} | {cell} |" in DOC, f"the month table says something other than {n} for {month} — re-run the derivation"
 
 
 def test_the_three_previously_missing_classes_are_named():
@@ -149,3 +154,113 @@ def test_the_section_says_it_is_derived():
     the next person hand-edits a number and the guard's failure looks like a bug."""
     assert "scripts/incident_log_patterns.py" in DOC
     assert "DERIVED" in DOC
+
+
+# ── the WRITER (#2975) ───────────────────────────────────────────────────────
+#
+# Until #2975 this derivation had a guard and no writer: the script emitted, a human
+# pasted, and the guard ran in a lane (CI/CD Unit Tests) that a `docs/**` change cannot
+# trigger — so every wrap that added rows reddened a later, innocent commit. These pin
+# both halves.
+
+
+def test_the_committed_blocks_equal_what_the_rows_render():
+    """THE currency assertion — the whole doc, not one number at a time. The per-fact
+    tests above give better messages; this one cannot be passed by a block nobody
+    remembered to write an assertion for."""
+    assert ilp.render_doc(DOC, DERIVED) == DOC, (
+        "docs/INCIDENT_LOG.md's derived blocks disagree with the rows. " "Fix: python3 scripts/incident_log_patterns.py --apply"
+    )
+
+
+def test_apply_is_idempotent():
+    """A writer whose second run differs from its first dirties the reconcile job forever."""
+    once = ilp.render_doc(DOC, DERIVED)
+    assert ilp.render_doc(once, DERIVED) == once
+
+
+def test_every_renderer_has_a_marker_pair_in_the_doc():
+    """Derived from _RENDERERS, not a hand list: a new derived block with no markers must
+    fail here rather than be silently skipped by the writer."""
+    for name in ilp._RENDERERS:
+        assert ilp._MARK.format(name=name, edge="START") in DOC, f"{name} has a renderer but no START marker in the doc"
+        assert ilp._MARK_END.format(name=name) in DOC, f"{name} has a renderer but no END marker in the doc"
+
+
+def test_a_missing_marker_is_a_hard_error_not_a_silent_skip():
+    """#2578's rule. A writer that quietly wrote nothing would be the #2840 defect wearing
+    a fix's clothes — the doc would freeze again and every gate would stay green."""
+    stripped = DOC.replace(ilp._MARK.format(name="SILENCE", edge="START"), "")
+    with pytest.raises(SystemExit):
+        ilp.render_doc(stripped, DERIVED)
+
+
+def test_check_reds_on_a_stale_block(tmp_path):
+    """Mutation proof, run every time: stale a derived number and confirm --check fails.
+
+    Drives the real CLI against a real (copied) log, so the lane wiring below is guarding
+    a command that genuinely reports staleness rather than a knob nobody exercised.
+    """
+    import subprocess
+    import sys
+
+    log = tmp_path / "INCIDENT_LOG.md"
+    log.write_text(DOC.replace(f"{DERIVED['total_rows']} dated rows", "1 dated rows"), encoding="utf-8")
+    probe = (
+        f"import sys; sys.path.insert(0, {str(_REPO / 'scripts')!r});\n"
+        "import incident_log_patterns as m, pathlib\n"
+        f"m.INCIDENT_LOG = pathlib.Path({str(log)!r})\n"
+        "sys.argv = ['x', '--check']\n"
+        "raise SystemExit(m.main())"
+    )
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 1, f"--check passed on a staled log (exit {out.returncode}):\n{out.stdout}\n{out.stderr}"
+    assert "STALE" in out.stderr
+
+
+def test_a_parse_regression_cannot_write(tmp_path):
+    """The sanity floor. Regenerating from a broken parse would replace correct numbers
+    with confident wrong ones — and then pass its own guard."""
+    import subprocess
+    import sys
+
+    log = tmp_path / "INCIDENT_LOG.md"
+    log.write_text(
+        "# empty\n" + ilp._MARK.format(name="DISTRIBUTION", edge="START") + "\n" + ilp._MARK_END.format(name="DISTRIBUTION"), "utf-8"
+    )
+    probe = (
+        f"import sys; sys.path.insert(0, {str(_REPO / 'scripts')!r});\n"
+        "import incident_log_patterns as m, pathlib\n"
+        f"m.INCIDENT_LOG = pathlib.Path({str(log)!r})\n"
+        "sys.argv = ['x', '--apply']\n"
+        "raise SystemExit(m.main())"
+    )
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 2, f"expected a refusal on a 0-row parse, got {out.returncode}"
+    assert "refusing to regenerate" in out.stderr
+
+
+# ── the LANE (#2975's load-bearing half) ─────────────────────────────────────
+
+
+def test_the_check_runs_in_the_lane_a_docs_change_triggers():
+    """(a) The guard was in a lane the breaking change cannot reach. A `docs/**` edit
+    triggers Docs CI, not CI/CD — so a stale section reddened whichever later commit
+    happened to touch `tests/**`, and whoever debugged it started from an unrelated diff."""
+    docs_ci = (_REPO / ".github" / "workflows" / "docs-ci.yml").read_text(encoding="utf-8")
+    assert "scripts/incident_log_patterns.py --check" in docs_ci, (
+        "#2975: the derivation's check must run in Docs CI — the lane a docs/** change triggers. "
+        "Anywhere else and the red lands on an innocent commit."
+    )
+    assert "- 'docs/**'" in docs_ci, "docs-ci.yml must trigger on docs/** for the check above to be reachable"
+
+
+def test_the_writer_is_wired_into_the_reconcile_job():
+    """(b) There was no writer, so it could not self-heal the way every other generator
+    output does. `run_generators()` is where that happens."""
+    ci = (_REPO / ".github" / "workflows" / "ci-cd.yml").read_text(encoding="utf-8")
+    block = ci[ci.index("run_generators() {") : ci.index("run_generators() {") + 800]
+    assert "scripts/incident_log_patterns.py --apply" in block, (
+        "#2975: incident_log_patterns must join run_generators() so a code-lane merge reconciles it "
+        "like sync_doc_metadata and generate_adr_index"
+    )

@@ -46,6 +46,11 @@ _DOC_GATES = [
     "scripts/check_doc_facts.py",
     "scripts/check_doc_index.py --strict",
     "scripts/generate_adr_index.py --check",
+    # #2975 — same shape as the ADR index: `--check` gates here, `--apply` reconciles in
+    # CI/CD's run_generators(). It lives here because the thing that stales it is a
+    # docs/** edit (every wrap adds incident rows), and it used to gate only in CI/CD's
+    # Unit Tests, where the red always landed on a later, innocent commit.
+    "scripts/incident_log_patterns.py --check",
 ]
 
 
