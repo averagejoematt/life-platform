@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "captured_at": "2026-08-22T02:47:47+00:00",
-    "note": "Committed reader-truth debt ledger \u2014 honest capture of standing high findings per page. The gate reds only on NEW (page, category) high findings vs this file; baselined entries surface as warnings naming their issue every run. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
+    "captured_at": "2026-08-22T18:55:28+00:00",
+    "note": "Committed reader-truth debt ledger \u2014 honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) \u2014 `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
   },
   "pages": {
     "/coaching/": [
@@ -98,10 +98,18 @@
     ],
     "/method/board/": [
       {
+        "category": "audience_violation",
+        "issue": "#2972",
+        "added": "2026-08-22",
+        "severity_observed": "high",
+        "note_sample": "Dr. Lisa Park addresses the subject directly: 'Matthew \u2014 and I want to name that plainly', 'I want to put to you directly', 'you were actively logging', 'When you're ready, I'd like you to resume'. Th"
+      },
+      {
         "category": "temporal_contradiction",
         "issue": "#2959",
         "added": "2026-08-22",
-        "note_sample": "'quiet for three days, Matthew' \u2014 the inclusive-day-counting coaching class"
+        "severity_observed": "high",
+        "note_sample": "Dr. Eli Marsh states 'You've logged two training sessions in the past 30 days' \u2014 impossible on Day 6 of experiment (max 6 days of current-cycle data exist). This asserts a 30-day history that contradi"
       }
     ],
     "/method/calibration/": [

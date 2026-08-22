@@ -1233,18 +1233,27 @@ def run_sweep(
         # Deliberate ledger rewrite (#2956) — a11y --update-baseline's sibling.
         # Only pages this sweep actually captured prose for are touched; fresh
         # entries land UNTRIAGED and red the unit suite until an issue is named.
-        if update_truth_baseline and (reader_truth_status or {}).get("status") == "ok":
+        # #2981: every exit from this block SAYS what it did. The old form
+        # skipped silently on a non-ok status and on an empty sweep, and printed
+        # "rewritten" otherwise — so an operator could not tell a recorded
+        # baseline from a no-op, and the publish path stayed held by debt they
+        # had already tried to acknowledge.
+        if update_truth_baseline:
             import truth_baseline_audit
 
-            observed_by_path = {
-                r["path"]: r.get("truth_findings", []) for r in results if any(s.get("kind") == "prose" for s in r.get("screenshots", []))
-            }
-            if observed_by_path:
-                truth_baseline_audit.update_baseline(observed_by_path)
-                print(
-                    f"truth baseline rewritten ({len(observed_by_path)} page(s) swept) → tests/truth_baseline.json"
-                    " — triage UNTRIAGED entries + commit the diff deliberately (#2956)"
-                )
+            truth_status = (reader_truth_status or {}).get("status")
+            if truth_status != "ok":
+                print(f"⚠ truth baseline NOT updated — reader-truth QA returned status={truth_status!r}; nothing was recorded (#2981)")
+            else:
+                observed_by_path = {
+                    r["path"]: r.get("truth_findings", [])
+                    for r in results
+                    if any(s.get("kind") == "prose" for s in r.get("screenshots", []))
+                }
+                report = truth_baseline_audit.update_baseline(observed_by_path)
+                for line in truth_baseline_audit.update_summary(report):
+                    print(line)
+                print("  → review + commit the diff deliberately (#2956)")
 
     # ── deliberate a11y-baseline rewrite (#1433) — only the pages this run swept ──
     if update_a11y_baseline:
