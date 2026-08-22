@@ -351,7 +351,12 @@ def lambda_name_hits(files, cdk_names: set, exempt) -> list:
 # so "~50 alarms" sat two lines from an auto-stamped "81 alarms" on the same page. The
 # ≥20 floor keeps incident prose ("3 alarms sat red 9 days") out of a platform-inventory
 # rule; ±10% honours the "~" the doc rightly uses.
-_ALARM_CLAIM = re.compile(r"(?<![\w.$])(\d+)\s+(?:metric\s+)?alarms?\b")
+#
+# `=` is in the lookbehind because an assigned number is a PARAMETER, never an inventory
+# count: "the Period=86400 alarms are re-cut" reds main as a claim of 86400 alarms
+# (2026-08-22, docs/PROPORTIONALITY.md:84 — the #2912 flap-detector row). The same shape
+# covers Threshold=, EvaluationPeriods=, and any other `key=N alarms` reference.
+_ALARM_CLAIM = re.compile(r"(?<![\w.$=])(\d+)\s+(?:metric\s+)?alarms?\b")
 _ALARM_INVENTORY_FLOOR = 20
 
 

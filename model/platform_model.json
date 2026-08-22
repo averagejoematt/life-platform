@@ -8,6 +8,14 @@
       "routing": "digest",
       "stack": "monitoring_stack"
     },
+    "chronicle-delivery-heartbeat": {
+      "routing": "urgent",
+      "stack": "email_stack"
+    },
+    "cost-metric-drift-sustained": {
+      "routing": "digest",
+      "stack": "operational_stack"
+    },
     "email-subscriber-errors": {
       "routing": "unresolved",
       "stack": "web_stack"
@@ -23,6 +31,10 @@
     "grading-stalled": {
       "routing": "digest",
       "stack": "monitoring_stack"
+    },
+    "hae-webhook-errors": {
+      "routing": "digest",
+      "stack": "ingestion_stack"
     },
     "hae-webhook-no-invocations-24h": {
       "routing": "digest",
@@ -183,6 +195,10 @@
     "token-alarm-genesis-window-active": {
       "routing": "unresolved",
       "stack": "monitoring_stack"
+    },
+    "weekly-signal-delivery-heartbeat": {
+      "routing": "urgent",
+      "stack": "email_stack"
     }
   },
   "edges": [
@@ -6074,7 +6090,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 46,
+      "alarms": 50,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,

@@ -240,10 +240,13 @@ readers under the `life-platform-mcp` lambda.
 |-------|-------|---------|
 | `ai-tokens-platform-daily-total` | monitoring_stack | unresolved |
 | `between-chronicle-scrub-failed-closed` | monitoring_stack | digest |
+| `chronicle-delivery-heartbeat` | email_stack | urgent |
+| `cost-metric-drift-sustained` | operational_stack | digest |
 | `email-subscriber-errors` | web_stack | unresolved |
 | `expert-gate-infra-hold` | monitoring_stack | digest |
 | `freshness-checker-errors` | operational_stack | digest |
 | `grading-stalled` | monitoring_stack | digest |
+| `hae-webhook-errors` | ingestion_stack | digest |
 | `hae-webhook-no-invocations-24h` | monitoring_stack | digest |
 | `hevy-restamp-errors` | operational_stack | digest |
 | `hevy-routine-cron-errors` | operational_stack | digest |
@@ -284,11 +287,12 @@ readers under the `life-platform-mcp` lambda.
 | `telegram-worker-errors` | serve_stack | digest |
 | `telegram-worker-throttles` | serve_stack | digest |
 | `token-alarm-genesis-window-active` | monitoring_stack | unresolved |
+| `weekly-signal-delivery-heartbeat` | email_stack | urgent |
 
 ## 6. Coverage (honest numbers, ADR-104)
 
 - Edge sites: 1113 total · 802 resolved · 311 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 46 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
+- Alarms: 50 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled

@@ -577,6 +577,18 @@ def _cron_hits(files, cdk_map: dict) -> list[str]:
     return hits
 
 
+# ── #2818: producer↔gate cron mirrors — rule lives in producer_mirror_check.py ──
+# (extracted 2026-08-22: this file sits at the #1665 1200-line ceiling; the sibling
+# module is spec-loaded so the sweep, the CLI wiring below, and the test contract
+# (`cdf._collect_producer_mirrors` / `cdf._producer_mirror_hits`) are unchanged.)
+_pmc_spec = importlib.util.spec_from_file_location("producer_mirror_check", Path(__file__).resolve().parent / "producer_mirror_check.py")
+_pmc = importlib.util.module_from_spec(_pmc_spec)
+_pmc_spec.loader.exec_module(_pmc)
+PRODUCER_MIRROR_NAME = _pmc.PRODUCER_MIRROR_NAME
+_collect_producer_mirrors = _pmc._collect_producer_mirrors
+_producer_mirror_hits = _pmc._producer_mirror_hits
+
+
 # ── #1260: reader-facing "N data sources" scan (lambdas/web/og_*.py) ──────────
 # The OG card lambda draws share-preview PNGs quoted on 72 pages — the platform's most
 # distributed surface. og_image_lambda.py hardcoded "One man. 25 data sources." while the
@@ -1060,6 +1072,24 @@ def main():
     # cron table is the highest-stakes operational claim — it drifted 2 months stale).
     cdk_map = _cdk_cron_map()
     hits += _cron_hits(_scan_files(), cdk_map)
+
+    # #2818: schedule literals that appear in TWO files — every PRODUCER_CRON_MIRRORS
+    # entry in lambdas/ must match that function's real CDK schedule. Both floors are
+    # blindness detectors (#2578's rule: a derivation that returns [] must red, never
+    # silently pass): qa_check_outputs.py declares one mirror today, so an empty sweep
+    # means a refactor moved/renamed the declaration out from under this gate.
+    mirrors = _collect_producer_mirrors(_scan_source_files())
+    if not mirrors:
+        print(
+            f"error: found no {PRODUCER_MIRROR_NAME} declaration anywhere in lambdas/ — the #2818 mirror sweep went blind "
+            "(qa_check_outputs.py declares one; a refactor moved or renamed it without updating this gate)",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if not cdk_map:
+        print("error: could not derive the CDK cron map to verify PRODUCER_CRON_MIRRORS (#2818)", file=sys.stderr)
+        sys.exit(2)
+    hits += _producer_mirror_hits(mirrors, cdk_map)
 
     # #1254/#1347: no live doc/source/site line claims the cost-governor runs hourly —
     # generalized past #1254's 3-enumerated-file test to the whole corpus (docs +
