@@ -2,7 +2,7 @@
 
 > **Status:** log · **Owner:** Matthew · **Verified:** 2026-05-19
 
-Last updated: 2026-08-19 opus backlog-drain session (#1332 gate; **+2 new rows** — main red 29m on an `aws_cdk` import CI does not install, a green-local/red-CI collection abort fixed by #2907; and a 6h22m production-deploy wedge behind a stranded approval gate, auto-detected by the platform as #2901 and cleared by rejecting two superseded leases). Prior: 2026-08-19 opus September-base session (#1332 gate; **+1 new row** — main red 1h02m on the $150 ceiling merge, four deselected stale-literal test failures, deploy gate rejected rather than approved, fixed by #2896). Prior: 2026-08-18 opus deploy-unblock session (#1332 gate; **+0 new rows — no incident-class event this session**; amended the 2026-08-18 site-auto-rollback row's resolution: it was closed the same day by #2879 WITHOUT a weigh-in, because the day-number proxy — not the missing Withings row — was the defect). Prior: 2026-08-18 opus observability session (+2 rows: the wrap-beat site auto-rollback — a TRUE positive about the data and a FALSE positive about the deploy, the vitals smoke carve-out keys on day_n not on whether a weigh-in happened, so every site deploy auto-rolls-back until one lands (#2878, owner-gated on a weigh-in); and a merge to main that produced ZERO CI runs — the swallowed-push class, second documented occurrence, recovered by manual dispatch). Prior: 2026-08-17 system-model session (+2 rows). Prior: 2026-08-17 conformance-guard session (+2 rows). Prior: 2026-08-17 charter/cycle-14 session (+1 row). Prior: 2026-08-16 overnight session (see history below).
+Last updated: 2026-08-21
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.
@@ -13,6 +13,9 @@ Last updated: 2026-08-19 opus backlog-drain session (#1332 gate; **+2 new rows**
 
 | Level | Definition |
 |-------|------------|
+| 2026-08-21 | **P3** | **Production deploys wedged behind two stranded approval gates (~6h and ~2.5h) — the platform auto-filed it before a human noticed, for the THIRD session running.** Run `32508603771` (sha `bd9efa9e`) sat `waiting` at the production gate from 17:31Z; `ci-cd.yml` is `cancel-in-progress: false`, so the next run queued behind it as 0-job pending. The remediation agent auto-filed #2937 at the 2h threshold. On inspection the parked sha was **5 commits behind main** — approving would have deployed a tree missing #2935 and #2936, the 2026-08-19 class that `deploy/reject_deployment.sh` exists to warn about. **Rejected**, not approved; the queued run reached the gate within 45s of the slot freeing and deployed 104/104 Lambdas. A second and third gate were actioned before wrap rather than left overnight. | A gated run is a deploy LEASE and must be approved or rejected, never left waiting. The detector is working; the recurring failure is the human half. | 2h28m by the platform's own auto-filer (#2937), consistent with #2931 the session before. | ~6h for the first gate; ~2.5h for the second. | No — nothing stale deployed; the rejection concluded its run without executing Deploy. |
+| 2026-08-21 | **P2** | **Both AI gates on the deploy-gating `visual-qa` job were structurally dark, and the job reported SUCCESS.** Observed in run `32509917798` / job `96909117231` during a real fleet deploy: `AI-vision QA` and `Reader-truth QA` each printed `⚠ AI-QA unavailable — could not import bedrock_client: No module named 'boto3'` and the job concluded `success`. `boto3` was never installed in ANY of the three visual-qa workflow copies (`ci-cd.yml`, `site-deploy.yml`, `visual-qa.yml`), while CLAUDE.md and ADR-076 describe these as gating since 2026-06-05 ("a deterministic FAIL or AI 'high' verdict blocks the pipeline"). Not credentials — OIDC is configured and the import fails first. Fixed by #2940: boto3 installed in all three (pinned via `ci_pins.py`) AND `run_sweep` now returns `failed == 0 and not ai_gate_failures`. Filed #2938. | The missing dependency was the trigger; the defect was `⚠` + exit 0 — the exit code read page failures only, so an `unavailable` AI status had no effect on it. Compounds #1927, which moved these same gates out of budget band 1 for being "dark 26 of 30 days while still reporting green". | ~3 months (gating claimed since 2026-06-05; found 2026-08-21 while verifying an unrelated deploy). **Silent.** | Same session. | No — the deterministic half of the job (Playwright sweep, leak-token sweep) was armed and working throughout; only the two AI gates were dark. |
+| 2026-08-21 | **P3** | **`/api/sleep_detail` served an impossible percentage to the public site: `light_pct: 106.7` (deep 11.1 + rem 31.1 + light 106.7 = 148.9%).** The stored Eight Sleep row for 2026-08-20 has stage hours summing to 2.01h against a TST of 1.35h — the vendor's stages carried the 0.61h of awake time, TST excluded it, and `compute_derived_fields` divided by TST anyway. All three percentages were wrong, not just the visible one. Fixed at the writer (#2939, omit-as-a-set with `stage_pct_omitted_reason`, ADR-104 absence over a clamped figure), in the archive (1 row corrected; 44 skewed-but-possible rows deliberately untouched), and verified live. | `tests/accuracy_audit.py::impossible_values` had exactly the right rule (`_pct` in [0,100]) but scanned two top-level blocks of ONE document (`public_stats.json`). The bad value sat inside a LIST on an endpoint it never fetched — a correct rule with a denominator narrower than the live surface (#2652's class). The scan is now recursive and sweeps the endpoint set derived from `qa_manifest`'s `api_deps`. | Unknown — surfaced only because a reader-truth oracle raised a DIFFERENT (false) finding on the same payload and the investigation read the rows. **Silent.** | Same session. | No — a wrong published figure, not lost data; the raw stage hours were never touched, so the correction is reversible. |
 | **P1 — Critical** | System broken, no data flowing or MCP completely down |
 | **P2 — High** | Major feature broken, data loss risk, or multi-day data gap |
 | **P3 — Medium** | Single source affected, degraded but functional |
@@ -186,12 +189,12 @@ Last updated: 2026-08-19 opus backlog-drain session (#1332 gate; **+2 new rows**
 > what the table actually says. **Re-run it, do not hand-edit it.**
 >
 > This section previously listed nine root causes tallied from ~32 Feb–Mar rows and stamped
-> *Verified: 2026-05-19*. It then never moved for three months while the corpus grew to 146
-> rows, 111 of them post-June — so the three classes that dominate the recent record
+> *Verified: 2026-05-19*. It then never moved for three months while the corpus grew to 149
+> rows, 114 of them post-June — so the three classes that dominate the recent record
 > appeared in it nowhere, and only the "Last updated" line changed per session. A section
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
-**Distribution — 146 dated rows, 111 post-June** (derived 2026-08-21):
+**Distribution — 149 dated rows, 114 post-June** (derived 2026-08-21):
 
 | month | rows |
 |---|---|
@@ -201,29 +204,29 @@ Last updated: 2026-08-19 opus backlog-drain session (#1332 gate; **+2 new rows**
 | 2026-05 | 1 |
 | 2026-06 | 2 |
 | 2026-07 | 36 |
-| 2026-08 | 75 |
+| 2026-08 | 78 |
 
-**By severity:** P1 4 · P2 19 · P3 51 · P4 67 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 4 · P2 20 · P3 53 · P4 67 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 20 match none):
 
 | n | class |
 |---|---|
-| 92 | deployment error |
+| 94 | deployment error |
 | 34 | stale config / literal drift |
 | 28 | QA-oracle false positive |
 | 22 | lane-subset / union-breach main red |
-| 20 | secret / credential |
-| 17 | deploy-plane wedge / strand / race |
+| 21 | secret / credential |
+| 18 | deploy-plane wedge / strand / race |
 | 12 | IAM / permission |
 | 11 | timezone / wallclock |
 | 4 | data quality / scoring |
-| 20 | *(unclassified)* |
+| 21 | *(unclassified)* |
 
 The three classes the old list omitted entirely — **QA-oracle false positives (28)**,
 **lane-subset/union-breach main reds (22)**, and **deploy-plane wedges/strands/races
-(17)** — are now the 3rd, 4th and 6th largest. They are the shape of this platform's
+(18)** — are now the 3rd, 4th and 6th largest. They are the shape of this platform's
 failures *today*; deployment errors remain the largest single class but are increasingly
 a co-tag on those three rather than a category of their own.
 
@@ -231,7 +234,7 @@ a co-tag on those three rather than a category of their own.
 
 A row is **silent** when it failed without announcing itself — nothing paged, nothing
 reddened, and someone found it by looking. That cuts across every class above, so it is
-scored orthogonally (loud/silent × class) rather than as a tenth category. **36 of 146
+scored orthogonally (loud/silent × class) rather than as a tenth category. **37 of 149
 rows are silent.**
 
 **What the corpus actually supports, stated with its limits.** The effect is *directional
@@ -239,10 +242,10 @@ but modest*, and materially weaker than this axis was described as when filed:
 
 | | silent | loud |
 |---|---|---|
-| rows | 36 | 110 |
-| TTD parseable | 26 | 64 |
-| median TTD | **28 min** | 12 min |
-| mean TTD | 2,300 min | 2,105 min |
+| rows | 37 | 112 |
+| TTD parseable | 26 | 65 |
+| median TTD | **23.5 min** | 12 min |
+| mean TTD | 2,300 min | 2,073 min |
 | exceeded 1 day | 5 (19% of parsed) | 7 (11% of parsed) |
 
 Silent rows take **~2.3× longer to detect at the median** and are **~1.7× more likely to
@@ -250,10 +253,10 @@ run past a day**. But the means are within 10% of each other, and the "days-scal
 silent vs minutes for loud" framing does **not** reproduce over the population — it comes
 from reading the worst ~10 silent rows, and the loud set has its own long tail (3 rows
 past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is
-keyword-based over free prose, and **56 of 146 TTD cells state no parseable duration** —
+keyword-based over free prose, and **58 of 149 TTD cells state no parseable duration** —
 over a third — and are excluded rather than counted as zero.
 
-The durable finding is not the multiplier. It is that **36 failures in this corpus
+The durable finding is not the multiplier. It is that **37 failures in this corpus
 announced nothing**, and every mitigation that has actually moved the numbers — the
 freshness checker, the DLQ consumer, the canary, the handled-5xx detector (#2819) — works
 by making a silent class loud.
