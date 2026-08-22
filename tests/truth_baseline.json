@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "captured_at": "2026-08-22T18:55:28+00:00",
+    "captured_at": "2026-08-22T20:30:11+00:00",
     "note": "Committed reader-truth debt ledger \u2014 honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) \u2014 `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
   },
   "pages": {
@@ -198,6 +198,24 @@
         "issue": "#2958",
         "added": "2026-08-22",
         "note_sample": "Attempt #14 marked 'SHOWED UP 0 OF 5 DAYS' (past-tense finality) beside 'live \u2014 day 5' \u2014 the live-cycle-as-closed class, sibling of /method/postmortems/"
+      }
+    ],
+    "/story/build/agent-review/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "severity_observed": "high",
+        "note_sample": "The page states 'THE RECORD SPANNING 2026-05-29 \u2192 2026-08-17' but today is 2026-08-22 (Day 6 of current experiment starting 2026-08-17). The end date 2026-08-17 is the cycle start date, not today. Thi"
+      }
+    ],
+    "/story/chronicle/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "severity_observed": "high",
+        "note_sample": "Chronicle entry dated 2026-08-18 (Day 2) is listed under 'WEEK 1 \u00b7 2026-08-18', but the page header states 'DAY 6 \u00b7 WEEK 1, SINCE AUGUST 17 2026' (today is 2026-08-22, Day 6). The entry itself is corr"
       }
     ],
     "/story/diary/": [
