@@ -1,4 +1,4 @@
-# Handover — 2026-08-22 ~11:45 → ~15:30 PT: machinery first — the class #2753 vacated now has an owner, and the publish path took two rounds because the oracle moved under it
+# Handover — 2026-08-22 ~11:45 → ~16:45 PT: machinery first — the class #2753 vacated now has an owner, and the publish path took two rounds because the oracle moved under it
 
 **Session:** Opus 5, autonomous, full merge + deploy authority. The driving instruction was
 *"machinery first, then opus paydown"*, against the approved plan
@@ -26,29 +26,40 @@ governance rule.
 deploy did not cause (`/method/board/` was among the 91 passes); and a ~5 min Docs CI red
 from a `test_count` stamp dropped during a rebase, healed unattended by the reconcile bot.
 
-**Main:** red — CI/CD `32594947913` on `564efa0c` failed its **visual-QA leg only**: Deploy,
-smoke and the I1/I2/I5 integration checks all SUCCESS, auto-rollback SKIPPED. The two
-failing findings are standing oracle debt on `/story/` pages, baselined in `#2990`; the
-follow-on run `32597212151` on `5f5069f6` was still mid-flight at wrap and is the
-confirmation. Docs CI is green on `5f5069f6`.
+**Main:** green at `5f5069f6` — the latest completed CI/CD run succeeded. The gate still
+exits 1, and its objection is fair rather than wrong: HEAD is the docs-only wrap commit
+`f2628761`, which is outside `ci-cd.yml`'s path filter and so mints no CI/CD run **by
+design** — not the swallowed-push shape (#2762) the gate flags it as, but genuinely
+unwatched all the same. Docs CI is green on it. The earlier red (`32594947913` on
+`564efa0c`) was its **visual-QA leg only** — Deploy, smoke and the I1/I2/I5 checks all
+SUCCESS, auto-rollback SKIPPED — and both its findings are baselined in `#2990`.
 
 **Alarms:** clean — every alarm red >72h cites an issue, no uncited flaps in the window.
 The `budget-tier-sustained-7d` citation was rewritten (it stated a ceiling that no longer
 exists).
 
-**CI warnings:** nothing to triage — the newest completed main run isn't green, which is
-(e2)'s business.
+**CI warnings:** 3, all triaged — two `Plan deployments` warnings claiming a "Lambda config
+change (handler/runtime/memory/timeout/env/layer) CI cannot ship" on `LifePlatformOperational`
+and `LifePlatformEmail`; I ran the diff they describe and **only `Code.S3Key` moved, on 7
+functions** — an asset-hash change CI's code-deploy path does ship. Filed as **#2993**. The
+third is the Unit Tests duration budget (1329s vs 1200s), the fifth crossing of a trend
+`157 → 294 → 688 → 830 → 1247 → 1329`; recorded on the issue that already owns it (**#2692**)
+rather than re-filed, noting this session added 63 tests to the suite.
 
 **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
 
-**Backlog:** Now live at 11 actionable; no stale `Later`. Fixed one hygiene violation I
-introduced (epic #2799's `## Stories` missing #2989).
+**Backlog:** Now live at 12 actionable; no stale `Later`. Fixed two hygiene violations —
+epic #2799's `## Stories` missing #2989 and #2992, and the platform's own auto-filer
+(#2991, the standalone visual-QA advisory) which is the same condition #2992 diagnoses in
+full; closed to it.
 
-**Closures:** #2981, #2975, #2982 each carry the ADR-099 two-line verdict.
+**Closures:** #2981, #2975, #2982 and #2991 each carry the ADR-099 two-line verdict.
 
-**Ledger:** derived-artifact registry row added to `docs/PROPORTIONALITY.md` — posture,
-rent (one build-time AST scan + `git ls-files`, one classification line per new generator),
-and a demote trigger stated as a full quarter with no registry change.
+**Ledger:** omitted — from the wrap commit only. The derived-artifact registry row shipped
+**with its subsystem** in `#2987` (`564efa0c9`), which is the better place for it, so
+`docs/PROPORTIONALITY.md` has no diff in the wrap window. The row is live and carries
+posture, rent (one build-time AST scan + `git ls-files`, one classification line per new
+generator), and a demote trigger of a full quarter with no registry change.
 
 ---
 
@@ -63,8 +74,12 @@ and a demote trigger stated as a full quarter with no registry change.
 | **#2988** | #2734 — re-measure the budget alarm; the projection half is resolved | merged `985dc935e` |
 | **#2990** | #2959 — baseline the two `/story/` oracle findings holding the publish path | merged `5f5069f63` |
 
-**Closed:** #2981, #2975, #2982. **Filed:** epic **#2986** (derived artifacts and their
-lanes) and **#2989** (the budget alarm's cut). **Open: 78 → 77.**
+**Closed:** #2981, #2975, #2982, #2991. **Filed:** epic **#2986** (derived artifacts and
+their lanes), **#2989** (the budget alarm's cut), **#2992** (the finding still holding the
+publish path) and **#2993** (the Plan job's asset-hash-vs-config-change misread).
+**Open: 78 → 79** — four closed, four filed, plus one the platform's own auto-filer opened
+mid-session and I closed to #2992. The count went up; every issue filed names something
+that was already broken and unmeasured.
 
 **Deployed + verified:** `life-platform-site-api` 20:06:53Z and `life-platform-mcp`
 20:09:49Z against a 19:51:19Z merge — both post-date it. Verified by **reading the deployed
@@ -95,6 +110,17 @@ a defect: `/story/chronicle/` lists a 2026-08-18 post titled *Day One Actually H
 which is ordinary Day-2 retrospective publishing, and `/story/build/agent-review/` states
 its own span (`2026-05-29 → 2026-08-17`) and never claims to be current. Baselined under
 #2959, 27 → 29.
+
+And then it moved **again**. The local full-surface sweep after those merges returned
+`92 passed, 1 failed` with a single high finding on `/method/` that the CI sweep 90 minutes
+earlier had not seen — a third distinct high-finding population in one day. **The publish
+path is therefore still held**, by #2992, and this time the finding may be a real render
+defect rather than a sanctioned shape, so it is filed rather than baselined.
+
+I nearly missed it. My first read of the sweep grepped a `tail -30` capture, found no 🔴,
+and I wrote *zero high findings* — the exact truncation trap this repo already has a rule
+for. `qa-screenshots/report.json` is the complete artifact and says `FAIL count: 1`. The
+correction came from reading the whole record instead of the tail of it.
 
 ## The flagship: three broken triples, and one stale behind a fresh timestamp
 
@@ -158,10 +184,14 @@ closed in the same change.
 
 ## Residual / next picks
 
-- **#2990's follow-on run** — CI/CD `32597212151` on `5f5069f6` was mid-flight at wrap; its
-  visual-QA sweep is the confirmation that the publish path is finally clear. Approve its
-  deploy gate (a gated run is a lease) and read the sweep. — *not-work — a live run to
-  watch, not a backlog item*
+- **#2992 — the publish path is NOT clear, and this is the one thing holding it.** I
+  expected run `32597212151` to confirm it; it could not — its Deploy was **skipped** (the
+  #2990 merge touched only `tests/truth_baseline.json`, nothing deployable), so visual-QA
+  skipped with it. So I ran the full surface locally instead: `92 passed, 1 failed across
+  93 pages`, and the single high finding is a NEW one on `/method/` that was absent from
+  the CI sweep 90 minutes earlier. The API is right in every particular
+  (`current_cycle = 14`, cycle 14 `is_current: True`), so it is either a wrong-row `· NOW`
+  binding or an oracle misread — **do not baseline it until that is settled.**
 - **#2889** — the generation cache has never hit once; root cause measured and posted. The
   fix is fingerprinting the structured brief before rendering, where `canonicalize` already
   works as designed. Do NOT start box 2 (extend to other surfaces) first — extending a gate
