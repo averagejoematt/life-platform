@@ -1,7 +1,7 @@
 # CloudWatch Alarm & Custom-Metric Audit — 2026-07
 
 **Issue:** #411 (cost-05, epic #344 "The budget serves readers") · **ADR:** ADR-116
-**Author:** infra/SRE pass, 2026-07-05 · **Region:** us-west-2 · **Account:** 205930651321
+**Author:** infra/SRE pass, 2026-07-05 · **Region:** us-west-2 (§1–8) **+ us-east-1 (§9, #2829, 2026-08-21)** · **Account:** 205930651321
 
 > Monitoring is the #2 cost line after AI (~$15/mo: `AlarmMonitorUsage` $10.46 +
 > `MetricMonitorUsage` $4.41 in June). The mandate: every alarm and billable custom
@@ -228,3 +228,48 @@ billing once its last datapoint ages out of the 15-month retention (no action).
 - Recovered: **~$1.80/mo** now; **~$4.80/mo more** by the §5 DLQ-digest follow-up
   (EXECUTED 2026-07-07, COST-01 #790 — 48 per-lambda `ingestion-error-*` alarms retired,
   CDK-defined alarm_count 113 → **65**).
+
+---
+
+## 9. us-east-1 — the region this pass skipped (#2829, added 2026-08-21)
+
+Everything above is **us-west-2 only** (the header says so, but nothing forced the next
+pass to notice). us-east-1 exists because CloudFront/Lambda@Edge/ACM require it —
+`LifePlatformWeb` is the only stack deployed there — and it was never run through the
+§3 reconciliation. The elite review 2026-08-16 (WS-B) found it; #2829 closed it. This
+section exists so **a region can never again be skipped silently: any future alarm
+audit must either cover us-east-1 or extend this table.**
+
+### The full us-east-1 estate (6 alarms, live-verified 2026-08-21)
+
+| alarm | CDK-owned? | AlarmActions (live) | disposition |
+|---|---|---|---|
+| `email-subscriber-errors` | **YES** (`web_stack.py` → `web_alarms.py`) | `life-platform-alerts-us-east-1` | **ROUTED — fixed.** The #2829 title bug: OBS-07 defined it with `AlarmActions=[]`, so silent subscriber-conversion failures alerted no one. Routed by PR #2913 + the 2026-08-20 rescope; action live since 2026-08-20 19:09 PT |
+| `life-platform-cf-auth-errors` | no (orphan) | **NONE — still silent** | **DEFER-ADOPT → #2961** (do first — the only remaining silent one) |
+| `life-platform-dash-5xx-rate` | no (orphan) | `life-platform-alerts-us-east-1` | **DEFER-ADOPT → #2961** (already routed; adoption is IaC hygiene) |
+| `life-platform-dash-total-errors` | no (orphan) | `life-platform-alerts-us-east-1` | **DEFER-ADOPT → #2961**; NB it watches the MAIN distribution (`E3S424OXQZ8NBE`), not dash's (`EM5NPX6NJN095`), despite its name → **#2963** |
+| `life-platform-cost-alert` | no (orphan) | NONE | **RETIRE → #2962** (duplicate $5 AWS/Billing alarm, superseded by ADR-133 budget + cost_governor tiers; deletion is an owner AWS mutation) |
+| `life-platform-ai-cost-soft-alarm` | no (orphan) | `life-platform-billing-alerts` | **RETIRE → #2962** (exact duplicate of cost-alert, routed to a second billing topic) |
+
+Orphan provenance: `deploy/archive/onetime/create_cloudfront_5xx_alarm.sh` (both dash
+alarms + the `life-platform-alerts-us-east-1` topic itself, which has a confirmed
+email subscription — awsdev@), `create_lambda_edge_alarm.sh` (cf-auth-errors, created
+action-less by its own comment because no us-east-1 topic existed yet), and
+`deploy/archive/20260314/create_ai_cost_alarm.sh` (ai-cost-soft-alarm + the second
+billing topic).
+
+### Two lessons this region taught (both cost a blocked deploy to learn)
+
+1. **Adoption needs `cdk import`, not a CREATE.** PR #2913 declared the three orphans
+   in `web_alarms.py` with their existing physical names; CloudFormation pre-validates
+   a CREATE against live names and failed early validation (`already exists`),
+   blocking the entire `LifePlatformWeb` deploy on 2026-08-20. **A green `cdk synth`
+   says the change is well-formed, not that it is deployable** — synth never consults
+   live AWS state. Same family as "merged ≠ deployed" (#2806), one level earlier:
+   *synth ≠ deployable*. `tests/test_web_alarms_2829.py` now pins the three names
+   ABSENT from `web_alarms.py` until #2961 does the import properly.
+2. **"IaC orphan" and "fires into the void" are different problems.** The issue title
+   said 5 of 6 fire into the void; measured live, only 2 of 6 had no actions (the
+   subscriber alarm, now fixed, and cf-auth-errors). Conflating the two inflates
+   urgency and buries the genuinely silent alarm in hygiene work. Audit tables must
+   carry the *measured* `AlarmActions` column, not infer it from IaC status.
