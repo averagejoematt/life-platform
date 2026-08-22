@@ -47,6 +47,20 @@ updates:
       - dependency-name: "black"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
+  # Remediation-agent toolchain, npm leg (remediation/package.json:
+  # @anthropic-ai/claude-code — #2759). The workflow resolves the CLI version from
+  # that manifest at install time, so this bump moves the ONLY copy (the #2609
+  # one-copy pattern, npm shape). Before this leg existed the CLI installed
+  # UNPINNED — floating to whatever released today in a scheduled job holding
+  # OIDC creds and a PR-writing token, with no automated bumper (#2468 class).
+  - package-ecosystem: "npm"
+    directory: "/remediation"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-remediation)"
+
   # CDK toolchain (cdk/requirements.txt: aws-cdk-lib, constructs).
   - package-ecosystem: "pip"
     directory: "/cdk"
