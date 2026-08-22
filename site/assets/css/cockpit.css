@@ -48,9 +48,10 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .hero-instruments .vr { gap: 2px; }
 .hero-instruments .vr-svg { max-width: 60px; }
 .hero-instruments .vr-c { top: calc(50% - 1em); }
-.hero-instruments .vr-v { font-size: 0.8rem; /* fs-ok: deliberate small-instrument scale */ }
-.hero-instruments .vr-sub { font-size: 0.55rem; /* fs-ok: rides the smaller ring */ }
-.hero-instruments .vr-l { font-size: 0.58rem; /* fs-ok: rides the smaller ring */ }
+.hero-instruments .vr-v { font-size: 0.8rem; /* fs-ok: deliberate small-instrument scale, 12.8px — above the 11px floor */ }
+/* The ring GEOMETRY scales down; the labels do not. .vr-sub/.vr-l ride the shared
+   .label register (--fs-label, the §10.5 11px floor) — the 0.55/0.58rem overrides
+   here rendered 8.8–9.3px, the least legible text on the most-visited page (#2674). */
 .hero-instruments .hi-note { flex-basis: 100%; margin: 0; color: var(--ink-faint); }
 @media (max-width: 480px) {
   .hero-instruments { gap: var(--sp-3); }
@@ -271,7 +272,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 }
 .spine-day {
   display: block; text-align: center;
-  font-family: var(--font-mono); font-size: 9px; /* fs-ok: measuring-rule spine geometry */ letter-spacing: 0.12em;
+  font-family: var(--font-mono); font-size: var(--fs-label); /* §10.5 floor — 9px sat under the 11px register (#2674); 3 digits at 11px mono ≈ 22px, well inside the 46px rail */ letter-spacing: 0.12em;
   color: var(--ink-faint);
 }
 .spine::after {
@@ -584,7 +585,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .carry-tag {
   display: inline-block; margin-left: 0.35em; padding: 0 0.4em;
   border: 1px solid var(--rule); border-radius: 3px;
-  font-size: 0.82em; /* fs-ok: inline carry marker, deliberately smaller than the lever caption it rides */ color: var(--ink-faint); white-space: nowrap;
+  font-size: var(--fs-label); /* §10.5 floor — 0.82em of the lever caption rendered 9px (#2674); border+faint ink keep the de-emphasis */ color: var(--ink-faint); white-space: nowrap;
 }
 .lever-go { margin-left: auto; color: var(--ink-faint); }
 .lever-link:hover .lever-what { color: var(--ember); }
