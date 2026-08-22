@@ -11,19 +11,31 @@
 import { sigil } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 
-// THE single genesis source of truth (P0.1). Genesis = 2026-06-14; Day N = whole days since,
-// +1 so genesis day is Day 1; Week N = floor((dayN-1)/7)+1 (Day 8 = Week 2). EVERY door's
-// Day-N/Week stamp consumes this one function — no door re-implements the math (that drift was
-// the original cross-door bug). `genesisCount()` is the pure calc; `stampGenesis()` writes it
-// into any [data-bind="genesisStamp"] element, with an optional per-door suffix.
+// THE single genesis source of truth (P0.1). Day N = whole PACIFIC calendar days since
+// genesis, +1 so genesis day is Day 1; Week N = floor((dayN-1)/7)+1 (Day 8 = Week 2).
+// EVERY door's Day-N/Week stamp consumes this one function — no door re-implements the
+// math (that drift was the original cross-door bug). `genesisCount()` is the pure calc;
+// `stampGenesis()` writes it into any [data-bind="genesisStamp"] element, with an
+// optional per-door suffix.
 // Exported (#1088) so the cockpit's time-travel scrub floor shares THIS single
 // client literal as its boot fallback (the API payload is the runtime truth).
 // The reset sweep (deploy/restart_site_copy_sync.py rewrite_js_files) follows
 // the quoted ISO form here — keep it a plain quoted literal.
 export const GENESIS_ISO = "2026-08-17";
 const GENESIS = new Date(`${GENESIS_ISO}T00:00:00`);
-export function genesisCount() {
-  const dayN = Math.floor((Date.now() - GENESIS.getTime()) / 86400000) + 1;
+// #2941: the platform's canonical clock is Pacific (#2506/#2675) — Day N must be the
+// PT calendar count for every viewer. Never subtract a local-midnight instant from
+// Date.now(): that mixes two clocks and reads a day ahead for any viewer east of
+// Pacific during their evening. Instead: today's PT calendar date via Intl, then a
+// date-only diff with both dates pinned to UTC noon (exact 86400000 multiples, so
+// DST transitions can't produce an off-by-one).
+const PT_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit",
+});
+const _utcNoon = (iso) => Date.parse(`${iso}T12:00:00Z`);
+export function genesisCount(now = new Date()) {
+  const todayPT = PT_DAY.format(now); // "YYYY-MM-DD"
+  const dayN = Math.round((_utcNoon(todayPT) - _utcNoon(GENESIS_ISO)) / 86400000) + 1;
   const weekN = Math.floor((Math.max(1, dayN) - 1) / 7) + 1;
   return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since August 17 2026` };
 }
