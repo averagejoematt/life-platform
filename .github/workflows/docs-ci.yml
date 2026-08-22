@@ -176,3 +176,17 @@ jobs:
       - name: Incident-log Patterns section current
         if: always()
         run: python3 scripts/incident_log_patterns.py --check
+
+      # #2986 — both had a working `--check` wired into NOTHING. The catalog's drifted a
+      # month behind a timestamp the reconcile bot refreshed daily (sync_doc_metadata owns
+      # its `Total tools:` literal, not its body), so it read `Total tools: 76` two lines
+      # above `## All 72 Tools`. Both belong here rather than in CI/CD: this lane already
+      # triggers on their inputs (mcp/**, lambdas/**, cdk/**) AND runs pre-merge on a PR,
+      # which is what CI/CD's Unit Tests — where the model's only guard lives — does not.
+      - name: MCP tool catalog current
+        if: always()
+        run: python3 scripts/generate_mcp_tool_catalog.py --check
+
+      - name: System model + dependency graph current
+        if: always()
+        run: python3 scripts/generate_platform_model.py --check

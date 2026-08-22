@@ -235,6 +235,8 @@ jobs:
             python3 deploy/sync_doc_metadata.py --apply
             python3 scripts/generate_adr_index.py --apply
             python3 scripts/incident_log_patterns.py --apply   # #2975 — INCIDENT_LOG's derived Patterns blocks
+            python3 scripts/generate_mcp_tool_catalog.py       # #2986 — docs/MCP_TOOL_CATALOG.md (bare invoke IS the writer)
+            python3 scripts/generate_platform_model.py         # #2986 — model/platform_model.json + docs/DEPENDENCY_GRAPH.md
             python3 scripts/v4_build_game_explained.py
             python3 scripts/v4_build_portraits.py
             python3 scripts/v4_build_data_sources.py
