@@ -345,6 +345,39 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
         scope="",
         proved_on="2026-08-13",
     ),
+    # ── #2938: the gate that was PROVEN unable to fail, then repaired ────────────
+    # This is the first entry recorded from a LIVE PRODUCTION OBSERVATION rather than a
+    # deliberately planted mutation — the defect was already running when it was found.
+    "ci::ci-cd.yml::visual-qa::4": Proof(
+        gate_name="visual-qa / Run visual + AI-vision QA sweep",
+        command="python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1 --reader-truth",
+        mutation=(
+            "NONE PLANTED — the cannot-fail state was observed live in run 32509917798 / job "
+            "96909117231 (2026-08-21), a real fleet deploy. The 'mutation' was the standing "
+            "config: the job installs only playwright, so `import bedrock_client` raises "
+            "ModuleNotFoundError('boto3'). Re-create by dropping boto3 from the job's pip install."
+        ),
+        observed=(
+            "PRE-FIX: both AI sections printed '⚠ AI-QA unavailable — could not import "
+            "bedrock_client: No module named boto3' and the job still concluded SUCCESS (exit 0) "
+            "— a declared-gating check that could not fail, on the deploy path, since 2026-06-05. "
+            "POST-FIX: boto3 is installed in all three visual-qa copies, and run_sweep returns "
+            "`failed == 0 and not ai_gate_failures`, so the same unavailable state now exits 1. "
+            "The decision function is mutation-proved over all six status shapes in "
+            "tests/test_ai_gate_must_run_2938.py (11 tests), including that a budget-tier pause "
+            "still does NOT fail."
+        ),
+        scope=(
+            "HONEST LIMIT: the post-fix RED has been proven at the decision-function level, not "
+            "yet observed end-to-end in CI — this PR's own visual-qa job runs WITH boto3, so it "
+            "goes green and cannot demonstrate the failure. Confirming the red end-to-end needs a "
+            "deliberate run with boto3 removed, which is not worth wedging the deploy path for; "
+            "the next genuine Bedrock outage will demonstrate it for free. Also note the "
+            "deterministic half of this job (Playwright sweep, leak-token sweep) was armed and "
+            "working throughout — only the two AI gates were dark."
+        ),
+        proved_on="2026-08-21",
+    ),
 }
 
 
