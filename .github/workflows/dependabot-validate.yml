@@ -38,8 +38,10 @@ jobs:
       # fails → the bump is NOT auto-merged (left for a human).
       - name: Install dev toolchain (bumped versions)
         run: |
+          # requirements-dev.txt already pins pytest/boto3/botocore — the extra
+          # unpinned `pip install pytest boto3 botocore` that used to follow was a
+          # no-op while in sync and floating-latest the day it wasn't (#2760).
           pip install -r requirements-dev.txt
-          pip install pytest boto3 botocore
 
       - name: Format gate (black --check — ENFORCED)
         run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/

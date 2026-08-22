@@ -55,3 +55,16 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps-cdk)"
+
+  # CDK CLI (cdk/package.json: aws-cdk) — the npm leg of the CDK toolchain (#2760).
+  # The pip leg is above; ci-cd.yml resolves the CLI version from cdk/package.json
+  # at install time, so this bump moves the ONLY copy (no born-red hand-edit —
+  # the #2609 pattern). Before this leg existed the CLI pin sat months stale
+  # behind a "bump it by hand" comment (#2468 incident, fix PR #2751).
+  - package-ecosystem: "npm"
+    directory: "/cdk"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-cdk)"
