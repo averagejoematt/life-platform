@@ -20,9 +20,15 @@ from web import site_api_social as social  # noqa: E402
 
 
 def _event(body):
+    # #1221/#2932: identity is CloudFront-Viewer-Address (the edge-set header) —
+    # the forgeable pair is kept alongside it so these tests run against the
+    # envelope production actually produces, with the trusted header winning.
+    # Without it every caller is identity-less: rate limiting fails CLOSED into one
+    # shared bucket and the capture doors' content dedup switches OFF (per-request
+    # ids), so `test_submit_finding_id_is_content_stable` would assert nothing real.
     return {
         "body": json.dumps(body),
-        "headers": {"x-forwarded-for": "1.2.3.4"},
+        "headers": {"x-forwarded-for": "1.2.3.4", "cloudfront-viewer-address": "1.2.3.4:23456"},
         "requestContext": {"http": {"sourceIp": "1.2.3.4"}},
     }
 
