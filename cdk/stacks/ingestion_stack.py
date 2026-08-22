@@ -17,6 +17,8 @@ from aws_cdk import (
     Duration,
     Stack,
     aws_apigatewayv2 as apigwv2,
+    aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
@@ -617,6 +619,43 @@ class IngestionStack(Stack):
         # Gateway invoke permission on `hae` scoped to this route — no manual
         # hae.add_permission() needed (that hardcoded-ARN call is what this
         # story removes).
+
+        # ── #2822: hae-webhook Errors alarm — the near-real-time carve-out ──
+        # The webhook's only dedicated watch was the no-invocations heartbeat in
+        # monitoring_stack (Invocations < 1 / 24h): a 100%-ERROR state (bad payload
+        # class, secret rotation, schema change) keeps invocations FLOWING and that
+        # heartbeat green while near-real-time CGM/BP/water/State-of-Mind readings
+        # drop, until the freshness checker's per-datatype staleness pages 2-3 days
+        # later. The 2026-05-29 fleet-wide error_alarm=False removal reasoned that
+        # gap-aware CRON sources self-heal and downstream checks catch sustained
+        # failure — sound for pull sources with a backfill cron behind them, but the
+        # HAE webhook is an inbound push with NO backfill cron and NO DLQ
+        # (synchronous API-GW invoke): an erroring invocation is a dropped reading.
+        # Shape mirrors lambda_helpers' fleet error_alarm exactly (AWS/Lambda Errors
+        # dimensioned on the function via metric_errors, 1h period, Sum >= 1,
+        # eval 1 — a transient blip self-clears within the hour, sustained failure
+        # re-fires as new errors arrive).
+        # treat_missing_data=NOT_BREACHING, reasoned: Errors is ABSENT only when
+        # there are no invocations at all, and that state already has exactly one
+        # owner — the hae-webhook-no-invocations-24h heartbeat (BREACHING). Making
+        # this alarm breach on missing data would double-report a quiet webhook on
+        # two alarms and conflate "dead" with "erroring".
+        # Digest routing (ADR-050, like every ingestion-error-* alarm before it):
+        # a next-morning digest line converts the 2-3 day blind window to <24h;
+        # an erroring webhook is a fix-today item, not a 2am page.
+        hae_errors = hae.metric_errors(
+            period=Duration.hours(1),
+            statistic="Sum",
+        ).create_alarm(
+            self,
+            "HaeWebhookErrorAlarm",
+            alarm_name="hae-webhook-errors",
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        hae_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── 16. Google Calendar — RETIRED (ADR-030, v3.7.46)
         # All integration paths blocked by Smartsheet IT policy or macOS restrictions.

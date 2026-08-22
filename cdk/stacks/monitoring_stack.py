@@ -936,14 +936,14 @@ class MonitoringStack(Stack):
             GTE,
         )
 
-        # 2026-05-29: the ~46 per-Lambda ingestion-error-* alarms ($4.60/mo) were
-        # removed (error_alarm=False in ingestion_stack). No aggregate replaces them:
-        # CloudWatch rejects SEARCH in alarms and caps metric-math alarms at ~10
-        # metrics (we have 19 ingestion fns). Sustained ingestion failure is already
-        # caught downstream by the freshness-checker (stale data → SNS), the DLQ +
-        # dlq-consumer (async failures), the canary (pipeline health), and the
-        # remediation agent (per-Lambda diagnosis from logs). The per-Lambda alarms
-        # mostly fired on transient self-healing errors — that was the noise.
+        # 2026-05-29: the ~46 per-Lambda ingestion-error-* alarms ($4.60/mo) were removed
+        # (error_alarm=False in ingestion_stack). No aggregate replaces them: CloudWatch
+        # rejects SEARCH in alarms and caps metric-math alarms at ~10 metrics (19 ingestion
+        # fns). Sustained failure is caught downstream by the freshness-checker (stale → SNS),
+        # the DLQ + dlq-consumer (async), the canary, and the remediation agent (per-Lambda
+        # log diagnosis); the removed alarms mostly fired on transient self-healing errors.
+        # #2822 carves out the ONE near-real-time exception: hae-webhook-errors (ingestion_stack,
+        # digest) — an inbound push with no backfill cron sits blind 2-3 days on this posture.
 
         # ══════════════════════════════════════════════════════════════
         # OBS-01: DynamoDB throttling alarm
