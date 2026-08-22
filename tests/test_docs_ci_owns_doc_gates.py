@@ -125,14 +125,82 @@ def test_engine_doc_sources_are_covered_by_a_trigger_path():
     )
 
 
-def test_push_and_pull_request_path_lists_are_identical():
-    """GitHub Actions has no YAML anchors, so the two lists are duplicated by hand —
-    which means they can drift by hand."""
-    text = _read(_DOCS_CI)
-    blocks = re.findall(r"paths:\s*\n((?:\s*(?:#[^\n]*|-\s*'[^']+')\s*\n)+)", text)
-    assert len(blocks) >= 2, "expected a push and a pull_request paths list in docs-ci.yml"
-    parsed = [re.findall(r"-\s*'([^']+)'", b) for b in blocks[:2]]
-    assert parsed[0] == parsed[1], f"push and pull_request path lists must match:\n  push={parsed[0]}\n  pr={parsed[1]}"
+def _trigger_paths():
+    """(push, pull_request) path lists as docs-ci.yml declares them.
+
+    Parsed as YAML, not regexed. The regex this replaced terminated a block at the first
+    entry carrying a trailing `# comment` — `- 'scripts/doc_facts_ops.py'   # …`, the 7th
+    of 15 — so the identity assertion it fed was comparing two six-element PREFIXES and
+    could not see the tails diverge at all. Found 2026-08-22 while making the tails
+    deliberately diverge (#2982); the guard would have stayed green either way.
+    """
+    import yaml  # in requirements-dev; imported here so collection never depends on it
+
+    spec = yaml.safe_load(_read(_DOCS_CI))
+    # PyYAML resolves the bare key `on:` to the boolean True (YAML 1.1 truthiness).
+    triggers = spec.get("on", spec.get(True))
+    assert triggers, "docs-ci.yml has no trigger block"
+    return triggers["push"]["paths"], triggers["pull_request"]["paths"]
+
+
+# #2982's decision, recorded as an assertion. The two tests-side fact SOURCES a doc gate
+# genuinely reads — derived below rather than trusted from this list, which exists only to
+# make the intent legible next to the asymmetry it licenses.
+_TESTS_PR_PATHS = {"tests/qa_manifest.py", "tests/leak_token_sweep.py", "tests/test_platform_stats_truth.py"}
+
+
+def test_the_only_push_vs_pr_asymmetry_is_the_tests_glob():
+    """GitHub Actions has no YAML anchors, so the two lists are duplicated by hand — which
+    means they can drift by hand. They were identical until #2982, which licensed exactly
+    ONE difference and nothing else.
+
+    `tests/**` on `pull_request` made every test-adding PR a guaranteed CI round-trip: the
+    branch reds on a `test_count` literal `agent_commit.sh` is policy-forbidden to stamp
+    (#2372). The `push` trigger keeps `tests/**`, so main is still fully gated and the
+    reconcile bot still owns the counter.
+    """
+    push, pr = _trigger_paths()
+    assert set(push) - set(pr) == {"tests/**"}, (
+        "the only sanctioned push-vs-PR difference is dropping the blanket tests/** glob from "
+        f"the PR trigger (#2982). Push-only paths are {sorted(set(push) - set(pr))}"
+    )
+    assert set(pr) - set(push) == _TESTS_PR_PATHS, (
+        "the PR trigger must add back exactly the real tests-side couplings and nothing else. "
+        f"PR-only paths are {sorted(set(pr) - set(push))}"
+    )
+
+
+def test_every_tests_side_fact_source_is_on_the_pr_trigger():
+    """THE guard that makes #2982 safe, derived rather than enumerated.
+
+    Dropping the blanket `tests/**` glob is only sound while the specific files a doc gate
+    READS are still listed. So read the gate scripts and find every `tests/<file>.py` they
+    reference as a path — a NEW coupling added later must be added to the PR trigger here,
+    or it fails, rather than silently losing its gate the way #1908's engine docs could.
+    """
+    gate_scripts = [
+        os.path.join(_REPO, "deploy", "sync_doc_metadata.py"),
+        os.path.join(_REPO, "scripts", "check_doc_facts.py"),
+        os.path.join(_REPO, "scripts", "check_doc_index.py"),
+        os.path.join(_REPO, "scripts", "check_doc_links.py"),
+        os.path.join(_REPO, "scripts", "check_doc_tombstones.py"),
+        os.path.join(_REPO, "scripts", "generate_adr_index.py"),
+        os.path.join(_REPO, "scripts", "incident_log_patterns.py"),
+    ]
+    # `ROOT / "tests" / "name.py"` — a real path construction, not a mention in prose.
+    pat = re.compile(r'"tests"\s*/\s*"([A-Za-z0-9_]+\.py)"')
+    referenced = set()
+    for path in gate_scripts:
+        if os.path.exists(path):
+            referenced.update(pat.findall(_read(path)))
+
+    assert referenced, "no tests/ fact sources found in any gate script — the pattern has drifted from the code"
+    _, pr = _trigger_paths()
+    missing = sorted(f"tests/{n}" for n in referenced if f"tests/{n}" not in pr)
+    assert not missing, (
+        f"#2982: a doc gate reads {missing} but the PR trigger does not list it, so a PR editing it "
+        "would not run the gate it can break. Add it to docs-ci.yml's pull_request paths."
+    )
 
 
 # ── The silent-skip trap ─────────────────────────────────────────────────────

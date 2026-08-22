@@ -325,6 +325,28 @@ found 22 unclassified files (20 added to the lane, 2 excluded with reasons).
 on the repo tree has no business running after the merge). If you find yourself hand-listing
 test paths in a brief again, that is the defect this section exists to stop.
 
+**What a test-adding branch owes — nothing (#2982).** It used to owe a `test_count` stamp
+it was forbidden to make. `docs-ci.yml`'s `pull_request` filter carried a blanket
+`tests/**`, so *any* PR that added a test ran `Wiki drift gates`, which reds when
+`test_count` (in `docs/TESTING.md` + `lambdas/web/site_api_common.py`) is stale — while
+`deploy/agent_commit.sh` **deliberately refuses** to stamp that literal on a branch,
+because a global counter in a feature PR is a guaranteed conflict against every concurrent
+PR that also added a test (§4c; #2372 lost five PRs to it on 2026-08-08). The command
+above cannot see the failure either: the gate lives in a workflow the `premerge` marker
+does not cover. Three PRs paid a full CI round-trip to it in one session.
+
+Resolved by dropping `tests/**` from that **`pull_request`** filter only, and listing the
+two files a doc gate genuinely reads as fact sources (`tests/qa_manifest.py` → `PAGES`,
+`tests/leak_token_sweep.py` → `JSON_ENDPOINTS`) plus `tests/test_platform_stats_truth.py`.
+The **`push`** trigger keeps `tests/**` unchanged, so main is still fully gated and the
+reconcile bot still owns the counter — which is §4c's division of labour, not an exception
+to it. `tests/test_docs_ci_owns_doc_gates.py` pins both halves: the asymmetry is the only
+one permitted, and every `tests/<file>.py` a gate script reads must be on the PR trigger,
+*derived from the gate scripts* so a new coupling fails instead of silently losing its gate.
+
+Editing a doc still owes the stamp: a PR touching `docs/**` runs these gates on its own
+merits. Run `python3 deploy/sync_doc_metadata.py --apply` once, immediately before pushing.
+
 ### 4b. Visual-QA fires independently of the pipeline (#749)
 
 The reader-facing regression net (Playwright sweep + Bedrock vision QA + the accuracy
