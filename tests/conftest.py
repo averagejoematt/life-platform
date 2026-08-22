@@ -222,6 +222,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_raw_key_registry_guard.py",  # #2286: no hand-built raw/ S3 keys
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
+        # #2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔
+        # lambdas/operational/qa_check_outputs.py). Its verdict is pure repo shape —
+        # a producer cron moving without its QA-window mirror must red BEFORE the
+        # merge, not after the window has silently drifted a second time (#2670's
+        # own fix seeded exactly that). Sweeps via check_doc_facts' helpers, which
+        # are spec-loaded from scripts/ — invisible to premerge_derivation's
+        # tests/-scoped helper detection, hence hand-listed here.
+        "test_qa_window_derivation_2818.py",
         # ── tree hygiene + safety sweeps ──────────────────────────────────────
         "test_lambdas_packaging_guard.py",  # ADR-146: no loose modules at the lambdas/ root
         "test_bundle_deploy_trigger_registry.py",  # #2920: every path build_bundle.py stages is a deploy trigger or a dated exemption
