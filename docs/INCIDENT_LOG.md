@@ -198,7 +198,7 @@ Last updated: 2026-08-22 opus autonomous drain session (#1332 gate; **+3 new row
 > appeared in it nowhere, and only the "Last updated" line changed per session. A section
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
-**Distribution — 150 dated rows, 115 post-June** (derived 2026-08-21):
+**Distribution — 153 dated rows, 118 post-June** (derived 2026-08-22):
 
 | month | rows |
 |---|---|
@@ -208,19 +208,19 @@ Last updated: 2026-08-22 opus autonomous drain session (#1332 gate; **+3 new row
 | 2026-05 | 1 |
 | 2026-06 | 2 |
 | 2026-07 | 36 |
-| 2026-08 | 79 |
+| 2026-08 | 82 |
 
-**By severity:** P1 4 · P2 21 · P3 53 · P4 67 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 4 · P2 22 · P3 54 · P4 68 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
-than one, and 20 match none):
+than one, and 21 match none):
 
 | n | class |
 |---|---|
-| 94 | deployment error |
-| 34 | stale config / literal drift |
-| 29 | QA-oracle false positive |
-| 22 | lane-subset / union-breach main red |
+| 95 | deployment error |
+| 35 | stale config / literal drift |
+| 30 | QA-oracle false positive |
+| 23 | lane-subset / union-breach main red |
 | 21 | secret / credential |
 | 18 | deploy-plane wedge / strand / race |
 | 12 | IAM / permission |
@@ -228,8 +228,8 @@ than one, and 20 match none):
 | 4 | data quality / scoring |
 | 21 | *(unclassified)* |
 
-The three classes the old list omitted entirely — **QA-oracle false positives (29)**,
-**lane-subset/union-breach main reds (22)**, and **deploy-plane wedges/strands/races
+The three classes the old list omitted entirely — **QA-oracle false positives (30)**,
+**lane-subset/union-breach main reds (23)**, and **deploy-plane wedges/strands/races
 (18)** — are now the 3rd, 4th and 6th largest. They are the shape of this platform's
 failures *today*; deployment errors remain the largest single class but are increasingly
 a co-tag on those three rather than a category of their own.
@@ -238,7 +238,7 @@ a co-tag on those three rather than a category of their own.
 
 A row is **silent** when it failed without announcing itself — nothing paged, nothing
 reddened, and someone found it by looking. That cuts across every class above, so it is
-scored orthogonally (loud/silent × class) rather than as a tenth category. **38 of 150
+scored orthogonally (loud/silent × class) rather than as a tenth category. **38 of 153
 rows are silent.**
 
 **What the corpus actually supports, stated with its limits.** The effect is *directional
@@ -246,18 +246,18 @@ but modest*, and materially weaker than this axis was described as when filed:
 
 | | silent | loud |
 |---|---|---|
-| rows | 38 | 112 |
-| TTD parseable | 27 | 65 |
+| rows | 38 | 115 |
+| TTD parseable | 27 | 67 |
 | median TTD | **19 min** | 12 min |
-| mean TTD | 2,215 min | 2,073 min |
-| exceeded 1 day | 5 (19% of parsed) | 7 (11% of parsed) |
+| mean TTD | 2,215 min | 2,021 min |
+| exceeded 1 day | 5 (19% of parsed) | 7 (10% of parsed) |
 
-Silent rows take **~2.3× longer to detect at the median** and are **~1.7× more likely to
+Silent rows take **~2.3× longer to detect at the median** and are **~1.9× more likely to
 run past a day**. But the means are within 10% of each other, and the "days-scale TTD for
 silent vs minutes for loud" framing does **not** reproduce over the population — it comes
 from reading the worst ~10 silent rows, and the loud set has its own long tail (3 rows
 past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is
-keyword-based over free prose, and **58 of 150 TTD cells state no parseable duration** —
+keyword-based over free prose, and **59 of 153 TTD cells state no parseable duration** —
 over a third — and are excluded rather than counted as zero.
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -267,7 +267,7 @@ by making a silent class loud.
 
 ### Pre-July frequencies are FLOORS, not counts
 
-**April has zero rows, May has one and June two (one of them backfilled by this change)**, against 36 in July and 73 in
+**April has zero rows, May has one and June two (one of them backfilled by this change)**, against 36 in July and 82 in
 August. The platform was not stable in those months — it was under-logged. Two proofs:
 the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop
 row existed until this change backfilled it, and two shipped timezone fixes
