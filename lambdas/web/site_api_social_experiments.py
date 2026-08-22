@@ -534,6 +534,7 @@ def _handle_experiment_suggest(event: dict, *, _g) -> dict:
     _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
     extract_client_ip = _g["extract_client_ip"]
+    extract_idempotency_identity = _g["extract_idempotency_identity"]
     hashlib = _g["hashlib"]
     json = _g["json"]
     logger = _g["logger"]
@@ -574,7 +575,16 @@ def _handle_experiment_suggest(event: dict, *, _g) -> dict:
     # tidiness: an unconditional put on the same key would reset `created_at` and — worse
     # — stamp `status: "pending"` back over a moderation decision Matthew had already
     # made. A retry must be a no-op on an existing row, not a silent un-approval.
-    suggestion_id = hashlib.sha256(f"{ip_hash}:{idea}:{source}".encode()).hexdigest()[:12]
+    #
+    # #2932: the id derives from the IDEMPOTENCY identity, not the rate-limit
+    # `ip_hash`. When CloudFront-Viewer-Address arrives they are the same viewer
+    # address; when it doesn't, `ip_hash` is the shared fail-closed sentinel and the
+    # conditional write below would silently swallow a SECOND reader's identical
+    # idea as a "duplicate" — data loss the moderation queue can't see. The
+    # idempotency identity is per-request unique in that state (dedup off, loudly
+    # logged by common.client_ip), so both readers' rows persist.
+    id_hash = hashlib.sha256(extract_idempotency_identity(event).encode()).hexdigest()[:16]
+    suggestion_id = hashlib.sha256(f"{id_hash}:{idea}:{source}".encode()).hexdigest()[:12]
     now = datetime.now(timezone.utc).isoformat()
     try:
         duplicate = False

@@ -72,6 +72,11 @@ churn hands out fresh buckets anyway) and it does break enforcement against real
 observable rather than silent.
 """
 
+import logging
+import uuid
+
+_LOG = logging.getLogger(__name__)
+
 _VIEWER_ADDRESS_HEADER = "cloudfront-viewer-address"
 
 
@@ -79,6 +84,11 @@ _VIEWER_ADDRESS_HEADER = "cloudfront-viewer-address"
 # absent. A constant on purpose — anything derived from the request would be
 # attacker-chosen, which is the bypass itself.
 _FAIL_CLOSED_IDENTITY = "no-trusted-client-ip"
+
+# #2932: the marker prefix for a minted per-request idempotency identity. Never a
+# constant on its own — see extract_idempotency_identity for why the two failure
+# directions are opposites.
+_UNTRUSTED_IDENTITY_PREFIX = "untrusted-client"
 
 
 def _headers(event: dict) -> dict:
@@ -188,3 +198,49 @@ def extract_client_ip(event: dict, default: str = "unknown") -> str:
     # not stable per viewer, and gave almost no enforcement (6 requests against a
     # 3/hour limit -> 400 429 400 400 400 400).
     return _FAIL_CLOSED_IDENTITY
+
+
+def extract_idempotency_identity(event: dict) -> str:
+    """Identity for content-keyed IDEMPOTENCY ids — never for rate limiting.
+
+    Same first choice as ``extract_client_ip``: the un-forgeable
+    ``CloudFront-Viewer-Address``. The FAILURE direction is deliberately the
+    OPPOSITE (#2932), because the two callers of this module need opposite things
+    from a missing identity:
+
+    * A **rate limiter** wants every identity-less caller in ONE bucket — a shared
+      limit is a safe failure (requests throttle site-wide, loudly). That is
+      ``extract_client_ip``'s fail-closed sentinel.
+    * An **idempotency key** wants them APART. The capture doors derive their id as
+      ``sha256(f"{ip_hash}:{content}")`` and guard the write with
+      ``attribute_not_exists`` / same-key overwrite — so under the shared sentinel,
+      two DIFFERENT readers submitting the same words derive the same id and the
+      second submission is silently swallowed as a "duplicate" that never reaches
+      moderation. That is silent data loss, and it is invisible: a swallowed
+      submission is indistinguishable from a genuine retry.
+
+    So when no trusted identity exists this returns a per-request UNIQUE value.
+    Dedup degrades — a same-reader retry may mint a second moderation row, which is
+    VISIBLE and costs one duplicate review — instead of a stranger's submission
+    being lost, which is invisible and costs the submission. The degradation is
+    logged loudly below; ``client_ip_is_trusted()`` remains the programmatic probe.
+
+    If this warning ever appears in production, a ``/api/*`` behaviour has stopped
+    forwarding ``CloudFront-Viewer-Address`` (the origin-request-policy coupling —
+    see ``cdk/stacks/web_cloudfront_policies.py`` and the derived guard in
+    ``tests/test_capture_door_untrusted_identity_2932.py``).
+    """
+    viewer = _strip_port(_headers(event).get(_VIEWER_ADDRESS_HEADER) or "")
+    if viewer:
+        return viewer
+
+    nonce = uuid.uuid4().hex
+    _LOG.warning(
+        "[client_ip #2932] no trusted client identity (CloudFront-Viewer-Address absent) — "
+        "minting per-request idempotency identity %s…: content dedup is OFF for this request, "
+        "so distinct readers cannot be silently collapsed onto one submission. If this logs in "
+        "production, a /api/* behaviour has stopped forwarding the header (origin request policy, "
+        "cdk/stacks/web_cloudfront_policies.py).",
+        nonce[:8],
+    )
+    return f"{_UNTRUSTED_IDENTITY_PREFIX}:{nonce}"
