@@ -69,6 +69,21 @@ on:
       - 'config/**'
       - 'cdk/**'
       - 'tests/**'
+  # #2982 — the ONE deliberate asymmetry between these two lists, and the only one
+  # allowed (test_the_only_push_vs_pr_asymmetry_is_the_tests_glob pins it).
+  #
+  # `tests/**` on `pull_request` made every test-adding PR a guaranteed CI round-trip:
+  # the `test_count` literal goes stale, `sync_doc_metadata --check` reds — and
+  # `deploy/agent_commit.sh` is DELIBERATELY forbidden to stamp that literal on a
+  # branch, because doing so makes it a guaranteed conflict against every concurrent
+  # PR that added a test (#2372's collision class, which lost five PRs on 2026-08-08).
+  # The branch was gated on a global counter it was policy-forbidden to update, and
+  # `pytest -m premerge` — the documented pre-PR command — cannot see the failure.
+  #
+  # `test_count` is main's business; the post-merge reconcile bot owns it, and CONVENTIONS
+  # §4c already says so. What is dropped here is exactly that one coupling. The two real
+  # tests-side fact SOURCES are named individually below, and the push trigger keeps
+  # `tests/**` unchanged, so main stays fully gated.
   pull_request:
     paths:
       - 'docs/**'
@@ -85,7 +100,15 @@ on:
       - 'mcp/**'
       - 'config/**'
       - 'cdk/**'
-      - 'tests/**'
+      # NOT 'tests/**' — see the #2982 note above. These are the tests-side paths a doc
+      # gate actually READS as a fact source, verified 2026-08-22 by scanning every gate
+      # script for a reference under tests/:
+      - 'tests/qa_manifest.py'          # PAGES — sync_doc_metadata runs `--emit leak` (#1426)
+      - 'tests/leak_token_sweep.py'     # JSON_ENDPOINTS — AST-read from the literal there (#1448)
+      # Not a fact source — it is the pytest that reds when the PLATFORM_STATS literal
+      # drifts, and it runs in CI/CD's Unit Tests. Listed anyway so a change to the guard
+      # still runs the gate family it belongs to.
+      - 'tests/test_platform_stats_truth.py'
   workflow_dispatch: {}
 
 permissions:
