@@ -270,6 +270,126 @@ def test_daily_brief_blocks_empty_bod_and_reports_it():
     assert out["tldr_guidance"]["guidance"] == ["Prioritise quality sleep tonight for recovery."]
 
 
+def test_daily_brief_blocked_journal_coach_is_reported():
+    """#2918: jc_result had its .blocked flag set and acted on (fallback swapped in)
+    but never reported — the operator's warning count undercounted. Inject the
+    BLOCKED state through the real assembly path and assert it reaches the
+    aggregate the brief reads."""
+    out = v.validate_daily_brief_outputs(
+        bod_insight="Solid recovery today; keep the intensity conversational and steady throughout the session.",
+        training_nutrition={
+            "training": "Good steady effort today, keep it conversational and controlled.",
+            "nutrition": "Hit your protein target and stay within your calorie range today.",
+        },
+        journal_coach_text="",  # blocked → fallback, and MUST be reported
+        tldr_guidance={"tldr": "Rest well and recover fully today.", "guidance": []},
+        health_context={},
+    )
+    assert out["journal_coach_text"] == v._fallback_for_type(AIOutputType.JOURNAL_COACH)
+    blocked_entries = [w for w in out["validation_warnings"] if "BLOCKED" in w]
+    assert any(w.startswith("[journal_coach] BLOCKED:") for w in blocked_entries), out["validation_warnings"]
+    # Exactly one output was blocked; exactly one BLOCKED entry may report it.
+    assert len(blocked_entries) == 1
+
+
+def test_daily_brief_blocked_tldr_is_reported():
+    """#2918: a suppressed TL;DR — the brief's headline — read as a healthy run
+    ('All AI outputs passed validation'). A blocked tldr_result must surface in
+    validation_warnings like its four siblings."""
+    out = v.validate_daily_brief_outputs(
+        bod_insight="Solid recovery today; keep the intensity conversational and steady throughout the session.",
+        training_nutrition={
+            "training": "Good steady effort today, keep it conversational and controlled.",
+            "nutrition": "Hit your protein target and stay within your calorie range today.",
+        },
+        journal_coach_text="Reflect on what worked and what you'd adjust tomorrow.",
+        tldr_guidance={"tldr": "", "guidance": []},  # blocked headline
+        health_context={},
+    )
+    assert out["tldr_guidance"]["tldr"] == v._fallback_for_type(AIOutputType.TLDR)
+    blocked_entries = [w for w in out["validation_warnings"] if "BLOCKED" in w]
+    assert any(w.startswith("[tldr] BLOCKED:") for w in blocked_entries), out["validation_warnings"]
+    assert len(blocked_entries) == 1
+
+
+def test_daily_brief_blocked_count_equals_blocked_outputs():
+    """#2918 acceptance: the blocked-output count the operator reads equals the
+    number of outputs actually blocked. Reproduces the 2026-08-20 live shape
+    (nutrition + journal both empty → 2 blocks) plus a blocked TL;DR → 3."""
+    out = v.validate_daily_brief_outputs(
+        bod_insight="Solid recovery today; keep the intensity conversational and steady throughout the session.",
+        training_nutrition={
+            "training": "Good steady effort today, keep it conversational and controlled.",
+            "nutrition": "",  # blocked (the one that WAS reported on 2026-08-20)
+        },
+        journal_coach_text="",  # blocked (silent pre-fix)
+        tldr_guidance={"tldr": "", "guidance": []},  # blocked (silent pre-fix)
+        health_context={},
+    )
+    blocked_entries = [w for w in out["validation_warnings"] if "BLOCKED" in w]
+    assert len(blocked_entries) == 3, out["validation_warnings"]
+    tags = {w.split("]")[0] + "]" for w in blocked_entries}
+    assert tags == {"[nutrition]", "[journal_coach]", "[tldr]"}
+
+
+# ── #2918 structural guard: every validate_ai_output result must have its ────
+# ── .blocked checked — guard the SET, not the instance ───────────────────────
+
+
+def _daily_brief_blocked_coverage(src: str):
+    """AST over validate_daily_brief_outputs (the idiom that found #2918):
+    return (results assigned from validate_ai_output, names with an
+    `if X.blocked` guard)."""
+    import ast
+    import textwrap
+
+    fn = ast.parse(textwrap.dedent(src)).body[0]
+    assigned, checked = set(), set()
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Assign):
+            call = node.value
+            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == "validate_ai_output":
+                assigned.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        elif isinstance(node, ast.If):
+            for sub in ast.walk(node.test):
+                if isinstance(sub, ast.Attribute) and sub.attr == "blocked" and isinstance(sub.value, ast.Name):
+                    checked.add(sub.value.id)
+    return assigned, checked
+
+
+def test_daily_brief_every_validation_result_has_blocked_checked():
+    """#2918: two of six results (jc_result, tldr_result) set .blocked, swapped
+    in the fallback, and never reported. Structural guard so a seventh output
+    added later cannot repeat this: every name bound to a validate_ai_output
+    call inside validate_daily_brief_outputs must appear in an `if X.blocked`
+    test somewhere in the function."""
+    import inspect
+
+    assigned, checked = _daily_brief_blocked_coverage(inspect.getsource(v.validate_daily_brief_outputs))
+    # Self-check the instrument: the function creates six results today; if the
+    # AST sweep ever finds none, the guard is measuring nothing (silent pass).
+    assert len(assigned) >= 6, f"AST sweep found only {sorted(assigned)} — instrument broken?"
+    unchecked = assigned - checked
+    assert not unchecked, f"validate_ai_output results with .blocked never checked (the #2918 defect): {sorted(unchecked)}"
+
+
+def test_daily_brief_blocked_guard_goes_red_on_mutation():
+    """Mutation proof for the structural guard: strip one `if X.blocked` branch
+    from the real source and the coverage sweep must report that name."""
+    import inspect
+    import re
+
+    src = inspect.getsource(v.validate_daily_brief_outputs)
+    mutated = re.sub(
+        r"if jc_result\.blocked:\n\s*all_warnings\.append\([^\n]+\)\n",
+        "",
+        src,
+    )
+    assert mutated != src, "mutation did not apply — regex drifted from source"
+    assigned, checked = _daily_brief_blocked_coverage(mutated)
+    assert "jc_result" in assigned - checked
+
+
 # ── small helpers ────────────────────────────────────────────────────────────
 
 
