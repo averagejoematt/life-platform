@@ -157,6 +157,28 @@ def test_alarm_count_ignores_incident_prose(ops, facts, tmp_path):
     assert ops.alarm_count_hits(_scratch(tmp_path, "3 alarms sat red for nine days.\n"), 81, facts.line_is_exempt) == []
 
 
+def test_alarm_count_ignores_assigned_parameters(ops, facts, tmp_path):
+    """An `=`-assigned number is a PARAMETER, not an inventory count.
+
+    2026-08-22: `docs/PROPORTIONALITY.md:84` said "the Period=86400 alarms are re-cut"
+    (the #2912 flap-detector row). The old lookbehind excluded `[\\w.$]` but not `=`, so
+    the CloudWatch period parsed as a claim of 86400 alarms and red-mained BOTH `Docs CI`
+    and `test / Unit Tests` off one line.
+    """
+    for line in (
+        "the Period=86400 alarms are re-cut",
+        "Threshold=500 alarms would page nightly",
+        "EvaluationPeriods=1440 alarms",
+    ):
+        assert ops.alarm_count_hits(_scratch(tmp_path, line + "\n"), 108, facts.line_is_exempt) == [], line
+
+
+def test_alarm_count_still_fires_when_the_number_merely_follows_punctuation(ops, facts, tmp_path):
+    """The `=` carve-out must not blind the rule to real claims after other punctuation."""
+    hits = ops.alarm_count_hits(_scratch(tmp_path, "CloudWatch (prod): 500 alarms total.\n"), 108, facts.line_is_exempt)
+    assert len(hits) == 1 and "claims 500" in hits[0]
+
+
 def test_alarm_count_clean_on_real_docs(ops, facts):
     truth = facts._ground_truth()["alarm_count"]
     hits = ops.alarm_count_hits(facts._scan_files(), truth, facts.line_is_exempt)
