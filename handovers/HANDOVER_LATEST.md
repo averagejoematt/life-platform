@@ -1,193 +1,138 @@
-# Handover — 2026-08-21 ~19:00 PT → 2026-08-22 ~07:00 PT: an armed gate with no baseline blocked the publish path, and the fix for that was five rounds deep
+# Handover — 2026-08-22 ~08:20 → ~11:20 PT: the plan's metric was wrong, and five instruments were lying
 
-**Session:** Fable 5 (switched to Opus 5 for the wrap on usage headroom), autonomous. The
-driving instruction was `/plan` → *"plan a really effective autonomous session to clean up as
-many open issues as possible in the backlog"*, with owner-granted **full merge/deploy authority
-and small scoped IAM grants**. Previous wrap archived as
-`HANDOVER_2026-08-21_epic-tails-drain.md`.
+**Session:** Opus 5, interactive. The driving instruction was *"Make a plan for an effective
+next autonomous session — pay down as many of our open issues as possible — opus or below only
+— no fable"*, then a series of `yes` / *"do what the best engineers would recommend"* approvals
+that turned the planning session into an executing one. Previous wrap archived as
+`HANDOVER_2026-08-21_deploy-plane-unblock.md`.
 
-**Build beat:** none — the reader-visible half (the Day/Week stamp now correct for every
-non-Pacific reader, #2941; readable vitals labels, #2674) is a *defect leaving* the site, and
-`docs/content/BUILD_DISPATCH_CHECKLIST.md` wants a beat a reader experiences as an addition.
-The honest story of the night is a QA-instrument fight, which is not a public beat.
+**Build beat:** none — nothing reader-visible shipped. The two merges are a CI pin and an
+internal privacy-tier guard; the one reader-facing defect found (#2972) is still open and is a
+*defect leaving* the site, which `docs/content/BUILD_DISPATCH_CHECKLIST.md` does not want as a
+beat.
 
-**Main:** stranded → recovering. `check_main_green.py` reported the **R8-ST6 Plan-red /
-Deploy-skipped** class (#1901, CONVENTIONS §4d): the Plan job stops on `CDK diff detected
-IAM/policy changes` — a *designed* manual-review stop, triggered by this session's three scoped
-grants. Because the IAM had already been applied by hand (`cdk_deploy.sh`), the documented
-recovery — a `deploy_all=true` dispatch of `ci-cd.yml` — was run as `32577787912` and was still
-on its test legs at wrap time. **All affected code was deployed directly and verified by
-`LastModified` + shipping-sha ancestry, so nothing waits on that run.**
+**Docs:** `docs/INCIDENT_LOG.md` (+2 rows, derived Patterns section regenerated 153→155),
+`docs/PROPORTIONALITY.md` (privacy-tier gate row), `docs/SCHEMA.md` (the Tier-2 paragraph now
+points at the registry that replaced it), `docs/alarm_citations.json` (#2976 flap citation).
+The session plan itself was written to `handovers/NEXT_SESSION_PLAN.md`, which `.gitignore`
+keeps off `main` (#1650) — it is laptop-local scratch, so everything durable from it is
+reproduced in this handover rather than referenced.
 
-**Docs:** `docs/INCIDENT_LOG.md` (3 rows + `Last updated:`), `docs/PROPORTIONALITY.md` (4 rows,
-Verified bumped), `docs/alarm_citations.json` (3 flap citations), `docs/reviews/CLOUDWATCH_AUDIT_2026-07.md`
-(new §9 us-east-1 section, via #2965), `docs/CONVENTIONS.md` §4/§9 (via #2955/#2947).
+**Decisions:** none needed — no governance-consequential choice was made. The #2841 decision
+(umbrella vs. dated acceptance) is recorded on the issue and in `#2978`, and CONVENTIONS §8b
+already carried the rule.
 
-**Decisions:** none needed — no governance-consequential choice landed. The nearest, the truth-debt
-ledger's gate semantics (#2956), deliberately *copies* an existing sanctioned pattern (the #1433
-a11y debt ledger) rather than establishing a new posture, so it is an implementation of ADR-076's
-QA contract, not an amendment to it.
+**Incidents:** 2 rows added — main red 1h58m on two independent stale-derived-artifact defects
+(the second landing on an innocent commit, filed as #2975); and two production-approval leases
+rejected as superseded after the deploy had been done manually and verified.
 
-**Incidents:** 3 rows added — the three-round auto-rollback from the un-baselined reader-truth
-gate (P2); main red on the wrap's own INCIDENT_LOG edit (P4); and the 08-21 wrap commit re-closing
-#2921/#2578 by narrating the accident that closed them (P3).
+**Main:** red — the newest *completed* CI/CD run is `caa7e6ae`'s, which failed on the literal
+drift since fixed by `3eb9f2583`. Every gate has since passed on HEAD: run `32587130309` on
+`a2e02465` shows reconcile / lint / deploy-critical / **Unit Tests** / Plan all green, with only
+the Deploy job parked — and that deploy was performed manually and verified, so the lease was
+rejected rather than left to strand. Docs CI is green on HEAD.
 
-**Closures:** #2941, #2956, #2918, #2912, #2932, #2652, #2827, #2822, #2820, #2818, #2761, #2760,
-#2678, #2674, #2919, #2829 commented (ADR-099 shape), plus **EPIC #2645** closed with acceptance
-evidence. #2829 is honestly recorded as **partial**.
+**Alarms:** clean after adding one citation — `ingest-liveness-unhealthy` fired **and cleared**
+inside the 72h window (the #2912 flap detector's catch), cited to #2976 with the live
+measurement that explains it.
 
-**Backlog:** 82 → **74 open** (17 closed, 8 filed, 2 reopened). `Now` refilled to 5 actionable
-(promoted #2759, #2889, #2893 by stored rank); `Later` sweep printed no stale issues.
-`check_backlog_hygiene.py` → `OK — 74 open issue(s)` after fixing 18 violations on issues this
-session filed.
+**CI warnings:** none to triage — the newest completed main run isn't green, which is (e2)'s
+business, not (e11)'s.
 
 **Stash/hooks:** clean — `git stash list` empty, hook freshness 🟢.
 
-**Alarms:** 0 red >72h. The **new flap detector caught 3** fired-and-cleared episodes invisible to
-current-state duration — all three now cited in `docs/alarm_citations.json`.
+**Backlog:** Now live at 13 actionable; no stale `Later` issues. Fixed 12 hygiene violations I
+had introduced — 9 score lines written with ASCII `x`/`->` instead of canonical `×`/`→`, 2
+`## Outcome` blocks naming an unsanctioned audience ("Readers"), and epic #2799's `## Stories`
+missing its 6 new children.
 
-**CI warnings:** none to triage — `check_ci_warnings.py` correctly defers while the newest main run
-isn't green (that is (e2)'s business, not its own).
+**Closures:** #2759, #2803 commented (the two that auto-closed via `Fixes` with no comment);
+#2841, #2753, #2802 carried their verdicts at close time.
 
-**Ledger:** 4 rows added — reader-truth debt ledger, the two delivery dead-men, the alarm flap
-detector, the producer↔gate cron mirror check.
+**Ledger:** privacy-tier field registry + consumer gate row added to `docs/PROPORTIONALITY.md`
+(#2803) — posture, rent, and a stated demote trigger, honoring the issue's ADR-103/144 pricing
+caveat.
 
 ---
 
-## What actually happened
-
-The plan was a clean three-wave fan-out over the ranked backlog. That part worked: **13
-worktree-implementer agents, 21 PRs merged, 17 issues closed**. But the session's real work was
-not the backlog — it was that **the publish path was blocked, and every attempt to unblock it
-revealed the previous attempt had been reasoning from too small a sample.**
-
-### The chain
-
-The prior session armed the reader-truth gate (#2940), which had been dark since June. Its first
-run caught a genuine bug (#2941): `genesisCount()` subtracted a browser-**local** midnight from
-`Date.now()` (a UTC instant), so every reader east of Pacific saw tomorrow's Day number. Fixed and
-merged as **#2942** — verified by render-qa in a London browser pinned to the incident instant
-(Day 5 correct; old code Day 6; Pacific unregressed; negative control proved the harness could see
-the bug).
-
-Then the deploy carrying that fix **rolled back**. Not on the fix — on **16 standing findings
-about content that predated any deploy**. The gate could not tell "this deploy broke truth" from
-"the site carries truth debt", so it failed every `site/**` merge regardless of diff.
-
-The structural answer was #2956: a **triaged debt ledger**, copied deliberately from the a11y
-gate's #1433 contract — NEW `(page, category)` highs still FAIL, baselined ones surface as
-warnings naming their tracking issue, unobserved entries report as shrink candidates, and a fresh
-entry lands `UNTRIAGED` which **reds the unit suite until a human names an issue**. The key
-design call: the gate key is `(page, category)`, never the finding note, because #2613 already
-measured one finding wearing three different phrasings on three consecutive nights.
-
-That should have been the end. It was round two of five.
-
-- **Round 3** failed on `/data/autonomic/` — a *deterministic* check, not the oracle. On cycle
-  Day 5 of a 7-day minimum, the API honestly answers `{available: false, reason: "Need at least
-  7 days — 5 so far"}` and the page renders that reason as designed. But `_payload_is_empty`
-  recognised only empty collections and zero counts, so the genesis dark-state discrimination
-  (#2500 — built for exactly this) **refused the engine's own declared-absence contract** and
-  gated. Fixed in **#2970**, scoped hard: `available` must be literal `False` with a non-empty
-  `reason`; every unknown shape stays fail-closed.
-- **Rounds 3, 4 and 5** each also surfaced *new* oracle findings on pages the earlier rounds had
-  not flagged. The mechanism matters: the oracle batches 4–6 surfaces per Bedrock call, so each
-  full-surface run **samples a different subset of a latent population across 93 pages**. Its
-  findings are non-stationary run-to-run. The ledger converges by absorbing each sample.
-
-Findings per round: **77 → 16 → 3 → 2 → 0.** The fifth deploy went green end-to-end, and the
-live CDN now serves the Pacific-anchored module (verified by content fetch, site 200).
-
-### What I got wrong, in order
-
-1. **I told the owner "82 → 63 open".** The measured number is **74**. I reported a figure I had
-   not counted at the moment I said it. Corrected here and in the status block; the arithmetic
-   (82 − 17 + 8 + 1 re-opened pair) lands at 74.
-2. **I claimed the ledger would unblock the plane after round 2.** It unblocked one *class*. I
-   generalised from 16 findings to a 93-page population I had not sampled — the same error the
-   previous session made when it armed the gate off two fixed defects. Twice in two sessions, the
-   same shape: **reasoning from the sample you happen to hold.**
-3. **My first monitor latched onto the wrong workflow**, reporting the v4-gate's job names as the
-   site deploy's and declaring `TERMINAL: success` for a run that had not deployed anything.
-
-### The find worth keeping
-
-Two issues (#2921, #2578) that the previous session had deliberately reopened were **closed again
-at 01:27Z** — by that session's own wrap commit. Its body reads:
-
-> `closed #2921 by accident writing "Does NOT close #2921" … and closed #2578 overclaiming`
-
-GitHub parses the literal phrase `closed #2921` as a closing keyword regardless of surrounding
-prose. **The confession re-committed the crime.** The known rule in memory is "a negated closing
-keyword still closes"; this is a second variant one layer up — *writing about a closure in past
-tense also closes*. Post-mortem prose about issue handling is itself parsed. Both reopened.
-
-### Two judgment calls
-
-- **The three flapping alarms were cited, not silenced.** #2912's detector (merged 3h earlier)
-  fired at this very wrap on `weekly-signal-delivery-heartbeat` — an alarm *I created tonight*.
-  It was a real arming transient (BREACHING-on-missing with no datapoints yet), and the honest
-  move was a citation explaining the episode plus the distinction from a real missed send, not an
-  exemption.
-- **`Advances #2883`, not `Fixes`.** The cost-drift worker declined a closing keyword because box
-  2 is measurably unmet (live ratio 1.37 against a <1.15 bar). The alarm deploys **red-bound by
-  design** with an expected-red citation. That is the correct call and I kept it.
-
 ## What shipped
 
-| PR | What | Issue |
+| PR | what | state |
 |---|---|---|
-| #2942 | Day/Week stamp counts Pacific calendar days | #2941 |
-| #2960 · #2970 · #2971 (+2 direct) | the reader-truth debt ledger + declared-absence contract | #2956 |
-| #2943 | two of six AI validations never reported BLOCKED | #2918 |
-| #2947 | the citation gate now sees fired-and-cleared alarms | #2912 |
-| #2949 | capture-door idempotency stops collapsing readers onto one sentinel | #2932 |
-| #2951 | 69 uncovered GET routes swept; numeric denominator 59 → 123 | #2652 (closes EPIC #2645) |
-| #2945 | STILL-IN-ALARM section with ages | #2827 |
-| #2964 | hae-webhook Errors alarm | #2822 |
-| #2969 | chronicle + Weekly-Signal delivery dead-men | #2820 |
-| #2950 | QA windows derived from the CDK's real crons | #2818 |
-| #2954 | the #2380 proportionality gate becomes a check that can fail | #2761 |
-| #2955 | 8 unpinned workflow installs + two missing Dependabot legs | #2760 |
-| #2952 | insight identity at the write path + backfill | #2678 |
-| #2953 | 8 sub-11px rules lifted; HTML-text floor gate | #2674 |
-| #2946 | coach colours to 5.05:1 / 5.12:1 + set-wide guard | #2919 |
-| #2965 | us-east-1 audit section (titled bug already fixed) | #2829 |
-| #2948 | sustained AI-cost drift alarm | advances #2883 |
+| **#2966** | the npm leg of #2759 — `remediation/package.json` as version of record, Dependabot npm ecosystem, bare-`npm install -g` guard | merged `cbbc08ce2` |
+| **#2980** | #2803 — privacy tier becomes structure: `field_tiers.py`, an AST-derived consumer registry, `TIER2_STRIP_FIELDS` converted from literal to derivation | merged `a2e024656`, **deployed + verified live** |
 
-**Deployed and verified:** 3 CDK stacks (Operational, Ingestion — `HaeWebhookErrorAlarm`
-CREATE_COMPLETE confirmed — and Email), site-api, and 3 operational Lambdas that CI's stranded
-Plan job never shipped (`alert-digest`, `cost-governor`, `qa-smoke` — each confirmed at shipping
-sha `e0c2b632`). Dead-men seeded with arming datapoints. **Scoped IAM grants applied:**
-`cloudwatch:DescribeAlarms` (alert-digest), `cloudwatch:PutMetricData` ×2 (chronicle sender,
-weekly-signal), `ssm:GetParameter` on `/life-platform/budget-tier` (chronicle sender).
+Plus two direct commits to main: `caa7e6ae2` (the `#1957` alarm-matcher fix that greened main)
+and `3eb9f2583` (INCIDENT_LOG regeneration), and `1688a62b0` (the #2841 tracker pointer).
 
-**Backfill:** #2678's dry run classified **1298 rows needing backfill / 18 complete / 0
-unfixable** — the issue's "32 of 33" was the windowed `get_insights` view, not the partition.
-Applied: **1316 of 1316 rows carry both fields, 0 remain.**
+**Closed:** #2759, #2841, #2803, and epics **#2753** and **#2802** — both with their own
+acceptance verified against live code, not inferred from child state.
+
+**Deployed:** `life-platform-site-api` 17:52:06Z and `life-platform-mcp` 17:53:31Z against a
+17:14:22Z merge, ancestry-gated preflight and postflight.
+
+## The thing worth carrying forward
+
+**The plan's success metric was wrong.** It said "pay down as many open issues as possible";
+open went **74 → 78**. Almost every issue filed describes something that was already broken and
+invisible, so a drain-shaped goal structurally cannot see the work. Next session's goal is
+better written as *leave the board more honest than you found it*.
+
+Five instruments were found lying, and two of them were mine:
+
+1. **Three alarms lit while healthy** — dropbox recovered at 13:33Z and stayed lit because
+   `IngestAuthHealthy` is only ever emitted as `0`; there is no `1.0` anywhere in August
+   (#2976).
+2. **The AI oracle silently skips 2 pages** — `Home` and `Protocols hub` return a Bedrock
+   `ValidationException` and are counted among the passes (#2973).
+3. **CI Bedrock spend bills without recording** — the visual-qa role lacks `PutMetricData`,
+   plausibly feeding the very drift #2883 is trying to close (#2974).
+4. **The truth-ledger baselining path silently no-ops** — it writes only `high` findings, so a
+   deliberate baselining run on a finding the oracle grades `medium` that day records nothing
+   *and prints "rewritten"* (#2981).
+5. **My own PR monitor reported "6 of 6 checks failing"** when nothing was failing — its jq
+   treated empty-string conclusions as non-null. Rewritten to key on `.status == "COMPLETED"`.
+
+And twice a verification I ran measured nothing and returned clean: an MCP probe that got a
+401 with no data (re-done by executing the downloaded live artifact), and a fallback-chain
+measurement that read *truncated* text, where truncation had removed the very pronoun that
+made it a violation.
+
+## The #2972 reversal — read this before touching it
+
+I built a read-time guard for the public board's audience violations, measured it, and threw
+it away. Two disqualifying defects:
+
+- It would have **blanked all seven coach blurbs** on the flagship page.
+- It checked text *after* `truncate_at_word(…, 200)`, so a 200-char slice of addressing prose
+  passes a check its source fails — it would have laundered the defect it existed to catch.
+
+The real diagnosis: **`position_summary` is empty in 175 of 175 rows.** The board falls through
+to `content`, which is written *to* Matthew because that is what it is. `position_summary` *is*
+written — to `USER#matthew` / `SOURCE#coach_thread#…`, a different partition — and **that copy
+is direct-address too** (8 of 8 sampled). So no producer anywhere writes reader-facing coach
+prose, and no read-time guard can fix it.
+
+**I withdrew my own "do not baseline it" instruction** on the issue. That was written believing
+this was fresh deploy-caused breakage; 175/175 rows and weeks of history say it is standing
+debt, which is exactly what the #2956 ledger exists to hold.
 
 ## Residual / next picks
 
-- #2957 — cross-phase counters render unlabeled (57-day training gap, "THIS SEASON · 26 graded
-  forecasts", N=16 voice judgments); fixing them shrinks the ledger
-- #2958 — `/method/postmortems/` renders the LIVE cycle as a closed post-mortem, contradicting
-  `/method/survival/`
-- #2959 — the oracle false-positive classes (10+ findings): inclusive-vs-elapsed day counting, a
-  new `audience_violation` category on the coaching pages whose designed content *is*
-  coach-to-Matthew messages, and a UTC billing frame on `/method/receipts/`
-- #2966 — the npm claude-code pin; the only PR still open, twice-rebased through the doc-sync
-  literal treadmill
-- #2944 — the recurring empty JOURNAL_COACH output (root cause, not the reporting fix)
-- #2961 · #2962 · #2963 — the us-east-1 residuals (orphan adoption via `cdk import`, duplicate
-  billing-alarm retirement, dash-total-errors watching the wrong distribution)
-- #2921 · #2578 — both reopened this session after the wrap-commit re-closure; genuinely unfinished
-- #2841 — the QA-oracle false-red umbrella; **2 new instrument false-reds recorded tonight**
-  against the prior 13-in-21-days measurement — re-measure after a few clean deploy cycles
-- #2692 — Unit Tests wall clock measured **1297s** this session (sixth crossing, but *down* from
-  1517s); commented, not raised
-- *not-work — the reader-truth oracle's non-stationary sampling means a future site deploy may
-  surface another new (page, category) pair. Each is a two-minute ledger add under its triage
-  issue. The population is near-drained (77 → 0 across five runs) but the tail is real; this is a
-  standing operational note, not a backlog item.*
-- *not-work — CI's Plan job stops at the R8-ST6 IAM gate whenever a session lands IAM. That is
-  by design and needs no fix; the recovery is a `deploy_all=true` dispatch after the CDK deploy.*
+- #2972 — the producer must emit reader-facing coach prose; corrected diagnosis and revised
+  acceptance are on the issue
+- #2981 — the baselining no-op blocks acknowledging #2972 as debt; fix this first, it is the
+  cheaper of the two and unblocks the publish path
+- #2975 — the incident-log guard's lane placement; every wrap adding rows reds a later
+  innocent commit until this lands
+- #2982 — the `test_count` policy conflict; **option A as filed is too blunt** and the refined
+  option is in the issue comment, verified against the three real coupling points
+- #2976, #2973, #2974, #2977 — the instrument defects above
+- #2797 — the epic will NOT close on #2803 alone: six folded findings remain, and one
+  (`segmental-fields-unverified-live`) is **blocked on a future weigh-in**, so it cannot close
+  today at any effort. Splitting that item out is the recommended next move
+- not-work — **the epic-tail method itself has a blind spot**: deriving an epic's remaining
+  work by grepping `#NNNN` out of its body cannot see *folded findings* (prose bullets with no
+  issue number), so any epic carrying them looks closer to done than it is. That is how the plan
+  claimed #2803 would close #2797. Verify an epic's own `## Done when` + folded list before
+  closing it — the rule held for #2753 and #2802 and caught me on #2797
