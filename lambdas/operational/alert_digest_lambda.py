@@ -5,7 +5,15 @@ Drains the life-platform-alerts-digest-queue SQS (fed by the
 life-platform-alerts-digest SNS topic with raw message delivery), groups
 by AlarmName, and sends ONE summary SES email at 8 AM PT.
 
-If the queue is empty, sends nothing (no "all clear" emails).
+#2827: SNS only fires on state TRANSITIONS, so an alarm that stays red
+falls out of the digest entirely (one live alarm had been red 29 days on a
+single transition). Every run now also does ONE read-only
+describe-alarms(StateValue=ALARM) sweep and appends a "STILL IN ALARM"
+section with each standing red's age — and a digest IS sent when standing
+reds exist even if the transition queue is empty.
+
+If the queue is empty AND nothing is standing in ALARM, sends nothing
+(no "all clear" emails).
 
 Replaces the previous model where every CloudWatch alarm produced an
 immediate email — see DECISIONS.md ADR-050 for rationale.
@@ -44,6 +52,7 @@ MAX_RECEIVE_BATCH = 10
 
 sqs = boto3.client("sqs", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
+cloudwatch = boto3.client("cloudwatch", region_name=REGION)
 
 
 def _parse_alarm_payload(body):
@@ -104,25 +113,104 @@ def _group_by_alarm(alarms):
     return dict(grouped)
 
 
-def _format_email(grouped):
+def _format_age(since):
+    """Human age of a standing red: '29d 4h', '7h 12m', '45m'."""
+    if not isinstance(since, datetime):
+        return "age unknown"
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=timezone.utc)
+    secs = max(0, int((datetime.now(timezone.utc) - since).total_seconds()))
+    days, rem = divmod(secs, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    if days:
+        return f"{days}d {hours}h"
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
+def _fetch_standing_alarms():
+    """#2827: one read-only describe-alarms sweep for everything currently in ALARM.
+
+    Returns [{name, since, age, reason}] sorted oldest-red first. Fail-open by
+    design: a CloudWatch error must never block the transition digest that
+    already works, so any failure logs and returns [] (the section is simply
+    absent that day — the Mon/Wed/Fri remediation agent remains the backstop).
+    """
+    standing = []
+    try:
+        params = {"StateValue": "ALARM", "AlarmTypes": ["CompositeAlarm", "MetricAlarm"]}
+        while True:
+            resp = cloudwatch.describe_alarms(**params)
+            for a in list(resp.get("MetricAlarms", [])) + list(resp.get("CompositeAlarms", [])):
+                since = a.get("StateTransitionedTimestamp") or a.get("StateUpdatedTimestamp")
+                standing.append(
+                    {
+                        "name": a.get("AlarmName", "unknown"),
+                        "since": since,
+                        "age": _format_age(since),
+                        "reason": (a.get("StateReason") or "")[:200],
+                    }
+                )
+            token = resp.get("NextToken")
+            if not token:
+                break
+            params["NextToken"] = token
+    except Exception as e:  # noqa: BLE001 — deliberate fail-open, see docstring
+        logger.error("standing_alarm_sweep_failed: %s", e)
+        return []
+
+    def _sort_key(s):
+        since = s["since"]
+        if not isinstance(since, datetime):
+            return datetime.max.replace(tzinfo=timezone.utc)
+        return since if since.tzinfo else since.replace(tzinfo=timezone.utc)
+
+    standing.sort(key=_sort_key)
+    return standing
+
+
+def _format_email(grouped, standing=None):
+    standing = standing or []
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     distinct = len(grouped)
     total = sum(g["count"] for g in grouped.values())
     subject = f"[LP digest {today}] {distinct} alarm(s), {total} fire(s)"
+    if standing:
+        subject += f", {len(standing)} still red"
 
     lines = [
         f"Life Platform alarm digest — {today}",
         f"{distinct} distinct alarm(s), {total} total fire(s) in the last 24h.",
         "",
-        "Per-alarm summary (sorted by fire count):",
-        "",
     ]
-    for name, entry in sorted(grouped.items(), key=lambda kv: -kv[1]["count"]):
-        lines.append(f"• {name}  ×{entry['count']}  [{entry['last_state'] or 'ALARM'}]")
-        if entry["reason"]:
-            lines.append(f"    {entry['reason']}")
-        if entry["last_state_change"]:
-            lines.append(f"    last state change: {entry['last_state_change']}")
+    if grouped:
+        lines.append("Per-alarm summary (sorted by fire count):")
+        lines.append("")
+        for name, entry in sorted(grouped.items(), key=lambda kv: -kv[1]["count"]):
+            lines.append(f"• {name}  ×{entry['count']}  [{entry['last_state'] or 'ALARM'}]")
+            if entry["reason"]:
+                lines.append(f"    {entry['reason']}")
+            if entry["last_state_change"]:
+                lines.append(f"    last state change: {entry['last_state_change']}")
+            lines.append("")
+    else:
+        lines.append("No new alarm state transitions in the last 24h.")
+        lines.append("")
+    if standing:
+        # #2827: re-surface every standing red daily — SNS only fires on
+        # transitions, so without this section a long-red alarm is invisible
+        # between Mon/Wed/Fri remediation-agent runs.
+        lines.append(f"STILL IN ALARM ({len(standing)}) — standing reds, oldest first:")
+        lines.append("")
+        for s in standing:
+            since_str = s["since"].strftime("%Y-%m-%d %H:%M UTC") if isinstance(s["since"], datetime) else "unknown"
+            lines.append(f"• {s['name']}  red for {s['age']}  (since {since_str})")
+            if s["reason"]:
+                lines.append(f"    {s['reason']}")
+            lines.append("")
+        lines.append("A standing red stays in this section every day until it returns to OK.")
         lines.append("")
     lines.append("Urgent alarms (canary, daily-brief, DLQ depth, cost runaway) still")
     lines.append("page in real time on the life-platform-alerts topic.")
@@ -133,12 +221,13 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     dry_run = is_dry_run(event)
     try:
         alarms = _drain_queue()
-        if not alarms:
+        standing = _fetch_standing_alarms()  # #2827: read-only, fail-open
+        if not alarms and not standing:
             logger.info("digest_empty")
-            return {"statusCode": 200, "drained": 0, "sent": False}
+            return {"statusCode": 200, "drained": 0, "standing": 0, "sent": False}
 
         grouped = _group_by_alarm(alarms)
-        subject, body = _format_email(grouped)
+        subject, body = _format_email(grouped, standing)
 
         guarded_send_email(
             ses,
@@ -152,8 +241,8 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 }
             },
         )
-        logger.info("digest_sent drained=%d distinct=%d", len(alarms), len(grouped))
-        return {"statusCode": 200, "drained": len(alarms), "distinct": len(grouped), "sent": True}
+        logger.info("digest_sent drained=%d distinct=%d standing=%d", len(alarms), len(grouped), len(standing))
+        return {"statusCode": 200, "drained": len(alarms), "distinct": len(grouped), "standing": len(standing), "sent": True}
     except Exception as e:
         logger.error("alert_digest_failed: %s", e)
         raise
