@@ -19,6 +19,7 @@ coach that authored the data.
 import glob
 import json
 import os
+import re
 import sys
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -137,6 +138,113 @@ def test_color_uniqueness_guard_catches_a_planted_collision():
     dupes = {c: pids for c, pids in colors.items() if len(pids) > 1}
     assert dupes, "the color-uniqueness guard's own detector did not fire on a planted collision"
     assert sorted(dupes[ops["physical_coach"]["color"]]) == ["labs_coach", "physical_coach"]
+
+
+# ── WCAG AA contrast floor for the coach palette (#2919) ─────────────────────
+#
+# Coach names render as NORMAL-SIZE text in their identity colour (tokens.css:
+# `.rd-name, .th-name, .cv-name, .coach-name { color: var(--coach, ...) }`) on
+# cards/panels grounded on the dark `--surface` token (`.coach { background:
+# var(--surface) }`, evidence.css). Two chat-tier colours shipped below the
+# WCAG AA 4.5:1 floor against that surface (`pattern_coach` #64748b = 3.89:1,
+# `career_coach` #b45309 = 3.69:1) and were invisible to the axe NEW-violations
+# gate, whose baseline (tests/a11y_baseline.json) deliberately carries
+# pre-existing debt as "recorded, not gating" (#1433). This is the deterministic
+# hole-closer: the SET of coach colours is checked at the registry, so the next
+# colour added or changed cannot land under the floor.
+#
+# The background is RESOLVED FROM tokens.css (test_paper_ramp_contrast's parser
+# + CSS Color 4 math — the same code that guards the paper ramp), never
+# hardcoded: if the token moves, the floor re-runs against the new value
+# instead of silently checking a colour nobody renders on.
+#
+# Scope — the coach id-space only (operational + chat + retired, i.e. every
+# persona a coach surface renders under its identity colour: the roster, the
+# reader-dispatch cards, story bylines). Board/guest personas are a separate
+# id-space with their own palette conventions (see the uniqueness guard's
+# scoping note above); several sit below 4.5:1 today and re-picking that
+# palette is not this guard's mandate.
+#
+# Theme scope — DARK ONLY, deliberately. Single-colour AA on both grounds is
+# mathematically impossible here: 4.5:1 on --surface dark (#16130E) needs
+# relative luminance >= ~0.28, while 4.5:1 on --surface light (#FBF8F1) needs
+# <= ~0.17. EVERY coach colour fails AA in light theme today (2.0-2.9:1); that
+# is systemic pre-existing debt carried honestly in the #1991 `pages_light`
+# axe ledger, and fixing it needs a per-theme identity channel, not a palette
+# tweak. Dark is the site's primary/default scheme (tokens.css declares
+# `color-scheme: dark`) and is the constraint #2919 sets.
+
+COACH_CONTRAST_FLOOR = 4.5
+
+# Dated exemptions (#2919 acceptance): a colour deliberately kept below the
+# floor MUST be recorded here as {persona_id: "YYYY-MM-DD: render-context
+# justification (e.g. only ever renders as >=24px large text, where the floor
+# is 3.0:1)"} — never left implicit. Empty today: every coach colour clears it.
+COACH_CONTRAST_EXEMPTIONS: dict = {}
+
+
+def _coach_palette():
+    """{persona_id: color} for the coach id-space (operational + chat + retired)."""
+    return {pid: p.get("color") for pid, p in _personas().items() if p.get("operational") or p.get("chat") or p.get("retired")}
+
+
+def _dark_surface_rgb():
+    """The dark-theme --surface token, resolved from site/assets/css/tokens.css."""
+    import test_paper_ramp_contrast as ramp
+
+    dark, _, _ = ramp._palettes()
+    return ramp._resolve("--surface", {}, dark)
+
+
+def _contrast_failures(colors_by_pid, bg_rgb, floor=COACH_CONTRAST_FLOOR):
+    """The detector the guard runs — pulled out so the mutation test below can
+    prove it fires, rather than trusting it by inspection."""
+    import test_paper_ramp_contrast as ramp
+
+    failures = {}
+    for pid, color in colors_by_pid.items():
+        ratio = ramp.contrast(ramp._hex_to_rgb(color), bg_rgb)
+        if ratio < floor:
+            failures[pid] = round(ratio, 2)
+    return failures
+
+
+def test_coach_colors_clear_wcag_aa_on_the_dark_surface():
+    palette = _coach_palette()
+    assert palette, "coach palette set is empty — the guard is checking nothing"
+    for pid, color in palette.items():
+        assert color and color.startswith("#"), f"{pid}: color must be a hex literal, got {color!r}"
+    failures = _contrast_failures(palette, _dark_surface_rgb())
+    unexempt = {pid: r for pid, r in failures.items() if pid not in COACH_CONTRAST_EXEMPTIONS}
+    assert not unexempt, (
+        f"coach colour(s) below the WCAG AA {COACH_CONTRAST_FLOOR}:1 floor against the dark --surface token "
+        f"(normal-size coach-name text renders there): {unexempt}. Either pick a colour that clears the floor "
+        f"or record a dated exemption in COACH_CONTRAST_EXEMPTIONS with the render context that justifies it."
+    )
+
+
+def test_coach_contrast_exemptions_are_dated_and_real():
+    """An exemption must name a persona that exists in the guarded set, carry a
+    date, and say why — an undated or orphaned exemption is silent debt."""
+    palette = _coach_palette()
+    for pid, note in COACH_CONTRAST_EXEMPTIONS.items():
+        assert pid in palette, f"exemption for {pid!r} names no persona in the guarded coach set"
+        assert re.match(r"^\d{4}-\d{2}-\d{2}: .+", note), f"exemption for {pid} must read 'YYYY-MM-DD: <render-context justification>'"
+
+
+def test_coach_contrast_guard_catches_a_planted_sub_floor_color():
+    """Mutation proof (#2919 acceptance): the real palette passes clean, and
+    planting pattern_coach's pre-#2919 colour (#64748b, 3.89:1 — the exact
+    live defect this guard exists to prevent) makes the detector fire."""
+    bg = _dark_surface_rgb()
+    real = _coach_palette()
+    assert _contrast_failures(real, bg) == {} or set(_contrast_failures(real, bg)) <= set(COACH_CONTRAST_EXEMPTIONS)
+
+    mutated = dict(real)
+    mutated["pattern_coach"] = "#64748b"
+    failures = _contrast_failures(mutated, bg)
+    assert "pattern_coach" in failures, "the contrast detector did not fire on a planted sub-floor colour"
+    assert failures["pattern_coach"] < COACH_CONTRAST_FLOOR
 
 
 # ── no orphans: registry <-> config/coaches/*.json ───────────────────────────
