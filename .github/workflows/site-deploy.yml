@@ -183,7 +183,8 @@ jobs:
         # backported S3→repo first (the live object was v2, newer than the repo's v1;
         # a blind apply would have reverted an owner-approved correction).
         run: |
-          pip install --quiet boto3
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore)   # versions from requirements-dev.txt (#2760)
+          pip install --quiet $PINS
           python3 deploy/config_twin_sync.py --apply --strict
 
   # ════════════════════════════════════════════════════════════════

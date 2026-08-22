@@ -53,6 +53,18 @@ The guard's teeth move accordingly, and both directions are mutation-proved belo
     rename leaves a gate running an unpinned tool;
   * the tree-wide agreement guard (#2570) is unchanged and still covers every OTHER
     place a version could be written down.
+Extended #2760 — the one-legged-pin class, both remaining shapes. Shape 1: a tool
+pinned ONLY in a workflow (pip-audit/pip-licenses) has no Dependabot leg, so the pin
+can only rot — those moved into requirements-dev.txt and resolve like everything
+else. Shape 2: a tool installed with NO pin at all (`pip install boto3 pytest` in
+the post-deploy smoke job; the golden-brief canary; claude-agent-sdk in the
+remediation agent) carries no `tool==X` literal to compare and asks the resolver for
+nothing, so it floated to whatever released today, invisible to every guard above BY
+CONSTRUCTION. test_no_workflow_installs_an_unpinned_package makes a bare install a
+finding. The CDK CLI (`npm install -g aws-cdk@X`, the #2468 incident) gets the same
+treatment on the npm side: the version of record is cdk/package.json (Dependabot npm
+ecosystem), resolved at install time, and a workflow literal is a red.
+
 Action-SHA bumps (`uses: owner/action@<sha>`) are a genuinely separate problem — a
 different Dependabot ecosystem, a different pin syntax, and no second copy — and are
 deliberately out of scope here.
@@ -100,22 +112,41 @@ def _ci_gate_text():
 
 # Tools whose versions are BOTH pinned in the CI gate (ci-cd/ci-lint/ci-test.yml) and
 # installed for local dev. Extended #1963 to add mypy/hypothesis/pytest/pytest-cov/
-# boto3/botocore. Kept as a literal tuple for readability, but
+# boto3/botocore; extended #2760 to add flake8 (was installed unpinned), pip-audit/
+# pip-licenses (were pinned only as workflow literals — no Dependabot leg), and
+# claude-agent-sdk (was installed unpinned in remediation-agent.yml). Kept as a
+# literal tuple for readability, but
 # test_gated_tools_matches_requirements_dev_pins below DERIVES the expected
 # membership from requirements-dev.txt itself, so a future Dependabot-managed pin
 # can't silently land outside this guard's coverage again (guard the SET, not the
 # instance).
-_GATED_TOOLS = ("black", "ruff", "mypy", "playwright", "hypothesis", "pytest", "pytest-cov", "boto3", "botocore", "pyyaml")
+_GATED_TOOLS = (
+    "black",
+    "ruff",
+    "mypy",
+    "playwright",
+    "hypothesis",
+    "pytest",
+    "pytest-cov",
+    "boto3",
+    "botocore",
+    "pyyaml",
+    "flake8",
+    "pip-audit",
+    "pip-licenses",
+    "claude-agent-sdk",
+)
 
 # requirements-dev.txt pins deliberately OUTSIDE this guard's coverage, each with why:
 _UNGATED_DEV_PINS = {
-    # ci-lint.yml installs flake8 unpinned ("pip install flake8") — a pre-existing
-    # gap #1963 did not scope in; tracked separately from this guard.
-    "flake8",
-    # The CDK toolchain is pinned bidirectionally by its OWN convention
-    # (cdk/requirements.txt <-> ci-cd.yml's `npm install -g aws-cdk@X`, #814,
-    # R22-MOD-01) — a CLI-install shape, not this guard's `pip install tool==`
-    # pattern, so it doesn't fit _pin_mismatches below.
+    # (flake8 left this set with #2760 — ci-lint.yml now resolves it via
+    # scripts/ci_pins.py like every other gate tool.)
+    #
+    # The CDK LIBRARY toolchain is pinned bidirectionally by its OWN convention
+    # (cdk/requirements.txt <-> requirements-dev.txt, #814, R22-MOD-01) — a
+    # requirements-file shape, not this guard's `pip install tool==` pattern, so it
+    # doesn't fit _pin_mismatches below. (The CDK CLI's npm leg is covered by the
+    # #2760 tests at the bottom of this file.)
     "aws-cdk-lib",
     "constructs",
 }
@@ -427,13 +458,22 @@ _HISTORICAL_FILES = ("tests/test_ci_pin_consistency.py", "tests/test_formatter_p
 # (path, tool) so a version bump doesn't silently re-arm them; each needs a reason.
 # An entry here is a debt, not an exemption — delete it by fixing the file.
 #
-# Currently EMPTY. #2570 opened it with two docs/LICENSES.md rows; #2588 paid that
+# #2570 opened it with two docs/LICENSES.md rows; #2588 paid that
 # debt the way the ledger intends — by fixing the file, not by aging the entry.
 # The resolution was to stop declaring versions in the licence inventory at all
 # (docs/LICENSES.md §6.1): auditing the table found 6 of its 13 version rows stale
 # and this guard could only ever see 7 of the 13, so exactness there was a fact
 # nothing could keep true. The mechanism stays for the next genuinely-deferred row.
-_KNOWN_STALE_DECLARATIONS: dict = {}
+_KNOWN_STALE_DECLARATIONS: dict = {
+    # #2760 widened _GATED_TOOLS to pip-audit and immediately saw this: the
+    # scheduled Lambda installs its own pip-audit into /tmp at runtime, pinned at
+    # 2.7.3 vs the CI gate's requirements-dev.txt pin. It CANNOT resolve the pin —
+    # the Lambda bundle does not carry requirements-dev.txt — so aligning it is a
+    # deliberate Lambda change + deploy, not a text edit here. Debt, not exemption.
+    ("lambdas/operational/pip_audit_lambda.py", "pip-audit"): (
+        "runtime /tmp install inside the Lambda; bundle carries no pin file (#2760)"
+    ),
+}
 
 # The code that RESOLVES a pinned tool at runtime must derive the version, never
 # carry a second copy of it (#2570). Derived from the tracked tree the same way as
@@ -572,3 +612,175 @@ def test_pin_readers_hardcode_no_version():
         with open(path, encoding="utf-8") as f:
             hits = rx.findall(f.read())
         assert not hits, f"{rel} hardcodes a tool pin {hits} — read it from requirements-dev.txt instead (#2570)"
+
+
+# --- #2760: an UNPINNED install is a finding, not a blind spot ------------------
+# Every guard above compares `tool==X` literals or resolver arguments. A workflow
+# that installs a BARE package name (`pip install boto3 pytest`) carries no literal
+# to compare and asks the resolver for nothing, so it floated to whatever released
+# today — invisible to the exact-equality guard BY CONSTRUCTION, not by oversight.
+# That is how the post-deploy smoke job (ci-cd.yml) and the golden-brief canary ran
+# unpinned, and how claude-agent-sdk floated in remediation-agent.yml.
+
+# pip flags that consume the following token, so a filename is never read as a
+# package name (`-r requirements.txt` is a pinned-file install, not a bare one).
+_PIP_VALUE_FLAGS = {
+    "-r",
+    "--requirement",
+    "-c",
+    "--constraint",
+    "-e",
+    "--editable",
+    "-t",
+    "--target",
+    "-i",
+    "--index-url",
+    "-f",
+    "--find-links",
+}
+
+# Package names allowed to install unpinned, each with why. An entry here is a debt
+# unless its reason argues otherwise (same contract as _KNOWN_STALE_DECLARATIONS).
+_UNPINNED_INSTALL_EXCEPTIONS = {
+    # `python -m pip install --upgrade pip` is installer self-hygiene, deliberately
+    # latest: pip is not a gate tool, its version gates nothing, and pinning the
+    # installer would only relocate this class into bootstrap failures.
+    "pip": "installer self-upgrade hygiene line — deliberately latest",
+}
+
+
+def _unpinned_workflow_installs(texts_by_path):
+    """[(path, package), ...] for every BARE package name a `pip install` line would
+    resolve from the network at whatever version released today.
+
+    Not a finding: `$PINS`-style resolved variables (the #2609 form), flags,
+    `-r`/`-c` file installs (their contents are pinned files with their own guards),
+    `tool==X` literals (the second-copy guard's finding, never double-reported
+    here), and the documented exceptions above.
+    """
+    findings = []
+    for path, text in sorted(texts_by_path.items()):
+        for line in text.splitlines():
+            line = re.sub(r"\s#.*$", "", line)
+            m = re.search(r"\bpip3?\s+install\s+(.*)$", line)
+            if not m:
+                continue
+            # Stop at shell connectives so `… || true` is never read as packages.
+            args = re.split(r"\s*(?:&&|\|\||;)\s*", m.group(1))[0]
+            skip_next = False
+            for tok in (t.strip("\"'") for t in args.split()):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if tok.startswith("-"):
+                    skip_next = tok in _PIP_VALUE_FLAGS
+                    continue
+                if tok.startswith("$") or "==" in tok or tok in _UNPINNED_INSTALL_EXCEPTIONS:
+                    continue
+                findings.append((path, tok))
+    return findings
+
+
+def test_no_workflow_installs_an_unpinned_package():
+    """The #2760 box: a bare `pip install <name>` in any workflow is a red."""
+    bad = _unpinned_workflow_installs(_workflow_texts())
+    assert not bad, (
+        "workflow(s) install packages UNPINNED — no literal for the parity guard to "
+        "compare and nothing for the resolver to resolve, so the tool floats to "
+        "whatever released today (#2760). Pin it in requirements-dev.txt and install "
+        f"via `PINS=$(python3 {_RESOLVER_SCRIPT} <names>)`: {bad}"
+    )
+
+
+def test_unpinned_install_guard_fires_on_a_synthetic_bare_install():
+    """Prove-red (#2760 acceptance, by mutation): the exact smoke-job line that sat
+    invisible to every guard above must be a finding — and the shipped forms must
+    stay clean, or the fix is unshippable."""
+    bad = _unpinned_workflow_installs({"x.yml": "        run: pip install boto3 pytest --quiet\n"})
+    assert bad == [("x.yml", "boto3"), ("x.yml", "pytest")], bad
+    ok = "\n".join(
+        [
+            f"          PINS=$(python3 {_RESOLVER_SCRIPT} boto3 botocore)",
+            "          pip install --quiet $PINS",
+            "          pip install -r requirements-dev.txt",
+            "          python -m pip install --upgrade pip",
+            '          pip install -q -r "$req" || true',
+        ]
+    )
+    assert not _unpinned_workflow_installs({"x.yml": ok})
+    # A literal pin is the SECOND-COPY guard's finding, not this one's.
+    assert not _unpinned_workflow_installs({"x.yml": "pip install pip-audit==2.10.1"})
+
+
+def test_unpinned_install_exceptions_are_still_real():
+    """The exception ledger must not rot (same contract as the stale-declaration
+    ledger): every exempted name must still be installed somewhere, with a reason."""
+    installed = set()
+    for _, text in _workflow_texts().items():
+        for line in text.splitlines():
+            m = re.search(r"\bpip3?\s+install\s+(.*)$", re.sub(r"\s#.*$", "", line))
+            if m:
+                installed.update(t.strip("\"'") for t in re.split(r"\s*(?:&&|\|\||;)\s*", m.group(1))[0].split())
+    for name, reason in _UNPINNED_INSTALL_EXCEPTIONS.items():
+        assert reason, f"_UNPINNED_INSTALL_EXCEPTIONS['{name}'] needs a reason"
+        assert name in installed, f"_UNPINNED_INSTALL_EXCEPTIONS names '{name}', which no workflow installs any more — delete the entry"
+
+
+# --- #2760: the CDK CLI's npm leg -----------------------------------------------
+# The #2468 incident: `npm install -g aws-cdk@X` in ci-cd.yml was guarded by the
+# comment "bump it by hand when those land" — memory, not structure — and sat
+# months stale. The structural fix is the #2609 pattern applied to npm: the version
+# of record is cdk/package.json's `aws-cdk` devDependency (Dependabot's npm
+# ecosystem bumps it), and ci-cd.yml resolves it at install time. These tests make
+# a workflow literal a red and both legs' existence a checked fact.
+
+_CDK_PACKAGE_JSON = os.path.join("cdk", "package.json")
+_CDK_CLI_LITERAL_RE = re.compile(r"\baws-cdk@[0-9][0-9A-Za-z.\-]*")
+
+
+def _cdk_cli_literal_installs(texts_by_path):
+    """[(path, literal), ...] for every hardcoded `aws-cdk@<version>` in a workflow.
+    The resolved form (`aws-cdk@${CDK_CLI_VERSION}`) is deliberately not matched."""
+    return [(p, lit) for p, text in sorted(texts_by_path.items()) for lit in _CDK_CLI_LITERAL_RE.findall(text)]
+
+
+def test_cdk_cli_version_of_record_is_cdk_package_json():
+    import json
+
+    with open(os.path.join(_REPO, _CDK_PACKAGE_JSON), encoding="utf-8") as f:
+        pkg = json.load(f)
+    version = pkg.get("devDependencies", {}).get("aws-cdk")
+    assert version, f"{_CDK_PACKAGE_JSON} lost its aws-cdk devDependency — the CDK CLI has no Dependabot leg again (#2760/#2468)"
+    assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version), (
+        f"{_CDK_PACKAGE_JSON} pins aws-cdk as '{version}' — must be an EXACT version "
+        "(no ^/~ range): a range floats, which is the defect this leg exists to end (#814/#2760)"
+    )
+    offenders = _cdk_cli_literal_installs(_workflow_texts())
+    assert not offenders, (
+        "workflow(s) hardcode the CDK CLI version again (#2760). The version of record "
+        f"is {_CDK_PACKAGE_JSON}; resolve it at install time so the Dependabot npm bump "
+        f"moves the ONLY copy: {offenders}"
+    )
+    # Non-vacuous (#1189 lesson): ci-cd.yml must still INSTALL the CLI, resolved from
+    # the manifest — otherwise this guard stays green after the install step vanishes.
+    ci_cd = _workflow_texts()[".github/workflows/ci-cd.yml"]
+    assert "aws-cdk@" in ci_cd, "ci-cd.yml no longer installs the CDK CLI at all — the drift-diff gate lost its toolchain"
+    assert "cdk/package.json" in ci_cd, "ci-cd.yml's CDK CLI install no longer resolves from cdk/package.json (#2760)"
+
+
+def test_cdk_cli_literal_guard_fires_on_a_synthetic_literal():
+    """Prove-red for the npm leg, same pattern as every synthetic proof above."""
+    offenders = _cdk_cli_literal_installs({"x.yml": "npm install -g aws-cdk@2.0.0 --quiet"})
+    assert offenders == [("x.yml", "aws-cdk@2.0.0")], offenders
+    assert not _cdk_cli_literal_installs({"x.yml": 'npm install -g "aws-cdk@${CDK_CLI_VERSION}" --quiet'})
+
+
+def test_cdk_cli_pin_has_a_dependabot_npm_leg():
+    """A pin Dependabot cannot see is one-legged by definition (#2468). The npm
+    ecosystem entry for /cdk is the leg; losing it re-opens the incident."""
+    import yaml
+
+    with open(os.path.join(_REPO, ".github", "dependabot.yml"), encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    legs = [u for u in cfg.get("updates", []) if u.get("package-ecosystem") == "npm" and u.get("directory") == "/cdk"]
+    assert legs, ".github/dependabot.yml lost the npm /cdk ecosystem — the CDK CLI pin is one-legged again (#2760/#2468)"

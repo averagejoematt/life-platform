@@ -196,11 +196,14 @@ ecosystem, different pin syntax, no second copy — and is untouched by this.
 **The CDK toolchain is pinned both directions too (#814, R22-MOD-01).** Before this
 fix, `ci-cd.yml`'s `npm install -g aws-cdk` had no version (always latest CLI) and
 `cdk/requirements.txt` was floor-only (`aws-cdk-lib>=X`), so a fresh CI install could
-silently pick up an untested CDK release and red a routine push. Both are now exact
-pins — `grep -E 'aws-cdk@|aws-cdk-lib==|constructs==' .github/workflows/ci-cd.yml
-cdk/requirements.txt requirements-dev.txt`. Bump the CLI pin, `cdk/requirements.txt`,
-and `requirements-dev.txt` together as one deliberate PR (Dependabot proposes the
-`cdk/requirements.txt` half; the CLI pin in `ci-cd.yml` is manual).
+silently pick up an untested CDK release and red a routine push. Both are exact pins,
+and since #2760 the CLI's version of record is `cdk/package.json` (`aws-cdk`
+devDependency): `ci-cd.yml` resolves it at install time and Dependabot's npm
+ecosystem bumps it — one copy, no hand-bump (the old "bump the `ci-cd.yml` literal by
+hand" step let the pin sit months stale, the #2468 incident). Discover them all —
+`grep -E 'aws-cdk|constructs==' cdk/package.json cdk/requirements.txt
+requirements-dev.txt .github/workflows/ci-cd.yml`. Dependabot proposes both halves
+(`chore(deps-cdk)`); land lib and CLI bumps as deliberate PRs.
 
 **CI-parity test runs need FAKE creds, not absent ones.** CI's runner has no valid AWS
 credentials, but `env -u` alone lets boto3 fall back to the `[default]` profile and
