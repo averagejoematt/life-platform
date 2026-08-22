@@ -185,6 +185,18 @@ _PRICES = {
 _DEFAULT_PRICE = _PRICES["fable"]  # unknown model → price as the most expensive tier
 _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never overshoot
 
+# #2883 box 3: the acceptance bar for CostMetricDriftRatio (AI-only, unbuffered
+# native estimate ÷ self-reported LifePlatform/AI::EstimatedCostUSD, see
+# _emit_metrics). < DRIFT_RATIO_BAR means the per-caller attribution can be
+# trusted to plan a cut; at or above it, the self-emitted metrics are
+# under-counting and any per-caller ranking is a guess about the unattributed
+# remainder. The `cost-metric-drift-sustained` CloudWatch alarm
+# (cdk/stacks/monitoring_stack.py) uses THIS SAME numeric bar —
+# tests/test_cost_drift_alarm_2883.py asserts the two literals match by AST,
+# so neither can drift alone. (Numerically equal to _AI_SAFETY_BUFFER by
+# coincidence, not by construction — they mean different things; do not merge.)
+DRIFT_RATIO_BAR = 1.15
+
 # Tier thresholds on PROJECTED month-end total (USD), calibrated against the
 # ORIGINAL $75 ceiling (ADR-063). _tier_for scales them by
 # ceiling / _THRESHOLD_REFERENCE_CEILING, so the bands are fixed FRACTIONS of
@@ -793,11 +805,14 @@ def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: fl
     if self_reported_mtd > 0:
         drift_ratio = ai_unbuffered / self_reported_mtd
         data.append({"MetricName": "CostMetricDriftRatio", "Value": drift_ratio, "Unit": "None"})
-        if drift_ratio > 1.5:
+        # #2883 box 3: warn at the SAME bar the cost-metric-drift-sustained alarm
+        # uses (was 1.5 — a log threshold above the acceptance bar meant the
+        # governor's own log stayed quiet through a breaching 1.37).
+        if drift_ratio >= DRIFT_RATIO_BAR:
             logger.warning(
                 f"CostMetricDrift: native AI (unbuffered) ${ai_unbuffered:.2f} vs self-reported "
-                f"${self_reported_mtd:.2f} = {drift_ratio:.2f}x — self-emitted AI metrics are "
-                f"significantly under-counting"
+                f"${self_reported_mtd:.2f} = {drift_ratio:.2f}x — at/above the {DRIFT_RATIO_BAR}x bar (#2883); "
+                f"self-emitted AI metrics are under-counting"
             )
     try:
         _cw.put_metric_data(Namespace="LifePlatform/Budget", MetricData=data)

@@ -377,6 +377,53 @@ class OperationalStack(Stack):
             alerts_topic=None,
         )
 
+        # #2883 box 3: the governor publishes LifePlatform/Budget::CostMetricDriftRatio
+        # every run — how much the platform's self-emitted per-caller AI attribution
+        # (LifePlatform/AI::EstimatedCostUSD) under-counts the authoritative
+        # AWS/Bedrock-derived estimate, AI-only and unbuffered on both sides since
+        # #2887 fixed the scope. The acceptance bar is < 1.15 (the threshold here MUST
+        # equal cost_governor_lambda.DRIFT_RATIO_BAR — tests/test_cost_drift_alarm_2883.py
+        # pins the two literals by AST). #357's regression (3x → 2.44x, closed, never
+        # re-read) sat unnoticed for weeks precisely because the governor PUBLISHED the
+        # ratio and nothing was obligated to read it. This alarm is the obligation.
+        #
+        # Shape mirrors monitoring_stack's budget-tier-sustained-7d: 28800s × 21 =
+        # 604800s, exactly CloudWatch's evaluation-window ceiling (never lengthen one
+        # factor without shortening the other). Minimum + all-21-must-breach means one
+        # below-bar reading anywhere in the week clears it, and the noisy first days of
+        # a month (tiny MTD sums on both sides of the division; the governor skips
+        # emission entirely while self-reported MTD is 0, and a missing datapoint is
+        # NOT_BREACHING) cannot fire it alone. A dead governor is a different fact with
+        # its own alarms (cost-governor-heartbeat + the DLQ above). Digest, not urgent:
+        # sustained drift is a trust-in-attribution problem, not an outage.
+        #
+        # Lives here rather than in monitoring_stack.py because that file sits at its
+        # recorded size ceiling (tests/test_module_size_guard.py) and this stack owns
+        # the alarms for the Lambdas it defines — the permanence-heartbeat precedent.
+        #
+        # NB deploys RED-bound (the grading-stalled precedent — firing on the current
+        # true state is the point): the live ratio has held ~1.37 since 2026-08-19, so
+        # absent a fix for the residual self-report undercount (#2883 box 2) this fires
+        # ~7 days after deploy. docs/alarm_citations.json carries the expected-red note.
+        cost_drift_alarm = cloudwatch.Alarm(
+            self,
+            "CostMetricDriftSustained",
+            alarm_name="cost-metric-drift-sustained",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Budget",
+                metric_name="CostMetricDriftRatio",
+                period=Duration.seconds(28800),
+                statistic="Minimum",
+            ),
+            evaluation_periods=21,
+            datapoints_to_alarm=21,
+            threshold=1.15,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        cost_drift_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+        cost_drift_alarm.add_ok_action(cw_actions.SnsAction(local_digest_topic))
+
         # ── 3c. Remediation Dispatcher — SNS-subscribed urgent-alarm → GH dispatch
         # Closes the urgent-alarm latency the daily 07:45 PT sweep can't cover.
         # Subscribes to life-platform-alerts (urgent topic), filters to a narrow
