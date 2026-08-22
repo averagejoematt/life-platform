@@ -34,23 +34,31 @@ and deploy/archive/20260314/create_ai_cost_alarm.sh (ai-cost-soft-alarm + a SECO
 still-live billing topic life-platform-billing-alerts). life-platform-cost-alert predates
 even that script and duplicates its metric/threshold exactly with no action at all.
 
-## Disposition (#2829 acceptance: "routed or retired, decision recorded")
+## Disposition (#2829 acceptance: "routed or retired, decision recorded" — rescoped
+## 2026-08-20 after the adoption-as-CREATE attempt blocked the LifePlatformWeb deploy)
 
-  ADOPT + ROUTE  life-platform-dash-5xx-rate
-  ADOPT + ROUTE  life-platform-dash-total-errors  (NOTE: live dimension is
-                 DistributionId=E3S424OXQZ8NBE — the MAIN averagejoematt.com
-                 distribution, not dash's EM5NPX6NJN095, despite the "dash" name. A
-                 pre-existing naming/coverage mismatch from the March 2026 script, out
-                 of scope for this reconciliation — codified byte-for-byte against live
-                 config so adoption changes zero observable behavior.)
-  ADOPT + ROUTE  life-platform-cf-auth-errors — a real functional signal (Lambda@Edge
-                 auth failures lock dash/blog out entirely) that was created with no
-                 action purely because no us-east-1 SNS topic existed yet at the time.
-                 One now does (see below) — wire it.
+  ROUTE (SHIPPED — the titled bug):
+    email-subscriber-errors           CDK-owned; the one `.add_alarm_action()` below.
+                                       Live-verified routed 2026-08-21.
 
-  RETIRE (decision recorded; NOT executed here — deleting a live alarm is an AWS
-  mutation, out of scope for a read-only worktree; see the PR body for the owner's
-  post-merge `aws cloudwatch delete-alarms` command):
+  DEFER adoption → #2961 (needs `cdk import`, not a CREATE — declaring an alarm here
+  with an existing physical name fails CloudFormation early validation and blocks the
+  whole stack deploy; `cdk synth` cannot catch it because synth never reads live state):
+    life-platform-dash-5xx-rate       already routed live — deferral costs nothing
+    life-platform-dash-total-errors   already routed live. NOTE: its live dimension is
+                                       DistributionId=E3S424OXQZ8NBE — the MAIN
+                                       averagejoematt.com distribution, not dash's
+                                       EM5NPX6NJN095, despite the "dash" name. Tracked
+                                       as #2963; the import (#2961) must coordinate so
+                                       adoption imports the corrected meaning, not the
+                                       lie.
+    life-platform-cf-auth-errors      the ONLY genuinely silent one (Lambda@Edge auth
+                                       failures lock dash/blog out with no alert) —
+                                       #2961 does it first.
+
+  RETIRE → #2962 (decision recorded; NOT executed here — deleting a live alarm is an AWS
+  mutation, out of scope for a read-only worktree; the exact owner-run
+  `aws cloudwatch delete-alarms` command is recorded in #2962):
     life-platform-cost-alert          AWS/Billing EstimatedCharges >= $5/mo, unrouted.
     life-platform-ai-cost-soft-alarm  Same metric/threshold/period as cost-alert —
                                        an exact duplicate, just routed to a second

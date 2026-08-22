@@ -185,3 +185,30 @@ def test_alerts_topic_is_imported_not_created():
     ]
     assert from_arn_calls, "expected sns.Topic.from_topic_arn(...) in add_web_alarms() — the import path"
     assert not new_topic_calls, "add_web_alarms() must not create a new sns.Topic(...) — life-platform-alerts-us-east-1 already exists live"
+
+
+def test_adr116_audit_doc_has_a_us_east_1_section():
+    """#2829 acceptance box 4: the ADR-116 audit doc gains a us-east-1 section so the
+    next alarm-audit pass cannot silently skip the region again (the 2026-07 pass was
+    us-west-2-only and nothing forced anyone to notice — the verifier found zero
+    us-east-1 mentions in the whole doc). Asserts the section header AND the two
+    region-specific facts a future pass must reckon with: the full 6-alarm estate table
+    and the create-vs-import lesson."""
+    doc = os.path.join(ROOT, "docs", "reviews", "CLOUDWATCH_AUDIT_2026-07.md")
+    with open(doc, encoding="utf-8") as f:
+        text = f.read()
+    assert (
+        "## 9. us-east-1" in text
+    ), "the ADR-116 audit doc lost its us-east-1 section (#2829 acceptance) — a future audit pass could silently skip the region again"
+    for anchor in (
+        "email-subscriber-errors",
+        "life-platform-cf-auth-errors",
+        "life-platform-dash-5xx-rate",
+        "life-platform-dash-total-errors",
+        "life-platform-cost-alert",
+        "life-platform-ai-cost-soft-alarm",
+        "cdk import",
+    ):
+        assert (
+            anchor in text
+        ), f"us-east-1 audit section no longer mentions {anchor!r} — the 6-alarm estate table or the create-vs-import lesson was dropped"
