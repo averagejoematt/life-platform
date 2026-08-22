@@ -1,6 +1,6 @@
 # CONVENTIONS — the load-bearing reflexes
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-08
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-21
 
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
@@ -910,6 +910,7 @@ read that section for the incident narrative and the exact mechanics.
 | A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
 | A CloudWatch alarm sits in ALARM >72h with no citation, normalizing among the chronic reds | Alarm-citation gate (#1959), step (e10) | `scripts/check_alarm_citations.py`; `docs/alarm_citations.json` |
 | A `::warning::` annotation on green main (e.g. the duration-budget warner below) goes untriaged | Standing-warning triage gate (#1966), step (e11) | `scripts/check_ci_warnings.py` |
+| A session ships standing machinery (gate/writer/watcher) and `docs/PROPORTIONALITY.md` never hears about it | Proportionality-ledger gate (#2380/#2761), step (e12) | `scripts/check_proportionality_ledger.py`; `docs/PROPORTIONALITY.md` |
 
 **CI gates** (`.github/workflows/ci-cd.yml` unless noted — every push to `main` or a PR):
 
