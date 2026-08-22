@@ -128,6 +128,14 @@
         "note_sample": "CYCLE 14 entry states 'Restarted 2026-08-17 as cycle 14' but then shows strip '\u00b7\u00b7\u00b7\u00b7\u00b7' (5 dots = 5 silent days). The cycle start date is 2026-08-17 (Day 1 of current experiment). On Day 5 (2026-08-21),"
       }
     ],
+    "/method/predictions/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "coach FORECAST rows ('over 14 days', '2-3 weeks') read as past-data claims \u2014 forward windows are not history; rubric adjudication on the issue"
+      }
+    ],
     "/method/receipts/": [
       {
         "category": "temporal_contradiction",
@@ -158,6 +166,14 @@
         "issue": "#2959",
         "added": "2026-08-22",
         "note_sample": "'AS OF 2026-08-10' + 'carried from prep' \u2014 labeled pre-cycle framing"
+      }
+    ],
+    "/story/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "note_sample": "chronicle piece labeled 'WEEK 1 \u00b7 2026-08-18' (correct for cycle 14) flagged \u2014 oracle week-counting artifact"
       }
     ],
     "/story/about/": [
