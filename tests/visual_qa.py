@@ -1021,6 +1021,7 @@ def run_sweep(
     max_tier=None,
     a11y=True,
     update_a11y_baseline=False,
+    update_truth_baseline=False,
     leak_scan=True,
     color_scheme="dark",
 ):
@@ -1149,6 +1150,22 @@ def run_sweep(
             from visual_ai_qa import assess_reader_truth
         print("\n── Reader-truth QA (phase-aware, Claude / Bedrock) ──")
         reader_truth_status = assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
+
+        # Deliberate ledger rewrite (#2956) — a11y --update-baseline's sibling.
+        # Only pages this sweep actually captured prose for are touched; fresh
+        # entries land UNTRIAGED and red the unit suite until an issue is named.
+        if update_truth_baseline and (reader_truth_status or {}).get("status") == "ok":
+            import truth_baseline_audit
+
+            observed_by_path = {
+                r["path"]: r.get("truth_findings", []) for r in results if any(s.get("kind") == "prose" for s in r.get("screenshots", []))
+            }
+            if observed_by_path:
+                truth_baseline_audit.update_baseline(observed_by_path)
+                print(
+                    f"truth baseline rewritten ({len(observed_by_path)} page(s) swept) → tests/truth_baseline.json"
+                    " — triage UNTRIAGED entries + commit the diff deliberately (#2956)"
+                )
 
     # ── deliberate a11y-baseline rewrite (#1433) — only the pages this run swept ──
     if update_a11y_baseline:

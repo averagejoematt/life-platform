@@ -81,6 +81,16 @@ def main(vqa=None, argv=None):
         ),
     )
     ap.add_argument(
+        "--update-truth-baseline",
+        action="store_true",
+        help=(
+            "Rewrite tests/truth_baseline.json (the reader-truth debt ledger, #2956) from this run's high findings "
+            "for the pages swept — a11y --update-baseline's sibling, same DELIBERATE contract: the run still reds on "
+            "NEW findings, fresh entries land UNTRIAGED (which reds the unit suite until an issue is named), and the "
+            "committed diff is the review surface. Requires --reader-truth."
+        ),
+    )
+    ap.add_argument(
         "--max-tier",
         type=int,
         default=None,
@@ -123,6 +133,7 @@ def main(vqa=None, argv=None):
         max_tier=args.max_tier,
         a11y=not args.no_a11y,
         update_a11y_baseline=args.update_baseline,
+        update_truth_baseline=args.update_truth_baseline,
         leak_scan=not args.no_leak_scan,
         color_scheme=args.color_scheme,
     )
