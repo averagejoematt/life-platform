@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-18
 
-Last updated: 2026-08-21 (v8.6.0)
+Last updated: 2026-08-22 (v8.6.0)
 
 > Budget ceiling: **$150/month all-in** base, floating to **$176 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated
