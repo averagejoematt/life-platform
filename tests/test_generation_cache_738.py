@@ -156,3 +156,172 @@ def test_store_shape_resets_unchanged_clock():
     assert item["first_generated"] == "2026-07-06"
     assert item["reuse_count"] == 0
     assert item["brief_hash"] == "fp"
+
+
+# ── #2889: pass STRUCTURE, not rendered prose ─────────────────────────────────
+#
+# THE MEASURED DEFECT. `canonicalize()` strips bookkeeping by dict KEY. The only
+# production call site hashed `system_prompt` + `user_message_full` — rendered
+# strings with `json.dumps(brief)` baked in — so every volatile key rode straight
+# into the digest and the whole `_VOLATILE_KEYS` mechanism was a no-op. Live
+# evidence on 2026-08-22, ~2 months after ADR-126 landed: `GenerationSkippedUnchanged`
+# had never been emitted (zero metric variants), and all 8 rows of
+# USER#matthew#SOURCE#coach_gen_cache carried `reuse_count = 0` with
+# `first_generated == last_generated` — every row written on a miss, none ever reused.
+
+
+def _brief(generation_date="2026-08-22", weight=321.0):
+    return {
+        "generation_date": generation_date,
+        "as_of": generation_date + "T17:00:00Z",
+        "decision_class_ceiling": "observational",
+        "current_stance": {"focus": "protein adherence", "as_of": generation_date},
+        "vitals": {"weight_lbs": weight},
+    }
+
+
+def test_a_new_day_alone_does_not_bust_a_structured_fingerprint():
+    """The whole point of _VOLATILE_KEYS, finally reachable."""
+    a = gc.brief_fingerprint({"brief": _brief("2026-08-22")})
+    b = gc.brief_fingerprint({"brief": _brief("2026-08-23")})
+    assert a == b
+
+
+def test_the_regression_reproduced_rendered_prose_busts_on_the_date_alone():
+    """The pre-fix shape, pinned so nobody reintroduces it believing it equivalent."""
+    import json as _json
+
+    a = gc.brief_fingerprint(f"GENERATION BRIEF:\n{_json.dumps(_brief('2026-08-22'), indent=2)}")
+    b = gc.brief_fingerprint(f"GENERATION BRIEF:\n{_json.dumps(_brief('2026-08-23'), indent=2)}")
+    assert a != b, "rendered prose must still bust — this is the defect, documented, not fixed in place"
+
+
+def test_a_real_semantic_change_still_busts_the_structured_fingerprint():
+    """The honesty invariant is NOT weakened: only keys the design already declared
+    volatile are stripped. A number moving still forces a fresh generation."""
+    a = gc.brief_fingerprint({"brief": _brief(weight=321.0)})
+    b = gc.brief_fingerprint({"brief": _brief(weight=319.4)})
+    assert a != b
+
+
+def test_a_day_count_that_is_semantic_still_busts():
+    """gap_days is NOT in _VOLATILE_KEYS and must not become so: a brief that says
+    'it has been 4 days' may never be reused on day 5. This is the design ceiling on
+    the achievable skip rate, asserted rather than assumed."""
+    a = gc.brief_fingerprint({"brief": {**_brief(), "engagement_signal": {"gap_days": 4}}})
+    b = gc.brief_fingerprint({"brief": {**_brief(), "engagement_signal": {"gap_days": 5}}})
+    assert a != b
+
+
+def test_part_fingerprints_are_per_part_and_stable():
+    parts = {"brief": _brief(), "corrections": "", "trends": {"weight": {"direction": "down"}}}
+    fps = gc.part_fingerprints(parts)
+    assert set(fps) == set(parts)
+    assert fps == gc.part_fingerprints(parts)
+    assert fps["brief"] != fps["trends"]
+
+
+def test_changed_parts_names_only_what_changed():
+    old = gc.part_fingerprints({"brief": _brief(), "corrections": ""})
+    new = gc.part_fingerprints({"brief": _brief(weight=300.0), "corrections": ""})
+    assert gc.changed_parts(old, new) == ["brief"]
+
+
+def test_changed_parts_marks_an_unknown_part_rather_than_calling_it_unchanged():
+    """An entry written before per-part digests existed must not read as a match —
+    an unknown is reported, never silently counted as equal."""
+    old = gc.part_fingerprints({"brief": _brief()})
+    new = gc.part_fingerprints({"brief": _brief(), "corrections": "new block"})
+    assert gc.changed_parts(old, new) == ["?corrections"]
+
+
+def test_changed_parts_on_a_legacy_entry_says_so():
+    assert gc.changed_parts({}, {"brief": "abc"}) == ["<no part digests stored>"]
+
+
+def test_store_entry_persists_part_hashes_when_given():
+    t = _FakeTable()
+    parts = {"brief": _brief()}
+    assert gc.store_entry(t, "sleep_coach", "daily_brief_sleep", "fp", "text", "2026-08-22", parts=parts)
+    stored = t.store[(gc.CACHE_PK, gc.cache_sk("sleep_coach", "daily_brief_sleep"))]
+    assert stored["part_hashes"] == gc.part_fingerprints(parts)
+
+
+def test_store_entry_without_part_hashes_is_unchanged():
+    """Additive: the pre-#2889 shape still stores, with no empty key left behind."""
+    t = _FakeTable()
+    assert gc.store_entry(t, "sleep_coach", "daily_brief_sleep", "fp", "text", "2026-08-22")
+    stored = t.store[(gc.CACHE_PK, gc.cache_sk("sleep_coach", "daily_brief_sleep"))]
+    assert "part_hashes" not in stored
+
+
+def test_the_call_site_fingerprints_structure_not_the_rendered_message():
+    """AST call-site pin (#2564's idiom). The unit tests above prove the helpers
+    behave; only this proves PRODUCTION uses them that way. Without it the module
+    could be perfect while the one caller keeps hashing prose — which is precisely
+    the state #2889 found, live, for two months behind a green suite."""
+    import ast
+    import pathlib
+
+    src = pathlib.Path(__file__).resolve().parents[1] / "lambdas" / "ai" / "ai_calls.py"
+    tree = ast.parse(src.read_text(encoding="utf-8"))
+    fingerprinting = {"brief_fingerprint", "check_reuse_or_explain", "brief_parts", "part_fingerprints"}
+    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in fingerprinting]
+    assert calls, "no generation-cache fingerprint call site found in ai_calls.py — the scan is vacuous, not clean"
+    assert any(c.func.attr == "check_reuse_or_explain" for c in calls), (
+        "production must go through check_reuse_or_explain — it is the seam that keeps the parts named "
+        "in generation_cache and logs the miss reason (#2889)"
+    )
+    for call in calls:
+        for arg in list(call.args) + [kw.value for kw in call.keywords]:
+            assert not isinstance(arg, ast.JoinedStr), "an f-string part defeats canonicalize (#2889)"
+            assert not (isinstance(arg, ast.Name) and arg.id.endswith("message_full")), (
+                "the rendered prompt is being fingerprinted again — canonicalize strips by dict KEY, "
+                "so a rendered part carries generation_date into the digest and the cache can never hit (#2889)"
+            )
+
+
+def test_brief_parts_names_every_part_here_not_at_the_call_site():
+    """The part NAMES are a property of this module, so a caller cannot quietly drop
+    one — dropping a part narrows the fingerprint, the direction that could serve
+    stale output as fresh."""
+    p = gc.brief_parts("sys", {"a": 1}, {"b": 2}, {"c": 3}, "inv", "corr")
+    assert set(p) == {"system_prompt", "brief", "domain_data", "trends", "data_inventory", "corrections"}
+    assert p["system_prompt"] == "sys" and p["corrections"] == "corr"
+
+
+def test_check_reuse_or_explain_returns_the_hit_and_never_logs_a_miss(capsys):
+    t = _FakeTable()
+    parts = gc.brief_parts("sys", _brief(), {}, {}, "inv", "")
+    fp = gc.brief_fingerprint(parts)
+    gc.store_entry(t, "sleep_coach", "daily_brief_sleep", fp, "the text", "2026-08-22", parts=parts)
+    got_fp, out, since = gc.check_reuse_or_explain(t, "sleep_coach", "daily_brief_sleep", parts)
+    assert (got_fp, out, since) == (fp, "the text", "2026-08-22")
+    assert "GEN-CACHE-MISS" not in capsys.readouterr().out
+
+
+def test_check_reuse_or_explain_names_the_changed_part_on_a_miss(capsys):
+    t = _FakeTable()
+    old = gc.brief_parts("sys", _brief(weight=321.0), {}, {}, "inv", "")
+    gc.store_entry(t, "sleep_coach", "daily_brief_sleep", gc.brief_fingerprint(old), "text", "2026-08-22", parts=old)
+    new = gc.brief_parts("sys", _brief(weight=300.0), {}, {}, "inv", "")
+    _fp, out, _since = gc.check_reuse_or_explain(t, "sleep_coach", "daily_brief_sleep", new)
+    assert out is None
+    line = capsys.readouterr().out
+    assert "GEN-CACHE-MISS" in line and "parts changed: brief" in line
+
+
+def test_check_reuse_or_explain_hits_when_only_the_day_moved(capsys):
+    """End to end, through the real entry point: the whole point of #2889."""
+    t = _FakeTable()
+    monday = gc.brief_parts("sys", _brief("2026-08-22"), {}, {}, "inv", "")
+    gc.store_entry(t, "c", "o", gc.brief_fingerprint(monday), "text", "2026-08-22", parts=monday)
+    tuesday = gc.brief_parts("sys", _brief("2026-08-23"), {}, {}, "inv", "")
+    _fp, out, since = gc.check_reuse_or_explain(t, "c", "o", tuesday)
+    assert out == "text" and since == "2026-08-22"
+
+
+def test_check_reuse_or_explain_is_fail_soft_on_a_broken_table(capsys):
+    parts = gc.brief_parts("sys", _brief(), {}, {}, "inv", "")
+    fp, out, since = gc.check_reuse_or_explain(_BrokenTable(), "c", "o", parts)
+    assert out is None and since is None and fp == gc.brief_fingerprint(parts)

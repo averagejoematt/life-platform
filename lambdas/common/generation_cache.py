@@ -82,10 +82,89 @@ def canonicalize(obj):
 def brief_fingerprint(*parts) -> str:
     """SHA-256 hex over the canonicalized semantic inputs. Deterministic across
     runs: dict keys are sorted, Decimals/dates are stringified. Any semantic
-    change in any part changes the digest."""
+    change in any part changes the digest.
+
+    #2889 — PASS STRUCTURE, NOT RENDERED PROSE. `canonicalize()` strips bookkeeping
+    by dict KEY, so a part handed in as an already-rendered string (a prompt with
+    `json.dumps(brief)` baked into it) carries every volatile key straight into the
+    digest and the whole `_VOLATILE_KEYS` mechanism becomes a no-op. That is exactly
+    what the only production call site did from ADR-126 until 2026-08-22: the digest
+    covered `json.dumps(brief)` text containing `generation_date`, so it changed
+    every single day and `GenerationSkippedUnchanged` was never once emitted.
+    """
     canon = [canonicalize(p) for p in parts]
     blob = json.dumps(canon, sort_keys=True, default=str, ensure_ascii=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def brief_parts(system_prompt, brief, domain_data, trends, data_inventory, corrections) -> dict:
+    """The named semantic parts of a coach daily-brief generation (#2889).
+
+    The NAMES live here, not at the call site, so a caller cannot quietly drop or
+    rename one — dropping a part narrows the fingerprint, which is the direction
+    that could serve stale output as fresh.
+    """
+    return {
+        "system_prompt": system_prompt,
+        "brief": brief,
+        "domain_data": domain_data,
+        "trends": trends,
+        "data_inventory": data_inventory,
+        "corrections": corrections,
+    }
+
+
+def check_reuse_or_explain(table, coach_id: str, output_type: str, parts: dict):
+    """Fingerprint `parts`, try reuse, and on a MISS say which part changed.
+
+    Returns `(fingerprint, reused_output_or_None, unchanged_since_or_None)`.
+
+    THIS IS THE ENTRY POINT CALLERS SHOULD USE (#2889). It exists so the caller
+    hands over STRUCTURE and never a rendered prompt — see `brief_fingerprint` for
+    what that mistake cost — and so the miss reason lives with the cache rather than
+    at each call site. `lambdas/ai/ai_calls.py` is baselined by the #1665 module-size
+    guard, and the guard was right: this logic belongs here.
+
+    The miss line is a `print`, deliberately not a dimensioned metric — #2837 is an
+    open finding about 743 EMF series across 35 namespaces, and a per-coach
+    miss-reason dimension would have added ~40 more for a diagnostic that a log
+    search answers just as well.
+    """
+    fingerprint = brief_fingerprint(parts)
+    entry = load_entry(table, coach_id, output_type)
+    if entry and entry.get("brief_hash") == fingerprint and entry.get("output"):
+        return fingerprint, entry["output"], entry.get("first_generated")
+    diff = changed_parts((entry or {}).get("part_hashes") or {}, part_fingerprints(parts))
+    print(f"[GEN-CACHE-MISS:{coach_id}] {output_type} regenerating — parts changed: {', '.join(diff) or 'none (first run)'}")
+    return fingerprint, None, None
+
+
+def part_fingerprints(parts: dict) -> dict:
+    """Per-part digests, so a MISS can say WHICH part changed (#2889).
+
+    The skip-rate was unmeasurable in the bad direction: the metric only fires on a
+    hit, so "never emitted" could not distinguish "the inputs genuinely change every
+    day" from "the fingerprint is computed wrong". Storing a digest per named part
+    turns the next miss into a named diff, at zero CloudWatch cost — deliberately a
+    log line rather than a dimensioned metric, because #2837 is an open finding about
+    743 EMF series and this would have added another 40.
+    """
+    return {name: brief_fingerprint(value) for name, value in parts.items()}
+
+
+def changed_parts(stored: dict, current: dict) -> list:
+    """Names of parts whose digest differs, sorted. Parts absent from `stored` (an
+    entry written before per-part digests existed) are reported as `?<name>` rather
+    than silently counted as unchanged — an unknown must not read as a match."""
+    if not stored:
+        return ["<no part digests stored>"]
+    out = []
+    for name, digest in sorted(current.items()):
+        if name not in stored:
+            out.append(f"?{name}")
+        elif stored[name] != digest:
+            out.append(name)
+    return out
 
 
 # ── DDB helpers — all fail-soft: any error degrades to "regenerate", never raises.
@@ -110,22 +189,26 @@ def check_reuse(table, coach_id: str, output_type: str, fingerprint: str):
     return None, None
 
 
-def store_entry(table, coach_id: str, output_type: str, fingerprint: str, output: str, today: str) -> bool:
+def store_entry(table, coach_id: str, output_type: str, fingerprint: str, output: str, today: str, parts: dict | None = None) -> bool:
     """Persist a freshly generated, gate-passed output under its brief fingerprint.
     Reached only on a cache MISS, so `first_generated` resets the unchanged-since
-    clock. Best-effort."""
+    clock. Pass the same `parts` dict the fingerprint came from (#2889) and the
+    per-part digests are stored alongside, so the NEXT miss names what changed
+    instead of leaving the miss reason unmeasurable. Best-effort."""
     try:
-        table.put_item(
-            Item={
-                "pk": CACHE_PK,
-                "sk": cache_sk(coach_id, output_type),
-                "brief_hash": fingerprint,
-                "output": output,
-                "first_generated": today,
-                "last_generated": today,
-                "reuse_count": 0,
-            }
-        )
+        part_hashes = part_fingerprints(parts) if parts else None
+        item = {
+            "pk": CACHE_PK,
+            "sk": cache_sk(coach_id, output_type),
+            "brief_hash": fingerprint,
+            "output": output,
+            "first_generated": today,
+            "last_generated": today,
+            "reuse_count": 0,
+        }
+        if part_hashes:
+            item["part_hashes"] = part_hashes
+        table.put_item(Item=item)
         return True
     except Exception as e:  # noqa: BLE001
         print(f"[GEN-CACHE] store failed for {coach_id}/{output_type}: {e}")

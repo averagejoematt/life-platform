@@ -2013,16 +2013,16 @@ Write your {domain_label} coaching section now."""
         output_type = f"daily_brief_{domain_label.lower().replace(' ', '_')}"
         _gen_cache = None
         _cache_tbl = None
-        _brief_fp = None
+        _brief_fp = _fp_parts = None
         try:
             from common import generation_cache as _gen_cache
 
             _cache_tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
-            # #1697: fingerprint over user_message_full so a newly-logged (or
-            # resolved) correction busts the hash-and-reuse and forces a fresh,
-            # corrections-aware generation — reuse can never be stale-but-fresh.
-            _brief_fp = _gen_cache.brief_fingerprint(system_prompt, user_message_full)
-            _reuse, _unchanged_since = _gen_cache.check_reuse(_cache_tbl, coach_id, output_type, _brief_fp)
+            # #2889: STRUCTURE, never rendered prose — canonicalize strips by dict KEY. See generation_cache.
+            _fp_parts = _gen_cache.brief_parts(
+                system_prompt, brief, domain_data, comp_results.get("trends", {}), _data_inventory, corrections_block
+            )
+            _brief_fp, _reuse, _unchanged_since = _gen_cache.check_reuse_or_explain(_cache_tbl, coach_id, output_type, _fp_parts)
             if _reuse:
                 print(f"[COACH-V2:{coach_id}] brief unchanged since {_unchanged_since} — reusing gated output, skipping generation")
                 _today = _date_cls.today().isoformat()
@@ -2171,7 +2171,7 @@ Write your {domain_label} coaching section now."""
         # fingerprint so an unchanged brief tomorrow reuses it. Only reached on a
         # cache MISS, so first_generated resets the unchanged-since clock.
         if _gen_cache is not None and _cache_tbl is not None and _brief_fp and output:
-            _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, _date_cls.today().isoformat())
+            _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, _date_cls.today().isoformat(), parts=_fp_parts)
 
         # #1691 (epic #1687): baseline-freshness gate — ADVISORY. The DATA-grounding
         # gates above pass a brief that is digit-grounded yet cites a STALE cycle
