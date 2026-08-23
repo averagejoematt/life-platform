@@ -468,6 +468,8 @@ def rule_later_staleness(ctxs: List[Dict[str, Any]], now: datetime) -> List[Find
     cutoff = now - timedelta(days=LATER_STALE_DAYS)
     stale: List[Finding] = []
     for ctx in ctxs:
+        # `Roadmap` is deliberately outside this rule (ADR-099 amendment 2026-08-22):
+        # a parked product idea is not stale debt, so only `Later` ages.
         if ctx["milestone"] != "Later":
             continue
         updated = _parse_iso(ctx["updated_at"])
