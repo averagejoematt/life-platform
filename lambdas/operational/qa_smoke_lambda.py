@@ -57,6 +57,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 # lives in its own module, same size-split pattern — this file owns the AWS
 # clients and the nightly wiring, raw_archive_qa owns the logic.
 from operational import (
+    qa_check_edge_429,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
     weight_truth_qa,  # noqa: E402
@@ -1011,6 +1012,7 @@ def check_steps():
         ("redirect_spotcheck", check_redirect_spotcheck),  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         ("notion_template_schema", check_notion_template_schema),  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
         ("canary_precision", check_canary_precision),  # #1956: AI-canary grounded false-positive-rate (sensor on the sensor)
+        ("edge_429_enforcement", qa_check_edge_429.checks),  # #2828: nightly real-edge 429 observation (the 08-14 class)
         ("phase_stamp_coverage", check_coach_ensemble_phase_stamp_coverage),  # #1970: tagger-blind COACH#/ENSEMBLE# gap
         ("recall_freshness", lambda: recall_freshness_qa.checks(table, f"{USER_PREFIX}chronicle", Check, CONTENT_TRUTH)),  # #1384
         # #2367: sk is identity, `date` is display — mismatch legal only with the carry-forward marker
