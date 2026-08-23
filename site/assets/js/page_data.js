@@ -13,6 +13,7 @@
   defaults, same as the old `window.X || fallback` idiom.
 */
 export function pageData() {
+  if (typeof document === "undefined") return {}; // DOM-less runtime (node unit tests) — the absent-island case
   var el = document.getElementById("page-data");
   if (!el) return {};
   try {
