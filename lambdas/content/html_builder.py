@@ -1572,6 +1572,7 @@ def _brief_journal_coaches(
     sleep_coach_v2_text,
     training_coach_v2_text,
     weekly_habit_review,
+    journal_coach_absent=False,
 ):
     """Section group of the daily brief (extracted from build_html, ADR-pending).
 
@@ -1639,6 +1640,16 @@ def _brief_journal_coaches(
                     '<p style="color:#94a3b8;font-size:12px;margin:0;">' + tactic + "</p></div>"
                 )
             out += "</div>"
+        elif journal_coach_absent:
+            # #2944 / ADR-104: no journal input — say so plainly instead of either
+            # a silently-missing section or a fabricated fallback coaching line.
+            out += (
+                '<div style="background:#16213e;padding:20px 24px;border-bottom:1px solid #2d2d5e;">'
+                '<p style="color:#64748b;font-size:10px;margin:0 0 8px;font-weight:700;letter-spacing:1px;">JOURNAL COACH</p>'
+                '<p style="color:#475569;font-size:12px;margin:0;">'
+                "No journal entries yesterday — nothing to coach on. This section returns with the next entry.</p>"
+                "</div>"
+            )
         out += "<!-- /S:journal_coach -->"
     except Exception as _e:
         out += _section_error_html("Journal Coach", _e)
@@ -1896,6 +1907,7 @@ def build_html(
     vacation_fund=None,
     budget_headroom_line=None,
     intake_line=None,
+    journal_coach_absent=False,
 ):
     """Build the full daily brief HTML email.
 
@@ -1946,6 +1958,7 @@ def build_html(
         sleep_coach_v2_text,
         training_coach_v2_text,
         weekly_habit_review,
+        journal_coach_absent=journal_coach_absent,
     )
     # #1405: private intake-ledger line — quiet, above the footer, never scolding.
     if intake_line:

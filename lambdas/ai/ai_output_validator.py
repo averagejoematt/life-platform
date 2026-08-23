@@ -669,6 +669,7 @@ def validate_daily_brief_outputs(
     journal_coach_text: str,
     tldr_guidance: dict,
     health_context: dict = None,
+    journal_coach_absent_reason: Optional[str] = None,
 ) -> dict:
     """Validate all four Daily Brief AI outputs and return safe versions.
 
@@ -678,6 +679,14 @@ def validate_daily_brief_outputs(
         journal_coach_text:  Journal coach string
         tldr_guidance:       {"tldr": ..., "guidance": [...]} dict
         health_context:      Current health metrics dict
+        journal_coach_absent_reason:
+            #2944 / ADR-104: when the journal coach never ran because there was
+            no journal input to coach on (a behavioral absence, not an AI
+            failure), the caller passes the reason here. The JOURNAL_COACH
+            empty-output BLOCK path — ERROR log + generic fallback text implying
+            coaching happened — is then skipped and the section stays honestly
+            empty. None (default) = the coach was expected to produce output,
+            and an empty string IS a blockable failure.
 
     Returns:
         Dict with keys: bod_insight, training_nutrition, journal_coach_text,
@@ -709,12 +718,18 @@ def validate_daily_brief_outputs(
     if nutrition_result.blocked:
         all_warnings.append(f"[nutrition] BLOCKED: {nutrition_result.block_reason}")
 
-    # Journal coach
-    jc_result = validate_ai_output(journal_coach_text, AIOutputType.JOURNAL_COACH, ctx)
-    results["journal_coach_text"] = jc_result.sanitized_text
-    all_warnings.extend([f"[journal_coach] {w}" for w in jc_result.warnings])
-    if jc_result.blocked:
-        all_warnings.append(f"[journal_coach] BLOCKED: {jc_result.block_reason}")
+    # Journal coach — #2944: a declared-absent input is not a model failure and
+    # must not be laundered through the BLOCK path (which fabricates a fallback
+    # coaching line for the reader and an ERROR alarm for the operator).
+    if journal_coach_absent_reason is not None:
+        results["journal_coach_text"] = ""
+        logger.info("[ai_validator] JOURNAL_COACH declared absent (%s) — validation skipped", journal_coach_absent_reason)
+    else:
+        jc_result = validate_ai_output(journal_coach_text, AIOutputType.JOURNAL_COACH, ctx)
+        results["journal_coach_text"] = jc_result.sanitized_text
+        all_warnings.extend([f"[journal_coach] {w}" for w in jc_result.warnings])
+        if jc_result.blocked:
+            all_warnings.append(f"[journal_coach] BLOCKED: {jc_result.block_reason}")
 
     # TL;DR + guidance JSON
     tg = tldr_guidance or {}

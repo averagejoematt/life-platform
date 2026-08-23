@@ -292,6 +292,49 @@ def test_daily_brief_blocked_journal_coach_is_reported():
     assert len(blocked_entries) == 1
 
 
+def test_daily_brief_journal_declared_absent_skips_block_path():
+    """#2944 / ADR-104: when the caller declares the journal input absent (no
+    entries to coach on — the 2026-08-20→08-22 live shape), the empty string is
+    a behavioral absence, not an AI failure. It must NOT be blocked, must NOT
+    be swapped for the fallback line (which implies coaching happened), and
+    must NOT raise the operator's BLOCKED count."""
+    out = v.validate_daily_brief_outputs(
+        bod_insight="Solid recovery today; keep the intensity conversational and steady throughout the session.",
+        training_nutrition={
+            "training": "Good steady effort today, keep it conversational and controlled.",
+            "nutrition": "Hit your protein target and stay within your calorie range today.",
+        },
+        journal_coach_text="",
+        tldr_guidance={"tldr": "Rest well and recover fully today.", "guidance": []},
+        health_context={},
+        journal_coach_absent_reason="no journal entries for 2026-08-21",
+    )
+    assert out["journal_coach_text"] == ""  # honestly empty — no fabricated fallback
+    assert out["journal_coach_text"] != v._fallback_for_type(AIOutputType.JOURNAL_COACH)
+    assert not any(w.startswith("[journal_coach]") for w in out["validation_warnings"]), out["validation_warnings"]
+
+
+def test_daily_brief_declared_absence_does_not_mask_other_blocks():
+    """#2944 mutation guard against over-skipping: a declared journal absence
+    must only exempt the journal seat — a genuinely-empty sibling output (here
+    nutrition) still goes through the BLOCK path and is still reported."""
+    out = v.validate_daily_brief_outputs(
+        bod_insight="Solid recovery today; keep the intensity conversational and steady throughout the session.",
+        training_nutrition={
+            "training": "Good steady effort today, keep it conversational and controlled.",
+            "nutrition": "",  # a real empty-output failure — must still block
+        },
+        journal_coach_text="",
+        tldr_guidance={"tldr": "Rest well and recover fully today.", "guidance": []},
+        health_context={},
+        journal_coach_absent_reason="no journal entries for 2026-08-21",
+    )
+    blocked_entries = [w for w in out["validation_warnings"] if "BLOCKED" in w]
+    assert len(blocked_entries) == 1
+    assert blocked_entries[0].startswith("[nutrition] BLOCKED:")
+    assert out["training_nutrition"]["nutrition"] == v._fallback_for_type(AIOutputType.NUTRITION_COACH)
+
+
 def test_daily_brief_blocked_tldr_is_reported():
     """#2918: a suppressed TL;DR — the brief's headline — read as a healthy run
     ('All AI outputs passed validation'). A blocked tldr_result must surface in
