@@ -24,7 +24,7 @@ Three arcs, in order:
 
 ## Shipped (merged + deployed unless noted)
 
-- **#3005** (PR #3032) — Co-Authored-By ban: 4 instruction files fixed + guard test + §9 row.
+- **#3005** (PR #3032) — tool-attribution-trailer ban: 4 instruction files fixed + guard test + §9 row.
 - **#2993** (PR #3033) — Plan-job config-drift classifier (`classify_cdk_diff.py`); agent
   found the issue's hypothesis wrong (real trigger = CDK LogRetention runtime skew).
 - **#3021** (PR #3034) — superseded-lease janitor (owner needs `DEPLOY_GATE_JANITOR_TOKEN`
