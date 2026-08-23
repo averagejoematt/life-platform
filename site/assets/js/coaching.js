@@ -1192,7 +1192,7 @@ async function renderRead(s, id) {
 // THE SCORECARD — the board's falsifiable record. Every call the coaches make is
 // graded by the daily evaluator (EWMA-trend directional / machine). Honest about
 // the early state: most calls are still inside their 2–4 week resolution window.
-const _STATUS_LABEL = { confirmed: "confirmed", refuted: "refuted", pending: "still open", inconclusive: "no signal", expired: "expired" };
+const _STATUS_LABEL = { confirmed: "confirmed", refuted: "refuted", pending: "still open", inconclusive: "no signal", expired: "expired", observational: "on record · not gradeable" };
 async function renderScorecard(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Tallying the board's calls…</span></p>`;
   const data = (await tryJSON("/api/predictions")) || {};
@@ -1220,23 +1220,30 @@ async function renderScorecard(read, id) {
       `<div class="sc-tile"><span class="sc-n">${o.pending || 0}</span><span class="sc-l label">still open</span></div>` +
       `</div>`;
     if (!decided) {
-      const pending = preds.filter((p) => p.status === "pending" && p.date);
-      pending.sort((a, b) => (a.date < b.date ? -1 : 1));
-      const nearest = pending[0];
-      // #1371: never promise a date that has already passed (post-reset, the nearest
-      // pending call's window can predate today) — say what actually happens next.
-      const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
-      const countdown = nearest
-        ? (nearest.date < todayISO
-          ? ` The earliest call's window (${esc(nearest.date)}) has closed — it grades at the evaluator's next daily pass.`
-          : ` First verdict expected around <strong>${esc(nearest.date)}</strong>.`)
-        : "";
+      // #3046 (was #1371): due-vs-pending context comes from the API's `due`
+      // block, computed server-side from the evaluator's OWN domain-clamped
+      // windows. The old copy inferred it from CREATED dates — always in the
+      // past on a fresh cycle, so it claimed the earliest window had "closed"
+      // when in truth nothing was due for a week.
+      const due = o.due || null;
+      let countdown = "";
+      if (due && due.due_now > 0) {
+        countdown = ` <strong>${due.due_now}</strong> ${due.due_now === 1 ? "call is past its window" : "calls are past their windows"} — grading at the evaluator's next daily pass.`;
+      } else if (due && due.earliest_due) {
+        countdown = ` <strong>0 due yet</strong> — the earliest window closes <strong>${esc(due.earliest_due)}</strong>.`;
+      }
       // #1376: a fresh cycle reads "fresh slate — career: n=X", never a bare
       // "none have resolved yet" that hides the record a reset didn't actually erase.
       const freshCareer = life.decided > 0
         ? ` Fresh slate — career: n=${life.decided} decided (${life.accuracy_pct}% hit rate) across every cycle so far.`
         : "";
-      h += `<p class="dx-prose sc-note">The board has made <strong>${o.total || 0}</strong> calls so far this cycle; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""}${freshCareer} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
+      const falsifiableN = Math.max(0, (o.total || 0) - (o.observational || 0));
+      h += `<p class="dx-prose sc-note">The board has made <strong>${falsifiableN}</strong> falsifiable calls so far this cycle; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""}${freshCareer} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
+    }
+    // #3046: qualitative claims are on the record but have no deterministic
+    // grading path — labeled, and never counted among the open calls above.
+    if (o.observational) {
+      h += `<p class="dx-prose sc-note sc-obs label">${o.observational} further claim${o.observational === 1 ? "" : "s"} this cycle ${o.observational === 1 ? "is" : "are"} observational — no measurable metric + direction, so no grading path. ${o.observational === 1 ? "It stays" : "They stay"} on the record, labeled, and ${o.observational === 1 ? "is" : "are"} never counted as an open falsifiable call.</p>`;
     }
     // The career tiles — every cycle, sports-card pattern (#1376). A reset wipes
     // this SEASON honestly to zero; it must never wipe the record from view too.
@@ -1316,7 +1323,10 @@ async function renderScorecard(read, id) {
     `</div>`;
   if (!decidedC) {
     const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${cl.hit_rate_pct}% hit rate) across every cycle so far.` : "";
-    h += `<p class="dx-prose sc-note">${esc(name)} has ${c.total || 0} calls on the board this cycle; none have resolved yet. Each grades after its window closes.${freshCareer}</p>`;
+    // #3046: count only falsifiable calls; observational claims are labeled in the list below.
+    const falsifiableC = Math.max(0, (c.total || 0) - (c.observational || 0));
+    const obsNote = c.observational ? ` ${c.observational} more ${c.observational === 1 ? "claim is" : "claims are"} observational — on the record, no grading path.` : "";
+    h += `<p class="dx-prose sc-note">${esc(name)} has ${falsifiableC} falsifiable call${falsifiableC === 1 ? "" : "s"} on the board this cycle; none have resolved yet. Each grades after its window closes.${obsNote}${freshCareer}</p>`;
   }
   if (cl.total > 0) {
     h += `<p class="dx-kicker label sc-sub">career · every cycle</p>`;
@@ -1336,9 +1346,12 @@ async function renderScorecard(read, id) {
 }
 function _scCallHTML(p, shareUrl) {
   const st = p.status || "pending";
+  // #3046: an open call shows WHEN its verdict is due (the API computes it from
+  // the evaluator's own domain-clamped window), not just when it was made.
+  const dueBit = st === "pending" && p.due_date ? `<span class="sc-call-d label">grades ${esc(p.due_date)}</span>` : "";
   return `<div class="sc-call sc-${esc(st)}"><div class="sc-call-top"><span class="sc-call-st label">${esc(_STATUS_LABEL[st] || st)}</span>` +
     `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
-    `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}</div>` +
+    `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}${dueBit}</div>` +
     `<p class="sc-call-claim">${esc(p.text || "")}</p>` +
     `${p.outcome_notes ? `<p class="sc-call-why label">${esc(p.outcome_notes)}</p>` : ""}` +
     `${shareUrl ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
@@ -1433,11 +1446,16 @@ async function wireMachineryRibbon(tabsEl) {
       bits.push(`<button type="button" class="cm-bit cm-tension" data-sec="read"><span class="cm-k label">the board disagrees</span> ${esc(tension.topic || tension.summary)} →</button>`);
     }
     const o = (preds && preds.overall) || {};
-    if (o.total) {
+    // #3046: observational claims are on the record but not falsifiable — say the
+    // falsifiable count, and say when the first verdict is actually due.
+    const falsifiable = Math.max(0, (o.total || 0) - (o.observational || 0));
+    if (falsifiable) {
       const tally = o.decided
         ? `${o.decided} decided · ${o.accuracy_pct != null ? o.accuracy_pct + "% held up" : ""}`
-        : "none decided yet — graded daily as windows close";
-      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(String(o.total))} falsifiable calls · ${esc(tally)} →</button>`);
+        : (o.due && !o.due.due_now && o.due.earliest_due
+          ? `none due before ${o.due.earliest_due} — graded daily as windows close`
+          : "none decided yet — graded daily as windows close");
+      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(String(falsifiable))} falsifiable calls · ${esc(tally)} →</button>`);
     }
     if (!bits.length) return;
     const rib = document.createElement("div");

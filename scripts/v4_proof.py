@@ -114,6 +114,7 @@ def load_scorecard() -> dict:
     if isinstance(d, dict) and isinstance(d.get("overall"), dict):
         o = d["overall"]
         snap = _snapshot().get("scorecard", {})
+        due = o.get("due") if isinstance(o.get("due"), dict) else {}
         return {
             "total": int(o.get("total", 0)),
             "confirmed": int(o.get("confirmed", 0)),
@@ -121,6 +122,11 @@ def load_scorecard() -> dict:
             "decided": int(o.get("decided", 0)),
             "pending": int(o.get("pending", 0)),
             "inconclusive": int(o.get("inconclusive", 0)),
+            # #3046: qualitative claims with no grading path — labeled, never "pending".
+            "observational": int(o.get("observational", 0)),
+            # #3046: due-vs-pending context from the API's domain-clamped windows.
+            "due_now": int(due.get("due_now", 0) or 0),
+            "earliest_due": due.get("earliest_due") or "",
             "accuracy_pct": o.get("accuracy_pct"),
             # live-since is not on the API; carry it from the snapshot (experiment genesis).
             "evaluator_live_since": snap.get("evaluator_live_since", ""),
@@ -306,16 +312,34 @@ def scorecard_block_html(sc: dict) -> str:
     as_of = sc.get("as_of", "")
     live_since = sc.get("evaluator_live_since", "")
 
+    # #3046: due-vs-pending context + the observational class. "N pending, 0 graded"
+    # with no due date reads as a stall on a fresh cycle when nothing is due yet.
+    due_now = int(sc.get("due_now", 0) or 0)
+    earliest_due = sc.get("earliest_due", "")
+    observational = int(sc.get("observational", 0) or 0)
+    if due_now:
+        due_bit = f" ({due_now} past {'its' if due_now == 1 else 'their'} window — grading at the next daily pass)"
+    elif earliest_due:
+        due_bit = f" (0 due yet — earliest verdict due {_esc(earliest_due)})"
+    else:
+        due_bit = ""
+    obs_bit = (
+        f" {observational} further claim{'s' if observational != 1 else ''} on the record "
+        f"{'are' if observational != 1 else 'is'} observational — no deterministic grading path — and never counted as pending."
+        if observational
+        else ""
+    )
+
     if decided > 0:
         acc = sc.get("accuracy_pct")
         headline = f"{decided} graded · {acc:.0f}% hit-rate" if isinstance(acc, (int, float)) else f"{decided} graded"
-        sentence = f"{decided} predictions graded, {pending} still open, {total} tracked in total."
+        sentence = f"{decided} predictions graded, {pending} still open{due_bit}, {total} tracked in total.{obs_bit}"
     else:
         headline = "0 graded yet"
         since = f"Evaluator live since {_esc(live_since)}. " if live_since else "Evaluator live. "
         sentence = (
-            f"{since}{pending} predictions pending; 0 graded yet — the deterministic evaluator "
-            f"resolves each prediction against the data when its evaluation window elapses."
+            f"{since}{pending} predictions pending{due_bit}; 0 graded yet — the deterministic evaluator "
+            f"resolves each prediction against the data when its evaluation window elapses.{obs_bit}"
         )
 
     return (

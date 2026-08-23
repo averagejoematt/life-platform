@@ -125,6 +125,10 @@ class TestProjectionCarriesEveryEmittedField:
             "confidence": 0.8,
             "status": "confirmed",
             "date": "2026-07-19",
+            # #3046: a decided call has no due date to promise; gradeable says it
+            # had a deterministic grading path (non-qualitative eval spec).
+            "due_date": None,
+            "gradeable": True,
             "metric": "sleep_duration_hours",
             "eval_type": "threshold",
             "outcome_notes": "cleared Wednesday",

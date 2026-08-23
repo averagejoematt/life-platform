@@ -85,84 +85,17 @@ COACH_IDS = list(OPERATIONAL_COACH_IDS)
 # cannot diverge. See lambdas/measurable_metrics.py.
 from experiment.measurable_metrics import METRIC_SOURCES, infer_direction  # noqa: E402
 
-# Domain-appropriate minimum evaluation windows (days).
-# Predictions with shorter windows are clamped to these minimums.
-DOMAIN_MIN_WINDOWS = {
-    "sleep": 7,
-    "hrv": 14,
-    "recovery": 14,
-    "training": 21,
-    "body_composition": 28,
-    "biomarkers": 60,
-    "mood": 7,
-    "mental": 7,
-    "nutrition": 14,
-    "glucose": 14,
-    "labs": 60,
-}
-
-# Map subdomains to their domain category for window enforcement.
-# #813: coach_state_updater derives a prediction's subdomain by scanning the
-# metric hint for these keywords: sleep, hrv, recovery, weight, calories,
-# protein, glucose, training, mood, stress — falling back to "general". That
-# emitted vocabulary MUST be covered here, or every prediction silently falls
-# to the "training" default and its window is clamped to 21 days (a sleep
-# prediction's 7-day minimum tripled). tests/test_prediction_triage_813.py
-# pins writer-vocabulary coverage.
-SUBDOMAIN_TO_DOMAIN = {
-    # coach_state_updater's emitted vocabulary (#813) — "weight", "mood" and
-    # "stress" already appear in the per-coach sections below.
-    "sleep": "sleep",
-    "hrv": "hrv",
-    "recovery": "recovery",
-    "calories": "nutrition",
-    "protein": "nutrition",
-    "glucose": "glucose",
-    "training": "training",
-    "general": "training",  # conservative default, but now explicit
-    # sleep_coach
-    "sleep_quality": "sleep",
-    "sleep_duration": "sleep",
-    "sleep_efficiency": "sleep",
-    "deep_sleep": "sleep",
-    "rem_sleep": "sleep",
-    # nutrition_coach
-    "caloric_intake": "nutrition",
-    "protein_intake": "nutrition",
-    "macros": "nutrition",
-    "meal_timing": "nutrition",
-    # training_coach
-    "training_load": "training",
-    "training_frequency": "training",
-    "strength": "training",
-    "endurance": "training",
-    "performance": "training",
-    "cardio": "training",
-    # mind_coach
-    "mood": "mood",
-    "stress": "mental",
-    "focus": "mental",
-    "mindfulness": "mental",
-    # physical_coach
-    "body_composition": "body_composition",
-    "weight": "body_composition",
-    "body_fat": "body_composition",
-    "muscle_mass": "body_composition",
-    "mobility": "training",
-    # glucose_coach
-    "glucose_control": "glucose",
-    "glucose_variability": "glucose",
-    "fasting_glucose": "glucose",
-    "postprandial": "glucose",
-    # labs_coach
-    "cholesterol": "labs",
-    "hormones": "labs",
-    "inflammation": "labs",
-    "vitamins": "labs",
-    "metabolic": "labs",
-    # explorer_coach
-    "cross_domain": "training",  # default conservative window
-}
+# Window policy (domain minimums + subdomain map) moved to
+# coach.prediction_windows (#3046) so the public scorecard surface computes due
+# dates from the SAME clamp this evaluator grades with. Re-exported here because
+# the suite + siblings (dispute_docket, diary_claims, coach_nudge) read them off
+# this module.
+from coach.prediction_windows import (  # noqa: E402,F401  (F401: DOMAIN_MIN_WINDOWS/SUBDOMAIN_TO_DOMAIN are re-exports)
+    DOMAIN_MIN_WINDOWS,
+    SUBDOMAIN_TO_DOMAIN,
+    effective_window_days as _effective_window_days,
+    is_gradeable as _is_gradeable,
+)
 
 # Statuses that are eligible for evaluation
 EVALUABLE_STATUSES = {"pending", "confirming"}
@@ -306,13 +239,21 @@ def _fetch_predictions():
     Queries each coach's PREDICTION# prefix and filters to statuses
     in EVALUABLE_STATUSES — plus the #813 reclaim: 'inconclusive' records
     terminalized by the removed duplicate grader get one real grading pass.
-    Skips qualitative evaluation types.
+
+    Qualitative evaluation types have no deterministic grading path; they are
+    returned SEPARATELY (#3046) rather than silently dropped — the handler
+    retires the past-window ones (_retire_ungradeable) and the count feeds the
+    GradableShare metric, so a structurally-skipped majority is visible instead
+    of pending forever (the DIL-007 finding: 28/50 pending were qualitative).
 
     #1841: the subject's own on-tape diary claims live in DIARY_CLAIMS_PK under the same
     PREDICTION# sk prefix and the same record shape, so they ride this identical scan and
     are graded by identical code — one grader for every forecast on the platform.
+
+    Returns (evaluable, ungradeable_pending).
     """
     predictions = []
+    ungradeable = []
     reclaimed = 0
     second_look = 0
     partitions = [f"COACH#{coach_id}" for coach_id in COACH_IDS] + [DIARY_CLAIMS_PK]
@@ -330,8 +271,11 @@ def _fetch_predictions():
                 items = [_decimal_to_float(i) for i in resp.get("Items", [])]
                 for item in items:
                     status = item.get("status", "")
-                    eval_type = item.get("evaluation", {}).get("type", "")
-                    if eval_type == "qualitative":
+                    if not _is_gradeable(item.get("evaluation", {})):
+                        # Legacy pending-qualitative debt (new qualitative claims are
+                        # emitted status="observation" and never enter this set).
+                        if status in EVALUABLE_STATUSES:
+                            ungradeable.append(item)
                         continue
                     if status in EVALUABLE_STATUSES:
                         predictions.append(item)
@@ -346,8 +290,52 @@ def _fetch_predictions():
                 kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         except Exception as e:
             logger.warning("Failed to fetch predictions for %s: %s", partition_pk, e)
-    logger.info("Evaluable predictions: %d (%d reclaimed #813, %d provisional second-look #2221)", len(predictions), reclaimed, second_look)
-    return predictions
+    logger.info(
+        "Evaluable predictions: %d (%d reclaimed #813, %d provisional second-look #2221, %d ungradeable-pending #3046)",
+        len(predictions),
+        reclaimed,
+        second_look,
+        len(ungradeable),
+    )
+    return predictions, ungradeable
+
+
+def _retire_ungradeable(ungradeable, today_str):
+    """#3046: retire legacy pending-qualitative predictions at window end.
+
+    A qualitative record has no deterministic grading path — left alone it pends
+    forever (28/50 of the pending corpus at the DIL-007 audit, violating closed
+    #715's "zero ungradeable-by-construction"). Once its domain-clamped window
+    elapses it expires: 'expired' moves no Bayesian confidence — a call the world
+    never tested is not a hit and not a miss — and no learning record is written
+    (the learning log is for graded outcomes). No 2x grace period: grace exists
+    for late-arriving data, and no data can ever grade these. Returns the count
+    retired; fail-soft per record.
+    """
+    today = datetime.strptime(today_str, "%Y-%m-%d")
+    retired = 0
+    for pred in ungradeable:
+        try:
+            created_dt = datetime.strptime(str(pred.get("created_date")), "%Y-%m-%d")
+        except (ValueError, TypeError):
+            continue
+        window = _get_effective_window(pred.get("evaluation", {}), pred.get("subdomain", ""))
+        if today < created_dt + timedelta(days=window):
+            continue  # window still open — stays visible as an open observational claim
+        evaluation = {
+            "prediction_id": pred.get("prediction_id") or pred.get("sk", "").replace("PREDICTION#", ""),
+            "status": "expired",
+            "evaluated_date": today_str,
+            "reason": (
+                f"Retired unevaluated at window end ({window}d): eval_type=qualitative has no "
+                "deterministic grading path (ungradeable-by-construction, #3046)"
+            ),
+        }
+        _update_prediction_status(pred, evaluation)
+        retired += 1
+    if ungradeable:
+        logger.info("[#3046] ungradeable-pending: %d found, %d retired at window end", len(ungradeable), retired)
+    return retired
 
 
 def _fetch_commitments():
@@ -629,16 +617,9 @@ def _evaluate_condition(actual, condition, threshold):
 
 
 def _get_effective_window(eval_spec, subdomain):
-    """
-    Enforce domain-appropriate minimum evaluation windows.
-
-    The prediction's stated window is used if it meets the domain minimum;
-    otherwise the domain minimum is enforced.
-    """
-    stated_window = int(eval_spec.get("evaluation_window_days", 14))
-    domain = SUBDOMAIN_TO_DOMAIN.get(subdomain, "training")
-    min_window = DOMAIN_MIN_WINDOWS.get(domain, 14)
-    return max(stated_window, min_window)
+    """Domain-clamped evaluation window — delegates to the shared policy module
+    (coach.prediction_windows, #3046); semantics unchanged."""
+    return _effective_window_days(eval_spec, subdomain)
 
 
 def _evaluate_machine(pred, eval_spec, data_cache, today_str):
@@ -1486,7 +1467,7 @@ def _days_since(today_str, prior_str):
         return _NEVER_DECIDED_DAYS
 
 
-def emit_grading_liveness(stats, gradable_count, today_str):
+def emit_grading_liveness(stats, gradable_count, today_str, ungradeable_count=0):
     """#727: emit the scientific-liveness metrics EVERY run (even a zero run — the
     whole point is that a metric must be present daily for the stall alarm to have
     data). Returns the dict it emitted so the handler can surface + tests can pin it.
@@ -1499,6 +1480,14 @@ def emit_grading_liveness(stats, gradable_count, today_str):
     - DaysSinceLastDecided — the gauge monitoring_stack.GradingStalled alarms on at
       >= 14. Reads the marker; if this run decided anything, resets to 0 and
       re-stamps the marker. Fail-soft — a metrics error must never sink evaluation.
+    - UngradeablePendingCount / GradableShare (#3046) — pending-corpus composition.
+      GradingStalled resets on ANY decided outcome, so a structurally-skipped
+      qualitative MAJORITY was invisible to it (DIL-007: 28/50 pending). The share
+      = gradable / (gradable + ungradeable-pending); monitoring alarms at < 0.5
+      sustained (prediction-gradable-share-low). Emitted only when the pending
+      corpus is non-empty — an empty board has no composition to judge, and the
+      alarm treats missing data as not-breaching (a dead evaluator is
+      GradingStalled's job, via its BREACHING gauge).
     """
     decided_count = int(stats.get("confirmed", 0)) + int(stats.get("refuted", 0))
 
@@ -1508,25 +1497,33 @@ def emit_grading_liveness(stats, gradable_count, today_str):
     else:
         days_since = _days_since(today_str, _read_last_decided_date())
 
+    pending_total = int(gradable_count) + int(ungradeable_count)
+    gradable_share = (float(gradable_count) / pending_total) if pending_total > 0 else None
+
     payload = {
         "decided_count": decided_count,
         "gradable_count": int(gradable_count),
         "days_since_last_decided": days_since,
+        "ungradeable_pending_count": int(ungradeable_count),
+        "gradable_share": gradable_share,
     }
     try:
-        _cw.put_metric_data(
-            Namespace=LIVENESS_NAMESPACE,
-            MetricData=[
-                {"MetricName": "DecidedCount", "Value": float(decided_count), "Unit": "Count"},
-                {"MetricName": "GradableCount", "Value": float(gradable_count), "Unit": "Count"},
-                {"MetricName": "DaysSinceLastDecided", "Value": float(days_since), "Unit": "Count"},
-            ],
-        )
+        metric_data = [
+            {"MetricName": "DecidedCount", "Value": float(decided_count), "Unit": "Count"},
+            {"MetricName": "GradableCount", "Value": float(gradable_count), "Unit": "Count"},
+            {"MetricName": "DaysSinceLastDecided", "Value": float(days_since), "Unit": "Count"},
+            {"MetricName": "UngradeablePendingCount", "Value": float(ungradeable_count), "Unit": "Count"},
+        ]
+        if gradable_share is not None:
+            metric_data.append({"MetricName": "GradableShare", "Value": gradable_share, "Unit": "None"})
+        _cw.put_metric_data(Namespace=LIVENESS_NAMESPACE, MetricData=metric_data)
         logger.info(
-            "[liveness] decided=%d gradable=%d days_since_last_decided=%d",
+            "[liveness] decided=%d gradable=%d days_since_last_decided=%d ungradeable_pending=%d share=%s",
             decided_count,
             gradable_count,
             days_since,
+            ungradeable_count,
+            "n/a" if gradable_share is None else f"{gradable_share:.2f}",
         )
     except Exception as e:
         logger.warning("[liveness] metric emit failed (non-fatal): %s", e)
@@ -1553,8 +1550,8 @@ def lambda_handler(event: dict, context) -> dict:
 
         logger.info("coach-prediction-evaluator START date=%s", today_str)
 
-        # Fetch all evaluable predictions
-        predictions = _fetch_predictions()
+        # Fetch all evaluable predictions (+ the legacy ungradeable-pending set, #3046)
+        predictions, ungradeable = _fetch_predictions()
 
         # Run prediction evaluations (commitments are graded below regardless — a coach
         # can have follow-through to check even on a day with no open predictions).
@@ -1564,6 +1561,14 @@ def lambda_handler(event: dict, context) -> dict:
         else:
             logger.info("No evaluable predictions found.")
             evaluations, stats = [], {}
+
+        # #3046: retire legacy pending-qualitative records at window end — they have
+        # no grading path and would otherwise pend forever. Fail-soft.
+        retired_ungradeable = 0
+        try:
+            retired_ungradeable = _retire_ungradeable(ungradeable, today_str)
+        except Exception as e:
+            logger.error("Ungradeable retirement failed (non-fatal): %s", e)
 
         # #532: grade coach commitments' follow-through in the same lane (shares the
         # metric cache; deterministic, zero AI). Fail-soft — a commitment error must
@@ -1604,7 +1609,7 @@ def lambda_handler(event: dict, context) -> dict:
         # datapoint). gradable_count is the evaluable predictions found this run.
         liveness = {}
         try:
-            liveness = emit_grading_liveness(stats, len(predictions), today_str)
+            liveness = emit_grading_liveness(stats, len(predictions), today_str, ungradeable_count=len(ungradeable))
         except Exception as e:
             logger.error("Grading-liveness emit failed (non-fatal): %s", e)
 
@@ -1614,6 +1619,8 @@ def lambda_handler(event: dict, context) -> dict:
             "algo_version": ALGO_VERSION,
             "predictions_found": len(predictions),
             "predictions_evaluated": len(evaluations),
+            "ungradeable_pending": len(ungradeable),
+            "ungradeable_retired": retired_ungradeable,
             "stats": stats,
             "commitment_stats": commitment_stats,
             "stance_refresh_stats": stance_refresh_stats,

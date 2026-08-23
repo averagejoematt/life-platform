@@ -787,37 +787,42 @@ class TestPredictionScan:
     @pytest.mark.parametrize("status", sorted(ev.EVALUABLE_STATUSES))
     def test_an_open_prediction_is_picked_up_for_grading(self, table, status):
         seed(table, prediction(status=status))
-        assert len(ev._fetch_predictions()) == 1
+        assert len(ev._fetch_predictions()[0]) == 1
 
     @pytest.mark.parametrize("status", ["confirmed", "refuted", "expired"])
     def test_an_already_decided_prediction_is_never_re_graded(self, table, status):
         """Idempotency: a second run must not double-count a coach's hit or miss."""
         seed(table, prediction(status=status))
-        assert ev._fetch_predictions() == []
+        assert ev._fetch_predictions() == ([], [])
 
     def test_a_qualitative_prediction_is_never_machine_graded(self, table):
+        """#3046: a pending-qualitative record is no longer silently dropped — it is
+        returned in the separate ungradeable set (fed to retirement + GradableShare),
+        and never in the evaluable set the graders run on."""
         seed(table, prediction(evaluation={"type": "qualitative", "metric": "mood"}))
-        assert ev._fetch_predictions() == []
+        evaluable, ungradeable = ev._fetch_predictions()
+        assert evaluable == []
+        assert len(ungradeable) == 1
 
     def test_a_duplicate_grader_victim_is_reclaimed_for_one_real_pass(self, table):
         seed(table, prediction(status="inconclusive", outcome_notes=json.dumps({"beats_null": False})))
-        assert len(ev._fetch_predictions()) == 1
+        assert len(ev._fetch_predictions()[0]) == 1
 
     def test_a_record_this_evaluator_already_decided_is_not_reclaimed_again(self, table):
         seed(table, prediction(status="inconclusive", outcome_notes=json.dumps({"algo_version": ev.ALGO_VERSION})))
-        assert ev._fetch_predictions() == []
+        assert ev._fetch_predictions() == ([], [])
 
     def test_the_scan_follows_pagination_to_the_last_page(self, table):
         table.pages = [
             {"Items": [prediction(pred_id="a")], "LastEvaluatedKey": {"pk": "COACH#sleep_coach", "sk": "PREDICTION#a"}},
             {"Items": [prediction(pred_id="b")]},
         ] + [{"Items": []}] * len(OPERATIONAL_COACH_IDS)
-        assert len(ev._fetch_predictions()) == 2
+        assert len(ev._fetch_predictions()[0]) == 2
 
     def test_one_unreadable_partition_does_not_lose_the_other_coaches_forecasts(self, table):
         table.error_pks.add("COACH#sleep_coach")
         seed(table, prediction(coach_id="mind_coach", pred_id="p2"))
-        assert [p["prediction_id"] for p in ev._fetch_predictions()] == ["p2"]
+        assert [p["prediction_id"] for p in ev._fetch_predictions()[0]] == ["p2"]
 
     def test_prediction_reads_exclude_other_experiment_cycles(self, table):
         ev._fetch_predictions()
@@ -1380,7 +1385,14 @@ class TestHandler:
         """A silent run is exactly the stall #727 exists to make visible."""
         out = ev.lambda_handler({}, None)
         assert out["stats"] == {}
-        assert out["liveness"] == {"decided_count": 0, "gradable_count": 0, "days_since_last_decided": ev._NEVER_DECIDED_DAYS}
+        assert out["liveness"] == {
+            "decided_count": 0,
+            "gradable_count": 0,
+            "days_since_last_decided": ev._NEVER_DECIDED_DAYS,
+            # #3046: pending-corpus composition — no pending rows, so no share to judge.
+            "ungradeable_pending_count": 0,
+            "gradable_share": None,
+        }
 
     def test_commitments_are_graded_even_on_a_day_with_no_open_predictions(self, table, quiet_docket):
         daily_series("hrv", TestEwmaTrend.RISING, table=table)
@@ -1456,16 +1468,16 @@ class TestSecondLook:
         a 2x-window grace period. EXPIRY_MULTIPLIER was unreachable for any prediction the
         daily run saw on schedule."""
         seed(table, prediction(created_date=days_before(20)))
-        ev._evaluate_all(ev._fetch_predictions(), TODAY)  # day 20: no readings yet
+        ev._evaluate_all(ev._fetch_predictions()[0], TODAY)  # day 20: no readings yet
         daily_series("hrv", [60.0], table=table)  # the reading lands the next day
-        assert len(ev._fetch_predictions()) == 1
+        assert len(ev._fetch_predictions()[0]) == 1
 
     def test_the_second_look_actually_decides_the_call_once_the_reading_lands(self, table):
         """A re-fetch that could never decide anything would be theatre."""
         seed(table, prediction(created_date=days_before(20)))
-        ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        ev._evaluate_all(ev._fetch_predictions()[0], TODAY)
         daily_series("hrv", [60.0], table=table)
-        evaluations, _ = ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        evaluations, _ = ev._evaluate_all(ev._fetch_predictions()[0], TODAY)
         assert [e["status"] for e in evaluations] == ["confirmed"]
         assert table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]["status"] == "confirmed"
 
@@ -1474,25 +1486,25 @@ class TestSecondLook:
         (idempotency — a second run must not double-count a coach's hit)."""
         seed(table, prediction(created_date=days_before(20)))
         daily_series("hrv", [60.0], table=table)
-        ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        ev._evaluate_all(ev._fetch_predictions()[0], TODAY)
         assert "grading_open" not in json.loads(table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]["outcome_notes"])
-        assert ev._fetch_predictions() == []
+        assert ev._fetch_predictions() == ([], [])
 
     def test_a_call_past_its_grace_period_is_retired_rather_than_re_looked_forever(self, table):
         """The bound on the second look: expiry terminalises, clearing the flag."""
         seed(table, prediction(created_date=days_before(200)))
-        evaluations, _ = ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        evaluations, _ = ev._evaluate_all(ev._fetch_predictions()[0], TODAY)
         assert [e["status"] for e in evaluations] == ["expired"]
         assert "grading_open" not in json.loads(table.items[("COACH#sleep_coach", "PREDICTION#pred_1")]["outcome_notes"])
-        assert ev._fetch_predictions() == []
+        assert ev._fetch_predictions() == ([], [])
 
     def test_a_provisional_grade_writes_no_learning_row_until_it_decides(self, table):
         """One undecided call must not write one LEARNING# row per day — that would
         crowd real confirmed/refuted rows out of the window the public profile reads."""
         seed(table, prediction(created_date=days_before(20)))
         for _ in range(3):
-            ev._evaluate_all(ev._fetch_predictions(), TODAY)
+            ev._evaluate_all(ev._fetch_predictions()[0], TODAY)
         assert [p for p in table.puts if str(p.get("sk", "")).startswith("LEARNING#")] == []
         daily_series("hrv", [60.0], table=table)
-        ev._evaluate_all(ev._fetch_predictions(), TODAY)
+        ev._evaluate_all(ev._fetch_predictions()[0], TODAY)
         assert len([p for p in table.puts if str(p.get("sk", "")).startswith("LEARNING#")]) == 1
