@@ -281,6 +281,39 @@ class ServeStack(Stack):
         )
         _site_api_handled_5xx.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # ── #3002: the content-filter fallback watch ──
+        # `ContentFilterFallback` = the privacy content filter could not load its
+        # off-repo vocabulary (#2503) and is serving the fail-closed sentinel.
+        # Until #3002 it was emitted into a CASING TWIN namespace (lowercase-i
+        # `SiteApi` — CloudWatch namespaces are case-sensitive) that no alarm
+        # or dashboard read, and a real 9-day
+        # fallback episode (2026-03-21 → 29, 62 datapoints, peak 16/day) passed
+        # unwatched. Threshold per ADR-105, from the metric's measured
+        # distribution rather than a guess: it is zero-inflated — 0/day for the
+        # ~5 months since that episode — so ANY datapoint is an incident and
+        # Sum >= 1/day is the distribution-derived threshold, not a default.
+        # Digest severity (ADR-050): the filter fails CLOSED, so a fallback
+        # over-hides rather than leaks — degradation, not breach. The namespace
+        # literal here is pinned to lambdas/common/metric_namespaces.py by
+        # tests/test_site_api_namespace_guard_3002.py (CDK is synth-time and
+        # does not import lambda modules).
+        _site_api_content_filter_fallback = cloudwatch.Alarm(
+            self,
+            "SiteApiContentFilterFallback",
+            alarm_name="site-api-content-filter-fallback",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/SiteAPI",
+                metric_name="ContentFilterFallback",
+                period=Duration.days(1),
+                statistic="Sum",
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _site_api_content_filter_fallback.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         _site_api_latency_alarm = cloudwatch.Alarm(
             self,
             "SiteApiLatencyHigh",

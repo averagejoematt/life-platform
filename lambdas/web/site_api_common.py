@@ -28,6 +28,7 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
+from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
 from common.pacific_time import PACIFIC
 from experiment.phase_filter import with_phase_filter
 
@@ -153,7 +154,7 @@ def emit_handled_5xx(status: int, route: str | None = None) -> None:
                 "Timestamp": int(time.time() * 1000),
                 "CloudWatchMetrics": [
                     {
-                        "Namespace": "LifePlatform/SiteAPI",
+                        "Namespace": SITE_API_METRIC_NAMESPACE,
                         "Dimensions": [["Route"], []],
                         "Metrics": [{"Name": "Handled5xx", "Unit": "Count"}],
                     }
@@ -577,7 +578,10 @@ def _load_content_filter():
                             "Timestamp": int(time.time() * 1000),
                             "CloudWatchMetrics": [
                                 {
-                                    "Namespace": "LifePlatform/SiteApi",
+                                    # #3002: this was the casing twin "…/SiteApi" —
+                                    # a namespace no alarm read. One spelling now,
+                                    # imported, never retyped.
+                                    "Namespace": SITE_API_METRIC_NAMESPACE,
                                     "Dimensions": [[]],
                                     "Metrics": [{"Name": "ContentFilterFallback", "Unit": "Count"}],
                                 }

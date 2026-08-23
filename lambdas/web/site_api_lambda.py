@@ -50,6 +50,7 @@ from decimal import Decimal  # noqa: F401 — kept for backward-compat with hand
 # third-party
 import boto3  # noqa: F401 — kept for handlers that create clients
 from boto3.dynamodb.conditions import Key
+from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE spelling, imported, never retyped
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 
 # bundled shared module
@@ -975,7 +976,7 @@ def lambda_handler(event, context):
                     "Timestamp": int(_time.time() * 1000),
                     "CloudWatchMetrics": [
                         {
-                            "Namespace": "LifePlatform/SiteAPI",
+                            "Namespace": SITE_API_METRIC_NAMESPACE,
                             "Dimensions": [[]],
                             "Metrics": [
                                 {"Name": "DurationMs", "Unit": "Milliseconds"},
