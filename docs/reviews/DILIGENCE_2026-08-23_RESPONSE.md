@@ -5,7 +5,15 @@
 **This register** is the platform's per-finding disposition, produced after a claim-by-claim
 fact-check against **live** repo / GitHub API / site state on 2026-08-23 (three independent
 verification agents, confidence 1.0). It is the acquirer-grade evidence pack and the
-re-grade instrument for **[EPIC] The A-Grade Program**.
+re-grade instrument for **[EPIC] The A-Grade Program (#3042)**.
+
+**Tracking issues (filed 2026-08-23, label `review:diligence-2026-08-23`):** #3042 epic ·
+#3043 privacy containment (DIL-001/012) · #3044 subscriber trust (DIL-003/013) · #3045
+Tier-2 publication ADR (DIL-008/011, gate:owner) · #3046 prediction gradeability (DIL-007) ·
+#3047 CodeQL regrowth (DIL-018) · #3048 CSP hardening (DIL-015) · #3049 source-completeness
+(DIL-024) · #3050 AI-safety eval matrix (DIL-029/030/031). Folds: #2824 (DIL-036) · #2828
+(DIL-014) · #2890 (DIL-016) · #2578 (sentinel/DIL-020) · #2986 (DIL-010/035) · #2834
+(DIL-004 residual) · #2799 (DIL-026).
 
 **Disposition vocabulary:** `CONFIRMED` (true today, remediation owned) · `STALE` (was true,
 already fixed — the report read a closed state or an out-of-date doc) · `WRONG` (misread of
