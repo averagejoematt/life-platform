@@ -208,5 +208,24 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-22 ~18:00 → ~20:45 PT (Fable 5, interactive — *"fable is back for the week: synthesize the Open-Issue Ledger's spirit, really close issues, stop the bleeding in the SDLC"*; merge+deploy authority as one numbered ask) — **11 PRs merged + deployed, 7 issues closed (6 realized, 1 partial), 2 filed; publish path GREEN (CI sweep 93/93 pages, 0 unevaluated) and the corpus restructured: 26 July product issues → the new `Roadmap` milestone (ADR-099 amendment, #3011), debt corpus ~55.** The synthesis: 25 fable issues split 4 machinery / 21 product — fable belongs on the 4. Lane A fan-out (6 agents) fixed the lying gauges: AI-QA silently skipped 2 pages that were >8000px screenshots (#2973/#3013 — downscale + cannot-evaluate now gates); `days_with_data` counted SKs not dates so a 6-day cycle claimed 8 and cycle 1 claimed 16 (#2992/#3008, verified live ≤ window); dropbox's IngestAuthHealthy had NEVER emitted a 1 — both latched alarms **recovered 6 min after the emitter deploy** (#2976/#3014); the CI Bedrock caller now records cost telemetry (#2974/#3009, strict-verified + zero emit-failures in the first post-apply QA job); ContentFilterFallback got its first-ever alarm off a 15-month retention query (#3002/#3012); the coach audience frame became a property of the surface (#2972/#3015, partial until the next daily run writes `public_summary`). **The queue audited itself, three times:** I merged #3012 on the agent's stated red-reason without reading the lane (real red = unregistered #2372 guard; #3016, ~20 min); the reconcile job **had the writer but not the write** (`generate_platform_model.py` in run_generators, output not whitelisted — killed main CI pre-deploy; #3017 adds the whitelist + a mutation-proved registry test so the class reds pre-merge); #3013's honesty upgrades red the FULL suite only (PR-lane deselection, 4th occurrence in 5 days — string-probe test, whole-dict assert, pillow parity, a fixture PNG that died at the new IHDR sniff; #3020). **Main GREEN (d94b11b7a) at wrap**, full unit suite included. Oracle note: three distinct /method/cycles/ objections in one day — one misread, one REAL, one wrong data-must-exist inference (baselined #3019 under #2959). **Next session runs the approved council plan** (`~/.claude/plans/stateful-squishing-dongarra.md`): #2832 operating calendar flagship; file+fix the PR-lane-deselection class (fold #2692); fan-out #2883 + #2921; #2959 rubric down-payment; #2889's first skip-metric at the 08-23 17:00 UTC brief. Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-22 ~20:50 → 08-23 ~02:45 PT (Fable 5, autonomous — *"execute the approved
+council plan end-to-end, merge+deploy authority for its scope"*) — **the council plan landed whole:
+closed 5 / filed 3, 8 PRs merged+deployed, main GREEN (18dfa1e4c) verified.** **#2832 Operating
+Calendar LIVE** (registry of 7 rituals w/ artifact-dated probes + daily dead-man, first run green;
+#1451/#1338 obligations re-homed; one cadence truth). **#3025 pre-merge full suite LIVE** (13:44 for
+20,560 tests after CI's own durations named a 181s unmocked-network test = 13% of the suite;
+mutation-proved via probe PR — old lane green with a failing deselected test aboard, new lane red on
+exactly it — and it caught TWO real deselected breaks the same night; #2692 folded+closed with the
+measurement as the 1200→1500s rationale; required-ness promotion is next-session, ≥2-merge window
+now satisfied). **#2959 down-payment:** the oracle blocked the publish path 3× in ~90 min and the
+root cause was the rubric's own bullet INSTRUCTING the class — fixed generation + two deterministic
+suppressors (+widened after block 3), 6 baselines triaged; site deploy #4 green, dispatch published.
+**#3030 one-clock class found+fixed live** (Day-6 screenshots judged against a Day-7 phase when a
+sweep straddled midnight PT — `pacific_today()` pinned at sweep start). #2921 realized (per-device
+sleep payload verified live); #2883 honestly OPEN (drift re-measured WORSE, 1.4177; residual
+out-of-repo — worktree sessions' own Bedrock calls are invisible to the chokepoint); #1629 promotion
+DECLINED at 0/30 vs the ≥15/30 gate. Five sweeps produced five distinct novel oracle highs — the
+#2959 non-stationarity series, now measured. **Next:** #2889 + #2972-tail observations at the 08-23
+daily runs; #3025 required-ness promotion; #2959 ground-truth feed; #2883 out-of-repo measurement.
+Full narrative: `handovers/HANDOVER_LATEST.md`.
 

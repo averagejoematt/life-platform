@@ -1,110 +1,141 @@
-# Handover — 2026-08-22 ~18:00 → ~20:45 PT: fable week, session 1 — Lane A cleared the publish path, and the corpus finally means something
+# Handover — 2026-08-22 ~20:50 → 2026-08-23 ~02:45 PT: fable week, session 2 — the council plan, executed; the oracle blocked its own publish path three times and each block became structure
 
-**Session:** Fable 5 (set mid-session), interactive, merge + deploy authority granted as one
-numbered ask. The driving instruction: *"fable is back — read the Open-Issue Ledger artifact,
-synthesize an effective fable week, really close open issues, and stop the bleeding in
-process/bugs/tech-debt — improve the SDLC so paying down backlogs gets easier."* Previous wrap
-archived as `HANDOVER_2026-08-22_max-opus-paydown.md` on `session-archive`.
+**Session:** Fable 5, autonomous (boot prompt: *"Execute the approved council plan at
+`~/.claude/plans/stateful-squishing-dongarra.md`, end-to-end, with merge+deploy authority
+for its scope"*). Previous wrap archived as `HANDOVER_2026-08-22_fable-week-lane-a.md` on
+`session-archive`.
 
-## The synthesis (approved via AskUserQuestion, both recommendations taken)
+## The scoreboard
 
-The 25 `model:fable` issues split **4 machinery / 21 product** — "use fable well" and "stop the
-bleeding" point at the same 4 (#2842, #2800, #2846, #2849), not the product majority. Week plan:
-**Lane A** (publish path + lying gauges, fan-out) → **Lane B** (one primitive per session:
-#2832 operating calendar first — review cadence is what sets the filing rate) → **Lane C**
-(corpus semantics). This session executed A + C.
+**Closed 5 / filed 3** (net −2): closed #2832 (flagship), #2692 (folded), #3025, #2921,
+#3030; filed #3021 (lease janitor, file-not-fix per plan), #3025, #3030. **8 PRs merged +
+deployed** (#3022 #3023 #3024 #3026 #3028 #3029 #3031, + probe #3027 closed-unmerged by
+design). 3 deploy-gate leases approved, 2 rejected-as-superseded with recorded reasons.
+Every closure carries its ADR-099 verdict comment. Main GREEN (18dfa1e4c) verified by
+`check_main_green.py` at wrap.
 
-## Shipped — 11 PRs merged, all deployed and verified
+## Shipped, by plan step
 
-- **#3010** (→#3003): both publish-path highs adjudicated against the *rendered page* — one
-  rubric fix in code, one baselined under #2959; report.json evidence caps removed.
-- **#3008** (→#2992): `days_with_data` counted SKs, not dates — whoop `DATE#…#WORKOUT#` sub-rows
-  inflated the column (cycle 1: 16 "days" in a 6-day matched window). One line + mutation-proved
-  test. **Verified live:** every cycle ≤ window after deploy.
-- **#3011**: the **Roadmap milestone** (ADR-099 amendment) — 26 July product-vision issues parked
-  outside the debt corpus; score-line grammar + `MILESTONE_ORDER` + hygiene extended; one
-  promotion per cycle. Corpus now: **Now 6 · Next 35 · Later 10 · Roadmap 26** (+2 unmilestoned
-  fable epics). The tracked number finally measures defects, not review cadence.
-- **#3012** (→#3002): namespace casing twin retired behind one imported constant + set-guard
-  (mutation-proved 4 ways); **first-ever alarm on ContentFilterFallback** (threshold derived
-  from a 15-month retention query: 62 fires/9 days in March, zero watchers). cdk Serve deployed.
-- **#3013** (→#2973): AI-QA silent skips root-caused (screenshots >8000px → Bedrock
-  ValidationException swallowed as a pass); downscale pre-call, cannot-evaluate now a gating
-  FAIL, evaluated-count printed. **First post-merge CI sweep: 93/93 pages, 0 unevaluated.**
-- **#3014** (→#2976): ingest alarms latched because healthy was only ever emitted as 0 —
-  dropbox's healthy stream had *never carried a 1 in its life*. Emit on every authenticated
-  success + windows 86400→3600s. **Live recovery proof: both alarms (lit since 08-21) flipped
-  OK six minutes after the emitter deploy.**
-- **#3015** (→#2972): the audience frame is now a property of the surface — `public_summary`
-  producer field, deterministic `audience_guard` (full text before truncation), all four public
-  consumer seams guarded. Closure verdict **partial**: honest-empty until the coaches' next
-  daily run writes the first rows.
-- **#3009** (→#2974): scoped `PutMetricData` for the CI diagnosis role, applied attended,
-  `verify_oidc_iam.py --strict` CLEAN; telemetry failure now ERROR-visible. **Proof:** the first
-  post-apply CI QA job logged zero emit-failures while LifePlatform/AI datapoints landed in its window.
-- **#3016 / #3017 / #3020**: same-session repairs of what the queue itself surfaced (below).
-- **#3019**: `/method/cycles/` third-objection baseline under #2959 (wrong data-must-exist
-  inference vs. the honest absence dash).
+- **Step 0/1 (boot + verification):** wrap commit had already landed; fixed its Docs CI
+  red (stale INCIDENT_LOG Patterns — the #2975 lane-gap class, regenerated + pushed).
+  Alarm board reconciled clean: all 4 ALARM-state alarms live-cited (#2989, #2883, #2977,
+  genesis window), 3 flaps = the known #2976 recovery episodes. #2889 + #2972 tails are
+  time-gated to the 08-23 daily runs — still owned by the next boot (see residuals).
+- **Step 2 flagship — #2832 Platform Operating Calendar (PR #3024):** registry
+  (`scripts/operating_calendar.py`, 7 rituals with artifact-dated probes + 3 dated
+  exemptions closing the review-skill set both directions) + daily dead-man workflow
+  (`operating-calendar.yml`, first live run green: 32619558490) + generated
+  `docs/OPERATING_CALENDAR.md` (#2986 DERIVED row, docs-ci lane). #1451/#1338 obligations
+  re-homed onto the sdlc entry; REVIEW_METHODOLOGY's competing cadence retired; PT
+  adoption anchor prevents born-red. Two premerge guards (PUSH_TRIGGER_GLOBS mirror, §9
+  pointer-length) caught the first push — fixed in-PR.
+- **Step 3 — #3025 pre-merge full suite (PR #3026), #2692 folded:** measured first from
+  CI's own `--durations` (green run 32613992699): ONE unmocked-network test cost 180.85s
+  (13% of the 1394s suite; 0.99s locally). Landed: `full-suite` job in pr-checks (exact
+  post-merge selection, no coverage, unpiped; **13:44 for 20,560 tests** post-fix),
+  parity/dep/unpiped contract tests, the 181s test made hermetic, a per-test 90s
+  `::warning` warner (e11-triaged), budget 1200→1500s in its three synced literals with
+  the measurement as rationale, PROPORTIONALITY row + two §9 rows. **Mutation-proved on
+  the wire** (probe PR #3027: old lane green with a failing deselected test aboard; new
+  lane red on exactly it) — and the lane caught **two real deselected-test breaks the
+  same night**: its own maiden run (the doc-literal treadmill lives INSIDE the suite →
+  in-workspace `sync --apply` step, never committed) and #3031's stub break. Required-ness
+  promotion (github_posture/ADR-148) deliberately deferred past the ≥2-merge observation
+  window — which is now satisfied (merges #3023, #3029, #3031 all landed green with the
+  lane active); the promotion itself is next-session work (#3025 closure comment notes it).
+- **Step 5 (promoted mid-session) — #2959 down-payment (PRs #3028, #3029):** the oracle
+  blocked the site publish path 3× in ~90 min (runs 32616299944, 32618360726,
+  32620189500). Root cause found in the rubric's own text — its final DO-NOT-FLAG bullet
+  *instructed* "Flag a window only when it is LONGER than the days elapsed", which
+  manufactured the 7-day-HRV-average-on-Day-6 highs. Fixed generation (cross-phase
+  trailing-window clause) + enforcement (two deterministic suppressors in the #2780/#3003
+  family: `is_day_counter_bound_inference` → demote, `is_self_refuted` → drop; phrase set
+  widened after the third block's surviving high ended "within phase bounds and
+  internally consistent"). 6 baselines recorded via the sanctioned writer + triaged
+  (#2959). **Site deploy #4 green; suppressors observed firing 9× then 5× on later
+  sweeps; the wrap's build dispatch finally published.** #2959 stays open — the
+  per-page API ground-truth feed is the remaining rubric work.
+- **Step 4 fan-out (sonnet worktrees):** **#2921 realized (PR #3023)** — `/api/sleep_detail`
+  per-device namespacing (additive `eightsleep`/`whoop` blocks), verified live post-deploy
+  (self-consistent per device, explicit `night_of`/`as_of_date`); evidence_sleep.js stage
+  bar fixed. **#2883 stays open honestly (PR #3022, "Part of")** — drift re-measured
+  WORSE (1.4177 vs the 1.15 bar), residual $20.64 unattributed with out-of-repo
+  candidates (remediation agent + concurrent Claude worktree sessions' own Bedrock
+  calls); the shipped fix (state-of-matthew's write-only 1h cache, 24,159 write/0 read
+  tokens over 30d) is correct and ~$0.006/mo. **#3021 filed** (lease janitor, Next).
+- **Unplanned class, found + fixed live — #3030 one-clock (PR #3031):** the QA harness
+  computed phase truth at assess time; a sweep straddling midnight PT judged Day-6
+  screenshots (PT-correct chrome per #2941) against a Day-7 phase — 2 red QA jobs on
+  green deploys (runs 32622594057, 32623497239's QA). Fixed: `pacific_today()` pinned
+  once at sweep start, threaded through `assess_prose(today_iso=…)`, spy-test proved,
+  stored in report.json. The new full-suite lane caught this PR's own deselected stub
+  break pre-merge.
 
-**Deploy surface:** site-api + site-api-ai + coach-state-updater + qa-smoke + dropbox-poll +
-notion (all sha-postflight-verified), the full fleet via the approved CI run (shared-module
-trigger), cdk Serve + Monitoring, and the IAM policy. Superseded deploy-gate leases rejected
-(2), the final run approved.
+## The night's honest pattern
 
-## The three defects the session created and repaired in-session (each now a rule)
+Five sweeps produced five DISTINCT novel oracle highs (build-log chrome, 7-day average
+×2 pages, a self-refuting note, a second self-refuting phrasing, an editorial
+cross-cycle-label nit graded high) — each on a page that had passed the previous sweep.
+That non-stationarity is #2959's remaining case, now with tonight's runs as the measured
+series; the suppressors + 6 baselines ended the bleeding, the rubric ground-truth feed is
+the cure. Also: I burned one empty-commit nudge diagnosing zero-run pushes before
+checking `mergeable` — the exact first move the existing memory prescribes (CONFLICTING
+PR after #3024's conftest twin-add; resolved by merging main, runs minted in a minute).
 
-1. **I merged #3012 on the agent's stated red-reason without reading the lane** — the real red
-   was its unregistered tree-sweeping guard (#2372 class), which red main's pre-merge lane.
-   Fixed in ~20 min (#3016); memory rule: the not-green set must equal the expected set exactly.
-2. **The reconcile job had the writer but not the write** — #2986 added
-   `generate_platform_model.py` to `run_generators()` but never whitelisted
-   `model/platform_model.json`, so #3012's alarm killed main CI pre-deploy. Manual reconcile
-   per the job's own fallback, then #3017: whitelist + a mutation-proved registry test so the
-   class reds pre-merge forever.
-3. **#3013's honesty upgrades red the full suite only** (PR lane deselects ~11k tests): a
-   string-probe test pinning the old exit line verbatim, a whole-dict assert, pillow parity,
-   and a fixture PNG that passed the size filter but died at the new IHDR sniff. Fixed in #3020
-   — the fixture must survive *every* filter on the wire path.
+## Gate lines
 
-## Gate lines (#736 et al.)
-
-**Build beat:** 2026-08-22-the-oracle-stopped-guessing
-**Docs:** ARCHITECTURE.md cost-table alarm count (97→109, drift gate); DECISIONS.md ADR-099
-amendment (in #3011); SCHEMA.md + MONITORING.md + RUNBOOK.md updated inside the agent PRs;
-sync + link/tombstone/index checkers green at commit.
-**Decisions:** ADR-099 amendment 2026-08-22 filed (Roadmap milestone, in #3011) — no separate ADR needed.
-**Main:** green (d94b11b7a) — #3020's run completed/success with every lane green, full
-unit suite included (Deploy correctly skipped on a test-only change; verified by
-`check_main_green.py` exit 0). The intervening reds were the in-session repair chain
-above, TTR ~2.5h.
-**Incidents:** 1 row added — main-red chain 00:45–03:30Z from the two queue-surfaced gaps
-(reconcile whitelist + premerge classification), no data loss, no reader impact.
-**Closures:** #2992, #2972, #2973, #2974, #2976, #3002, #3003 commented (6 realized, 1 partial — #2972).
-**Backlog:** Now 6 actionable of 6 non-blocked after the Roadmap move (3 former Now items
-parked as product: #1571, #1629, #1738 — deliberate, they were the product cohort); hygiene OK
-over the whole corpus; no stale Later issues printed. Roadmap promotions are explicit
-one-per-cycle acts per the amendment.
-**Alarms:** 0 red; 3 flaps flagged by the gate = the #2976 recovery episodes themselves
-(dropbox + 24h fired-and-cleared around the emitter deploy; liveness cleared organically at
-10:11 PT) — named here, gate closed with `--decoded`.
-**CI warnings:** 1 — Unit Tests 1427s vs the 1200s budget (fifth breach): owned by the
-already-open #2692, deliberately folded into next session's pre-merge-completeness
-decision (approved plan, Step 3) rather than re-raising the budget blind.
-**Stash/hooks:** clean (empty stash, hook 🟢).
-**Ledger:** none — no new standing subsystem; the ContentFilterFallback alarm and the
-whitelist registry test fold into the existing alarm-board and #2986-registry rows.
+**Build beat:** 2026-08-23-the-suite-that-catches-what-the-fast-lane-cannot
+**Docs:** OPERATING_CALENDAR.md (new, generated) + README index + REVIEW_METHODOLOGY
+cadence retirement + PROPORTIONALITY (2 rows + Re-read log) + CONVENTIONS §9 (3 rows) +
+frontier-plan artifact path — all inside the feature PRs; SCHEMA.md sleep SoT ruling in
+#3023; wiki checkers green at commit.
+**Decisions:** none needed — no new ADR; #2832 executes ADR-099/103/144 machinery,
+required-ness change deferred (will need the ADR-148 posture edit when taken).
+**Main:** green (18dfa1e4c) — `check_main_green.py` exit 0; the intervening QA-job reds
+(32626430842, 32623497239) were the #3030 clock race + the fifth oracle novel high, both
+structurally answered same-session.
+**Incidents:** 2 rows added — (1) the 3× oracle-blocked site publish path
+04:07–06:36Z (2 auto-rollbacks, no reader impact, recovered by #3028/#3029+baselines);
+(2) the #3030 midnight-clock QA reds on green deploys (no rollback, no reader impact).
+**Closures:** #2832, #2692, #3025, #2921, #3030 commented (4 realized, 1 fold-realized);
+#2883 + #1629 got dated status comments without closure.
+**Backlog:** hygiene OK over 77 open; Now refilled per (e9) by stored rank — promoted
+#2989, #3005, #2813 (score lines updated to `→ Now` with dated notes; the liveness rule
+counts type:story only, which took three promotions to satisfy); no stale Later issues
+printed. The cycle's one Roadmap promotion allowance DECLINED on measurement (#1629 gate
+reads 0/30 vs ≥15/30 — owner decision point ~09-01 per its own close-unbuilt banner).
+**Alarms:** 4 red, all cited (#2989, #2883 — deliberately red, #2977, genesis window
+self-clearing 08-24); 2 flaps flagged and decoded: `ingest-liveness-unhealthy`
+(08-21 10:11 → 08-22 10:11 PT — the previous wrap's already-named #2976-cluster
+organic clear, still inside this wrap's 72h window) and `site-api-invocation-spike`
+(08-22 23:43→23:45 PT, 2-min dwell — self-inflicted by this session's own five
+full-surface QA sweeps in ~3h during the publish-path recovery; no reader-facing
+symptom, load source known). Gate closed with `--decoded`.
+**CI warnings:** 2 — both `cdk deploy` config-change advisories (Operational + Email)
+on the wrap-tip green run: the already-filed #2993 class (the Plan classifier calls an
+asset-hash-only `Code.S3Key` diff a config change; tonight's fleet deploys moved every
+bundle hash). Owned by #2993 (Next, 2.00 — top of its milestone's rank); no local cdk
+deploy warranted on a hash-only diff. Gate closed with `--decoded`.
+**Stash/hooks:** clean.
+**Ledger:** 2 rows added — operating calendar + pre-merge full suite (posture, rent,
+demote triggers in `docs/PROPORTIONALITY.md`).
 
 ## Residuals / next picks
 
-- **Lane B, session 2 flagship: #2832** (operating calendar + dead-man) — the filing-rate
-  lever; then #2986 application, #2846, #2847 (one contract pair), #2999/#3000 (#2578 children).
-- **#3018** — integrator public register (filed this session, epic #2799, Next).
-- **#2972 tail** (tracked in #3018's body + the #2959 baseline): after the coaches' next daily
-  run writes `public_summary`, verify 2 clean oracle runs then delete the `/method/board/`
-  baseline entry — not-work — a dated observation step, owned by the next session's boot.
-- **#2889** first live `GenerationSkippedUnchanged` observation at the 08-23 17:00 UTC brief —
-  not-work — scheduled observation, issue already open.
-- **Product allowance if Lane B lands: #1629** (Bluesky shadow, Roadmap → Now would be the
-  cycle's one promotion).
-- **#2959** — the reader-truth oracle rubric: three objections on one page in one day, two
-  over-reads; the baselines are accumulating where rubric fixes belong.
+- **#2889** first live `GenerationSkippedUnchanged` reading at the 08-23 17:00 UTC brief —
+  not-work — scheduled observation, issue open.
+- **#2972 tail**: `public_summary` first rows after the 08-23 coach daily run; then 2
+  clean oracle runs → delete the `/method/board/` baseline entry — not-work — dated
+  observation owned by the next boot (tracked in #3018's body).
+- **#3025 follow-through**: promote `Full unit suite (pre-merge, #3025)` to a REQUIRED
+  check via `deploy/github_posture.json` + `apply_branch_protection.py` (ADR-148 path) —
+  the ≥2-merge green window is satisfied; noted in #3025's closure comment.
+- **#2883**: measure the out-of-repo candidates (Cost Explorer usage-type granularity vs
+  the callers' windows) — the issue's own next step, recorded in its status comment.
+- **#2959**: the rubric ground-truth feed (per-page API cycle metadata) — the plan's
+  stated success metric: zero NEW over-read highs on baselined pages next session.
+- **#1629**: owner decision ~09-01 — 0/30 usage at the gate reads as close-unbuilt per
+  the issue's banner — not-work — gate:owner decision, measurement recorded on the issue.
+- One-off flake observed once, not filed: `test_singleton_tombstone_guards` order-
+  dependence candidate (probe run only; passed on identical base 20 min earlier) —
+  not-work — single observation recorded in #3025's evidence comment; file on recurrence.

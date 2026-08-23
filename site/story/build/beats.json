@@ -3011,6 +3011,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3015"
         }
       ]
+    },
+    {
+      "id": "2026-08-23-the-suite-that-catches-what-the-fast-lane-cannot",
+      "date": "2026-08-23",
+      "title": "The full test suite now runs before a merge — and caught two bugs its first night",
+      "shipped": "The pre-merge check lane ran 8,813 of 20,509 tests, so a change could pass every visible check and still break the main branch minutes later — that happened four times in five days. Now every pull request runs the FULL suite before merging: 20,560 tests in under 14 minutes, after CI's own timing report exposed one test eating 181 seconds (13% of the whole suite) on a network call that should never happen in a unit test. Alongside it: a Platform Operating Calendar with a daily dead-man that screams when a judgment review silently stops running, and three deterministic fixes to the AI reader-truth gate that had blocked the site's publish path three times in one night.",
+      "why_it_mattered": "A test lane that can pass a broken change isn't a safety net, it's a ceremony. Each escape cost one to two-and-a-half hours of a red main branch, and the blame always landed on whichever innocent merge came next. The fix was chosen with numbers — a merge queue would have serialized eleven merges into four-plus hours; running the full suite in parallel per PR costs sixteen minutes and no throughput.",
+      "gotcha": "The new gate proved itself the same night it landed, twice: its own first run caught a documentation-counter test that only fails on branches (fixed by reconciling the counters inside the CI runner, never committed), and a later fix's stub broke a deselected test that the old lane would have waved straight through to main.",
+      "honest_miss": "The AI reader-truth oracle produced five distinct novel objections across five sweeps — each on a page that had passed the sweep before. One root cause was humbling: the rubric's own instructions told the model to flag exactly the pattern we then spent two deploys suppressing. The model wasn't hallucinating; it was obeying. The rubric is fixed, but the oracle's run-to-run restlessness is still an open problem with a name on it.",
+      "prs": [
+        {
+          "label": "PR #3026",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3026"
+        },
+        {
+          "label": "PR #3024",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3024"
+        },
+        {
+          "label": "PR #3028",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3028"
+        },
+        {
+          "label": "PR #3031",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3031"
+        }
+      ]
     }
   ]
 }

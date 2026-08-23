@@ -2,7 +2,7 @@
 
 > **Status:** log · **Owner:** Matthew · **Verified:** 2026-05-19
 
-Last updated: 2026-08-23 fable-week Lane A session (#1332 gate; **+1 new row** — the main-red chain from two queue-surfaced structural gaps, both guarded permanently in-session: the reconcile whitelist had the writer but not the write (#3017), and a real red rode into a merge behind the expected doc-literal category (#3016), with #3013's full-suite-only unit tail (#3020)). Prior: 2026-08-22 opus max-paydown session (#1332 gate; **+4 new rows** — a documented signal silently dropped at the source for 6 days (the 15 BodyScan segmental fields were never written; the fixture was not the wire); a post-deploy visual-QA red on two NEW reader-truth findings the deploy did not cause; the reader-truth `report.json` storing its evidence truncated; and a production-approval lease found waiting 1.3h by the wrap gate rather than by anyone watching). Prior: 2026-08-22 opus machinery-first session (#1332 gate; **+2 new rows** — post-deploy visual-QA red on two NEW reader-truth findings the deploy did not cause, with `/method/board/` among the 91 passes; and a ~5 min Docs CI red from a `test_count` stamp dropped during a rebase and healed unattended by the reconcile bot). Prior: 2026-08-22 opus plan-then-execute session (#1332 gate; **+2 new rows** — main red 1h58m on two independent stale-derived-artifact defects, the second landing on an innocent commit (lane-placement defect filed as #2975); and two production-approval leases rejected as superseded after the deploy was done manually and verified). Prior: 2026-08-22 opus autonomous drain session (#1332 gate; **+3 new rows** — three consecutive site auto-rollbacks from an un-baselined reader-truth gate, fixed structurally by #2956/#2970; main red on the wrap's own INCIDENT_LOG edit; and the 08-21 wrap commit re-closing #2921/#2578 by narrating the accident that closed them). Prior: 2026-08-21 opus epic-tails session + post-wrap (#1332 gate; **+4 new rows** — the site auto-rollback where the gate was RIGHT (the newly-armed reader-truth check caught a live wrong Day number on its first run, #2941); two stranded deploy-approval gates auto-filed as #2937 and cleared by rejection; both AI gates on the deploy path structurally dark while the job reported success (#2938); and a live impossible `light_pct: 106.7` on `/api/sleep_detail` (#2939)). Prior: 2026-08-19 opus backlog-drain session (#1332 gate; **+2 new rows** — main red 29m on an `aws_cdk` import CI does not install, a green-local/red-CI collection abort fixed by #2907; and a 6h22m production-deploy wedge behind a stranded approval gate, auto-detected by the platform as #2901 and cleared by rejecting two superseded leases). Prior: 2026-08-19 opus September-base session (#1332 gate; **+1 new row** — main red 1h02m on the $150 ceiling merge, four deselected stale-literal test failures, deploy gate rejected rather than approved, fixed by #2896). Prior: 2026-08-18 opus deploy-unblock session (#1332 gate; **+0 new rows — no incident-class event this session**; amended the 2026-08-18 site-auto-rollback row's resolution: it was closed the same day by #2879 WITHOUT a weigh-in, because the day-number proxy — not the missing Withings row — was the defect). Prior: 2026-08-18 opus observability session (+2 rows: the wrap-beat site auto-rollback — a TRUE positive about the data and a FALSE positive about the deploy, the vitals smoke carve-out keys on day_n not on whether a weigh-in happened, so every site deploy auto-rolls-back until one lands (#2878, owner-gated on a weigh-in); and a merge to main that produced ZERO CI runs — the swallowed-push class, second documented occurrence, recovered by manual dispatch). Prior: 2026-08-17 system-model session (+2 rows). Prior: 2026-08-17 conformance-guard session (+2 rows). Prior: 2026-08-17 charter/cycle-14 session (+1 row). Prior: 2026-08-16 overnight session (see history below).
+Last updated: 2026-08-23 fable-week council-plan session (#1332 gate; **+2 new rows** — the 3x oracle-blocked publish path (2 auto-rollbacks; rubric-instructed class + #2959 non-stationarity, both structurally answered same-session by #3028/#3029), and the #3030 one-clock QA race (Day-6 screenshots judged against a Day-7 phase across midnight PT, no rollback, fixed by #3031)). Prior: 2026-08-23 fable-week Lane A session (#1332 gate; **+1 new row** — the main-red chain from two queue-surfaced structural gaps, both guarded permanently in-session: the reconcile whitelist had the writer but not the write (#3017), and a real red rode into a merge behind the expected doc-literal category (#3016), with #3013's full-suite-only unit tail (#3020)). Prior: 2026-08-22 opus max-paydown session (#1332 gate; **+4 new rows** — a documented signal silently dropped at the source for 6 days (the 15 BodyScan segmental fields were never written; the fixture was not the wire); a post-deploy visual-QA red on two NEW reader-truth findings the deploy did not cause; the reader-truth `report.json` storing its evidence truncated; and a production-approval lease found waiting 1.3h by the wrap gate rather than by anyone watching). Prior: 2026-08-22 opus machinery-first session (#1332 gate; **+2 new rows** — post-deploy visual-QA red on two NEW reader-truth findings the deploy did not cause, with `/method/board/` among the 91 passes; and a ~5 min Docs CI red from a `test_count` stamp dropped during a rebase and healed unattended by the reconcile bot). Prior: 2026-08-22 opus plan-then-execute session (#1332 gate; **+2 new rows** — main red 1h58m on two independent stale-derived-artifact defects, the second landing on an innocent commit (lane-placement defect filed as #2975); and two production-approval leases rejected as superseded after the deploy was done manually and verified). Prior: 2026-08-22 opus autonomous drain session (#1332 gate; **+3 new rows** — three consecutive site auto-rollbacks from an un-baselined reader-truth gate, fixed structurally by #2956/#2970; main red on the wrap's own INCIDENT_LOG edit; and the 08-21 wrap commit re-closing #2921/#2578 by narrating the accident that closed them). Prior: 2026-08-21 opus epic-tails session + post-wrap (#1332 gate; **+4 new rows** — the site auto-rollback where the gate was RIGHT (the newly-armed reader-truth check caught a live wrong Day number on its first run, #2941); two stranded deploy-approval gates auto-filed as #2937 and cleared by rejection; both AI gates on the deploy path structurally dark while the job reported success (#2938); and a live impossible `light_pct: 106.7` on `/api/sleep_detail` (#2939)). Prior: 2026-08-19 opus backlog-drain session (#1332 gate; **+2 new rows** — main red 29m on an `aws_cdk` import CI does not install, a green-local/red-CI collection abort fixed by #2907; and a 6h22m production-deploy wedge behind a stranded approval gate, auto-detected by the platform as #2901 and cleared by rejecting two superseded leases). Prior: 2026-08-19 opus September-base session (#1332 gate; **+1 new row** — main red 1h02m on the $150 ceiling merge, four deselected stale-literal test failures, deploy gate rejected rather than approved, fixed by #2896). Prior: 2026-08-18 opus deploy-unblock session (#1332 gate; **+0 new rows — no incident-class event this session**; amended the 2026-08-18 site-auto-rollback row's resolution: it was closed the same day by #2879 WITHOUT a weigh-in, because the day-number proxy — not the missing Withings row — was the defect). Prior: 2026-08-18 opus observability session (+2 rows: the wrap-beat site auto-rollback — a TRUE positive about the data and a FALSE positive about the deploy, the vitals smoke carve-out keys on day_n not on whether a weigh-in happened, so every site deploy auto-rolls-back until one lands (#2878, owner-gated on a weigh-in); and a merge to main that produced ZERO CI runs — the swallowed-push class, second documented occurrence, recovered by manual dispatch). Prior: 2026-08-17 system-model session (+2 rows). Prior: 2026-08-17 conformance-guard session (+2 rows). Prior: 2026-08-17 charter/cycle-14 session (+1 row). Prior: 2026-08-16 overnight session (see history below).
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.
@@ -192,6 +192,8 @@ Last updated: 2026-08-23 fable-week Lane A session (#1332 gate; **+1 new row** �
 
 | 2026-08-22 | **P4** | **Post-deploy visual-QA red on `main` (~1h40m and counting at wrap) on two NEW reader-truth findings the deploy did not cause.** Run `32594947913` on `564efa0c`: Deploy, smoke and the I1/I2/I5 integration checks all SUCCESS, auto-rollback SKIPPED — then the full-surface sweep returned `91 passed, 2 failed across 93 pages` on `/story/chronicle/` and `/story/build/agent-review/`. Both checked against the LIVE pages rather than the CI line (which truncates the note at ~96 chars): the chronicle lists a 2026-08-18 post titled *Day One Actually Happened*, which is ordinary Day-2 retrospective publishing, and the agent-review page states its own span (`2026-05-29 → 2026-08-17`) and never claims to be current. | The oracle's non-stationary finding population (#2959's class), not a deploy defect. `/method/board/` — the finding that held the publish path all session — was among the 91 PASSES, so #2981's fix and its baselined entry held; two different pages had picked up highs in the meantime. Baselined via the deliberate path in #2990 (27 → 29 entries). | Immediate — the gating job reports it. | ~25 min to the baselining PR merged; the follow-on run's own sweep is the confirmation. | No — the deploy itself was healthy and stayed live. |
 | 2026-08-22 | **P4** | **Docs CI red on `main` for ~5 min from a `test_count` stamp dropped during a rebase.** `#2983` was rebased onto main after `#2982` merged; its stamp commit conflicted, was skipped (the correct resolution — replay substantive files, let main's automation regenerate), and no replacement stamp was added before merge. `sync_doc_metadata --check` then failed on `9d7a99e0`. | The doc-sync literal treadmill, taken deliberately. The reconcile bot in `run_generators()` regenerated it unattended (`778bb7a2`) — which is exactly §4c's division of labour working, and the reason `#2982` was safe to ship. Docs CI is green on every later commit. | Immediate — Docs CI reds on the push. | ~5 min, unattended. | No. |
+| 2026-08-23 | **P3** | **The site publish path was blocked THREE times in ~90 min by the reader-truth oracle (runs 32616299944, 32618360726, 32620189500) — two full site auto-rollbacks, one dispatch cancelled pre-flight; the wrap's build dispatch stayed unpublished ~2.5h.** Each sweep produced a NEW (page,category) high on a page that had passed the sweep before: the build log vs the day-counter chrome, a 7-day HRV average on Day 6 (two pages), and two self-refuting notes emitted at gating severity. No reader impact — rollback restored the prior site each time. | Two causes, both structural: the rubric's own final DO-NOT-FLAG bullet INSTRUCTED flagging any window longer than days elapsed (the model obeyed, not hallucinated — fixed in #3028 with the cross-phase clause), and the oracle's non-stationary finding population (#2959) inventing one novel high per sweep (two deterministic suppressors + 6 triaged baselines, #3028/#3029). Deploy #4 green same night; the dispatch published. | Immediate — the gating job reds. | ~2.5h to the green deploy; each block's fix landed within ~40 min of its diagnosis. | No. |
+| 2026-08-23 | **P4** | **Two post-deploy QA jobs red on GREEN deploys (runs 32622594057, 32623497239) — the harness judged Day-6 screenshots against a Day-7 phase.** Both sweeps straddled midnight PT: capture at ~23:5x PT correctly rendered the DAY 6 chrome (client-JS, PT-exact per #2941); the assessor computed its phase truth after 00:00 PT and flagged 8+ pages for disagreeing with a day that was not true when the pixels were made. No rollback (rollback is smoke-gated), no reader impact — red QA verdicts on healthy deploys. | One run, two clocks: assess_reader_truth never pinned a sweep clock; assess_prose accepted today_iso all along and nothing passed it. Fixed same night (#3030/#3031): pacific_today() pinned once before the first capture, threaded through, spy-test proved; stored in report.json. The new #3025 full-suite lane caught the fix's own stub break pre-merge. | Immediate — the QA job reds. | Same session (~2h from first red to the fix merged green). | No. |
 ---
 
 ## Patterns & Observations
@@ -208,7 +210,7 @@ Last updated: 2026-08-23 fable-week Lane A session (#1332 gate; **+1 new row** �
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 162 dated rows, 127 post-June** (newest row 2026-08-23):
+**Distribution — 164 dated rows, 129 post-June** (newest row 2026-08-23):
 
 | month | rows |
 |---|---|
@@ -218,23 +220,23 @@ Last updated: 2026-08-23 fable-week Lane A session (#1332 gate; **+1 new row** �
 | 2026-05 | 1 |
 | 2026-06 | 2 |
 | 2026-07 | 36 |
-| 2026-08 | 91 |
+| 2026-08 | 93 |
 
-**By severity:** P1 4 · P2 23 · P3 57 · P4 73 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 4 · P2 23 · P3 58 · P4 74 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 22 match none):
 
 | n | class |
 |---|---|
-| 101 | deployment error |
+| 103 | deployment error |
 | 39 | stale config / literal drift |
-| 31 | QA-oracle false positive |
+| 33 | QA-oracle false positive |
 | 25 | lane-subset / union-breach main red |
 | 21 | secret / credential |
 | 20 | deploy-plane wedge / strand / race |
+| 13 | timezone / wallclock |
 | 12 | IAM / permission |
-| 12 | timezone / wallclock |
 | 5 | data quality / scoring |
 | 22 | *(unclassified)* |
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:END -->
@@ -249,7 +251,7 @@ than one, and 22 match none):
 > 2026-08-22: 14 rows in July (1 per 2.2 days), 15 in 2026-08-01→22 (1 per 1.5 days).
 
 <!-- INCIDENT-PATTERNS:TOPCLASSES:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-The three classes the old list omitted entirely — **QA-oracle false positives (31)**, **lane-subset/union-breach main reds (25)** and **deploy-plane wedges/strands/races (20)** — are now the 3rd, 4th and 6th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
+The three classes the old list omitted entirely — **QA-oracle false positives (33)**, **lane-subset/union-breach main reds (25)** and **deploy-plane wedges/strands/races (20)** — are now the 3rd, 4th and 6th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
 <!-- INCIDENT-PATTERNS:TOPCLASSES:END -->
 
 ### Silence is an axis, not a class
@@ -262,17 +264,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**39 of 162 rows are silent.**
+**39 of 164 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 39 | 123 |
-| TTD parseable | 28 | 74 |
-| median TTD | **23.5 min** | 11 min |
-| mean TTD | 2,445 min | 1,832 min |
+| rows | 39 | 125 |
+| TTD parseable | 28 | 76 |
+| median TTD | **23.5 min** | 10 min |
+| mean TTD | 2,445 min | 1,783 min |
 | exceeded 1 day | 6 (21% of parsed) | 7 (9% of parsed) |
 
-Silent rows take **~2.1× longer to detect at the median** and are **~2.3× more likely to run past a day**. But the *means* are only 25% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (3 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **60 of 162 TTD cells (37%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~2.4× longer to detect at the median** and are **~2.3× more likely to run past a day**. But the *means* are only 27% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (3 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **60 of 164 TTD cells (37%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -283,7 +285,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July and 91 in August. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July and 93 in August. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)
