@@ -40,7 +40,7 @@ stop re-improvising briefs from memory prose (#796).
 
 ## Working norms (how changes land)
 
-- **One change → one branch → one PR.** `main` is branch-protected (PR required, no direct pushes). Conventional-commit subjects; `Co-Authored-By` trailers credit the model.
+- **One change → one branch → one PR.** `main` is branch-protected (PR required, no direct pushes). Conventional-commit subjects; **no tool-attribution trailers** (owner decision 2026-08-12 — commits carry the work, not the tooling).
 - **Decisions become ADRs.** Architectural or irreversible choices get an ADR before/with the code.
 - **Cost is a first-class constraint.** Everything runs under a $75/mo *enforced* budget (ADR-063); features justify their spend.
 - **Honesty over optimism.** Failing tests are reported with output; skipped steps are stated; "done" means verified.

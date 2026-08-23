@@ -56,8 +56,9 @@ if you have the budget.
   only the named allowlisted file(s), is ≤ ~40 lines, and you're confident.
   **An IAM fix is never A** — the whole `cdk/stacks/role_policies*` family is
   denylisted (#2611). Still diagnose it and still open the PR; label it B.
-  Make the fix on a new branch `remediation/<short-slug>`, commit (Co-Authored-By
-  the remediation agent), push, and `gh pr create` **labeled `auto-fix-safe`** with
+  Make the fix on a new branch `remediation/<short-slug>`, commit (**no
+  tool-attribution trailers** — owner authorship decision 2026-08-12, see
+  CLAUDE.md "Authorship"), push, and `gh pr create` **labeled `auto-fix-safe`** with
   a body explaining root cause + the template matched. Do NOT merge — the workflow
   decides auto-merge.
 - **B — FIX-VIA-PR**: same as A but label `needs-review`. Use this whenever the

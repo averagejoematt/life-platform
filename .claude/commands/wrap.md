@@ -484,8 +484,6 @@ git and are never part of this commit):
 git add handovers/HANDOVER_LATEST.md CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ only if (e) touched pages or (e10) updated docs/alarm_citations.json
 git commit -m "$(cat <<'EOF'
 docs(wrap): <short session theme> (<n items/PRs shipped>)
-
-Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 EOF
 )"
 ```
