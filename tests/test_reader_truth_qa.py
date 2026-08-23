@@ -618,3 +618,87 @@ def test_midword_guard_ignores_full_and_sentence_terminated_values():
     # truncated but ends on sentence punctuation → clean.
     src = "First sentence ends here. And then a much longer continuation that got dropped."
     assert rtq.check_midword_truncation([{"value": "First sentence ends here.", "source": src}]) == []
+
+
+# ── #3003: the stored evidence is FULL — truncation is a print-time concern ────
+# The 2026-08-22 publish-path hold was triaged from report.json, and every stored
+# note ended mid-word ("vague abou", "habit data wit") because _normalize_finding
+# capped it at 300 chars — the [never diagnose from a truncated log line] trap
+# built into the instrument's own record. A human must be able to adjudicate a
+# finding from the artifact without re-running the sweep.
+
+# The observed /story/timeline/ note's shape at real evidence length (>300 chars,
+# so this test has teeth against the old cap being reintroduced).
+_NOTE_3003 = (
+    "The milestone states 'The logs have gone quiet — 4 days without an entry' on Day 6. "
+    "If 4 days have passed without an entry, the last entry would have been on Day 2 or earlier. "
+    "However, Day 1 is listed as 2026-08-17, making Day 6 equal to 2026-08-22. "
+    "The phrase '4 days without an entry' is vague about whether it counts calendar days or elapsed 24-hour periods."
+)
+
+
+def test_normalize_finding_stores_the_full_note():
+    assert len(_NOTE_3003) > 300, "the fixture no longer overflows the old cap — this test would prove nothing"
+    out = rtq._normalize_finding(
+        {"page": "/story/timeline/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3003},
+        {"/story/timeline/"},
+    )
+    assert out["note"] == _NOTE_3003, "the stored note must be the model's note IN FULL (#3003)"
+
+
+def test_truth_line_carries_the_full_note():
+    """The report.json issues/warnings line is stored evidence, not console output."""
+    f = {"page": "/story/timeline/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3003}
+    assert _NOTE_3003 in visual_ai_qa._truth_line(f)
+
+
+# ── #3003: "vague" is not a temporal_contradiction ─────────────────────────────
+# /story/timeline/ was render-verified (Day 6, /api/presence gap_days=4.0): the
+# copy was TRUE, the oracle's own arithmetic placed the last entry in-cycle, and
+# its stated objection resolved to the phrase being "vague" — graded high, which
+# held the site publish path. An objection resting on vagueness is editorial,
+# never an impossibility, and never gates.
+
+
+def test_vagueness_objection_fires_on_the_observed_timeline_note():
+    f = {"page": "/story/timeline/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3003}
+    assert rtq.is_vagueness_objection(f) is True
+
+
+def test_vagueness_objection_spares_a_real_impossibility_claim():
+    note = (
+        "Prose states 'No training logged — 57 days' on Day 5 of a 5-day experiment "
+        "(Day 1 = 2026-08-17). A 57-day history is impossible; the experiment has only existed for 5 days."
+    )
+    f = {"page": "/data/vitals/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_vagueness_objection(f) is False
+
+
+def test_vagueness_objection_never_touches_other_categories():
+    for cat in ("duplicated_narrative", "audience_violation", "other"):
+        f = {"page": "/", "category": cat, "severity": "high", "note": _NOTE_3003}
+        assert rtq.is_vagueness_objection(f) is False, cat
+
+
+def test_assess_prose_demotes_a_vagueness_high_to_low(capsys):
+    """The predicate is wired: a high that resolves to vagueness reaches the gate as low."""
+    verdict = {
+        "findings": [
+            {"page": "/story/timeline/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3003},
+        ],
+        "severity": "high",
+        "summary": "x",
+    }
+    pages = [{"name": "Timeline", "path": "/story/timeline/", "prose": "The logs have gone quiet — 4 days without an entry."}]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_2)
+    assert errors == []
+    assert len(findings) == 1, "demoted, not dropped — it must stay visible as an advisory"
+    assert findings[0]["severity"] == "low"
+    assert findings[0]["note"] == _NOTE_3003, "demotion must not lose the evidence"
+    assert "demoted a vagueness-objection finding" in capsys.readouterr().out
+
+
+def test_prompt_states_the_vagueness_principle():
+    """The clause the model reads and the predicate code enforces state one rule."""
+    prompt = rtq.build_prompt([{"name": "Home", "path": "/", "prose": "hello"}], rtq.phase_context(_DAY_2))
+    assert "vague" in prompt and "NOT a contradiction" in prompt

@@ -257,7 +257,12 @@ def assess_results(results):
 
 
 def _truth_line(f):
-    return f"Reader-truth ({f['severity']}) [{f['category']}]: {f['note'][:140]}"
+    # #3003: the FULL note — this line is stored in report.json (issues/warnings),
+    # the artifact a human adjudicates a finding from without re-running the sweep.
+    # It used to cut at 140 chars, so the stored evidence for every finding ended
+    # mid-word; truncation belongs at print time only (the console prints below
+    # slice their own copies).
+    return f"Reader-truth ({f['severity']}) [{f['category']}]: {f['note']}"
 
 
 def assess_reader_truth(results):
@@ -338,7 +343,7 @@ def assess_reader_truth(results):
         if r is None:
             # model mangled the path — keep the finding visible on the first surface
             r = by_path[surfaces[0]["path"]]
-            f = dict(f, note=f"(claimed page {f['page']!r}) {f['note']}"[:300])
+            f = dict(f, note=f"(claimed page {f['page']!r}) {f['note']}")  # full note — #3003
         r.setdefault("truth_findings", []).append(f)
         line = _truth_line(f)
         verdict = truth_baseline_audit.gate_finding(f, truth_baseline)
