@@ -40,20 +40,46 @@ Adding a feature? Classify it into a band here AND in tests/test_budget_guard_la
 (the pre-ADR-125 coherence_semantic bug). CI_GATE_FEATURES below is the derived set the
 QA harnesses read; never hand-list those names at a call site.
 
-Fail-open: if SSM is unreadable (transient error, missing grant, param absent)
-we return tier 0 — a monitoring blip must never take AI down. The AWS Budgets
-notifications are the backstop for that rare window.
+Fail-open vs fail-closed — the SPLIT contract (#2824, DIL-036): when the tier
+is UNREADABLE (deleted param, revoked grant, SSM outage, garbage value — each
+class logged loudly as `BUDGET_TIER_UNREADABLE reason=<class>` at ERROR), the
+two audiences part ways:
+
+  * FAIL_CLOSED_FEATURES — the PUBLIC anonymous inference surface (website_ai:
+    /api/ask, /api/board_ask, /api/explain) — are DENIED, exactly as at tier 3.
+    An attacker-facing surface must never run with NO budget enforcement while
+    nothing pages (DIL-036's finding), and the endpoints already have an honest
+    'paused' output to serve. allow() consults the exported set; call sites
+    never hand-list names.
+  * Everything else stays FAIL-OPEN at tier 0 — protect-longest is deliberate:
+    the daily brief, the coach narratives and internal AI must NOT be taken
+    down by an SSM blip. The AWS Budgets notifications + the
+    `budget-tier-unreadable` CloudWatch alarm (metric filter on the token
+    above) are the backstop for that window.
+
+Cache contract on unreadable state: one (tier, readable) result is cached for
+_CACHE_TTL_S. A cached-good tier keeps serving for the remainder of its window
+even if SSM dies mid-window (a blip must not flap the public surface); at the
+FIRST refresh after expiry a failed read flips the state to unreadable — no
+stale-grace beyond the TTL, because grace would let the public surface run
+indefinitely on stale budget state during exactly the outage class DIL-036
+names. An unreadable result is cached for the same TTL (no per-request SSM
+hammering; recovery lands within ~one TTL of SSM coming back).
 
 This module is bundled into every function's deploy package (#781 retired the shared Lambda layer).
 """
 
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
 from typing import Any
 
 import boto3
+from botocore.exceptions import ClientError
+
+logger = logging.getLogger(__name__)
 
 _SSM_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
 # #822: the governor's projection breakdown (mtd / projected / ai + non-ai daily
@@ -211,10 +237,22 @@ _HARD_STOP_TIER = 3
 # _FEATURE_CUTOFF in tests/test_budget_guard_ladder.py.
 CI_GATE_FEATURES = ("reader_truth_qa", "visual_ai_qa")
 
-# dict[str, Any]: the values are heterogeneous (int tier + float timestamp), and
-# without the annotation mypy joins them to `float`, so `return _cache["tier"]`
-# reads as returning a float from `-> int` (#2638).
-_cache: dict[str, Any] = {"tier": 0, "ts": 0.0}
+# #2824 / DIL-036: the features that must fail CLOSED when the budget tier is
+# UNREADABLE (see the module docstring's split contract). Guard the SET, not the
+# instance: allow() consults THIS tuple and the tests assert membership and
+# behavior against it — a call site never hand-lists a name. Only the PUBLIC
+# anonymous inference surface belongs here (an attacker-facing endpoint running
+# with no budget enforcement and nothing paging is DIL-036's exact finding);
+# everything else deliberately stays fail-open (protect-longest, ADR-125).
+FAIL_CLOSED_FEATURES = ("website_ai",)
+
+# dict[str, Any]: the values are heterogeneous (int tier + float timestamp +
+# bool readable), and without the annotation mypy joins them, so
+# `return _cache["tier"]` reads as returning a float from `-> int` (#2638).
+# `readable` records whether the LAST refresh actually read the tier (#2824) —
+# it is only ever written by the real refresh path, so a test that monkeypatches
+# current_tier() leaves it True and the ladder tests keep their fixtures.
+_cache: dict[str, Any] = {"tier": 0, "ts": 0.0, "readable": True}
 _ssm = None
 
 
@@ -229,26 +267,63 @@ def _client():
     return _ssm
 
 
+def _read_tier() -> tuple[int, bool]:
+    """One uncached SSM read → (tier, readable). Never raises.
+
+    The failure classes are split so each names itself in the log (#2824 — the
+    pre-split bare `except Exception: tier = 0` made a deleted param, a revoked
+    grant and a real outage indistinguishable and silent):
+
+      * ParameterNotFound          — the param was deleted / never seeded
+      * ClientError.<Code>         — AccessDeniedException (IAM grant
+                                     regression), throttling, endpoint errors …
+      * Unexpected.<ExceptionType> — anything else, INCLUDING a garbage value
+                                     (int() ValueError): an unparseable tier is
+                                     an unreadable tier, never tier 0.
+
+    Every failure logs the stable token `BUDGET_TIER_UNREADABLE reason=<class>`
+    at ERROR — the budget-tier-unreadable CloudWatch alarm's metric filter
+    (cdk/stacks/monitoring_budget_alarms.py) matches that literal.
+    """
+    try:
+        return int(_client().get_parameter(Name=_SSM_PARAM)["Parameter"]["Value"]), True
+    except ClientError as e:
+        code = str((getattr(e, "response", None) or {}).get("Error", {}).get("Code") or "UnknownCode")
+        reason = code if code == "ParameterNotFound" else f"ClientError.{code}"
+        detail = str(e)
+    except Exception as e:
+        reason = f"Unexpected.{type(e).__name__}"
+        detail = str(e)
+    logger.error("BUDGET_TIER_UNREADABLE reason=%s param=%s detail=%s", reason, _SSM_PARAM, detail)
+    return 0, False
+
+
 def current_tier() -> int:
-    """Current budget tier (0-3), cached ~5 min. Fail-open to 0 on any error."""
+    """Current budget tier (0-3), cached ~5 min. The RETURNED value fails open
+    to 0 on an unreadable tier (protect-longest for everything outside
+    FAIL_CLOSED_FEATURES); the shared cache records readable=False so allow()
+    can fail the public surface closed (#2824 — module docstring contract)."""
     now = time.time()
     if now - _cache["ts"] < _CACHE_TTL_S:
-        return _cache["tier"]
-    tier = 0
-    try:
-        tier = int(_client().get_parameter(Name=_SSM_PARAM)["Parameter"]["Value"])
-    except Exception:
-        tier = 0  # fail-open: never break AI on an SSM blip / missing param
+        return int(_cache["tier"])
+    tier, readable = _read_tier()
     _cache["tier"] = tier
+    _cache["readable"] = readable
     _cache["ts"] = now
     return tier
 
 
 def allow(feature: str) -> bool:
     """True if `feature` may run at the current tier. Unknown features are
-    treated as hard-stop-only (cutoff 3)."""
+    treated as hard-stop-only (cutoff 3). A feature in FAIL_CLOSED_FEATURES is
+    DENIED outright while the tier is unreadable — tier-3-equivalent on the
+    public surface (#2824, DIL-036); every other feature keeps the fail-open
+    tier-0 default."""
+    tier = current_tier()  # refreshes the shared (tier, readable) cache
+    if feature in FAIL_CLOSED_FEATURES and not _cache.get("readable", True):
+        return False
     cutoff = _FEATURE_CUTOFF.get(feature, _HARD_STOP_TIER)
-    return current_tier() < cutoff
+    return tier < cutoff
 
 
 def hard_stopped() -> bool:

@@ -24,5 +24,10 @@
   "weekly-signal-delivery-heartbeat": {
     "citation": "arming transition of the #2820 dead-man 2026-08-21 — not a delivery failure",
     "note": "Kept 2026-08-22 (#2996). The alarm is OK, but #2912's flap check reads a 72h window and this alarm's only episode is inside it: describe-alarm-history shows INSUFFICIENT_DATA -> ALARM at 2026-08-21 20:44 PT and ALARM -> OK at 21:44 PT — one hour, immediately after #2820 deployed the WeeklySignalSent dead-man (treat_missing=BREACHING, so a freshly created alarm with no datapoints is ALARM by construction until the first one lands). No signal was missed. THE PRUNE RULE, corrected: remove a recovered alarm's entry once it has been OK for longer than the flap window (72h), not the moment it clears — pruning on recovery alone trades a stale entry for a flap-gate red, which is what happened while writing this. Prune after 2026-08-24 21:44 PT if still OK."
+  },
+  "budget-tier-unreadable": {
+    "citation": "#2824",
+    "note": "New alarm (2026-08-23, DIL-036 slice of #2824): fires when budget_guard logs BUDGET_TIER_UNREADABLE on the public site-api-ai path — the SSM budget-tier read failed (ParameterNotFound / AccessDenied / outage), website_ai is failing CLOSED (readers get the honest 'paused' output), and the rest of the fleet is running fail-open with NO ceiling enforcement. Never a routine state: if lit, restore the SSM param/grant (/life-platform/budget-tier) — the guard recovers within one 5-min cache TTL. Prune this entry only if the alarm is retired; while #2824 is open it is the named owner.",
+    "added": "2026-08-23"
   }
 }
