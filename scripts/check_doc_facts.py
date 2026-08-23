@@ -672,8 +672,8 @@ def _og_source_hits(files, truth: int) -> list[str]:
     return hits
 
 
-# ── #1351: DATA_GOVERNANCE.md fact gate (repo visibility, deletion-lambda status,
-# Verified-header freshness) ──────────────────────────────────────────────────
+# ── #1351/#3043: DATA_GOVERNANCE.md fact gate (repo visibility, deletion-lambda
+# status, Verified-header freshness) ──────────────────────────────────────────
 # The compliance-answer doc misstated a load-bearing privacy control in BOTH
 # directions at once: it claimed the repo was "still PUBLIC" three days after it
 # actually flipped PRIVATE (2026-07-13, understating a real fix as an open exposure),
@@ -683,12 +683,57 @@ def _og_source_hits(files, truth: int) -> list[str]:
 # existing per-doc freshness ceiling machinery is check_doc_index.py's canonical-doc
 # sweep — this is DATA_GOVERNANCE-specific per the #1351 acceptance criterion).
 #
+# #3043 (DIL-001): the original repo-visibility check HARDCODED "truth is PRIVATE" —
+# which inverted the moment the repo deliberately flipped public (2026-07-20): for 34
+# days the gate would have redded the honest correction while blessing the stale
+# "PRIVATE" claim. The truth is now read LIVE from the GitHub API (gh). When live
+# visibility cannot be determined (offline / no gh / no token), every visibility
+# claim is reported as an explicit SKIP via DG_SKIP_NOTICES — printed loudly by
+# main(), never a silent pass (INDEX_review_discipline: a gate that cannot fail is
+# not a gate; the can-it-fail proof lives in tests/test_wiki_checkers.py).
+#
 # PRECISION: HISTORICAL-framed lines are exempt as everywhere else, so a corrected doc
 # is free to narrate "was PUBLIC until 2026-07-13" without re-tripping the gate.
 DATA_GOVERNANCE_PATH = ROOT / "docs" / "DATA_GOVERNANCE.md"
 DATA_GOVERNANCE_VERIFIED_MAX_AGE_DAYS = 90
-REPO_STILL_PUBLIC_CLAIM = re.compile(r"repo(?:sitory)?\s+is\s+(?:still\s+)?PUBLIC\b|is\s+still\s+PUBLIC\b", re.I)
+# A present-tense claim about the repo's visibility: "the repo is PUBLIC",
+# "the repository has been PRIVATE since ...", "the repo stays public", etc.
+REPO_VISIBILITY_CLAIM = re.compile(
+    r"\brepo(?:sitory)?\b[^\n]{0,60}?\b(?:is|has\s+been|stays|remains)\s+(?:still\s+)?(?:deliberately\s+)?(PUBLIC|PRIVATE)\b",
+    re.I,
+)
 DELETE_LAMBDA_STALE_CLAIM = re.compile(r"scaffolded;?\s*not\s+yet\s+wired", re.I)
+
+# Explicit-skip channel for the live-visibility check (#3043). _data_governance_hits
+# (the only writer) clears it at entry; main() prints anything left in it so an
+# unverifiable claim is a loud SKIP in the gate's own output, never a silent pass.
+DG_SKIP_NOTICES: list[str] = []
+
+_REPO_VIS_UNSET = object()  # sentinel: "resolve live" (tests inject True/False/None)
+
+
+def _live_repo_private():
+    """LIVE repo visibility via the GitHub API: True=private, False=public,
+    None=undeterminable (offline / gh missing / no token). #3043 — the truth is
+    the API, never a hardcoded constant."""
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            ["gh", "api", "repos/{owner}/{repo}", "--jq", ".private"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=ROOT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    val = proc.stdout.strip().lower()
+    if proc.returncode == 0 and val in ("true", "false"):
+        return val == "true"
+    return None
+
+
 VERIFIED_HEADER_RE = re.compile(r"\*\*Verified:\*\*\s*(\d{4}-\d{2}-\d{2})")
 # Deliberately NARROWER than the shared HISTORICAL regex: the shared one treats any
 # "as of <date>" as historical framing (right for a dated cost/count snapshot like
@@ -700,25 +745,42 @@ VERIFIED_HEADER_RE = re.compile(r"\*\*Verified:\*\*\s*(\d{4}-\d{2}-\d{2})")
 _DG_HISTORICAL = re.compile(r"\bwas\b|\bwere\b|formerly|previously|used to|no longer|retired|superseded|\bold\b", re.I)
 
 
-def _data_governance_hits(doc_path: Path, today=None) -> list[str]:
-    """DATA_GOVERNANCE.md-specific fact checks (#1351). `today` is injectable
+def _data_governance_hits(doc_path: Path, today=None, repo_private=_REPO_VIS_UNSET) -> list[str]:
+    """DATA_GOVERNANCE.md-specific fact checks (#1351/#3043). `today` is injectable
     (a `datetime.date`) so the regression test never depends on wall-clock — the
-    live gate (called with today=None from main()) uses the real date."""
+    live gate (called with today=None from main()) uses the real date.
+    `repo_private` is likewise injectable (True/False/None) so the regression test
+    never depends on the network; the live gate resolves it via _live_repo_private().
+    None means "could not determine" and downgrades visibility claims to explicit
+    SKIP notices in DG_SKIP_NOTICES — never a silent pass."""
     import datetime as _dt
 
+    DG_SKIP_NOTICES.clear()
     if not doc_path.exists():
         return []
     today = today or _dt.date.today()
+    if repo_private is _REPO_VIS_UNSET:
+        repo_private = _live_repo_private()
     text = doc_path.read_text(encoding="utf-8")
     hits = []
     for lineno, line in enumerate(text.splitlines(), 1):
         if _DG_HISTORICAL.search(line):
             continue
-        if REPO_STILL_PUBLIC_CLAIM.search(line):
-            hits.append(
-                f"docs/DATA_GOVERNANCE.md:{lineno}: claims the repo is PUBLIC — truth is PRIVATE since "
-                f"2026-07-13 (#1351)\n      | {line.strip()[:120]}"
-            )
+        for mo in REPO_VISIBILITY_CLAIM.finditer(line):
+            claimed_private = mo.group(1).upper() == "PRIVATE"
+            if repo_private is None:
+                DG_SKIP_NOTICES.append(
+                    f"docs/DATA_GOVERNANCE.md:{lineno}: SKIP — claims the repo is "
+                    f"{mo.group(1).upper()}, but live visibility could not be verified "
+                    f"(gh unavailable / offline / no token) (#3043)\n      | {line.strip()[:120]}"
+                )
+            elif claimed_private != repo_private:
+                truth = "PRIVATE" if repo_private else "PUBLIC"
+                hits.append(
+                    f"docs/DATA_GOVERNANCE.md:{lineno}: claims the repo is {mo.group(1).upper()} — live "
+                    f"GitHub visibility is {truth} (gh api repos/{{owner}}/{{repo}} .private) (#3043)\n"
+                    f"      | {line.strip()[:120]}"
+                )
         if DELETE_LAMBDA_STALE_CLAIM.search(line):
             hits.append(
                 f"docs/DATA_GOVERNANCE.md:{lineno}: claims delete_user_data_lambda is 'scaffolded; not yet "
@@ -1185,6 +1247,13 @@ def main():
     # #1351: DATA_GOVERNANCE.md-specific fact checks (repo visibility, deletion-lambda
     # status, Verified-header freshness).
     hits += _data_governance_hits(DATA_GOVERNANCE_PATH)
+    # #3043: an unverifiable repo-visibility claim is a LOUD, explicit SKIP — the
+    # check did not run, which is different from the check passing.
+    if DG_SKIP_NOTICES:
+        print(f"⚠️  SKIPPED (#3043, not a pass) — {len(DG_SKIP_NOTICES)} repo-visibility claim(s) could not be verified live:")
+        for notice in DG_SKIP_NOTICES:
+            print(f"   {notice}")
+        print()
 
     # #1354: COST_TRACKER.md-specific freshness ceiling — the canonical cost doc must
     # be re-verified from live Cost Explorer within 45 days of its Verified: stamp.

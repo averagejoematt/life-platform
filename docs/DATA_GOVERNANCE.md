@@ -1,6 +1,6 @@
 # Data Governance — PII Classification + Retention Policy
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-25
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-23
 
 Phase 7 (2026-05-16, refreshed 2026-07-18 — #1351 current-truth pass: repo visibility,
 delete-lambda status, current data classes, subscriber-retention readiness #1350):
@@ -231,6 +231,7 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-07-19 | `generated/qa_archive/` added (90d, audit-log class): generation-time archive of every AI surface — text written by `lambdas/common/qa_archive.py` at each surface's publish point, screenshots by the daily standalone visual-qa sweep. No new PII class: archives the already-public reader-facing text plus rendered-page screenshots | #1441 |
 | 2026-07-25 | #1350 [gate:owner] **SIGNED**: subscriber emails → anonymize 548 days (18 months) post-unsubscribe (was UNSIGNED). Signed window/mode centralized in `lambdas/content/subscriber_retention.py`; enacted weekly by `delete_user_data_lambda`'s `subscriber_retention_sweep` EventBridge rule (reuses existing IAM — no role change); guard test `tests/test_subscriber_retention_sweep.py` added | #1350 |
 | 2026-08-18 | `deploys/` gained `NoncurrentVersionExpiration` (7d, keep 1) and `site/` gained a noncurrent-version rule (7d, keep 1) — closes 67 GB of unbounded noncurrent-version growth (`life-platform-s3-bucket-size-high` red 4.5 days). `imports/` found accumulating noncurrent versions under zero current bytes (2.23 GB) — flagged, not yet covered, out of scope for this pass | #2642 |
+| 2026-08-23 | #3043 (DIL-001/DIL-012) containment: 5 PRIVATE-marked `docs/coaching/` files relocated to `s3://matthew-life-platform/config/coaching/`; scope note rewritten to the true PUBLIC posture (the pre-fix note still claimed PRIVATE, 34 days after the 07-20 public flip); `check_doc_facts.py` repo-visibility gate un-inverted (asserts LIVE visibility via `gh api`, was hardcoded "truth is PRIVATE"); structural marker guard `tests/test_no_private_markers_3043.py` added; dated risk acceptance for the historical exposure recorded in the diligence register | #3043 |
 
 ---
 
@@ -253,12 +254,27 @@ deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build be
 
 ## Scope note: the PII guard vs the repo itself
 
-`deploy/pii_surface_guard.py` scans the **published site surface (`site/`) only**. The
-repo's `docs/coaching/` files carry Tier-2 owner-only data (real biometrics, training
-calibration) — their intended privacy control is **repo visibility**, NOT the guard.
-✅ **The repo has been PRIVATE since 2026-07-13** — `docs/coaching/` is no longer
-world-readable; the exposure this note used to flag (public 2026-05 through 2026-07-13)
-is closed. Wiki-panel finding 2026-07-10 (before the flip) still stands as the
-governing rule going forward: treat repo visibility as a load-bearing privacy control;
-never flip this repo public again without first relocating or redacting
-`docs/coaching/`.
+`deploy/pii_surface_guard.py` scans the **published site surface (`site/`) only** — it
+has never scanned the repo tree. **The repo is PUBLIC** (deliberately, since the
+2026-07-20 flip — [[project_repo_visibility]]), so repo visibility is **not** a privacy
+control at all: anything tracked in the tree is world-readable by design. The real
+controls for owner-private material are:
+
+- **Relocation out of the tree.** Owner-private coaching material (Tier-2 owner
+  biometrics/training calibration) lives at the S3 owner prefix
+  `s3://matthew-life-platform/config/coaching/` (delete-protected `config/` prefix,
+  owner credentials only) — relocated 2026-08-23 (#3043, DIL-001); see
+  `docs/coaching/README.md` for the file list. What remains in `docs/coaching/` is
+  deliberately public.
+- **The structural marker guard.** `tests/test_no_private_markers_3043.py` fails CI if
+  any tracked file declares itself PRIVATE — the in-band marker in a public tree is
+  itself the defect.
+- **The live-visibility fact gate.** `scripts/check_doc_facts.py` verifies this doc's
+  repo-visibility claims against the LIVE GitHub API (not a hardcoded truth — the
+  pre-#3043 gate hardcoded "PRIVATE" and would have redded the honest correction).
+
+Historical exposure of the five relocated files (world-readable 2026-05→2026-07-13 and
+2026-07-20→2026-08-23) is accepted as history: a git-history rewrite was priced out
+(1,454 retained GitHub pull refs keep the content reachable regardless) — dated risk
+acceptance in `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md` (DIL-001). The
+containment is forward-looking.

@@ -1156,7 +1156,8 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
 # and is reported regardless; the verdict that's withheld is only the NEAT/aerobic
 # one that depends on the unavailable sources. Correlational framing only.
 
-# Strava is authoritative for *what moved* (TRAINING_CALIBRATION §4a) — it carries the
+# Strava is authoritative for *what moved* (TRAINING_CALIBRATION §4a — owner-private,
+# S3 config/coaching/ since #3043) — it carries the
 # aerobic/NEAT dose. Garmin is a redundant backstop and steps systematically undercount,
 # so aerobic/NEAT volume is "assessable" iff Strava is live. A state not in this set is
 # treated as unavailable (paused / stale / rate_limited / missing).

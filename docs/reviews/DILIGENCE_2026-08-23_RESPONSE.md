@@ -33,11 +33,26 @@ named revisit trigger). A finding is not "answered" until its row cites live evi
 
 | DIL | Title | Verdict | Live evidence (2026-08-23) | Disposition |
 |---|---|---|---|---|
-| 001 | Public Tier-2 coaching docs | **CONFIRMED** | 5 `Status: PRIVATE / internal` files under `docs/coaching/` return 200 on raw.githubusercontent; `DATA_GOVERNANCE.md` scope note claims "repo is PRIVATE" (false since 07-20 public flip); `check_doc_facts.py:690` gate hardcodes "truth is PRIVATE" (would red the honest fix) | D0.1 — relocate + fix gate + marker guard |
+| 001 | Public Tier-2 coaching docs | **CONFIRMED → FIX LANDED** (#3043, 2026-08-23; pending driver S3 upload + merge) | Was: 5 `Status: PRIVATE / internal` files under `docs/coaching/` return 200 on raw.githubusercontent; `DATA_GOVERNANCE.md` scope note claims "repo is PRIVATE" (false since 07-20 public flip); `check_doc_facts.py:690` gate hardcodes "truth is PRIVATE" (would red the honest fix) | D0.1 done: 5 files `git rm`'d → `s3://matthew-life-platform/config/coaching/` (driver uploads BEFORE merge); scope note rewritten to the true PUBLIC posture; gate un-inverted (asserts LIVE visibility via `gh api`, offline = loud SKIP); marker guard `tests/test_no_private_markers_3043.py` (mutation-proved: red on the 5 pre-removal, green after). **Dated risk acceptance — see below.** |
 | 002 | Rate-limit identity bypass (#1221) | **STALE** | #1221 CLOSED 2026-08-21; `common/client_ip.py` fails closed to a constant, XFF fallback deleted, AST-guarded fleet-wide (`test_rate_limit_identity_1221.py`); live wire proof 6×forged-XFF → `400 400 400 429 429 429` | Docstring residual **closed 2026-08-23** (D0.5 sweep — module + function docstrings now state the fail-closed reality, interim framed as history); edge-observation decision remains (#2828, D1) |
 | 003 | Deletion promise vs 548-day retention | **CONFIRMED (worse)** | `/privacy/` promises "immediately"/"entirely"; `subscriber_retention.py` retains plaintext 548d then anonymizes; unsubscribe carries **plaintext email, no token**, unauthenticated GET mutation across 7 senders | D0.2 — subscriber trust package |
 | 004 | Production approval absent | **WRONG (live)** | `gh api …/environments/production` → `required_reviewers` rule live + actively blocking (3 runs `waiting` today); ledger row stale (Verified 07-09) manufactured this; residual = self-approvable + admin-bypass | Ledger **corrected 2026-08-23** (D0.5 sweep — every row re-verified live, per-row Verified column, monthly re-verify dead-man on the #2832 calendar); residual PRICED under #2834 |
 | 007 | 75 pending / 0 graded | **PARTIALLY (re-diagnosed)** | Two systems conflated (coach predictions vs `/api/calibration` n=30 @80%); nothing due before 08-24 (domain-min windows); REAL defect: 28/50 pending are `eval_type: qualitative` = structurally ungradeable, violating closed #715's own criterion | D0.4 — gradeability + scorecard honesty |
+
+### DIL-001 historical exposure — dated risk acceptance (2026-08-23, #3043)
+
+The five relocated coaching docs were world-readable **2026-05 → 2026-07-13** (repo
+public since inception) and again **2026-07-20 → 2026-08-23** (the deliberate public
+flip). A git-history rewrite was evaluated and **ruled ineffective**: GitHub retains
+~1,454 pull refs that keep force-pushed content reachable by direct sha, so a rewrite
+would break every commit reference and external link while erasing nothing (the same
+analysis as the CLAUDE.md authorship decision; the off-repo remediation plan holds the
+full pricing). **Accepted:** the historical copies in git history remain reachable;
+the containment is forward-looking — the tree carries no PRIVATE-marked file (guarded
+structurally), the live surface returns 404, and any future marker reds CI. Incident
+row: the in-band `PRIVATE` marker was an intent with no enforcing control from the
+day the repo first went public; the control now exists. Revisit trigger: any future
+repo-visibility change, or GitHub shipping ref-level purge tooling.
 
 ## P1 / P2 register (condensed — full detail in the phase plan)
 
@@ -49,7 +64,7 @@ named revisit trigger). A finding is not "answered" until its row cites live evi
 | 009 "100% IaC" false | **CONFIRMED** | README headline vs MANAGED_WHERE_LEDGER's honest 13-row out-of-IaC ring | README **corrected 2026-08-23** (D0.5 sweep — "CDK-managed application infra with a declared out-of-IaC ring", ledger linked) |
 | 010/035 doc contradictions | **MIXED** | (a) README $85 & $150 CONFIRMED; (b) ONBOARDING GSI WRONG (agrees); (c) "repo private" WRONG (conditional only); (d) TESTING retired-test WRONG; (e) COST_TRACKER authoritative + live-site `.js`/editorial $85 ×4 STALE | (a)+(e) **corrected 2026-08-23** (D0.5 sweep — README row, evidence_meta.js, inference blurb, /method/build lede + org-chart essay via their generators; `check_doc_facts.py` now scans site `.js`/`.html` + v4 generators for the ceiling family, mutation-proofed); D2 truth manifest remains |
 | 011 field-privacy registry subset | **CONFIRMED** | #2803 registry = 3 fields; all DATA_GOVERNANCE Tier-2 = TIER_PUBLIC-by-omission | D0.3 full port |
-| 012 public operational recon | **CONFIRMED** | account id ×7, live IAM policies, 29 secret names, break-glass ordering | D0.1 recon-surface pass |
+| 012 public operational recon | **CONFIRMED → DISPOSED per family** (#3043, 2026-08-23) | account id ×7, live IAM policies, 29 secret names, break-glass ordering | Pass done: **break-glass/day-1 ordering REDACTED** from `docs/ACCOUNTS.md` (to the owner's estate kit; the ⚠️ UNDOCUMENTED estate rows stay — `check_reentry_hardening.py` parses them, the loud gap is deliberate) · **account id ACCEPTED** (dated note `infra/iam/README.md` — identifier not credential, in every CDK ARN) · **IAM policies ACCEPTED** (same note — reviewable source of truth, no credentials; boundary = OIDC trust) · **secret-name inventory ACCEPTED** (dated note `docs/SECRETS_MAP.md` — names not values) · residual: BENCH-1 numeric anchors in shipped code/tests → folded to #3045 |
 | 013 tokens in URLs | **PARTIALLY (worse)** | confirm token in query string yes; unsubscribe = plaintext email, no token | folded into D0.2 |
 | 014 no edge-abuse control | **CONFIRMED (severity ↓)** | WAF removed (deliberate, also WAFv2 target-incompatible); limiter now fail-closed + fan-out-priced | #2828 decision, D1 |
 | 015 CSP unsafe-inline + jsdelivr | **CONFIRMED** | `csp.py` ships both (ADR-057 W-08 accepted); `a11y_audit.py:86` coupled | D1 CSP hardening |

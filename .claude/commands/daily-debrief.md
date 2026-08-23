@@ -17,8 +17,9 @@ earlier). Empty runs both, in order, as the standard nightly ritual.
 
 ### 0. Context first — every time, no shortcuts
 
-Read `docs/coaching/TRAINING_CALIBRATION.md`, `docs/coaching/TRAINING_PROGRAM.md`, and
-`docs/coaching/PROVEN_BLUEPRINT.md` before reasoning about anything. If authoring is in
+Read `TRAINING_CALIBRATION.md`, `TRAINING_PROGRAM.md`, and `PROVEN_BLUEPRINT.md` from
+the S3 owner prefix before reasoning about anything (owner-private since #3043 —
+`aws s3 cp s3://matthew-life-platform/config/coaching/<name> -`). If authoring is in
 scope, also read the matching `docs/coaching/routines/<type>/` spec for what was last
 built and the progression currently in play. Do not fall back to a generic routine or
 generic coaching — these three docs are how Matthew is calibrated and what's actually

@@ -1,6 +1,6 @@
 # READING_CALIBRATION.md
 **The Mind Pillar — how to calibrate Matthew as a reader and build his curriculum.**
-Repo path: `docs/coaching/READING_CALIBRATION.md` (sibling to `TRAINING_CALIBRATION.md`)
+Repo path: `docs/coaching/READING_CALIBRATION.md` (the reading analogue of `TRAINING_CALIBRATION.md`, which is owner-private at the S3 owner prefix `config/coaching/` since #3043)
 Status: DRAFT v0.2 · 2026-06-30 · the reading analogue of the training calibration doc
 Personas reconciled 2026-06-30: the reading coach is **Dr. Cora Vance** (`cora_vance`, non-operational); counter-voices are the real roster — Coach Maya Rodriguez, Dr. Amara Patel, Mara Chen. (Was: Lena/Maya/Nadia/Priya/Mara/Crowe/Theo archetypes.)
 Read this BEFORE generating any recommendation. It is reference, not a whitelist.
@@ -9,7 +9,7 @@ Read this BEFORE generating any recommendation. It is reference, not a whitelist
 
 ## 0. How to use this doc
 
-Same contract as `TRAINING_CALIBRATION.md`: this defines *how to calibrate him* and *what we're running*, so the engine never falls back to a generic list. Before any recommendation:
+Same contract as the (owner-private) `TRAINING_CALIBRATION.md`: this defines *how to calibrate him* and *what we're running*, so the engine never falls back to a generic list. Before any recommendation:
 1. **Freshness & completeness first** (§10). Never trust a computed reading number — streak, retention, wheel slice — until the latest sessions/probes actually appear in the aggregation. Green status is a high-water mark and hides mid-window gaps. Empty/"no matches" is a *hypothesis* — verify by direct read.
 2. **Continuity** — read Cora's thread for prior positions, open predictions, what we said we'd try. Treat narrative flags as hypotheses to verify against actual reading data, not facts.
 3. **Synthesize state before proposing** — capacity, journal, completion history, wheel, phase.

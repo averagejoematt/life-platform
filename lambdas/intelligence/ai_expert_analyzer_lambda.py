@@ -335,7 +335,8 @@ def gather_data_for_expert(expert_key):
         }
 
     elif expert_key == "training":
-        # DI-1.3: Hevy is the PRIMARY "did he train" signal (TRAINING_CALIBRATION §4a) —
+        # DI-1.3: Hevy is the PRIMARY "did he train" signal (TRAINING_CALIBRATION §4a —
+        # owner-private, S3 config/coaching/ since #3043) —
         # the training-stimulus read is built off Hevy first, then Strava for aerobic/NEAT,
         # never off steps. Strava is paused (402) and Garmin rate-limited, so a Strava-only
         # read collapses to "all rest days" and produces a false under-training verdict.

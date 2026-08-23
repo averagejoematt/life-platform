@@ -1,12 +1,16 @@
 # External Accounts Inventory — what a successor needs to keep the platform alive
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 — added a pointer to `scripts/check_reentry_hardening.py`; the two ⚠️ estate rows below remain open, owner action)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-23 (#3043 DIL-012 — day-1 recovery ordering redacted to the estate kit, dated publication note added; the two ⚠️ estate rows below remain open, owner action)
 > **Sources of truth:** `lambdas/ingestion/source_registry.py` (data sources) · `docs/SECRETS_MAP.md` (credential locations) · `aws route53 list-hosted-zones` + `whois averagejoematt.com` (domain facts) · `aws ses list-identities` (email identities)
 
 Every external account/service the platform depends on, what it's for, where its
 credential lives, and how to recover access. **No secret values and no account
-emails appear here** — the repo went private 2026-07-13, but this discipline stands
-regardless (secrets never belong in git; the site is public; visibility can flip back).
+emails appear here** — the repo is public (since 2026-07-20), and this discipline
+stands regardless of visibility (secrets never belong in git). Dated publication
+note (2026-08-23, #3043 DIL-012): this inventory is published deliberately —
+service names, credential *locations*, and recovery *paths* only, never values or
+account identities; the successor day-1 ordering and estate specifics are the parts
+that stay out of the tree.
 "Password manager" means Matthew's
 password manager; a successor needs estate access to it first.
 
@@ -49,8 +53,10 @@ genome / measurements / supplements / food-delivery (manual entry paths).
 
 ## Notes for a successor
 
-- **Order of operations on day 1:** password manager access → AWS root/Identity
-  Center (`docs/AWS_ACCESS.md`) → GitHub → everything else can wait until an
+- **Order of operations on day 1:** owner-private — the successor's day-1 recovery
+  ordering was removed from this public file 2026-08-23 (#3043 DIL-012 recon-surface
+  pass; it read as an operational attack recipe). It lives with the estate material
+  in the owner's password-manager estate kit. Non-urgent sources can wait until an
   ingestion source goes stale (`get_freshness_status` via MCP, or
   `docs/RUNBOOK_REENTRY.md` for re-auth procedures).
 - **The nearest hard deadline is the domain**: averagejoematt.com registration
@@ -78,7 +84,7 @@ successor needs, recorded pointer-level only:
 | Item | Status |
 |---|---|
 | Which password manager + where its emergency/estate access lives | ⚠️ **UNDOCUMENTED — owner action required.** Matthew: record (a) the manager, (b) the estate mechanism (e.g. 1Password Emergency Kit / family recovery, iCloud Legacy Contact, printed kit + physical location) here, pointer-level only. |
-| MFA device + 2FA recovery-code locations (AWS root, GitHub, SSO) | ⚠️ **UNDOCUMENTED — owner action required.** If these live only on one phone, root+GitHub+SSO recovery all fail together. Record where backup codes live. |
+| MFA device + 2FA recovery-code locations (AWS root, GitHub, SSO) | ⚠️ **UNDOCUMENTED — owner action required.** Record where backup codes live (pointer-level only). |
 | AWS root email | See password manager (deliberate — never in this repo). |
 
 Until both ⚠️ rows are filled, treat bus-factor as **1** regardless of how good the rest

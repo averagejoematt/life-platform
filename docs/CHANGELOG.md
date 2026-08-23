@@ -608,12 +608,12 @@ Layer **v86**; deployed live (Core + MCP + freshness) + backfilled 2026-06-19.
 
 ## Cut benchmarking (BENCH-1) — 2026-06-19 (ADR-089: descriptive divergence vs his own proven cut)
 
-PRIVATE cut-benchmarking & regain firewall operationalizing PROVEN_BLUEPRINT.md (16 loss episodes, 0 held; regain ≈ 0.79× loss; walking collapses post-trough).
+PRIVATE cut-benchmarking & regain firewall operationalizing PROVEN_BLUEPRINT.md's cross-episode loss/regain analysis (episode ledger and rate specifics owner-private with the blueprint at the S3 owner prefix — #3043).
 
 ### Added
 - **Two derived computed sources** — `weight_episodes` (detected loss/regain ledger) + `training_reference` (by-band proven volumes + the 2024-09→2025-04 proven curve), keyed like `computed_metrics`, cross-phase (no `phase` attr → survive a reset).
 - **`episode-detect` Lambda** — weekly (Sun 17:00 UTC) + manual; pure-Python turning-point/episode/outcome/covariate pass over full Withings/Strava/Hevy history (reads pre-genesis too). No Bedrock (pennies/mo).
-- **`get_benchmark` MCP tool** (view-dispatched, PRIVATE): `pace` (live pace vs proven trajectory + ~240 lb run gate), `episodes` (the ledger + 0.79× asymmetry), `maintenance` (regain firewall near goal).
+- **`get_benchmark` MCP tool** (view-dispatched, PRIVATE): `pace` (live pace vs proven trajectory + the run gate), `episodes` (the detected-episode ledger + the loss-vs-regain asymmetry), `maintenance` (regain firewall near goal).
 
 ### Guardrails (board)
 - **No predictor** (Henning): descriptive only, `n_held=0`, no classifier. Every numeric block carries `confidence`+`n`; no causal language.
