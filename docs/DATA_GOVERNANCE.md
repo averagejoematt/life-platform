@@ -33,6 +33,19 @@ Visible at `averagejoematt.com` to anyone:
 - AI coaching responses (via `/api/ask`, `/api/board_ask`)
 
 ### Tier 2 — Owner-only (Matthew via MCP / dashboard)
+
+> **Publication carve-out (ADR-155, signed 2026-08-23, `gate:owner`).** Parts of this
+> tier are **deliberately published** by recorded owner consent: everything `/api/vitals`
+> serves (HRV raw ms + averages, RHR, recovery %, sleep hours, weight + deltas/trends),
+> everything `/api/labs` serves (the full named-biomarker panel, genetic entries
+> structurally stripped), the sleep-stage trio on `/api/sleep_detail`, lean mass on the
+> nutrition surface, and the DEXA scan summary on the physical surface. The machine
+> registry `lambdas/privacy/field_tiers.py` is the enforcement point: a published field
+> carries an explicit `TIER_OWNER_PUBLISHED` stamp; everything else in this tier is
+> `TIER_OWNER_ONLY` and **never** reaches a public payload — by stamp, never by omission
+> (DIL-008/DIL-011). `tests/test_data_governance_tier_guard_3045.py` fails CI if this
+> section and the registry ever disagree.
+
 - Raw biometrics: HRV, heart rate, sleep stages, CGM glucose readings
 - Lab results (cholesterol, biomarkers, genome variants)
 - Body composition (DEXA scan details, weight, body fat %)
@@ -233,6 +246,7 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-08-18 | `deploys/` gained `NoncurrentVersionExpiration` (7d, keep 1) and `site/` gained a noncurrent-version rule (7d, keep 1) — closes 67 GB of unbounded noncurrent-version growth (`life-platform-s3-bucket-size-high` red 4.5 days). `imports/` found accumulating noncurrent versions under zero current bytes (2.23 GB) — flagged, not yet covered, out of scope for this pass | #2642 |
 | 2026-08-23 | #3043 (DIL-001/DIL-012) containment: 5 PRIVATE-marked `docs/coaching/` files relocated to `s3://matthew-life-platform/config/coaching/`; scope note rewritten to the true PUBLIC posture (the pre-fix note still claimed PRIVATE, 34 days after the 07-20 public flip); `check_doc_facts.py` repo-visibility gate un-inverted (asserts LIVE visibility via `gh api`, was hardcoded "truth is PRIVATE"); structural marker guard `tests/test_no_private_markers_3043.py` added; dated risk acceptance for the historical exposure recorded in the diligence register | #3043 |
 | 2026-08-23 | #3044 (DIL-003/DIL-013) **retention row re-signed v2**: subscriber emails → **anonymize AT unsubscribe (0 days)**; the handler scrubs inline, the weekly sweep demoted to backstop (≤7d worst case). Unsubscribe links tokenized fleet-wide (signed HMAC over the email hash — no plaintext email in URLs; legacy links sunset 2026-09-22); `/privacy/` copy rewritten to the implemented contract | #3044 |
+| 2026-08-23 | #3045 (DIL-008/DIL-011, ADR-155, `gate:owner` signed): Tier-2 publication becomes a recorded decision — `TIER_OWNER_PUBLISHED` stamp added to `lambdas/privacy/field_tiers.py`; the full currently-served public surface (vitals set, labs panel, sleep-stage trio, lean mass, DEXA summary) stamped by explicit consent; every remaining Tier-2 prose row ported into the registry (field-level or source-level); this doc's Tier-2 section now GUARDED against the registry by `tests/test_data_governance_tier_guard_3045.py` — the twin-sources drift class is closed | #3045 |
 
 ---
 

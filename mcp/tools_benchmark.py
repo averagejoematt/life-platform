@@ -24,6 +24,13 @@ from mcp.core import get_profile, query_source
 
 # Run gate from PROVEN_BLUEPRINT.md (owner-private: s3://matthew-life-platform/config/coaching/,
 # #3043) — zero runs logged above ~240 lb in his own history.
+#
+# Numeric-anchor disclosure ACCEPTED, dated 2026-08-23 (#3045, DIL-012 residual): this
+# threshold (and the ~0.79x regain-asymmetry ratio below) are functional code constants
+# in a public repo. The quantity they anchor — the owner's weight ballpark — is itself
+# TIER_OWNER_PUBLISHED (ADR-155: weight is deliberately published daily on /api/vitals),
+# so the anchors disclose nothing beyond the consented surface. Revisit trigger: weight
+# ever leaves the published set.
 RUN_GATE_LB = 240.0
 
 TRAINING_REFERENCE_SOURCE = "training_reference"
