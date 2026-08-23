@@ -208,24 +208,27 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-22 ~20:50 → 08-23 ~02:45 PT (Fable 5, autonomous — *"execute the approved
-council plan end-to-end, merge+deploy authority for its scope"*) — **the council plan landed whole:
-closed 5 / filed 3, 8 PRs merged+deployed, main GREEN (18dfa1e4c) verified.** **#2832 Operating
-Calendar LIVE** (registry of 7 rituals w/ artifact-dated probes + daily dead-man, first run green;
-#1451/#1338 obligations re-homed; one cadence truth). **#3025 pre-merge full suite LIVE** (13:44 for
-20,560 tests after CI's own durations named a 181s unmocked-network test = 13% of the suite;
-mutation-proved via probe PR — old lane green with a failing deselected test aboard, new lane red on
-exactly it — and it caught TWO real deselected breaks the same night; #2692 folded+closed with the
-measurement as the 1200→1500s rationale; required-ness promotion is next-session, ≥2-merge window
-now satisfied). **#2959 down-payment:** the oracle blocked the publish path 3× in ~90 min and the
-root cause was the rubric's own bullet INSTRUCTING the class — fixed generation + two deterministic
-suppressors (+widened after block 3), 6 baselines triaged; site deploy #4 green, dispatch published.
-**#3030 one-clock class found+fixed live** (Day-6 screenshots judged against a Day-7 phase when a
-sweep straddled midnight PT — `pacific_today()` pinned at sweep start). #2921 realized (per-device
-sleep payload verified live); #2883 honestly OPEN (drift re-measured WORSE, 1.4177; residual
-out-of-repo — worktree sessions' own Bedrock calls are invisible to the chokepoint); #1629 promotion
-DECLINED at 0/30 vs the ≥15/30 gate. Five sweeps produced five distinct novel oracle highs — the
-#2959 non-stationarity series, now measured. **Next:** #2889 + #2972-tail observations at the 08-23
-daily runs; #3025 required-ness promotion; #2959 ground-truth feed; #2883 out-of-repo measurement.
-Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-23 daytime (Fable 5, interactive→autonomous — *"maximize fable use paying
+down the open-issues list … the real north star is a stabilized, production-grade platform a
+CTO/CPO/CIO panel would accept"*, then an external acquisition-diligence PDF). **The backlog
+campaign became the A-Grade Program.** Session 1 triaged the debt corpus 49→43 (folds + #1677→Roadmap)
+and landed **CONVENTIONS §10 filing discipline** (inflow is the real problem: 312 filed / 311 closed
+in 14 days — the board churns). Session 2 drained via 8 merged PRs: **6 issues closed** — #3005
+(Co-Authored-By ban + guard), #2993 (Plan config-drift classifier — agent proved the issue's
+hypothesis wrong), #3021 (lease janitor), #2944 (journal-coach absence, deployed), #3006+#3007 (wrap
+gates asserted+batched, 12 runs→2). Then the pivot: the 52-finding diligence report (4.47/10,
+"conditional no-go") was **fact-checked live by 3 agents** — and the verdict is materially better than
+the score: **2 of 5 P0s are STALE/WRONG against current state** (DIL-002 fixed 08-21; DIL-004 approval
+gate live+blocking now), most of the report's false positives **manufactured by the platform's own
+7-week-stale MANAGED_WHERE_LEDGER**; 3 P0s genuinely live (public coaching docs, subscriber deletion
+promise, 56%-ungradeable predictions); +7 findings sharper than the report. Filed **epic #3042
+[A-Grade Program]** + stories #3043–3050 + 7 folds + the response register (`docs/reviews/
+DILIGENCE_2026-08-23_RESPONSE.md`, PR #3041). **Honest miss:** #2959's oracle-ground-truth deploy
+(#3038, qa-smoke deployed+verified) auto-rolled-back the site — the fix worked (every documented class
+dropped correctly) but the non-stationary tail raised one novel high AND the visual-qa CI role lacks
+the SSM cycle-param grant, so the feed is dark in the gating path (incident row added; both fold to
+#3042; site healthy on prior build). **Next:** boot Phase D0 of the A-Grade Program
+(`~/.claude/plans/lively-juggling-candle.md`) — coaching-docs containment #3043, subscriber trust
+#3044, Tier-2 ADR #3045, prediction gradeability #3046, `apply_branch_protection.py --apply` for
+required checks, CodeQL #3047. Full narrative: `handovers/HANDOVER_LATEST.md`.
 

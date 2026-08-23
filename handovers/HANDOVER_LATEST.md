@@ -1,141 +1,135 @@
-# Handover — 2026-08-22 ~20:50 → 2026-08-23 ~02:45 PT: fable week, session 2 — the council plan, executed; the oracle blocked its own publish path three times and each block became structure
+# Handover — 2026-08-23 (daytime, Fable 5, interactive→autonomous): the backlog campaign became the A-Grade Program — an external diligence report, fact-checked and turned into a plan
 
-**Session:** Fable 5, autonomous (boot prompt: *"Execute the approved council plan at
-`~/.claude/plans/stateful-squishing-dongarra.md`, end-to-end, with merge+deploy authority
-for its scope"*). Previous wrap archived as `HANDOVER_2026-08-22_fable-week-lane-a.md` on
-`session-archive`.
+**Session:** Fable 5. Drove: `/plan` to "maximize fable use paying down the open-issues
+list … the real north star is a stabilized, mature, production-grade platform a CTO/CPO/CIO
+panel would accept." Executed Session 1 (triage) + Session 2 (drain) of the approved
+backlog campaign, then the owner supplied an **external acquisition-diligence PDF** and the
+campaign was re-planned to **absorb** it as the A-Grade Program. Plan:
+`~/.claude/plans/lively-juggling-candle.md`. Previous handover archived as
+`HANDOVER_2026-08-22_fable-week-session2.md` on `session-archive`.
 
-## The scoreboard
+## What this session was
 
-**Closed 5 / filed 3** (net −2): closed #2832 (flagship), #2692 (folded), #3025, #2921,
-#3030; filed #3021 (lease janitor, file-not-fix per plan), #3025, #3030. **8 PRs merged +
-deployed** (#3022 #3023 #3024 #3026 #3028 #3029 #3031, + probe #3027 closed-unmerged by
-design). 3 deploy-gate leases approved, 2 rejected-as-superseded with recorded reasons.
-Every closure carries its ADR-099 verdict comment. Main GREEN (18dfa1e4c) verified by
-`check_main_green.py` at wrap.
+Three arcs, in order:
+1. **Campaign plan + Session 1 triage (interactive).** Built the campaign: get the debt
+   corpus (49) to ≤20 while fixing the *inflow* (measured: 312 filed / 311 closed in 14
+   days — the board churns, it doesn't drain). Triaged 49→43 (folds #2958→#2957,
+   #2962+#2963→#2961, #2891→#2837, #2838→#2986; #1677→Roadmap), landed the filing-discipline
+   rule (**CONVENTIONS §10** + issue-filer agent), committed clean.
+2. **Session 2 drain (autonomous, merge+deploy authority).** Five worktree implementers +
+   driver work. **6 issues closed via 8 merged PRs.**
+3. **The diligence pivot (interactive→plan).** Read the 44-page report (52 findings, 5 P0,
+   4.47/10, "conditional no-go"), fact-checked every claim live with 3 agents, and
+   re-planned the campaign as the A-Grade Program. Filed the tracking epic + register.
 
-## Shipped, by plan step
+## Shipped (merged + deployed unless noted)
 
-- **Step 0/1 (boot + verification):** wrap commit had already landed; fixed its Docs CI
-  red (stale INCIDENT_LOG Patterns — the #2975 lane-gap class, regenerated + pushed).
-  Alarm board reconciled clean: all 4 ALARM-state alarms live-cited (#2989, #2883, #2977,
-  genesis window), 3 flaps = the known #2976 recovery episodes. #2889 + #2972 tails are
-  time-gated to the 08-23 daily runs — still owned by the next boot (see residuals).
-- **Step 2 flagship — #2832 Platform Operating Calendar (PR #3024):** registry
-  (`scripts/operating_calendar.py`, 7 rituals with artifact-dated probes + 3 dated
-  exemptions closing the review-skill set both directions) + daily dead-man workflow
-  (`operating-calendar.yml`, first live run green: 32619558490) + generated
-  `docs/OPERATING_CALENDAR.md` (#2986 DERIVED row, docs-ci lane). #1451/#1338 obligations
-  re-homed onto the sdlc entry; REVIEW_METHODOLOGY's competing cadence retired; PT
-  adoption anchor prevents born-red. Two premerge guards (PUSH_TRIGGER_GLOBS mirror, §9
-  pointer-length) caught the first push — fixed in-PR.
-- **Step 3 — #3025 pre-merge full suite (PR #3026), #2692 folded:** measured first from
-  CI's own `--durations` (green run 32613992699): ONE unmocked-network test cost 180.85s
-  (13% of the 1394s suite; 0.99s locally). Landed: `full-suite` job in pr-checks (exact
-  post-merge selection, no coverage, unpiped; **13:44 for 20,560 tests** post-fix),
-  parity/dep/unpiped contract tests, the 181s test made hermetic, a per-test 90s
-  `::warning` warner (e11-triaged), budget 1200→1500s in its three synced literals with
-  the measurement as rationale, PROPORTIONALITY row + two §9 rows. **Mutation-proved on
-  the wire** (probe PR #3027: old lane green with a failing deselected test aboard; new
-  lane red on exactly it) — and the lane caught **two real deselected-test breaks the
-  same night**: its own maiden run (the doc-literal treadmill lives INSIDE the suite →
-  in-workspace `sync --apply` step, never committed) and #3031's stub break. Required-ness
-  promotion (github_posture/ADR-148) deliberately deferred past the ≥2-merge observation
-  window — which is now satisfied (merges #3023, #3029, #3031 all landed green with the
-  lane active); the promotion itself is next-session work (#3025 closure comment notes it).
-- **Step 5 (promoted mid-session) — #2959 down-payment (PRs #3028, #3029):** the oracle
-  blocked the site publish path 3× in ~90 min (runs 32616299944, 32618360726,
-  32620189500). Root cause found in the rubric's own text — its final DO-NOT-FLAG bullet
-  *instructed* "Flag a window only when it is LONGER than the days elapsed", which
-  manufactured the 7-day-HRV-average-on-Day-6 highs. Fixed generation (cross-phase
-  trailing-window clause) + enforcement (two deterministic suppressors in the #2780/#3003
-  family: `is_day_counter_bound_inference` → demote, `is_self_refuted` → drop; phrase set
-  widened after the third block's surviving high ended "within phase bounds and
-  internally consistent"). 6 baselines recorded via the sanctioned writer + triaged
-  (#2959). **Site deploy #4 green; suppressors observed firing 9× then 5× on later
-  sweeps; the wrap's build dispatch finally published.** #2959 stays open — the
-  per-page API ground-truth feed is the remaining rubric work.
-- **Step 4 fan-out (sonnet worktrees):** **#2921 realized (PR #3023)** — `/api/sleep_detail`
-  per-device namespacing (additive `eightsleep`/`whoop` blocks), verified live post-deploy
-  (self-consistent per device, explicit `night_of`/`as_of_date`); evidence_sleep.js stage
-  bar fixed. **#2883 stays open honestly (PR #3022, "Part of")** — drift re-measured
-  WORSE (1.4177 vs the 1.15 bar), residual $20.64 unattributed with out-of-repo
-  candidates (remediation agent + concurrent Claude worktree sessions' own Bedrock
-  calls); the shipped fix (state-of-matthew's write-only 1h cache, 24,159 write/0 read
-  tokens over 30d) is correct and ~$0.006/mo. **#3021 filed** (lease janitor, Next).
-- **Unplanned class, found + fixed live — #3030 one-clock (PR #3031):** the QA harness
-  computed phase truth at assess time; a sweep straddling midnight PT judged Day-6
-  screenshots (PT-correct chrome per #2941) against a Day-7 phase — 2 red QA jobs on
-  green deploys (runs 32622594057, 32623497239's QA). Fixed: `pacific_today()` pinned
-  once at sweep start, threaded through `assess_prose(today_iso=…)`, spy-test proved,
-  stored in report.json. The new full-suite lane caught this PR's own deselected stub
-  break pre-merge.
+- **#3005** (PR #3032) — Co-Authored-By ban: 4 instruction files fixed + guard test + §9 row.
+- **#2993** (PR #3033) — Plan-job config-drift classifier (`classify_cdk_diff.py`); agent
+  found the issue's hypothesis wrong (real trigger = CDK LogRetention runtime skew).
+- **#3021** (PR #3034) — superseded-lease janitor (owner needs `DEPLOY_GATE_JANITOR_TOKEN`
+  to fully arm — batch item).
+- **#2944** (PR #3035) — journal-coach absence declared not laundered; **deployed daily-brief**
+  (root cause: designed absence since the cycle-14 reset).
+- **#3006 + #3007** (PR #3036) — wrap gates asserted (11 lines) + batched (12 runs → 2).
+  *This wrap ran through the new battery.*
+- **#2959** (PR #3038) — oracle ground-truth feed: cycle number + 5 rulings + 2 structural
+  drops; ledger 38→8; **deployed qa-smoke** (sha-verified). See the honest residual below.
+- **#2978** (PR #3039, "Part of", stays open) — confirm-before-fail primitive on both QA
+  surfaces + the incident-classifier sub-shape split.
+- **#3040** — extracted `daily_brief_signals.py` to fix a size-guard main-red I caused by
+  merging #3035 past its (not-yet-required) full-suite lane.
+- **#3041** — `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md`, the diligence response register.
+- **Campaign scaffolding:** CONVENTIONS §10 filing discipline (commit a86415136).
 
-## The night's honest pattern
+## The diligence fact-check (the session's highest-value output)
 
-Five sweeps produced five DISTINCT novel oracle highs (build-log chrome, 7-day average
-×2 pages, a self-refuting note, a second self-refuting phrasing, an editorial
-cross-cycle-label nit graded high) — each on a page that had passed the previous sweep.
-That non-stationarity is #2959's remaining case, now with tonight's runs as the measured
-series; the suppressors + 6 baselines ended the bleeding, the rubric ground-truth feed is
-the cure. Also: I burned one empty-commit nudge diagnosing zero-run pushes before
-checking `mergeable` — the exact first move the existing memory prescribes (CONFLICTING
-PR after #3024's conftest twin-add; resolved by merging main, runs minted in a minute).
+Three agents verified all 52 findings against **live** repo/GitHub/site. The verdict is
+materially better than 4.47/10 — and the gap is instructive:
+- **3 of 5 P0s genuinely live** → Phase D0: DIL-001 (5 PRIVATE-marked coaching docs are
+  world-readable), DIL-003 (/privacy/ "deleted immediately" vs 548-day retention + tokenless
+  unsubscribe), DIL-007 (56% of the prediction corpus is `eval_type: qualitative` =
+  structurally ungradeable — the report missed this, fixating on "0 graded" which is
+  *correct*: nothing's due before 08-24).
+- **2 of 5 P0s WRONG/STALE against current state** — DIL-002 fixed 08-21; DIL-004
+  ("approval absent") is live+blocking now. **Root cause: the platform's own 7-week-stale
+  `MANAGED_WHERE_LEDGER.md` manufactured the report's false positives.** Documentation truth
+  is the external-assessment attack surface — D0.5 + D2 close it.
+- **7 findings sharper than the report** (main has zero required checks; CodeQL regrew 7
+  alerts; budget-guard hard-stop shares a fail-open path; etc.) — all in the register.
+
+**Filed:** epic **#3042** [A-Grade Program] + stories **#3043–3050** + 7 folds
+(#2824/#2828/#2890/#2578/#2986/#2834/#2799). Owner decisions: repo stays public+sanitized ·
+commercial domains priced + a clinical-lite build subset · program absorbs the campaign.
+
+## The honest residual — #2959's deploy rolled back
+
+#3038's deploy auto-rolled-back the site (incident row added). The fix WORKED — every
+documented oracle class dropped/demoted correctly on the live sweep — but the
+non-stationary tail (#2959's own tracked remaining work) raised ONE novel high (a
+correctly-dated 'WEEK 1 · 2026-08-18' chronicle piece on /story/), and a NEW finding
+surfaced: **the visual-qa CI role lacks `ssm:GetParameter` on the experiment-cycle param**,
+so the cycle ground-truth sentence is dark in exactly the gating path. Deploy content (the
+receipts UTC-caption) was orthogonal — a rollback casualty. Site healthy on the prior build
+(3ad9572, all 200s). Re-deploy + both residuals carry into #3042's oracle lane; re-deploying
+now without baselining the new shape would just block again (the documented "3 blocks in one
+night" anti-pattern).
 
 ## Gate lines
 
-**Build beat:** 2026-08-23-the-suite-that-catches-what-the-fast-lane-cannot
-**Docs:** OPERATING_CALENDAR.md (new, generated) + README index + REVIEW_METHODOLOGY
-cadence retirement + PROPORTIONALITY (2 rows + Re-read log) + CONVENTIONS §9 (3 rows) +
-frontier-plan artifact path — all inside the feature PRs; SCHEMA.md sleep SoT ruling in
-#3023; wiki checkers green at commit.
-**Decisions:** none needed — no new ADR; #2832 executes ADR-099/103/144 machinery,
-required-ness change deferred (will need the ADR-148 posture edit when taken).
-**Main:** green (18dfa1e4c) — `check_main_green.py` exit 0; the intervening QA-job reds
-(32626430842, 32623497239) were the #3030 clock race + the fifth oracle novel high, both
-structurally answered same-session.
-**Incidents:** 2 rows added — (1) the 3× oracle-blocked site publish path
-04:07–06:36Z (2 auto-rollbacks, no reader impact, recovered by #3028/#3029+baselines);
-(2) the #3030 midnight-clock QA reds on green deploys (no rollback, no reader impact).
-**Closures:** #2832, #2692, #3025, #2921, #3030 commented (4 realized, 1 fold-realized);
-#2883 + #1629 got dated status comments without closure.
-**Backlog:** hygiene OK over 77 open; Now refilled per (e9) by stored rank — promoted
-#2989, #3005, #2813 (score lines updated to `→ Now` with dated notes; the liveness rule
-counts type:story only, which took three promotions to satisfy); no stale Later issues
-printed. The cycle's one Roadmap promotion allowance DECLINED on measurement (#1629 gate
-reads 0/30 vs ≥15/30 — owner decision point ~09-01 per its own close-unbuilt banner).
-**Alarms:** 4 red, all cited (#2989, #2883 — deliberately red, #2977, genesis window
-self-clearing 08-24); 2 flaps flagged and decoded: `ingest-liveness-unhealthy`
-(08-21 10:11 → 08-22 10:11 PT — the previous wrap's already-named #2976-cluster
-organic clear, still inside this wrap's 72h window) and `site-api-invocation-spike`
-(08-22 23:43→23:45 PT, 2-min dwell — self-inflicted by this session's own five
-full-surface QA sweeps in ~3h during the publish-path recovery; no reader-facing
-symptom, load source known). Gate closed with `--decoded`.
-**CI warnings:** 2 — both `cdk deploy` config-change advisories (Operational + Email)
-on the wrap-tip green run: the already-filed #2993 class (the Plan classifier calls an
-asset-hash-only `Code.S3Key` diff a config change; tonight's fleet deploys moved every
-bundle hash). Owned by #2993 (Next, 2.00 — top of its milestone's rank); no local cdk
-deploy warranted on a hash-only diff. Gate closed with `--decoded`.
+**Build beat:** none — the session's public-worthy work (the #2959 oracle rulings, the
+receipts-caption fix) auto-rolled-back on deploy; nothing net-new is live on the reader
+surface. Merged infra/QA (#3005/#2993/#3021/#3006/#3007) is not reader-facing dispatch material.
+**Docs:** CONVENTIONS §10 (filing discipline, committed mid-session a86415136) +
+`docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md` (new, PR #3041) + INCIDENT_LOG (+1 row) +
+this wrap's doc-sync literals. Register links the 10 filed diligence issues.
+**Decisions:** none needed — the A-Grade Program's ADR-worthy calls (Tier-2 publication
+consent, repo-posture) are staged as D0/D3 work (#3045 carries `gate:owner`), not landed
+this session.
+**Main:** green — the recent CI/CD "failures" (`4b89eba2`, `3862eb55`, `5557b0a2`,
+`f4ef58f4`) are all deliberately-**rejected superseded/hand-deployed leases** (#2467/#1901
+class, actioned this session), not test reds; HEAD's Docs CI is green and the live site is
+healthy. Verified via `check_main_green.py --decoded`.
+**Incidents:** 1 row added — the #3038 site auto-rollback (#2959 non-stationary tail;
+deploy content orthogonal; + the visual-qa role's missing SSM grant; both fold to #3042).
 **Stash/hooks:** clean.
-**Ledger:** 2 rows added — operating calendar + pre-merge full suite (posture, rent,
-demote triggers in `docs/PROPORTIONALITY.md`).
+**Closures:** #3005, #2993, #3021, #2944, #3006, #3007, #2959 commented (7 ADR-099 verdicts —
+6 realized, #2959 partial-realized with residuals to #3042); the Session-1 folds
+(#2958/#2962/#2963/#2891/#2838) carry their fold-closure comments.
+**Backlog:** Now 12 actionable (the A-Grade Program filed #3042–3050 into Now/Next — the
+plan's expected transient rise from 39→46 debt, drains class-wise as D0–D5 close them); no
+stale Later issues; #1677 score-line corrected to Roadmap.
+**Alarms:** 3 flapped in the 72h window, all decoded — `ingest-auth-unhealthy-dropbox` +
+`ingest-liveness-unhealthy` (the known #2976 recovery-episode cluster) and
+`site-api-invocation-spike` (self-inflicted by this session's own full-surface QA sweeps
+during the #2959 deploy verification; no reader symptom). No standing red >72h. Closed
+with `--decoded`.
+**CI warnings:** none — the newest completed main run isn't green (it's a rejected lease),
+so `check_ci_warnings` has nothing to triage (that's the main-green gate's job).
+**Ledger:** none — no NEW standing subsystem shipped this session; #2978's confirm-before-fail
+and #2959's rulings extend existing machinery (reader-truth gate, smoke harness) already
+in `docs/PROPORTIONALITY.md`, and #3036's wrap-gate batcher is session tooling, not a
+production subsystem.
 
 ## Residuals / next picks
 
-- **#2889** first live `GenerationSkippedUnchanged` reading at the 08-23 17:00 UTC brief —
-  not-work — scheduled observation, issue open.
-- **#2972 tail**: `public_summary` first rows after the 08-23 coach daily run; then 2
-  clean oracle runs → delete the `/method/board/` baseline entry — not-work — dated
-  observation owned by the next boot (tracked in #3018's body).
-- **#3025 follow-through**: promote `Full unit suite (pre-merge, #3025)` to a REQUIRED
-  check via `deploy/github_posture.json` + `apply_branch_protection.py` (ADR-148 path) —
-  the ≥2-merge green window is satisfied; noted in #3025's closure comment.
-- **#2883**: measure the out-of-repo candidates (Cost Explorer usage-type granularity vs
-  the callers' windows) — the issue's own next step, recorded in its status comment.
-- **#2959**: the rubric ground-truth feed (per-page API cycle metadata) — the plan's
-  stated success metric: zero NEW over-read highs on baselined pages next session.
-- **#1629**: owner decision ~09-01 — 0/30 usage at the gate reads as close-unbuilt per
-  the issue's banner — not-work — gate:owner decision, measurement recorded on the issue.
-- One-off flake observed once, not filed: `test_singleton_tombstone_guards` order-
-  dependence candidate (probe run only; passed on identical base 20 min earlier) —
-  not-work — single observation recorded in #3025's evidence comment; file on recurrence.
+- **The A-Grade Program (#3042) is the spine** — next session boots Phase D0 (P0 truth:
+  coaching-docs containment #3043, subscriber trust #3044, Tier-2 ADR #3045, prediction
+  gradeability #3046, doc-truth kills, `apply_branch_protection.py --apply` for required
+  checks, CodeQL #3047). Plan: `~/.claude/plans/lively-juggling-candle.md`.
+- **#2959 oracle lane (fold into #3042):** re-deploy the receipts caption AFTER baselining
+  the /story/ WEEK-1 finding; grant the visual-qa CI role `ssm:GetParameter` on the
+  experiment-cycle param (the ground-truth feed is dark in CI without it) — not-work until
+  D0, both recorded on #2959.
+- **#3037 (recall indexer) — OPEN, blocked:** its fix breaches `monitoring_stack.py`'s size
+  ceiling; carried into #3042's alarm lane where the cdk Email+Monitoring deploy chain gets
+  proper attention (diagnosis on the PR). #2977 stays the tracker.
+- **#2978 30-day re-measure** (~2026-09-22): the confirm-before-fail transient counters in
+  both summaries are the data source — not-work, scheduled.
+- **#2944 live verify** at the 08-23 17:00 UTC brief (declared-absent path) — not-work,
+  scheduled.
+- **Owner batch (staged for Session 5 / D1):** `DEPLOY_GATE_JANITOR_TOKEN` secret (#3021) ·
+  billing-alarm dupes (#2961) · #2834 IAM posture · WAF decision (#2828) · notion-secret
+  retire (#2890).
+- **One lease may still present** on the #3038 CI/CD run if it re-queues — the deploy-wedge
+  janitor (#3021, just merged) + next boot's `check_main_green` cover it — not-work.
