@@ -74,6 +74,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [TESTING.md](TESTING.md) | Test layers, run commands, golden harnesses, visual QA |
 | [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) | Restore procedures (PITR + S3 — exercised 2026-07-10) |
 | [REVIEW_METHODOLOGY.md](REVIEW_METHODOLOGY.md) · [SITE_REVIEW_METHODOLOGY.md](SITE_REVIEW_METHODOLOGY.md) | Run an architecture / site audit |
+| [OPERATING_CALENDAR.md](OPERATING_CALENDAR.md) | The judgment-ritual cadences + dead-man (#2832) — GENERATED from `scripts/operating_calendar.py`, the one cadence truth |
 
 ## Explanation (understand why)
 

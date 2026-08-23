@@ -136,6 +136,9 @@ n stated). An idea that needs dishonest data to be impressive is dead on arrival
    ranking, cost flags in-body, links to the research artifacts. Upgrade/dedupe against
    existing open issues rather than double-filing.
 
-Deliverables: the ranked backlog live in GitHub Issues, plus one synthesis document
-(`docs/` or handover) capturing the flourishing coverage map and the competitive/frontier
-findings so future sessions inherit the research, not just the issue titles.
+Deliverables: the ranked backlog live in GitHub Issues, plus one synthesis document —
+**canonically `docs/reviews/FRONTIER_REVIEW_<YYYY-MM-DD>.md`** (the #2832 operating
+calendar's dead-man probes exactly that name; a run that lands its report elsewhere
+reads as "never ran" to the cadence sweep) — capturing the flourishing coverage map and
+the competitive/frontier findings so future sessions inherit the research, not just the
+issue titles.

@@ -63,6 +63,7 @@ on:
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
+      - 'scripts/operating_calendar.py'   # #2832 — the calendar doc derives from its registry
       # The code half — a source change can invalidate a doc (#1908).
       - 'lambdas/**'
       - 'mcp/**'
@@ -95,6 +96,7 @@ on:
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
+      - 'scripts/operating_calendar.py'   # #2832 — the calendar doc derives from its registry
       # The code half — a source change can invalidate a doc (#1908).
       - 'lambdas/**'
       - 'mcp/**'
@@ -186,6 +188,10 @@ jobs:
       - name: MCP tool catalog current
         if: always()
         run: python3 scripts/generate_mcp_tool_catalog.py --check
+
+      - name: Operating calendar current (#2832)
+        if: always()
+        run: python3 scripts/operating_calendar.py --check
 
       - name: System model + dependency graph current
         if: always()

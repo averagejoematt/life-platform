@@ -103,9 +103,14 @@ Previous review: [FILL IN with prior review # and version]. Current version: [FI
 
 ## Review Cadence
 
-- **Monthly:** Quick review — incidents + new features only (~30 min)
-- **Quarterly:** Full review all dimensions (~2-3 hours)
-- **Pre-milestone:** Full review before productization/open-source/handoff decisions
+**Retired 2026-08-22 (#2832) in favor of the Platform Operating Calendar** — the one
+cadence truth is the `CALENDAR` registry in `scripts/operating_calendar.py`, rendered
+as [OPERATING_CALENDAR.md](OPERATING_CALENDAR.md), with a daily dead-man
+(`.github/workflows/operating-calendar.yml`) that reds when a ritual's newest run
+artifact exceeds its window. This section stated a second, competing cadence (and was
+itself part of the drift #2832 measured); it now defers entirely. Pre-milestone full
+reviews (productization/open-source/handoff decisions) remain event-driven — the
+calendar cadences standing judgment, not event-triggered judgment.
 
 ---
 
