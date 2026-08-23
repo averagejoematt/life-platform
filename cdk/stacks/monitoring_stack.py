@@ -655,17 +655,15 @@ class MonitoringStack(Stack):
             self,
             "IngestAuthUnhealthy",
             alarm_name="ingest-auth-unhealthy-24h",
-            # #2004: the 86400s/Minimum/1-eval window is load-bearing (do not shorten —
-            # see the qa-smoke-alarm-window memory for the same class of window) but it
-            # means a fully-recovered fleet can sit ALARM for up to 24h after the last
-            # unhealthy emission. Undocumented, that reads as a standing false red and
-            # trains alarm fatigue — so the description says so, in the console, where
-            # an operator triaging this alarm will actually see it.
-            alarm_description=("clears up to 24h after last unhealthy emission — confirm via AUTH_FAILURE " "markers, not alarm state."),
+            # #2976 re-cut 86400s → 3600s, superseding #2004's "do not shorten": every
+            # authenticated-successful run now emits 1 (≥1 point/30 min, and a tripped
+            # breaker keeps landing 0s) — fires as fast as before, clears ~1h after
+            # real recovery instead of a 24h latch (2026-08-21→22). See RUNBOOK.md.
+            alarm_description="some source emitted IngestAuthHealthy=0 in the last hour; clears ~1h after recovery (#2976) — confirm via AUTH_FAILURE markers.",
             metric=cloudwatch.Metric(
                 namespace="LifePlatform/OAuth",
                 metric_name="IngestAuthHealthy",
-                period=Duration.seconds(86400),
+                period=Duration.seconds(3600),
                 statistic="Minimum",
             ),
             evaluation_periods=1,
@@ -710,13 +708,15 @@ class MonitoringStack(Stack):
         # predates #1960. Verified against the actual 2026-08-01 outage: the
         # consecutive-failures alarm DID fire (dispatched 08-01T14:01Z, ~2h after the
         # breaker latched at 12:00:28Z) — so this is a fix-in-place, not a new report.
+        # #2976: window = emitter cadence — dropbox (≤30-min emissions) re-cut to 3600s;
+        # daily-cron sources KEEP 86400s (NB missing-data would clear them overnight).
         for _auth_src in ("todoist", "habitify", "dropbox", "whoop"):
             _alarm(
                 f"IngestAuthUnhealthy{_auth_src.title()}",
                 f"ingest-auth-unhealthy-{_auth_src}",
                 "LifePlatform/OAuth",
                 "IngestAuthHealthy",
-                86400,
+                3600 if _auth_src == "dropbox" else 86400,
                 "Minimum",
                 1,
                 LT,

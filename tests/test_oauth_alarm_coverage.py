@@ -261,26 +261,139 @@ def _find_alarm_call(alarm_name, path=_MONITORING):
     return None
 
 
-def test_aggregate_alarm_description_documents_the_clear_lag():
-    """#2004: `ingest-auth-unhealthy-24h` is a fixed 86400s/Minimum/1-eval-period
-    detect window (load-bearing — do not shorten it, see the
-    qa-smoke-alarm-window-load-bearing memory), which means the alarm can stay
-    ALARM for up to 24h after the fleet has fully recovered. Undocumented, a
-    standing red on a healthy fleet trains alarm fatigue. Any alarm of this
-    detect-window class (single-eval-period Minimum/Maximum over the full 24h,
-    treat_missing_data=NOT_BREACHING) must carry a clear-lag note in its
-    AlarmDescription so an operator triaging a red sees, in the CloudWatch
-    console itself, that alarm state alone doesn't prove the fleet is unhealthy
-    — a rebuilt stack that drops the kwarg must fail here, not silently ship a
-    null description again."""
+def test_aggregate_alarm_description_documents_the_clear_behavior():
+    """#2004 required this alarm's description to document its 24h clear lag;
+    #2976 removed the lag itself (86400s → 3600s, safe now that every
+    authenticated-successful run emits a 1, so the stream is dense and a tripped
+    breaker keeps landing 0s). The description contract survives the re-cut: it
+    must state the actual clear window (~1h) and still point triage at the
+    AUTH_FAILURE markers rather than alarm state alone — a rebuilt stack that
+    drops the kwarg must fail here, not silently ship a null description."""
     node = _find_alarm_call("ingest-auth-unhealthy-24h")
     assert node is not None, "ingest-auth-unhealthy-24h not found in monitoring_stack.py"
     desc_kw = next((kw.value for kw in node.keywords if kw.arg == "alarm_description"), None)
-    assert desc_kw is not None, "ingest-auth-unhealthy-24h lost its alarm_description= (#2004 clear-lag note)"
+    assert desc_kw is not None, "ingest-auth-unhealthy-24h lost its alarm_description= (#2004/#2976 clear-window note)"
     desc = ast.literal_eval(desc_kw) if isinstance(desc_kw, (ast.Constant, ast.JoinedStr)) else None
     assert isinstance(desc, str) and desc.strip(), "alarm_description must resolve to a non-empty string literal"
-    assert "24h" in desc, f"alarm_description must state the 24h clear-lag window, got: {desc!r}"
+    assert "1h" in desc, f"alarm_description must state the ~1h clear window (#2976), got: {desc!r}"
     assert "AUTH_FAILURE" in desc, f"alarm_description must point triage at AUTH_FAILURE markers, not alarm state: {desc!r}"
+
+
+# ── #2976: alarm windows match the emitter's cadence ────────────────────────
+# The three-alarm latch incident (2026-08-21→22): dropbox recovered at 13:33Z and
+# its alarms stayed ALARM for ~24h because the window was 86400s and the healthy
+# path emitted nothing. The contract now: an alarm's period is the shortest
+# window its source's reporting cadence can keep populated — 3600s for streams
+# with ≥hourly datapoints (the dimensionless aggregate + dropbox), 86400s for
+# sources that report on daily/morning crons (shortening those would let NB
+# missing-data clear a still-dead credential overnight — the qa-smoke-alarm-window
+# class, which is exactly why this is pinned rather than left to taste).
+
+
+def _alarm_period(call, bindings=None):
+    """The period of an _alarm(...) call (positional arg 4) or of an inline
+    cloudwatch.Alarm(metric=Metric(period=Duration.seconds(N))). Resolves a
+    constant, or — with `bindings` — a `A if <loopvar> == "x" else B` conditional
+    (the shape the per-source loop uses so one loop can carry per-source
+    windows without changing its conformance-ledger enumeration key)."""
+
+    def _resolve(node):
+        if isinstance(node, ast.Constant):
+            return node.value
+        if bindings and isinstance(node, ast.IfExp):
+            test = node.test
+            if (
+                isinstance(test, ast.Compare)
+                and isinstance(test.left, ast.Name)
+                and test.left.id in bindings
+                and len(test.ops) == 1
+                and isinstance(test.ops[0], ast.Eq)
+                and len(test.comparators) == 1
+                and isinstance(test.comparators[0], ast.Constant)
+            ):
+                branch = node.body if bindings[test.left.id] == test.comparators[0].value else node.orelse
+                return _resolve(branch)
+        return None
+
+    if call.args and len(call.args) >= 5:
+        return _resolve(call.args[4])
+    metric = next((kw.value for kw in call.keywords if kw.arg == "metric"), None)
+    if isinstance(metric, ast.Call):
+        period = next((kw.value for kw in metric.keywords if kw.arg == "period"), None)
+        if isinstance(period, ast.Call) and period.args:
+            return _resolve(period.args[0])
+    return None
+
+
+def _per_source_loop_periods(path=_MONITORING):
+    """{source: period} for every f-string ingest-auth-unhealthy-{src} loop alarm."""
+    tree = ast.parse(open(path, encoding="utf-8").read(), filename=path)
+    periods = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.For) or not isinstance(node.target, ast.Name):
+            continue
+        if not isinstance(node.iter, (ast.Tuple, ast.List)):
+            continue
+        values = [e.value for e in node.iter.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+        for call in [n for n in ast.walk(node) if isinstance(n, ast.Call)]:
+            for arg in list(call.args) + [kw.value for kw in call.keywords]:
+                if not isinstance(arg, ast.JoinedStr):
+                    continue
+                for bound in values:
+                    name = _render_fstring(arg, {node.target.id: bound})
+                    if name == "ingest-auth-unhealthy-" + bound:
+                        periods[bound] = _alarm_period(call, {node.target.id: bound})
+    return periods
+
+
+def test_dropbox_alarm_window_matches_its_30_minute_cadence():
+    """#2976: dropbox emits IngestAuthHealthy every ≤30 min around the clock
+    (rate(30 minutes) poll; 0 on every breaker-suppressed run, 1 after
+    list_folder succeeds), so a 1h window both holds ALARM while broken and
+    clears within ~1h of recovery — instead of latching a recovered source red
+    for a day."""
+    periods = _per_source_loop_periods()
+    assert periods.get("dropbox") == 3600, f"ingest-auth-unhealthy-dropbox window must be 3600s (#2976), got {periods.get('dropbox')}"
+
+
+def test_daily_cadence_sources_keep_the_24h_window():
+    """The counter-assertion that makes the re-cut principled rather than a blanket
+    shorten: sources reporting on daily/morning crons emit nothing overnight, so a
+    1h window + treat_missing=NOT_BREACHING would clear a still-dead credential
+    every evening. Their window stays matched to their cadence."""
+    periods = _per_source_loop_periods()
+    for src in ("todoist", "habitify", "whoop", "garmin", "notion"):
+        assert periods.get(src) == 86400, f"ingest-auth-unhealthy-{src} must keep the 86400s cadence-matched window, got {periods.get(src)}"
+
+
+def test_aggregate_alarm_window_is_one_hour():
+    """#2976: with every authenticated-successful run emitting a 1 (and dropbox
+    guaranteeing ≥hourly datapoints), Min<1 over 1h reads 'some source emitted
+    unhealthy within the hour' — fires as fast as the old 24h window, clears ~1h
+    after recovery instead of 24h."""
+    node = _find_alarm_call("ingest-auth-unhealthy-24h")
+    assert node is not None
+    assert _alarm_period(node) == 3600, "ingest-auth-unhealthy-24h must read a 3600s window (#2976)"
+
+
+def test_liveness_alarm_window_matches_the_daily_scan():
+    """The third latched alarm from the incident: ingest-liveness-unhealthy's
+    producer scans once daily (17:10 UTC), so 86400s IS its cadence-matched
+    window — verified live 2026-08-22: datapoints landed every day including the
+    all-pass 0s, and the alarm cleared the morning after recovery. Pinned so a
+    well-meaning 'shorten everything' sweep can't let NB clear it between scans."""
+    node = _find_alarm_call("ingest-liveness-unhealthy")
+    if node is None:
+        # Built via the _alarm helper with a positional literal name — find that call.
+        tree = ast.parse(open(_MONITORING, encoding="utf-8").read(), filename=_MONITORING)
+        for cand in ast.walk(tree):
+            if isinstance(cand, ast.Call) and any(
+                isinstance(a, ast.Constant) and a.value == "ingest-liveness-unhealthy" for a in cand.args
+            ):
+                node = cand
+                break
+    assert node is not None, "ingest-liveness-unhealthy not found in monitoring_stack.py"
+    assert _alarm_period(node) == 86400, "ingest-liveness-unhealthy must keep the 86400s daily-scan window"
 
 
 # ── The page payload actually names the source (#1960) ──────────────────────

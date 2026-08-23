@@ -893,10 +893,16 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
             time.sleep(config.gap_rate_limit_seconds)
 
     # ── Clear circuit breaker on a clean run (ADR-052) ──
-    # If we wrote at least one record successfully and had no errors at all,
-    # the credential is healthy — drop any lingering marker so the next run
-    # behaves normally even before the 24h TTL expires.
-    if errors == 0 and records_written > 0:
+    # By this point authenticate_fn succeeded and every per-date fetch completed
+    # without error, so the credential is proven healthy — drop any lingering
+    # marker and emit IngestAuthHealthy=1 (clear_failure does both). #2976: this
+    # used to be gated on `records_written > 0`, which meant a clean run that
+    # found NO new data — the overwhelmingly common case — never emitted a 1, so
+    # the Source-dimensioned IngestAuthHealthy stream starved (dropbox's had
+    # literally never carried a 1) and a recovered source's alarm could only
+    # clear by its 24h window sliding past the last 0. Zero new records is not
+    # zero proof: the authenticated fetch is the proof.
+    if errors == 0:
         _clear_auth_failure(table, config.source_name, config.user_id, logger)
 
     # ── ER-01 infra-liveness sentinel ──

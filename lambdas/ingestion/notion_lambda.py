@@ -816,6 +816,13 @@ def lambda_handler(event, context):
         pages = query_database(api_key, database_id, start_date, end_date, full_sync=full_sync)
         logger.info(f"Retrieved {len(pages)} pages from Notion")
 
+        # #2976: an authenticated query succeeding IS the proof the credential is
+        # healthy — clear the breaker (emits IngestAuthHealthy=1) here, so the
+        # no-new-entries early return below (the common case) also feeds the
+        # per-source alarm's recovery path instead of starving it.
+        if _HAS_AUTH_BREAKER:
+            clear_failure(table, source_name="notion", user_id=USER_ID, logger=logger)
+
         if not pages:
             _record_health(succeeded=True)  # ran + fetched cleanly; no new entries is benign
             return {
@@ -852,10 +859,7 @@ def lambda_handler(event, context):
         }
         logger.info(f"Complete: {summary}")
 
-        # V2 P2.4: clear any prior breaker marker on success
-        if _HAS_AUTH_BREAKER:
-            clear_failure(table, source_name="notion", user_id=USER_ID, logger=logger)
-
+        # (#2976: the breaker clear moved up to just after query_database succeeds.)
         _record_health(succeeded=True)
         return {
             "statusCode": 200,

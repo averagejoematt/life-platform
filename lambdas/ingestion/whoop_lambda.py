@@ -1036,6 +1036,13 @@ def _reconcile(event: dict, context) -> dict:
         # authenticate() already wrote.
         secret = authenticate(secret_data)
 
+        # #2976 considered clearing the breaker here (a successful authenticate()
+        # is credential proof) and deliberately does NOT: the reconciler is
+        # read-only on success by contract (test_reconcile_is_read_only), and the
+        # main daily run now emits IngestAuthHealthy=1 on EVERY clean framework
+        # run (errors == 0, even with zero new records), which is what feeds the
+        # Source=whoop alarm's recovery path.
+
         token = secret["access_token"]
         today = datetime.now(timezone.utc).date()
         start = today - timedelta(days=RECONCILE_WINDOW_DAYS)

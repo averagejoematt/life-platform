@@ -671,24 +671,29 @@ script's module docstring.
 ### Whoop/Withings/Strava: "Token expired" error
 These functions auto-refresh tokens and write back to Secrets Manager. If they fail with auth errors, the refresh token itself may have expired (rare but possible if the function didn't run for weeks). Resolution: re-authenticate via the source app and manually update the secret.
 
-### ingest-auth-unhealthy-24h: red on a verified-healthy fleet (#2004)
+### ingest-auth-unhealthy-24h: red on a verified-healthy fleet (#2004, re-cut by #2976)
 
 **Symptom:** the `ingest-auth-unhealthy-24h` alarm (SNS urgent topic) is in ALARM,
 but every source looks fine — recent ingestion Lambda logs are clean and no
 credential actually needs rotating.
 
-**This is expected, by design, for up to 24h after the last unhealthy emission.**
-The alarm reads `LifePlatform/OAuth IngestAuthHealthy` (dimensionless, fleet-wide)
-with `Minimum` over a fixed `period=86400s` / `evaluation_periods=1` window
-(`cdk/stacks/monitoring_stack.py`, alarm id `IngestAuthUnhealthy`) — a single 0
-anywhere in the trailing 24h keeps the Minimum at 0 and the alarm red for the
-*entire* 24h window that datapoint is in, even if every subsequent run emitted a
-healthy 1. **Do not shorten this window** — it is the same load-bearing
-24h/Maximum-or-Minimum detection-window class as `qa-smoke-warnings` (see
-`reference_qa_smoke_alarm_window_load_bearing` memory); a shorter window would
-either miss a slow-building auth death or reintroduce false fires from a single
-transient blip. The alarm's `AlarmDescription` states this directly for anyone
-triaging it from the CloudWatch console.
+**Since #2976 this should self-resolve within ~1h of real recovery.** The alarm
+reads `LifePlatform/OAuth IngestAuthHealthy` (dimensionless, fleet-wide) with
+`Minimum` over a `period=3600s` / `evaluation_periods=1` window
+(`cdk/stacks/monitoring_stack.py`, alarm id `IngestAuthUnhealthy`; the name's
+`-24h` suffix is historical). The old fixed 86400s window latched a fully
+recovered fleet red for up to 24h after the last unhealthy emission — the
+2026-08-21→22 dropbox incident held two alarms red for a day after a transient
+403. The shorten is safe *only because* #2976 also made every
+authenticated-successful run emit a 1 (framework `errors == 0`, dropbox after
+`list_folder`, notion after `query_database`): the stream now carries datapoints
+at least every 30 min around the clock, a tripped breaker keeps landing 0s on
+every scheduled run, and Min<1 over 1h reads "some source emitted unhealthy
+within the hour". Note the cadence caveat: a DAILY-cron source's breakage pins
+this aggregate red only around its cron hours — its per-source
+`ingest-auth-unhealthy-{source}` alarm (window matched to its own cadence,
+86400s for daily sources) is the durable per-source truth. A red older than ~1h
+therefore means some source is emitting 0s *right now*.
 
 **Triage — confirm real state, don't trust alarm state:**
 
@@ -717,15 +722,13 @@ triaging it from the CloudWatch console.
    per-source `ingest-auth-unhealthy-{source}` alarms (#1960) name the culprit
    directly, so check those first if this aggregate alarm is the only one red.
 4. If both checks are clean, no action is needed — the alarm self-clears once the
-   unhealthy datapoint ages out of the trailing 24h window. Do not silence or
-   re-threshold it to force an earlier clear.
+   unhealthy datapoint ages out of the trailing 1h window (#2976). A clean fleet
+   with the alarm still red after ~2h is a real defect — investigate the metric
+   stream, don't silence the alarm.
 
-**Optional operator call (not implemented here):** the 24h coverage could be
-reshaped into 4×6h `Minimum` evaluation periods (same total 24h detection
-coverage, but each 6h period ages out independently, so a recovered fleet clears
-in ~6h instead of up to 24h). That is a real behavior change to a load-bearing
-alarm, so it is left as an explicit choice for the operator rather than applied
-here.
+(The pre-#2976 "reshape into 4×6h evaluation periods" operator option is
+obsolete — the #2976 re-cut delivered a strictly better clear latency by fixing
+the emitters instead of the window arithmetic.)
 
 ### Garmin: 429 Too Many Requests / OAuth1 expired (auth_breaker tripped)
 
