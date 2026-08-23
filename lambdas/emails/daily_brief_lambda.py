@@ -1401,6 +1401,13 @@ def _run_ai_coach_pipeline(
         "training_nutrition": {},
         "journal_coach_text": "",
         "journal_coach_is_stub": False,
+        # #2944: True when there was no journal input to coach on — a declared
+        # absence (ADR-104), not an AI failure. Distinct from an empty
+        # journal_coach_text with entries present, which IS a failure.
+        "journal_coach_absent": False,
+        # #2944: True when the whole AI pipeline was skipped by the tier gate —
+        # a designed pause, so the validator must not fabricate fallbacks.
+        "ai_paused": False,
         "tldr_guidance": {},
         "sleep_coach_v2_text": "",
         "nutrition_coach_v2_text": "",
@@ -1412,6 +1419,7 @@ def _run_ai_coach_pipeline(
         "explorer_coach_v2_text": "",
     }
     if not _daily_brief_ai_allowed():
+        result["ai_paused"] = True
         return result
 
     # Coach Intelligence Pipeline — Full 8-coach system (Phase 5)
@@ -1555,6 +1563,13 @@ def _run_ai_coach_pipeline(
             result["journal_coach_text"] = journal_coach_text
         except Exception as e:
             logger.warning("Journal coach failed: " + str(e))
+    else:
+        # #2944 / ADR-104: no journal entries for the brief's day — nothing to
+        # coach on. Declared absent, NOT routed through the validator's
+        # empty-output BLOCK path (which logged an ERROR and shipped a generic
+        # fallback line as if coaching had happened — dark 08-20→08-22).
+        result["journal_coach_absent"] = True
+        logger.info("Journal coach: no journal entries — declared absent (ADR-104), generation skipped")
 
     try:
         result["tldr_guidance"] = ai_calls.call_tldr_and_guidance(
@@ -2049,6 +2064,8 @@ def lambda_handler(event, context):
     training_nutrition = _ai["training_nutrition"]
     journal_coach_text = _ai["journal_coach_text"]
     _journal_coach_is_stub = bool(_ai.get("journal_coach_is_stub"))
+    _journal_coach_absent = bool(_ai.get("journal_coach_absent"))  # #2944: declared absence, not failure
+    _ai_paused = bool(_ai.get("ai_paused"))  # #2944: tier-gate pause, not failure
     tldr_guidance = _ai["tldr_guidance"]
     sleep_coach_v2_text = _ai["sleep_coach_v2_text"]
     nutrition_coach_v2_text = _ai["nutrition_coach_v2_text"]
@@ -2078,7 +2095,13 @@ def lambda_handler(event, context):
         logger.warning(f"guidance_given write failed (non-fatal): {_gg_e}")
 
     # AI-3: Validate all AI outputs before delivery
-    if _HAS_AI_VALIDATOR:
+    # #2944: when the tier gate paused the whole pipeline there is nothing to
+    # validate — running the validator over the all-empty defaults fabricated a
+    # BLOCK + fallback line for every coach section of a deliberately AI-free
+    # brief. A designed pause is declared, not narrated as failure (ADR-104).
+    if _HAS_AI_VALIDATOR and _ai_paused:
+        logger.info("[AI-3] AI pipeline paused by budget tier — outputs declared absent, validation skipped (#2944)")
+    elif _HAS_AI_VALIDATOR:
         try:
             _primary_whoop = data.get("primary_whoop") or data.get("whoop") or {}
             _health_ctx = {
@@ -2093,6 +2116,9 @@ def lambda_handler(event, context):
                 journal_coach_text=journal_coach_text,
                 tldr_guidance=tldr_guidance,
                 health_context=_health_ctx,
+                # #2944: no journal input = declared absence; skip the JOURNAL_COACH
+                # empty-output BLOCK path (fallback text implying coaching happened).
+                journal_coach_absent_reason=("no journal entries for " + yesterday) if _journal_coach_absent else None,
             )
             bod_insight = _validated["bod_insight"]
             training_nutrition = _validated["training_nutrition"]
@@ -2227,6 +2253,7 @@ def lambda_handler(event, context):
             vacation_fund=_vacation_fund,
             budget_headroom_line=_budget_headroom_line,
             intake_line=_intake_line,
+            journal_coach_absent=_journal_coach_absent,  # #2944: explicit declared-absent label
         )
     except Exception as e:
         logger.error("build_html crashed, sending minimal brief: " + str(e))

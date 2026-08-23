@@ -751,6 +751,255 @@ def recover(state: dict) -> int:
     return 0
 
 
+# ── Superseded-lease janitor (#3021) ─────────────────────────────────────────
+#
+# Every main CI run that reaches Plan parks `waiting` at the `production` gate. A run
+# parked there is a deploy-group LEASE (CONVENTIONS §4d): approve or REJECT, never
+# leave-waiting (#2467). When a newer main run supersedes an older waiting one — the
+# newer head sha is a strict descendant of the older's — the older lease is pure dead
+# weight: approving it would deploy stale code, leaving it waiting holds the slot.
+# Disposal was manual EVERY documented time (≥5: #2901, #2937, the 2026-08-20 2.6h
+# strand, the 2026-08-22 pair, the #2467 zombies). This is the disposal.
+#
+# The decision is a PURE predicate (find_superseded_leases, fixture-tested offline):
+#   - only `main`-branch runs are considered, on both sides of the relation;
+#   - the NEWEST waiting lease is never touched — structurally excluded, even when a
+#     newer completed run has already deployed past it (a human decides that one);
+#   - an older waiting lease is superseded iff a strictly newer main run — another
+#     waiting lease, or a completed run whose Deploy job concluded success — has a head
+#     sha that is a STRICT descendant of the older's (same-sha re-dispatches are NOT
+#     superseded: distinct-commit descent is the proof the newer run carries the
+#     older's changes);
+#   - ancestry is answered by the compare API (`status: "ahead"` ⇒ strict descendant);
+#     an unreadable comparison is UNKNOWN, and unknown never rejects.
+#
+# A completed superseder must have a Deploy job that concluded `success` — run-level
+# `conclusion: success` is NOT enough: a tests-only push completes green with Deploy
+# skipped, and the older lease's deploy content would still be undeployed.
+#
+# The rejection goes through the same endpoint deploy/reject_deployment.sh uses
+# (POST …/actions/runs/<id>/pending_deployments, state=rejected), so a janitor-rejected
+# run lands as exactly the #2590 shape: `conclusion: failure`, Deploy the sole red job,
+# rejection recorded in the run's `approvals` — which is where check_main_green.py
+# reads it from to report "rejected-and-superseded", never a red main. The rejection
+# comment carries the superseding run id + both shas: that comment persists in the
+# run's approvals record, which IS the audit trail.
+#
+# Writes are behind --apply; the default is a dry-run that prints what it would reject.
+
+JANITOR_BRANCH = "main"
+# Completed-superseder candidates whose Deploy jobs we are willing to fetch per sweep.
+# Real counts between two waiting leases are single digits; this is a hard stop, not a
+# recency window (the waiting leases themselves come from collect()'s exhaustive scan).
+_JANITOR_MAX_DEPLOYED_PROBES = 15
+
+
+def gate_waiting_leases(runs: list[dict], jobs_by_run: dict, pending_by_run: dict) -> list[dict]:
+    """The leases the janitor may consider: main-branch, in-flight, Deploy parked
+    `waiting` at the gate, with a non-empty pending_deployments (something to reject).
+    Pure — fixture-tested offline."""
+    out = []
+    for run in runs:
+        if run.get("head_branch") != JANITOR_BRANCH:
+            continue
+        if run.get("status") == "completed":
+            continue
+        rid = str(run.get("id"))
+        job = deploy_job(jobs_by_run.get(rid, []))
+        if job is None or job.get("status") != "waiting":
+            continue
+        if not pending_by_run.get(rid):
+            continue
+        out.append(run)
+    return out
+
+
+def _created(run: dict) -> str:
+    return str(run.get("created_at") or "")
+
+
+def find_superseded_leases(waiting: list[dict], deployed: list[dict], is_descendant) -> list[dict]:
+    """The whole disposal decision. Pure, offline-tested (#3021).
+
+    `waiting`: gate-parked leases (gate_waiting_leases' output, or a fixture).
+    `deployed`: completed runs whose Deploy concluded success (potential superseders).
+    `is_descendant(older_sha, newer_sha)` -> True | False | None (None = unknown, and
+    unknown NEVER rejects).
+
+    Returns [{"run": <older waiting run>, "superseded_by": <superseding run>}, ...].
+    The newest waiting lease is structurally excluded from rejection. Non-main entries
+    are ignored on both sides even if a caller passes them in.
+    """
+    waiting_main = sorted(
+        (r for r in waiting if r.get("head_branch") == JANITOR_BRANCH),
+        key=_created,
+        reverse=True,
+    )
+    if len(waiting_main) < 2:
+        return []
+    candidates_all = waiting_main + [r for r in deployed if r.get("head_branch") == JANITOR_BRANCH]
+    out = []
+    for older in waiting_main[1:]:  # [0] is the newest waiting lease — never touched
+        older_sha = older.get("head_sha") or ""
+        if not older_sha:
+            continue
+        candidates = sorted(
+            (
+                c
+                for c in candidates_all
+                if c.get("id") != older.get("id")
+                and _created(c) > _created(older)
+                and (c.get("head_sha") or "")
+                and c.get("head_sha") != older_sha
+            ),
+            key=_created,
+            reverse=True,
+        )
+        for cand in candidates:
+            if is_descendant(older_sha, cand["head_sha"]) is True:
+                out.append({"run": older, "superseded_by": cand})
+                break
+    return out
+
+
+def build_rejection_comment(older: dict, superseder: dict) -> str:
+    """The rejection comment — persisted in the run's approvals record, which is the
+    audit trail (#3021 acceptance: superseded id + sha AND superseding id, retrievable
+    after the fact). Pure."""
+    return (
+        f"Auto-rejected by the deploy-gate lease janitor (#3021): run {older.get('id')} "
+        f"(sha {(older.get('head_sha') or '')[:12]}) is superseded by run {superseder.get('id')} "
+        f"(sha {(superseder.get('head_sha') or '')[:12]}, a strict descendant on main). "
+        "Approving would deploy a stale sha; leaving it waiting holds the deploy-group slot (#2467). "
+        "This run now renders as the rejected shape check_main_green.py disregards (#2590)."
+    )
+
+
+def _compare_is_descendant(older_sha: str, newer_sha: str) -> bool | None:
+    """`newer_sha` is a STRICT descendant of `older_sha`, via the compare API.
+    None = could not determine (API failure) — the caller must treat that as
+    'never reject', not as either verdict."""
+    try:
+        res = _gh_api(f"repos/{REPO}/compare/{older_sha}...{newer_sha}")
+    except Exception:  # noqa: BLE001 - unknown ancestry must never reject
+        return None
+    status = res.get("status")
+    if status == "ahead":
+        return True
+    if status in ("behind", "diverged", "identical"):
+        return False
+    return None
+
+
+def _deployed_superseders(min_created: str) -> list[dict]:
+    """Completed main runs newer than `min_created` whose Deploy job concluded
+    success — the 'has actually deployed' superseder class."""
+    runs = _gh_api(f"repos/{REPO}/actions/workflows/{WORKFLOW}/runs?branch={JANITOR_BRANCH}&status=completed&per_page=50").get(
+        "workflow_runs", []
+    )
+    fresh = [r for r in runs if r.get("conclusion") == "success" and _created(r) > min_created]
+    deployed = []
+    for run in fresh[:_JANITOR_MAX_DEPLOYED_PROBES]:
+        jobs = _gh_api(f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=100").get("jobs", [])
+        job = deploy_job(jobs)
+        if job is not None and job.get("conclusion") == "success":
+            deployed.append(run)
+    return deployed
+
+
+def reject_lease(run_id, comment: str) -> None:
+    """POST the rejection — the same call deploy/reject_deployment.sh makes. Re-reads
+    pending_deployments immediately before writing so a lease that moved under us
+    (approved/rejected between classify and apply) raises instead of mis-posting."""
+    pending = _gh_api(f"repos/{REPO}/actions/runs/{run_id}/pending_deployments")
+    env_ids = [p.get("environment", {}).get("id") for p in pending if p.get("environment", {}).get("id") is not None]
+    if not env_ids:
+        raise RuntimeError(f"run {run_id} has no pending deployments any more — state moved between classify and apply; not rejecting")
+    body = json.dumps({"environment_ids": env_ids, "state": "rejected", "comment": comment})
+    subprocess.run(
+        ["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/pending_deployments", "--method", "POST", "--input", "-"],
+        input=body,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    )
+
+
+def janitor(apply: bool) -> int:
+    """The #3021 sweep. Exit 0 = swept clean (or nothing to do); exit 1 = the janitor
+    itself could not do its job (API read failure, or an --apply rejection failed) —
+    loud by design, so a dead janitor reds the scheduled run instead of silently
+    reverting the class to manual."""
+    mode = "APPLY" if apply else "DRY-RUN"
+    try:
+        runs, jobs_by_run, pending_by_run = collect()
+    except Exception as e:  # noqa: BLE001 - any API failure is "decode manually"
+        print(f"janitor[{mode}]: could not read the Actions API ({e}) — decode manually.")
+        return 1
+
+    waiting = gate_waiting_leases(runs, jobs_by_run, pending_by_run)
+    if len(waiting) < 2:
+        print(f"janitor[{mode}]: {len(waiting)} waiting production-gate lease(s) on {JANITOR_BRANCH} — nothing supersedable. Done.")
+        return 0
+
+    oldest = min(_created(r) for r in waiting)
+    try:
+        deployed = _deployed_superseders(min_created=oldest)
+    except Exception as e:  # noqa: BLE001 - the waiting-vs-waiting relation still works without this class
+        deployed = []
+        print(f"janitor[{mode}]: WARNING — could not enumerate completed superseders ({e}); waiting-vs-waiting supersession still applies.")
+
+    cache: dict = {}
+
+    def is_descendant(older_sha: str, newer_sha: str) -> bool | None:
+        key = (older_sha, newer_sha)
+        if key not in cache:
+            cache[key] = _compare_is_descendant(older_sha, newer_sha)
+            if cache[key] is None:
+                print(
+                    f"janitor[{mode}]: WARNING — ancestry {older_sha[:8]}..{newer_sha[:8]} UNKNOWN (compare API unreadable); not rejecting on it."
+                )
+        return cache[key]
+
+    pairs = find_superseded_leases(waiting, deployed, is_descendant)
+    print(
+        f"janitor[{mode}]: {len(waiting)} waiting lease(s), {len(deployed)} completed-deploy superseder candidate(s), "
+        f"{len(pairs)} PROVABLY superseded."
+    )
+    newest = max(waiting, key=_created)
+    print(f"janitor[{mode}]: newest waiting lease is run {newest.get('id')} (sha {(newest.get('head_sha') or '')[:8]}) — never touched.")
+    if not pairs:
+        return 0
+
+    failures = 0
+    for pair in pairs:
+        older, cand = pair["run"], pair["superseded_by"]
+        line = (
+            f"run {older.get('id')} (sha {(older.get('head_sha') or '')[:8]}, created {_created(older)}) "
+            f"superseded by run {cand.get('id')} (sha {(cand.get('head_sha') or '')[:8]}, created {_created(cand)})"
+        )
+        if not apply:
+            print(f"janitor[DRY-RUN]: would REJECT {line}")
+            continue
+        try:
+            reject_lease(older.get("id"), build_rejection_comment(older, cand))
+            print(f"janitor[APPLY]: REJECTED {line}")
+        except Exception as e:  # noqa: BLE001 - a failed rejection must red the sweep, not vanish
+            failures += 1
+            print(
+                f"janitor[APPLY]: FAILED to reject {line}: {e}\n"
+                "  If this is a 4xx from GitHub, the token is not a required reviewer of the `production` "
+                "environment — the workflow's GITHUB_TOKEN (github-actions[bot]) cannot review pending "
+                "deployments. Fix: the owner adds a repo secret DEPLOY_GATE_JANITOR_TOKEN (a fine-grained "
+                "PAT of the required reviewer with Actions read/write on this repo); the workflow already "
+                "prefers it over github.token."
+            )
+    if not apply:
+        print("janitor[DRY-RUN]: no writes performed (pass --apply to reject).")
+    return 1 if failures else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Detect a wedged CI/CD deploy (#2052).")
     ap.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD_MIN, help="minutes blocked before alarming")
@@ -761,7 +1010,20 @@ def main() -> int:
         action="store_true",
         help="(#2149) on a CONFIRMED wedge, fire the throttled repository_dispatch urgent_alarm; no-op otherwise",
     )
+    ap.add_argument(
+        "--janitor",
+        action="store_true",
+        help="(#3021) sweep superseded `waiting` production-gate leases instead of classifying; dry-run unless --apply",
+    )
+    ap.add_argument(
+        "--apply",
+        action="store_true",
+        help="with --janitor: actually POST the rejections (default prints what it would reject)",
+    )
     args = ap.parse_args()
+
+    if args.janitor:
+        return janitor(apply=args.apply)
 
     try:
         runs, jobs_by_run, pending_by_run = collect()
