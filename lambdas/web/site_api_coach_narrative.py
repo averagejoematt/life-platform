@@ -25,6 +25,7 @@ This module does NOT import the facade; no import cycle.
 """
 
 from boto3.dynamodb.conditions import Key
+from coach import audience_guard  # #2972 — the public-audience frame (public_read)
 from coach.persona_registry import (  # coaching-team v2: names come from the registry
     display_map as _registry_display_map,
     short_id_names as _registry_short_names,
@@ -410,6 +411,14 @@ def handle_coach_analysis(event, *, _g):
             "coach_color": display.get("color", ""),
             "domain": domain,
             "analysis": analysis_text,
+            # #2972: the PUBLIC-audience read — the only field the reader-facing board
+            # detail (/method/board/, evidence.js renderBoard) renders. Guarded on the
+            # FULL stored text (never a truncated slice); absent (stripped below) until
+            # the coach's next run writes a reader-safe `public_summary`, and the board
+            # shows its designed honest-empty state meanwhile. `analysis` stays the
+            # coaching-register read pending the #2959 audience-rubric adjudication for
+            # the /coaching/* exhibit pages.
+            "public_read": audience_guard.public_read(output),
             "key_recommendation": output.get("key_recommendation") or (output.get("themes", [""])[0] if output.get("themes") else None),
             "elena_quote": output.get("elena_quote"),
             "journaling_prompt": output.get("journaling_prompt"),

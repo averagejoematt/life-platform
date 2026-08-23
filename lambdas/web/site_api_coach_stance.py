@@ -24,6 +24,7 @@ import re
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
+from coach import audience_guard  # #2972 — no owner-directed text on the public seams
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 from web.site_api_coach_ledger import _CALIB_COACH_NAMES  # the huddle shows the same calibration the scoreboard does (#538)
@@ -73,7 +74,17 @@ def _integrator_digest(*, _g):
         item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}).get("Item")
         if not singleton_visible(item):
             return None
-        return _decimal_to_float(item)
+        item = _decimal_to_float(item)
+        # #2972: every consumer of this record is a PUBLIC endpoint (/api/coaching-dashboard,
+        # /api/weekly_priority, /api/coach_analysis, /api/coach_team), and the integrator's
+        # producer writes in the coaching register — TO Matthew. Until that producer emits a
+        # public-audience variant, an owner-directed weekly text is withheld (analysis -> None,
+        # checked on the FULL text) and every consumer renders its designed honest-empty state
+        # instead of a leaked private channel. Guarded at this one chokepoint, not per caller.
+        if audience_guard.is_owner_directed(item.get("analysis") or ""):
+            item = dict(item)
+            item["analysis"] = None
+        return item
     except Exception:
         return None
 

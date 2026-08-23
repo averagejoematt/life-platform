@@ -2,8 +2,9 @@
 
 WHAT THIS OWNS
 --------------
-`coach_state_updater` asks Haiku to condense a coach's generated narrative into three
-short fields, and those fields — not the narrative — are what most readers actually
+`coach_state_updater` asks Haiku to condense a coach's generated narrative into four
+short fields (#2972 added `public_summary`, the one field with a PUBLIC audience
+frame), and those fields — not the narrative — are what most readers actually
 see:
 
   * `observatory_summary` — the coach-analysis text `/api/coach_analysis` prefers over
@@ -42,7 +43,12 @@ from coach.reading_date_fidelity import SUMMARY_DAY_CORRESPONDENCE_RULE
 
 # The set, named once. Order is the WRITE order (how the extraction prompt lists them),
 # not the read preference — `served_summary` below owns that separately.
-DERIVED_PROSE_FIELDS = ("observatory_summary", "key_recommendation", "elena_quote")
+# #2972 added `public_summary` — the ONE public-audience-frame field (third person for
+# the subject, `coach/audience_guard.py` enforces it at write and at every public read
+# seam). It joins THIS set so the ADR-104 grounding gate, the HOLD and the recondense
+# cover it like the other three; it deliberately does NOT join
+# SERVED_SUMMARY_PREFERENCE below, whose consumers are owner/coach-register surfaces.
+DERIVED_PROSE_FIELDS = ("observatory_summary", "key_recommendation", "elena_quote", "public_summary")
 
 # The read preference every serving path already used, made explicit so the six sites
 # cannot drift apart. `content` is the coach's full narrative — the artifact that
@@ -50,7 +56,7 @@ DERIVED_PROSE_FIELDS = ("observatory_summary", "key_recommendation", "elena_quot
 SERVED_SUMMARY_PREFERENCE = ("key_recommendation", "observatory_summary")
 
 RECONDENSE_SYSTEM_PROMPT = (
-    "You rewrite the three short reader-facing condensations of an AI coach's output. "
+    "You rewrite the four short reader-facing condensations of an AI coach's output. "
     "The coach's full narrative is the ONLY source of truth: every number, every date "
     "and every claim you write must already be present in it. You may shorten, "
     "paraphrase and round; you may not introduce.\n\n"
@@ -62,7 +68,11 @@ RECONDENSE_SYSTEM_PROMPT = (
     "standalone 1-2 sentence string.\n"
     '  - "elena_quote": one sentence in Elena Voss\'s literary-journalist voice about '
     "what the coach is NOT seeing, third person — or null if the narrative implies no "
-    "such meta-observation.\n\n" + SUMMARY_DAY_CORRESPONDENCE_RULE + "\n"
+    "such meta-observation.\n"
+    '  - "public_summary": the coach\'s read rewritten for visitors to the public '
+    "website (2 short paragraphs, ~120-180 words): first person for the coach, "
+    "strictly THIRD person for the subject (his first name or 'he'/'his') — never "
+    "'you'/'your', never a name-as-salutation, never an imperative aimed at him.\n\n" + SUMMARY_DAY_CORRESPONDENCE_RULE + "\n"
     "A sleep, recovery, HRV or resting-HR figure that does not say which night it "
     "belongs to cannot be checked by a reader or by the grounding gate — name the "
     "night or drop the figure. Dropping a figure is always allowed; inventing one is "
@@ -98,7 +108,7 @@ def hold(extraction) -> dict:
     """The HOLD: null every derived condensation, keep the rest of the extraction.
 
     A copy — the caller's dict is not mutated. The whole set goes, not just the field
-    whose sentence tripped the gate: the three are produced by ONE model call over one
+    whose sentence tripped the gate: the four are produced by ONE model call over one
     source, `grounding_findings` grades the joined text and reports a finding against a
     sentence rather than a field, and attributing it back by string-matching would be a
     guess. Holding the set is the same choice the ensemble digest makes when its gate
@@ -134,13 +144,13 @@ def recondense_message(coach_id, source_text, extraction, correction) -> str:
             "",
             str(correction or ""),
             "",
-            "Rewrite all three fields. Return ONLY the JSON object.",
+            "Rewrite all four fields. Return ONLY the JSON object.",
         ]
     )
 
 
 def recondense(coach_id, source_text, extraction, correction, call_model) -> dict:
-    """One corrective regeneration of the three fields; the rest of the record is kept.
+    """One corrective regeneration of the four fields; the rest of the record is kept.
 
     `call_model(system=..., user_message=..., max_tokens=..., temperature=...)` is the
     caller's own transport (ADR-062 routes it to Bedrock) — this module picks no model

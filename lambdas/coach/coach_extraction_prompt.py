@@ -12,10 +12,12 @@ system prompt, one message builder.
 `updater._build_extraction_message(...)` keep resolving exactly as before. Nothing
 monkeypatches them, which is what makes a re-export safe here.
 
-The eleven extraction tasks below are the contract between the coach pipeline and the
-COACH# state machine. Items 8-10 (`observatory_summary`, `key_recommendation`,
-`elena_quote`) are the DERIVED READER PROSE — see `coach_derived_prose.py` for what
-guards them and why they are one set.
+The twelve extraction tasks below are the contract between the coach pipeline and the
+COACH# state machine. Items 8-10 and 12 (`observatory_summary`, `key_recommendation`,
+`elena_quote`, `public_summary`) are the DERIVED READER PROSE — see
+`coach_derived_prose.py` for what guards them and why they are one set. Item 12 is the
+one field with a PUBLIC audience frame (#2972): third person for the subject, enforced
+downstream by `coach/audience_guard.py`, never by this prompt alone.
 """
 
 from experiment.measurable_metrics import MEASURABLE_METRICS
@@ -117,6 +119,16 @@ EXTRACTION_SYSTEM_PROMPT = (
     "thing (earlier bedtime -> resting_heart_rate 'down'; protein target -> "
     "total_protein_g 'up'). null if action_check is null.\n"
     "   - timeframe_hint: when the coach should revisit it (e.g. 'this week').\n\n"
+    "12. **public_summary**: The coach's read rewritten for VISITORS to the public "
+    "website — an audience reading ABOUT the subject's experiment, not the subject "
+    "himself (2 short paragraphs, ~120-180 words). Speak AS the coach in first "
+    "person ('I'm watching…'), but refer to the subject strictly in the THIRD "
+    "person — by his first name or 'he'/'his'. NEVER address him: no 'you'/'your', "
+    "no name-as-salutation ('Matthew — …'), no imperatives aimed at him. Say what "
+    "the data showed, what concerns or encourages you, and what you have asked him "
+    "to do — reported ('I've asked him to…'), never commanded. Keep the most "
+    "important data point. This is the ONLY field served to site visitors; the "
+    "others speak to the subject directly.\n\n"
     "## Output Format\n\n"
     "Return ONLY valid JSON with the above fields. No markdown, "
     "no explanation, no preamble."
@@ -156,7 +168,8 @@ def build_extraction_message(coach_id, output_text, output_type, voice_spec):
         "Extract all metadata from the coach output above. "
         "Return ONLY valid JSON with fields: themes, structural_fingerprint, "
         "threads_opened, threads_referenced, predictions_made, commitments_made, "
-        "decision_classes_used, anti_pattern_violations."
+        "decision_classes_used, anti_pattern_violations, observatory_summary, "
+        "key_recommendation, elena_quote, public_summary."
     )
 
     return "\n".join(parts)

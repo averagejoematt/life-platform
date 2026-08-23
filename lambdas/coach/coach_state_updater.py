@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
-from coach import coach_derived_prose, published_vitals  # #2418 derived reader-prose SET; #2575 publication-time vitals stamp
+from coach import audience_guard, coach_derived_prose, published_vitals  # #2972 public frame; #2418 derived-prose SET; #2575 vitals stamp
 from coach.reading_date_fidelity import guard_derived_summary  # #2343
 from coach.relationship_engine import compute_relationship_update  # #536
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
@@ -580,6 +580,8 @@ def _write_output_record(coach_id, date, output_type, output_text, extraction):
         "observatory_summary": observatory_summary,
         "key_recommendation": extraction.get("key_recommendation"),
         "elena_quote": extraction.get("elena_quote"),
+        # #2972: the ONE public-audience field — owner-directed candidates are held (None) at write time.
+        "public_summary": audience_guard.reader_safe(extraction.get("public_summary"), coach_id, logger),
         "word_count": word_count,
         "created_at": now_iso,
     }
