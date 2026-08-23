@@ -1,135 +1,142 @@
-# Handover — 2026-08-23 (daytime, Fable 5, interactive→autonomous): the backlog campaign became the A-Grade Program — an external diligence report, fact-checked and turned into a plan
+# Handover — 2026-08-23 (evening, Fable 5, mixed→autonomous): Phase D0 of the A-Grade Program — every P0 the diligence confirmed is now fixed, deployed, and verified live
 
-**Session:** Fable 5. Drove: `/plan` to "maximize fable use paying down the open-issues
-list … the real north star is a stabilized, mature, production-grade platform a CTO/CPO/CIO
-panel would accept." Executed Session 1 (triage) + Session 2 (drain) of the approved
-backlog campaign, then the owner supplied an **external acquisition-diligence PDF** and the
-campaign was re-planned to **absorb** it as the A-Grade Program. Plan:
-`~/.claude/plans/lively-juggling-candle.md`. Previous handover archived as
-`HANDOVER_2026-08-22_fable-week-session2.md` on `session-archive`.
+**Session:** Fable 5. Drove: "Boot Phase D0 of the A-Grade Program" — the plan's
+"P0 truth: privacy, trust, and the claims that lied" phase
+(`~/.claude/plans/lively-juggling-candle.md`), MIXED mode: three owner decisions
+surfaced first, then autonomous merge+deploy. Owner calls received up front:
+**#3043 → S3 owner-prefix** (`config/coaching/`) · **#3044 → anonymize-at-unsubscribe
++ honest copy** · **#3045 → the FULL currently-served surface consented** (nothing
+stripped). Previous handover archived as
+`HANDOVER_2026-08-23_agrade-program-diligence.md` on `session-archive`.
 
-## What this session was
+## What shipped (all merged AND deployed, postflight sha-verified)
 
-Three arcs, in order:
-1. **Campaign plan + Session 1 triage (interactive).** Built the campaign: get the debt
-   corpus (49) to ≤20 while fixing the *inflow* (measured: 312 filed / 311 closed in 14
-   days — the board churns, it doesn't drain). Triaged 49→43 (folds #2958→#2957,
-   #2962+#2963→#2961, #2891→#2837, #2838→#2986; #1677→Roadmap), landed the filing-discipline
-   rule (**CONVENTIONS §10** + issue-filer agent), committed clean.
-2. **Session 2 drain (autonomous, merge+deploy authority).** Five worktree implementers +
-   driver work. **6 issues closed via 8 merged PRs.**
-3. **The diligence pivot (interactive→plan).** Read the 44-page report (52 findings, 5 P0,
-   4.47/10, "conditional no-go"), fact-checked every claim live with 3 agents, and
-   re-planned the campaign as the A-Grade Program. Filed the tracking epic + register.
+- **#3043 coaching containment (DIL-001/012, P0)** — PR #3052. 5 PRIVATE-marked docs
+  uploaded to `s3://matthew-life-platform/config/coaching/` BEFORE the repo removal
+  merged; **verified live: raw.githubusercontent 404 ×5, S3 objects ×5**. DATA_GOVERNANCE
+  scope note tells the truth (repo PUBLIC since 07-20); the inverted
+  `check_doc_facts.py` visibility gate now asserts LIVE `gh api` visibility (offline =
+  loud SKIP); marker guard over `git ls-files` (mutation-proved); DIL-012 recon pass
+  (break-glass ordering redacted; account id/IAM/secret-names accepted with dated notes);
+  dated historical-exposure risk acceptance in the register. CLOSED, realized.
+- **#3044 subscriber trust (DIL-003/013, P0)** — PR #3054. Signed-HMAC unsubscribe
+  tokens (email HASH, never the address) across all 7 senders; anonymize-at-unsubscribe
+  inline (548d window → 0, weekly sweep = backstop ≤7d); `/privacy/` §05 rewritten to
+  the implemented contract. **Deployed 17:40–42Z**: cdk Email+Web (token-secret grants
+  on 6 roles + all sender code), `delete-user-data` backstop; **live /privacy/ verified**
+  ("anonymized on the spot", hash-as-suppression-record, 7-day hard-delete SLA). No new
+  secret needed (reuses `subscriber-token-secret`). Legacy plaintext links sunset
+  2026-09-22 (dated in code). CLOSED, realized.
+- **#3045 Tier-2 publication ADR (DIL-008/011, gate:owner)** — PR #3055. **ADR-155**
+  records the owner consent; `TIER_OWNER_PUBLISHED` stamp in `field_tiers.py` (above
+  OWNER_ONLY so naive `>=` fails closed); full registry port (42 wired field pairs + 15
+  source-level tiers incl. private_intake/flourishing/felt_probe); DATA_GOVERNANCE now
+  GUARDED against the registry both directions. Discovery: the served surface was WIDER
+  than the report saw (sleep stages, lean mass, full DEXA summary) — all brought inside
+  recorded consent. **MCP Lambda deployed 17:45Z.** CLOSED, realized.
+- **#3046 prediction gradeability (DIL-007, P0)** — PR #3053. Emission contract
+  (`gradeable_by` stamped; qualitative → `observation`, never pending; #715 criterion 3
+  is now a regression test); evaluator retires legacy qualitative rows at window end;
+  due-context scorecard **verified live: pending 83→34 with 49 observational split out,
+  "0 due yet — earliest verdict due 2026-08-31" derived from the corpus**; `GradableShare`
+  + `prediction-gradable-share-low` alarm live (new `monitoring_prediction_alarms.py` —
+  monitoring_stack was at its exact ratchet cap). Agent also found+fixed a real JS bug:
+  created-dates used as due-dates made the scorecard claim windows closed a week early.
+  CLOSED, realized.
+- **D0.5 doc-truth sweep** — PR #3051 (Part of #3042/#2986). All 16 MANAGED_WHERE_LEDGER
+  rows re-verified live + per-row Verified column + monthly `managed-where-reverify`
+  dead-man on the #2832 calendar; client_ip docstrings, CONTRIBUTING, README ($85 →
+  ADR-133 wording, "100% IaC" → declared out-of-IaC ring), evidence_meta.js + /method/build
+  + org-chart essay fixed at their GENERATORS; `check_doc_facts.py` ceiling scan now covers
+  183 site js/html/generator files (planted-defect mutation proof).
+- **D0.7 CodeQL (#3047)** — 7 alerts triaged: js/redos FIXED (d02e64d63), #152 dismissed
+  false-positive (integer counter, name heuristic — NOT a real #1902 recurrence), #153–157
+  dismissed intentional (emoji-block ranges). **Verified 0 open post-re-scan; CLOSED.**
+  Sentinel can-it-fail question filed on #2578.
+- **#2959 oracle debts (both)** — the visual-qa/diagnosis CI role now has
+  `ssm:GetParameter` on the experiment-cycle param (applied live from the checked-in
+  permissions file, `verify_oidc_iam.py` CLEAN); the WEEK-1 finding got a **structural
+  ruling** (`is_position_banner_misread` — the position banner is a clock, not a content
+  label; both wire notes are fixtures; the #2941 banner-actually-wrong residue survives
+  at full severity) instead of a ledger entry (the ledger's own contract forbids
+  hand-growing, and the predicate covers the shape on every page).
+- **The receipts-caption re-deploy went green** after one more rollback round: the ruling
+  killed the WEEK-1 shape, but the tail raised 2 novel highs on `/coaching/lab-notes/` +
+  `/method/wrong/` (cross-phase content genuinely unlabeled — the producer gap is
+  #2957's scope); both baselined via the sanctioned `--update-truth-baseline` sweeps,
+  a doomed queued sweep cancelled pre-gate, and dispatch 32654357546 passed
+  **smoke + visual-qa end-to-end, no rollback**. Two more gated deploys (privacy copy,
+  regenerated scorecard shells) also green — three consecutive green gated site deploys.
+- **Main-red repair mid-train:** the #3051+#3052 merges redded 5 gates (module-size ×3,
+  premerge registration ×2 — caught by the #3044 agent's full-suite run). Fixed by
+  extracting the DG fact gate to `scripts/doc_facts_governance.py` (#1665 ceiling),
+  re-wrapping one comment, registering the marker sweep with premerge (#2372). Also
+  fixed at boot: the wrap's own INCIDENT_LOG Patterns staleness and the #3005 guard
+  tripping on the previous handover's own wording.
 
-## Shipped (merged + deployed unless noted)
+## Deploys (hand-deployed from exact merged shas; leases rejected with decodes)
 
-- **#3005** (PR #3032) — tool-attribution-trailer ban: 4 instruction files fixed + guard test + §9 row.
-- **#2993** (PR #3033) — Plan-job config-drift classifier (`classify_cdk_diff.py`); agent
-  found the issue's hypothesis wrong (real trigger = CDK LogRetention runtime skew).
-- **#3021** (PR #3034) — superseded-lease janitor (owner needs `DEPLOY_GATE_JANITOR_TOKEN`
-  to fully arm — batch item).
-- **#2944** (PR #3035) — journal-coach absence declared not laundered; **deployed daily-brief**
-  (root cause: designed absence since the cycle-14 reset).
-- **#3006 + #3007** (PR #3036) — wrap gates asserted (11 lines) + batched (12 runs → 2).
-  *This wrap ran through the new battery.*
-- **#2959** (PR #3038) — oracle ground-truth feed: cycle number + 5 rulings + 2 structural
-  drops; ledger 38→8; **deployed qa-smoke** (sha-verified). See the honest residual below.
-- **#2978** (PR #3039, "Part of", stays open) — confirm-before-fail primitive on both QA
-  surfaces + the incident-classifier sub-shape split.
-- **#3040** — extracted `daily_brief_signals.py` to fix a size-guard main-red I caused by
-  merging #3035 past its (not-yet-required) full-suite lane.
-- **#3041** — `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md`, the diligence response register.
-- **Campaign scaffolding:** CONVENTIONS §10 filing discipline (commit a86415136).
-
-## The diligence fact-check (the session's highest-value output)
-
-Three agents verified all 52 findings against **live** repo/GitHub/site. The verdict is
-materially better than 4.47/10 — and the gap is instructive:
-- **3 of 5 P0s genuinely live** → Phase D0: DIL-001 (5 PRIVATE-marked coaching docs are
-  world-readable), DIL-003 (/privacy/ "deleted immediately" vs 548-day retention + tokenless
-  unsubscribe), DIL-007 (56% of the prediction corpus is `eval_type: qualitative` =
-  structurally ungradeable — the report missed this, fixating on "0 graded" which is
-  *correct*: nothing's due before 08-24).
-- **2 of 5 P0s WRONG/STALE against current state** — DIL-002 fixed 08-21; DIL-004
-  ("approval absent") is live+blocking now. **Root cause: the platform's own 7-week-stale
-  `MANAGED_WHERE_LEDGER.md` manufactured the report's false positives.** Documentation truth
-  is the external-assessment attack surface — D0.5 + D2 close it.
-- **7 findings sharper than the report** (main has zero required checks; CodeQL regrew 7
-  alerts; budget-guard hard-stop shares a fail-open path; etc.) — all in the register.
-
-**Filed:** epic **#3042** [A-Grade Program] + stories **#3043–3050** + 7 folds
-(#2824/#2828/#2890/#2578/#2986/#2834/#2799). Owner decisions: repo stays public+sanitized ·
-commercial domains priced + a clinical-lite build subset · program absorbs the campaign.
-
-## The honest residual — #2959's deploy rolled back
-
-#3038's deploy auto-rolled-back the site (incident row added). The fix WORKED — every
-documented oracle class dropped/demoted correctly on the live sweep — but the
-non-stationary tail (#2959's own tracked remaining work) raised ONE novel high (a
-correctly-dated 'WEEK 1 · 2026-08-18' chronicle piece on /story/), and a NEW finding
-surfaced: **the visual-qa CI role lacks `ssm:GetParameter` on the experiment-cycle param**,
-so the cycle ground-truth sentence is dark in exactly the gating path. Deploy content (the
-receipts UTC-caption) was orthogonal — a rollback casualty. Site healthy on the prior build
-(3ad9572, all 200s). Re-deploy + both residuals carry into #3042's oracle lane; re-deploying
-now without baselining the new shape would just block again (the documented "3 blocks in one
-night" anti-pattern).
+qa-smoke 17:29Z · coach-prediction-evaluator + coach-state-updater 17:20Z · site-api
+17:2xZ · life-platform-mcp 17:45Z · delete-user-data 17:42Z · cdk LifePlatformMonitoring
+17:24Z + LifePlatformEmail/Web 17:40Z · site ×3 gated green (receipts+D0.5 → privacy copy
+→ scorecard shells). 4 production leases disposed (rejected with #2467 decodes); no
+waiting leases at close.
 
 ## Gate lines
 
-**Build beat:** none — the session's public-worthy work (the #2959 oracle rulings, the
-receipts-caption fix) auto-rolled-back on deploy; nothing net-new is live on the reader
-surface. Merged infra/QA (#3005/#2993/#3021/#3006/#3007) is not reader-facing dispatch material.
-**Docs:** CONVENTIONS §10 (filing discipline, committed mid-session a86415136) +
-`docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md` (new, PR #3041) + INCIDENT_LOG (+1 row) +
-this wrap's doc-sync literals. Register links the 10 filed diligence issues.
-**Decisions:** none needed — the A-Grade Program's ADR-worthy calls (Tier-2 publication
-consent, repo-posture) are staged as D0/D3 work (#3045 carries `gate:owner`), not landed
-this session.
-**Main:** green — the recent CI/CD "failures" (`4b89eba2`, `3862eb55`, `5557b0a2`,
-`f4ef58f4`) are all deliberately-**rejected superseded/hand-deployed leases** (#2467/#1901
-class, actioned this session), not test reds; HEAD's Docs CI is green and the live site is
-healthy. Verified via `check_main_green.py --decoded`.
-**Incidents:** 1 row added — the #3038 site auto-rollback (#2959 non-stationary tail;
-deploy content orthogonal; + the visual-qa role's missing SSM grant; both fold to #3042).
-**Stash/hooks:** clean.
-**Closures:** #3005, #2993, #3021, #2944, #3006, #3007, #2959 commented (7 ADR-099 verdicts —
-6 realized, #2959 partial-realized with residuals to #3042); the Session-1 folds
-(#2958/#2962/#2963/#2891/#2838) carry their fold-closure comments.
-**Backlog:** Now 12 actionable (the A-Grade Program filed #3042–3050 into Now/Next — the
-plan's expected transient rise from 39→46 debt, drains class-wise as D0–D5 close them); no
-stale Later issues; #1677 score-line corrected to Roadmap.
-**Alarms:** 3 flapped in the 72h window, all decoded — `ingest-auth-unhealthy-dropbox` +
-`ingest-liveness-unhealthy` (the known #2976 recovery-episode cluster) and
-`site-api-invocation-spike` (self-inflicted by this session's own full-surface QA sweeps
-during the #2959 deploy verification; no reader symptom). No standing red >72h. Closed
-with `--decoded`.
-**CI warnings:** none — the newest completed main run isn't green (it's a rejected lease),
-so `check_ci_warnings` has nothing to triage (that's the main-green gate's job).
-**Ledger:** none — no NEW standing subsystem shipped this session; #2978's confirm-before-fail
-and #2959's rulings extend existing machinery (reader-truth gate, smoke harness) already
-in `docs/PROPORTIONALITY.md`, and #3036's wrap-gate batcher is session tooling, not a
-production subsystem.
+**Build beat:** 2026-08-23-d0-p0-truth
+**Docs:** DATA_GOVERNANCE (scope note, retention row v2, ADR-155 carve-out + tier guard) ·
+MANAGED_WHERE_LEDGER (16 rows re-verified, dead-man) · README · CONTRIBUTING ·
+DECISIONS (ADR-155 + index) · SCHEMA (PREDICTION# row) · API.md · INCIDENT_LOG (+1 row +
+Patterns regen) · PROPORTIONALITY (+1 row) · alarm_citations untouched ·
+docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md (all D0 rows flipped to FIXED+DEPLOYED
+with evidence)
+**Decisions:** ADR-155 filed (Tier-2 self-publication by owner consent, #3045)
+**Main:** stranded — run 32655256700 R8-ST6 Plan-red at 53e0a357 (#1901 class),
+transient: it planned against live BEFORE the 17:40Z hand cdk deploy of the same IAM
+diff; both subsequent runs planned green and are rejected-superseded leases (#2467,
+hand-deployed + verified above). No recovery dispatch owed — every artifact is live at
+its merged sha.
+**Incidents:** 1 row added — the receipts-re-deploy auto-rollback (2 novel oracle highs
+on genuinely-unlabeled cross-phase surfaces → baselined as #2957 debt, next dispatch
+green)
+**Stash/hooks:** clean
+**Closures:** #3043, #3044, #3045, #3046, #3047 commented (5 ADR-099 verdicts, all
+realized with live deploy evidence)
+**Backlog:** Now live at 5 actionable; no stale Later issues; hygiene OK (69 issues
+clean)
+**Alarms:** 0 red >72h; 4 flaps in the window, decoded — `ingest-auth-unhealthy-24h`/
+`-dropbox` + `ingest-liveness-unhealthy` (the known #2976 recovery-episode cluster,
+single cycle each) and `site-api-invocation-spike` ×3 (self-inflicted: this session's
+three full-surface QA sweeps during deploy verification; no reader symptom). Closed with
+`--decoded`.
+**CI warnings:** none — the newest completed main run isn't green (a rejected-superseded
+lease), so there is nothing to triage (that's the main-green gate's finding, decoded
+above).
+**Ledger:** Prediction-gradeability contract row added (posture + rent + demote trigger;
+the #2832 calendar row already covers the new managed-where-reverify dead-man entry)
 
 ## Residuals / next picks
 
-- **The A-Grade Program (#3042) is the spine** — next session boots Phase D0 (P0 truth:
-  coaching-docs containment #3043, subscriber trust #3044, Tier-2 ADR #3045, prediction
-  gradeability #3046, doc-truth kills, `apply_branch_protection.py --apply` for required
-  checks, CodeQL #3047). Plan: `~/.claude/plans/lively-juggling-candle.md`.
-- **#2959 oracle lane (fold into #3042):** re-deploy the receipts caption AFTER baselining
-  the /story/ WEEK-1 finding; grant the visual-qa CI role `ssm:GetParameter` on the
-  experiment-cycle param (the ground-truth feed is dark in CI without it) — not-work until
-  D0, both recorded on #2959.
-- **#3037 (recall indexer) — OPEN, blocked:** its fix breaches `monitoring_stack.py`'s size
-  ceiling; carried into #3042's alarm lane where the cdk Email+Monitoring deploy chain gets
-  proper attention (diagnosis on the PR). #2977 stays the tracker.
-- **#2978 30-day re-measure** (~2026-09-22): the confirm-before-fail transient counters in
-  both summaries are the data source — not-work, scheduled.
-- **#2944 live verify** at the 08-23 17:00 UTC brief (declared-absent path) — not-work,
-  scheduled.
-- **Owner batch (staged for Session 5 / D1):** `DEPLOY_GATE_JANITOR_TOKEN` secret (#3021) ·
-  billing-alarm dupes (#2961) · #2834 IAM posture · WAF decision (#2828) · notion-secret
-  retire (#2890).
-- **One lease may still present** on the #3038 CI/CD run if it re-queues — the deploy-wedge
-  janitor (#3021, just merged) + next boot's `check_main_green` cover it — not-work.
+- **D0.6 branch protection — BLOCKED ON OWNER:** `apply_branch_protection.py --apply`
+  structurally refuses until a fine-grained PAT (Contents read-write, this repo only,
+  owned by averagejoematt) exists as the `RECONCILE_PUSH_TOKEN` repo secret + ci-cd.yml's
+  reconcile checkout uses it (CONVENTIONS §4c). Then: `--apply`, add the #3025 full-suite
+  context to `deploy/github_posture.json`, re-apply. not-work — owner-only PAT mint, in
+  the batched ask below.
+- **Owner batch (ONE ask):** ① RECONCILE_PUSH_TOKEN PAT (unblocks D0.6, main's first
+  required checks) · ② `DEPLOY_GATE_JANITOR_TOKEN` secret (#3021, arms the lease
+  janitor) · ③ respiratory_rate + disturbance_count consent call (#3045 left them
+  default-public deliberately — stamp or consent) · ④ carried: billing-alarm dupes
+  (#2961) · #2834 IAM posture · WAF decision (#2828) · notion-secret retire (#2890).
+- **#2957 got two new class members** (lab-notes diary reaction, /method/wrong validator
+  table) — the producer fix (cycle labels on cross-phase content) drains both baseline
+  entries; commented on the issue.
+- **Scheduled observations (not-work — dated):** `prediction-gradable-share-low` may
+  fire ~3d on the legacy corpus and clears as retirement drains it from 08-24;
+  first real prediction grades as windows mature (corpus earliest 2026-08-31); #2978
+  30-day re-measure ~09-22; legacy unsubscribe-link sunset 2026-09-22; next Monday's
+  retention sweep anonymizes the legacy subscriber backlog.
+- **Next phase:** D1 (control boundaries — WAF/#2828, budget-guard fail-closed under
+  #2824, secrets #2890, CSP #3048) per `~/.claude/plans/lively-juggling-candle.md`;
+  the D0 register rows are the re-grade evidence pack.

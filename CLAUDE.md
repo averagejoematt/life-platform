@@ -208,27 +208,26 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-23 daytime (Fable 5, interactive→autonomous — *"maximize fable use paying
-down the open-issues list … the real north star is a stabilized, production-grade platform a
-CTO/CPO/CIO panel would accept"*, then an external acquisition-diligence PDF). **The backlog
-campaign became the A-Grade Program.** Session 1 triaged the debt corpus 49→43 (folds + #1677→Roadmap)
-and landed **CONVENTIONS §10 filing discipline** (inflow is the real problem: 312 filed / 311 closed
-in 14 days — the board churns). Session 2 drained via 8 merged PRs: **6 issues closed** — #3005
-(Co-Authored-By ban + guard), #2993 (Plan config-drift classifier — agent proved the issue's
-hypothesis wrong), #3021 (lease janitor), #2944 (journal-coach absence, deployed), #3006+#3007 (wrap
-gates asserted+batched, 12 runs→2). Then the pivot: the 52-finding diligence report (4.47/10,
-"conditional no-go") was **fact-checked live by 3 agents** — and the verdict is materially better than
-the score: **2 of 5 P0s are STALE/WRONG against current state** (DIL-002 fixed 08-21; DIL-004 approval
-gate live+blocking now), most of the report's false positives **manufactured by the platform's own
-7-week-stale MANAGED_WHERE_LEDGER**; 3 P0s genuinely live (public coaching docs, subscriber deletion
-promise, 56%-ungradeable predictions); +7 findings sharper than the report. Filed **epic #3042
-[A-Grade Program]** + stories #3043–3050 + 7 folds + the response register (`docs/reviews/
-DILIGENCE_2026-08-23_RESPONSE.md`, PR #3041). **Honest miss:** #2959's oracle-ground-truth deploy
-(#3038, qa-smoke deployed+verified) auto-rolled-back the site — the fix worked (every documented class
-dropped correctly) but the non-stationary tail raised one novel high AND the visual-qa CI role lacks
-the SSM cycle-param grant, so the feed is dark in the gating path (incident row added; both fold to
-#3042; site healthy on prior build). **Next:** boot Phase D0 of the A-Grade Program
-(`~/.claude/plans/lively-juggling-candle.md`) — coaching-docs containment #3043, subscriber trust
-#3044, Tier-2 ADR #3045, prediction gradeability #3046, `apply_branch_protection.py --apply` for
-required checks, CodeQL #3047. Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-23 evening (Fable 5, mixed→autonomous — *"Boot Phase D0 of the A-Grade
+Program"*). **Phase D0 is done: every P0 the diligence CONFIRMED is fixed, deployed, and verified
+live.** Owner decisions taken up front (S3 owner-prefix · anonymize-at-unsubscribe · full-surface
+Tier-2 consent), then 5 PRs merged+deployed: **#3043** containment (5 PRIVATE docs → S3, 404×5
+verified, inverted visibility gate now reads LIVE `gh api`, marker guard), **#3044** subscriber
+trust (HMAC unsub tokens ×7 senders, anonymize-at-unsubscribe 548d→0, honest /privacy/ live),
+**#3045** ADR-155 (TIER_OWNER_PUBLISHED, 42-pair registry port, DATA_GOVERNANCE guarded — the
+served surface was WIDER than the report saw, all consented), **#3046** gradeability (emission
+contract, pending 83→34 + 49 observational live, GradableShare alarm), **#3051** doc-truth sweep
+(16 ledger rows re-verified + dead-man; site $85 literals fixed at generators; check_doc_facts
+scans 183 site files). **#3047 CodeQL closed on verified 0.** #2959's two debts paid: SSM
+cycle-grant live in the gating path + the WEEK-1 banner-misread ruling (structural, both wire
+notes fixtured) — the receipts caption is live after **three consecutive green gated site
+deploys** (one more rollback first: 2 novel highs on genuinely-unlabeled cross-phase surfaces,
+baselined as #2957 debt via the sanctioned path). Honest bumps: the merge train redded main on 5
+gates (module-size/premerge — DG gate extracted to `doc_facts_governance.py`, marker sweep
+registered); main reads "stranded" on a TRANSIENT Plan-red that planned before the 17:40Z hand
+cdk deploy (decoded; every artifact live at its merged sha; 4 leases rejected with decodes).
+**Next:** owner batch (① RECONCILE_PUSH_TOKEN PAT → unblocks D0.6 required checks ② janitor
+token #3021 ③ respiratory_rate/disturbance_count consent ④ #2961/#2834/#2828/#2890), then
+Phase D1 (control boundaries) per `~/.claude/plans/lively-juggling-candle.md`. Full narrative:
+`handovers/HANDOVER_LATEST.md`.
 
