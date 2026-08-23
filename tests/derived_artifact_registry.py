@@ -55,6 +55,7 @@ from __future__ import annotations
 import ast
 import fnmatch
 import os
+import re
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(_HERE)
@@ -588,6 +589,21 @@ def lane_covers(input_glob: str, trigger_globs: list[str]) -> bool:
         if fnmatch.fnmatch(probe, pattern) or fnmatch.fnmatch(probe, g.replace("**", "*")):
             return True
     return False
+
+
+def reconcile_whitelist_re(repo: str = REPO) -> "re.Pattern[str]":
+    """The compiled generator-output whitelist from ci-cd.yml's reconcile step.
+
+    #3012's live lesson: adding a generator to run_generators() without adding its
+    output to ALLOWED makes the reconcile job refuse-and-red on the NEXT innocent
+    merge — the lane had the writer but not the write.
+    """
+    with open(os.path.join(repo, ".github", "workflows", "ci-cd.yml"), encoding="utf-8") as fh:
+        text = fh.read()
+    m = re.search(r"ALLOWED='([^']+)'", text)
+    if not m:
+        raise AssertionError("ci-cd.yml no longer defines the reconcile ALLOWED whitelist")
+    return re.compile(m.group(1))
 
 
 def run_generators_commands(repo: str = REPO) -> list[str]:

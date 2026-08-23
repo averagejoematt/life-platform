@@ -153,6 +153,25 @@ def test_the_lane_triggers_on_the_artifacts_inputs(name):
 
 
 @pytest.mark.parametrize("name", sorted(DERIVED_ENTRIES))
+def test_a_reconciled_artifacts_outputs_are_whitelisted(name):
+    """The other half of reconciled=True — the writer ran, but may the job COMMIT what
+    it wrote? #3012 live: generate_platform_model.py was in run_generators() while
+    model/platform_model.json was not in ALLOWED, so the first cdk change after the
+    generator landed killed main CI at the reconcile step (refuse-and-red, deploy
+    skipped). A reconciled artifact's every non-glob output must match the whitelist."""
+    e = DERIVED_ENTRIES[name]
+    if not e.get("reconciled"):
+        pytest.skip(f"{name} does not claim to be reconciled")
+    allowed = reg.reconcile_whitelist_re()
+    bad = [o for o in e["outputs"] if "*" not in o and not allowed.match(o)]
+    assert not bad, (
+        f"{name}: reconciled=True but output(s) {bad} do not match ci-cd.yml's reconcile "
+        f"ALLOWED whitelist — the job will regenerate them and then refuse to commit, "
+        f"redding main on the next innocent merge (#3012's failure shape)."
+    )
+
+
+@pytest.mark.parametrize("name", sorted(DERIVED_ENTRIES))
 def test_a_reconciled_artifact_really_is_in_run_generators(name):
     """The self-healing half. `reconciled=True` is a claim about ci-cd.yml; check it."""
     e = DERIVED_ENTRIES[name]
