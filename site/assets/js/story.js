@@ -782,7 +782,16 @@ async function load() {
       if (elenaEl && !$(".hero-elena-kicker")) {
         const k = document.createElement("p");
         k.className = "label hero-elena-kicker";
-        k.textContent = statsV.elena_hero_line_as_of ? `${BRIEF_LINE_KICKER} · as of ${statsV.elena_hero_line_as_of}` : BRIEF_LINE_KICKER;
+        k.append(BRIEF_LINE_KICKER);
+        if (statsV.elena_hero_line_as_of) {
+          // A dedicated span so the "as of <date>" fragment (nowrap below) can wrap
+          // onto its own line without the ISO date itself splitting mid-string —
+          // the kicker's full sentence still wraps freely at the verse's 46ch cap.
+          const asOf = document.createElement("span");
+          asOf.className = "hero-elena-asof";
+          asOf.textContent = ` · as of ${statsV.elena_hero_line_as_of}`;
+          k.append(asOf);
+        }
         elenaEl.parentNode.insertBefore(k, elenaEl);
       }
       if (elenaEl) elenaEl.textContent = statsV.elena_hero_line;

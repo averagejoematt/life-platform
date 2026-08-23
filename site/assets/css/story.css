@@ -148,6 +148,9 @@ body { overflow-x: hidden; }
    story.js only when the daily line binds; pulled tight over its quote against
    the verse's flex gap. */
 .verse-close .hero-elena-kicker { margin-bottom: calc(-1 * var(--sp-3)); }
+/* #3066 — the absolute-date fragment stays on one line so the ISO date never
+   splits mid-string when the kicker sentence wraps at the verse's 46ch cap. */
+.hero-elena-asof { white-space: nowrap; }
 .verse-close a:not(.cta):not(.vgo) { color: var(--ink-muted); }
 .cta-row { display: flex; gap: var(--sp-5); flex-wrap: wrap; margin-top: var(--sp-2); }
 
