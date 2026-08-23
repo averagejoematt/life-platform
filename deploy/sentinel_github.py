@@ -73,6 +73,7 @@ PUSH_TRIGGER_GLOBS = (
     "scripts/doc_facts_ops.py",
     "scripts/generate_adr_index.py",
     "scripts/generate_mcp_tool_catalog.py",
+    "scripts/operating_calendar.py",  # #2832 — the calendar doc derives from its registry
     # site-deploy.yml (+ v4-gate.yml shares site/**; config/** shared with ci-cd.yml)
     "site/**",
     ".github/workflows/site-deploy.yml",
