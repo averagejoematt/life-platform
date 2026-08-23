@@ -655,28 +655,11 @@ class MonitoringStack(Stack):
             self,
             "IngestAuthUnhealthy",
             alarm_name="ingest-auth-unhealthy-24h",
-            # #2976 re-cut 86400s → 3600s. The #2004 "do not shorten" note was
-            # load-bearing while healthy 1s were RARE: the framework only emitted a 1
-            # on runs that wrote records, so a shorter window would have cleared on
-            # missing data (NB) while a source was still dead. #2976 changed the
-            # emitters — every authenticated-successful run now emits 1 (framework
-            # `errors == 0`, dropbox after list_folder, notion after query) — so the
-            # dimensionless stream carries a datapoint at least every 30 min around
-            # the clock (dropbox's poll), and a tripped breaker keeps landing 0s on
-            # every scheduled run. Min<1 over 1h therefore reads "some source
-            # emitted unhealthy within the hour": it fires as fast as before and
-            # clears ~1h after real recovery instead of holding a lie for a day.
-            # A DAILY-cadence source's breakage only pins this aggregate red around
-            # its cron hours — its per-source ingest-auth-unhealthy-{src} alarm
-            # (window matched to its own cadence) is the durable per-source truth.
-            # The name's historical "-24h" suffix is kept: renaming would churn the
-            # urgent-dispatch patterns, alarm citations, and doc inventory for zero
-            # operational gain.
-            alarm_description=(
-                "some breaker source emitted IngestAuthHealthy=0 in the last hour; clears ~1h after recovery "
-                "(#2976 — was a 24h latch). Per-source ingest-auth-unhealthy-* names the culprit; confirm via "
-                "AUTH_FAILURE markers, not alarm state alone."
-            ),
+            # #2976 re-cut 86400s → 3600s, superseding #2004's "do not shorten": every
+            # authenticated-successful run now emits 1 (≥1 point/30 min, and a tripped
+            # breaker keeps landing 0s) — fires as fast as before, clears ~1h after
+            # real recovery instead of a 24h latch (2026-08-21→22). See RUNBOOK.md.
+            alarm_description="some source emitted IngestAuthHealthy=0 in the last hour; clears ~1h after recovery (#2976) — confirm via AUTH_FAILURE markers.",
             metric=cloudwatch.Metric(
                 namespace="LifePlatform/OAuth",
                 metric_name="IngestAuthHealthy",
@@ -725,38 +708,15 @@ class MonitoringStack(Stack):
         # predates #1960. Verified against the actual 2026-08-01 outage: the
         # consecutive-failures alarm DID fire (dispatched 08-01T14:01Z, ~2h after the
         # breaker latched at 12:00:28Z) — so this is a fix-in-place, not a new report.
-        # Window = the source's own reporting cadence (#2976): these sources emit
-        # IngestAuthHealthy once per scheduled run (daily / morning-hourly crons),
-        # so 86400s is the shortest window that can't clear on missing data (NB)
-        # overnight while the credential is still dead — the qa-smoke-alarm-window
-        # class. Recovery therefore shows within one cadence period, which for a
-        # daily source is honest, not latched.
-        for _auth_src in ("todoist", "habitify", "whoop"):
+        # #2976: window = emitter cadence — dropbox (≤30-min emissions) re-cut to 3600s;
+        # daily-cron sources KEEP 86400s (NB missing-data would clear them overnight).
+        for _auth_src in ("todoist", "habitify", "dropbox", "whoop"):
             _alarm(
                 f"IngestAuthUnhealthy{_auth_src.title()}",
                 f"ingest-auth-unhealthy-{_auth_src}",
                 "LifePlatform/OAuth",
                 "IngestAuthHealthy",
-                86400,
-                "Minimum",
-                1,
-                LT,
-                dims={"Source": _auth_src},
-            )
-        # dropbox reports every 30 min around the clock (rate(30 minutes) poll +
-        # the #2976 clear-after-list_folder emission), so its window is re-cut to
-        # 1h (#2976): a tripped breaker lands a 0 in every hourly bucket (ALARM
-        # holds), and recovery clears within ~1h instead of latching for a day —
-        # the 2026-08-21→22 incident held a recovered dropbox red for ~24h. The
-        # single-element tuple keeps the f-string-over-loop-var shape that
-        # test_oauth_alarm_coverage + sync_doc_metadata AST-resolve.
-        for _auth_src in ("dropbox",):
-            _alarm(
-                f"IngestAuthUnhealthy{_auth_src.title()}",
-                f"ingest-auth-unhealthy-{_auth_src}",
-                "LifePlatform/OAuth",
-                "IngestAuthHealthy",
-                3600,
+                3600 if _auth_src == "dropbox" else 86400,
                 "Minimum",
                 1,
                 LT,

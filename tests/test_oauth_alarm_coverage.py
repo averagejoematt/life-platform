@@ -290,16 +290,38 @@ def test_aggregate_alarm_description_documents_the_clear_behavior():
 # class, which is exactly why this is pinned rather than left to taste).
 
 
-def _alarm_period(call):
-    """The period literal of an _alarm(...) call (positional arg 4) or of an
-    inline cloudwatch.Alarm(metric=Metric(period=Duration.seconds(N)))."""
-    if call.args and len(call.args) >= 5 and isinstance(call.args[4], ast.Constant):
-        return call.args[4].value
+def _alarm_period(call, bindings=None):
+    """The period of an _alarm(...) call (positional arg 4) or of an inline
+    cloudwatch.Alarm(metric=Metric(period=Duration.seconds(N))). Resolves a
+    constant, or — with `bindings` — a `A if <loopvar> == "x" else B` conditional
+    (the shape the per-source loop uses so one loop can carry per-source
+    windows without changing its conformance-ledger enumeration key)."""
+
+    def _resolve(node):
+        if isinstance(node, ast.Constant):
+            return node.value
+        if bindings and isinstance(node, ast.IfExp):
+            test = node.test
+            if (
+                isinstance(test, ast.Compare)
+                and isinstance(test.left, ast.Name)
+                and test.left.id in bindings
+                and len(test.ops) == 1
+                and isinstance(test.ops[0], ast.Eq)
+                and len(test.comparators) == 1
+                and isinstance(test.comparators[0], ast.Constant)
+            ):
+                branch = node.body if bindings[test.left.id] == test.comparators[0].value else node.orelse
+                return _resolve(branch)
+        return None
+
+    if call.args and len(call.args) >= 5:
+        return _resolve(call.args[4])
     metric = next((kw.value for kw in call.keywords if kw.arg == "metric"), None)
     if isinstance(metric, ast.Call):
         period = next((kw.value for kw in metric.keywords if kw.arg == "period"), None)
-        if isinstance(period, ast.Call) and period.args and isinstance(period.args[0], ast.Constant):
-            return period.args[0].value
+        if isinstance(period, ast.Call) and period.args:
+            return _resolve(period.args[0])
     return None
 
 
@@ -320,7 +342,7 @@ def _per_source_loop_periods(path=_MONITORING):
                 for bound in values:
                     name = _render_fstring(arg, {node.target.id: bound})
                     if name == "ingest-auth-unhealthy-" + bound:
-                        periods[bound] = _alarm_period(call)
+                        periods[bound] = _alarm_period(call, {node.target.id: bound})
     return periods
 
 
