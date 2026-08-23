@@ -56,7 +56,10 @@ read the stack for routing.
 > (`life-platform-monthly-75`, $150 ceiling, ADR-133), not a CloudWatch alarm.
 
 **OAuth auth-death coverage (#1960).** `ingest-auth-unhealthy-24h` is the fleet-wide
-aggregate (dimensionless `LifePlatform/OAuth IngestAuthHealthy`, Min<1 over 24h). It
+aggregate (dimensionless `LifePlatform/OAuth IngestAuthHealthy`, Min<1 over 1h — re-cut
+from 24h by #2976, safe now that every authenticated-successful run emits a 1, so the
+stream is dense and a recovered fleet clears within ~1h instead of latching red for a
+day; the name's `-24h` suffix is historical). It
 fires for ANY breaker source but by construction cannot name which one — so it is a
 "something died" page, not a diagnosis. `lambdas/common/auth_breaker.py` therefore emits
 the same 0/1 twice: dimensionless (feeding that aggregate, unchanged) and with

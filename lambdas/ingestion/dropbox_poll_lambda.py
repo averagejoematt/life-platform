@@ -504,6 +504,10 @@ def lambda_handler(event, context):
             if _is_recently_empty(tracker):
                 logger.info("COST-03: Dropbox was empty at last poll (<25 min ago) — skipping")
                 _record_health(succeeded=True)  # deliberate healthy skip, not a dead cron
+                # #2976: no IngestAuthHealthy emission here on purpose — this path
+                # never touched Dropbox, so it proves nothing about the credential.
+                # (In practice the 30-min cron > the 25-min window, so real polls
+                # still happen essentially every run.)
                 return {"statusCode": 200, "body": "Skipped — recently checked, no new files"}
 
         # ── Auth ──
@@ -518,6 +522,18 @@ def lambda_handler(event, context):
         # ── List files ──
         files = list_folder(access_token)
         logger.info(f"Found {len(files)} files in app folder")
+
+        # #2976: auth is proven the moment an AUTHORIZED API call succeeds — clear
+        # the breaker (which emits IngestAuthHealthy=1) HERE, not only after a CSV
+        # was processed. The app folder is empty on almost every poll, so the old
+        # end-of-run-only clear meant Source=dropbox never emitted a single 1 in
+        # its life (verified live: Min=Max=0 over all of August) and a recovered
+        # dropbox stayed ALARM until the 24h window slid past the last 0. Placed
+        # after list_folder (not just the token refresh) because the 2026-08-21
+        # trip was an authorization failure on list_folder itself, with the token
+        # refresh succeeding one line earlier.
+        if _HAS_AUTH_BREAKER:
+            clear_failure(table, source_name="dropbox", user_id=USER_ID, logger=logger)
 
         if not files:
             _mark_empty_poll()
@@ -629,10 +645,8 @@ def lambda_handler(event, context):
         }
         logger.info(f"Complete: {json.dumps(summary)}")
 
-        # V2 P2.4: clear any prior breaker marker on success
-        if _HAS_AUTH_BREAKER:
-            clear_failure(table, source_name="dropbox", user_id=USER_ID, logger=logger)
-
+        # (#2976: the breaker clear moved up to just after list_folder succeeds —
+        # one emission per run, covering the empty-folder early returns too.)
         _record_health(succeeded=True)
         return {"statusCode": 200, "body": json.dumps(summary)}
     except Exception as e:
