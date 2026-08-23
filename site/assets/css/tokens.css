@@ -1694,8 +1694,18 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
    colored dot; 40px is where the rings/ticks become a face. */
 .sigil-md { inline-size: 40px; block-size: 40px; flex: none; color: var(--coach, var(--ember)); }
 /* The coach's NAME carries their sanctioned identity color (§8.2 — persona
-   identity only, never data encoding), pairing name ↔ sigil into a character. */
-.rd-name, .th-name, .cv-name, .coach-name { color: var(--coach, var(--ink)); }
+   identity only, never data encoding), pairing name ↔ sigil into a character.
+   #3057 — AA CLAMP: --coach arrives from DATA (the /api/coaches roster), not a
+   locked palette, so a roster edit can push it below 4.5:1 with nothing between
+   the payload and the pixel (2026-08-23 auto-rollback, INCIDENT_LOG — the SECOND
+   data-driven a11y dark-state, first was .wu-carried 2026-08-10). color-mix here
+   folds ANY --coach value 25% toward --ink before it paints text: tests/
+   test_coach_accent_contrast_3057.py proves the worst case (an --ink-anchored 25/75
+   blend of literal #000/#fff, the two adversarial extremes an unvalidated hex can
+   supply) still clears 4.5:1 on every paper-ramp step, both themes — comfortably
+   inside the >=4.5 floor the ramp itself already holds for --ink. Sigils/borders/
+   dots above stay on raw var(--coach, ...) deliberately: decorative, not text. */
+.rd-name, .th-name, .cv-name, .coach-name { color: color-mix(in oklch, var(--coach, var(--ink)) 25%, var(--ink) 75%); }
 /* Sigil draw-in — self-contained (pathLength="1" in sigils.js): every sigil
    draws itself the moment it enters the DOM; rings sweep, ticks follow. Inside
    the reduced-motion wrapper below, so motion-averse readers see it complete.
