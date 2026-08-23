@@ -100,6 +100,10 @@ SEVERITIES = ("low", "med", "high")
 from operational.reader_truth_rulings import (  # noqa: F401
     CODE_OWNED_TEMPORAL_SURFACES,
     DURABLE_DESIGN_COPY,
+    _is_registered_span,
+    _normalize_copy,
+    _note_dates,
+    _pacific_renderings,
     is_coach_surface_audience,
     is_code_owned_temporal,
     is_day_counter_bound_inference,
