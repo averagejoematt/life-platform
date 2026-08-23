@@ -196,6 +196,17 @@ jobs:
           PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml pillow)
           pip install $PINS
 
+      # The doc-sync literals (test_count et al.) are DRIVER-reconciled on main by
+      # policy — a branch must never stamp them (#2372's collision class), yet the
+      # full suite contains the tests that assert them. Applying the sync IN THE
+      # RUNNER'S WORKSPACE (never committed) makes those tests assert the
+      # post-reconcile reality this branch will actually have on main, with zero
+      # selection divergence from the post-merge lane. First observed on this
+      # job's own maiden run: 4 literal-treadmill fails on PR #3026 itself.
+      - name: Reconcile doc literals in-workspace (never committed)
+        if: always()
+        run: python3 deploy/sync_doc_metadata.py --apply
+
       - name: Full unit suite (same selection as the post-merge coverage gate)
         if: always()
         run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25
