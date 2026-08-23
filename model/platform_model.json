@@ -148,6 +148,10 @@
       "routing": "digest",
       "stack": "serve_stack"
     },
+    "site-api-content-filter-fallback": {
+      "routing": "digest",
+      "stack": "serve_stack"
+    },
     "site-api-errors": {
       "routing": "digest",
       "stack": "serve_stack"
@@ -6090,7 +6094,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 50,
+      "alarms": 51,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,
