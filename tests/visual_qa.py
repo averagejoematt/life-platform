@@ -583,7 +583,16 @@ def gha_paused_gate_annotation(gate, status, env=None, stream=None):
 
 def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None, ai_vision_status=None):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
-    lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
+    # #2973: unevaluated pages get their own bucket in the headline (passed +
+    # failed + unevaluated == pages) AND a named callout — a page the AI oracle
+    # never saw must be unmissable in the one surface reviewers actually read.
+    unevaluated = [r for r in results if r.get("ai_unevaluated")]
+    uneval_part = f", {len(unevaluated)} UNEVALUATED" if unevaluated else ""
+    lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed{uneval_part}, {warns} warnings\n"]
+    for r in unevaluated:
+        lines.append(
+            f"❌ **UNEVALUATED (#2973)** — the AI oracle never saw **{r['page']}** (`{r['path']}`): {str(r['ai_unevaluated'])[:160]}\n"
+        )
     # #1440/#1428: a budget-tier pause must render as its own line in the CI
     # summary — never silently absent, never indistinguishable from a clean run.
     if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
@@ -1065,6 +1074,23 @@ def ai_qa_targets(results, max_tier=None):
 _SANCTIONED_AI_STATES = frozenset({"ok", "skipped_by_budget"})
 
 
+def sweep_tally(results):
+    """The three DISJOINT buckets the summary line reports (#2973): (passed,
+    failed, unevaluated), with passed + failed + unevaluated == len(results).
+
+    A page the AI oracle could not look at (`ai_unevaluated`, set by
+    visual_ai_qa.assess_results) counts ONLY in `unevaluated` — never in
+    `passed` (it has no coverage, regardless of recorded status) and not
+    double-counted in `failed`. Pure/testable: this arithmetic is what
+    guarantees a green sweep means every page was actually evaluated, so it
+    must not live inline where no test can reach it (the #2938 lesson).
+    """
+    unevaluated = sum(1 for r in results if r.get("ai_unevaluated"))
+    passed = sum(1 for r in results if r["status"] == "PASS" and not r.get("ai_unevaluated"))
+    failed = sum(1 for r in results if r["status"] == "FAIL" and not r.get("ai_unevaluated"))
+    return passed, failed, unevaluated
+
+
 def requested_ai_gate_failures(gates):
     """Which REQUESTED AI gates failed to actually run (#2938).
 
@@ -1298,11 +1324,17 @@ def run_sweep(
             }
         )
 
-    passed = sum(1 for r in results if r["status"] == "PASS")
-    failed = sum(1 for r in results if r["status"] == "FAIL")
+    # #2973: three disjoint buckets — passed + failed + unevaluated == total — so
+    # "passed" can never silently absorb a page the AI oracle errored on instead
+    # of looking at. Unevaluated pages are also status=FAIL (they gate), but the
+    # tally names them separately: a green sweep must MEAN every page was seen.
+    passed, failed, unevaluated = sweep_tally(results)
     warns = sum(len(r.get("warnings", [])) for r in results)
     print(f"\n{'=' * 56}")
-    print(f"Visual QA: {passed} passed, {failed} failed, {warns} warning(s) across {len(results)} pages")
+    print(f"Visual QA: {passed} passed, {failed} failed, {unevaluated} unevaluated, {warns} warning(s) across {len(results)} pages")
+    for r in results:
+        if r.get("ai_unevaluated"):
+            print(f"  ❌ UNEVALUATED — the AI oracle never saw {r['page']} ({r['path']}): {str(r['ai_unevaluated'])[:120]}")
     # #1440/#1428: a budget-tier pause of an AI QA pass must read as its own
     # explicit state, never blend into "passed" — this is the one line a human
     # or a CI summary skim is guaranteed to see regardless of page-level warnings.
@@ -1373,6 +1405,7 @@ def run_sweep(
                 "color_scheme": color_scheme,
                 "passed": passed,
                 "failed": failed,
+                "unevaluated": unevaluated,  # #2973: passed + failed + unevaluated == len(results)
                 "warnings": warns,
                 "ai_vision_status": ai_vision_status,
                 "reader_truth_status": reader_truth_status,
@@ -1386,7 +1419,10 @@ def run_sweep(
     if summary_path:
         _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status, ai_vision_status)
 
-    return failed == 0 and not ai_gate_failures
+    # #2973: an unevaluated page can never ride out on a green exit code — the
+    # explicit `unevaluated == 0` term holds even if a future refactor stops
+    # flipping unevaluated pages to FAIL.
+    return failed == 0 and unevaluated == 0 and not ai_gate_failures
 
 
 if __name__ == "__main__":
