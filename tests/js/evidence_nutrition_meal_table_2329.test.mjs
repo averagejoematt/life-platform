@@ -52,8 +52,9 @@ test("every column header has a backing value in every row", async () => {
   const table = /<table class="rd-tbl"><thead>(.*?)<\/table>/s.exec(html);
   assert.ok(table, "meal table not found");
   const headers = [...table[1].matchAll(/<th>(.*?)<\/th>/g)].map((m) => m[1]);
-  const rows = [...table[1].matchAll(/<tr>((?:<td.*?<\/td>)+)<\/tr>/g)]
-    .map((m) => [...m[1].matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((c) => c[1]));
+  const rows = [...table[1].matchAll(/<tr>(.*?)<\/tr>/gs)]
+    .map((m) => [...m[1].matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((c) => c[1]))
+    .filter((cells) => cells.length > 0);
   assert.equal(rows.length, 2, "both fixture meals must render");
   for (const cells of rows) {
     assert.equal(cells.length, headers.length, "a row must print exactly one cell per header");
