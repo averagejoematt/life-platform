@@ -131,12 +131,12 @@ export function renderReceipts(d) {
     ? { value: d.projected_month_end_usd, date: d.month_end_date, label: "projected" }
     : null;
   const curveChart = (d.history || []).length
-    ? lineChart(d.history, { valueKey: "mtd_usd", dateKey: "date", unit: "", label: "month-to-date spend", goal: d.ceiling_usd, projection: proj, emptyMsg: "The spend curve draws in as the month accrues." })
+    ? lineChart(d.history, { valueKey: "mtd_usd", dateKey: "date", unit: "", label: "month-to-date spend · UTC billing days", goal: d.ceiling_usd, projection: proj, emptyMsg: "The spend curve draws in as the month accrues." })
     : "";
   // ADR-105: the dashed line is a forecast, not a measurement — say so in prose, not just the
   // caption, so a reader can never mistake the projected continuation for recorded spend.
   const curveNote = (proj && curveChart)
-    ? `<p class="rd-archive">The solid line is what has actually been spent this month; the dashed line is the governor's projection to month-end — $${fmt(d.projected_month_end_usd)}, an estimate it re-runs every 8 hours, not a measured value (ADR-105).</p>`
+    ? `<p class="rd-archive">The solid line is what has actually been spent this month; the dashed line is the governor's projection to month-end — $${fmt(d.projected_month_end_usd)}, an estimate it re-runs every 8 hours, not a measured value (ADR-105). AWS bills on UTC days, so late in a Pacific evening the curve can already show a point for a day that hasn't finished here.</p>`
     : "";
   const curve = curveChart
     ? sec(proj ? "The month so far — and where it's heading" : "The month so far", curveChart + curveNote)

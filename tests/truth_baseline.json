@@ -1,126 +1,15 @@
 {
  "_meta": {
-  "captured_at": "2026-08-23T08:25:55+00:00",
+  "captured_at": "2026-08-23T14:20:00+00:00",
   "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
  },
  "pages": {
-  "/": [
-   {
-    "category": "duplicated_narrative",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "med",
-    "note_sample": "The same substantive narrative 'HRV spiked to 49ms (+27% above your 7-day average) while every logged habit shows zero — your body is signaling readiness that the tracking system can't yet confirm.' a — observed low-severity rider recorded by the #2981 any-severity rule during the 2026-08-23 publish-path episode (run 32618360726)."
-   },
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "day-counter-bound inference: 'HRV +27% above your 7-day average' flagged because 'only 6 days of current-experiment data can exist' — wrong: HRV averages run over the CROSS-PHASE raw timeseries (ADR-077). Held the deploy (run 32618360726); rubric clause + is_day_counter_bound_inference suppressor landed same-day."
-   }
-  ],
-  "/coaching/": [
-   {
-    "category": "audience_violation",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "coaches address Matthew by name/second person — the coaching surface's designed content; adjudicate the audience rubric for coach pages"
-   },
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Multiple coaches state 'three days quiet on food and habits' and 'nothing in the food channel since the protocol went live on August 19.' If today is Day 5 (Aug 21), and the protocol went live Aug 19,"
-   }
-  ],
-  "/coaching/by-coach/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Same contradiction: coaches refer to 'three days quiet on food and habits' and 'three days of missing meal logs.' On Day 5 (Aug 21), if logging stopped after Aug 19 protocol start, only 2 days have pa"
-   }
-  ],
-  "/coaching/by-coach/#physical_coach": [
-   {
-    "category": "audience_violation",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "same coach-addressing class as /coaching/"
-   },
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Dr. Max Reyes states 'Habits and food logging have been quiet for three days' and 'The wearables are still flowing — Whoop caught the night of 2026-08-19 at 50% recovery.' On Day 5 (Aug 21), from Aug "
-   }
-  ],
-  "/coaching/read/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Multiple coaches state 'three days of missing food logs' and 'three days quiet on food and habits.' On Day 5 (2026-08-21), if logging went silent for three days, that would span Days 3–5. However, the"
-   }
-  ],
-  "/coaching/scorecard/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Text states 'The earliest call's window (2026-08-17) has closed — it grades at the evaluator's next daily pass.' On Day 5 (2026-08-21), a 2–4 week window opened on 2026-08-17 would not have closed yet"
-   }
-  ],
-  "/cockpit/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "same day-counter-bound inference as / (identical daily line, same run 32618360726) — 7-day trailing average is legitimate cross-phase data on Day 6."
-   }
-  ],
-  "/data/character/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Character sheet states 'FOUNDATION · LEVEL 1 OF 100 · AS OF 2026-08-20' but today is 2026-08-21 (Day 5). The date is one day in the past, suggesting either the page was not updated or the timestamp is"
-   }
-  ],
-  "/data/habits/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "severity_observed": "high",
-    "note_sample": "The 90-DAY ADHERENCE HEATMAP section states '90-DAY HISTORY PREDATES THE CUT' and shows a heatmap with 90 days of history, but the experiment phase only allows 6 days of current-experiment data (Day 1"
-   }
-  ],
-  "/data/physical/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Prose states 'The last DEXA was 145 days ago, pre-cut.' This correctly identifies a pre-experiment date (2026-03-30, ~145 days before Day 5 of 2026-08-21). However, the accompanying statement 'A secon"
-   }
-  ],
   "/data/sleep/": [
    {
     "category": "temporal_contradiction",
     "issue": "#2957",
     "added": "2026-08-22",
     "note_sample": "Prose states 'STAGE COMPOSITION OVER THE WEEK' with a chart labeled 'DEEP · REM · LIGHT · HOURS BY STAGE · PER NIGHT' spanning days 17–21, but on Day 5 (2026-08-21) only 5 days of data can exist. The "
-   }
-  ],
-  "/data/training/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "self-refuted 'high': the note's final sentence reads 'within phase bounds and internally consistent' yet gated the THIRD deploy attempt (run 32620189500); widened _WITHDRAWAL_RE same-day + this baseline as defense in depth."
    }
   ],
   "/data/vitals/": [
@@ -131,37 +20,13 @@
     "note_sample": "Prose states 'No training logged — 57 days' on Day 5 of a 5-day experiment (Day 1 = 2026-08-17). A 57-day history is impossible; the experiment has only existed for 5 days maximum. This asserts a pre-"
    }
   ],
-  "/data/wall/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "self-refuted finding: the note's own last sentence reads 'No contradiction here on rechecking arithmetic' yet was emitted high (run 32618360726) — is_self_refuted drops the class; entry kept as the observed record."
-   }
-  ],
-  "/journal/essays/org-chart-of-one/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Essay is dated JULY 8, 2026 with a snapshot from 2026-07-06, but the experiment phase indicates today is 2026-08-21 (Day 5 of current cycle starting 2026-08-17). The essay claims to describe current p"
-   }
-  ],
   "/method/board/": [
    {
     "category": "audience_violation",
-    "issue": "#2972",
+    "issue": "#3018",
     "added": "2026-08-22",
     "severity_observed": "high",
     "note_sample": "Dr. Lisa Park addresses the subject directly: 'Matthew — and I want to name that plainly', 'I want to put to you directly', 'you were actively logging', 'When you're ready, I'd like you to resume'. Th"
-   },
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "severity_observed": "high",
-    "note_sample": "Dr. Eli Marsh states 'You've logged two training sessions in the past 30 days' — impossible on Day 6 of experiment (max 6 days of current-cycle data exist). This asserts a 30-day history that contradi"
    }
   ],
   "/method/calibration/": [
@@ -172,51 +37,18 @@
     "note_sample": "States 'THIS SEASON · CYCLE 14' with '26 GRADED FORECASTS' on Day 5, but only 5 days of data can exist in the current cycle (started 2026-08-17). On Day 5, a maximum of 5 days of in-cycle data is poss"
    }
   ],
-  "/method/cycles/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "oracle infers 'Day 6 with days_with_data=6 => start weight must be populated, not —' — wrong inference: zero weigh-ins exist since 2026-08-17 genesis (withings partition verified empty in DDB), so — is the honest ADR-104 absence marker while days_with_data counts whoop rows. Third distinct objection on this page in one day (CYCLE 10 NOW misread #2992; days_with_data=8 REAL, fixed #3008; this). The real one was this page+category, so prefer rubric work over widening this entry."
-   }
-  ],
-  "/method/data/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "pipeline footer 'updated 2026-08-09' pre-cycle — verify staleness under the triage issue"
-   }
-  ],
   "/method/postmortems/": [
    {
     "category": "temporal_contradiction",
-    "issue": "#2958",
+    "issue": "#2957",
     "added": "2026-08-22",
     "note_sample": "CYCLE 14 entry states 'Restarted 2026-08-17 as cycle 14' but then shows strip '·····' (5 dots = 5 silent days). The cycle start date is 2026-08-17 (Day 1 of current experiment). On Day 5 (2026-08-21),"
-   }
-  ],
-  "/method/predictions/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "coach FORECAST rows ('over 14 days', '2-3 weeks') read as past-data claims — forward windows are not history; rubric adjudication on the issue"
-   }
-  ],
-  "/method/receipts/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "States '$121.6 SPENT THIS MONTH' and '$158.5 PROJECTED MONTH-END' with a chart labeled 'AUG 1–AUG 22 · 22 PTS'. Today is 2026-08-21 (Day 5), not August 22. The cycle began 2026-08-17. The chart depict"
    }
   ],
   "/method/survival/": [
    {
     "category": "temporal_contradiction",
-    "issue": "#2958",
+    "issue": "#2957",
     "added": "2026-08-22",
     "note_sample": "The cycle 14 row displays 'cycle 14 | 2026-08-17 | ····· | 0/5 | day 5 · live' which correctly identifies the cycle as live on day 5. However, Surface 1 (/method/postmortems/) treats cycle 14 as a clo"
    }
@@ -229,88 +61,12 @@
     "note_sample": "States 'NEXT ON THE LOOP the coaching — See what the AI team makes of it' but this appears to be navigational chrome. However, the surface shows 'N=16' voice-fidelity judgments with 11 correct on Day "
    }
   ],
-  "/method/wrong/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "editorial-labeling objection graded high: the CAUGHT BY THE VALIDATOR table mixes cross-cycle catches (2026-05-19, 2026-06-18) with a current-cycle row without a lifetime label. Fifth distinct novel high in five sweeps tonight (runs ...9944, ...0726, ...9500, 3023's, ...0842) on a page that passed the previous four — the #2959 non-stationarity record. Substantively a med-at-most label suggestion; a cross-cycle label on this table is legitimate future polish, not a lie."
-   }
-  ],
-  "/protocols/supplements/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "'AS OF 2026-08-10' + 'carried from prep' — labeled pre-cycle framing"
-   }
-  ],
-  "/story/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "chronicle piece labeled 'WEEK 1 · 2026-08-18' (correct for cycle 14) flagged — oracle week-counting artifact"
-   }
-  ],
-  "/story/about/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "origin-story prose ('In early 2026 I turned that thinking on myself') — dated-narrative class"
-   }
-  ],
   "/story/attempts/": [
    {
     "category": "temporal_contradiction",
-    "issue": "#2958",
+    "issue": "#2957",
     "added": "2026-08-22",
     "note_sample": "Attempt #14 marked 'SHOWED UP 0 OF 5 DAYS' (past-tense finality) beside 'live — day 5' — the live-cycle-as-closed class, sibling of /method/postmortems/"
-   }
-  ],
-  "/story/build/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "oracle infers the site chrome's experiment-day counter (DAY 6 - WEEK 1, SINCE AUGUST 17 2026) bounds the build log's content — wrong data-must-exist-only-in-window inference: /story/build/ is the platform's engineering log, deliberately CROSS-PHASE (ADR-077/153 taxonomy), every dispatch explicitly dated. Same chrome-vs-archive shape as the 15 sibling temporal_contradiction baselines. Surfaced 2026-08-23 when the wrap's new dispatch made the page newest-dated; the finding rolled back the site deploy (run 32616299944), recovered by full re-run after this baseline."
-   }
-  ],
-  "/story/build/agent-review/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "severity_observed": "high",
-    "note_sample": "The page states 'THE RECORD SPANNING 2026-05-29 → 2026-08-17' but today is 2026-08-22 (Day 6 of current experiment starting 2026-08-17). The end date 2026-08-17 is the cycle start date, not today. Thi"
-   }
-  ],
-  "/story/chronicle/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "severity_observed": "high",
-    "note_sample": "Chronicle entry dated 2026-08-18 (Day 2) is listed under 'WEEK 1 · 2026-08-18', but the page header states 'DAY 6 · WEEK 1, SINCE AUGUST 17 2026' (today is 2026-08-22, Day 6). The entry itself is corr"
-   }
-  ],
-  "/story/diary/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Surface 2 states 'DAY 5 · CYCLE 10' and 'JULY 26, 2026 · VIDEO DIARY', but the experiment phase confirms today is 2026-08-21 (Day 5 of Cycle 10 starting 2026-08-17). July 26, 2026 is 56 days before th"
-   }
-  ],
-  "/story/journal/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-22",
-    "note_sample": "Journal entry dated 2026-07-08 listed under 'DAY 5 · WEEK 1' header — the dated-archival-content class, sibling of the essay finding"
    }
   ]
  }
