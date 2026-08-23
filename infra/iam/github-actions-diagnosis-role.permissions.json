@@ -45,6 +45,16 @@
       ]
     },
     {
+      "Sid": "ReaderTruthCycleGroundTruth",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter"
+      ],
+      "Resource": [
+        "arn:aws:ssm:us-west-2:205930651321:parameter/life-platform/experiment-cycle"
+      ]
+    },
+    {
       "Sid": "QaArchivePerfList",
       "Effect": "Allow",
       "Action": [
