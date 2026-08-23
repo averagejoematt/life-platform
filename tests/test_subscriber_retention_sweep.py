@@ -1,16 +1,17 @@
-"""tests/test_subscriber_retention_sweep.py — #1350 signed retention-window guard.
+"""tests/test_subscriber_retention_sweep.py — signed retention-window guard (#3044, was #1350).
 
-The [gate:owner] decision is 18 months, anonymize (docs/DATA_GOVERNANCE.md). This
-guard asserts:
-  1. the signed window constant IS 18 months (548 days), mode anonymize, in the ONE
-     source of truth (lambdas/subscriber_retention.py);
+The signed policy (docs/DATA_GOVERNANCE.md, v2 2026-08-23) is ANONYMIZE AT UNSUBSCRIBE:
+the handler scrubs inline, and the weekly sweep is the backstop with window 0 — any
+unsubscribed row still carrying plaintext is past-window. This guard asserts:
+  1. the signed window constant IS 0 days (anonymize-at-unsubscribe), mode anonymize,
+     in the ONE source of truth (lambdas/subscriber_retention.py);
   2. the governance doc's signed row names that same day-count (doc ↔ constant, no drift);
   3. the pure eligibility/redaction logic anonymizes every eligible row and preserves
      the rest (count + confirmation state survive) — no eligible row survives
      un-anonymized;
   4. the scheduled sweep handler (delete_user_data_lambda's subscriber_retention_sweep
-     event) is dry-run by default, anonymizes only eligible rows on apply, is
-     idempotent, and never touches active subscribers or the subscriber count.
+     event) is dry-run by default, anonymizes every plaintext-carrying unsubscribed row
+     on apply, is idempotent, and never touches active subscribers or the count.
 """
 
 import json
@@ -29,12 +30,12 @@ from content import subscriber_retention as sr  # noqa: E402
 DOC = ROOT / "docs" / "DATA_GOVERNANCE.md"
 
 
-# ── 1. The signed window constant IS 18 months ──────────────────────────────────
+# ── 1. The signed window constant IS 0 days — anonymize-at-unsubscribe ──────────
 
 
-def test_window_constant_is_18_months():
-    assert sr.RETENTION_WINDOW_MONTHS == 18
-    assert sr.RETENTION_WINDOW_DAYS == 548  # 18 × 30.4375 ≈ 548
+def test_window_constant_is_anonymize_at_unsubscribe():
+    assert sr.RETENTION_WINDOW_MONTHS == 0
+    assert sr.RETENTION_WINDOW_DAYS == 0  # #3044: the handler scrubs inline; the sweep is the backstop
     assert sr.RETENTION_MODE == "anonymize"
 
 
@@ -48,7 +49,7 @@ def test_governance_doc_names_the_signed_day_count():
     line = row[0]
     assert "UNSIGNED" not in line, "row is still UNSIGNED — the owner decision must be signed in"
     assert f"{sr.RETENTION_WINDOW_DAYS} days" in line, f"signed row must name the {sr.RETENTION_WINDOW_DAYS}-day window"
-    assert "18 month" in line and "anonymize" in line.lower()
+    assert "at unsubscribe" in line and "anonymize" in line.lower()
 
 
 # ── 3. Pure logic: eligible rows anonymized, the rest preserved ─────────────────
@@ -133,9 +134,10 @@ def _import(env):
 
 
 def _fixture_rows():
-    """A mix that exercises every branch: one long-ago unsubscribed (eligible), one
-    recently unsubscribed (too new), one active confirmed (never), one already
-    anonymized (idempotent)."""
+    """A mix that exercises every branch under the window-0 policy: two unsubscribed
+    rows still carrying plaintext (BOTH eligible — one legacy-old, one recent: with
+    anonymize-at-unsubscribe there is no such thing as "too new to scrub"), one
+    active confirmed (never touched), one already anonymized (idempotent)."""
     old_iso = (datetime.now(timezone.utc) - timedelta(days=800)).isoformat()
     recent_iso = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
     return [
@@ -153,7 +155,7 @@ def test_sweep_dry_run_changes_nothing(env):
     body = json.loads(resp["body"])
     assert resp["statusCode"] == 200
     assert body["plan"]["apply"] is False
-    assert body["plan"]["eligible"] == 1  # only EMAIL#old
+    assert body["plan"]["eligible"] == 2  # EMAIL#old + EMAIL#recent — window 0, both carry plaintext
     assert body["plan"]["window_days"] == sr.RETENTION_WINDOW_DAYS
     m.table.put_item.assert_not_called()
     m.table.delete_item.assert_not_called()
@@ -165,16 +167,16 @@ def test_sweep_apply_anonymizes_only_eligible_and_preserves_count(env):
         with patch.object(m, "_write_audit_record") as audit:
             resp = m.lambda_handler({"subscriber_retention_sweep": True, "apply": True}, None)
     body = json.loads(resp["body"])
-    assert body["acted"] == 1
-    # Exactly one PutItem — the eligible row, rebuilt with email redacted. No row deleted
-    # (anonymize mode) → the subscriber COUNT is unchanged.
+    assert body["acted"] == 2
+    # One PutItem per plaintext-carrying unsubscribed row, rebuilt with email redacted.
+    # No row deleted (anonymize mode) → the subscriber COUNT is unchanged.
     m.table.delete_item.assert_not_called()
-    m.table.put_item.assert_called_once()
-    put = m.table.put_item.call_args.kwargs["Item"]
-    assert put["sk"] == "EMAIL#old"
-    assert put["email"] == "[redacted]"
-    assert "ip_hash" not in put
-    assert put["status"] == "unsubscribed"  # confirmation/status preserved
+    puts = [c.kwargs["Item"] for c in m.table.put_item.call_args_list]
+    assert {p["sk"] for p in puts} == {"EMAIL#old", "EMAIL#recent"}
+    for put in puts:
+        assert put["email"] == "[redacted]"
+        assert "ip_hash" not in put
+        assert put["status"] == "unsubscribed"  # confirmation/status preserved
     assert audit.call_args.args[0] == "subscriber_retention_sweep"
 
 

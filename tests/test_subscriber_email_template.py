@@ -82,7 +82,10 @@ def test_extract_chronicle_preview_empty():
 
 
 def test_bug_fix_subscriber_email_variable():
-    """Verify the subscriber_email bug is fixed — should use subscriber.get('email')."""
+    """Verify the subscriber_email bug is fixed — should use subscriber.get('email').
+
+    #3044: the unsubscribe link is now a signed token — the html must carry the
+    tokenized link and must NOT carry the subscriber's plaintext address anywhere."""
     from chronicle_email_sender_lambda import _build_subscriber_email
 
     installment = {"title": "Bug Test", "week_number": 1, "content_html": "<p>Test</p>"}
@@ -90,4 +93,5 @@ def test_bug_fix_subscriber_email_variable():
 
     # This should NOT raise NameError for 'subscriber_email'
     subject, html = _build_subscriber_email(installment, subscriber)
-    assert "bugtest%40example.com" in html  # unsubscribe URL contains URL-encoded email
+    assert "action=unsubscribe&t=" in html  # signed token link (conftest supplies UNSUB_TOKEN_SECRET)
+    assert "bugtest%40example.com" not in html and "bugtest@example.com" not in html  # no plaintext email in any URL

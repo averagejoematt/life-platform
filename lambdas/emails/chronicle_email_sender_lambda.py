@@ -39,7 +39,6 @@ import json
 import logging
 import os
 import time
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -130,6 +129,7 @@ def _chronicle_budget_paused() -> bool:
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 
 
 def _fmt_week(week_num) -> str:
@@ -390,7 +390,7 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
     subject = f'The Measured Life \u2014 Week {week_num}: "{title}"'
 
     sub_email = subscriber.get("email", "")
-    unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(sub_email)}"
+    unsub_url = unsub_url_or_fallback(sub_email, SITE_URL)  # #3044
 
     try:
         display_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%B %-d, %Y")

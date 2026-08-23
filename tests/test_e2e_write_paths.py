@@ -727,15 +727,69 @@ def test_subscribe_confirm_unsubscribe_lifecycle(wp):
     assert record["status"] == "confirmed" and "confirm_token" not in record
     assert len(wp.ses.sent) == 2  # welcome email
 
-    # Unsubscribe → non-destructive status flip (#1350: the row is RETAINED).
-    resp = wp.call_subscriber(method="GET", qs={"action": "unsubscribe", "email": SUB_EMAIL})
+    # #3044: the welcome email carries the SIGNED unsubscribe link — token, no
+    # plaintext address in any URL (the To: field is SES metadata, not a URL).
+    welcome_text = wp.ses.sent[1]["Content"]["Simple"]["Body"]["Text"]["Data"]
+    assert "action=unsubscribe&email=" not in welcome_text
+    unsub_match = re.search(r"action=unsubscribe&t=([A-Za-z0-9.]+)", welcome_text)
+    assert unsub_match, "welcome email must carry the signed unsubscribe link"
+    unsub_token = unsub_match.group(1)
+    assert SUB_EMAIL not in unsub_token and email_hash in unsub_token  # hash-carrying, PII-free
+
+    # A GET with NO token (and no legacy email param) cannot mutate subscription state.
+    resp = wp.call_subscriber(method="GET", qs={"action": "unsubscribe"})
+    assert resp["statusCode"] == 302 and "error=invalid_token" in resp["headers"]["Location"]
+    # Neither can a forged token.
+    forged = unsub_token[:-4] + ("0000" if not unsub_token.endswith("0000") else "1111")
+    resp = wp.call_subscriber(method="GET", qs={"action": "unsubscribe", "t": forged})
+    assert resp["statusCode"] == 302 and "error=invalid_token" in resp["headers"]["Location"]
+    record = wp.table.store[("USER#matthew#SOURCE#subscribers", f"EMAIL#{email_hash}")]
+    assert record["status"] == "confirmed"  # both rejected GETs mutated nothing
+
+    # Unsubscribe via the emailed token → anonymize-at-unsubscribe (#3044): the SAME
+    # write flips the status AND scrubs the PII. The deletion-evidence assertion: the
+    # plaintext address is GONE from the store the instant the redirect returns.
+    resp = wp.call_subscriber(method="GET", qs={"action": "unsubscribe", "t": unsub_token})
     assert resp["statusCode"] == 302 and "unsubscribed=true" in resp["headers"]["Location"]
     record = wp.table.store[("USER#matthew#SOURCE#subscribers", f"EMAIL#{email_hash}")]
     assert record["status"] == "unsubscribed" and record["unsubbed_at"]
+    assert record["email"] == "[redacted]" and record["anonymized_at"]
+    assert "ip_hash" not in record
+    assert record["email_hash"] == email_hash  # the suppression hash survives — that's the contract
+    assert SUB_EMAIL not in json.dumps({k: v for k, v in record.items()})
+
+    # Replay of the same (still-valid) token is a harmless no-op.
+    resp = wp.call_subscriber(method="GET", qs={"action": "unsubscribe", "t": unsub_token})
+    assert resp["statusCode"] == 302 and "unsubscribed=already" in resp["headers"]["Location"]
 
     # A bogus token never confirms.
     resp = wp.call_subscriber(method="GET", qs={"action": "confirm", "token": "0" * 64, "h": email_hash[:16]})
     assert resp["statusCode"] == 302 and "error=invalid_token" in resp["headers"]["Location"]
+
+
+def test_unsubscribe_legacy_email_param_grace_window(wp):
+    """#3044: pre-token `email=` links (already in inboxes) are honored until the
+    dated sunset — and the legacy path ALSO anonymizes on the spot. The harness
+    clock is frozen at 2026-07-15, inside the grace window."""
+    import hashlib
+
+    email_hash = hashlib.sha256(SUB_EMAIL.encode()).hexdigest()
+    wp.table.seed(
+        {
+            "pk": "USER#matthew#SOURCE#subscribers",
+            "sk": f"EMAIL#{email_hash}",
+            "email": SUB_EMAIL,
+            "email_hash": email_hash,
+            "status": "confirmed",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "ip_hash": "deadbeef",
+        }
+    )
+    resp = wp.call_subscriber(method="GET", qs={"action": "unsubscribe", "email": SUB_EMAIL})
+    assert resp["statusCode"] == 302 and "unsubscribed=true" in resp["headers"]["Location"]
+    record = wp.table.store[("USER#matthew#SOURCE#subscribers", f"EMAIL#{email_hash}")]
+    assert record["status"] == "unsubscribed"
+    assert record["email"] == "[redacted]" and record["anonymized_at"] and "ip_hash" not in record
 
 
 def test_subscribe_blocked_domain_is_silently_dropped(wp):

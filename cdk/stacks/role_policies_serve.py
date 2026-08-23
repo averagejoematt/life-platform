@@ -615,6 +615,11 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/ai-keys*"],
         ),
+        iam.PolicyStatement(
+            sid="SubscriberTokenSecret",  # #3044: HMAC key minting the signed unsubscribe link (common/unsubscribe_token.py).
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/subscriber-token-secret")],
+        ),
         # Day-2 bridge email reads the live dispatch cards from S3 (#352).
         # Without this grant the s3.get_object call raises AccessDenied and the
         # bridge falls back to generic FALLBACK_PAGES on every run.

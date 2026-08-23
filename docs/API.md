@@ -27,7 +27,7 @@ All responses: `Content-Type: application/json` (except OG image endpoints).
 | Read-only data endpoints (`/api/vitals`, `/api/labs`, etc.) | None — public |
 | Subscriber-gated endpoints | `X-Subscriber-Token` header (issued at `/api/subscribe/confirm`) |
 | AI endpoints (`/api/ask`, `/api/board_ask`) | Per-IP rate limit (no auth header) |
-| Subscribe / unsubscribe | Email-based double opt-in (token in URL) |
+| Subscribe / unsubscribe | Email-based double opt-in (stored confirm token) / signed HMAC unsubscribe token — no plaintext email in URLs (#3044) |
 
 ---
 
@@ -102,18 +102,31 @@ Q&A with health data context.
 
 ## Subscription endpoints
 
+All three routes are ONE Lambda (`email-subscriber`) behind ONE CloudFront path
+(`/api/subscribe*`), dispatched on the `action` query param — the separate
+`/api/subscribe/confirm` / `/api/unsubscribe` paths this section used to document never
+existed (corrected #3044, DIL-003).
+
 ### `POST /api/subscribe`
 Initiates double opt-in subscription.
-**Body:** `{ "email": "string" }`
-**Response:** `{ "ok": true, "message": "Check your email" }`
+**Body:** `{ "email": "string" }` (+ optional `source`, `utm_*` attribution fields)
+**Response:** `{ "status": "pending_confirmation", "message": "Check your inbox." }`
 **Rate limit:** 60 per 5 min per IP (in-Lambda DynamoDB atomic counter — WAF was removed 2026-06)
-**Sends:** Confirmation email with token link (`{base}/api/subscribe/confirm?token=...`)
+**Sends:** Confirmation email with token link (`{base}/api/subscribe?action=confirm&token=<64-hex>&h=<hash-prefix>`)
 
-### `GET /api/subscribe/confirm?token=<...>`
-Confirms subscription. Redirects to `/welcome` on success, `/subscribe?error=...` on failure.
+### `GET /api/subscribe?action=confirm&token=<64-hex>&h=<hash-prefix>`
+Confirms subscription (token random, stored server-side, 48h expiry). Redirects to
+`/subscribe/confirm/?confirmed=true` on success, `/subscribe/confirm/?error=...` on failure.
 
-### `GET /api/unsubscribe?token=<...>`
-Unsubscribes (non-destructive — sets `status=unsubscribed` per Raj's directive). Redirects to `/goodbye`.
+### `GET /api/subscribe?action=unsubscribe&t=<signed-token>`
+One-click unsubscribe (#3044). `t` is a signed short-lived token
+(`common/unsubscribe_token.py`: HMAC-SHA256 over the email HASH + expiry, 60-day
+validity — no plaintext email in any URL). Anonymize-at-unsubscribe: the same write
+flips `status=unsubscribed` AND redacts the plaintext email, keeping only the sha256
+suppression hash. A GET without a valid token cannot mutate subscription state.
+Legacy pre-token `email=<plaintext>` links are honored (logged) until **2026-09-22**,
+then rejected. Redirects to `/subscribe/confirm/?unsubscribed=true` (or
+`?error=invalid_token`).
 
 ---
 

@@ -346,7 +346,9 @@ def test_lock_email_carries_fingerprint_verify_and_unsubscribe():
     assert stamp["public_artifact_url"] in html
     assert "shasum -a 256" in html
     assert "/cockpit/" in html, "the CTA must point at the predict-the-week surface"
-    assert "action=unsubscribe" in html and "reader%2Btest%40example.com" in html
+    # #3044: signed-token unsubscribe — the link is present, the plaintext email is not.
+    assert "action=unsubscribe&t=" in html
+    assert "reader%2Btest%40example.com" not in html and "reader+test@example.com" not in html
     assert not _CYCLE_LANGUAGE.findall(re.sub(r"<[^>]+>", " ", html))
 
 

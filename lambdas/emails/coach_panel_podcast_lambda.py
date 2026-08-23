@@ -20,7 +20,6 @@ import importlib
 import json
 import os
 import re
-import urllib.parse
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -30,6 +29,7 @@ from ai.ai_context import build_experiment_phase_context, format_experiment_phas
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
+from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -1471,7 +1471,7 @@ def _subscriber_email(ep: dict, email: str) -> tuple:
     listen = f"{SITE}{ep.get('url', '/story/panel/')}"
     excerpt = ep.get("excerpt") or ""
     byline = ep.get("byline") or "Elena + a coach"
-    unsub = f"{SITE}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
+    unsub = unsub_url_or_fallback(email, SITE)  # #3044
     subject = f"The Panel — {title}"[:120]
     html = (
         f'<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#1a1a1a;line-height:1.55">'

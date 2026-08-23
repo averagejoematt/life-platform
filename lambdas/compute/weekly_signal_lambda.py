@@ -19,7 +19,6 @@ import json
 import logging
 import os
 import time
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -96,6 +95,7 @@ BOARD_ROTATION = [
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 
 
 def _s3_json(key):
@@ -321,7 +321,7 @@ def lambda_handler(event, context):
 
         if dry_run:
             preview_email = (subscribers[0].get("email") if subscribers else "") or "preview@example.com"
-            unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(preview_email)}"
+            unsub_url = unsub_url_or_fallback(preview_email, SITE_URL)  # #3044
             subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url)
             logger.info(
                 "[DRY_RUN] Weekly Signal week %d would send to %d subscriber(s) — sending nothing",
@@ -355,7 +355,7 @@ def lambda_handler(event, context):
             if not email:
                 continue
 
-            unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
+            unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #3044
             subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url)
 
             try:
