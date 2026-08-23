@@ -239,6 +239,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps .claude/commands + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
         "test_budget_guard_fail_closed_2824.py",  # #2824: os.walk sweep — no lambdas/mcp module may re-declare FAIL_CLOSED_FEATURES; membership lives in budget_guard alone
+        "test_csp_hardening_3048.py",  # #3048: site/ tree sweep — no non-legacy page may reintroduce an executable inline script; repo-shape, pre-merge
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
         # #2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔

@@ -39,11 +39,25 @@ import v4_build_permanence_terms as builder  # noqa: E402
 from operational import permanence_terms as terms  # noqa: E402
 
 PAGE = os.path.join(ROOT, "site", "privacy", "index.html")
+# #3048 moved the live-panel script out of the page (CSP: no inline scripts) —
+# the behavior these tests guard now ships in this asset, and the page's part
+# of the contract is REFERENCING it (an unreferenced asset is dead code, the
+# extract-the-right-real-source trap).
+PANEL_JS = os.path.join(ROOT, "site", "assets", "js", "privacy_permanence.js")
 
 
 @pytest.fixture(scope="module")
 def page() -> str:
     with open(PAGE, encoding="utf-8") as fh:
+        return fh.read()
+
+
+@pytest.fixture(scope="module")
+def panel_js(page: str) -> str:
+    assert (
+        "/assets/js/privacy_permanence.js" in page
+    ), "the page no longer loads the extracted live-panel script — its behavior is dead code"
+    with open(PANEL_JS, encoding="utf-8") as fh:
         return fh.read()
 
 
@@ -134,34 +148,35 @@ def test_the_live_panel_reads_both_published_documents(page: str):
         assert f'data-perm="{slot}"' in page, f"the live panel has no {slot} slot"
 
 
-def test_absent_numbers_are_stated_absent_not_blank(page: str):
+def test_absent_numbers_are_stated_absent_not_blank(panel_js: str):
     """ADR-104 on the front end: a fetch that fails must say so. Guarding the
     literal because a refactor that drops it renders an empty box, which reads
-    as zero."""
-    assert 'var ABSENT = "not available";' in page
-    assert 'el.setAttribute("data-absent", "1")' in page
+    as zero. (#3048: the script lives in privacy_permanence.js now.)"""
+    assert 'var ABSENT = "not available";' in panel_js
+    assert 'el.setAttribute("data-absent", "1")' in panel_js
 
 
-def test_a_malformed_two_hundred_is_explained_not_silently_blank(page: str):
+def test_a_malformed_two_hundred_is_explained_not_silently_blank(panel_js: str):
     """Render QA found it: a manifest that answers 200 with a half-written body
     left four slots reading "not available" with no note. A number that is
     absent because the document was incomplete must say so as loudly as one
     absent because the document was missing — otherwise the reader cannot tell
     a broken build from a build that has not happened."""
-    assert "var incomplete = [];" in page, "the incomplete-document branch is gone"
-    assert "did not carry every number this panel states" in page
-    assert "Could not read " in page
-    assert "var mismatch = null;" in page, "the edition mismatch must compose with the absence notes, not replace them"
+    assert "var incomplete = [];" in panel_js, "the incomplete-document branch is gone"
+    assert "did not carry every number this panel states" in panel_js
+    assert "Could not read " in panel_js
+    assert "var mismatch = null;" in panel_js, "the edition mismatch must compose with the absence notes, not replace them"
 
 
-def test_the_download_hedge_is_gated_on_the_manifest_having_failed(page: str):
+def test_the_download_hedge_is_gated_on_the_manifest_having_failed(page: str, panel_js: str):
     """If only the continuity clock is unreadable, the panel has already
     published this archive's build time, size and checksum — warning that the
     download "may not answer" would contradict evidence the page is showing on
     the same screen. The hedge belongs to the manifest's failure alone."""
-    assert 'unreadable.indexOf("the manifest") !== -1' in page, "the download hedge is no longer gated on the manifest failing"
+    assert 'unreadable.indexOf("the manifest") !== -1' in panel_js, "the download hedge is no longer gated on the manifest failing"
     hedge = "The download address above is fixed and does not move"
-    assert page.count(hedge) == 1, "the hedge appears outside its guard"
+    assert panel_js.count(hedge) == 1, "the hedge appears outside its guard"
+    assert hedge not in page, "the hedge is baked into static copy — it must only render behind the manifest-failure guard"
 
 
 # ── the generator refuses to write a page it cannot verify ──────────────────
