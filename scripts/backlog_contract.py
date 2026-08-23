@@ -24,7 +24,7 @@ THE CANONICAL SCORE LINE (ADR-099 amendment 2026-07-27, #1865)
     **Score:** P2 · Impact 3 × Confidence 1.0 / Effort S(1) = 3.00 → Now
 
   prio token P0–P3 · Impact <int> × Confidence <float> / Effort <S|M|L>(<int>)
-  = <float> → <Now|Next|Later>, optionally followed by a free-text
+  = <float> → <Now|Next|Later|Roadmap>, optionally followed by a free-text
   parenthetical rationale (the sanctioned "(severity→milestone disposition,
   PM-set)" override lives there). The separators are U+00B7 MIDDLE DOT, U+00D7
   MULTIPLICATION SIGN and U+2192 RIGHTWARDS ARROW — not ASCII lookalikes.
@@ -61,7 +61,7 @@ SCORE_LINE_RE = re.compile(
     r"Confidence[ \t]+(?P<confidence>\d+(?:\.\d+)?)[ \t]+/[ \t]+"
     r"Effort[ \t]+(?P<effort>[SML])\((?P<effort_points>\d+)\)[ \t]+=[ \t]+"
     r"(?P<value>\d+(?:\.\d+)?)[ \t]+→[ \t]+"
-    r"(?P<milestone>Now|Next|Later)"
+    r"(?P<milestone>Now|Next|Later|Roadmap)"
     r"(?:[ \t].*)?$"
 )
 
@@ -96,8 +96,12 @@ EPIC_LINE_PREFIX_RE = re.compile(r"^\*\*Epic:\*\*", re.IGNORECASE)
 
 ANY_HEADING_RE = re.compile(r"^#{1,6}[ \t]")
 
-# Now first — the tiebreak direction, and the fall-through order.
-MILESTONE_ORDER: Tuple[str, ...] = ("Now", "Next", "Later")
+# Now first — the tiebreak direction, and the fall-through order. Roadmap is the
+# ADR-099 amendment (2026-08-22): product-vision items parked OUTSIDE the debt
+# corpus — ranked last, reached by the walk only when Now/Next/Later are empty,
+# promoted to Now explicitly (one pick per experiment cycle), and exempt from
+# later_staleness (a parked idea is not stale debt).
+MILESTONE_ORDER: Tuple[str, ...] = ("Now", "Next", "Later", "Roadmap")
 
 BLOCKED_LABELS = ("gate:owner",)
 BLOCKED_LABEL_PREFIXES = ("blocked:",)
@@ -114,7 +118,7 @@ class Score(NamedTuple):
     effort: str  # "S" | "M" | "L"
     effort_points: int
     value: float  # the stored rank — impact * confidence / effort_points
-    milestone: str  # "Now" | "Next" | "Later"
+    milestone: str  # "Now" | "Next" | "Later" | "Roadmap"
     raw: str  # the source line, verbatim
 
 

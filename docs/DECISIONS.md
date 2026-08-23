@@ -3158,6 +3158,20 @@ S5 is #1868 (open-issue backfill); S10 is #1873 (closed-epic closing comments).
 
 **Regression guard.** `tests/test_backlog_hygiene_gate.py` mutation-proves both directions: `test_cli_default_mode_is_now_blocking_and_exits_one` (a deliberately non-conforming issue, zero flags, must exit 1) and `test_cli_is_fail_open_when_gh_is_unavailable_in_both_modes` (a simulated `gh`/network failure, must exit 0 in every mode including the new default). `tests/test_gate_registry_1349.py::test_gate_registry_no_longer_references_the_deleted_1349_script` guards against a dangling doc reference to the deleted file.
 
+### ADR-099 Amendment (2026-08-22 — the `Roadmap` milestone: product vision leaves the debt corpus)
+
+**Context.** The open-issue corpus had become two documents living in one list. Measured 2026-08-22: of 85 open issues, 26 were product-vision items filed by the July planning reviews (the frontier/voice-studio/social-boards cohorts plus their epics) — none started, none blocking anything, none broken. The other ~59 were live defects, lying instruments, and delivery-machinery debt filed by August review sweeps. Counting both in one number made "open issues" mean nothing: sessions chased a total that review cadence, not defect rate, controlled, and a 60-day-stale product idea drew the same staleness advisory as abandoned debt.
+
+**Decision.** A fourth milestone, **`Roadmap`**, joins `Now`/`Next`/`Later` in `MILESTONE_ORDER` (last). Product-vision items — ideas whose absence breaks nothing — live there. Semantics:
+
+1. **Out of the debt corpus.** The wrap-reported open count and any "are we draining the backlog" reading track `Now`/`Next`/`Later` only. `Roadmap` is a parked roadmap, reported separately when reported at all.
+2. **Ranked last, never surfaced by default.** `backlog_next.py`'s fall-through walk reaches `Roadmap` only when the three debt milestones are empty; seeding a session from it is an explicit `--milestone Roadmap` act.
+3. **One pick per experiment cycle.** The sanctioned path out is promotion to `Now` — deliberately, at most about one product item per cycle — not gradual leakage.
+4. **Exempt from `later_staleness`.** A parked idea is not stale debt; the 60-day advisory keeps meaning "this debt went cold."
+5. **The filing contract is unchanged** otherwise: `Roadmap` issues keep the full ADR-099 body shape, and the score line's `→ Roadmap` must agree with the milestone like any other.
+
+**Consequences.** The tracked number falls from 85 to ~59 with no code and no closures — and that is the point: the remaining number is one a session can actually drain, and movement in it means defects fixed rather than reviews not run. The July cohort stops accruing cognitive rent as "open problems" while staying findable, scored, and promotable.
+
 ## ADR-100: The budget ceiling protects readers — the public ask endpoints degrade LAST
 
 **Date:** 2026-07-03 · **Status:** Accepted · **Amends:** ADR-063
