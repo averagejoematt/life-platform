@@ -28,6 +28,7 @@ from web.site_api_common import (
     PT,
     _ok,
     _window_span,
+    logger,
     night_of_for,
 )
 
@@ -48,6 +49,141 @@ def _sane_sleep_score(raw, hours, whoop_quality):
     if raw < 40 and (hrs >= 6 or wq >= 70):
         return round(wq, 0) if wq else None
     return raw
+
+
+# ── #2921: per-device stage blocks, each internally self-consistent ──────────
+#
+# THE BUG (root-caused in the issue). `/api/sleep_detail`'s flat `sleep_detail`
+# object interleaves Eight Sleep and Whoop fields with no source attribution:
+# `total_sleep_hours` (Eight Sleep) sat beside `deep_sleep_hours`/`rem_sleep_hours`
+# (Whoop), and `deep_pct`/`rem_pct`/`light_pct` (Eight Sleep's own share of ITS
+# OWN total) got read as if they described the Whoop hours next to them. Every
+# individual field was correct; the juxtaposition implied one coherent nightly
+# breakdown that never existed — two independent sensors' measurements of the
+# same night, not a discrepancy in either.
+#
+# THE FIX IS ADDITIVE (issue acceptance box (b)), not a rename. The pre-existing
+# flat fields are read by `/legacy` (frozen, never edited) and by ~7 tests that
+# each pin a hard-won historical incident (#1968, #2344, #2575, #2613) — so they
+# stay exactly as they are, kept for compatibility. New nested `eightsleep` and
+# `whoop` blocks (built below, in `sleep_detail()`) each carry ONLY that device's
+# own numbers: its own total, its own stage hours, and a `deep_pct`/`rem_pct`/
+# `light_pct` computed from ITS OWN hours ÷ ITS OWN total — never cross-device.
+# Whoop's percentages did not previously exist on this payload at all (only
+# Eight Sleep's did); they are computed here the same way the platform's other
+# Whoop-normaliser already does it (`mcp/helpers.py::normalize_whoop_sleep`,
+# not imported here — site-api does not import mcp/, see the sleep_correlations
+# docstring above — so the formula is replicated, not shared).
+def _stage_consistency_findings(
+    label, total_hours, deep_hours, rem_hours, light_hours, deep_pct, rem_pct, light_pct, tol_hours=0.15, tol_pct=8.0
+):
+    """#2921 — ONE device's own stage block must be internally consistent: its own
+    deep+rem+light hours must not exceed its own total by more than rounding slop, and
+    each of its own *_pct must match its own *_hours / total within tolerance. Never
+    compares across devices — call once per device block. Returns a list of finding
+    strings (empty = consistent)."""
+    findings = []
+    stage_hours = [h for h in (deep_hours, rem_hours, light_hours) if h is not None]
+    if total_hours is not None and stage_hours:
+        stage_sum = sum(stage_hours)
+        if stage_sum - float(total_hours) > tol_hours:
+            findings.append(
+                f"{label}: stage hours sum to {round(stage_sum, 2)}h, which exceeds this device's own "
+                f"total_sleep_hours ({round(float(total_hours), 2)}h) by more than {tol_hours}h — sleep cannot "
+                f"total less than its own stages"
+            )
+    if total_hours and float(total_hours) > 0:
+        for name, hours, pct in (("deep", deep_hours, deep_pct), ("rem", rem_hours, rem_pct), ("light", light_hours, light_pct)):
+            if hours is None or pct is None:
+                continue
+            expected_pct = float(hours) / float(total_hours) * 100
+            if abs(expected_pct - float(pct)) > tol_pct:
+                findings.append(
+                    f"{label}: {name}_pct={pct} does not match {name}_hours ({hours}) / total_sleep_hours "
+                    f"({total_hours}) = {round(expected_pct, 1)}% within {tol_pct} points"
+                )
+    return findings
+
+
+def _eightsleep_block(date, r, sleep_score):
+    """#2921 — Eight Sleep's own self-consistent stage block for one night. `r` is
+    that night's raw Eight Sleep DDB row. `sleep_score` is passed in (rather than
+    re-read off `r`) so this block's score agrees byte-for-byte with whatever
+    figure the rest of the payload publishes for that night — the summary uses
+    the GATED `_sane_sleep_score`, and a trend row uses its own gated value."""
+    r = r or {}
+    return {
+        "as_of_date": date,
+        "night_of": night_of_for(date),
+        "sleep_score": round(float(sleep_score), 0) if sleep_score else None,
+        "sleep_efficiency_pct": round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
+        "total_sleep_hours": round(float(r["sleep_duration_hours"]), 1) if r.get("sleep_duration_hours") else None,
+        "deep_hours": round(float(r["deep_hours"]), 2) if r.get("deep_hours") else None,
+        "rem_hours": round(float(r["rem_hours"]), 2) if r.get("rem_hours") else None,
+        "light_hours": round(float(r["light_hours"]), 2) if r.get("light_hours") else None,
+        # Eight Sleep's OWN percentages — computed at ingestion from ITS OWN
+        # hours ÷ ITS OWN total-sleep-time (#2939's reconciliation guard; omitted
+        # as a set, honest-absence, on a night whose stages don't reconcile).
+        "deep_pct": round(float(r["deep_pct"]), 1) if r.get("deep_pct") else None,
+        "rem_pct": round(float(r["rem_pct"]), 1) if r.get("rem_pct") else None,
+        "light_pct": round(float(r["light_pct"]), 1) if r.get("light_pct") else None,
+    }
+
+
+def _whoop_block(date, w):
+    """#2921 — Whoop's own self-consistent stage block for one night. `w` is that
+    night's raw Whoop DDB row (or {} when Whoop has no record for the night).
+
+    deep_pct/rem_pct/light_pct are NEW on this endpoint — Whoop never published
+    its own stage percentages here before, only Eight Sleep's did — computed from
+    Whoop's own hours ÷ Whoop's own total, the identical formula the platform's
+    other Whoop normaliser already uses (`mcp/helpers.py::normalize_whoop_sleep`).
+    Not imported from there: site-api does not import mcp/ (see the
+    sleep_correlations docstring above), so the formula is replicated in full
+    here rather than shared."""
+    w = w or {}
+    has_w = bool(w)
+    total = None
+    try:
+        total = float(w["sleep_duration_hours"]) if w.get("sleep_duration_hours") else None
+    except (TypeError, ValueError):
+        total = None
+    deep = _f(w.get("slow_wave_sleep_hours"))
+    rem = _f(w.get("rem_sleep_hours"))
+    light = _f(w.get("light_sleep_hours"))
+    return {
+        "as_of_date": date if has_w else None,
+        "night_of": night_of_for(date) if has_w else None,
+        "quality_score": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
+        "total_sleep_hours": round(total, 1) if total else None,
+        "deep_hours": round(deep, 2) if deep else None,
+        "rem_hours": round(rem, 2) if rem else None,
+        "light_hours": round(light, 2) if light else None,
+        "sleep_start": w.get("sleep_start"),
+        "deep_pct": round(deep / total * 100, 1) if deep is not None and total else None,
+        "rem_pct": round(rem / total * 100, 1) if rem is not None and total else None,
+        "light_pct": round(light / total * 100, 1) if light is not None and total else None,
+    }
+
+
+def _log_stage_consistency(label, block):
+    """#2921 — best-effort, log-only. Never raises, never changes the HTTP response:
+    a data-quality anomaly must not 500 a reader-facing endpoint."""
+    try:
+        findings = _stage_consistency_findings(
+            label,
+            block.get("total_sleep_hours"),
+            block.get("deep_hours"),
+            block.get("rem_hours"),
+            block.get("light_hours"),
+            block.get("deep_pct"),
+            block.get("rem_pct"),
+            block.get("light_pct"),
+        )
+        for finding in findings:
+            logger.warning("[sleep_device_consistency] %s", finding)
+    except Exception as e:  # pragma: no cover — diagnostic only, must never break the response
+        logger.warning("[sleep_device_consistency] check itself failed: %s", e)
 
 
 # ── Cross-source correlation board (sleep §8, Phase 2) ───────────────────────
@@ -417,10 +553,11 @@ def sleep_detail(*, _g) -> dict:
         if date < EXPERIMENT_START:
             continue  # Don't include pre-experiment days in trend output
         w = whoop_by_date.get(date, {})
+        _row_score = _sane_sleep_score(r.get("sleep_score"), w.get("sleep_duration_hours"), w.get("sleep_quality_score"))
         trend.append(
             {
                 "date": date,
-                "sleep_score": _sane_sleep_score(r.get("sleep_score"), w.get("sleep_duration_hours"), w.get("sleep_quality_score")),
+                "sleep_score": _row_score,
                 "efficiency": round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
                 "hours": round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
                 "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
@@ -433,6 +570,13 @@ def sleep_detail(*, _g) -> dict:
                 "hrv": round(float(w["hrv"]), 1) if w.get("hrv") else None,
                 "rhr": round(float(w["resting_heart_rate"]), 0) if w.get("resting_heart_rate") else None,
                 "sleep_start": w.get("sleep_start"),
+                # #2921 — the same per-device, self-consistent blocks as the
+                # sleep_detail summary below, one per trend row. This is what
+                # stops a trend row's Whoop `sleep_start` (a raw UTC instant)
+                # from sitting in a device-ambiguous flat row with no frame of
+                # its own — nested under `whoop`, it carries its OWN night_of.
+                "eightsleep": _eightsleep_block(date, r, _row_score),
+                "whoop": _whoop_block(date, w),
             }
         )
 
@@ -557,6 +701,18 @@ def sleep_detail(*, _g) -> dict:
     avg_wake = round(sum(wake_times) / len(wake_times), 2) if wake_times else None
     social_jet_lag_hrs = round(abs((avg_bed_wd or 0) - (avg_bed_we or 0)), 1) if avg_bed_wd is not None and avg_bed_we is not None else None
 
+    # ── #2921: per-device, internally self-consistent blocks ─────────────────
+    # ADDITIVE — every flat field above stays exactly as it was (read by
+    # /legacy, pinned by #1968/#2344/#2575/#2613's tests). These are the
+    # corrected surface: each block carries ONLY its own device's numbers, so a
+    # reader who wants one coherent nightly breakdown picks ONE block instead of
+    # having the API pick fields from both and imply they were the same night's
+    # single measurement (they never were — see docs/SCHEMA.md's SoT ruling).
+    _eightsleep_summary = _eightsleep_block(latest_date, latest, score_today)
+    _whoop_summary = _whoop_block(latest_date, whoop_latest)
+    _log_stage_consistency(f"eightsleep {latest_date}", _eightsleep_summary)
+    _log_stage_consistency(f"whoop {latest_date}", _whoop_summary)
+
     return _ok(
         {
             "sleep_detail": {
@@ -605,6 +761,12 @@ def sleep_detail(*, _g) -> dict:
                 "frame": NIGHT_OF_FRAME,
                 "night_of": _night_of,
                 "figure_scope": _figure_scope,
+                # #2921 — the corrected, per-device surface. Each block is
+                # internally self-consistent by construction (own hours ÷ own
+                # total = own pct); never blend a figure from one block with a
+                # figure from the other.
+                "eightsleep": _eightsleep_summary,
+                "whoop": _whoop_summary,
                 "avg_bedtime": _fmt_hour(avg_bed) if avg_bed is not None else None,
                 "avg_bedtime_weekday": _fmt_hour(avg_bed_wd) if avg_bed_wd is not None else None,
                 "avg_bedtime_weekend": _fmt_hour(avg_bed_we) if avg_bed_we is not None else None,

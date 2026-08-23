@@ -579,6 +579,33 @@ Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM
 | `wake_hour` | number | Hour of wake (derived) |
 | `sleep_midpoint_hour` | number | Midpoint hour (derived) |
 
+**SoT ruling — sleep duration/staging (#2921):** Whoop (wrist HRV/motion) and Eight
+Sleep (mattress pressure sensor) each independently measure sleep duration, stage
+breakdown (deep/rem/light), and efficiency for the same physical night, using
+different sensing methods. **Neither is SoT for the other; there is no single
+"sleep duration" truth surface, by design** — the SOT-Domains table above names
+Whoop for Sleep Duration & Staging (coaching/scoring reads Whoop) and Eight Sleep
+for Sleep Environment only, but that ruling governs which device DRIVES scoring —
+it does not license blending one device's total against the other's stage hours,
+or one device's percentage against the other's hours, into one implied breakdown.
+`/api/sleep_detail` did exactly that until #2921: `total_sleep_hours` (Eight
+Sleep) sat beside `deep_sleep_hours`/`rem_sleep_hours` (Whoop), and Eight Sleep's
+own `deep_pct`/`rem_pct`/`light_pct` (its share of ITS OWN total) read as if they
+described the Whoop hours next to them — every field individually correct, the
+juxtaposition false. The endpoint now publishes both devices' own self-consistent
+blocks (`sleep_detail.eightsleep`, `sleep_detail.whoop`, plus one pair per
+`sleep_trend` row) — each built from that device's own hours ÷ that device's own
+total, never blended. The pre-existing flat top-level fields (`deep_pct`/
+`rem_pct`/`light_pct` are Eight Sleep's own; `deep_sleep_hours`/`rem_sleep_hours`
+are Whoop's own; `total_sleep_hours` is Eight Sleep's own; `whoop_hours`/
+`whoop_quality` are Whoop's own) are kept for compatibility — read by `/legacy`
+and pinned by #1968/#2344/#2575/#2613's tests — but were never meant to be read as
+one merged breakdown; that they could be read that way is the actual historical
+defect, not a documentation gap. A consuming surface that wants one internally
+coherent stage picture must pick ONE block. Same established pattern as
+`sleep_detail.recovery_night_of` (#495/M-9): borrowing a figure across a device
+boundary is fine — SAYING SO, every time, is the rule.
+
 ### hevy (strength training)
 Hevy data is stored at the workout and set level, not day-level aggregates. Access via strength-specific MCP tools (`get_exercise_history`, `get_strength_prs`, etc.) rather than `get_date_range`.
 
