@@ -66,6 +66,7 @@ workflow's header comment for the exact cadence split.
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 # Default target is live prod. The PR-time render gate (tests/pr_render_gate.py)
@@ -118,6 +119,42 @@ import leak_token_sweep  # noqa: E402  (#1448 — pure module, no Playwright imp
 from qa_manifest import leak_scan_paths, visual_pages  # noqa: E402
 
 _API_SEQUENCING_REGISTRY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "deploy", "api_deploy_sequencing.json")
+
+# ── #2978: confirm-before-fail — the deploy-race class's ONE primitive ─────────
+# The shape-(a) record (5 closed per-symptom issues, rate 1 per 1.5 days and
+# worsening): smoke/visual-QA measuring the edge mid-invalidation, a cold
+# Lambda's first hit, an asset race, an empty first readout — each a transient
+# that reds a green deploy and auto-rolls it back. The reader-truth gate already
+# proved the answer (#2741 confirm-before-fail): a deterministic FAIL only gates
+# after it REPRODUCES on one re-probe. Crucially the confirm path COUNTS AND
+# PRINTS every confirmed transient (ADR-104) — the race rate stays measurable
+# for #2978's 30-day re-measure even though it no longer reds deploys.
+QA_CONFIRM_ATTEMPTS = int(os.environ.get("VISUAL_QA_CONFIRM_ATTEMPTS", "1"))
+QA_CONFIRM_DELAY_S = float(os.environ.get("VISUAL_QA_CONFIRM_DELAY_S", "15"))
+
+
+def confirm_before_fail(first, reprobe, sleeper=None, attempts=None, delay=None):
+    """#2978: return `first` unless it FAILed, in which case re-probe once after
+    a bounded delay. A clean re-probe records PASS + a visible confirmed-transient
+    warning (carrying the first probe's issues as evidence); a reproduced failure
+    returns the SECOND result stamped as reproduced — fresher evidence, and the
+    stamp says the race was ruled out."""
+    attempts = QA_CONFIRM_ATTEMPTS if attempts is None else attempts
+    if first.get("status") != "FAIL" or attempts < 1:
+        return first
+    delay = QA_CONFIRM_DELAY_S if delay is None else delay
+    print(f"  ⟳ {first.get('path')}: FAIL on first probe — confirming once after {delay:g}s before it can gate (#2978)")
+    (sleeper or time.sleep)(delay)
+    second = reprobe()
+    evidence = "; ".join(first.get("issues") or [])[:300]
+    if second.get("status") == "PASS":
+        second["warnings"] = list(second.get("warnings") or []) + [
+            f"confirmed-transient (#2978 deploy-race): first probe failed [{evidence}], clean on re-probe"
+        ]
+        second["confirmed_transient"] = True
+    else:
+        second["issues"] = list(second.get("issues") or []) + ["(reproduced on #2978 confirm re-probe — not a transient)"]
+    return second
 
 
 def _pending_deploy_routes() -> set:
@@ -1215,15 +1252,19 @@ def run_sweep(
 
         for page_def in sweep_pages(pages or PAGES, max_tier):
             # --reader-truth needs each page's rendered innerText (the prose dump).
-            result = capture_page(
-                context,
-                page_def,
-                screenshot_dir,
-                save_screenshots,
-                capture_prose=reader_truth,
-                a11y_baseline=a11y_baseline,
-                theme=color_scheme,
-            )
+            def _probe(pd=page_def):
+                return capture_page(
+                    context,
+                    pd,
+                    screenshot_dir,
+                    save_screenshots,
+                    capture_prose=reader_truth,
+                    a11y_baseline=a11y_baseline,
+                    theme=color_scheme,
+                )
+
+            # #2978: a deterministic FAIL only gates after it reproduces once.
+            result = confirm_before_fail(_probe(), _probe)
             results.append(result)
             icon = "✅" if not result["issues"] else "❌"
             n_warn = len(result["warnings"])
@@ -1343,6 +1384,13 @@ def run_sweep(
     warns = sum(len(r.get("warnings", [])) for r in results)
     print(f"\n{'=' * 56}")
     print(f"Visual QA: {passed} passed, {failed} failed, {unevaluated} unevaluated, {warns} warning(s) across {len(results)} pages")
+    # #2978: confirmed transients are the deploy-race rate, kept measurable —
+    # one line per run so the 30-day re-measure can count them from CI logs.
+    transients = sum(1 for r in results if r.get("confirmed_transient"))
+    if transients:
+        print(
+            f"Confirmed-transient (#2978): {transients} page(s) failed the first probe and passed the confirm — the race fired, nothing gated"
+        )
     for r in results:
         if r.get("ai_unevaluated"):
             print(f"  ❌ UNEVALUATED — the AI oracle never saw {r['page']} ({r['path']}): {str(r['ai_unevaluated'])[:120]}")
