@@ -55,7 +55,7 @@ named revisit trigger). A finding is not "answered" until its row cites live evi
 | 015 CSP unsafe-inline + jsdelivr | **CONFIRMED** | `csp.py` ships both (ADR-057 W-08 accepted); `a11y_audit.py:86` coupled | D1 CSP hardening |
 | 016 bundled/static/stale secrets | **CONFIRMED** | `ingestion-keys` bundle; static provider keys; `notion` retire-candidate live | #2890 (re-scoped), D1 |
 | 017 native-layer scanning | **STALE** | `pip_audit_lambda` coverage guard reds RED on unscanned layer; SBOM (syft) emitted; pip-audit enforced | closed by prior work |
-| 018 CodeQL backlog | **STALE-as-filed / REGRESSED** | #1902 backlog gone, but **7 open alerts (2 high)** regrown 13-14d on main; CONVENTIONS "steady-state 0" false today | D0.7 triage |
+| 018 CodeQL backlog | **STALE-as-filed / REGRESSED → TRIAGED 08-23** | D0.7 done: #151 js/redos FIXED (d02e64d63); #152 dismissed false-positive (integer counter, name heuristic); #153–157 dismissed intentional (emoji-block ranges). Open=1 pending re-scan of the fix; sentinel can-it-fail question filed on #2578 | D0.7 complete; #3047 closes on verified 0 |
 | 021 auto site-deploy vs narrative | **CONFIRMED** | site-deploy.yml no approval by design (#750); org-chart essay claims universal click | D0.5 essay correction |
 | 023 heartbeat silent-fail | **STALE** | #1196 fixed; `test_heartbeat_completeness.py` + live liveness gauge | — |
 | 024 clock-based sequencing | **CONFIRMED** | 5 compute lambdas run blind on cron; no completeness manifest | D3 source-completeness contract |
@@ -82,7 +82,7 @@ named revisit trigger). A finding is not "answered" until its row cites live evi
 ## Findings our verification produced (not in the report)
 
 1. `main` has **no required status checks at all** — `main-required-fast-lane` unapplied; CONTRIBUTING's "PRs required" is false. → D0.6.
-2. **CodeQL regrew 7 alerts (2 high)**, one a recurrence of #1902's clear-text-logging class; `drift_sentinel.check_codeql_alerts` did not surface it → a #2578 can-it-fail question. → D0.7.
+2. **CodeQL regrew 7 alerts (2 high)**, one a recurrence-shaped hit on #1902's clear-text-logging class; `drift_sentinel.check_codeql_alerts` did not surface it → a #2578 can-it-fail question. → D0.7. **Triaged 2026-08-23: 1 fixed, 6 dismissed with reasons (see DIL-018 row); the "recurrence" was a name-heuristic false positive on an integer counter.**
 3. `budget_guard` tier-3 hard stop **shares the fail-open SSM path** — a grant regression silently disables the ceiling. → #2824 / D1.
 4. `check_doc_facts.py` **scans no `.js`** — the site's most-quoted number ships un-guarded. → D0.5 / D2.
 5. Privacy-tier registry and DATA_GOVERNANCE prose are **unreconciled twin sources**. → D0.3.
