@@ -916,7 +916,11 @@ would catch THIS class of defect?" in one glance. This table is a routing index,
 restatement: each row is a one-line pointer to the section/file that owns the rule —
 read that section for the incident narrative and the exact mechanics.
 
-**Wrap gates** (session-close, `.claude/commands/wrap.md` — run every `/wrap`):
+**Wrap gates** (session-close, `.claude/commands/wrap.md` — run every `/wrap`; since
+#3007 the battery runs as ONE batched pass — `scripts/wrap_gates.py` gathers the
+non-handover-reading gates in parallel before the handover is written, and
+`scripts/wrap_gates.py --verify` runs the handover-reading gates before the wrap
+commit — the step letters below stay the per-gate contract anchors):
 
 | Defect class | Owning gate | Where |
 |---|---|---|
@@ -937,6 +941,8 @@ read that section for the incident narrative and the exact mechanics.
 | A CloudWatch alarm fires and clears between wraps — invisible to current-state duration by construction (a 24h-window alarm can flap with 1–3 min dwells; measured 35 cycles off one planted datapoint) | Fired-and-cleared flap detector folded into the alarm-citation gate (#2912), step (e10) — reads `describe-alarm-history` transitions over the same 72h window; a transition count is the honest signal, current-state duration is not (ADR-104) | `scripts/check_alarm_citations.py::flapped_uncited`; `docs/alarm_citations.json` |
 | A `::warning::` annotation on green main (e.g. the duration-budget warner below) goes untriaged | Standing-warning triage gate (#1966), step (e11) | `scripts/check_ci_warnings.py` |
 | A session ships standing machinery (gate/writer/watcher) and `docs/PROPORTIONALITY.md` never hears about it | Proportionality-ledger gate (#2380/#2761), step (e12) | `scripts/check_proportionality_ledger.py`; `docs/PROPORTIONALITY.md` |
+| A truncated wrap drops gate marker lines while the handover reads complete (measured: 20 missing lines in a 25-handover window, ALL in 4 wraps — whole-wrap collapse) | Handover line assertion (#3006), wrap Phase 3 (before the (f) commit) | `scripts/check_handover_lines.py` — markers derived from `wrap.md`'s own step contracts, never hand-listed |
+| A wrap gate is skipped because running 12 sequential checks and re-editing the handover per gate invites truncation | Batched gate runner (#3007) — Phase 1 gather (parallel, all failures reported together, draft marker block pre-filled) + Phase 3 verify | `scripts/wrap_gates.py` |
 
 **CI gates** (`.github/workflows/ci-cd.yml` unless noted — every push to `main` or a PR):
 

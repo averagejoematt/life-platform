@@ -9,7 +9,39 @@ handover filename and titles. If empty, derive one from what the session actuall
 
 ## Instructions
 
-Run these steps **in order**. Each has a hard guardrail — read it before acting.
+The wrap runs in **four phases — gather → write → verify → commit** (#3007). The
+lettered step ids ((a)–(f), (e2)–(e12); (e6) never existed) are stable anchors — tests
+and the CONVENTIONS §9 gate registry point at them — so they name gates and duties, not
+an execution order. Each step has a hard guardrail — read it before acting.
+
+## Phase 1 — Gather: one batched gate run, before anything is written
+
+Run the whole battery once:
+
+```bash
+python3 scripts/wrap_gates.py
+```
+
+It runs every gate that does NOT read the finished handover — the (e2) green-main
+check, the (e5) stash + postflight pair, the (e7) filing-contract linter (bare,
+blocking-by-default), the (e10) alarm board, the (e11) warning triage, and the (e) doc
+checkers — in parallel (they are independent and several are network-bound; ~10–15s
+total), reports **all failures together**, and prints a **draft marker-line block**
+with each script-determined outcome pre-filled. Every gate's own semantics, exit codes
+and degrade behaviour (`UNVERIFIED`, fail-open) are unchanged and surfaced verbatim in
+the batch output — this is batching, not weakening.
+
+- Fix what is red using the owning step's remediation below, then re-run the batch. An
+  honest `--decoded`-style acknowledgement still happens on the owning step's own terms.
+- Carry the draft block into Phase 2 and write the handover **once** — correct the
+  pre-filled lines and fill every `<placeholder>`; the draft is a start, never a record.
+
+## Phase 2 — Write everything once (steps (a)–(e))
+
+The handover is written a single time in step (a), carrying ALL the gate marker lines
+(the corrected Phase 1 draft plus the session-judgment lines from (d), (e), (e3),
+(e8), (e9), (e12)). Phase 3 asserts each line is present (#3006) — do not plan to come
+back and append them one gate at a time; that treadmill is what #3007 removed.
 
 ### (a) Archive the outgoing handover, write the new one
 
@@ -39,7 +71,11 @@ old flow and it is what grew the directory to 489 files.
    the shape of the archived files: the driving instruction/prompt, what shipped (PRs,
    merged/deployed status), what was verified (tests, smoke, live checks), gotchas hit,
    and the residual/next-picks queue. This file is the live driver the next session reads
-   first (see `/uplevel` Phase 0 and `docs/README.md`).
+   first (see `/uplevel` Phase 0 and `docs/README.md`). **Write it complete in one pass:**
+   include every gate marker line — the corrected Phase 1 draft block plus the
+   session-judgment lines each gate step below defines. Phase 3's
+   `scripts/check_handover_lines.py` asserts every marker line is present (#3006), so a
+   missing line now fails the wrap loudly instead of reading complete.
 4. **Standing-alarms checklist (#1329, folded into step (e10)):** the full alarm-board
    reconcile — enumerate every CloudWatch alarm in ALARM state and require a citation
    for anything red >72h — now lives in step (e10) below and supersedes this item's
@@ -174,12 +210,18 @@ an outcome.**
 - **If something load-bearing was retired** (script/service/pattern): add a rule to
   `docs/_lint/tombstones.txt` in the same commit — that is what stops every other page
   from teaching the dead path (the #781 lesson).
-- Run the machinery before the wrap commit — all must be green:
+- Run the machinery before the wrap commit — all must be green (the four checkers
+  already ran in the Phase 1 batch; re-run them individually only while fixing a red):
   ```bash
   python3 deploy/sync_doc_metadata.py --apply
   python3 scripts/check_doc_links.py && python3 scripts/check_doc_tombstones.py && \
   python3 scripts/check_doc_index.py && python3 scripts/generate_adr_index.py --check
   ```
+  **`sync_doc_metadata.py --apply` is the doc-sync literal treadmill** (#3007): it
+  stamps ~8 unrelated docs (`test_count`/`alarm`/`lambda_count` and friends) and
+  concurrent PRs collide on those literals — the driver reconciles them at merge time
+  via `/reconcile-branch`. Run it deliberately at the wrap, never mid-session from a
+  worktree, and expect its diff to be the wrap commit's, not a feature branch's.
 - The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
   `**Docs:** <pages updated>` or `**Docs:** none needed — <one-clause reason>`.
 - **Decisions gate (#1343) — same silent-omission-is-not-an-outcome shape.** Ask: did this
@@ -189,12 +231,22 @@ an outcome.**
   (already required above). The handover carries one line either way:
   `**Decisions:** ADR-NNN filed` or `**Decisions:** none needed — <one-clause reason>`.
 
+## Gate reference — the lettered wrap gates ((e2)–(e12))
+
+Each step below is one gate's contract and remediation. The (e2)/(e5)/(e7)/(e10)/(e11)
+checks **already ran in the Phase 1 batch** — reuse its output, and re-run a script
+individually only while fixing a red. (e3)/(e4)/(e8)/(e9) are session duties done while
+writing in Phase 2. (e4)/(e12) — plus the line-presence assertion — are re-checked
+mechanically in Phase 3. Every gate's marker line lands in the ONE Phase 2 handover
+write.
+
 ### (e2) Green-main gate — a wrap gate, same shape as (d)/(e) (#1327)
 
 A wrap may not declare "main GREEN" over a badge it never read (2026-07-18: a status
 block said `main GREEN (1c641b6a)` while that sha's own push run had FAILED).
 
-- Run `python3 scripts/check_main_green.py` before the wrap commit.
+- Run `python3 scripts/check_main_green.py` before the wrap commit (Phase 1 batch runs
+  this; re-run it standalone only while fixing a red).
   - Exit 0 (latest completed non-cancelled CI/CD run on main succeeded): done.
   - Exit 1: either fix main now, or write the explicit decode line into the handover —
     `**Main:** red — <one-line cause>` (e.g. "pre-existing Withings DLQ transient") —
@@ -237,7 +289,8 @@ omission fails this checklist. The residual queue is not a sanctioned shadow bac
 ADR-099's "new work enters as an issue or not at all" invariant has to hold here too, or a
 parked defect gets independently re-discovered (and re-paid-for) by a later review.
 
-- Before closing the wrap, run the gate against the handover you just wrote in step (a):
+- Before closing the wrap, run the gate against the handover you just wrote in step (a)
+  (the Phase 3 verify batch runs this):
   ```bash
   python3 scripts/check_residual_queue.py
   ```
@@ -256,12 +309,12 @@ shared stack while 3+ concurrent worktrees were active — the documented
 stash-pop-race incident class; the installed hook kept calling a script #818
 deleted, fail-open via `[[ -f ]]`, so its doc-sync half silently no-oped).
 
-- Run `git stash list`. It **must print nothing**, or every entry must be
+- Run `git stash list` (the Phase 1 batch runs it). It **must print nothing**, or every entry must be
   explained (inspected via `git stash show -p stash@{N}` and either dropped or
   intentionally kept with a one-line reason). Memory rule: stash is BANNED in
   concurrent sessions — if you didn't put it there this session, inspect and
   drop it, don't leave it for the next session to trip over.
-- Run `python3 deploy/session_postflight.py` and confirm the `hook freshness`
+- Run `python3 deploy/session_postflight.py` (also in the Phase 1 batch) and confirm the `hook freshness`
   line is 🟢. If 🔴 (stale or not installed), run `bash scripts/install_hooks.sh`
   and re-check before closing the wrap.
 - The handover carries one line either way: `**Stash/hooks:** clean` or
@@ -276,7 +329,7 @@ with no milestone, no score line and no `## Outcome` — were invisible to every
 query and nothing noticed. That script's single rule is now absorbed and it is deleted
 (#1872) — this gate is the only filing-contract check.
 
-- Run:
+- Run (the Phase 1 batch runs exactly this bare, blocking invocation):
   ```bash
   python3 scripts/check_backlog_hygiene.py
   ```
@@ -378,7 +431,7 @@ advisory only (a next-picks note, no `describe-alarms` enumeration, no fail
 condition). At the 2026-07-28 review 6 alarms were red simultaneously against one
 incident row in the session ledger; a new red could hide among the chronic ones.
 
-- Run:
+- Run (in the Phase 1 batch):
   ```bash
   python3 scripts/check_alarm_citations.py
   ```
@@ -420,7 +473,7 @@ noise precisely BECAUSE main still reads green — #1966's own finding is the pr
 #1349 suite-duration warner tripped on a green run and the optimize-or-raise decision
 sat unactioned for a week with nothing obligated to look at it.
 
-- Run:
+- Run (in the Phase 1 batch):
   ```bash
   python3 scripts/check_ci_warnings.py
   ```
@@ -451,7 +504,8 @@ week while four standing subsystems shipped with real rent (#2572, #2552, #2527,
 A check that cannot fail is a check that never ran. Same fix as (d)/(e3): the line is
 unconditional, the assertion is a script.
 
-- Run (after the new handover from step (a) is written):
+- Run (after the new handover from step (a) is written; the Phase 3 verify batch runs
+  this):
   ```bash
   python3 scripts/check_proportionality_ledger.py
   ```
@@ -475,7 +529,25 @@ unconditional, the assertion is a script.
   `**Ledger:** omitted — <reason>`, or `**Ledger:** none — no standing machinery
   shipped`.
 
+## Phase 3 — Verify: the gates that read the finished handover
+
+```bash
+python3 scripts/wrap_gates.py --verify
+```
+
+Runs — reporting all failures together — `scripts/check_handover_lines.py` (#3006:
+every gate marker line, derived from THIS file's own "carries one line" contracts and
+never hand-listed, must be present in the new handover; measured cost of the prose-only
+era: 20 missing lines in a 25-handover window, all in four truncated wraps), the (e4)
+residual-queue gate, the (e12) proportionality-ledger gate, and the (d) beat
+validators. **It must exit 0 before the wrap commit.** A truncated wrap now fails
+loudly instead of producing a handover that reads complete and is not.
+
+## Phase 4 — Commit
+
 ### (f) Commit the wrap
+
+Phase 3's `wrap_gates.py --verify` must have exited 0 first.
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside
 git and are never part of this commit):
@@ -491,58 +563,37 @@ EOF
 Match the style of prior wrap commits (e.g. `28a5d603 docs(wrap): mobile bug-bash
 session — status block, handover, build beat (9 R22 smalls #836–#845)`).
 
-## Guardrails (verbatim from CLAUDE.md — do not relax these)
+## Guardrails (do not relax these)
+
+Every gate states the same contract — an explicit line or artifact, never silence — and
+since #3006 every marker line is ASSERTED by `scripts/check_handover_lines.py` in Phase
+3, with the marker set derived from this file's own step contracts (never hand-listed).
+The registry (#3007 — one row per former guardrail bullet, no rule dropped):
+
+| Gate (the rule) | Step | Script / assertion | Required handover line |
+|---|---|---|---|
+| Beat or explicit skip (#736); **merged-work-only dispatch** — a beat narrates what shipped and is live, never a plan or an open PR | (d) | `validate_beats.py` + `content_policy_scan.py` (Phase 3); line asserted by `check_handover_lines.py` | `**Build beat:** <id or "none — reason">` |
+| Docs or explicit skip (wiki contract) — the wiki checkers must be green at the wrap commit | (e) | doc checkers (Phase 1); line asserted by `check_handover_lines.py` | `**Docs:** <pages or "none needed — reason">` |
+| Decisions or explicit skip (#1343) — a governance decision must never land only in a workflow file or a commit message | (e) | `check_handover_lines.py` | `**Decisions:** <ADR-NNN filed or "none needed — reason">` |
+| Main is declared from a read badge, never assumed (#1327; stranded classes #1901/#2052) | (e2) | `scripts/check_main_green.py` exit 0, clean or `--decoded` (Phase 1) | `**Main:** green (<sha>)` / `red — <decode>` / `stranded — <decode>` |
+| Incident rows or explicit skip (#1332) — every incident-class event gets a `docs/INCIDENT_LOG.md` row the same session | (e3) | rows in `docs/INCIDENT_LOG.md`; line asserted by `check_handover_lines.py` | `**Incidents:** <rows added or "none">` |
+| Residual queue cites an issue, never silence (#1340) — every residual/next-picks bullet carries `#<issue>` or `not-work — <reason>`; the gate script must print `OK` before the wrap commit | (e4) | `scripts/check_residual_queue.py` (Phase 3) | (per-bullet tags, not one marker line) |
+| Stash empty + hook fresh, or explained (#1326) | (e5) | `git stash list` + `deploy/session_postflight.py` (Phase 1) | `**Stash/hooks:** clean` / `<found + action>` |
+| Filing-contract violators get fixed, not deferred (#1870, blocking since #1872 — which absorbed and deleted the old #1349 `model:*`-only gate). A printed violator on an issue this session filed, touched or closed may not be left unfixed; a live-fetch failure still fails open (exit 0), noted in the handover | (e7) | `scripts/check_backlog_hygiene.py` bare (Phase 1) | (fail-open noted in handover) |
+| Outcome verdict on every closure, never silence (#1870) — the ADR-099 closure comment (`**Shipped:** …` + `**Outcome:** <realized\|partial\|not-realized> — …`) on each issue closed, `not planned` closes included; a fabricated `realized` is worse than a blank comment (ADR-104) | (e8) | line asserted by `check_handover_lines.py` | `**Closures:** <#N commented or "none — …">` |
+| The queue is refilled or its depth is reported, never silence (#1870) — `Now` below 3 actionable gets promotions from `Next` by stored rank; every `Later` issue untouched >60d gets an explicit promote-or-close call | (e9) | `scripts/backlog_next.py`; line asserted by `check_handover_lines.py` | `**Backlog:** …` |
+| A red alarm >72h cites something, or the wrap names it (#1959); since #2912 a FIRED-AND-CLEARED flap in the 72h window is answered the same way — never waved through because the board "looks green now" | (e10) | `scripts/check_alarm_citations.py` exit 0, clean or `--decoded` (Phase 1); `docs/alarm_citations.json` | `**Alarms:** …` |
+| A `::warning::` on green main gets triaged, or the wrap names it (#1966) — an issue or an explicit named decision, never left both unfixed and unacknowledged | (e11) | `scripts/check_ci_warnings.py` exit 0, clean or `--decoded` (Phase 1) | `**CI warnings:** …` |
+| Standing machinery gets a `docs/PROPORTIONALITY.md` row, or the wrap says why not (#2380, enforced by #2761) — a line claiming a row the ledger never saw fails loudly | (e12) | `scripts/check_proportionality_ledger.py` (Phase 3) | `**Ledger:** …` |
+| Every marker line above is PRESENT — a truncated wrap fails loudly, not silently (#3006) | Phase 3 | `scripts/check_handover_lines.py` (markers derived from this file) | all of the above |
+
+Not tabular, still binding:
 
 - **Replace, don't stack.** CLAUDE.md's status block is one paragraph, always.
 - **One live block.** `handovers/HANDOVER_LATEST.md` is the only "current" handover — and
   since #1650 it is the only handover tracked on `main` at all; everything else is archived
   under its dated name on the `session-archive` branch by `scripts/archive_handover.py`.
   A dated `HANDOVER_*.md` committed to `main` reds `tests/test_archive_handover.py`.
-- **Merged-work-only dispatch.** A build beat narrates what shipped and is live — never
-  a plan, never an open PR.
-- **Beat or explicit skip, never silence (#736).** Every wrap's handover carries a
-  `**Build beat:** <id or "none — reason">` line; step (d) cannot be skipped implicitly.
-- **Docs or explicit skip, never silence (wiki contract).** Every wrap's handover carries
-  a `**Docs:** <pages or "none needed — reason">` line; step (e) cannot be skipped
-  implicitly, and the wiki checkers must be green at the wrap commit.
-- **Incident or explicit skip, never silence (#1332).** Every wrap's handover carries a
-  `**Incidents:** <rows added or "none">` line; step (e3) cannot be skipped implicitly.
-- **Residual queue cites an issue, never silence (#1340).** Every residual/next-picks
-  bullet carries a `#<issue>` or a `not-work — <reason>` tag; step (e4)'s gate script must
-  print `OK` before the wrap commit.
 - **Body follows index, never an index-only patch (#1342).** A `MEMORY.md` index-line
   correction is not complete until the same wrap rewrites the topic file's body too; step
   (c)'s memory-body-drift grep must be reviewed clean (or its hits fixed) before closing.
-- **Decisions or explicit skip, never silence (#1343).** Every wrap's handover carries a
-  `**Decisions:** <ADR-NNN filed or "none needed — reason">` line — a governance decision
-  must never land only in a workflow file or a commit message.
-- **Filing-contract violators get fixed, not deferred (#1870, blocking since #1872).**
-  `scripts/check_backlog_hygiene.py` runs at every wrap (step (e7)) and exits 1 on any
-  violation by default — this absorbs and replaces the old #1349 `model:*`-only
-  label-completeness gate (`scripts/check_story_labels.py`, deleted by #1872). A printed
-  violator on an issue this session filed, touched or closed may not be left unfixed. A
-  live-fetch failure (no `gh`/network) still fails open — exit 0 — even in blocking mode.
-- **Outcome verdict on every closure, never silence (#1870).** Step (e8): each issue closed
-  this session carries the ADR-099 closure comment (`**Shipped:** …` + `**Outcome:**
-  <realized|partial|not-realized> — …`), a `not planned` close included. A fabricated
-  `realized` is worse than a blank comment (ADR-104).
-- **The queue is refilled or its depth is reported, never silence (#1870).** Step (e9):
-  `Now` below 3 actionable stories gets promotions from `Next` by stored rank, and every
-  `Later` issue untouched >60d gets an explicit promote-or-close call in the handover.
-- **A red alarm >72h cites something, or the wrap names it, never silence (#1959).**
-  Step (e10): `scripts/check_alarm_citations.py` must exit 0 (clean or `--decoded`)
-  before the wrap commit; an alarm printed uncited gets a `docs/alarm_citations.json`
-  entry or an explicit named line in the handover — never left both unfixed and
-  unacknowledged. Since #2912 the same step also names every alarm that FIRED AND
-  CLEARED within the last 72h (read from alarm history — a flap between wraps never
-  appears in current state); a flagged flap is answered the same way, never waved
-  through because the board "looks green now".
-- **A `::warning::` on green main gets triaged, or the wrap names it, never silence
-  (#1966).** Step (e11): `scripts/check_ci_warnings.py` must exit 0 (clean or
-  `--decoded`) before the wrap commit; a warning printed untriaged gets an issue or an
-  explicit named decision in the handover — never left both unfixed and unacknowledged.
-- **Standing machinery gets a `docs/PROPORTIONALITY.md` row, or the wrap says why not,
-  never silence (#2380, enforced by #2761).** Step (e12):
-  `scripts/check_proportionality_ledger.py` must exit 0 before the wrap commit — a
-  ledger diff this session or an explicit `**Ledger:**` line, and a line claiming a row
-  the ledger never saw fails loudly.
