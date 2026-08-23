@@ -69,6 +69,7 @@ from aws_cdk import (
 )
 
 from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
+from stacks.monitoring_budget_alarms import add_budget_alarms  # #2824: budget-unreadable, same seam
 from stacks.monitoring_dashboards import add_dashboards  # #2610: the dashboards live in a sibling
 from stacks.monitoring_prediction_alarms import add_prediction_alarms  # #727/#3046: the science alarms, same seam
 
@@ -517,10 +518,9 @@ class MonitoringStack(Stack):
             evaluation_periods=21,
         )
 
-        # #727/#3046: the prediction-science alarms (grading-stalled recency +
-        # prediction-gradable-share-low composition) live in the sibling module —
-        # same extraction seam as the dashboards (#2610): same scope, same order.
+        # #727/#3046 science + #2824 budget-unreadable alarms — siblings on the #2610 extraction seam (same scope, same digest topic).
         add_prediction_alarms(self, digest)
+        add_budget_alarms(self, digest)
 
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
