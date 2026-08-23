@@ -484,6 +484,82 @@ _WITHDRAWAL_RE = re.compile(
 )
 
 
+# ── #2959 (2026-08-23): the labeled-prior-cycle-archive class, RETIRED ────────
+# The DO-NOT-FLAG list has said "story/archive/chronicle content clearly dated
+# before the current cycle" since #2575, and the 2026-08-23 cycle ground-truth
+# sentence restated it — and the same sweep that carried both STILL raised highs
+# on /story/diary/ ("'DAY 5 · CYCLE 10' dated 'JULY 26, 2026'"), /story/journal/
+# ("dated 2026-07-08") and /journal/essays/org-chart-of-one/ ("dated JULY 8,
+# 2026"), each note QUOTING the very date or cycle label that exempts it and
+# then demanding a further "archive" label. That is the #2613 shape: a clause
+# the model re-derives an accusation straight through. Per that precedent the
+# class is retired structurally, scoped to the ARCHIVAL surfaces (/story/,
+# /journal/ — the writing hubs, dated by design): a temporal_contradiction
+# there whose own evidence cites a pre-cycle date or a prior cycle label is a
+# re-read of the exemption, not a truth finding.
+#
+# Residue, named honestly: on those two path families a prose temporal
+# contradiction that cites a pre-genesis date can no longer gate. A /story/ or
+# /journal/ surface misrepresenting the CURRENT cycle (its notes cite in-cycle
+# dates) stays fully flaggable, as does every other surface.
+
+_TEXT_DATE_RE = re.compile(
+    r"\b(january|february|march|april|may|june|july|august|september|october|november|december)" r"\s+(\d{1,2}),?\s+(\d{4})\b",
+    re.IGNORECASE,
+)
+_MONTHS = {
+    m: i + 1
+    for i, m in enumerate(
+        ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+    )
+}
+_CYCLE_LABEL_RE = re.compile(r"\bcycle\s+(\d{1,3})\b", re.IGNORECASE)
+_ARCHIVE_PATH_PREFIXES = ("/story/", "/journal/")
+
+
+def _note_dates(note):
+    """Every date the note cites, as ISO strings — ISO literals + 'July 8, 2026' forms."""
+    dates = list(_NOTE_ISO_DATE_RE.findall(note or ""))
+    for mon, day, year in _TEXT_DATE_RE.findall(note or ""):
+        dates.append(f"{year}-{_MONTHS[mon.lower()]:02d}-{int(day):02d}")
+    return dates
+
+
+def is_prior_cycle_archive(finding, start_date, cycle=None):
+    """True when an archival-surface temporal finding's own evidence cites a
+    pre-cycle date or a prior cycle label (#2959 — the exemption, enforced)."""
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    page = str(finding.get("page") or "")
+    if not page.startswith(_ARCHIVE_PATH_PREFIXES):
+        return False
+    note = str(finding.get("note") or "")
+    if any(d < start_date for d in _note_dates(note)):
+        return True
+    if cycle:
+        return any(0 < int(n) < cycle for n in _CYCLE_LABEL_RE.findall(note))
+    return False
+
+
+# ── #2959 (2026-08-23): the coach-surface audience ruling, ADJUDICATED ─────────
+# The first armed full sweep (run 32545820852) raised audience_violation on
+# /coaching/ and /coaching/by-coach/#physical_coach for coaches addressing Matthew
+# by name / in the second person. The baseline entries said "adjudicate the
+# audience rubric for coach pages" — this is the adjudication: the /coaching/
+# door's designed content IS the coach→owner dialogue (the reader observes the
+# coaching relationship; that is the product). The prompt states the exception;
+# this predicate ENFORCES it structurally, because the module's own measured
+# record (#2613: a clause survived by 3-of-3 runs; #2741) says prose clauses
+# alone fail about half the time. Scoped to /coaching/ paths only — the same
+# copy on /method/board/ (the #2972 producer-side debt, tracked in #3018) or any
+# other surface stays fully flaggable.
+
+
+def is_coach_surface_audience(finding):
+    """True for an audience_violation finding on a /coaching/ surface (#2959)."""
+    return finding.get("category") == "audience_violation" and str(finding.get("page") or "").startswith("/coaching/")
+
+
 def is_self_refuted(finding):
     """True when the note's own final sentence withdraws the contradiction (#2959)."""
     note = (finding.get("note") or "").strip()
@@ -505,13 +581,44 @@ MAX_PROSE_CHARS = 6000
 # ── phase ground truth ─────────────────────────────────────────────────────────
 
 
-def phase_context(today_iso=None):
+_cycle_probe = {"done": False, "value": None}
+
+
+def _current_cycle():
+    """Current experiment cycle (int) or None — fail-soft, never raises.
+
+    #2959 ground truth: the oracle repeatedly INFERRED the cycle number from page
+    content (misstating cycle 14 as 10 on the first armed sweep) because the
+    prompt never told it. The number lives in SSM /life-platform/experiment-cycle
+    (stamped by the restart pipeline); `coach_checkin.read_cycle` is the cached,
+    fail-soft reader every other consumer uses. No AWS → None → the phase line
+    simply omits the cycle sentence (tests inject `cycle=` explicitly).
+
+    Probed ONCE per process (unlike read_cycle, which retries failures per call —
+    right for a warm Lambda writing stamps, wrong here: a creds-less test or CI
+    run would otherwise re-attempt SSM on every phase_context call).
+    """
+    if _cycle_probe["done"]:
+        return _cycle_probe["value"]
+    try:
+        from coach.coach_checkin import read_cycle
+
+        _cycle_probe["value"] = read_cycle()
+    except Exception:  # noqa: BLE001 — ground truth is optional, never fatal
+        _cycle_probe["value"] = None
+    _cycle_probe["done"] = True
+    return _cycle_probe["value"]
+
+
+def phase_context(today_iso=None, cycle=None):
     """The experiment phase, computed at runtime from constants.EXPERIMENT_START_DATE.
 
-    Returns {"today", "start_date", "day_n", "pre_start", "days_until_start"}.
+    Returns {"today", "start_date", "day_n", "pre_start", "days_until_start", "cycle"}.
     day_n is 1-indexed (constants.day_n); 0 == pre-genesis countdown state.
     `today_iso` is injectable for tests (derive fixtures from EXPERIMENT_START_DATE,
     never wall-clock literals); default is today in the site's Pacific timezone.
+    `cycle` is injectable for tests; default is the SSM-stamped current cycle,
+    fail-soft None (#2959 — feed the ground truth, never let the model infer it).
     """
     from common.constants import EXPERIMENT_START_DATE, day_n
 
@@ -529,7 +636,25 @@ def phase_context(today_iso=None):
         "day_n": n,
         "pre_start": n == 0,
         "days_until_start": days_until,
+        "cycle": cycle if cycle is not None else _current_cycle(),
     }
+
+
+def _cycle_line(phase):
+    # #2959: the first armed sweep's oracle MISSTATED the current cycle as 10 —
+    # it was never told, so it inferred from a labeled prior-cycle diary card.
+    # Ground truth is fed, never inferred; when SSM is unreachable the sentence
+    # is omitted rather than guessed.
+    c = phase.get("cycle")
+    if not c:
+        return ""
+    return (
+        f" This is CYCLE {c} of the experiment. Cycles 1–{c - 1} are prior attempts whose artifacts "
+        f"(diary cards, essays, post-mortems, archives) remain published, labeled with their own cycle "
+        f"numbers and dates — content explicitly labeled or dated to a prior cycle is historical record, "
+        f"not a contradiction. Never infer the current cycle number from page content; this sentence is "
+        f"the ground truth."
+    )
 
 
 def _phase_line(phase):
@@ -537,7 +662,7 @@ def _phase_line(phase):
         return (
             f"The experiment has NOT started yet — Day 1 is {phase['start_date']}, "
             f"{phase['days_until_start']} day(s) away (today is {phase['today']}). The site runs an honest "
-            f"pre-start countdown; ZERO days of current-experiment data can exist yet."
+            f"pre-start countdown; ZERO days of current-experiment data can exist yet." + _cycle_line(phase)
         )
     return (
         f"Today ({phase['today']}) is Day {phase['day_n']} of the experiment (Day 1 = {phase['start_date']}). "
@@ -553,7 +678,7 @@ def _phase_line(phase):
         f"A window, span, average or count SMALLER than {phase['day_n']} day(s) is EXPECTED and CORRECT — "
         f"trailing windows are deliberately clamped to the cycle start, so on Day {phase['day_n']} a field "
         f"may honestly report any span from 0 to {phase['day_n']} day(s). Only a span LONGER than "
-        f"{phase['day_n']} day(s) is impossible. Never flag a number for being smaller than {phase['day_n']}."
+        f"{phase['day_n']} day(s) is impossible. Never flag a number for being smaller than {phase['day_n']}." + _cycle_line(phase)
     )
 
 
@@ -714,14 +839,29 @@ appearing on two or more of the surfaces below. Shared navigation, footers, tagl
 labels do NOT count — only real narrative/analysis prose.
 3. "audience_violation" — copy that assumes the reader saw private context: unexplained internal \
 jargon, references to private conversations or sessions ("as discussed", "like I told you"), or \
-second-person notes clearly addressed to the site's owner rather than a public reader.
+second-person notes clearly addressed to the site's owner rather than a public reader. EXCEPTION: \
+surfaces under /coaching/ publish the coach-to-owner dialogue AS their content — the reader is \
+deliberately observing the coaching relationship, so coaches addressing the owner by name or in \
+the second person there is the designed format, never a violation. This exception is scoped to \
+/coaching/ paths only; the same copy on any other surface stays flaggable.
 
 Severity: "high" = a first-time reader would conclude the site is lying or broken; "med" = \
 noticeably wrong but survivable; "low" = borderline/cosmetic.
 
 DO NOT flag (these are CORRECT):
-- lifetime / all-time / cross-cycle / "pilot" / previous-cycle stats labeled as such — history from \
-before Day 1 legitimately exists and may be large;
+- lifetime / all-time / cross-cycle / "pilot" / previous-cycle / "pre-cut" / pre-experiment stats \
+and framings labeled as such — history from before Day 1 legitimately exists and may be large;
+- a day count in narrated or quoted prose that differs from your own date arithmetic by ONE — \
+prose legitimately counts inclusively of both endpoints ("three days quiet" spanning the 19th to \
+the 21st) or counts from an announcement day; flag an elapsed-time claim only when it is off by \
+two or more days;
+- an "as of <yesterday's date>" stamp on a daily-computed surface — the pipeline publishes data \
+through the last COMPLETE day, so as-of = yesterday is the design, not staleness;
+- a deadline or window "closing early" when the page never states the window's length — never \
+flag against a window length you assumed;
+- cost/billing charts using UTC day boundaries: AWS bills on UTC days, so a spend chart's point \
+count or latest date may legitimately run one day ahead of Pacific today — that is the billing \
+frame, not a fabricated day;
 - the pre-start countdown copy itself, and honest sparse/empty states ("awaiting data", "N readings \
 so far", "no data yet");
 - the "··" placeholder glyph — it is the site's honest-absence marker (ADR-104): a tile, chart, \
@@ -908,6 +1048,24 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     print(
                         f"  ↩ reader-truth: dropped a durable-design-copy finding on {f['page']} "
                         f"(the rubric names this copy exempt in every phase, #2741): {f['note'][:120]}"
+                    )
+                    continue
+                # #2959 (2026-08-23): an archival-surface finding whose own
+                # evidence cites the pre-cycle date/label that exempts it —
+                # printed, never silently swallowed.
+                if is_prior_cycle_archive(f, phase["start_date"], phase.get("cycle")):
+                    print(
+                        f"  ↩ reader-truth: dropped a labeled-prior-cycle archive finding on {f['page']} "
+                        f"(dated archival content is the exemption, #2959): {f['note'][:120]}"
+                    )
+                    continue
+                # #2959 (2026-08-23): the coach-surface audience adjudication —
+                # /coaching/ publishes the coach→owner dialogue as its content.
+                # Printed, never silently swallowed.
+                if is_coach_surface_audience(f):
+                    print(
+                        f"  ↩ reader-truth: dropped a coach-surface audience finding on {f['page']} "
+                        f"(the /coaching/ door publishes the dialogue as content, #2959): {f['note'][:120]}"
                     )
                     continue
                 # #2959: the note's own last sentence withdraws the claim ("No

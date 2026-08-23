@@ -195,7 +195,14 @@ def test_prompt_truncates_oversized_prose():
     # the old bullet's last line INSTRUCTED flagging any window longer than the
     # elapsed days, which manufactured the 7-day-HRV-average highs that held the
     # publish path twice in one hour (runs 32616299944 + 32618360726).
-    assert len(prompt) < rtq.MAX_PROSE_CHARS + 6800
+    # 6800 → 8200 on 2026-08-23 (#2959 ground-truth feed): the cycle sentence
+    # (~380 chars, present only when SSM answers), the /coaching/ audience
+    # adjudication, and four measured rulings from the first armed sweep's
+    # false-positive ledger (inclusive day counting, as-of convention, assumed
+    # windows, the UTC billing frame). Measured overhead 7760 with the cycle
+    # sentence; ~440 chars headroom kept, same allowed-to-grow-not-unnoticed
+    # contract as every prior raise.
+    assert len(prompt) < rtq.MAX_PROSE_CHARS + 8200
 
 
 def test_batching_four_to_six_surfaces_per_call():
@@ -864,3 +871,167 @@ def test_harness_threads_the_sweep_clock_to_assess_prose(tmp_path, monkeypatch):
     _patch_harness(monkeypatch, _CLEAN_VERDICT)
     visual_ai_qa.assess_reader_truth(results, today_iso=_DAY_2)
     assert seen["today_iso"] == _DAY_2
+
+
+# ── #2959 (2026-08-23): the ground-truth feed + the adjudicated rulings ────────
+# The first armed full sweep's 10 false-positive classes were each a fact the
+# prompt never stated (cycle number, inclusive counting, as-of convention,
+# assumed windows, the UTC billing frame, the /coaching/ audience design). These
+# tests pin the feed and the rulings; the coach-surface drop is mutation-proved
+# on both sides of its scope.
+
+
+def test_phase_context_carries_injected_cycle():
+    p = rtq.phase_context(_DAY_2, cycle=14)
+    assert p["cycle"] == 14
+
+
+def test_prompt_states_the_cycle_ground_truth():
+    prompt = rtq.build_prompt(_PAGES, rtq.phase_context(_DAY_2, cycle=14))
+    assert "CYCLE 14" in prompt
+    assert "Never infer the current cycle number" in prompt
+    # prior cycles are named as labeled historical record
+    assert "1–13" in prompt
+
+
+def test_prompt_omits_cycle_sentence_when_unknown():
+    prompt = rtq.build_prompt(_PAGES, rtq.phase_context(_DAY_2, cycle=0))
+    assert "CYCLE" not in prompt.split("FLAG findings")[0].replace("cross-cycle", "")
+
+
+def test_prompt_carries_the_2026_08_23_rulings():
+    prompt = rtq.build_prompt(_PAGES, rtq.phase_context(_DAY_2, cycle=14))
+    # inclusive day counting (±1 is not a contradiction)
+    assert "counts inclusively" in prompt
+    assert "off by two or more days" in prompt or "off by two or more days" in prompt
+    # as-of = data through the last complete day
+    assert "as-of = yesterday is the design" in prompt
+    # never flag against an assumed window length
+    assert "window length you assumed" in prompt
+    # UTC billing frame
+    assert "AWS bills on UTC days" in prompt
+    # pre-experiment framing joins the labeled list
+    assert "pre-cut" in prompt
+
+
+def test_prompt_scopes_the_coaching_audience_exception():
+    prompt = rtq.build_prompt(_PAGES, rtq.phase_context(_DAY_2, cycle=14))
+    assert "surfaces under /coaching/ publish the coach-to-owner dialogue" in prompt
+    assert "scoped to \\\n/coaching/ paths only" in prompt or "/coaching/ paths only" in prompt
+
+
+def test_coach_surface_audience_drop_fires_and_stays_scoped():
+    # Mutation proof, both directions (CONVENTIONS §9): the drop fires on
+    # /coaching/* and ONLY there — /method/board/ keeps the class (#3018 debt).
+    on_coaching = {"page": "/coaching/", "category": "audience_violation", "severity": "high", "note": "addresses Matthew directly"}
+    on_subpage = {
+        "page": "/coaching/by-coach/#physical_coach",
+        "category": "audience_violation",
+        "severity": "high",
+        "note": "second person",
+    }
+    on_board = {"page": "/method/board/", "category": "audience_violation", "severity": "high", "note": "addresses Matthew directly"}
+    temporal_on_coaching = {"page": "/coaching/", "category": "temporal_contradiction", "severity": "high", "note": "three days quiet"}
+    assert rtq.is_coach_surface_audience(on_coaching) is True
+    assert rtq.is_coach_surface_audience(on_subpage) is True
+    assert rtq.is_coach_surface_audience(on_board) is False
+    assert rtq.is_coach_surface_audience(temporal_on_coaching) is False
+
+
+def test_assess_prose_drops_coach_surface_audience_but_keeps_board():
+    verdict = {
+        "findings": [
+            {"page": "/coaching/", "category": "audience_violation", "severity": "high", "note": "addresses the owner"},
+            {"page": "/", "category": "audience_violation", "severity": "high", "note": "addresses the owner"},
+        ],
+        "severity": "high",
+        "summary": "audience",
+    }
+    findings, errors = rtq.assess_prose(_PAGES, _fake_invoke(verdict), today_iso=_DAY_2)
+    assert errors == []
+    pages = [f["page"] for f in findings]
+    assert "/coaching/" not in pages, "the /coaching/ audience finding must be dropped (#2959 adjudication)"
+    assert "/" in pages, "the exception must stay scoped — other surfaces keep the class"
+
+
+def test_prior_cycle_archive_drop_fires_on_the_three_wire_notes():
+    """#2959: the labeled-prior-cycle class survived its clause on the 2026-08-23
+    verification sweep — these are the three VERBATIM wire notes (fixture is the
+    wire). Each quotes the very date/label that exempts it."""
+    start = "2026-08-17"
+    wire = [
+        {
+            "page": "/story/journal/",
+            "category": "temporal_contradiction",
+            "severity": "high",
+            "note": "Journal entry 'The Org Chart of One Human and N Agents' is dated 2026-07-08, which is 46 days BEFORE the experiment phase start (2026-08-17). The surface header states 'DAY 7 · WEEK 1, SINCE AUGUST 17 2026' but the single visible journal entry predates the experiment entirely.",
+        },
+        {
+            "page": "/story/diary/",
+            "category": "temporal_contradiction",
+            "severity": "high",
+            "note": "Surface shows 'DAY 5 · CYCLE 10' dated 'JULY 26, 2026', but the experiment phase states today is Day 7 of Cycle 14 (2026-08-23). This diary entry references Cycle 10 from July, which is a prior cycle and should be labeled as historical archive.",
+        },
+        {
+            "page": "/journal/essays/org-chart-of-one/",
+            "category": "temporal_contradiction",
+            "severity": "high",
+            "note": "Essay is dated JULY 8, 2026 and references 'platform numbers as of the 2026-07-06 snapshot', but the current experiment phase is CYCLE 14 starting 2026-08-17 (today is 2026-08-23, Day 7).",
+        },
+    ]
+    for f in wire:
+        assert rtq.is_prior_cycle_archive(f, start, cycle=14) is True, f["page"]
+
+
+def test_prior_cycle_archive_drop_scope_residue():
+    """The drop's residue stays narrow: in-cycle dates, non-archive paths, and
+    other categories all keep gating."""
+    start = "2026-08-17"
+    in_cycle = {
+        "page": "/story/",
+        "category": "temporal_contradiction",
+        "severity": "high",
+        "note": "The hub claims 'day 5' but today is 2026-08-23, Day 7 — both dates are 2026-08-22 or later.",
+    }
+    off_archive = {
+        "page": "/data/vitals/",
+        "category": "temporal_contradiction",
+        "severity": "high",
+        "note": "Cites a reading dated 2026-07-08, before the cycle start.",
+    }
+    other_cat = {
+        "page": "/story/diary/",
+        "category": "audience_violation",
+        "severity": "high",
+        "note": "dated JULY 26, 2026 and addresses the owner",
+    }
+    assert rtq.is_prior_cycle_archive(in_cycle, start, cycle=14) is False
+    assert rtq.is_prior_cycle_archive(off_archive, start, cycle=14) is False
+    assert rtq.is_prior_cycle_archive(other_cat, start, cycle=14) is False
+
+
+def test_assess_prose_drops_prior_cycle_archive_findings():
+    verdict = {
+        "findings": [
+            {
+                "page": "/story/diary/",
+                "category": "temporal_contradiction",
+                "severity": "high",
+                "note": "Shows 'DAY 5 · CYCLE 10' dated 'JULY 26, 2026' under the current header.",
+            },
+            {
+                "page": "/now/",
+                "category": "temporal_contradiction",
+                "severity": "high",
+                "note": "narrates a 30-day in-cycle trend on Day 2",
+            },
+        ],
+        "severity": "high",
+        "summary": "temporal",
+    }
+    pages = _PAGES + [{"name": "Diary", "path": "/story/diary/", "prose": "diary card"}]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_2)
+    assert errors == []
+    kept = [f["page"] for f in findings]
+    assert "/story/diary/" not in kept, "the dated prior-cycle archive finding must drop (#2959)"
+    assert "/now/" in kept, "in-cycle temporal findings must keep gating"
