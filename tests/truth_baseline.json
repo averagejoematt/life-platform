@@ -1,6 +1,6 @@
 {
  "_meta": {
-  "captured_at": "2026-08-22T20:30:11+00:00",
+  "captured_at": "2026-08-23T04:13:15+00:00",
   "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
  },
  "pages": {
@@ -129,6 +129,15 @@
     "note_sample": "States 'THIS SEASON · CYCLE 14' with '26 GRADED FORECASTS' on Day 5, but only 5 days of data can exist in the current cycle (started 2026-08-17). On Day 5, a maximum of 5 days of in-cycle data is poss"
    }
   ],
+  "/method/cycles/": [
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "oracle infers 'Day 6 with days_with_data=6 => start weight must be populated, not —' — wrong inference: zero weigh-ins exist since 2026-08-17 genesis (withings partition verified empty in DDB), so — is the honest ADR-104 absence marker while days_with_data counts whoop rows. Third distinct objection on this page in one day (CYCLE 10 NOW misread #2992; days_with_data=8 REAL, fixed #3008; this). The real one was this page+category, so prefer rubric work over widening this entry."
+   }
+  ],
   "/method/data/": [
    {
     "category": "temporal_contradiction",
@@ -209,6 +218,15 @@
     "note_sample": "Attempt #14 marked 'SHOWED UP 0 OF 5 DAYS' (past-tense finality) beside 'live — day 5' — the live-cycle-as-closed class, sibling of /method/postmortems/"
    }
   ],
+  "/story/build/": [
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "oracle infers the site chrome's experiment-day counter (DAY 6 - WEEK 1, SINCE AUGUST 17 2026) bounds the build log's content — wrong data-must-exist-only-in-window inference: /story/build/ is the platform's engineering log, deliberately CROSS-PHASE (ADR-077/153 taxonomy), every dispatch explicitly dated. Same chrome-vs-archive shape as the 15 sibling temporal_contradiction baselines. Surfaced 2026-08-23 when the wrap's new dispatch made the page newest-dated; the finding rolled back the site deploy (run 32616299944), recovered by full re-run after this baseline."
+   }
+  ],
   "/story/build/agent-review/": [
    {
     "category": "temporal_contradiction",
@@ -241,15 +259,6 @@
     "issue": "#2959",
     "added": "2026-08-22",
     "note_sample": "Journal entry dated 2026-07-08 listed under 'DAY 5 · WEEK 1' header — the dated-archival-content class, sibling of the essay finding"
-   }
-  ],
-  "/method/cycles/": [
-   {
-    "category": "temporal_contradiction",
-    "issue": "#2959",
-    "added": "2026-08-23",
-    "severity_observed": "high",
-    "note_sample": "oracle infers 'Day 6 with days_with_data=6 => start weight must be populated, not —' — wrong inference: zero weigh-ins exist since 2026-08-17 genesis (withings partition verified empty in DDB), so — is the honest ADR-104 absence marker while days_with_data counts whoop rows. Third distinct objection on this page in one day (CYCLE 10 NOW misread #2992; days_with_data=8 REAL, fixed #3008; this). The real one was this page+category, so prefer rubric work over widening this entry."
    }
   ]
  }
