@@ -1,6 +1,6 @@
 {
  "_meta": {
-  "captured_at": "2026-08-23T05:42:48+00:00",
+  "captured_at": "2026-08-23T08:25:55+00:00",
   "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
  },
  "pages": {
@@ -227,6 +227,15 @@
     "issue": "#2957",
     "added": "2026-08-22",
     "note_sample": "States 'NEXT ON THE LOOP the coaching — See what the AI team makes of it' but this appears to be navigational chrome. However, the surface shows 'N=16' voice-fidelity judgments with 11 correct on Day "
+   }
+  ],
+  "/method/wrong/": [
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "editorial-labeling objection graded high: the CAUGHT BY THE VALIDATOR table mixes cross-cycle catches (2026-05-19, 2026-06-18) with a current-cycle row without a lifetime label. Fifth distinct novel high in five sweeps tonight (runs ...9944, ...0726, ...9500, 3023's, ...0842) on a page that passed the previous four — the #2959 non-stationarity record. Substantively a med-at-most label suggestion; a cross-cycle label on this table is legitimate future polish, not a lie."
    }
   ],
   "/protocols/supplements/": [
