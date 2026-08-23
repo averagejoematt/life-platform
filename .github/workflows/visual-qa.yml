@@ -93,7 +93,9 @@ jobs:
           # --reader-truth printed "⚠ unavailable" and the job still reported success,
           # so the gates CLAUDE.md/ADR-076 call gating were structurally dark. Pinned
           # via ci_pins.py from requirements-dev.txt (CQ-01, #2609), never a literal.
-          PINS=$(python3 scripts/ci_pins.py playwright boto3 botocore)
+          # pillow (#2973): visual_ai_qa downscales full-page captures over Bedrock's
+          # 8000px image limit — without it those pages FAIL loudly instead of evaluating.
+          PINS=$(python3 scripts/ci_pins.py playwright boto3 botocore pillow)
           python -m pip install $PINS
           python -m playwright install --with-deps chromium
 

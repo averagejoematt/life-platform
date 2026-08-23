@@ -45,9 +45,11 @@ amended by #1927) with an honest printed/warned skip, never silent green.
 """
 
 import base64
+import io
 import json
 import os
 import re
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -56,6 +58,17 @@ import truth_baseline_audit  # the reader-truth debt ledger (#2956) — same dir
 # Haiku cross-region profile (vision-capable, cheap). bedrock_client maps the short name.
 _VISION_MODEL = os.environ.get("VISUAL_AI_MODEL", "claude-haiku-4-5-20251001")
 _MAX_IMAGES_PER_PAGE = int(os.environ.get("VISUAL_AI_MAX_IMAGES", "3"))
+
+# Bedrock/Anthropic vision hard limits (#2973): an image over 8000px in EITHER
+# dimension — or over ~5MB decoded — is rejected outright with a
+# ValidationException on messages.*.content.*.image.source. Tall full-page
+# captures cross the dimension cap routinely: in run 32580634729 home.png was
+# 1440x11827 and protocols.png 1440x9200, and both pages went silently
+# unevaluated. _prepare_image downscales to fit BEFORE the call; the model's
+# own input pipeline resizes far below 8000px anyway, so the downscale loses
+# nothing the oracle would have seen.
+_BEDROCK_MAX_DIM = 8000
+_BEDROCK_MAX_BYTES = 5 * 1024 * 1024
 
 # budget_guard._FEATURE_CUTOFF key (#1428) — operator-truth band, pauses at tier 3
 # only (ADR-125 as amended by #1927), same posture as reader_truth_qa below.
@@ -127,9 +140,51 @@ def _import_bedrock():
         return None
 
 
-def _image_block(path):
+def _png_dims(data):
+    """(width, height) from a PNG's IHDR header, or None if `data` isn't a PNG."""
+    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return struct.unpack(">II", data[16:24])
+
+
+def _prepare_image(path):
+    """Return PNG bytes guaranteed inside Bedrock's per-image limits (#2973).
+
+    A capture over the per-dimension cap (tall full-page screenshots) or the
+    byte cap is downscaled via Pillow. Raises RuntimeError with a NAMED reason
+    when a valid payload cannot be produced — the caller records the page as
+    UNEVALUATED and FAILS it. Silently sending a payload Bedrock will reject,
+    or silently skipping the page, is the #2973 defect class.
+    """
     with open(path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
+        data = f.read()
+    dims = _png_dims(data)
+    if dims is None:
+        raise RuntimeError(f"{os.path.basename(path)} is not a valid PNG — cannot submit to Bedrock")
+    w, h = dims
+    if w <= _BEDROCK_MAX_DIM and h <= _BEDROCK_MAX_DIM and len(data) <= _BEDROCK_MAX_BYTES:
+        return data
+    try:
+        from PIL import Image
+    except ImportError:
+        raise RuntimeError(
+            f"{os.path.basename(path)} is {w}x{h}px / {len(data) / 1e6:.1f}MB — over the Bedrock image limit "
+            f"({_BEDROCK_MAX_DIM}px, {_BEDROCK_MAX_BYTES // (1024 * 1024)}MB) and Pillow is not installed to downscale it"
+        )
+    scale = min(_BEDROCK_MAX_DIM / w, _BEDROCK_MAX_DIM / h, 1.0)
+    for _ in range(4):  # the byte cap can demand more shrink than the dimension cap alone
+        with Image.open(io.BytesIO(data)) as im:
+            buf = io.BytesIO()
+            im.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS).save(buf, format="PNG", optimize=True)
+        out = buf.getvalue()
+        if len(out) <= _BEDROCK_MAX_BYTES:
+            return out
+        scale *= 0.7
+    raise RuntimeError(f"{os.path.basename(path)} still exceeds {_BEDROCK_MAX_BYTES // (1024 * 1024)}MB after repeated downscaling")
+
+
+def _image_block(path):
+    b64 = base64.b64encode(_prepare_image(path)).decode()
     return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
 
 
@@ -164,12 +219,15 @@ def _parse_verdict(text):
 
 
 def _assess_page(bedrock, name, path, shots):
-    # Skip zero/near-empty captures (a zero-height element crop produces an
+    # Drop zero/near-empty captures (a zero-height element crop produces an
     # empty PNG that Bedrock rejects with a ValidationException — seen on the
-    # labs chart crop 2026-06-12).
+    # labs chart crop 2026-06-12). If NOTHING usable remains, that used to
+    # return a fabricated "ok" verdict — a page the oracle never saw counted
+    # as fine. #2973: it is now a loud, named failure like any other
+    # cannot-evaluate condition.
     shots = [s for s in shots if os.path.getsize(s["path"]) > 256]
     if not shots:
-        return {"severity": "ok", "renders_ok": True, "summary": "(no usable screenshots — skipped)"}
+        raise RuntimeError("no usable screenshots — every capture for this page is empty/near-empty")
     content = [_image_block(s["path"]) for s in shots]
     prompt = _PROMPT.format(name=name, path=path)
     if path in _PAGE_RULES:  # #2383 — page-specific semantic rule (not .format-ed: rules may carry literal braces)
@@ -185,7 +243,14 @@ def assess_results(results):
     """Run Claude-vision QA over each page's captured screenshots; mutate `results` in place.
 
     Adds `ai_verdict` per page. High-severity → issue + status FAIL; med/low → warning.
-    No-ops gracefully (per page) on any Bedrock error.
+
+    A page the oracle CANNOT evaluate is a FAILURE, not a warning (#2973): any
+    per-page error (Bedrock ValidationException on the payload, no usable
+    captures, …) marks the result `ai_unevaluated`, appends a gating issue, and
+    flips it to FAIL. Until 2026-08-22 that path was `⚠ AI-QA error` + continue,
+    so run 32580634729 reported "91 passed, 2 failed" while Home and the
+    Protocols hub — 2 of the 6 tier-1 doors — were never looked at. Same defect
+    class as #2938 (`⚠ unavailable` + exit 0), one level down.
 
     Budget-aware (#1428): checks budget_guard.allow("visual_ai_qa") UPFRONT — the
     operator-truth band pauses at tier 3 only (ADR-125 as amended by #1927), same band
@@ -195,10 +260,14 @@ def assess_results(results):
     {"status": "skipped_by_budget", "tier": N} so the caller can render SKIPPED-BY-BUDGET
     rather than have the pause surface only as a per-page "AI-QA error" from the
     bedrock_client Tier-3 hard-stop backstop (silent-by-accident before this fix).
+    A mid-run BudgetExceeded (tier flipped to 3 while the sweep was running) gets the
+    SAME sanctioned-pause treatment — a deliberate budget pause must never red the
+    deploy path as fabricated page failures.
 
     Returns a status dict `{"status": "ok"|"unavailable"|"skipped_by_budget", ...}` —
-    mirroring assess_reader_truth's contract. `results` is still mutated in place exactly
-    as before; no caller relied on the old (implicit None) return value.
+    mirroring assess_reader_truth's contract; the "ok" form carries the #2973
+    accounting: {"status": "ok", "evaluated": E, "unevaluated": U, "no_shots": S}.
+    `results` is still mutated in place.
     """
     bedrock = _import_bedrock()
     if not bedrock:
@@ -224,18 +293,50 @@ def assess_results(results):
     except ImportError:
         pass  # fail-open, same posture as the guard itself
 
+    try:
+        from ai.budget_guard import BudgetExceeded as _BudgetExceeded  # lambdas/ on sys.path
+    except Exception:  # pragma: no cover — bedrock imported fine, so this should too
+
+        class _BudgetExceeded(Exception):
+            pass
+
+    evaluated, unevaluated, no_shots = 0, [], 0
     for r in results:
         shots = [s for s in r.get("screenshots", []) if s.get("kind") in ("page", "chart")][:_MAX_IMAGES_PER_PAGE]
         if not shots:
+            # No page/chart capture at all: only synthetic results or pages whose
+            # navigation/screenshot already FAILED deterministically land here
+            # (an --ai-qa run force-enables screenshots). Counted + printed so
+            # partial coverage is visible, never silent.
+            no_shots += 1
             continue
         try:
             verdict = _assess_page(bedrock, r["page"], r["path"], shots)
+        except _BudgetExceeded:
+            # Tier flipped to 3 MID-run — the same sanctioned pause the upfront
+            # check reports, discovered late. Honest skip for this + remaining
+            # pages, never fabricated page failures on the deploy path (#1440).
+            try:
+                tier = budget_guard.current_tier()
+            except Exception:
+                tier = 3
+            print(f"  ⏸ SKIPPED-BY-BUDGET (mid-run) — AI-vision QA paused at budget tier {tier} after {evaluated} page(s)")
+            for rr in results:
+                if "ai_verdict" not in rr and not rr.get("ai_unevaluated"):
+                    rr.setdefault("warnings", []).append(f"SKIPPED-BY-BUDGET: AI-vision QA — budget tier {tier} (ADR-125)")
+            return {"status": "skipped_by_budget", "tier": tier, "evaluated": evaluated, "unevaluated": len(unevaluated)}
         except Exception as e:
-            msg = str(e)[:140]
-            r.setdefault("warnings", []).append(f"AI-QA error: {msg}")
-            print(f"  ⚠ {r['page']}: AI-QA error — {msg}")
+            # #2973: a page the oracle could not look at has NO coverage — that
+            # is a gating failure with a named reason, never a ⚠-and-continue.
+            msg = str(e)[:200]
+            r["ai_unevaluated"] = msg
+            r.setdefault("issues", []).append(f"AI-vision UNEVALUATED (#2973): {msg}")
+            r["status"] = "FAIL"
+            unevaluated.append(r["page"])
+            print(f"  ❌ {r['page']}: AI-vision could NOT evaluate this page — {msg}")
             continue
 
+        evaluated += 1
         r["ai_verdict"] = verdict
         sev = verdict.get("severity", "ok")
         summary = (verdict.get("summary") or "").strip()
@@ -253,7 +354,16 @@ def assess_results(results):
             r.setdefault("warnings", []).append(f"AI-vision (advisory slop-lens, #1466 — never gating): {note}")
             print(f"  🎭 slop-lens · {r['page']}: {note[:96]}")
 
-    return {"status": "ok"}
+    # #2973: the evaluated-page count printed next to the verdicts — a check that
+    # measures nothing returns clean, so say out loud how much WAS measured.
+    targeted = evaluated + len(unevaluated)
+    line = f"  AI-vision: evaluated {evaluated}/{targeted} captured page(s)"
+    if unevaluated:
+        line += f"; {len(unevaluated)} UNEVALUATED → FAIL: {', '.join(unevaluated[:6])}"
+    if no_shots:
+        line += f"; {no_shots} result(s) carried no page/chart capture (deterministic-only)"
+    print(line)
+    return {"status": "ok", "evaluated": evaluated, "unevaluated": len(unevaluated), "no_shots": no_shots}
 
 
 def _truth_line(f):
@@ -381,7 +491,10 @@ if __name__ == "__main__":
     assess_results(data["results"])
     data["failed"] = sum(1 for r in data["results"] if r["status"] == "FAIL")
     data["passed"] = sum(1 for r in data["results"] if r["status"] == "PASS")
+    data["unevaluated"] = sum(1 for r in data["results"] if r.get("ai_unevaluated"))
     with open(report, "w") as f:
         json.dump(data, f, indent=2)
-    print(f"\n{data['passed']} passed, {data['failed']} failed after AI-vision pass.")
+    # #2973: unevaluated pages are inside `failed` (they gate) — named separately
+    # so the tally never reads as "everything was looked at" when it wasn't.
+    print(f"\n{data['passed']} passed, {data['failed']} failed ({data['unevaluated']} of those UNEVALUATED) after AI-vision pass.")
     sys.exit(0 if data["failed"] == 0 else 1)

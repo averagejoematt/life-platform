@@ -28,6 +28,16 @@ pyyaml==6.0.3
 # source of truth for the enforced gate versions; a mismatch let local formatting
 # diverge from what the build enforces. Bump both together, never one alone.
 playwright==1.62.0
+# Pillow — visual_ai_qa._prepare_image downscales full-page captures that exceed
+# Bedrock's 8000px-per-dimension image limit (#2973: home.png at 1440x11827 drew a
+# ValidationException and the page went silently unevaluated). LOAD-BEARING in every
+# lane that runs --ai-qa (visual-qa.yml, ci-cd.yml, site-deploy.yml — resolved via
+# scripts/ci_pins.py); without it an oversized capture is a loud per-page FAIL, by
+# design, never a silent skip. Deliberately UNGATED from tree-wide pin agreement
+# (test_ci_pin_consistency._UNGATED_DEV_PINS): the Lambda pillow LAYER
+# (lambdas/requirements/pillow.txt) is a separate runtime plane with its own
+# promote flow — matching it today is convenience, not a contract.
+pillow==12.3.0
 
 # Linting & formatting (config in pyproject.toml). ruff owns lint + import-sort;
 # black owns formatting. (standalone isort removed — it fought ruff's sorter.)

@@ -43,7 +43,9 @@ jobs:
         # Versions are READ from requirements-dev.txt, never copied here (CQ-01, #2609) —
         # a second copy is what made every Dependabot bump born red.
         run: |
-          PINS=$(python3 scripts/ci_pins.py pytest pytest-cov boto3 botocore hypothesis pyyaml)
+          # pillow (#2973): lets test_visual_ai_qa's real-downscale test run here
+          # (visual_ai_qa._prepare_image; pytest.importorskip elsewhere).
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-cov boto3 botocore hypothesis pyyaml pillow)
           pip install $PINS
 
       - name: Run unit tests

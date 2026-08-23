@@ -149,6 +149,13 @@ _UNGATED_DEV_PINS = {
     # #2760 tests at the bottom of this file.)
     "aws-cdk-lib",
     "constructs",
+    # pillow (#2973) rides scripts/ci_pins.py like a gated tool (the resolver-argument
+    # test still covers that leg), but tree-wide version agreement would be WRONG
+    # coupling: the Lambda pillow LAYER (lambdas/requirements/pillow.txt, its own
+    # build/promote flow + #2099 --check-manifest drift gate, plus a deliberate
+    # synthetic 99.0.0 fixture in tests/test_layer_build_manifest.py) is a separate
+    # runtime plane, bumped by layer promotion — never by a Dependabot dev bump.
+    "pillow",
 }
 
 
