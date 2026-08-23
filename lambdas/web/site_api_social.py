@@ -60,6 +60,7 @@ from common.client_ip import (
     extract_client_ip,  # #1221 — the ONE edge-observed client-IP helper
     extract_idempotency_identity,  # #2932 — fail-OPEN identity for the capture doors' content-keyed ids
 )
+from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE spelling, imported, never retyped
 from content.social_signals import coach_route_of  # #1671 — training/mind coach-route classifier, reused read-side (#1674)
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from ingestion.source_registry import (  # #1679 — inbound channel live/dormant, read from the canonical registry
@@ -199,7 +200,7 @@ def _rate_limited(endpoint: str, message: str, retry_after=None, **extra) -> dic
     """The ONE 429 in this module — emits the OBS-03 abuse metric, then answers.
 
     #2221: `_emit_rate_limit_metric` existed but only 3 of the module's 13 refusal
-    paths called it, so the `LifePlatform/SiteApi RateLimitHit` metric under-reported
+    paths called it, so the `RateLimitHit` metric under-reported
     abuse by ~77% and a flood against nudge/vote/follow/checkin/suggest/ritual/
     predict/cohort was invisible. Emitting inside the builder makes "a 429 that
     doesn't count" unexpressible; `tests/test_site_api_social_behavior.py` derives the
@@ -368,7 +369,10 @@ def _emit_rate_limit_metric(endpoint: str) -> None:
                 "Timestamp": int(_t.time() * 1000),
                 "CloudWatchMetrics": [
                     {
-                        "Namespace": "LifePlatform/SiteApi",
+                        # #3002: was the casing twin "…/SiteApi" — CloudWatch
+                        # namespaces are case-sensitive, so this metric lived in
+                        # a namespace no alarm or dashboard read.
+                        "Namespace": SITE_API_METRIC_NAMESPACE,
                         "Dimensions": [["Endpoint"]],
                         "Metrics": [{"Name": "RateLimitHit", "Unit": "Count"}],
                     }
