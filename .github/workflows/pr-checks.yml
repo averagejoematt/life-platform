@@ -72,7 +72,7 @@ jobs:
       - name: Install lane dependencies
         # Versions are READ from requirements-dev.txt, never copied here (CQ-01, #2609).
         run: |
-          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore black hypothesis pyyaml mypy ruff)
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore black hypothesis pyyaml mypy ruff pillow)
           pip install $PINS
 
       # `if: always()` from here down — the #749 lesson, applied to this lane. Sequential

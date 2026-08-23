@@ -132,5 +132,5 @@ def test_the_exit_code_actually_depends_on_this():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     src = open(os.path.join(root, "tests", "visual_qa.py")).read()
     assert (
-        "return failed == 0 and not ai_gate_failures" in src
+        "return failed == 0 and unevaluated == 0 and not ai_gate_failures" in src
     ), "run_sweep's return value ignores the AI-gate verdict — the fix is decorative"

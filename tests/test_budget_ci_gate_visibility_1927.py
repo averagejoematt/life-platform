@@ -52,9 +52,32 @@ def _fake_bedrock(calls):
     return type("B", (), {"invoke": staticmethod(invoke)})()
 
 
+# A real 20x20 PNG (1039 bytes) — the fixture must be the wire twice over:
+# _assess_page drops captures <= 256 bytes as empty-crop noise, and #3013's
+# _prepare_image sniffs the IHDR and honestly refuses unparseable captures
+# BEFORE any Bedrock call. The old `b"\x89PNG" + b"0"*300` fake passed the size
+# filter but now (correctly) dies at the IHDR sniff, so this suite would measure
+# the refusal path instead of the gate it exists to pin.
+_REAL_PNG = __import__("base64").b64decode(
+    "iVBORw0KGgoAAAAN"
+    "SUhEUgAAABQAAAAUCAIAAAAC64paAAAD1klEQVR4AWNgUPXKn7LzHrOGb9H0PQ/ZtANKZ+1/wqkXXDH30HMew7DqBUdf8ZtE1i0+8VbIPKZx2ekPolbx"
+    "LSvPfZawTWpniG5cfvazpH1cy6oL32ScEtvXXv4p75rSteHaHyWP9N7NN/+remdN2HaHScMvd/LO+6zagQXT9jzi0Aspnrn/KcO2uyza3kUzdz5g1/Mr"
+    "nbPnMZdhYMX8/c94TUKqFx16KWAeXrf06Bthq6jGFSfei9nGtqw+/UnSIaF93bmvMs4MgpaJTatOfxaxSWlde+6buH16x4aLP6Wcsro3X/kj65rbt+36"
+    "fwWPgok7bzEpexdP2XOXVc2vbPr+BxyagZWzGHKmbn/ApO2bP2PXY1a9gKLZe59xGAaXzjvwktskrGLh4Td85pHVS469F7SKqVt+8pOIbXzjqjNfxR2S"
+    "Wtae/8Fw/KOIeWLL8lNfxK1S2led/S5lm9619sIvWYes3g2X/yo4507YfI1B2a1g8rabzGqexdN23mHT9Cmbuec+p44/g5Jv4dSddxlVA0pm7HnAohFc"
+    "Pnv/Y3btsKp5h55x6UXWLjz6ktcwpmHJiTcCJvHNy0+/FzZPalt17pOYVWrnWobaRcffCJpFNyw99V7EMq55xdlP4jaJbasvfJWyT+lcd/mHrFN6z8Zr"
+    "vxVcs/q33Pyn7JE7afsdRjXvgqm77rMw3Pin4gUM/duM6r7A0L/HohVQNufQQ3bd4Mr5R59wGYTVLDrxnNc4sn7p6VcCZjFNK869FbaMb1198YOYTRKD"
+    "MSQSzCCRYAmJBJvkro0Xf8jbp/VuufJbySlzwvbr/1RdcybvusWo4ZE/bS8keg8w9G27918dFBcPmbRAcfGEVRcUF885DIBxcegVt3FIzdyjb/nMwusX"
+    "nPggaBnVtBgUr7Gty4DxyvBSyCS2fsWpN6LmCU2rz76XsEpuXXfhk7RtWsfGy1/lHDK7t1z7oeic07f95m8Vt/yJu+78U/csmrL3PqOWTymDS97ELfcY"
+    "VdwLp2x/yKLuVTJ91xN2Ld/yWXufc+kGVM098IrXILh2weG3AsZhDYuPfRA2i2xedvKzmGVM28ozDPNPvRMyi6pbdPajqGVs49ILXyRsElpWXP4ubZ/c"
+    "vvraLzmntK51N/8qumb2brzDoOKRM2HLfWZ17/zJ2x+xaTH8knfJ7Nt846+Se87EbbdJy2MModULjwNDP6JuySlg6JOWxxg2QCJhMyQSSMtjDNzG0TVL"
+    "QHERV78cFBek5DGGtP6Nt/6oumdO2nL3v4YXaXmM4eBrPsPouoVH3gmaxDUuIS2PAQBaHlG1dkhrXQAAAABJRU5ErkJggg=="
+)
+
+
 def _result(tmp_path, name="Cockpit"):
     shot = tmp_path / f"{name}.png"
-    shot.write_bytes(b"\x89PNG" + b"0" * 300)
+    shot.write_bytes(_REAL_PNG)
     return {
         "page": name,
         "path": "/cockpit/",
@@ -80,7 +103,10 @@ def test_both_ci_gates_run_at_the_default_operating_tier(tmp_path, monkeypatch, 
 
     status = visual_ai_qa.assess_results(results)
 
-    assert status == {"status": "ok"}
+    # #3013 added evaluated/unevaluated/no_shots counts to the status dict; this
+    # test's claim is only that the gate RUNS at the default operating tier (not
+    # paused) — pin the status key, not the diagnostic shape.
+    assert status["status"] == "ok"
     assert calls, "the vision gate must actually run at tier 1 (#1927)"
     assert results[0]["status"] == "FAIL", "a genuine high verdict must still gate"
     assert "SKIPPED-BY-BUDGET" not in capsys.readouterr().out
