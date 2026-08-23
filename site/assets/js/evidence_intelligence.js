@@ -204,9 +204,16 @@ export function renderCycles(d) {
     [`Weight change (first ${K}d)`, (c) => c.weight_delta_lbs != null ? `${c.weight_delta_lbs > 0 ? "+" : ""}${fmt(c.weight_delta_lbs)} lb` : "—"],
     ["Avg recovery", (c) => c.avg_recovery_pct != null ? `${fmt(c.avg_recovery_pct)}%` : "—"],
     ["Avg sleep", (c) => c.avg_sleep_hours != null ? `${fmt(c.avg_sleep_hours)} h` : "—"],
-    ["Days with data", (c) => fmt(c.days_with_data)],
+    // #2957: name the denominator on the row itself — "Days with data: 7" alone reads
+    // as a claim about the cycle's length; "7 of 7" reads as the window it is measured in.
+    ["Days with data", (c) => `${fmt(c.days_with_data)} of ${fmt(K)}`],
   ];
-  const head = `<tr><th></th>${cs.map((c) => `<th>cycle ${esc(String(c.cycle))}${c.is_current ? " · now" : ""}</th>`).join("")}</tr>`;
+  // #2957: "· now" left the live column looking like a finished result sitting beside
+  // finished ones, so "Days with data: 7" next to "—" for start weight read as a
+  // contradiction. Say the column is still filling, and how far in it is. `in_progress`
+  // is the server's own word for it; `is_current` is the older field the flagmark below
+  // still keys off, and is the fallback for a payload served before the API ships.
+  const head = `<tr><th></th>${cs.map((c) => { const live = c.in_progress ?? c.is_current; return `<th>cycle ${esc(String(c.cycle))}${live ? ` · in progress${c.days_elapsed ? ` · day ${esc(String(c.days_elapsed))}` : ""}` : ""}</th>`; }).join("")}</tr>`;
   const body = rows.map(([lbl, f]) => `<tr><td class="rd-name">${esc(lbl)}</td>${cs.map((c) => `<td class="num${c.is_current ? " rd-flagmark" : ""}">${f(c)}</td>`).join("")}</tr>`).join("");
   // #948: the day-1 case reads "first 1 day" — the singular recurs on every genesis day.
   return sec(`The same first ${K} day${K === 1 ? "" : "s"}, every restart`, `<table class="rd-tbl"><thead>${head}</thead><tbody>${body}</tbody></table>`) +
@@ -306,10 +313,17 @@ if (typeof document !== "undefined") {
 }
 
 // One stat block (season OR career) — shared so the two cards render identically.
-function _calStatFigs(s) {
+// #2957: `scope` labels the n ON THE FIGURE ("graded forecasts · this cycle" /
+// "· all cycles"). The two cards were distinguished only by their headings, so a
+// reader — and the reader-truth judge, which reads the page as flat text — saw
+// "THIS SEASON · CYCLE 14" adjacent to the CAREER count and read one claim: 26
+// graded forecasts inside a 5-day cycle. Every number was true; only the frame
+// travelled badly. A stat that can span a reset now says which side it is on.
+function _calStatFigs(s, scope) {
   const cal = String(s.calibration || "").replace(/_/g, " ");
+  const nLabel = scope ? `graded forecasts · ${scope}` : "graded forecasts";
   return figs([
-    fig(s.n, "graded forecasts", null, "calibration_score_pairs"),
+    fig(s.n, nLabel, null, "calibration_score_pairs"),
     s.brier != null && fig(fmt(s.brier), "Brier", null, "brier_score"),
     s.brier_skill != null && fig(fmt(s.brier_skill), "skill vs base-rate", null, "brier_skill_score"),
     s.accuracy_pct != null && fig(fmt(s.accuracy_pct) + "%", "hit rate", null, "calibration_score_pairs"),
@@ -360,9 +374,9 @@ export function renderCalibration(d) {
     );
 
   const seasonBody = p.n > 0
-    ? _calStatFigs(p)
+    ? _calStatFigs(p, "this cycle")
     : `<p class="cs-fresh">Fresh slate — career: n=${life.n}. Nothing has graded this cycle yet; the coaches' calls are already logged and resolve as their windows close.</p>`;
-  const careerBody = life.n > 0 ? _calStatFigs(life) : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
+  const careerBody = life.n > 0 ? _calStatFigs(life, "all cycles") : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
   // #1893: the void ledger, made visible. A reset voids (never grades) every
   // still-open pre-registered bet; without this line the career n silently
   // reads as the whole record when ~85% of all bets were voided at resets.
@@ -370,9 +384,13 @@ export function renderCalibration(d) {
   const voidLine = voided.n > 0
     ? `<p class="cs-fresh">${esc(String(voided.n))} pre-registered bets voided at resets — never graded, shown so this denominator is honest.</p>`
     : "";
+  // #2957: the season heading names the window it counts. "This season · cycle 14"
+  // bounded nothing on its own — "since 2026-08-17" does, and it is the same date the
+  // rest of the site's day-number arithmetic runs off.
+  const since = (d && d.cycle_start) ? ` · since ${esc(d.cycle_start)}` : "";
   const pair = `<div class="cs-pair">` +
-    `<div class="cs-card"><h3 class="cs-h">This season${cycle ? ` · cycle ${esc(cycle)}` : ""}</h3>${seasonBody}</div>` +
-    `<div class="cs-card"><h3 class="cs-h">Career · every cycle</h3>${careerBody}${voidLine}</div>` +
+    `<div class="cs-card"><h3 class="cs-h">This season${cycle ? ` · cycle ${esc(cycle)}` : ""}${since}</h3>${seasonBody}</div>` +
+    `<div class="cs-card"><h3 class="cs-h">Career · every cycle${since ? " · the record before this one included" : ""}</h3>${careerBody}${voidLine}</div>` +
     `</div>`;
 
   const bins = p.reliability_bins || [];

@@ -119,10 +119,13 @@ function entriesFor(s, data) {
     // find the reaction in the cached list; the uid segment (the server's per-record
     // sk id) is what keeps two same-day posts on one channel addressable. `~` and not
     // `#` because the id is written into location.hash by selectEntry.
+    // #2957: a pre-genesis reaction is marked IN THE LIST too, not only once it is
+    // opened — the list is the first (and often only) thing a reader scans, and the
+    // reader-truth judge reads the whole rendered page, not just the detail pane.
     const reactions = (data.diary_reactions || []).map((r) => ({
       id: reactionId(r),
       title: `${r.coach_name || "A coach"} on ${r.kind === "social" ? "the post" : "the diary"}`,
-      date: r.date || "",
+      date: (r.date || "") + (r.archival && r.archival.pre_cycle ? " · previous cycle" : ""),
     }));
     return reactions.concat(weeks);
   }
@@ -969,9 +972,22 @@ function renderDiaryReaction(read, id) {
   const machine = r.reaction
     ? `<div class="voice machine"><span class="who">${esc(r.coach_name || "The coach")}</span><p class="what">${esc(r.reaction)}</p></div>`
     : "";
+  // #2957: after a restart the newest surviving reaction can predate the live genesis
+  // by weeks, and lab-notes opens on it — a 2026-07-26 diary reaction was the featured
+  // "current coaching" on Day 7 of cycle 14. The server decides (site_api_thirdwall →
+  // site_api_phase_frame.archival_frame) and ships `archival.label`; the render never
+  // re-derives the cycle boundary, so the two can't disagree. In-cycle rows carry no
+  // `archival` key and pick up no badge.
+  // Keyed off `pre_cycle` — the SAME field the list badge in entriesFor uses — so the
+  // two can never show a badge in one place and not the other. `label` is the server's
+  // sentence when it has one; the fallback is the claim without the arithmetic, never
+  // a guessed number.
+  const arch = r.archival && r.archival.pre_cycle
+    ? `<p class="dx-archival label">${esc(r.archival.label || "From a previous cycle")} — kept on the record, not a reading of this cycle.</p>`
+    : "";
   read.innerHTML =
     `<p class="dx-kicker label">${isSocial ? "post" : "diary"} reaction · ${esc(r.date || "")} · Matthew ↔ ${esc(r.coach_name || "the coach")}${r.tone ? ` · ${esc(r.tone)}` : ""}</p>` +
-    human + machine;
+    arch + human + machine;
   enhanceCoachNames(read);
 }
 

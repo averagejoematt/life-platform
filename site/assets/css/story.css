@@ -342,6 +342,9 @@ body { overflow-x: hidden; }
 .dx-empty { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); padding: var(--sp-3) 0; }
 .dx-read { min-width: 0; }
 .dx-kicker { color: var(--ember); }
+/* #2957 — the prior-cycle frame on an archived lab-notes reaction. Muted, not alarming:
+   the entry is honest and worth keeping; it just isn't a reading of the live cycle. */
+.dx-archival { color: var(--ink-muted); margin-top: var(--sp-2); }
 .dx-title { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.12; margin-top: var(--sp-2); }
 .dx-stats { color: var(--ink-faint); margin-top: var(--sp-2); }
 .dx-prose { margin-top: var(--sp-4); color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
