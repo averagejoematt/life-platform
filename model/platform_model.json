@@ -8,6 +8,10 @@
       "routing": "digest",
       "stack": "monitoring_stack"
     },
+    "budget-tier-unreadable": {
+      "routing": "digest",
+      "stack": "monitoring_budget_alarms"
+    },
     "chronicle-delivery-heartbeat": {
       "routing": "urgent",
       "stack": "email_stack"
@@ -6098,7 +6102,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 52,
+      "alarms": 53,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,
