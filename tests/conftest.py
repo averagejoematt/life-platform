@@ -38,6 +38,12 @@ os.environ.setdefault("AI_VALIDATOR_AUTOLOAD", "off")
 # Tests that exercise the fetch itself set PANELCAST_ZEITGEIST=on and mock urlopen.
 os.environ.setdefault("PANELCAST_ZEITGEIST", "off")
 
+# #3044: keep the unit suite hermetic — signed-unsubscribe-link minting resolves its
+# HMAC key env-first (common.unsubscribe_token.get_unsub_secret). Without this, every
+# sender test that builds a subscriber email would attempt a real Secrets Manager
+# round-trip (with the fake creds below) and degrade to the /privacy/ fallback link.
+os.environ.setdefault("UNSUB_TOKEN_SECRET", "test-unsub-signing-key")
+
 
 # #381: make the unit suite hermetic regardless of the developer's local
 # ~/.aws profile. Several nominally-offline tests (e.g. tests/test_coaches_api.py)
@@ -229,6 +235,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_wallclock_fixture_bombs_2376.py",  # #2376: dated fixture + unfrozen handler clock (the #2354 midnight red)
         "test_raw_key_registry_guard.py",  # #2286: no hand-built raw/ S3 keys
         "test_site_api_namespace_guard_3002.py",  # #3002: one site-API metric namespace, no casing twins — repo-shape sweep, pre-merge
+        "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps .claude/commands + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
         "test_no_hardcoded_feature_tier.py",

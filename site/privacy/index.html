@@ -142,10 +142,10 @@
       <p>Subscriber data is stored in Amazon DynamoDB (AWS us-west-2, encrypted at rest). Email delivery is handled via Amazon SES. No subscriber data is stored in any third-party marketing platform or CRM.</p>
     </section>
 
-    <section class="policy-section">
+    <section class="policy-section" id="unsubscribe">
       <h2><span class="ps-n">05</span> unsubscribing</h2>
-      <p>Every email includes an unsubscribe link. Click it and you&#x27;re removed immediately — no re-engagement emails, no questions asked. You can also email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I&#x27;ll remove you within 24 hours.</p>
-      <p>After unsubscribing, your email is deleted from the subscriber list entirely.</p>
+      <p>Every email includes a one-click unsubscribe link, signed so that only you (the person holding the email) can use it. Click it and two things happen in the same instant: you stop receiving emails, and your email address is <strong>anonymized on the spot</strong> — the stored address is overwritten with a redaction marker. You can also email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I&#x27;ll unsubscribe you within 24 hours.</p>
+      <p>Here is exactly what remains after you unsubscribe, and why: a one-way cryptographic hash (SHA-256) of your address, plus the subscribe/unsubscribe timestamps. The hash is the suppression record — it&#x27;s what stops the system from ever emailing that address again, and it keeps the historical subscriber counts honest. It cannot be reversed back into your address. If you want even that hash gone, email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and the whole record is hard-deleted within 7 days.</p>
     </section>
 
     <section class="policy-section">

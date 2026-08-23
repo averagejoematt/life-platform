@@ -31,7 +31,6 @@ import json
 import logging
 import os
 import time
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -71,6 +70,7 @@ ses = boto3.client("sesv2", region_name=REGION)
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
 
 # #2654: the log token monitoring keys a MetricFilter + alarm on. The literal in
@@ -195,7 +195,7 @@ def has_real_content(digest: dict) -> bool:
 
 
 def build_email(digest: dict, sub_email: str) -> tuple:
-    unsub = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(sub_email)}"
+    unsub = unsub_url_or_fallback(sub_email, SITE_URL)  # #3044
     parts = [
         '<div style="background:#0b0f0d;color:#e8f0e8;font-family:Georgia,serif;padding:28px;max-width:640px;margin:auto;">',
         '<p style="font-family:monospace;font-size:11px;letter-spacing:.08em;color:#8aaa90;text-transform:uppercase;">since the last installment · what the machine found</p>',

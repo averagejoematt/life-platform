@@ -28,15 +28,16 @@ import json
 import os
 import sys
 import time
-import urllib.parse
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "deploy"))
+sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
 import genesis_prereg_stamp  # noqa: E402
+from common.unsubscribe_token import unsub_url_or_fallback  # noqa: E402  — #3044: signed unsub link, never plaintext email
 
 REGION = "us-west-2"
 TABLE_NAME = "life-platform"
@@ -65,7 +66,7 @@ def check_timing(today_pt: date, genesis: str) -> None:
 def build_email(stamp: dict, genesis: str, sub_email: str) -> tuple:
     """(subject, html) for one subscriber — pure, testable, no AWS."""
     day1 = datetime.strptime(genesis, "%Y-%m-%d").strftime("%B %-d, %Y")
-    unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(sub_email)}"
+    unsub_url = unsub_url_or_fallback(sub_email, SITE_URL)  # #3044
     url = stamp["public_artifact_url"]
     sha = stamp["sha256"]
     html = f"""<!DOCTYPE html>

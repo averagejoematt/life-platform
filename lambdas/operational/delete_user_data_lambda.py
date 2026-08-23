@@ -43,9 +43,10 @@ SUBSCRIBER RETENTION SWEEP (#1350):
     {"subscriber_retention_sweep": true, "apply": true}     # enact (anonymize)
     {"subscriber_retention_sweep": true}                    # dry-run (plan only)
 
-  enacting the SIGNED policy in docs/DATA_GOVERNANCE.md's "Subscriber emails" row:
-  anonymize the plaintext email on `status=unsubscribed` rows older than the signed
-  18-month window (lambdas/subscriber_retention.py::RETENTION_WINDOW_DAYS). Only the
+  enacting the SIGNED policy in docs/DATA_GOVERNANCE.md's "Subscriber emails" row
+  (v2 2026-08-23, #3044: anonymize-at-unsubscribe — the handler scrubs inline, this
+  sweep is the BACKSTOP): anonymize the plaintext email on `status=unsubscribed` rows
+  past lambdas/subscriber_retention.py::RETENTION_WINDOW_DAYS (=0). Only the
   PII is scrubbed — sk/status/timestamps and the subscriber COUNT are preserved. The
   attended operator equivalent is deploy/subscriber_retention_purge.py.
 """
@@ -278,8 +279,10 @@ def _scan_subscribers() -> list[dict]:
 
 def _handle_retention_sweep(apply: bool) -> dict:
     """#1350 SCHEDULED retention enactment (weekly EventBridge rule). Enacts the signed
-    policy (docs/DATA_GOVERNANCE.md "Subscriber emails" row): anonymize the plaintext
-    email on unsubscribed rows older than the signed 18-month window. Dry-run unless
+    policy (docs/DATA_GOVERNANCE.md "Subscriber emails" row, v2 #3044:
+    anonymize-at-unsubscribe, window 0): anonymize the plaintext email on any
+    unsubscribed row still carrying it — the BACKSTOP behind the handler's inline
+    anonymize (legacy rows + failed inline writes). Dry-run unless
     `apply` is True (a bare/manual invoke reports the plan, changes nothing).
 
     Anonymize is done via PutItem-overwrite (the role has PutItem, not UpdateItem) with
@@ -349,8 +352,8 @@ def lambda_handler(event: dict, context) -> dict:
     Returns counts + audit metadata. Refuses on protected users or missing confirm.
     """
     try:
-        # #1350: the SCHEDULED bulk retention sweep — anonymize unsubscribed subscriber
-        # emails past the signed 18-month window. Dry-run unless {"apply": true}. A
+        # #1350/#3044: the SCHEDULED bulk retention sweep — anonymize any unsubscribed
+        # subscriber row still carrying plaintext (window 0). Dry-run unless {"apply": true}. A
         # separate, aggregate path — never routes through the user_id logic below.
         if event.get("subscriber_retention_sweep"):
             return _handle_retention_sweep(apply=bool(event.get("apply")))

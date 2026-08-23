@@ -35,20 +35,33 @@ Attribution (#1621): three signals of DIFFERENT confidence are stored as SEPARAT
   rows) and now carries the highest-confidence signal available, precedence
   UTM > free-text > referrer host > "subscribe_page". Existing rows are untouched.
 
-Retention (#1350): unsub writes status=unsubscribed + unsubbed_at; this Lambda never
-  deletes on unsubscribe. Whether/when an unsubscribed row is later purged or
-  anonymized is an owner-signed decision — see the "Subscriber emails" row in
-  docs/DATA_GOVERNANCE.md. Until that row is signed, rows are retained (today's de
-  facto posture, now documented rather than an undocumented in-code directive). Once
-  signed, `deploy/subscriber_retention_purge.py` enacts the chosen window/mode. A
-  single subscriber can be deleted on request (right-to-be-forgotten, independent of
-  the retention window) via `delete_user_data_lambda`'s `{"subscriber_email": "...",
-  "confirm": "DELETE"}` event shape.
+Retention (#3044, supersedes #1350's 548-day window): unsubscribe ANONYMIZES the row
+  in the same write — status=unsubscribed + unsubbed_at, plaintext `email` redacted to
+  `[redacted]`, `ip_hash` dropped, `anonymized_at` stamped. The sk (the sha256 hash)
+  is KEPT deliberately: it is the suppression record that prevents re-mailing and
+  keeps the subscriber count honest, and it is one-way. The weekly
+  `subscriber_retention_sweep` (delete_user_data_lambda) remains as the backstop for
+  rows unsubscribed under the old policy or where this inline write failed — see the
+  "Subscriber emails" row in docs/DATA_GOVERNANCE.md. A single subscriber can be
+  hard-deleted on request (right-to-be-forgotten, including the hash) via
+  `delete_user_data_lambda`'s `{"subscriber_email": "...", "confirm": "DELETE"}`
+  event shape.
+
+Unsubscribe auth (#3044, DIL-013): the link is tokenized — `?action=unsubscribe&t=`
+  carries a signed short-lived token (common/unsubscribe_token.py, HMAC over the
+  email HASH + expiry with the life-platform/subscriber-token-secret key). No sender
+  puts a plaintext email in a URL anymore, and a GET without a valid token cannot
+  mutate subscription state. Pre-token `email=` links already sitting in inboxes are
+  honored (logged) until LEGACY_EMAIL_PARAM_SUNSET (2026-09-22), then rejected.
+  Deliberately still a one-click GET: the token closes forgery, the redirect flow
+  stays CAN-SPAM one-click, and a scanner prefetch can only enact the subscriber's
+  own emailed link (same exposure as before, now scoped to the link holder).
 
 Routes (via API Gateway query param ?action=):
   POST ?action=subscribe   — create pending record, send confirmation email
   GET  ?action=confirm     — confirm email, send welcome
-  GET  ?action=unsubscribe — mark unsubscribed (non-destructive)
+  GET  ?action=unsubscribe — anonymize-at-unsubscribe (signed token `t=`; legacy
+                             `email=` accepted until 2026-09-22)
 
 Confirmation token: 32-byte random hex, stored in DDB, expires 48h.
 Welcome email: Ava directive — warm, specific, on-brand.
@@ -76,7 +89,6 @@ import json
 import logging
 import os
 import secrets
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -90,11 +102,21 @@ import boto3
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
 from common.client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+from common.pacific_time import PACIFIC  # #2414 — the site's day boundary is Pacific (legacy-link sunset check)
 from common.send_guard import guarded_send_email, is_dry_run  # #2291 — explicit dry_run honored
+from common.unsubscribe_token import (  # #3044 — signed one-click unsubscribe
+    UNSUB_TOKEN_PARAM,
+    get_unsub_secret,
+    legacy_email_param_accepted,
+    subscriber_email_hash,
+    unsub_url_or_fallback,
+    verify_unsub_token,
+)
 from common.utm import (
     normalize as _utm_normalize,  # #1621 — shared with the outbound link tagger
     referrer_host as _referrer_host,
 )
+from content.subscriber_retention import REDACTED_EMAIL  # #3044 — ONE redaction literal, shared with the sweep
 
 from web.site_api_common import SITE_API_ORIGIN_SECRET
 
@@ -143,8 +165,9 @@ ses = boto3.client("sesv2", region_name=SES_REGION)  # us-west-2 (verified ident
 
 
 def _email_hash(email: str) -> str:
-    """SHA256 of lowercased email — used as SK and for dedup."""
-    return hashlib.sha256(email.strip().lower().encode()).hexdigest()
+    """SHA256 of lowercased email — used as SK and for dedup. Delegates to the ONE
+    canonical hash in common.unsubscribe_token so mint and verify can never drift."""
+    return subscriber_email_hash(email)
 
 
 def _ip_hash(ip: str) -> str:
@@ -527,7 +550,7 @@ def _welcome_email_content(email: str) -> tuple[str, str]:
     first dispatch so a new subscriber can read the journey from the beginning
     (PG-03's "start from the beginning")."""
     subject = "You're in. Here's what you just signed up for."
-    unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
+    unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #3044 — signed token, never plaintext email
     body_text = f"""Hey —
 
 You just subscribed to The Measured Life. Every Wednesday, you'll get a dispatch from the experiment: what the data showed, what I tried, what surprised me, and what I'm thinking about next.
@@ -580,11 +603,13 @@ def _send_welcome_email(email: str, dry_run: bool = False) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def handle_unsubscribe(email: str) -> dict:
-    """Mark status=unsubscribed. Never deletes here — see the retention pointer in the
-    module docstring (#1350: docs/DATA_GOVERNANCE.md "Subscriber emails" row)."""
-    email = email.strip().lower()
-    email_hash = _email_hash(email)
+def handle_unsubscribe(email_hash: str, dry_run: bool = False) -> dict:
+    """Anonymize-at-unsubscribe (#3044): ONE write flips status AND scrubs the PII —
+    plaintext `email` -> `[redacted]`, `ip_hash` dropped, `anonymized_at` stamped.
+    The sk (sha256 hash), status and timestamps are kept: that is the suppression
+    contract that prevents re-mailing and keeps the subscriber count honest
+    (docs/DATA_GOVERNANCE.md "Subscriber emails" row). Takes the HASH, not the
+    address — the verified token never contained the address to begin with."""
     now_iso = datetime.now(timezone.utc).isoformat()
 
     existing = _get_record(email_hash)
@@ -592,21 +617,26 @@ def handle_unsubscribe(email: str) -> dict:
         # Not found — return success silently (don't leak subscription status)
         return _redirect(f"{SITE_URL}/subscribe/confirm/?unsubscribed=true")
 
-    if existing.get("status") == "unsubscribed":
+    if existing.get("status") == "unsubscribed" and existing.get("anonymized_at"):
         return _redirect(f"{SITE_URL}/subscribe/confirm/?unsubscribed=already")
+
+    if dry_run:
+        # #2291: explicit operator dry run — report, write nothing.
+        logger.info("unsubscribe: dry run — anonymize suppressed for %s", email_hash[:8])
+        return _redirect(f"{SITE_URL}/subscribe/confirm/?unsubscribed=true")
 
     try:
         table.update_item(
             Key={"pk": SUBSCRIBERS_PK, "sk": f"EMAIL#{email_hash}"},
-            UpdateExpression="SET #s = :s, unsubbed_at = :u, updated_at = :u",
+            UpdateExpression="SET #s = :s, unsubbed_at = :u, updated_at = :u, email = :r, anonymized_at = :u REMOVE ip_hash",
             ExpressionAttributeNames={"#s": "status"},
-            ExpressionAttributeValues={":s": "unsubscribed", ":u": now_iso},
+            ExpressionAttributeValues={":s": "unsubscribed", ":u": now_iso, ":r": REDACTED_EMAIL},
         )
     except Exception as exc:
         logger.error("unsubscribe: DDB update failed: %s", exc)
         return _redirect(f"{SITE_URL}/subscribe/confirm/?error=server_error")
 
-    logger.info("unsubscribed: %s", email_hash[:8])
+    logger.info("unsubscribed+anonymized: %s", email_hash[:8])
     return _redirect(f"{SITE_URL}/subscribe/confirm/?unsubscribed=true")
 
 
@@ -652,10 +682,27 @@ def lambda_handler(event, context):
             return handle_confirm(token, email_hash_pfx, dry_run=dry_run)
 
         if action == "unsubscribe":
+            # #3044: signed-token path — the ONLY durable way in. The token carries the
+            # email HASH; a GET without a valid token cannot mutate subscription state.
+            token = params.get(UNSUB_TOKEN_PARAM, "")
+            if token:
+                try:
+                    secret = get_unsub_secret()
+                except RuntimeError as exc:
+                    logger.error("unsubscribe: signing secret unavailable: %s", exc)
+                    return _redirect(f"{SITE_URL}/subscribe/confirm/?error=server_error")
+                email_hash = verify_unsub_token(token, secret)
+                if email_hash is None:
+                    logger.warning("unsubscribe: invalid/expired token rejected")
+                    return _redirect(f"{SITE_URL}/subscribe/confirm/?error=invalid_token")
+                return handle_unsubscribe(email_hash, dry_run=dry_run)
+            # Legacy plaintext-email links (pre-#3044 emails still in inboxes) — honored
+            # until the dated sunset, logged each time, then rejected with no deploy.
             email = params.get("email", "")
-            if not email:
-                return _redirect(f"{SITE_URL}/subscribe/confirm/?error=missing_email")
-            return handle_unsubscribe(email)
+            if email and legacy_email_param_accepted(datetime.now(PACIFIC).date()):
+                logger.warning("unsubscribe: legacy plaintext-email link honored (sunset 2026-09-22)")
+                return handle_unsubscribe(_email_hash(email), dry_run=dry_run)
+            return _redirect(f"{SITE_URL}/subscribe/confirm/?error=invalid_token")
 
         # Default: subscribe (POST body)
         if method == "POST":

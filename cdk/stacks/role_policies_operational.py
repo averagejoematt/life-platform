@@ -907,6 +907,11 @@ def operational_email_subscriber() -> list[iam.PolicyStatement]:
     """Email subscriber Lambda (BS-03): DDB read+write (subscribers partition), KMS, SES send."""
     return [
         iam.PolicyStatement(
+            sid="SubscriberTokenSecret",  # #3044: HMAC key minting the signed unsubscribe link (common/unsubscribe_token.py).
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/subscriber-token-secret")],
+        ),
+        iam.PolicyStatement(
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query"],
             resources=[TABLE_ARN],

@@ -1,17 +1,27 @@
-"""lambdas/subscriber_retention.py — signed subscriber-email retention policy (#1350).
+"""lambdas/subscriber_retention.py — signed subscriber-email retention policy (#3044).
 
 Single source of truth for the retention WINDOW + MODE Matthew signed into
 docs/DATA_GOVERNANCE.md's "Subscriber emails" row, plus the pure eligibility/redaction
 logic the scheduled sweep shares. Bundled at the lambdas/ root (#781 one-bundle) so the
 operational Lambda imports it by bare name, exactly like platform_logger / client_ip.
 
-SIGNED POLICY (docs/DATA_GOVERNANCE.md, 2026-07-25):
-  ANONYMIZE the plaintext email on unsubscribed subscriber rows 18 months
-  (RETENTION_WINDOW_DAYS) after `unsubbed_at`. Only the PII is scrubbed — the sk
-  (sha256 hash), `status`, and all timestamps are preserved, so the subscriber COUNT
-  and confirmation state that public stats reference survive the sweep. Active
-  (pending/confirmed) subscribers are NEVER touched: an ongoing delivery relationship
-  is the lawful basis to hold their address.
+SIGNED POLICY (docs/DATA_GOVERNANCE.md, v2 2026-08-23, #3044 — supersedes the #1350
+548-day window signed 2026-07-25):
+  ANONYMIZE at unsubscribe. The unsubscribe handler itself
+  (web/email_subscriber_lambda.handle_unsubscribe) scrubs the PII in the same write
+  that flips the status — plaintext `email` redacted, `ip_hash` dropped,
+  `anonymized_at` stamped. Only the PII is scrubbed — the sk (sha256 hash), `status`,
+  and all timestamps are preserved, so the subscriber COUNT and confirmation state
+  that public stats reference survive, and the hash doubles as the suppression record
+  that prevents re-mailing. Active (pending/confirmed) subscribers are NEVER touched:
+  an ongoing delivery relationship is the lawful basis to hold their address.
+
+  RETENTION_WINDOW_DAYS = 0 makes the weekly sweep the BACKSTOP, not the mechanism:
+  any unsubscribed row still carrying plaintext (rows unsubscribed under the old
+  548-day policy, or a row where the inline anonymize write failed) is scrubbed on
+  the next weekly run. Stated SLA: immediate at the unsubscribe click; ≤7 days
+  worst-case via the sweep; on-request hard delete (including the hash) via
+  delete_user_data_lambda's `subscriber_email` path.
 
 Two independent enactment paths read these constants (deliberately not one runtime, to
 avoid coupling independently deployed contexts):
@@ -27,10 +37,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 # ── Signed window (docs/DATA_GOVERNANCE.md "Subscriber emails" row) ──────────────
-RETENTION_WINDOW_MONTHS = 18
-# 18 months expressed in days for a day-granularity `unsubbed_at` cutoff
-# (18 × 30.4375 ≈ 548). The doc row names both forms; the guard test asserts they agree.
-RETENTION_WINDOW_DAYS = 548
+RETENTION_WINDOW_MONTHS = 0
+# 0 days: anonymize-at-unsubscribe (#3044). The handler scrubs inline; the weekly
+# sweep treats EVERY unsubscribed row still carrying plaintext as past-window.
+# The doc row names both forms; the guard test asserts they agree.
+RETENTION_WINDOW_DAYS = 0
 # Signed mode: scrub the email but keep the row (hash/status/timestamps) so aggregate
 # subscriber-count analytics survive. "purge" (hard-delete the row) is the other option.
 RETENTION_MODE = "anonymize"

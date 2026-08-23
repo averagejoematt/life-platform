@@ -12,9 +12,11 @@ BACKGROUND
   than Matthew, and required an owner-signed retention decision instead of an
   in-code directive attributed to a fictional persona.
 
-SIGNED WINDOW (#1350, 2026-07-25) — --window-days / --mode DEFAULT to the signed
-  policy in docs/DATA_GOVERNANCE.md's "Subscriber emails" row: anonymize 548 days
-  (18 months) post-unsubscribe. Those defaults come from the ONE source of truth,
+SIGNED WINDOW (v2 2026-08-23, #3044 — supersedes #1350's 548-day window) —
+  --window-days / --mode DEFAULT to the signed policy in docs/DATA_GOVERNANCE.md's
+  "Subscriber emails" row: anonymize AT unsubscribe (window 0 — the handler scrubs
+  inline; this CLI and the weekly sweep are the backstop for legacy/failed rows).
+  Those defaults come from the ONE source of truth,
   lambdas/subscriber_retention.py (RETENTION_WINDOW_DAYS / RETENTION_MODE), so this
   attended CLI can never drift from the scheduled sweep. Both remain overridable for
   an ad-hoc run. Still SAFE by default: dry-run unless --apply is passed.
@@ -104,7 +106,7 @@ def main() -> None:
         "--window-days",
         type=int,
         default=RETENTION_WINDOW_DAYS,
-        help=f"Retention window in days since unsubscribe. Defaults to the signed {RETENTION_WINDOW_DAYS}d (18 months) window (#1350); override for an ad-hoc run.",
+        help=f"Retention window in days since unsubscribe. Defaults to the signed {RETENTION_WINDOW_DAYS}d window (anonymize-at-unsubscribe, #3044); override for an ad-hoc run.",
     )
     ap.add_argument(
         "--mode",

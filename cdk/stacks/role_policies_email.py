@@ -232,7 +232,8 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
         # human-review drafts when the QA/compassion gate holds an episode.
         # editorial/* = atmospheric cover art (Part II, fail-soft, kill-switch off).
         needs_s3_write=["generated/panelcast/*", "panelcast-holds/*", "generated/assets/images/editorial/*"],
-        extra_secrets=["life-platform/google-tts", "life-platform/pexels"],
+        # #3044: subscriber-token-secret = HMAC key minting the signed unsubscribe link.
+        extra_secrets=["life-platform/google-tts", "life-platform/pexels", "life-platform/subscriber-token-secret"],
         extra_statements=[
             iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
             # Loud HOLD + new-episode notify: SNS to life-platform-alerts.
@@ -469,6 +470,11 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
             resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(
+            sid="SubscriberTokenSecret",  # #3044: HMAC key minting the signed unsubscribe link (common/unsubscribe_token.py).
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/subscriber-token-secret")],
+        ),
+        iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
             resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
@@ -507,6 +513,11 @@ def email_between_chronicle() -> list[iam.PolicyStatement]:
             sid="S3ConfigRead",
             actions=["s3:GetObject"],
             resources=_s3("config/content_filter.json"),
+        ),
+        iam.PolicyStatement(
+            sid="SubscriberTokenSecret",  # #3044: HMAC key minting the signed unsubscribe link (common/unsubscribe_token.py).
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
         iam.PolicyStatement(
             sid="KMS",
@@ -553,6 +564,11 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
                 f"{BUCKET_ARN}/generated/public_stats.json",
                 f"{BUCKET_ARN}/generated/journal/*",
             ],
+        ),
+        iam.PolicyStatement(
+            sid="SubscriberTokenSecret",  # #3044: HMAC key minting the signed unsubscribe link (common/unsubscribe_token.py).
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
         iam.PolicyStatement(
             sid="KMS",

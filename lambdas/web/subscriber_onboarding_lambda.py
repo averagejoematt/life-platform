@@ -18,12 +18,12 @@ onboarding_sent marker write, and reports what would have gone out.
 import json
 import logging
 import os
-import urllib.parse
 from datetime import datetime, timezone
 
 import boto3
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 from common.send_guard import guarded_send_email, is_dry_run
+from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 
 try:
     from common.platform_logger import get_logger
@@ -90,7 +90,7 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
     """Build the Day 2 bridge email with curated installments."""
     subject = "Welcome to The Weekly Signal \u2014 here's what you're following"
 
-    unsub_url = f"{SITE_URL}/api/subscribe?action=unsubscribe&email={urllib.parse.quote(email)}"
+    unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #3044
 
     # Dynamically load published content — adapts as new posts are approved
     featured_pages = _get_published_posts(max_posts=3)
