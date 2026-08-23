@@ -109,3 +109,41 @@ smoke_curl_retry_count() {
     echo 0
   fi
 }
+
+# ── #2978: confirm-before-fail for HTTP-level check failures ──────────────────
+# Transport retries above cover curl-exit failures; this covers the OTHER half
+# of the deploy-race class: the probe SUCCEEDS at the transport layer but reads
+# a transient wrong answer (stale edge mid-invalidation, a cold Lambda's first
+# hit, an empty first readout). A failed check re-runs its probe ONCE after a
+# bounded delay; only a REPRODUCED failure reds the smoke. Every confirmed
+# transient is counted (ADR-104) so the race rate stays measurable for #2978's
+# 30-day re-measure even though it no longer auto-rolls-back green deploys.
+#
+#   smoke_confirm <probe-fn> [args…]
+#     Sleeps SMOKE_CONFIRM_DELAY, re-runs the probe. Returns 0 (and increments
+#     the confirmed-transient counter) iff the re-probe passes. Returns 1 when
+#     confirmation is disabled (SMOKE_CONFIRM_ATTEMPTS < 1) or the failure
+#     reproduces — the caller records its normal ❌ in that case.
+SMOKE_CONFIRM_ATTEMPTS="${SMOKE_CONFIRM_ATTEMPTS:-1}"
+SMOKE_CONFIRM_DELAY="${SMOKE_CONFIRM_DELAY:-15}"
+SMOKE_CONFIRM_LOG="${SMOKE_CONFIRM_LOG:-$(mktemp "${TMPDIR:-/tmp}/smoke_confirm.XXXXXX")}"
+
+smoke_confirm() {
+  [[ "${SMOKE_CONFIRM_ATTEMPTS}" -lt 1 ]] && return 1
+  echo "  ⟳ probe failed — confirming once after ${SMOKE_CONFIRM_DELAY}s before it can red (#2978)" >&2
+  sleep "${SMOKE_CONFIRM_DELAY}"
+  if "$@"; then
+    echo "confirmed-transient: $*" >>"$SMOKE_CONFIRM_LOG" 2>/dev/null || true
+    return 0
+  fi
+  return 1
+}
+
+# How many checks failed a first probe but passed the confirm (for the summary).
+smoke_confirm_transient_count() {
+  if [[ -f "$SMOKE_CONFIRM_LOG" ]]; then
+    wc -l <"$SMOKE_CONFIRM_LOG" | tr -d ' '
+  else
+    echo 0
+  fi
+}

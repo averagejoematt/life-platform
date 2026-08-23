@@ -109,6 +109,34 @@ CLASSES: dict[str, tuple[str, ...]] = {
         "cold-start",
         "cold lambda",
     ),
+    # #2978: the umbrella above conflates two sub-shapes whose fixes live in
+    # different machinery, so its rate could not answer "is the deploy-race fix
+    # working?". Rows multi-label (matched is a list), so the umbrella keeps the
+    # total for continuity while these two split it; umbrella-minus-parts stays
+    # visible as the ambiguous remainder.
+    "QA false positive — deploy-race (#2978)": (
+        "auto-rollback",
+        "rolled back",
+        "rollback reverted",
+        "healthy deploy",
+        "canary residue",
+        "cold-start",
+        "cold lambda",
+        "asset race",
+        "invalidation race",
+        "stale edge",
+        "empty readout",
+        "race window",
+    ),
+    "QA false positive — semantic oracle (#2959)": (
+        "reader-truth",
+        "reader truth",
+        "oracle",
+        "rubric",
+        "over-read",
+        "truth finding",
+        "sanctioned content",
+    ),
     "timezone / wallclock": ("timezone", "utc", "pacific", "wallclock", "dst", "midnight"),
     "IAM / permission": ("iam", "accessdenied", "permission", "policy", "grant", "role"),
     "deployment error": ("deploy", "bundle", "zip", "packaging", "handler", "cdk drift"),

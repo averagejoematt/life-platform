@@ -93,8 +93,13 @@ def test_retry_knobs_are_env_overridable_and_transport_scoped():
     assert codes, "retry codes must be a documented, overridable list"
     assert "28" in codes.group(1).split(), "curl exit 28 (timeout) is the incident class — it must be retried"
     # No literal-digit sleeps (the #1526 no-fixed-sleep rule applies here too).
+    # Two configurable sleeps are sanctioned: the transport-retry interval and
+    # the #2978 confirm-before-fail delay — both env-overridable, never literals.
     sleeps = re.findall(r"\bsleep\s+(\S+)", _strip_comments(code))
-    assert sleeps == ['"$SMOKE_CURL_RETRY_INTERVAL"'], f"only the configurable interval sleep is allowed, found: {sleeps}"
+    assert sorted(set(sleeps)) == [
+        '"$SMOKE_CURL_RETRY_INTERVAL"',
+        '"${SMOKE_CONFIRM_DELAY}"',
+    ], f"only the two configurable sleeps are allowed, found: {sleeps}"
 
 
 # ── Behavioral: real bash, curl/sleep stubbed ────────────────────────────────

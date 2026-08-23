@@ -51,50 +51,75 @@ _smoke_on_exit() {
 }
 trap _smoke_on_exit EXIT
 
+# Each check_* is probe + verdict; on a failed probe, smoke_confirm (#2978)
+# re-runs the probe once after a bounded delay — only a REPRODUCED failure ❌s.
+# PROBE_GOT carries the last probe's observed value for the failure message.
+_probe_status() {
+  local url="$1" expected="$2"
+  PROBE_GOT=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+  [[ "$PROBE_GOT" == "$expected" ]]
+}
+
 check_status() {
   local label="$1"
   local url="$2"
   local expected="${3:-200}"
-  local status
   CURRENT_CHECK="$label ($url)"
-  status=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
-  if [[ "$status" == "$expected" ]]; then
+  if _probe_status "$url" "$expected"; then
     echo "  ✅ $label"
     PASS=$((PASS + 1))
+  elif smoke_confirm _probe_status "$url" "$expected"; then
+    echo "  ⟳ $label — transient on first probe, clean on confirm (#2978)"
+    PASS=$((PASS + 1))
   else
-    echo "  ❌ $label — expected $expected, got $status ($url)"
+    echo "  ❌ $label — expected $expected, got $PROBE_GOT ($url)"
     FAIL=$((FAIL + 1))
   fi
 }
 
 # 301 + exact Location target (single hop — the destination must be final, never
 # another redirect source). Added for #1108 (/now/ -> /cockpit/).
+_probe_redirect() {
+  local url="$1" target="$2"
+  local status location
+  status=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+  location=$(smoke_curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 "$url")
+  PROBE_GOT="$status → $location"
+  [[ "$status" == "301" && "$location" == "$BASE$target" ]]
+}
+
 check_redirect() {
   local label="$1"
   local url="$2"
   local target="$3"
-  local status location
   CURRENT_CHECK="$label ($url)"
-  status=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
-  location=$(smoke_curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 "$url")
-  if [[ "$status" == "301" && "$location" == "$BASE$target" ]]; then
+  if _probe_redirect "$url" "$target"; then
     echo "  ✅ $label"
     PASS=$((PASS + 1))
+  elif smoke_confirm _probe_redirect "$url" "$target"; then
+    echo "  ⟳ $label — transient on first probe, clean on confirm (#2978)"
+    PASS=$((PASS + 1))
   else
-    echo "  ❌ $label — expected 301 → $BASE$target, got $status → $location"
+    echo "  ❌ $label — expected 301 → $BASE$target, got $PROBE_GOT"
     FAIL=$((FAIL + 1))
   fi
+}
+
+_probe_header() {
+  local url="$1" header_pattern="$2"
+  smoke_curl -s -I --max-time 10 "$url" | grep -qi "$header_pattern"
 }
 
 check_header() {
   local label="$1"
   local url="$2"
   local header_pattern="$3"
-  local headers
   CURRENT_CHECK="$label ($url)"
-  headers=$(smoke_curl -s -I --max-time 10 "$url")
-  if echo "$headers" | grep -qi "$header_pattern"; then
+  if _probe_header "$url" "$header_pattern"; then
     echo "  ✅ $label"
+    PASS=$((PASS + 1))
+  elif smoke_confirm _probe_header "$url" "$header_pattern"; then
+    echo "  ⟳ $label — transient on first probe, clean on confirm (#2978)"
     PASS=$((PASS + 1))
   else
     echo "  ❌ $label — header not found: $header_pattern"
@@ -598,6 +623,12 @@ echo "Results: $PASS passed, $FAIL failed"
 SMOKE_RETRIES=$(smoke_curl_retry_count)
 if [[ "$SMOKE_RETRIES" -gt 0 ]]; then
   echo "⟳ $SMOKE_RETRIES request(s) needed a transport retry — the deploy passed, but the origin is slow (#1911)."
+fi
+# #2978: same visibility contract for the HTTP-level confirm path — a confirmed
+# transient is the deploy-race firing without gating; the count IS the rate.
+SMOKE_TRANSIENTS=$(smoke_confirm_transient_count)
+if [[ "$SMOKE_TRANSIENTS" -gt 0 ]]; then
+  echo "⟳ $SMOKE_TRANSIENTS check(s) failed the first probe and passed the confirm (#2978 deploy-race) — nothing gated, the race is counted."
 fi
 if [[ $FAIL -eq 0 ]]; then
   echo "✅ All checks passed."
