@@ -30,7 +30,7 @@
     },
     "grading-stalled": {
       "routing": "digest",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_prediction_alarms"
     },
     "hae-webhook-errors": {
       "routing": "digest",
@@ -139,6 +139,10 @@
     "permanence-heartbeat": {
       "routing": "digest",
       "stack": "operational_stack"
+    },
+    "prediction-gradable-share-low": {
+      "routing": "digest",
+      "stack": "monitoring_prediction_alarms"
     },
     "site-api-ai-errors": {
       "routing": "digest",
@@ -6094,7 +6098,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 51,
+      "alarms": 52,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,
