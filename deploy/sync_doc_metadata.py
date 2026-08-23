@@ -350,6 +350,25 @@ def _count_alarms_in_tree(tree: ast.AST, parents: dict) -> int:
                 helper_names.add(node.name)
                 helper_def_ids.add(id(node))
 
+    # A detected single-alarm "helper" with ZERO call sites in its own file is not a
+    # local closure — it's a cross-file extraction seam (monitoring_budget_alarms.py's
+    # add_budget_alarms, called once from monitoring_stack.py: the #1665 sibling-module
+    # idiom). Call-site counting would tally it 0 here and 0 in the caller's file (the
+    # caller's tree doesn't know the imported name is a helper), silently dropping the
+    # alarm — exactly how the counter (110) diverged from the name resolver (111) on
+    # 2026-08-23. Count such a def at its definition (x1: each extraction-seam module is
+    # invoked once from the owning stack; a same-file helper keeps call-site counting
+    # with loop multipliers, unchanged).
+    called_names = {n.func.id for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and id(node) in helper_def_ids:
+            # create_platform_lambda stays call-site-counted: it is the ONE cross-file
+            # helper the visitor already resolves by name (and conditionally) at every
+            # caller — counting its definition here would double it.
+            if node.name not in called_names and node.name != "create_platform_lambda":
+                helper_names.discard(node.name)
+                helper_def_ids.discard(id(node))
+
     total = 0
 
     class _AlarmCountVisitor(ast.NodeVisitor):
