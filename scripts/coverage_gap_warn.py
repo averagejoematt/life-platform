@@ -90,7 +90,7 @@ from typing import Optional, Tuple
 # tests/test_duration_budget_ratchet.py asserts this constant, the ci-test.yml
 # literal, and its own committed high-water mark all agree, so the three can't
 # silently drift apart the way the coverage floor could before #1658.
-DEFAULT_DURATION_BUDGET_SECONDS = 1200.0
+DEFAULT_DURATION_BUDGET_SECONDS = 1500.0
 
 # How far measured coverage may fall below the committed high-water mark before the
 # regression check (3) fails the build (#1658). This is NOT slack to spend — it

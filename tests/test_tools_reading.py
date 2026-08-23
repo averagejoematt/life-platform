@@ -29,6 +29,17 @@ def fake_table(monkeypatch):
     return t
 
 
+@pytest.fixture(autouse=True)
+def _hermetic_cover_trigger(monkeypatch):
+    # #3025: the ONE add_book commit that didn't mock _trigger_cover made a real
+    # boto3 lambda.invoke against the suite's fake creds — 0.99s locally, 180.85s
+    # on CI (13% of the entire suite's wall-clock, the top --durations entry).
+    # Mock it for the whole file; the tests that exercise trigger behavior
+    # (test_add_book_triggers_cover_fetch, test_add_book_cover_failure_is_soft)
+    # override with their own monkeypatch inside the test body.
+    monkeypatch.setattr(tr, "_trigger_cover", lambda bid, meta: True)
+
+
 def _add(title, status="want", **kw):
     return rs.add_book({"title": title, "author": "A", **kw}, initial_status=status, enricher=lambda m: {"domainTags": ["fiction"]})
 

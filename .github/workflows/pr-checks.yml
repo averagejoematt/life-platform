@@ -157,6 +157,61 @@ jobs:
         run: python3 scripts/verify_bundle_boot.py --compare deploy/bundle_boot_baseline.json
 
   # ════════════════════════════════════════════════════════════════
+  # FULL UNIT SUITE, PRE-MERGE (#3025) — the premerge marker selects 8,813 of
+  # 20,509 tests, so a PR redding only the deselected ~11,700 read 7/7 green and
+  # redded main on landing: ≥4 occurrences in 5 days (08-18 ×2, #2907,
+  # #3013→#3020), 1-2.5h TTR each, always misattributed to merge order. This job
+  # is the same selection as ci-test.yml's coverage gate MINUS coverage
+  # instrumentation (~1.4x overhead per the #2259 measurement, and the floor is a
+  # post-merge concern): ~16 min, parallel across PRs, no serialization — chosen
+  # over a merge queue (11 merges × ~24 min serialized on a session day) and over
+  # impact-selection (whose selection logic is this same class one level up).
+  # tests/test_full_suite_premerge_3025.py pins selection + dep parity with
+  # ci-test.yml. UNPIPED on purpose: `pytest ... | tail` exits with tail's
+  # status (the gate-that-cannot-fail class).
+  #
+  # Blocking-by-rollup on landing (any red blocks the driver's merge discipline
+  # and remediation automerge alike). Promotion to a REQUIRED check in the
+  # main-required-fast-lane ruleset (deploy/github_posture.json +
+  # apply_branch_protection --apply, the ADR-148 path) is deliberately deferred
+  # until it has run clean across the #3025 observation window — a 16-minute
+  # required check earns required-ness by not flaking first.
+  # ════════════════════════════════════════════════════════════════
+  full-suite:
+    name: Full unit suite (pre-merge, #3025)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-ci
+        with:
+          python-cache: 'pip'
+
+      - name: Install lane dependencies
+        # DEP PARITY WITH ci-test.yml (#2258/#3013): identical pin list minus
+        # pytest-cov (no coverage here). Versions read from requirements-dev.txt
+        # (CQ-01, #2609). tests/test_full_suite_premerge_3025.py asserts parity.
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore hypothesis pyyaml pillow)
+          pip install $PINS
+
+      # The doc-sync literals (test_count et al.) are DRIVER-reconciled on main by
+      # policy — a branch must never stamp them (#2372's collision class), yet the
+      # full suite contains the tests that assert them. Applying the sync IN THE
+      # RUNNER'S WORKSPACE (never committed) makes those tests assert the
+      # post-reconcile reality this branch will actually have on main, with zero
+      # selection divergence from the post-merge lane. First observed on this
+      # job's own maiden run: 4 literal-treadmill fails on PR #3026 itself.
+      - name: Reconcile doc literals in-workspace (never committed)
+        if: always()
+        run: python3 deploy/sync_doc_metadata.py --apply
+
+      - name: Full unit suite (same selection as the post-merge coverage gate)
+        if: always()
+        run: python3 -m pytest tests/ --ignore=tests/test_integration_aws.py -q --tb=short --durations=25
+
+  # ════════════════════════════════════════════════════════════════
   # #2831 — API-before-frontend sequencing check.
   #
   # site/** merges auto-deploy with NO approval gate (#750); site-api's

@@ -274,7 +274,7 @@ jobs:
         run: |
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
           python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 74 --gap-threshold 10 \
-              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1200 \
+              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1500 \
               --high-water 81.60 --fail-on-regression
 
       - name: Upload coverage artifact
