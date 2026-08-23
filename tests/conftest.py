@@ -227,6 +227,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_wallclock_fixture_bombs_2376.py",  # #2376: dated fixture + unfrozen handler clock (the #2354 midnight red)
         "test_raw_key_registry_guard.py",  # #2286: no hand-built raw/ S3 keys
         "test_site_api_namespace_guard_3002.py",  # #3002: one site-API metric namespace, no casing twins — repo-shape sweep, pre-merge
+        "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps .claude/commands + docs/reviews — repo-shape, pre-merge
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
         # #2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔

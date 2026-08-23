@@ -32,9 +32,19 @@ standing subsystem names what it costs, what it earns, and what would demote it.
   safety design, zero merged safe-class PRs in ~6 weeks — was demoted to
   `shadow`, and re-promotion carries a numeric bar (10 consecutive clean runs).
   That is the template: demotions cite a measurement, promotions cite a bar.
-- **Cadence:** quarterly re-read (with `/platform-review` or `/sdlc-review`);
-  any review that finds a subsystem findings-empty twice consecutively proposes
-  a demotion row here.
+- **Cadence:** quarterly re-read — owned by the `proportionality-reread` entry of
+  the Platform Operating Calendar (#2832, `scripts/operating_calendar.py`), whose
+  dead-man probes the dated lines in the Re-read log below. Any review that finds
+  a subsystem findings-empty twice consecutively proposes a demotion row here.
+
+## Re-read log (#2832 — the calendar's probe reads these lines)
+
+Each completed quarterly re-read appends one line, dated the day the whole table
+was actually walked: `- Re-read: YYYY-MM-DD — <one-line verdict>`. The `Verified:`
+stamp in the header is refreshed by automation and therefore proves nothing about
+a re-read (the stale-behind-a-fresh-timestamp class); only a line here advances
+the calendar's clock. First calendar-driven re-read due within one quarterly
+window of the 2026-08-22 adoption.
 
 ## Active ledger
 
@@ -47,6 +57,7 @@ standing subsystem names what it costs, what it earns, and what would demote it.
 | Outbound initiative pings (celebration + soft-concern, #2527) | Experiment | Bedrock $ within the 2/day outbound cap | The coaches text FIRST when the data moves — the #2490 priority ladder bounds volume. Demote: if the owner mutes/ignores >50% over a month, the initiative reads as notification spam and the classes retire |
 | Gate census + can-it-fail proofs (epic #2578) | Load-bearing | CI seconds, session attention | 425 declared gates with measured error bars; the week's cannot-fail finds (#2746, #2754) came from it. Demote trigger: census derivation cost exceeding one CI minute, or two consecutive sessions with zero acted-on findings |
 | Proportionality-ledger wrap gate (`check_proportionality_ledger.py`, #2380/#2761) | Load-bearing (small) | session attention (~1s per wrap) | Keeps THIS ledger a live inventory, not a snapshot — the prose-only #2380 version produced zero ledger commits in its first week while four standing systems shipped. Demote trigger: two consecutive quarterly reviews find the `**Ledger:**` line rubber-stamped (`none` while unledgered machinery shipped) — then the script measures nothing, redesign or fold it into the census |
+| Operating calendar + ritual dead-man (#2832: `scripts/operating_calendar.py`, daily `operating-calendar.yml`) | Load-bearing | CI (one 5-min daily run + a docs-ci step), attention when a ritual lapses | The filing-rate lever: review cadence is what finds defects, and every prior cadence statement was prose that drifted (craft-review NEVER ran; sdlc's obligations died with it). One registry, artifact-dated probes, misses scream via the remediation triage. Demote trigger: two consecutive quarters where every OVERDUE red is resolved by re-anchoring/exempting instead of running the ritual — then the calendar is theater and the honest fix is deciding the rituals themselves are dead |
 | Kernel conformance guard (#2844) | Load-bearing | CI seconds (one AST sweep per unit-test run), mind (the ledger discipline) | The charter's standing rule 1 made executable — closes the missed-consumer class (the elite review's WS-A trace: SOCIAL_CHANNELS, _BROADCAST_SOURCES, ALL_LAMBDAS-at-40) by construction; the ledger (37 dated entries at birth, 2026-08-17) only shrinks. Demote trigger: two consecutive sessions where a red is resolved by loosening thresholds instead of deriving a site — that's the guard mis-tuned, re-scope its vocabularies |
 | System model + drift gate (#2845) | Load-bearing | CI seconds (~30s regenerate+diff per unit-test run) | The kernel's second primitive artifact: one generated source of truth (lambdas/schedules/alarms/partitions/edges) with blast-radius lookup; subsumes the hand-prose DEPENDENCY_GRAPH that misled on the critical path (#2839). Demote trigger: two consecutive sessions where drift reds are resolved by regenerating without reading the diff — then the model isn't informing anyone, fold the doc rendering |
 | Deploy-critical lane import guard (#2758) | Load-bearing | ~2s of every premerge + lane run | The #2699/#2732 collection-crash class (redded main twice in 48h) now fails premerge; self-protecting (deploy_critical-marked) with an in-suite mutation proof. Demote trigger: two consecutive quarters with zero catches AND the lane's dep set going unchanged — then fold into the census |

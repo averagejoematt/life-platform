@@ -1,0 +1,41 @@
+name: Operating calendar dead-man
+
+# #2832 — the Platform Operating Calendar's dead-man (charter primitive 5 applied to
+# judgment rituals). Daily sweep of scripts/operating_calendar.py --due: a ritual whose
+# newest run artifact is outside its cadence window REDS this run, and a red scheduled
+# workflow lands in the remediation agent's Mon/Wed/Fri triage email — so a silently
+# stopped review screams instead of waiting for a session to remember it.
+#
+# Deliberately NOT part of docs-ci or ci-cd: an overdue ritual is a fact about the
+# calendar date, and a time-based red must land on the schedule, never on whichever
+# innocent PR happens to run next (the #2975 misattribution class). The deterministic
+# doc-drift half (--check) lives in docs-ci; only the time-based half lives here.
+#
+# 15:40 UTC daily — offset from the other scheduled workflows (fresh-eyes Sun 15:00,
+# golden-brief-eval Mon 15:17, config-drift daily 15:20, eval-harvest 3rd 16:23,
+# remediation MWF 14:45, CodeQL Sat 12:13). Fixed UTC, no DST drift.
+
+on:
+  schedule:
+    - cron: "40 15 * * *"
+  workflow_dispatch: {} # manual sweep / testing
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operating-calendar
+  cancel-in-progress: false
+
+jobs:
+  due:
+    name: Ritual cadence sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      # Depth-1 is safe here BY DESIGN: every probe reads the date in the artifact's
+      # own filename (or a dated ledger line), never git history or mtimes — see the
+      # "HOW LAST RUN IS MEASURED" note in scripts/operating_calendar.py.
+      - name: Dead-man sweep (--due)
+        run: python3 scripts/operating_calendar.py --due
