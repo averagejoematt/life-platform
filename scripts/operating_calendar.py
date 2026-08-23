@@ -160,6 +160,27 @@ CALENDAR: dict[str, dict] = {
             "for real; until then the adoption anchor holds the window."
         ),
     ),
+    "managed-where-reverify": _entry(
+        skill=None,  # not a command — a ledger re-verification, recorded as a dated line
+        cadence_days=31,
+        grace_days=7,
+        attendance=SESSION,
+        probe=(REGEX_IN_FILE, "docs/MANAGED_WHERE_LEDGER.md", r"^- Re-verified: (\d{4}-\d{2}-\d{2})"),
+        obligations=(
+            "Walk every ledger row against LIVE state (gh api for the GitHub rows, "
+            "read-only aws for the AWS rows); update each probed row's Verified cell "
+            "and append the dated log line the probe reads",
+        ),
+        reason=(
+            "The out-of-IaC ledger sat self-stamped 'Verified 2026-07-09' for ~7 weeks "
+            "while three GitHub rows inverted underneath it, and the 2026-08-23 external "
+            "diligence review read the stale rows as current truth — manufacturing two "
+            "P0 findings (DIL-004/DIL-006). A self-description doc is an external-"
+            "assessment attack surface when stale; the probe reads the dated "
+            "'- Re-verified:' log lines, not the header stamp, for the same reason "
+            "proportionality-reread does (a bumped literal is not a re-read, #2986)."
+        ),
+    ),
     # ── Quarterly ─────────────────────────────────────────────────────────────
     "sdlc-review": _entry(
         skill="sdlc-review",

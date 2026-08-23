@@ -522,7 +522,7 @@ REGISTRY = [
     (
         "inference",
         "The inference receipt",
-        "Every AI call, priced — the meter behind the $85 ceiling, live.",
+        "Every AI call, priced — the meter behind the hard budget ceiling, live.",
         "Credibility & the machine",
         "data",
         "/api/inference_receipt",
@@ -704,7 +704,7 @@ EDITORIAL = {
         '<p class="rd-archive">The Kitchen is personalised meal intelligence — built from CGM response, macro tracking, and your real eating patterns. It needs data to work, and fills in automatically once daily nutrition logging and CGM readings accumulate over the first weeks. Until then, see Nutrition and Glucose &amp; meals for what\'s already flowing.</p>'
     ),
     "build": (
-        '<p class="rd-lede">Most of these pages show the data. This one shows the machine that gathers it — built in public, by one person and a model, on a hard $85-a-month ceiling.</p>'
+        '<p class="rd-lede">Most of these pages show the data. This one shows the machine that gathers it — built in public, by one person and a model, on a hard monthly budget ceiling enforced in code (the live number is on the <a href="/method/cost/">Cost page</a>).</p>'
         # Hand-authored inline-SVG architecture diagram (themes via CSS vars; zero runtime cost).
         '<figure class="arch-fig" aria-label="System architecture: ingest, store, serve, with one AI chokepoint">'
         '<svg class="arch-svg" viewBox="0 0 760 250" role="img" preserveAspectRatio="xMidYMid meet">'
@@ -746,8 +746,8 @@ EDITORIAL = {
         '<p class="rd-prose">The rule the whole system is built around: the model never does the math. Every number — correlations, scores, deltas — is computed in Python; the model only narrates pre-computed values, always as a correlation, never a causal claim, always with the confidence label attached. It cannot invent a statistic in prose because it is never handed the raw freedom to. All inference routes through one Bedrock chokepoint so there is a single place to audit what was asked and what came back. <em>(ADR-062; <strong>bedrock_client.py</strong>.)</em> <span class="confidence conf-low">interpretive only</span></p></section>'
         '<section class="rd-sec"><h2 class="rd-h">A governor that won\'t let the bill run away</h2>'
         '<p class="rd-prose">Putting an AI behind a public website is a way to get a surprise invoice. So a cost governor projects month-end spend every 8 hours and writes a budget tier (0–3). As the projection climbs, AI features degrade on purpose — first the heavy ensemble narratives pause, then the public ask-the-data endpoint returns a friendly "paused" instead of a charge, and at the ceiling even the daily brief skips inference. One traffic spike cannot empty the budget and dark-fire the site. <em>(ADR-063; <strong>cost_governor_lambda.py</strong> + <strong>budget_guard.py</strong>.)</em></p></section>'
-        '<section class="rd-sec"><h2 class="rd-h">An agent that fixes the platform while I sleep</h2>'
-        '<p class="rd-prose">A self-healing agent runs each morning, triaging alarms, failed CI, and queue backlogs. The narrow, provably-safe fixes it merges itself — behind a deterministic gate that checks an allowlist, a diff-size cap, and the test subset before anything lands. Everything riskier becomes a pull request for a human, and the production deploy approval is never bypassed. The agent has read-only credentials; the gate, not the model, holds the keys. <em>(ADR-064 / ADR-065.)</em></p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">An agent that triages the platform while I sleep</h2>'
+        '<p class="rd-prose">A self-healing agent runs three mornings a week (plus on-demand when an urgent alarm fires), triaging alarms, failed CI, and queue backlogs. For the narrow, provably-safe class the machinery includes a deterministic merge gate — an allowlist, a diff-size cap, and the test subset — but that gate currently runs in shadow mode: every fix, safe class included, lands as a pull request a human merges, until the gate re-earns self-merge on a measured clean-run bar. The engine\'s production deploy approval is never bypassed either way. The agent has read-only credentials; the gate, not the model, holds the keys. <em>(ADR-064 / ADR-065 / ADR-129.)</em></p></section>'
         '<section class="rd-sec"><h2 class="rd-h">QA that looks at the screen, with a model\'s eyes</h2>'
         '<p class="rd-prose">After every deploy a headless browser walks the live site, opens the cockpit, exercises the interactions, and screenshots each page. Then a vision model reads each screenshot for things a pixel-diff would miss or false-alarm on — broken charts, overflow, a panel that rendered empty — robust to the fact that the underlying numbers change every day. The site you\'re reading was checked this way. <em>(ADR-076; <strong>tests/visual_qa.py</strong> + <strong>tests/visual_ai_qa.py</strong>.)</em></p></section>'
         # #741 — the career artifact: cross-link the published org-design essay.

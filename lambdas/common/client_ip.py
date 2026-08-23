@@ -30,46 +30,43 @@ described since 2026-07-16 — including the whole period it sat closed, "fixed"
 flipping first-hop→last-hop and guarded by a unit test whose fixture hand-built the
 appended chain this distribution never produces (docs/CONVENTIONS.md §9a).
 
-THE TRUSTWORTHY SOURCE
-----------------------
+THE TRUSTWORTHY SOURCE — LIVE SINCE 2026-08-21 (#1221 CLOSED)
+-------------------------------------------------------------
 
 ``CloudFront-Viewer-Address`` is set by CloudFront itself from the TCP peer address
-and cannot be influenced by the client. It reaches the origin only when an origin
-request policy forwarding it is attached to the ``/api/*`` cache behaviours — an
-**owner-run infrastructure change** that is the other half of #1221.
+and cannot be influenced by the client. The origin request policies attached on
+2026-08-21 (``cdk/stacks/web_cloudfront_policies.py``) forward it on every ``/api/*``
+behaviour, verified live: six POSTs with six DIFFERENT forged ``X-Forwarded-For``
+values were limited at exactly 3/hour (``400 400 400 429 429 429``), where before
+every rotation minted a fresh bucket.
 
-WHY ``X-Forwarded-For`` IS STILL THE SECOND CHOICE (2026-08-14, measured)
-------------------------------------------------------------------------
+CURRENT BEHAVIOUR: TRUSTED HEADER OR FAIL CLOSED
+------------------------------------------------
 
-The first cut of this fix dropped ``X-Forwarded-For`` entirely and fell straight back
-to ``requestContext…sourceIp``, on the reasoning that it is coarser but un-forgeable.
-Deployed and re-measured, that was **worse**, because ``sourceIp`` is the CloudFront
-*edge* address and it is not stable per viewer:
+``extract_client_ip`` reads exactly one identity source — ``CloudFront-Viewer-Address``
+— and when it is absent returns the shared ``_FAIL_CLOSED_IDENTITY`` constant, so
+every identity-less caller collapses into ONE rate-limit bucket. The old fallback
+ladder is deliberately GONE, and both retired rungs are worth remembering because
+each was measured failing before it was deleted:
 
-    no XFF header, 6 requests, limit 3/hour  ->  400 429 400 400 400 400
+* ``X-Forwarded-For`` (any hop) — attacker-chosen on this distribution. CloudFront
+  forwards the client's header UNCHANGED, adding its own only when absent (measured
+  2026-08-14 against the live edge), so no choice of hop index is safe. Rotating the
+  header minted a fresh bucket per request — the #1221 bypass itself. It was retained
+  only while ``CloudFront-Viewer-Address`` could not reach the origin; that interim
+  ended 2026-08-21 and the fleet-wide AST guard
+  (``tests/test_rate_limit_identity_1221.py``) now rejects any handler that reads it.
+* ``requestContext…sourceIp`` — not an identity at all here: it is the CloudFront
+  *edge* address, unstable per viewer (measured 2026-08-14: 6 requests against a
+  3/hour limit -> ``400 429 400 400 400 400``, i.e. almost no enforcement). It is
+  deliberately NOT used as a middle ground.
 
-One 429 in six means the identity was changing between requests, so nearly every
-request got a fresh bucket and the limiter stopped enforcing anything. The same signal
-was already in #1221's body and was misread: ``site_api_ai_lambda``, keying on raw
-``sourceIp``, produced *17 consecutive POSTs -> 0 x HTTP 429*. That was not a broken
-limiter; it was ``sourceIp`` failing to be an identity at all.
-
-So the order below is deliberate, and each step is the best available:
-
-1. ``CloudFront-Viewer-Address`` — stable AND un-forgeable. The real fix. A forged
-   ``X-Forwarded-For`` can never override it; that is the property this module exists
-   to guarantee, and it is what makes the origin-request-policy change sufficient.
-2. ``X-Forwarded-For`` last hop — **stable for real callers, forgeable by an attacker.**
-   This is the pre-#1221 behaviour, kept ONLY as the interim. It enforces correctly
-   against ordinary traffic, which the ``sourceIp`` fallback does not.
-3. ``sourceIp`` — last resort when no header is present at all.
-
-**The #1221 bypass is therefore still open until the origin request policy lands, and
-that is a known, measured, deliberate interim rather than an oversight.** Step 2 is not
-a regression to delete casually: removing it does not close the bypass (edge-address
-churn hands out fresh buckets anyway) and it does break enforcement against real users.
-``client_ip_is_trusted()`` reports whether step 1 was used, so the degraded window is
-observable rather than silent.
+Absence of the trusted header therefore no longer means "not deployed yet" — it means
+something is WRONG (a behaviour added without the policy, or the policy reverted).
+The failure direction is loud by design: legitimate callers share one limit and
+IP-gated writes throttle site-wide, while ``client_ip_is_trusted()`` returns False so
+the state is observable. "Reported green while guarding nothing" is the failure mode
+#1221 itself was.
 """
 
 import logging
@@ -147,25 +144,29 @@ def _source_ip(event: dict) -> str:
 def client_ip_is_trusted(event: dict) -> bool:
     """True when the derived identity came from the un-forgeable CloudFront header.
 
-    False means the origin request policy is not (yet) forwarding
-    ``CloudFront-Viewer-Address`` and the coarser ``sourceIp`` fallback is in use.
-    Callers can emit this so the degraded window is visible instead of silent —
-    "reported green while guarding nothing" is the failure mode #1221 itself was.
+    False means ``CloudFront-Viewer-Address`` did not reach the origin — since the
+    2026-08-21 origin-request policies that is a FAULT state, not a deployment gap:
+    ``extract_client_ip`` is returning the shared fail-closed identity and
+    ``extract_idempotency_identity`` is minting per-request identities. Callers emit
+    this so the degraded window is visible instead of silent — "reported green while
+    guarding nothing" is the failure mode #1221 itself was.
     """
     return bool(_strip_port(_headers(event).get(_VIEWER_ADDRESS_HEADER) or ""))
 
 
 def extract_client_ip(event: dict, default: str = "unknown") -> str:
-    """Return the best available rate-limiting identity.
+    """Return the rate-limiting identity: the trusted header, or fail closed.
 
-    Order: ``CloudFront-Viewer-Address`` (stable + un-forgeable) → ``X-Forwarded-For``
-    last hop (stable for real callers, forgeable — the documented #1221 interim) →
-    ``requestContext…sourceIp`` (unstable; last resort) → ``default``.
+    ``CloudFront-Viewer-Address`` (stable + un-forgeable, forwarded by the ``/api/*``
+    origin request policies since 2026-08-21) is the ONLY identity source. When it is
+    absent this returns the shared ``_FAIL_CLOSED_IDENTITY`` constant — never
+    ``X-Forwarded-For`` (attacker-chosen on this distribution) and never ``sourceIp``
+    (the unstable CloudFront edge address). ``default`` is accepted for signature
+    compatibility but no longer reached.
 
-    The load-bearing guarantee: **a forged ``X-Forwarded-For`` can never override
-    ``CloudFront-Viewer-Address``.** Once the origin request policy forwards that
-    header, step 2 becomes unreachable and the bypass closes with no code change.
-    See the module docstring for why step 2 outranks ``sourceIp`` (measured).
+    The load-bearing guarantee: **no request header a caller controls can influence
+    the identity.** See the module docstring for the measured history of the retired
+    fallbacks and why absence of the header is a fault, not a deployment gap.
     """
     headers = _headers(event)
 

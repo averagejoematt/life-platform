@@ -891,6 +891,43 @@ def _scan_governor_surface() -> list[Path]:
     return out
 
 
+# ── #3042 D0.5: ceiling-literal scan over the PUBLISHED SITE (.js + .html) ────
+# The 2026-08-23 diligence fact-check (docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md,
+# verification finding 4) found the site's most-quoted number shipping stale in four
+# places NO gate scanned: evidence_meta.js's renderCost ("$85 hard ceiling" + "$100
+# surge" prose), an inference blurb baked into every /method/ shell's embedded
+# registry, and the /method/build + org-chart-essay editorial. The #1230 source scan
+# covered lambdas/*.py and the doc scan covered *.md — site/**/*.js was scanned by
+# NOTHING, so the number the most readers see was the least guarded.
+#
+# This widens the #2898/#2899 ceiling family to: all site/**/*.js and site/**/*.html
+# except site/legacy/ (frozen pre-v4 mirror, same exemption as the governor-cadence
+# scan), PLUS the site generators (scripts/v4_*.py) — their string literals are the
+# SOURCE of the shells' editorial, and fixing only the emitted HTML is the
+# drift-on-next-build trap (CLAUDE.md "site shells are generator output").
+# site/story/build/beats.json stays unscanned by extension choice: build beats are
+# dated narrative records and legitimately quote the ceiling of their day.
+# Reuses _source_hits (the per-line ceiling scan) — HISTORICAL framing and the
+# per-amount #2899 exemption apply unchanged.
+_SITE_GENERATOR_GLOB = "v4_*.py"
+
+
+def _scan_site_surface() -> list[Path]:
+    """Published site .js/.html (site/legacy/ excepted) + the v4 site generators —
+    exposed so the regression test can assert the surface includes evidence_meta.js
+    and the method shells, and prove the scan bites on a planted stale literal."""
+    out = []
+    if SITE_DIR.exists():
+        for pattern in ("*.js", "*.html"):
+            for p in sorted(SITE_DIR.rglob(pattern)):
+                rel = str(p.relative_to(ROOT))
+                if any(rel.startswith(d) for d in SITE_EXEMPT_DIRS):
+                    continue
+                out.append(p)
+    out += sorted((ROOT / "scripts").glob(_SITE_GENERATOR_GLOB))
+    return out
+
+
 def _line_names_the_governor(line: str) -> bool:
     """True if `line` names the cost-governor — either the unambiguous compound
     spelling, or a bare "governor" alongside its cost-cadence context (the shape
@@ -1065,6 +1102,10 @@ def main():
     # #1230: same ground truth, now over the SOURCE tree — no hardcoded ceiling in code.
     hits += _source_hits(_scan_source_files())
 
+    # #3042 D0.5: and over the published site (.js/.html + the v4 generators) — the
+    # ceiling the most readers see must not ship un-guarded again (DIL-010/035).
+    hits += _source_hits(_scan_site_surface())
+
     # #1235: no live doc states a stale experiment genesis/cycle as the current anchor.
     hits += _anchor_hits(_scan_files(), truth["experiment_genesis"], truth["experiment_cycle"])
 
@@ -1190,6 +1231,7 @@ def main():
     print(
         f"✅ doc + source facts OK — no live doc/source states a stale count/budget "
         f"({len(_scan_files())} docs + {len(_scan_source_files())} source files + "
+        f"{len(_scan_site_surface())} site js/html/generator files + "
         f"{len(_scan_og_files())} og cards + {len(_scan_governor_surface())} governor-surface files scanned)."
     )
 
