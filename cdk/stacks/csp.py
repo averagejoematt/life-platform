@@ -22,6 +22,12 @@ Why this is its own module and not a helper inside `web_stack.py`:
 Deploy surface: CloudFront response-headers policies ship ONLY via
 `cdk deploy LifePlatformWeb` (us-east-1). CI deploys Lambda code, never CDK — so
 editing this file changes nothing in production until someone runs that command.
+
+#3048 (DIL-015, 2026-08-23): the main-domain policy dropped 'unsafe-inline' and
+cdn.jsdelivr.net from script-src (SCRIPT_SRC_HARDENED below). NB the Plan-job
+rule the #1678 block explains still applies: this change touches
+AWS::CloudFront::ResponseHeadersPolicy, so merging it reds CI's Plan gate until
+`cdk deploy LifePlatformWeb` runs — merge and deploy belong to the same sitting.
 """
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -60,6 +66,28 @@ NATIVE_EMBED_FRAME_SRC = ("https://www.youtube-nocookie.com",)
 # (`-c native_social_embeds=true` on the CLI), hence the coercion below.
 NATIVE_EMBED_CONTEXT_KEY = "native_social_embeds"
 
+# ── #3048 (DIL-015): the script-src profiles ─────────────────────────────────
+#
+# HARDENED — the production averagejoematt.com surface. No 'unsafe-inline'
+# (every inline block was extracted to real /assets/js/ files or converted to
+# non-executable type="application/json" data islands) and no third-party CDN
+# (the only cdn.jsdelivr.net consumer was the a11y harness's axe-core, which is
+# vendored at tests/vendor/axe.min.js and injected via CDP, outside the page
+# CSP). Adding ANY origin or source keyword back here is an owner decision —
+# tests/test_csp_hardening_3048.py pins this string.
+SCRIPT_SRC_HARDENED = "script-src 'self'"
+#
+# COMPAT — the pre-#3048 policy, kept ONLY for surfaces whose HTML cannot be
+# retrofitted: /legacy/* (the preserved old site, served verbatim from S3) and
+# the dash/blog/buddy subdomain distributions (out of #3048's scope). Never
+# attach this to the main-domain default behavior.
+SCRIPT_SRC_COMPAT = "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net"
+
+# The main-domain policy's connect-src, hoisted here (from web_stack.py) so the
+# expected production CSP is buildable without aws-cdk-lib — scripts/
+# expected_csp.py derives the smoke test's expected header from this module.
+AMJ_CONNECT_SRC = "'self' https://averagejoematt.com"
+
 
 def native_embeds_enabled(raw_context_value) -> bool:
     """Coerce a CDK context value to the embed flag. Anything unrecognised is OFF.
@@ -75,11 +103,15 @@ def native_embeds_enabled(raw_context_value) -> bool:
     return False
 
 
-def build_site_csp(*, connect_src: str, native_social_embeds: bool = False) -> str:
+def build_site_csp(*, connect_src: str, hardened_scripts: bool, native_social_embeds: bool = False) -> str:
     """Assemble the CSP header value for a CloudFront ResponseHeadersPolicy.
 
-    `connect_src` is the only directive that legitimately differs between the two
-    policies (the subdomains additionally reach the wildcard subdomain origin).
+    `connect_src` and `hardened_scripts` are the only inputs that legitimately
+    differ between policies (the subdomains additionally reach the wildcard
+    subdomain origin). `hardened_scripts` is REQUIRED — every call site chooses
+    its script-src profile explicitly (#3048): True → SCRIPT_SRC_HARDENED (the
+    production main-domain surface), False → SCRIPT_SRC_COMPAT (/legacy/* and
+    the subdomain distributions only).
 
     When `native_social_embeds` is False the returned string is byte-identical to
     the policy deployed today — the OFF path is a pure refactor.
@@ -92,11 +124,12 @@ def build_site_csp(*, connect_src: str, native_social_embeds: bool = False) -> s
     See ADR-149.
     """
     directives = [
-        # SEC-05: 'unsafe-inline' kept intentionally — all JS/CSS is first-party
-        # and server-rendered with no user-controlled content. Nonce-based CSP
-        # would require per-request Lambda changes for a static S3 site.
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        # #3048 (DIL-015): scripts are hardened on the production surface —
+        # see the profile constants above. style-src keeps 'unsafe-inline'
+        # (inline <style>/style= attributes are widespread and out of #3048's
+        # scope; scripts were the injection-foothold risk the issue closes).
+        SCRIPT_SRC_HARDENED if hardened_scripts else SCRIPT_SRC_COMPAT,
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https:",
         f"connect-src {connect_src}",

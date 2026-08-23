@@ -265,29 +265,19 @@ FONTS = (
     '<link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>'
     '<link rel="stylesheet" href="/assets/css/fonts.css">'
 )
-THEME = (
-    '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
-    'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
-)
-MOTION_HEAD = (
-    '<script>(function(){try{if(!("IntersectionObserver" in window))return;'
-    'if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;'
-    'document.documentElement.classList.add("mo");'
-    'window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>'
-)
+# #3048: extracted to a real asset so the site CSP can drop 'unsafe-inline' for
+# scripts — synchronous head script, so theme still applies before first paint.
+THEME = '<script src="/assets/js/boot_theme.js"></script>'
+MOTION_HEAD = '<script src="/assets/js/boot_motion.js"></script>'
 MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
 # Wire the shared one-line theme toggle (the standalone Methods Registry omits this and
 # ships a dead toggle — #904 does better with a real, self-wiring module init).
-THEME_SCRIPT = '<script type="module">import { initTheme } from "/assets/js/theme.js"; initTheme();</script>'
+THEME_SCRIPT = '<script type="module" src="/assets/js/theme_mount.js"></script>'  # #3048: no inline modules under the hardened CSP
 # #1015 — the page runs ~9,500px tall at 390px: mount the shared mobile section-TOC
 # (sticky "on this page" jump bar; section_toc.js self-injects its stylesheet and
 # assigns shareable ids to each category head). Anchored before the first section so
 # the affiliate disclosure stays above it.
-TOC_SCRIPT = (
-    '<script type="module">import { mountSectionToc } from "/assets/js/section_toc.js"; '
-    'const w = document.querySelector(".gr-wrap"); '
-    'mountSectionToc(w, { before: w.querySelector(".rd-sec") });</script>'
-)
+TOC_SCRIPT = '<script type="module" src="/assets/js/gear_toc.js"></script>'  # #3048: code lives in the asset
 
 
 # Doors nav + footer are the shared chrome partial (#1009). /gear/ is a footer-tier page

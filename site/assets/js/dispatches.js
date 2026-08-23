@@ -8,6 +8,7 @@
   Chronicle/journal indexes from posts.json (native excerpts); lab notes fully
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
+import { pageData } from "/assets/js/page_data.js"; // #3048 — per-page start section, JSON island
 import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis, preStart, genesisCount } from "/assets/js/coach_popover.js"; // + #931 pre-start countdown
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
@@ -843,7 +844,10 @@ function build() {
   tabsEl.innerHTML = SECTIONS.filter((s) => !s.unlisted).map((s) => `<button class="dx-tab" data-sec="${s.key}">${s.icon ? icon(s.icon, { cls: "tab-ico" }) : ""}${esc(s.label)}</button>`).join("");
   tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => selectSection(b.dataset.sec)));
   wireTabList(tabsEl, (key) => selectSection(key));
-  const start = (window.__DISPATCH_START__ && BYKEY[window.__DISPATCH_START__]) ? window.__DISPATCH_START__ : "chronicle";
+  // #3048: the shell's start section ships as the #page-data JSON island (the
+  // old window.__DISPATCH_START__ inline global stays as a fallback).
+  const startRaw = pageData().start || window.__DISPATCH_START__;
+  const start = startRaw && BYKEY[startRaw] ? startRaw : "chronicle";
   const hashId = (location.hash || "").replace("#", "") || undefined;
   selectSection(start, hashId, false);
 }

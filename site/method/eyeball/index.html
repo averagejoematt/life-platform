@@ -45,8 +45,8 @@
 .eb-disclaimer code { overflow-wrap: anywhere; }
 </style>
 
-  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
-  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
+  <script src="/assets/js/boot_theme.js"></script>
+  <script src="/assets/js/boot_motion.js"></script>
 </head>
 <body>
   <a class="skip" href="#eb">Skip to the content</a>
@@ -71,62 +71,7 @@
   <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/coaching/">the coaching</a> — See what the AI team makes of it</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside><footer class="site-foot"><nav class="wayfinder" aria-label="The loop"><p class="wf-lede label">you are here on the loop</p><div class="wf-ribbon"><a class="wf-stop is-from is-vantage" data-station="cockpit" href="/cockpit/"><span class="wf-name">Now</span><span class="wf-role">today&#x27;s slice</span><span class="wf-tag">from</span></a><span class="wf-sep" aria-hidden="true">&middot;</span><span class="wf-stop is-here" data-station="data" aria-current="page"><span class="wf-name">Data</span><span class="wf-role">the engine</span></span><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop is-next" data-station="coaching" href="/coaching/"><span class="wf-name">Coaching</span><span class="wf-role">AI reads the data</span><span class="wf-tag">next</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="protocols" href="/protocols/"><span class="wf-name">Protocols</span><span class="wf-role">the levers</span></a><span class="wf-arrow" aria-hidden="true">&rarr;</span><a class="wf-stop" data-station="story" href="/story/"><span class="wf-name">Story</span><span class="wf-role">narrates the loop</span></a><span class="wf-arrow wf-cycle" aria-hidden="true">&#8635;</span></div></nav><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col is-here" data-station="data"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col" data-station="coaching"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col" data-station="protocols"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col" data-station="story"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="https://bsky.app/profile/averagejoematt.bsky.social" target="_blank" rel="me noopener">Bluesky</a><a href="https://x.com/averagejoematt_" target="_blank" rel="me noopener">X</a><a href="https://www.instagram.com/averagejoematt/" target="_blank" rel="me noopener">Instagram</a><a href="https://www.reddit.com/user/averagejoematt/" target="_blank" rel="me noopener">Reddit</a><a href="https://www.youtube.com/@averagejoematt" target="_blank" rel="me noopener">YouTube</a><a href="https://www.tiktok.com/@averagejoematt" target="_blank" rel="me noopener">TikTok</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p><script type="module" src="/assets/js/attribution.js"></script></footer>
   <script src="/assets/js/motion.js" defer></script>
   
-<script>
-(function () {
-  var MACRO_LABELS = { calories: "Calories", protein_g: "Protein", carbs_g: "Carbs", fat_g: "Fat" };
-  var root = document.getElementById("eb-readout");
-  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
-  function el(html){ var d=document.createElement("div"); d.innerHTML=html; return d.firstElementChild; }
-  function emptyState(a){
-    return '<div class="eb-state eb-empty" data-readout data-state="empty">' +
-      '<p><strong>No graded photos yet.</strong> Nothing has been eyeballed and graded, so there is no error to report ' +
-      '(n = 0). This chart fills in only as real meal photos are estimated and checked against the logged day — ' +
-      'it will never show a made-up accuracy number.</p></div>';
-  }
-  function bar(label, mape){
-    var pct = Math.max(0, Math.min(100, mape));
-    return '<div class="eb-bar-row"><span class="eb-bar-label">' + esc(label) + '</span>' +
-      '<span class="eb-bar-track"><span class="eb-bar-fill" style="width:' + pct.toFixed(1) + '%"></span></span>' +
-      '<span class="eb-bar-val">' + mape.toFixed(1) + '% MAPE</span></div>';
-  }
-  function macroCard(key, cell){
-    var name = MACRO_LABELS[key] || key;
-    if (!cell || !cell.sufficient) {
-      var n = (cell && cell.n) || 0;
-      return '<div class="eb-macro"><h3>' + esc(name) + '</h3>' +
-        '<div class="eb-lown">n = ' + n + ' — too few to score yet. Stats are withheld until there are enough graded days ' +
-        '(honest low-n; no precision claimed on thin data).</div></div>';
-    }
-    var body = '<div class="eb-macro"><h3>' + esc(name) + '</h3>' +
-      '<div class="eb-n">n = ' + cell.n + ' graded days</div>' +
-      bar("Mean abs err", cell.mape_pct) +
-      '<div class="eb-bar-row"><span class="eb-bar-label">Median</span><span></span>' +
-        '<span class="eb-bar-val">' + cell.median_abs_pct.toFixed(1) + '%</span></div>' +
-      '<div class="eb-bar-row"><span class="eb-bar-label">Bias</span><span></span>' +
-        '<span class="eb-bar-val">' + (cell.bias_pct > 0 ? "+" : "") + cell.bias_pct.toFixed(1) + '% (' +
-          (cell.bias_pct > 0 ? "over" : (cell.bias_pct < 0 ? "under" : "no bias")) + ')</span></div>';
-    if (cell.trend) {
-      body += '<p class="eb-trend">Trend: ' + esc(cell.trend.direction) + ' — recent ' +
-        cell.trend.recent_mape_pct.toFixed(1) + '% vs earlier ' + cell.trend.earlier_mape_pct.toFixed(1) + '%.</p>';
-    }
-    return body + '</div>';
-  }
-  function render(a){
-    if (!a || a.state === "empty" || a.n_days === 0) { root.appendChild(el(emptyState(a))); return; }
-    var wrap = el('<div class="eb-state" data-readout data-state="' + esc(a.state) + '"></div>');
-    var head = '<p class="eb-n" style="font-family:var(--font-mono);color:var(--ink-faint)">' +
-      a.n_days + ' graded day' + (a.n_days === 1 ? "" : "s") + ' &middot; as of ' + esc(a.as_of || "") +
-      (a.state === "low_n" ? ' &middot; low-n: summary stats withheld below the threshold of ' + esc(a.min_n) : '') + '</p>';
-    wrap.innerHTML = head + '<div class="eb-grid">' +
-      Object.keys(MACRO_LABELS).map(function(k){ return macroCard(k, (a.macros||{})[k]); }).join("") + '</div>';
-    root.appendChild(wrap);
-  }
-  fetch('/data/eyeball_calibration.json', { cache: "no-store" })
-    .then(function(r){ if (!r.ok) throw new Error("no artifact"); return r.json(); })
-    .then(render)
-    .catch(function(){ root.appendChild(el(emptyState(null))); });
-})();
-</script>
+<script src="/assets/js/eyeball_readout.js"></script>
 
 </body>
 </html>

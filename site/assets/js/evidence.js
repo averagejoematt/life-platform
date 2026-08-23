@@ -4,10 +4,15 @@
   pillars (/data/, /protocols/, /method/). Every actual readout lives in a per-family
   renderer module (evidence_*.js) imported below — this file only wires them up.
 
-  Registry + start slug are embedded by scripts/v4_build_evidence.py:
-    window.__EVIDENCE_REGISTRY__ = [{slug,title,blurb,group,mode,endpoint,root,legacy,editorial}]
-    window.__START_SLUG__ = "<slug>"
+  Registry + start slug are embedded by scripts/v4_build_evidence.py as a
+  non-executable JSON island (#3048 — the hardened CSP has no 'unsafe-inline'):
+    <script type="application/json" id="page-data">
+      {registry: [{slug,title,blurb,group,mode,endpoint,root,legacy,editorial}],
+       start, base, door, title, judge_calibration?}
+    </script>
+  The old window.__*__ globals remain as fallbacks for any stale cached shell.
 */
+import { pageData } from "/assets/js/page_data.js";
 import { initTheme } from "/assets/js/theme.js";
 import { stampGenesis } from "/assets/js/coach_popover.js"; // #949 — the cross-site Day-N anchor / pre-start countdown
 import { domainIcon } from "/assets/js/icons.js";
@@ -30,7 +35,9 @@ import { renderPulse } from "/assets/js/evidence_vitals.js";
 import { renderAutonomic, renderZone2 } from "/assets/js/evidence_autonomic.js";
 import { mountSectionToc } from "/assets/js/section_toc.js";
 
-const REG = window.__EVIDENCE_REGISTRY__ || [];
+const PAGE_DATA = pageData();
+
+const REG = PAGE_DATA.registry || window.__EVIDENCE_REGISTRY__ || [];
 
 // BYSLUG keeps EVERY entry — an unlisted topic's direct URL (/data/ledger/) must
 // still route + render. Only the menu surfaces below use the LISTED view (#1109).
@@ -44,9 +51,9 @@ const { BYSLUG, LISTED, GROUPS } = indexRegistry(REG);
 // v5: one engine serves three archive pillars (/data/, /protocols/, /method/).
 // The builder sets the route base + door label per page; defaults keep the
 // legacy /data/ door working if a page omits them.
-export const BASE = window.__ARCHIVE_BASE__ || "/data/";
+export const BASE = PAGE_DATA.base || window.__ARCHIVE_BASE__ || "/data/";
 
-const DOOR = window.__ARCHIVE_DOOR__ || "evidence";
+const DOOR = PAGE_DATA.door || window.__ARCHIVE_DOOR__ || "evidence";
 
 // #802 (R22-CONTENT-03): honest "refresh paused" disclosure for a coach's
 // analysis, disclosed only when it's noteworthy — budget_guard paused this
@@ -60,7 +67,7 @@ function coachRefreshNote(generatedAt, paused) {
   return "";
 }
 
-const DOORTITLE = window.__ARCHIVE_TITLE__ || "Evidence";
+const DOORTITLE = PAGE_DATA.title || window.__ARCHIVE_TITLE__ || "Evidence";
 
 const slugFromPath = () => resolveSlugFromPath(location.pathname);
 
@@ -131,7 +138,7 @@ const $ = (s) => document.querySelector(s);
 // topics are shallow enough to thumb-scroll, and the /data/ hub keeps its rail.
 const TOC_SLUGS = new Set(["labs", "character"]);
 
-let current = window.__START_SLUG__ || (LISTED[0] && LISTED[0].slug);
+let current = PAGE_DATA.start || window.__START_SLUG__ || (LISTED[0] && LISTED[0].slug);
 
 function buildTabs() {
   const g = BYSLUG[current] ? BYSLUG[current].group : GROUPS[0];

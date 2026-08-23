@@ -30,6 +30,7 @@
                   weekly from the trailing ~4 lab notes; honest-empty early).
     Experiment  → the cross-week arc (/api/experiment_synthesis), unchanged.
 */
+import { pageData } from "/assets/js/page_data.js"; // #3048 — per-page start section, JSON island
 import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis, preStart } from "/assets/js/coach_popover.js"; // + #949 pre-start gate
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
@@ -1422,7 +1423,10 @@ function build() {
   tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}">${esc(s.label)}</button>`).join("");
   tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => selectSection(b.dataset.sec)));
   wireTabList(tabsEl, (key) => selectSection(key));
-  const start = (window.__COACHING_START__ && BYKEY[window.__COACHING_START__]) ? window.__COACHING_START__ : "read";
+  // #3048: the shell's start section ships as the #page-data JSON island (the
+  // old window.__COACHING_START__ inline global stays as a fallback).
+  const startRaw = pageData().start || window.__COACHING_START__;
+  const start = startRaw && BYKEY[startRaw] ? startRaw : "read";
   const hashId = (location.hash || "").replace("#", "") || undefined;
   selectSection(start, hashId, false);
   wireMachineryRibbon(tabsEl);

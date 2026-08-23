@@ -139,8 +139,8 @@ SHELL = """<!DOCTYPE html>
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
-  <script>(function(){{try{{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}}catch(e){{}}}})();</script>
-  <script>(function(){{try{{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){{document.documentElement.classList.remove("mo");}},2600);}}catch(e){{}}}})();</script>
+  <script src="/assets/js/boot_theme.js"></script>
+  <script src="/assets/js/boot_motion.js"></script>
 </head>
 <body class="dx-page">
   <a class="skip" href="#dx">Skip to the story</a>
@@ -185,7 +185,7 @@ SHELL = """<!DOCTYPE html>
     </nav>
     <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">← home</a></p>
   </footer>
-  <script>window.__DISPATCH_START__ = "{start}";</script>
+  <script type="application/json" id="page-data">{{"start": "{start}"}}</script>
   <script src="/assets/js/motion.js" defer></script>
   <script type="module" src="/assets/js/dispatches.js"></script>
 </body>
