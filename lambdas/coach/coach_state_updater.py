@@ -114,34 +114,15 @@ def _parse_confidence(raw) -> float:
 # map — imported above as _infer_direction.
 
 
-def _build_prediction_eval_spec(metric_hint, direction, window_days):
-    """Build the PREDICTION# `evaluation` block, choosing the gradable type.
-
-    metric + direction → directional (EWMA trend, no threshold needed) — this is
-    the path that lets the daily evaluator actually confirm/refute. Without a
-    resolvable direction (or metric) we stay qualitative rather than writing a
-    machine spec with threshold=None that can only ever go inconclusive.
-    """
-    if metric_hint and direction in ("up", "down"):
-        return {
-            "type": "directional",
-            "metric": metric_hint,
-            "condition": direction,  # the directional evaluator reads 'up'/'down'
-            "threshold": None,
-            "evaluation_window_days": window_days,
-            "null_hypothesis": None,
-            "beats_null_if": None,
-        }
-    return {
-        "type": "qualitative",
-        "metric": metric_hint or None,
-        "condition": None,
-        "threshold": None,
-        "evaluation_window_days": window_days,
-        "null_hypothesis": None,
-        "beats_null_if": None,
-    }
-
+# The PREDICTION# emission contract moved to coach.prediction_emission (#3046):
+# spec building, timeframe→window mapping, subdomain inference, and the record
+# builder that decides status/gradeable_by (qualitative → "observation", never
+# "pending"). Re-exported because the suite pins the spec builder off this module.
+from coach.prediction_emission import (  # noqa: E402
+    build_prediction_eval_spec as _build_prediction_eval_spec,
+    build_prediction_record as _build_prediction_record,
+    prediction_window_days as _prediction_window_days,
+)
 
 # ── #813: write-time data-liveness gate ──────────────────────────────────────
 # A prediction is only machine-gradable if its metric's source is actually
@@ -1137,45 +1118,10 @@ def lambda_handler(event, context):
                 coach_id,
             )
             metric_hint = ""
-        timeframe_hint = pred.get("timeframe_hint", "")
-        confidence_stated = pred.get("confidence_stated")
         # C-3 gradability: resolve the expected direction so a metric-backed claim
         # routes to the directional (EWMA) evaluator instead of a dead machine spec.
         direction = _infer_direction(pred.get("direction"), claim) if metric_hint else None
-
-        # Build a slug-based prediction ID
-        import re
-
-        slug = re.sub(r"[^a-z0-9]+", "_", claim.lower()[:40]).strip("_")
-        pred_id = f"pred_{generation_date.replace('-', '')}_{slug}"
-
-        # Map timeframe hint to evaluation window days
-        window_days = 14  # default
-        if timeframe_hint:
-            tf = timeframe_hint.lower()
-            if "week" in tf:
-                try:
-                    n = int(re.search(r"(\d+)", tf).group(1))
-                    window_days = n * 7
-                except (AttributeError, ValueError):
-                    window_days = 14
-            elif "month" in tf:
-                window_days = 30
-            elif "day" in tf:
-                try:
-                    n = int(re.search(r"(\d+)", tf).group(1))
-                    window_days = n
-                except (AttributeError, ValueError):
-                    window_days = 14
-
-        # Determine subdomain from metric hint
-        subdomain = "general"
-        if metric_hint:
-            mh = metric_hint.lower()
-            for sd_key in ["sleep", "hrv", "recovery", "weight", "calories", "protein", "glucose", "training", "mood", "stress"]:
-                if sd_key in mh:
-                    subdomain = sd_key
-                    break
+        window_days = _prediction_window_days(pred.get("timeframe_hint", ""))
 
         eval_spec = _build_prediction_eval_spec(metric_hint, direction, window_days)
         if eval_spec.get("type") == "directional":
@@ -1183,31 +1129,19 @@ def lambda_handler(event, context):
         else:
             _qualitative_n += 1
 
-        pred_record = {
-            "pk": f"COACH#{coach_id}",
-            "sk": f"PREDICTION#{pred_id}",
-            "prediction_id": pred_id,
-            "coach_id": coach_id,
-            "created_date": generation_date,
-            "claim_natural": claim,
-            "evaluation": eval_spec,
-            "confidence": _parse_confidence(confidence_stated),
-            "subdomain": subdomain,
-            "confounders_noted": [],
-            "status": "pending",
-            "outcome": None,
-            "outcome_date": None,
-            "outcome_notes": None,
-            "decision_class": (
-                extraction.get("decision_classes_used", ["observational"])[0]
-                if extraction.get("decision_classes_used")
-                else "observational"
-            ),
-            "surfaced_to_subject": True,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+        # #3046 emission contract: the record builder stamps gradeable_by and emits a
+        # qualitative claim as status "observation" — never a pending row the
+        # deterministic evaluator can't grade (closed #715 criterion 3).
+        pred_record = _build_prediction_record(
+            coach_id,
+            generation_date,
+            claim,
+            eval_spec,
+            _parse_confidence(pred.get("confidence_stated")),
+            (extraction.get("decision_classes_used", ["observational"])[0] if extraction.get("decision_classes_used") else "observational"),
+        )
         _put_item(pred_record)
-        logger.info("Created PREDICTION# %s for %s", pred_id, coach_id)
+        logger.info("Created PREDICTION# %s for %s (%s)", pred_record["prediction_id"], coach_id, pred_record["status"])
 
     # SS-06: surface the write-time gradable share so an extraction regression is
     # visible the same day, not weeks later when windows close (see the helper).

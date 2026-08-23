@@ -219,7 +219,7 @@ BASELINE = {
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
     "lambdas/intelligence/intelligence_common.py": 1744,
     "lambdas/coach/coach_history_summarizer.py": 1731,
-    "lambdas/coach/coach_prediction_evaluator.py": 1638,
+    "lambdas/coach/coach_prediction_evaluator.py": 1633,
     # 2026-08-13 (#2610): 1623 → 1382. This file was at 1623/1623 — zero headroom — and
     # adding an alarm is the most routine change it ever takes, so it was the next
     # role_policies.py. Both CloudWatch DASHBOARDS (311 lines, pure composition, not one
@@ -229,7 +229,7 @@ BASELINE = {
     # 60 of them (a fifth — the earned-headroom rule) are banked so the extraction does not
     # land the file straight back at zero, and 241 are handed back to the ratchet.
     # Measured 1322. The terminal cure is still getting under 1200 and pruning this line.
-    "cdk/stacks/monitoring_stack.py": 1382,
+    "cdk/stacks/monitoring_stack.py": 1358,
     # 2026-08-09 (#2420): 1556 → 1637. The +81 is the ADR-104 grounding gate for the
     # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
     # census matches SURFACES by module, so extracting the gate would unclassify the
@@ -251,7 +251,6 @@ BASELINE = {
     # gate’s blob/regen/hold/read helpers live in coach/coach_derived_prose.py, which the
     # three serving paths import anyway. Tightened to the measured count so the 35 lines
     # handed back are not left as unpoliced headroom.
-    "lambdas/coach/coach_state_updater.py": 1233,
     "mcp/tools_hevy_routine.py": 1218,
 }
 

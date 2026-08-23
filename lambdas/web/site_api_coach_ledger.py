@@ -23,7 +23,10 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 from boto3.dynamodb.conditions import Key
-from coach import coach_dossier  # #1795: the docket reuses the dossier's privacy filter, never a fork
+from coach import (
+    coach_dossier,  # #1795: the docket reuses the dossier's privacy filter, never a fork
+    prediction_windows,  # #3046: due dates from the evaluator's OWN window clamp, never a copy
+)
 from experiment import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -618,12 +621,31 @@ def handle_predictions(event, *, _g):
         # The real graded calls live in PREDICTION# records (status set by the daily
         # coach-prediction-evaluator), NOT in OUTPUT#.predictions (which was a list of
         # natural-language strings with no status — the old read returned all-zero).
-        _BUCKETS = ("confirmed", "refuted", "pending", "inconclusive", "expired")
+        #
+        # #3046 (DIL-007): "observational" is the ungradeable class — qualitative
+        # eval specs the deterministic evaluator structurally skips (legacy rows
+        # still status "pending", plus new emission-contract rows written as status
+        # "observation"). They are counted in their OWN bucket, never in "pending":
+        # pending is a promise the evaluator will grade the call, and these it cannot.
+        _BUCKETS = ("confirmed", "refuted", "pending", "inconclusive", "expired", "observational")
 
-        _LIFETIME_ZERO = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
+        _LIFETIME_ZERO = {
+            "total": 0,
+            "confirmed": 0,
+            "refuted": 0,
+            "pending": 0,
+            "inconclusive": 0,
+            "expired": 0,
+            "observational": 0,
+            "decided": 0,
+        }
+
+        # #3046: due-date context for the pending set, from the evaluator's OWN
+        # domain-clamped window (coach.prediction_windows — single source, no copy).
+        _due_dates = []
 
         for cid in scan_coaches:
-            by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
+            by_coach[cid] = dict(_LIFETIME_ZERO)
             # #1376: career (all cycles, tombstoned archives included) beside this
             # season — same sports-card pattern as /api/calibration.
             by_coach[cid]["lifetime"] = dict(_LIFETIME_ZERO)
@@ -635,8 +657,12 @@ def handle_predictions(event, *, _g):
                 # applies server-side (ADR-058/#946) — so season can never diverge
                 # from or double-count against career.
                 for rec in fetched.get(cid, []):
+                    ev = rec.get("evaluation") or {}
+                    ungradeable = not prediction_windows.is_gradeable(ev)
                     p_status = rec.get("status", "pending")
-                    if p_status not in _BUCKETS:
+                    if p_status == "observation" or (ungradeable and p_status in ("pending", "confirming")):
+                        p_status = "observational"
+                    elif p_status not in _BUCKETS:
                         p_status = "pending"
 
                     by_coach[cid]["lifetime"]["total"] += 1
@@ -652,10 +678,15 @@ def handle_predictions(event, *, _g):
                     if p_status in ("confirmed", "refuted"):
                         by_coach[cid]["decided"] += 1
 
+                    due = None
+                    if p_status == "pending":
+                        due = prediction_windows.due_date(rec.get("created_date"), ev, rec.get("subdomain", ""))
+                        if due:
+                            _due_dates.append(due)
+
                     if status_filter != "all" and p_status != status_filter:
                         continue
 
-                    ev = rec.get("evaluation") or {}
                     all_predictions.append(
                         {
                             "coach_id": cid,
@@ -664,6 +695,8 @@ def handle_predictions(event, *, _g):
                             "confidence": rec.get("confidence", "medium"),
                             "status": p_status,
                             "date": rec.get("created_date", ""),
+                            "due_date": due,
+                            "gradeable": not ungradeable,
                             "metric": ev.get("metric"),
                             "eval_type": ev.get("type"),
                             "outcome_notes": rec.get("outcome_notes") or "",
@@ -681,7 +714,7 @@ def handle_predictions(event, *, _g):
             )
 
         # Surface decided calls first (the scorecard signal), then by recency.
-        _order = {"confirmed": 0, "refuted": 0, "pending": 1, "inconclusive": 1, "expired": 2}
+        _order = {"confirmed": 0, "refuted": 0, "pending": 1, "inconclusive": 1, "observational": 2, "expired": 2}
         all_predictions.sort(key=lambda x: (_order.get(x.get("status"), 1), x.get("date", "")), reverse=False)
         all_predictions.sort(key=lambda x: x.get("date", ""), reverse=True)
         all_predictions = all_predictions[:limit]
@@ -693,8 +726,18 @@ def handle_predictions(event, *, _g):
         pending = sum(c["pending"] for c in by_coach.values())
         inconclusive = sum(c["inconclusive"] for c in by_coach.values())
         expired = sum(c["expired"] for c in by_coach.values())
+        observational = sum(c["observational"] for c in by_coach.values())
         resolved = confirmed + refuted
         accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else None
+
+        # #3046: due-vs-pending context — "N pending" with no due date reads as a
+        # stall on a fresh cycle when in truth nothing is due yet (DIL-007).
+        today_pt = _g["datetime"].now(PT).strftime("%Y-%m-%d")
+        due = {
+            "as_of": today_pt,
+            "due_now": sum(1 for d in _due_dates if d <= today_pt),
+            "earliest_due": min(_due_dates) if _due_dates else None,
+        }
 
         l_total = sum(c["lifetime"]["total"] for c in by_coach.values())
         l_confirmed = sum(c["lifetime"]["confirmed"] for c in by_coach.values())
@@ -702,6 +745,7 @@ def handle_predictions(event, *, _g):
         l_pending = sum(c["lifetime"]["pending"] for c in by_coach.values())
         l_inconclusive = sum(c["lifetime"]["inconclusive"] for c in by_coach.values())
         l_expired = sum(c["lifetime"]["expired"] for c in by_coach.values())
+        l_observational = sum(c["lifetime"]["observational"] for c in by_coach.values())
         l_resolved = l_confirmed + l_refuted
         l_accuracy_pct = round(l_confirmed / l_resolved * 100, 1) if l_resolved > 0 else None
 
@@ -714,8 +758,10 @@ def handle_predictions(event, *, _g):
                     "pending": pending,
                     "inconclusive": inconclusive,
                     "expired": expired,
+                    "observational": observational,
                     "decided": resolved,
                     "accuracy_pct": accuracy_pct,
+                    "due": due,
                     "lifetime": {
                         "total": l_total,
                         "confirmed": l_confirmed,
@@ -723,6 +769,7 @@ def handle_predictions(event, *, _g):
                         "pending": l_pending,
                         "inconclusive": l_inconclusive,
                         "expired": l_expired,
+                        "observational": l_observational,
                         "decided": l_resolved,
                         "accuracy_pct": l_accuracy_pct,
                     },
