@@ -7,6 +7,17 @@ deployed site.
 RUN THIS MANUALLY. NEVER WIRE IT INTO CI, `deploy/smoke_test_site.sh`, or any
 other automatic/on-every-deploy path. See "Scheduling / runbook" below.
 
+**Posture re-decided 2026-08-23 (#2828, Phase D1):** the manual-only rule above
+was written before the 2026-08-14 P2 incident (rate limiting silently
+unenforced ~40 min; every CI gate green; caught only by a manual run of this
+script). A SCHEDULED observation now exists — the nightly qa-smoke check
+`ratelimit:edge_429` (`lambdas/operational/qa_check_edge_429.py`) reuses this
+script's trip429 mechanism (same endpoint, same charge-before-validation
+premise, same shape assertions) once per night. This script stays the ATTENDED
+tool for on-demand investigation; the never-on-every-deploy rule stands (a
+per-deploy trip would burn the probe IP's quota against concurrent deploys and
+prove nothing the nightly doesn't).
+
 ── What this does ───────────────────────────────────────────────────────────
 Targets POST /api/board_ask (the smallest natural per-IP limit in production —
 BOARD_RATE_LIMIT = 5/hr, see `lambdas/web/site_api_ai_lambda.py`) with a

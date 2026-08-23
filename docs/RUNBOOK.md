@@ -645,8 +645,12 @@ against `POST /api/board_ask` — chosen because its rate-limit check runs befor
 validation, so probe requests never reach a Bedrock call (zero model cost) and never
 touch `/api/subscribe` (no real emails).
 
-**Run manually only — never in CI, never on a schedule, never from
-`deploy/smoke_test_site.sh`:**
+**Posture re-decided 2026-08-23 (#2828):** a scheduled observation now exists — the
+nightly qa-smoke check `ratelimit:edge_429` (`lambdas/operational/qa_check_edge_429.py`)
+reuses the trip429 mechanism nightly, because the 2026-08-14 P2 incident (rate limiting
+silently unenforced ~40 min, all CI gates green, caught only by a manual run) postdates
+and overrides #1439's manual-only call. The script below remains the ATTENDED tool;
+never wire it into per-deploy paths (`deploy/smoke_test_site.sh` / CI):
 ```bash
 python3 deploy/probe_rate_limiter.py                 # --mode shape (default, safest): 2 requests, shape-only
 python3 deploy/probe_rate_limiter.py --mode trip429   # up to 6 requests, deliberately observes one real 429
