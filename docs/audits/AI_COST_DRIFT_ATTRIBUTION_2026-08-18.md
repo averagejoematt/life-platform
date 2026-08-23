@@ -206,3 +206,102 @@ attempted here:
 - The exact split of Component C's residual between cache-token undercounting and a possible
   out-of-repo remediation-agent contribution (Hypothesis 4) is not resolved to the dollar — see
   the residual note above.
+
+---
+
+## Addendum — 2026-08-22: the residual hasn't closed, one real (small) fix, two hypotheses ruled in/out
+
+**The ratio did not drift toward 1.15 on its own after box 2 landed — it drifted slightly away
+from it.** Live `LifePlatform/Budget::CostMetricDriftRatio`, hourly, since box 2 shipped:
+
+```
+1.3673  2026-08-19T17:00 PT  (box 2 lands)
+1.3663  2026-08-20T09:00 PT
+1.3613  2026-08-20T17:00 PT
+1.3647  2026-08-21T01:00 PT
+1.3778  2026-08-21T09:00 PT
+1.3800  2026-08-21T17:00 PT
+1.4114  2026-08-22T01:00 PT
+1.4140  2026-08-22T09:00 PT
+1.4177  2026-08-22T17:00 PT  <- latest
+```
+
+Cross-checked against the governor's own log line (`/aws/lambda/life-platform-cost-governor`,
+`2026-08-23T00:00:14Z`): `non_ai=$46.84 ai=$80.57 mtd=$127.41 self_reported_mtd=$49.42`.
+`ai_unbuffered = 80.57 / 1.15 = 70.06`; `70.06 / 49.42 = 1.4177` — matches the CloudWatch series
+exactly. **Residual gap is now $20.64 (up from $16.58 on 08-18)** — growing in dollars roughly in
+proportion to total spend (not accelerating), so this reads as a steady ~29–30% self-report miss
+rate holding over the observation window, not a one-time event trailing off.
+
+### Hypothesis 2 (cache-token undercounting) — narrowed, not fully resolved
+
+Two follow-up questions from the 08-18 doc, answered this session:
+
+1. **Is there a second Bedrock response source we're not reading (an
+   `x-amzn-bedrock-invocation-metrics` header carrying more reliable cache counts than the body's
+   `usage` object)?** Checked against botocore's own service model (`bedrock-runtime`
+   `2023-09-30/service-2.json`, `InvokeModelResponse` shape) rather than assumed: the modeled
+   response has exactly four members — `body`, `contentType`, `performanceConfigLatency`,
+   `serviceTier` — **no invocation-metrics header exists on synchronous `InvokeModel`**. That
+   header/JSON blob is a real AWS mechanism, but it's an invocation-*logging* artifact (written to
+   CloudWatch Logs/S3 when Bedrock model-invocation logging is enabled), not something the
+   synchronous API response carries. **Ruled out** — `bedrock_client.py` is already reading the
+   only source that exists.
+2. **Why do only 4 of ~20 reporting callers ever show cache activity at all?** AWS documents two
+   real, non-bug reasons a `cache_control`-marked call still reports zero cache tokens: the cached
+   prefix must clear a per-model minimum (documented ~1,024–4,096 tokens depending on model tier),
+   and the cache has a TTL (5m default, up to 1h) that a call must land inside to register a read.
+   Two of the four opt-outs already in the codebase are exactly this, by design and pre-dated this
+   session: `ai_calls.py`'s D-01 note (daily-brief: measured 0 reads / 10K writes, caching
+   disabled) and `/api/ask`'s system prompt (per-question archive retrieval + live metrics —
+   genuinely unstable content, never eligible for a useful cache regardless of `cache_control`).
+   These are legitimate, not defects.
+
+### A third instance of the same waste class, found and fixed: State of Matthew
+
+Audited all 4 callers with real cache activity (`AnthropicCacheWriteTokens`/`ReadTokens` present
+in `LifePlatform/AI`) for the D-01 signature — writes with no matching reads — over a trailing 30d
+window:
+
+| caller | cache-write tokens | cache-read tokens | verdict |
+|---|---:|---:|---|
+| `wednesday-chronicle` | 9,646 | 9,646 | reused — keep caching |
+| `telegram-coach-worker` | 37,066 | 39,416 | reused — keep caching |
+| `coach-narrative-orchestrator` | 875,666 | 1,020,339 | reused — keep caching |
+| **`state-of-matthew`** | **24,159** | **0** | **100% wasted — same class as D-01** |
+
+`state-of-matthew` makes exactly ONE Bedrock call per run (its own `narrate()` docstring: "the
+platform's ONE weekly call, not two") via `whole_life_context.with_cached_archive()`, which wraps
+the archive in a 1-hour `cache_control` block. A write with no possible read inside the same call,
+and a next run 7 days later (168h, far past even the 1h TTL), pays the ~2x cache-write premium for
+a discount that can never be realized. Fixed in this PR: `with_cached_archive()` gained a
+`cache: bool = True` parameter; `state_of_matthew_lambda.py` now passes `cache=False`, dropping the
+`cache_control` wrapper (archive content and grounding behavior unchanged) — same fix class as
+D-01, independently discovered.
+
+**Honest sizing: this is real but small.** `state-of-matthew`'s entire MTD self-reported cost is
+$0.032 (of $49.42 total, 0.06%) — the wasted premium within that is on the order of a few tenths
+of a cent per month (24,159 tokens × (1.25−1.00)/1M ≈ $0.006/mo at Haiku's cache-write rate). This
+fix does not move the $20.64 residual or the 1.4177 ratio in any way a human would notice on a
+CloudWatch graph. It's shipped because it's correct and cheap, not because it closes the issue.
+
+### What's still open
+
+The $20.64 residual is **not attributed to a specific remaining code defect** after this session's
+narrowing. What's ruled out now, cumulatively: stale pricing (08-18), chokepoint bypass (08-18), a
+missed invocation-metrics header (08-22), and the specific write-without-read waste pattern across
+every caller that has any cache activity at all (08-22, one real instance found and fixed). What's
+still standing as plausible, unconfirmed: (a) Hypothesis 4 from 08-18 — out-of-repo Bedrock usage
+(the self-healing remediation agent's own Claude Code/Bedrock calls, which would appear in
+`AWS/Bedrock` native totals but never reach `_emit_usage_metrics()`) — and (b) a new candidate this
+session did not check: the many concurrent Claude Code agent worktree sessions this repo runs
+routinely (dozens observed via `git worktree list` during this session) may also authenticate to
+Bedrock directly rather than through `ai.bedrock_client`, which would be invisible to
+`LifePlatform/AI` by the same mechanism as (a) but at potentially much higher volume. Neither (a)
+nor (b) is fixable from `lambdas/` — confirming or ruling either in requires the CLI/agent
+infrastructure's own usage logs, out of scope for a repo-side PR.
+
+**Acceptance-box status, updated:** `CostMetricDriftRatio` is trending slightly *away* from 1.15
+(1.36 → 1.42 over four days), not toward it — the 7-day-sustained box remains open and, on current
+trend, is not close. The alarm (box 3) is live and correctly in ALARM on this true condition. Box 4
+(per-caller reconciliation) is untouched.
