@@ -13,7 +13,7 @@
 `secret_count` literal + its `live-verified` stamp; `scripts/check_doc_facts.py` reds CI
 when that stamp passes 90 days).
 
-**Current state (2026-08-02): 25 active secrets, 0 in deletion window.**
+**Current state (2026-08-23): 26 active secrets us-west-2, 0 in deletion window (+3 us-east-1 — see the us-east-1 section below).**
 The 2026-05-19 state (12 active + 3 pending deletion) is history: `dropbox` and
 `anthropic-api-key` completed deletion; `notion` was kept (restored 2026-05-24, the
 day its deletion was due — it exists live, last accessed 2026-03-09; ingestion reads
@@ -46,7 +46,7 @@ aws secretsmanager list-secrets --include-planned-deletion --region us-west-2 \
   --query 'SecretList[].{Name:Name,DeletedDate:DeletedDate}' --output table
 ```
 
-Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `life-platform/*`.
+Last reconciled: **2026-08-23**. 26 active us-west-2 + 3 us-east-1, 0 in deletion window, all under `life-platform/*`.
 
 ---
 
@@ -122,6 +122,43 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 
 ---
 
+## Rotation ownership register (added 2026-08-23 — #2890 / DIL-016)
+
+Every secret gets a **rotation owner** and an **expiry / next-action** entry. "Static —
+on exposure" means the credential has no expiry and rotation is event-driven; that is a
+recorded posture, not an omission. ⚠️ marks a fact that exists only outside this repo
+(e.g. a PAT's expiry set in the GitHub UI) — loud gaps, same convention as
+`docs/ACCOUNTS.md`. Blast radius = the consumer set in the table below; the per-family
+split/merge decisions are priced in #2890.
+
+| Family | Secrets | Rotation owner | Expiry / next action |
+|---|---|---|---|
+| OAuth data sources | `whoop` · `withings` · `strava` · `garmin` | Lambda auto-refresh; **Matthew** on refresh-token death (re-auth procedures above) | No fixed expiry; garmin idle (ADR-074 pause) — re-auth only on revival |
+| Static source keys (dedicated) | `habitify` · `hevy` · `hevy-write` · `todoist` · `eightsleep` + `eightsleep-client` | **Matthew** | Static — on exposure |
+| Bundled ingestion keys | `ingestion-keys` (todoist / notion / dropbox / HAE fields) | **Matthew** (per-field, at the provider) | Static — on exposure; dropbox OAuth refresh in-Lambda. Widest blast radius: one secret → 4 providers × 6 consumer Lambdas (#2890 prices the split) |
+| Anthropic direct-API | `ai-keys` · `site-api-ai-key` | **Matthew** | Static — on exposure; runtime inference is Bedrock/IAM (ADR-062), these are fallback/isolated paths |
+| Platform-minted HMAC | `subscriber-token-secret` · `ritual-token-secret` · `site-api-origin-secret` | **Matthew** (rotation = mass token invalidation — plan it) | Static — on exposure |
+| Auto-rotating | `mcp-api-key` | **Automated** (`life-platform-key-rotator`, 90d) | Next rotation ~2026-10-05 |
+| GitHub PATs | `github-dispatch-token` · `github-billing` | **Matthew** (regenerate in GitHub → update secret) | ⚠️ Expiry set in GitHub UI, unrecorded here — record on next regeneration |
+| Content/publish keys | `google-tts` · `pexels` · `youtube` · `bluesky` (app password) · `telegram` (bot tokens) | **Matthew** (at each provider) | Static — on exposure; bluesky is a scoped app password, never the account password |
+| Operator config (not credentials) | `digest` (recipient list) | **Matthew** | n/a — configuration kept out of git, no rotation concept |
+| Retire-candidate | `notion` (dedicated) | **Matthew** | **Deletion batched to the owner 2026-08-23 (#2890)** — see Cleanup below; pre-check required (live LastAccessedDate 2026-07-25 says something still reads it) |
+
+## us-east-1 secrets (region is structural, not drift — verified live 2026-08-23)
+
+| Secret (us-east-1) | Why it exists there | Consumer |
+|---|---|---|
+| `life-platform/cf-auth` | Lambda@Edge functions MUST be deployed in us-east-1; this is the edge HTML-gate password (`cdk/stacks/constants.py` CF_AUTH_*) | `life-platform-cf-auth` Lambda@Edge (`lambdas/cf-auth/index.mjs`) |
+| `life-platform/buddy-auth` | Buddy accountability page auth, read at the same us-east-1 edge | cf-auth edge function |
+| `life-platform/site-api-origin-secret` | Cross-region twin of the us-west-2 secret: CloudFormation secret dynamic references are region-local, so the us-east-1 stacks need a local copy | CDK-injected origin-header verification |
+
+The #2890 "replicas unjustified" finding resolves to: **one** true twin
+(`site-api-origin-secret`, justified above) and two edge-native secrets that were
+missing from this map entirely (now rows here). Rotating the origin secret means
+rotating BOTH regions in one operation.
+
+---
+
 ## Where each secret is consumed
 
 Use this section to answer "if I rotate secret X, which Lambdas need a redeploy or cache flush?"
@@ -162,7 +199,7 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 
 1. ✅ **`life-platform/anthropic-api-key`** — deleted (window closed 2026-05). Gone from live inventory.
 2. ✅ **`life-platform/dropbox`** — deleted (window closed 2026-05). Bundle path authoritative.
-3. ⚠️ **`life-platform/notion`** — was scheduled for deletion 2026-05-24 but is LIVE (LastChangedDate = 2026-05-24, i.e. restored the day deletion was due). Last accessed 2026-03-09; ingestion reads the bundle. **Retire-candidate**: confirm the freshness-checker/pipeline-health-check references are name-only, then re-schedule deletion — or adopt it as the authoritative Notion path. Either way, resolve the split.
+3. ⚠️ **`life-platform/notion`** — was scheduled for deletion 2026-05-24 but is LIVE (LastChangedDate = 2026-05-24, i.e. restored the day deletion was due). Ingestion reads the bundle. **Deletion is batched to the owner (2026-08-23, #2890 / DIL-016)** with a required pre-check: live `LastAccessedDate` is **2026-07-25** (not 2026-03-09 as previously recorded), so something DOES still call `GetSecretValue` on it — identify that reader (start with `life-platform-freshness-checker` / `pipeline-health-check`, whose references were assumed name-only) before scheduling deletion, or adopt it as the authoritative Notion path. Either way, resolve the split.
 4. The 2026-05-19 audit's other actions (test-list drift, ARCHITECTURE count, role_policies comment) were closed in V2 — see git history.
 
 If a deletion-window secret is ever needed back, restore within the window:
