@@ -2976,6 +2976,41 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/2908"
         }
       ]
+    },
+    {
+      "id": "2026-08-22-the-oracle-stopped-guessing",
+      "date": "2026-08-22",
+      "title": "The QA oracle stopped guessing — and the backlog stopped lying",
+      "shipped": "Eleven merged PRs in one evening queue. The site's AI reader-truth gate was holding every deploy hostage, so the session fixed the gate itself: two pages it silently skipped turned out to be screenshots taller than the vision model's 8,000-pixel limit (now downscaled, and a page it cannot evaluate is a loud failure, never a silent pass); its stored evidence is no longer truncated mid-sentence; and the one page it kept flagging had a real bug underneath — the 'days with data' column counted database rows, not days, so a 6-day cycle claimed 8 and an old one claimed 16. Alarms that stayed lit a full day after recovery now clear within the hour, because the 'healthy' signal is finally emitted on success — one source had never sent a single healthy datapoint in its life. And 26 parked product ideas moved out of the bug count into a Roadmap milestone, so the open-issue number now measures defects, not ambition.",
+      "why_it_mattered": "A QA gate that can silently skip pages, truncate its own evidence, and hold deploys on findings nobody can adjudicate isn't protecting readers — it's noise wearing a uniform. After this queue, the first full sweep came back 93 pages evaluated, 93 passed, zero unevaluated: green finally means every page was actually looked at. And the backlog count dropping from 85 to a ~55-item debt corpus wasn't deletion — it was admitting that a July roadmap and an August defect list are two different documents.",
+      "gotcha": "The merge queue audited itself. One agent's PR carried a second, real failure behind the expected doc-literal red and I merged it on the agent's say-so — main's test lane went red for it. Another PR's new alarm made the auto-reconcile job regenerate the system model, which was whitelisted nowhere, killing the deploy pipeline: the job had been given the generator but never permission to commit its output. Both got permanent guards the same evening — the second one is now a mutation-proved registry test that fails the PR that introduces the gap, not the innocent merge after it.",
+      "honest_miss": "The strictest fixes broke their own tests: three unit failures surfaced only in the full 16,000-test suite because the PR lane deselects them — including a fixture PNG that passed the old size filter but died at the new honesty check, proof the fixture was never a real screenshot to begin with. And one closure is only 'partial': public coach pages render honest-empty until the coaches' next daily run writes their first reader-facing summaries.",
+      "prs": [
+        {
+          "label": "PR #3008",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3008"
+        },
+        {
+          "label": "PR #3010",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3010"
+        },
+        {
+          "label": "PR #3011",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3011"
+        },
+        {
+          "label": "PR #3013",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3013"
+        },
+        {
+          "label": "PR #3014",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3014"
+        },
+        {
+          "label": "PR #3015",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3015"
+        }
+      ]
     }
   ]
 }
