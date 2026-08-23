@@ -1,0 +1,22 @@
+COHERENCE SENTINEL FINDING — 2026-08-23
+
+facts_agreement ALARM: expert:physical and expert:integrator are citing wrong values.
+
+Canonical facts:
+  recovery_pct: 17%
+  hrv_ms: 23.6 ms
+
+Coached values (persisted to DynamoDB):
+  expert:physical — recovery_pct: 77%, hrv_ms: 49.3 ms
+  expert:integrator — recovery_pct: 77%, hrv_ms: 49.3 ms
+
+Grounding chain audit required:
+  1. Are facts being passed to the expert prompts?
+  2. Is grounding_guard.hard_canonical_contradictions() being applied?
+  3. Is the generation being re-tried on contradiction?
+  4. Are the corrected outputs being persisted?
+
+See lambdas/intelligence/grounding_guard.py (SS-10) and
+lambdas/intelligence/ai_expert_analyzer_lambda.py for the generation flow.
+
+Sentinel read date: 2026-08-23 18:46 UTC
