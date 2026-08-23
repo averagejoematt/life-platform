@@ -626,7 +626,11 @@ def cycle_compare(*, _g) -> dict:
                     "weight_delta_lbs": round(weights[-1][1] - weights[0][1], 1) if len(weights) >= 2 else None,
                     "avg_recovery_pct": round(sum(rec) / len(rec), 1) if rec else None,
                     "avg_sleep_hours": round(sum(slp) / len(slp), 2) if slp else None,
-                    "days_with_data": len({r["sk"] for r in wd} | {r["sk"] for r in wh}),
+                    # #2992: distinct DATES, not distinct SKs — whoop workout sub-rows
+                    # (DATE#YYYY-MM-DD#WORKOUT#uuid) fall inside the between() range and
+                    # inflated the count past the window (8 "days" in a 6-day cycle).
+                    # Same [5:15] date-slice idiom as _engaged_dates above.
+                    "days_with_data": len({str(r["sk"])[5:15] for r in wd} | {str(r["sk"])[5:15] for r in wh}),
                 }
             )
 
