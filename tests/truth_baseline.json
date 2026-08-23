@@ -1,9 +1,25 @@
 {
  "_meta": {
-  "captured_at": "2026-08-23T04:13:15+00:00",
+  "captured_at": "2026-08-23T05:03:41+00:00",
   "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
  },
  "pages": {
+  "/": [
+   {
+    "category": "duplicated_narrative",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "med",
+    "note_sample": "The same substantive narrative 'HRV spiked to 49ms (+27% above your 7-day average) while every logged habit shows zero — your body is signaling readiness that the tracking system can't yet confirm.' a — observed low-severity rider recorded by the #2981 any-severity rule during the 2026-08-23 publish-path episode (run 32618360726)."
+   },
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "day-counter-bound inference: 'HRV +27% above your 7-day average' flagged because 'only 6 days of current-experiment data can exist' — wrong: HRV averages run over the CROSS-PHASE raw timeseries (ADR-077). Held the deploy (run 32618360726); rubric clause + is_day_counter_bound_inference suppressor landed same-day."
+   }
+  ],
   "/coaching/": [
    {
     "category": "audience_violation",
@@ -56,6 +72,15 @@
     "note_sample": "Text states 'The earliest call's window (2026-08-17) has closed — it grades at the evaluator's next daily pass.' On Day 5 (2026-08-21), a 2–4 week window opened on 2026-08-17 would not have closed yet"
    }
   ],
+  "/cockpit/": [
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "same day-counter-bound inference as / (identical daily line, same run 32618360726) — 7-day trailing average is legitimate cross-phase data on Day 6."
+   }
+  ],
   "/data/character/": [
    {
     "category": "temporal_contradiction",
@@ -95,6 +120,15 @@
     "issue": "#2957",
     "added": "2026-08-22",
     "note_sample": "Prose states 'No training logged — 57 days' on Day 5 of a 5-day experiment (Day 1 = 2026-08-17). A 57-day history is impossible; the experiment has only existed for 5 days maximum. This asserts a pre-"
+   }
+  ],
+  "/data/wall/": [
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "self-refuted finding: the note's own last sentence reads 'No contradiction here on rechecking arithmetic' yet was emitted high (run 32618360726) — is_self_refuted drops the class; entry kept as the observed record."
    }
   ],
   "/journal/essays/org-chart-of-one/": [
