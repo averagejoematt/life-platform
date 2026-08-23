@@ -1,6 +1,6 @@
 {
  "_meta": {
-  "captured_at": "2026-08-23T05:03:41+00:00",
+  "captured_at": "2026-08-23T05:42:48+00:00",
   "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
  },
  "pages": {
@@ -112,6 +112,15 @@
     "issue": "#2957",
     "added": "2026-08-22",
     "note_sample": "Prose states 'STAGE COMPOSITION OVER THE WEEK' with a chart labeled 'DEEP · REM · LIGHT · HOURS BY STAGE · PER NIGHT' spanning days 17–21, but on Day 5 (2026-08-21) only 5 days of data can exist. The "
+   }
+  ],
+  "/data/training/": [
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2959",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "self-refuted 'high': the note's final sentence reads 'within phase bounds and internally consistent' yet gated the THIRD deploy attempt (run 32620189500); widened _WITHDRAWAL_RE same-day + this baseline as defense in depth."
    }
   ],
   "/data/vitals/": [

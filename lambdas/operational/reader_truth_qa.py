@@ -474,8 +474,12 @@ def is_day_counter_bound_inference(finding):
 # a claim its own evidence retracts is gating on nothing. Only the LAST sentence
 # counts: a mid-note "this is internally consistent. But the header …" is a live
 # objection and survives (the /method/postmortems/ shape, same run).
+# Phrase list widened same-day: the third blocked deploy's surviving high ended
+# "This is within phase bounds and internally consistent." — a withdrawal the
+# first list was too narrow to see. Last-sentence scoping is what keeps the
+# widening safe: a mid-note "internally consistent. But …" still survives.
 _WITHDRAWAL_RE = re.compile(
-    r"\b(?:no contradiction|not a contradiction|self-consistent and correct|label is accurate)\b",
+    r"\b(?:no contradiction|not a contradiction|self-consistent|internally consistent" r"|within phase bounds|label is accurate)\b",
     re.I,
 )
 

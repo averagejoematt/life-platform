@@ -831,3 +831,17 @@ def test_assess_prose_drops_a_self_refuted_finding(capsys):
     assert errors == []
     assert findings == [], "a withdrawn claim must not reach the gate at any severity"
     assert "dropped a self-refuted finding" in capsys.readouterr().out
+
+
+def test_self_refuted_fires_on_the_third_deploy_training_note():
+    """Run 32620189500's surviving high — the note affirms consistency in its
+    final sentence with phrasing the first list missed. Verbatim wire note."""
+    note = (
+        "Section 'RESTING HEART RATE · NIGHTLY · AUG 17–AUG 22 · 6 PTS' claims a span of Aug 17 to "
+        "Aug 22. Aug 17 is Day 1; Aug 22 is Day 6. This is 6 days inclusive, which is correct for "
+        "the current phase. However, the label '6 PTS' (six data points) on a 6-day window is "
+        "correct only if each day produced exactly one measurement. The chart shows RHR trending "
+        "from 63→67 bpm across this window. This is within phase bounds and internally consistent."
+    )
+    f = {"page": "/data/training/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_self_refuted(f) is True
