@@ -770,11 +770,19 @@ async function load() {
       // so "tomorrow" in the line can never sit under a "today" frame on home.
       // The static timeless line stays unlabeled — the kicker belongs to the
       // live brief line only, so it is inserted here, not in the HTML shell.
+      // #3066 — "yesterday's read" alone is a RELATIVE claim: a reader (or an
+      // automated truth-sweep judge) comparing it against the cockpit's absolute
+      // "as of <date>" stamp can't reconcile the two without doing date math, so
+      // any intra-day data movement reads as a contradiction. Fold in the exact
+      // date, in the same "as of <date>" vocabulary the cockpit footer and this
+      // page's own "is he okay" panel already use — sourced from
+      // elena_hero_line_as_of, the SAME generation metadata (the brief's data
+      // day) that produced the line's numbers, never a freshly computed "today".
       const elenaEl = bind("elena");
       if (elenaEl && !$(".hero-elena-kicker")) {
         const k = document.createElement("p");
         k.className = "label hero-elena-kicker";
-        k.textContent = BRIEF_LINE_KICKER;
+        k.textContent = statsV.elena_hero_line_as_of ? `${BRIEF_LINE_KICKER} · as of ${statsV.elena_hero_line_as_of}` : BRIEF_LINE_KICKER;
         elenaEl.parentNode.insertBefore(k, elenaEl);
       }
       if (elenaEl) elenaEl.textContent = statsV.elena_hero_line;
