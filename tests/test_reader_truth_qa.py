@@ -845,3 +845,22 @@ def test_self_refuted_fires_on_the_third_deploy_training_note():
     )
     f = {"page": "/data/training/", "category": "temporal_contradiction", "severity": "high", "note": note}
     assert rtq.is_self_refuted(f) is True
+
+
+def test_harness_threads_the_sweep_clock_to_assess_prose(tmp_path, monkeypatch):
+    """#3030 — one clock per sweep. The today_iso handed to assess_reader_truth
+    must be the today_iso assess_prose judges with; run 32622594057 flagged 8+
+    pages because assess-time crossed midnight PT after capture. Mutation proof:
+    dropping the pass-through makes the recorded value None and this fails."""
+    seen = {}
+    real = rtq.assess_prose
+
+    def spy(surfaces, invoke, today_iso=None, **kw):
+        seen["today_iso"] = today_iso
+        return real(surfaces, invoke, today_iso=today_iso, **kw)
+
+    monkeypatch.setattr(rtq, "assess_prose", spy)
+    results = _harness_results(tmp_path, "Day marker prose.")
+    _patch_harness(monkeypatch, _CLEAN_VERDICT)
+    visual_ai_qa.assess_reader_truth(results, today_iso=_DAY_2)
+    assert seen["today_iso"] == _DAY_2

@@ -375,8 +375,15 @@ def _truth_line(f):
     return f"Reader-truth ({f['severity']}) [{f['category']}]: {f['note']}"
 
 
-def assess_reader_truth(results):
+def assess_reader_truth(results, today_iso=None):
     """Phase-aware reader-truth QA (#1095) over the harness's prose captures; mutates `results`.
+
+    `today_iso` (#3030): the PT calendar date the SWEEP started — one run, one
+    clock. Without it the phase truth is computed at assess time, and a run whose
+    capture starts just before midnight PT judges Day-N screenshots against a
+    Day-N+1 phase (measured: run 32622594057 flagged 8+ pages whose chrome was
+    correct when the pixels were made). Callers that capture and assess in one
+    breath may omit it; visual_qa.run pins it at sweep start.
 
     Reads each page's rendered-innerText dump (kind == "prose", written by
     visual_qa.capture_page(capture_prose=True)), batches 4-6 surfaces per Bedrock
@@ -437,7 +444,7 @@ def assess_reader_truth(results):
         print("  ⚠ Reader-truth QA: no prose captures found — run visual_qa.py with --reader-truth")
         return {"status": "no_surfaces"}
 
-    findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock.invoke)
+    findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock.invoke, today_iso=today_iso)
     for err in errors:
         print(f"  ⚠ Reader-truth batch error (fail-soft): {err}")
 
@@ -481,7 +488,7 @@ def assess_reader_truth(results):
         )
 
     if not findings:
-        phase = reader_truth_qa.phase_context()
+        phase = reader_truth_qa.phase_context(today_iso)
         day = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
         print(f"  ✅ Reader-truth: {len(surfaces)} surfaces clean at {day}")
     return {"status": "ok", "findings": len(findings)}
