@@ -191,7 +191,11 @@ def test_prompt_truncates_oversized_prose():
     # re-failing nightly at Day 3. ~660 chars ≈ 165 Haiku tokens per batch, twice
     # a night — the ledger IS the rule in this module, so it is allowed to grow;
     # this bound exists to keep it from growing UNNOTICED, not to freeze it.
-    assert len(prompt) < rtq.MAX_PROSE_CHARS + 6000
+    # 6000 → 6800 on 2026-08-23 (#2959): the trailing-window/day-counter clause —
+    # the old bullet's last line INSTRUCTED flagging any window longer than the
+    # elapsed days, which manufactured the 7-day-HRV-average highs that held the
+    # publish path twice in one hour (runs 32616299944 + 32618360726).
+    assert len(prompt) < rtq.MAX_PROSE_CHARS + 6800
 
 
 def test_batching_four_to_six_surfaces_per_call():
@@ -702,3 +706,128 @@ def test_prompt_states_the_vagueness_principle():
     """The clause the model reads and the predicate code enforces state one rule."""
     prompt = rtq.build_prompt([{"name": "Home", "path": "/", "prose": "hello"}], rtq.phase_context(_DAY_2))
     assert "vague" in prompt and "NOT a contradiction" in prompt
+
+
+# ── #2959: the day counter is not a data bound ─────────────────────────────────
+# Five instances in 24h held the publish path twice (runs 32616299944 +
+# 32618360726): the model turned the prompt's own phase ground truth into a
+# bound ("only 6 days of current-experiment data can exist") and flagged
+# legitimately cross-phase content — a trailing 7-day HRV average, the build
+# log's history. Notes below are the WIRE — verbatim from the runs' report.json.
+
+_NOTE_2959_HOME = (
+    "Home page states 'HRV spiked to 49ms (+27% above your 7-day average)' but only 6 days of "
+    "current-experiment data can exist. A 7-day average is impossible on Day 6 of the experiment "
+    "(Day 1 = 2026-08-17, today = 2026-08-22). This contradicts the phase constraint that at most "
+    "6 days of current-experiment data exist."
+)
+_NOTE_2959_COCKPIT = (
+    "Cockpit states 'HRV spiked to 49ms (+27% above your 7-day average)' in the daily line. This is "
+    "impossible on Day 6 when only 6 days of data exist—a 7-day average cannot be computed from 6 "
+    "days of current-cycle data."
+)
+_NOTE_2959_BOARD = (
+    "States 'THIS SEASON · CYCLE 14' with '26 GRADED FORECASTS' on Day 5, but only 5 days of data "
+    "can exist in the current cycle (started 2026-08-17). On Day 5, a maximum of 5 days of in-cycle "
+    "data is possible."
+)
+
+
+def test_day_counter_bound_fires_on_all_three_observed_notes():
+    for page, note in (("/", _NOTE_2959_HOME), ("/cockpit/", _NOTE_2959_COCKPIT), ("/method/board/", _NOTE_2959_BOARD)):
+        f = {"page": page, "category": "temporal_contradiction", "severity": "high", "note": note}
+        assert rtq.is_day_counter_bound_inference(f) is True, page
+
+
+def test_day_counter_bound_spares_a_bound_unrelated_to_the_day_number():
+    note = "Chart claims a 90-day trend but only 30 days of data exist in the retention window; " "today is Day 6 of the cycle."
+    f = {"page": "/data/vitals/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_day_counter_bound_inference(f) is False, "N=30 vs Day 6 — not derived from the day counter"
+
+
+def test_day_counter_bound_spares_a_genuine_intra_page_contradiction():
+    # The #2921 sleep-interleave class: internally contradictory numbers, no bound phrase.
+    note = (
+        "Field 'total_sleep_hours' is 1.4, but 'deep_sleep_hours' 1.98 + 'rem_sleep_hours' 1.64 "
+        "printed beside it sum to 3.62 — sleep cannot total less than its own stages."
+    )
+    f = {"page": "/api/sleep_detail", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_day_counter_bound_inference(f) is False
+
+
+def test_day_counter_bound_never_touches_other_categories():
+    f = {"page": "/", "category": "audience_violation", "severity": "high", "note": _NOTE_2959_HOME}
+    assert rtq.is_day_counter_bound_inference(f) is False
+
+
+# ── #2959: a finding whose own note withdraws the claim ────────────────────────
+# Run 32618360726 emitted BOTH of these at gating severity; each note's final
+# sentence retracts the contradiction it reports. Verbatim wire notes.
+
+_NOTE_2959_WALL = (
+    "Lists 'ATTEMPT 14 FROM 2026-08-17 alive · day 6', which is correct for the phase. However, "
+    "the cycle started 2026-08-17 and today is 2026-08-22, making this Day 6 elapsed — the label "
+    "is accurate. No contradiction here on rechecking arithmetic."
+)
+_NOTE_2959_SURVIVAL = (
+    "The survival curve page shows '6 SILENT DAYS RIGHT NOW' and the engagement table shows cycle "
+    "14 with strip '······' (6 dots) and '0/6' engagement. The header says 'DAY 6 · WEEK 1, SINCE "
+    "AUGUST 17 2026'. This is self-consistent and correct: 6 days have elapsed, all silent. "
+    "No contradiction."
+)
+
+
+def test_self_refuted_fires_on_both_observed_notes():
+    for page, note in (("/data/wall/", _NOTE_2959_WALL), ("/method/survival/", _NOTE_2959_SURVIVAL)):
+        f = {"page": page, "category": "temporal_contradiction", "severity": "high", "note": note}
+        assert rtq.is_self_refuted(f) is True, page
+
+
+def test_self_refuted_spares_a_midnote_consistency_with_live_objection():
+    # The /method/postmortems/ shape, same run: consistency stated mid-note, the
+    # objection continues after it — a live claim, never dropped.
+    note = (
+        "The strip shows '······' (6 dots = 6 silent days), which matches Day 1 through Day 6. "
+        "However, the postmortem then says 'Showed up 0/6 days. day 6 · live' — this is internally "
+        "consistent. But the header dates the restart 2026-08-16, one day before genesis."
+    )
+    f = {"page": "/method/postmortems/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_self_refuted(f) is False
+
+
+def test_self_refuted_spares_an_ordinary_finding():
+    f = {"page": "/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_2959_HOME}
+    assert rtq.is_self_refuted(f) is False
+
+
+def test_assess_prose_demotes_a_day_counter_bound_high_to_low(capsys):
+    """The predicate is wired: the / HRV-average high reaches the gate as low."""
+    verdict = {
+        "findings": [
+            {"page": "/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_2959_HOME},
+        ],
+        "severity": "high",
+        "summary": "x",
+    }
+    pages = [{"name": "Home", "path": "/", "prose": "HRV spiked to 49ms (+27% above your 7-day average)"}]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_2)
+    assert errors == []
+    assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"
+    assert findings[0]["severity"] == "low"
+    assert "demoted a day-counter-bound finding" in capsys.readouterr().out
+
+
+def test_assess_prose_drops_a_self_refuted_finding(capsys):
+    """The predicate is wired: a finding whose note withdraws itself never gates."""
+    verdict = {
+        "findings": [
+            {"page": "/data/wall/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_2959_WALL},
+        ],
+        "severity": "high",
+        "summary": "x",
+    }
+    pages = [{"name": "Wall", "path": "/data/wall/", "prose": "ATTEMPT 14 FROM 2026-08-17 alive · day 6"}]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_2)
+    assert errors == []
+    assert findings == [], "a withdrawn claim must not reach the gate at any severity"
+    assert "dropped a self-refuted finding" in capsys.readouterr().out

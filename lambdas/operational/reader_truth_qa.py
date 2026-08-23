@@ -415,6 +415,80 @@ def is_vagueness_objection(finding):
     return bool(_VAGUENESS_OBJECTION_RE.search(finding.get("note") or ""))
 
 
+# ── the day counter is not a data bound (#2959, 2026-08-23) ───────────────────
+#
+# THE OBSERVED FAILURE, five instances in 24h across two blocked deploys: the
+# prompt hands the model the phase ground truth ("today is Day 6, Day 1 =
+# 2026-08-17") and the model turns the day counter into a BOUND on what data can
+# exist — "only 6 days of current-experiment data can exist", "a maximum of 5
+# days of in-cycle data is possible" — then flags anything wider as a
+# contradiction: a trailing 7-day HRV average (/, /cockpit/, run 32618360726),
+# the cross-phase build log (/story/build/, run 32616299944), the graded-forecast
+# count (/method/board/, #3015). The inference is wrong BY DESIGN of the data
+# model: ADR-077's taxonomy resets only experiment_scoped partitions at genesis —
+# raw timeseries, archives, and the build narrative are cross-phase, so trailing
+# windows and pre-cycle history legitimately coexist with a young day counter.
+# The strict payloads where pre-cycle rows genuinely ARE defects are exactly the
+# CODE_OWNED_TEMPORAL_SURFACES phase_plausibility sweeps deterministically.
+#
+# The tell is self-contained (no clock needed): the note states a day-count bound
+# AND names the same number as the current day ("Day 6" … "only 6 days") — i.e.
+# the bound's only source is the day counter the prompt itself injected. DEMOTED
+# to low rather than dropped: on the off-chance a page CLAIMS in-cycle scope
+# while showing out-of-cycle data, the finding stays visible as advisory and the
+# baseline machinery still records the pair.
+_DAY_BOUND_RE = re.compile(
+    r"\b(?:only|a maximum of|at most|max(?:imum)?(?: of)?)\s+(\d{1,3})\s+days?\b[^.?!]{0,100}?"
+    r"\b(?:data|entr(?:y|ies)|history|narrative|exist|possible)",
+    re.I,
+)
+_DAY_N_RE = re.compile(r"\bday\s+(\d{1,3})\b", re.I)
+
+
+def is_day_counter_bound_inference(finding):
+    """True when a temporal_contradiction's bound is the day counter itself (#2959).
+
+    Structural conditions, all required: temporal_contradiction; the note states a
+    "only/at most/maximum N days" bound on data/history; the note also cites the
+    experiment day ("Day M"); and N is M (±1 for the PT/UTC boundary). A bound
+    unrelated to the day counter (retention windows, product limits) or a note
+    that never mentions the day number survives untouched.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    note = finding.get("note") or ""
+    bound = _DAY_BOUND_RE.search(note)
+    if not bound:
+        return False
+    day_ns = {int(m) for m in _DAY_N_RE.findall(note)}
+    return any(abs(int(bound.group(1)) - m) <= 1 for m in day_ns)
+
+
+# ── a finding whose own note withdraws the claim (#2959, 2026-08-23) ──────────
+#
+# THE OBSERVED FAILURE (run 32618360726, twice in one sweep): the model narrates
+# its re-check and ends by withdrawing — "… making this Day 6 elapsed — the label
+# is accurate. No contradiction here on rechecking arithmetic." (/data/wall/),
+# "This is self-consistent and correct: … No contradiction." (/method/survival/)
+# — and still emits the finding at `high`, which FAILs a blocking gate. Gating on
+# a claim its own evidence retracts is gating on nothing. Only the LAST sentence
+# counts: a mid-note "this is internally consistent. But the header …" is a live
+# objection and survives (the /method/postmortems/ shape, same run).
+_WITHDRAWAL_RE = re.compile(
+    r"\b(?:no contradiction|not a contradiction|self-consistent and correct|label is accurate)\b",
+    re.I,
+)
+
+
+def is_self_refuted(finding):
+    """True when the note's own final sentence withdraws the contradiction (#2959)."""
+    note = (finding.get("note") or "").strip()
+    if not note:
+        return False
+    sentences = [s.strip() for s in re.split(r"[.?!]", note) if s.strip()]
+    return bool(sentences) and bool(_WITHDRAWAL_RE.search(sentences[-1]))
+
+
 # Batch 4-6 surfaces per call so the duplicated-narrative check sees pages
 # side-by-side (a single-page call structurally cannot catch duplication).
 DEFAULT_BATCH_SIZE = 5
@@ -663,9 +737,15 @@ frame being correct, not two surfaces disagreeing about the date;
 - the same header/nav/footer chrome appearing on every page;
 - API field names or JSON structure — judge only human-readable narrative values inside them;
 - a window/span/n SMALLER than the elapsed day count — e.g. "5 day(s)" or "n = 5" on Day 6, or a \
-field named for 30 days reading null. Trailing windows clamp to the cycle start, so an under-filled \
-window is the CORRECT behaviour and a null "30d" field is the system being honest, not broken. \
-Flag a window only when it is LONGER than the days elapsed.
+field named for 30 days reading null. In-cycle windows clamp to the cycle start, so an under-filled \
+window is the CORRECT behaviour and a null "30d" field is the system being honest, not broken;
+- a trailing window or average LONGER than the elapsed day count over a continuous signal — a \
+"7-day average" of HRV/RHR/sleep/weight on Day 6 is CORRECT: those baselines are computed over the \
+raw timeseries, which continues across cycle restarts by design (only experiment-scoped stats reset \
+at Day 1). The experiment day counter ("DAY N") counts the current cycle; it NEVER bounds how much \
+data, history, or narrative a page may show, and "only N days of data can exist" is not a valid \
+inference from it. Flag a too-long window ONLY when the page explicitly claims the window is \
+in-cycle ("this cycle's 7-day average") while the cycle is younger than the window.
 
 SURFACES ({k}):
 """
@@ -826,6 +906,29 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                         f"(the rubric names this copy exempt in every phase, #2741): {f['note'][:120]}"
                     )
                     continue
+                # #2959: the note's own last sentence withdraws the claim ("No
+                # contradiction here on rechecking arithmetic" — and it still came
+                # back `high`, run 32618360726). Gating on a claim its own evidence
+                # retracts is gating on nothing. Printed, never silently swallowed.
+                if is_self_refuted(f):
+                    print(
+                        f"  ↩ reader-truth: dropped a self-refuted finding on {f['page']} "
+                        f"(its own final sentence withdraws the contradiction, #2959): {f['note'][:120]}"
+                    )
+                    continue
+                # #2959: the model turned the prompt's own day counter into a bound on
+                # what data can exist ("only 6 days of current-experiment data") and
+                # flagged legitimately cross-phase content (ADR-077: raw timeseries,
+                # archives and the build narrative survive genesis) — five instances
+                # in 24h across two blocked deploys. DEMOTED to low, never gating;
+                # the strict payloads where pre-cycle rows ARE defects stay owned by
+                # phase_plausibility. Printed, never silently swallowed.
+                if f["severity"] != "low" and is_day_counter_bound_inference(f):
+                    print(
+                        f"  ↩ reader-truth: demoted a day-counter-bound finding on {f['page']} "
+                        f"{f['severity']}→low (the day counter is not a data bound, #2959): {f['note'][:120]}"
+                    )
+                    f = dict(f, severity="low")
                 # #3003: a "contradiction" whose own objection resolves to vagueness is
                 # an editorial complaint, not an impossibility — DEMOTED to low (kept
                 # visible as advisory, never gating). Printed, never silently swallowed.

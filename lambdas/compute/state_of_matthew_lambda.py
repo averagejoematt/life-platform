@@ -365,12 +365,23 @@ def build_narration_body(state: dict) -> dict:
             )
     data_blob = json.dumps(_narration_payload(state), indent=2, default=str)
     user = "This week's pre-computed platform state:\n\n" + data_blob + "\n\nWrite the connecting narrative."
-    # #1385: the full multi-cycle chronicle archive rides as a 1-hour cached content
-    # block for whole-life callbacks. Context only — every NUMBER the narration voices
-    # still comes from the pre-computed payload above (ADR-104); the archive's numbers
-    # join the grounding allow-list in narration_gate() so a real archival callback
-    # isn't false-flagged, but the narrator is not licensed to compute anything new.
-    system_value = whole_life_context.with_cached_archive(system, state.get("archive_text"))
+    # #1385: the full multi-cycle chronicle archive is context for whole-life
+    # callbacks. Context only — every NUMBER the narration voices still comes from
+    # the pre-computed payload above (ADR-104); the archive's numbers join the
+    # grounding allow-list in narration_gate() so a real archival callback isn't
+    # false-flagged, but the narrator is not licensed to compute anything new.
+    #
+    # #2883: cache=False (was the 1385 default 1h cache_control block). This
+    # narrator makes exactly ONE Bedrock call per run (narrate()'s own docstring:
+    # "the platform's ONE weekly call, not two") — a cache write here can never be
+    # read back within the same run, and the next run is 7 days later, long past
+    # even the 1h TTL. Measured live (LifePlatform/AI, trailing 30d, 2026-08-22):
+    # AnthropicCacheWriteTokens=24,159, AnthropicCacheReadTokens=0 for this caller
+    # — every dollar of the ~2x cache-write premium bought zero discount, every
+    # week, forever. Same waste class as ai_calls.py's D-01 fix for daily-brief
+    # (measured 0 reads / 10K writes there); chronicle_prompt.py keeps caching
+    # (it makes several calls per run that genuinely reuse one write).
+    system_value = whole_life_context.with_cached_archive(system, state.get("archive_text"), cache=False)
     return {
         "model": MODEL,
         "max_tokens": MAX_TOKENS,

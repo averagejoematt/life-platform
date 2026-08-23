@@ -4,8 +4,11 @@ chronicle + State of Matthew over the full multi-cycle archive via 1-hour cached
 reads, with the grounded-generation gate widened to match (rigor is the product).
 
 Covers:
-  AC2 — the archive is passed as a 1-hour cache_control block (NOT inline uncached),
-        on both the chronicle call path and State of Matthew.
+  AC2 — the archive is passed as a 1-hour cache_control block (NOT inline uncached)
+        on the chronicle call path. State of Matthew was the same until #2883:
+        it makes exactly one Bedrock call per run, so a cache write there could
+        never be read back — measured live, a 100%-wasted premium — and now rides
+        as plain (uncached) text via `with_cached_archive(..., cache=False)`.
   AC3 — a fabricated dated/numeric callback is still caught by the grounding gate,
         while a real archival callback passes ONLY because the archive feeds the
         allow-list (proving the widened window didn't widen the fabrication surface).
@@ -41,6 +44,43 @@ def test_archive_rides_as_1h_cache_control_block_not_inline():
 def test_no_archive_leaves_system_unchanged():
     assert wlc.with_cached_archive("sys", "") == "sys"
     assert wlc.with_cached_archive("sys", None) == "sys"
+
+
+# ── #2883: cache=False — a single-call-per-run caller must never pay the write
+# premium for a cache it can never read back ──────────────────────────────────
+
+
+def test_cache_false_returns_plain_string_no_cache_control():
+    system = "You are the narrator."
+    archive = "=== ARCHIVE ===\nWeek 1: he began."
+    result = wlc.with_cached_archive(system, archive, cache=False)
+    assert isinstance(result, str)  # not a block list — no cache_control anywhere
+    assert "cache_control" not in result
+    assert system in result
+    assert archive in result
+
+
+def test_cache_false_preserves_persona_text_when_system_is_a_block_list():
+    # A caller that already built a structured system (e.g. carrying its own
+    # cache_control from an earlier step) must still get the SAME persona text
+    # back, just flattened to plain text with no cache wrapper.
+    system_blocks = [{"type": "text", "text": "You are Elena.", "cache_control": {"type": "ephemeral"}}]
+    archive = "=== ARCHIVE ===\nreal history"
+    result = wlc.with_cached_archive(system_blocks, archive, cache=False)
+    assert result == "You are Elena.\n\n=== ARCHIVE ===\nreal history"
+
+
+def test_cache_false_no_archive_still_returns_system_unchanged():
+    assert wlc.with_cached_archive("sys", "", cache=False) == "sys"
+    assert wlc.with_cached_archive("sys", None, cache=False) == "sys"
+
+
+def test_cache_true_is_still_the_default_unaffected_by_the_new_param():
+    # #2883 must not change the default (cached) behavior for existing callers
+    # (chronicle_prompt.py) that genuinely reuse a write within one run.
+    system = "You are Elena."
+    archive = "=== ARCHIVE ===\nreal history"
+    assert wlc.with_cached_archive(system, archive) == wlc.with_cached_archive(system, archive, cache=True)
 
 
 def test_format_full_archive_multicycle_oldest_first_untruncated():
@@ -95,18 +135,27 @@ def test_chronicle_call_anthropic_no_archive_is_plain_string(monkeypatch):
     assert captured["system"] == "You are Elena."  # backward-compatible
 
 
-# ── AC2: State of Matthew carries the archive as a 1h cached block ────────────
+# ── AC2 (revised #2883): State of Matthew carries the archive as PLAIN TEXT,
+# not a 1h cached block — this narrator makes exactly one Bedrock call per run,
+# so a cache write here could never be read back (measured live: 24,159 write
+# tokens / 0 read tokens over 30d). Superseded by #2883's cache=False fix; the
+# chronicle path (multiple calls per run) keeps the original 1h cached-block
+# behavior — see test_chronicle_call_anthropic_sends_archive_as_cached_block.
 
 
-def test_state_of_matthew_narration_body_archive_cached_block():
+def test_state_of_matthew_narration_body_archive_is_plain_text_not_cached():
     som = importlib.import_module("state_of_matthew_lambda")
     archive = "=== ARCHIVE ===\nWeek 3 (2026-05-08): the plunge, 218.4 lbs."
     state = {"as_of": "2026-07-22", "phase": {"as_of": "2026-07-22"}, "archive_text": archive}
     body = som.build_narration_body(state)
     system = body["system"]
-    assert isinstance(system, list)
-    assert any(b.get("text") == archive and b["cache_control"].get("ttl") == "1h" for b in system)
-    # Archive is context in the cached block — NOT dumped inline into the user turn.
+    # #2883: no cache_control — a single-call-per-run narrator can never realize
+    # a cache read, so wrapping the archive in a (billed) cache block would be
+    # pure write-premium waste every week.
+    assert isinstance(system, str)
+    assert "cache_control" not in system
+    assert archive in system
+    # Archive is context in the system block — NOT dumped inline into the user turn.
     assert archive not in body["messages"][0]["content"]
 
 
