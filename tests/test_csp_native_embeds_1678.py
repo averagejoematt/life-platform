@@ -52,6 +52,7 @@ if _CDK not in sys.path:
     sys.path.insert(0, _CDK)
 
 from stacks.csp import (  # noqa: E402
+    AMJ_CONNECT_SRC,
     NATIVE_EMBED_CONTEXT_KEY,
     NATIVE_EMBED_FRAME_SRC,
     build_site_csp,
@@ -61,15 +62,16 @@ from stacks.csp import (  # noqa: E402
 _WEB_STACK = os.path.join(_CDK, "stacks", "web_stack.py")
 _CDK_JSON = os.path.join(_CDK, "cdk.json")
 
-# The connect-src values the two policies legitimately differ by.
-AMJ_CONNECT_SRC = "'self' https://averagejoematt.com"
+# The connect-src the subdomain policy legitimately differs by (the amj value
+# is now the source of truth in stacks.csp — #3048).
 SUBDOMAIN_CONNECT_SRC = "'self' https://averagejoematt.com https://*.averagejoematt.com"
 
-# Captured from `curl -sI https://averagejoematt.com/` on 2026-08-06 — the policy
-# actually serving readers today, before ADR-149.
+# #3048 (DIL-015): the main-domain policy HARDENED — script-src 'self' only.
+# This is the string the deployed distribution must serve after
+# `cdk deploy LifePlatformWeb`; deploy/smoke_test_site.sh asserts it live.
 LIVE_AMJ_CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: https:; "
     "connect-src 'self' https://averagejoematt.com; "
@@ -79,9 +81,15 @@ LIVE_AMJ_CSP = (
     "form-action 'self'"
 )
 
-# The subdomain policy as it stood in web_stack.py before the refactor
+# The COMPAT policy (pre-#3048 script-src) — /legacy/* and the subdomains only.
+COMPAT_LEGACY_CSP = LIVE_AMJ_CSP.replace(
+    "script-src 'self';",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;",
+)
+
+# The subdomain policy: compat script-src + the wider connect-src
 # (dash/blog/buddy are not on the public smoke path, so this one is source-frozen).
-PRE_ADR149_SUBDOMAIN_CSP = LIVE_AMJ_CSP.replace(
+PRE_ADR149_SUBDOMAIN_CSP = COMPAT_LEGACY_CSP.replace(
     "connect-src 'self' https://averagejoematt.com;",
     "connect-src 'self' https://averagejoematt.com https://*.averagejoematt.com;",
 )
@@ -121,18 +129,23 @@ def _directives(csp: str) -> dict:
 # ══════════════════════════════════════════════════════════════════════════
 
 
-def test_off_matches_the_live_main_domain_policy_byte_for_byte():
-    assert build_site_csp(connect_src=AMJ_CONNECT_SRC) == LIVE_AMJ_CSP
+def test_off_matches_the_hardened_main_domain_policy_byte_for_byte():
+    assert build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=True) == LIVE_AMJ_CSP
+
+
+def test_legacy_compat_policy_byte_for_byte():
+    assert build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=False) == COMPAT_LEGACY_CSP
 
 
 def test_off_matches_the_pre_adr149_subdomain_policy_byte_for_byte():
-    assert build_site_csp(connect_src=SUBDOMAIN_CONNECT_SRC) == PRE_ADR149_SUBDOMAIN_CSP
+    assert build_site_csp(connect_src=SUBDOMAIN_CONNECT_SRC, hardened_scripts=False) == PRE_ADR149_SUBDOMAIN_CSP
 
 
 def test_off_emits_no_frame_src_at_all():
     """No directive means media/frame fall back to `default-src 'self'`."""
     for connect_src in (AMJ_CONNECT_SRC, SUBDOMAIN_CONNECT_SRC):
-        assert "frame-src" not in _directives(build_site_csp(connect_src=connect_src))
+        for hardened in (True, False):
+            assert "frame-src" not in _directives(build_site_csp(connect_src=connect_src, hardened_scripts=hardened))
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -147,13 +160,13 @@ def test_allowlist_constant_is_exactly_the_owner_approved_set():
 
 
 def test_on_adds_frame_src_with_only_the_approved_origins():
-    csp = build_site_csp(connect_src=AMJ_CONNECT_SRC, native_social_embeds=True)
+    csp = build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=True, native_social_embeds=True)
     assert _directives(csp)["frame-src"] == list(OWNER_APPROVED_FRAME_SRC)
 
 
 def test_on_differs_from_off_by_the_frame_src_directive_only():
-    off = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC))
-    on = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC, native_social_embeds=True))
+    off = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=True))
+    on = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=True, native_social_embeds=True))
     assert set(on) - set(off) == {"frame-src"}
     for name, tokens in off.items():
         assert on[name] == tokens, f"{name} changed when native embeds were enabled"
@@ -172,13 +185,13 @@ def test_media_src_is_never_widened_to_a_third_party():
     """ADR-149 deliberately ships frame-src only — an iframe player's own media
     is governed by the iframe document's CSP, not ours."""
     for enabled in (False, True):
-        directives = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC, native_social_embeds=enabled))
+        directives = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=True, native_social_embeds=enabled))
         assert "media-src" not in directives
 
 
 def test_rejected_origins_appear_nowhere_in_either_mode():
     for enabled in (False, True):
-        csp = build_site_csp(connect_src=AMJ_CONNECT_SRC, native_social_embeds=enabled)
+        csp = build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=True, native_social_embeds=enabled)
         for origin in REJECTED_ORIGINS:
             assert origin not in csp, f"{origin} is not owner-approved (ADR-149) but appears in the CSP"
 
@@ -187,7 +200,7 @@ def test_frame_ancestors_stays_none_in_both_modes():
     """frame-src (who we may frame) must never be confused with frame-ancestors
     (who may frame us) — widening one must not touch the other."""
     for enabled in (False, True):
-        directives = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC, native_social_embeds=enabled))
+        directives = _directives(build_site_csp(connect_src=AMJ_CONNECT_SRC, hardened_scripts=True, native_social_embeds=enabled))
         assert directives["frame-ancestors"] == ["'none'"]
 
 
@@ -237,10 +250,14 @@ def test_web_stack_calls_the_builder_once_per_policy():
     and a comment is not a call site."""
     tree = ast.parse(open(_WEB_STACK, encoding="utf-8").read())
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "build_site_csp"]
-    assert len(calls) == 2, f"expected exactly 2 build_site_csp() call sites (amj + subdomain), found {len(calls)}"
+    assert len(calls) == 3, f"expected exactly 3 build_site_csp() call sites (amj + subdomain + legacy, #3048), found {len(calls)}"
     for call in calls:
         kwargs = {kw.arg for kw in call.keywords}
-        assert kwargs == {"connect_src", "native_social_embeds"}, f"call site passes {kwargs} — both args are required at every site"
+        assert kwargs == {
+            "connect_src",
+            "hardened_scripts",
+            "native_social_embeds",
+        }, f"call site passes {kwargs} — all three args are required at every site (#3048)"
 
 
 def test_web_stack_reads_the_flag_once_and_shares_it():
@@ -248,7 +265,7 @@ def test_web_stack_reads_the_flag_once_and_shares_it():
     different values by a later edit."""
     src = open(_WEB_STACK, encoding="utf-8").read()
     assert len(re.findall(r"native_embeds_enabled\(", src)) == 1
-    assert len(re.findall(r"native_social_embeds=native_embeds\b", src)) == 2
+    assert len(re.findall(r"native_social_embeds=native_embeds\b", src)) == 3  # amj + subdomain + legacy (#3048)
 
 
 # ══════════════════════════════════════════════════════════════════════════

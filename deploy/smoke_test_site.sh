@@ -17,6 +17,7 @@ BASE="https://averagejoematt.com"
 QUICK="${1:-}"
 PASS=0
 FAIL=0
+WARN=0  # #3048: non-fatal transitional states (e.g. CSP cdk deploy pending)
 
 # ── Cache-aware content reads (#1526) ─────────────────────────────────────────
 # Same-deploy content assertions must never race the CloudFront invalidation: on
@@ -454,7 +455,10 @@ if [[ "$QUICK" != "--quick" ]]; then
   check_body_contains "Story: chronicle linked"       "$STORY_FILE" 'chronicle'             "$BASE/story/"
   check_body_contains "Story: journal linked"         "$STORY_FILE" 'journal'               "$BASE/story/"
   # Evidence: registry + readout shell + the new live Pipeline-status topic
-  check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  '__EVIDENCE_REGISTRY__' "$BASE/data/"
+  # #3048: the registry ships as the non-executable #page-data JSON island
+  # (the old inline window.__EVIDENCE_REGISTRY__ global is gone with the CSP
+  # hardening) — assert the island marker, not the retired global.
+  check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  'id="page-data"' "$BASE/data/"
   check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'          "$BASE/data/"
   check_body_contains "Method: Pipeline-status topic" "$PIPE_FILE" 'Pipeline status'        "$BASE/method/pipeline/"
   check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness' "$BASE/method/pipeline/"
@@ -561,6 +565,52 @@ if [[ "$QUICK" != "--quick" ]]; then
   check_header "HTML page: short TTL (max-age=300)"  "$BASE/story/"               "cache-control:.*max-age=300"
   check_header "CSS: long TTL"                        "$BASE/assets/css/tokens.css" "cache-control:.*max-age="
   check_header "CloudFront serving"                  "$BASE/"                      "x-cache"
+  echo ""
+
+  # ── Security headers: the deployed CSP (#3048, DIL-015) ─────────────────────
+  # The live distribution's Content-Security-Policy must MATCH the one the CDK
+  # source would deploy (scripts/expected_csp.py derives it from
+  # cdk/stacks/csp.py + cdk/cdk.json — "fixture must be the wire"). Failure
+  # modes are distinguished explicitly — no vacuous green:
+  #   * fetch failed / header absent            → FAIL (cannot verify ≠ verified)
+  #   * header == expected (hardened)           → PASS
+  #   * header == the exact pre-#3048 policy    → WARN "PENDING cdk deploy" only.
+  #     This is the one sanctioned transitional state: site content merges
+  #     auto-deploy IMMEDIATELY on merge, while the tightened header ships via
+  #     the driver's `cdk deploy LifePlatformWeb` minutes later in the same
+  #     sitting (Plan-gate mandated). Hard-failing here would auto-roll-back a
+  #     correct site deploy during that gap. A csp.py revert cannot hide in this
+  #     branch: tests/test_csp_hardening_3048.py pins the source string.
+  #   * anything else                           → FAIL (policy drift)
+  echo "── Security headers (CSP #3048) ──────────────────────────"
+  _EXPECTED_CSP="$(python3 "$(dirname "$0")/../scripts/expected_csp.py" 2>/dev/null || true)"
+  _PRE_3048_CSP="$(python3 "$(dirname "$0")/../scripts/expected_csp.py" --legacy 2>/dev/null || true)"
+  _LIVE_CSP="$(smoke_curl -s -I --max-time 10 "$BASE/" | tr -d '\r' | grep -i '^content-security-policy:' | sed 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy:[[:space:]]*//' || true)"
+  if [ -z "$_EXPECTED_CSP" ]; then
+    echo "  ❌ CSP: scripts/expected_csp.py produced nothing — cannot derive the expected policy"; FAIL=$((FAIL + 1))
+  elif [ -z "$_LIVE_CSP" ]; then
+    echo "  ❌ CSP: no content-security-policy header on $BASE/ (fetch failed or header missing)"; FAIL=$((FAIL + 1))
+  elif [ "$_LIVE_CSP" = "$_EXPECTED_CSP" ]; then
+    echo "  ✅ CSP: live header matches the source-derived hardened policy (no 'unsafe-inline' scripts, no jsdelivr)"; PASS=$((PASS + 1))
+  elif [ "$_LIVE_CSP" = "$_PRE_3048_CSP" ]; then
+    echo "  ⚠️  CSP: live header is still the pre-#3048 policy — cdk deploy LifePlatformWeb is PENDING (same-sitting per the Plan gate)"
+    WARN=$((WARN + 1))
+  else
+    echo "  ❌ CSP: live header drifted from source"
+    echo "     live:     $_LIVE_CSP"
+    echo "     expected: $_EXPECTED_CSP"
+    FAIL=$((FAIL + 1))
+  fi
+  # /legacy/* keeps the compat policy (its frozen pages need inline scripts).
+  _LEGACY_LIVE_CSP="$(smoke_curl -s -I --max-time 10 "$BASE/legacy/" | tr -d '\r' | grep -i '^content-security-policy:' | sed 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy:[[:space:]]*//' || true)"
+  if [ -z "$_LEGACY_LIVE_CSP" ]; then
+    echo "  ❌ CSP: no content-security-policy header on $BASE/legacy/"; FAIL=$((FAIL + 1))
+  elif [ "$_LEGACY_LIVE_CSP" = "$_PRE_3048_CSP" ]; then
+    echo "  ✅ CSP: /legacy/ serves the compat policy (frozen old site keeps working)"; PASS=$((PASS + 1))
+  else
+    echo "  ⚠️  CSP: /legacy/ header is not the compat policy yet (pre-deploy it matches the main policy) — verify after cdk deploy LifePlatformWeb"
+    WARN=$((WARN + 1))
+  fi
   echo ""
 
   # ── API data quality ─────────────────────────────────────────────────────────

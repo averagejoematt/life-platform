@@ -763,18 +763,12 @@ FONTS = (
     '<link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>'
     '<link rel="stylesheet" href="/assets/css/fonts.css">'
 )
-THEME = (
-    '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
-    'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
-)
+# #3048: extracted to a real asset so the site CSP can drop 'unsafe-inline' for
+# scripts — synchronous head script, so theme still applies before first paint.
+THEME = '<script src="/assets/js/boot_theme.js"></script>'
 # Motion layer (v5): fail-open head guard + the deferred motion.js. Reveal-on-scroll,
 # chart draw-in, hover lifts — reduced-motion aware; content shows if motion.js never runs.
-MOTION_HEAD = (
-    '<script>(function(){try{if(!("IntersectionObserver" in window))return;'
-    'if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;'
-    'document.documentElement.classList.add("mo");'
-    'window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>'
-)
+MOTION_HEAD = '<script src="/assets/js/boot_motion.js"></script>'
 MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
 # The doors nav itself is the shared chrome partial (#1009): v4_chrome.doors_nav. This
 # generator only supplies the <header> wrapper + brand and the active door path. Archive
@@ -936,7 +930,7 @@ OG_CARD_BY_SLUG = {
 JUDGE_CAL_ARTIFACT = Path(__file__).resolve().parent.parent / "site" / "data" / "judge_calibration.json"
 
 
-def judge_calibration_block() -> str:
+def judge_calibration_block() -> dict | None:
     """#1374 AC2 — the quality-gate judge's own sensitivity/specificity, inlined.
 
     Read from the artifact `tests/judge_calibration.py --publish` writes, so the
@@ -947,14 +941,14 @@ def judge_calibration_block() -> str:
 
     A COMPACT projection — the full record (per-error scores, the margin analysis,
     the separability finding) stays at /data/judge_calibration.json, which the panel
-    links to. Absent artifact ⇒ empty string ⇒ the panel renders its honest
+    links to. Absent artifact ⇒ None ⇒ the panel renders its honest
     "not measured" state, never a stale hardcoded number.
     """
     try:
         art = json.loads(JUDGE_CAL_ARTIFACT.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return ""
-    compact = {
+        return None
+    return {
         "measured_at": art.get("measured_at"),
         "instrument": art.get("instrument"),
         "corpus_n": (art.get("corpus") or {}).get("n_total"),
@@ -963,12 +957,24 @@ def judge_calibration_block() -> str:
         "margin_verdict": (art.get("margin") or {}).get("verdict"),
         "margin_reason": ((art.get("margin") or {}).get("reasons") or [""])[0],
     }
-    return f"\nwindow.__JUDGE_CALIBRATION__ = {json.dumps(compact)};"
 
 
 def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof: str = "", og: dict | None = None) -> str:
-    reg = json.dumps(registry_json(pillar["groups"]))
-    judge_cal = judge_calibration_block() if any(s.get("slug") == "calibration" for s in registry_json(pillar["groups"])) else ""
+    # #3048: build-time page data ships as ONE non-executable JSON island
+    # (type="application/json" needs no script-src allowance) read by
+    # assets/js/page_data.js — the hardened CSP has no 'unsafe-inline'.
+    # "</" is escaped inside the payload so no JSON string can close the tag.
+    judge_cal = judge_calibration_block() if any(s.get("slug") == "calibration" for s in registry_json(pillar["groups"])) else None
+    page_data = {
+        "registry": registry_json(pillar["groups"]),
+        "start": start_slug,
+        "base": pillar["base"],
+        "door": pillar["door"],
+        "title": pillar["title"],
+    }
+    if judge_cal is not None:
+        page_data["judge_calibration"] = judge_cal
+    page_data_json = json.dumps(page_data).replace("</", "<\\/")
     og_image = f"https://averagejoematt.com/assets/images/{OG_CARD_BY_SLUG.get(start_slug, 'og-home.png')}"
     # #1395: the door HUBS carry a data-driven OG override (a dated, falsifiable number
     # in the title/description) + a <noscript> static core; the topic shells keep the
@@ -1031,8 +1037,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
     </div>
   </main>
   {footer_for(pillar["nav_key"])}
-  <script>window.__EVIDENCE_REGISTRY__ = {reg}; window.__START_SLUG__ = {json.dumps(start_slug)};
-window.__ARCHIVE_BASE__ = {json.dumps(pillar["base"])}; window.__ARCHIVE_DOOR__ = {json.dumps(pillar["door"])}; window.__ARCHIVE_TITLE__ = {json.dumps(pillar["title"])};{judge_cal}</script>
+  <script type="application/json" id="page-data">{page_data_json}</script>
   {MOTION_SCRIPT}
   <script type="module" src="/assets/js/evidence.js"></script>
 </body>

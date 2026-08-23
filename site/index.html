@@ -20,7 +20,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Measured Life">
-  <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>
+  <script src="/assets/js/boot_sw.js"></script>
 
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://averagejoematt.com/">
@@ -38,15 +38,8 @@
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
 
-  <script>
-    (function () {
-      try {
-        var t = localStorage.getItem("ajm-theme");
-        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
-      } catch (e) {}
-    })();
-  </script>
-  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
+  <script src="/assets/js/boot_theme.js"></script>
+  <script src="/assets/js/boot_motion.js"></script>
 </head>
 <body>
   <a class="skip" href="#arc">Skip to the story</a>

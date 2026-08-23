@@ -49,7 +49,8 @@ from stacks.constants import (
     S3_BUCKET as _CONSTANTS_BUCKET,  # CONF-01
     TABLE_NAME,  # #936: DR cutover — no hardcoded table names
 )
-from stacks.csp import (  # ADR-149 (#1678) — the CSP is built in one place, for both policies
+from stacks.csp import (  # ADR-149 (#1678) — the CSP is built in one place, for all policies
+    AMJ_CONNECT_SRC,
     NATIVE_EMBED_CONTEXT_KEY,
     build_site_csp,
     native_embeds_enabled,
@@ -128,6 +129,10 @@ class WebStack(Stack):
                         # ADR-149: built, not hand-written — see build_site_csp().
                         content_security_policy=build_site_csp(
                             connect_src="'self' https://averagejoematt.com https://*.averagejoematt.com",
+                            # #3048: the subdomain dashboards still carry inline
+                            # scripts — they keep the compat profile and are out
+                            # of DIL-015's scope (main domain only).
+                            hardened_scripts=False,
                             native_social_embeds=native_embeds,
                         ),
                         override=True,
@@ -429,12 +434,56 @@ class WebStack(Stack):
                 name="life-platform-amj-security-headers",
                 security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
                     content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
-                        # SEC-05 risk note: low (no XSS vectors today) — revisit if
-                        # user-generated content is ever added. ADR-149: the policy is
+                        # #3048 (DIL-015): HARDENED — script-src 'self' only, no
+                        # 'unsafe-inline', no jsdelivr. ADR-149: the policy is
                         # assembled by build_site_csp() so this block and the subdomain
-                        # block above cannot drift apart.
+                        # block above cannot drift apart. connect_src lives in csp.py
+                        # (AMJ_CONNECT_SRC) so scripts/expected_csp.py can rebuild the
+                        # expected live header without aws-cdk-lib.
                         content_security_policy=build_site_csp(
-                            connect_src="'self' https://averagejoematt.com",
+                            connect_src=AMJ_CONNECT_SRC,
+                            hardened_scripts=True,
+                            native_social_embeds=native_embeds,
+                        ),
+                        override=True,
+                    ),
+                    frame_options=cloudfront.CfnResponseHeadersPolicy.FrameOptionsProperty(
+                        frame_option="DENY",
+                        override=True,
+                    ),
+                    content_type_options=cloudfront.CfnResponseHeadersPolicy.ContentTypeOptionsProperty(
+                        override=True,
+                    ),
+                    referrer_policy=cloudfront.CfnResponseHeadersPolicy.ReferrerPolicyProperty(
+                        referrer_policy="strict-origin-when-cross-origin",
+                        override=True,
+                    ),
+                    strict_transport_security=cloudfront.CfnResponseHeadersPolicy.StrictTransportSecurityProperty(
+                        access_control_max_age_sec=31536000,
+                        include_subdomains=True,
+                        override=True,
+                    ),
+                ),
+            ),
+        )
+
+        # #3048 (DIL-015): /legacy/* keeps the pre-hardening CSP. The old site is
+        # preserved VERBATIM under /legacy (ADR-071 — private rollback surface,
+        # never linked from the UI) and its pages are full of inline scripts that
+        # will never be retrofitted. Rather than hash every historical block, the
+        # /legacy/* cache behavior below attaches this compat policy; every other
+        # main-domain HTML path stays on the hardened amj policy above. Same
+        # non-CSP security headers as the main policy.
+        legacy_security_headers = cloudfront.CfnResponseHeadersPolicy(
+            self,
+            "LegacySecurityHeadersPolicy",
+            response_headers_policy_config=cloudfront.CfnResponseHeadersPolicy.ResponseHeadersPolicyConfigProperty(
+                name="life-platform-legacy-security-headers",
+                security_headers_config=cloudfront.CfnResponseHeadersPolicy.SecurityHeadersConfigProperty(
+                    content_security_policy=cloudfront.CfnResponseHeadersPolicy.ContentSecurityPolicyProperty(
+                        content_security_policy=build_site_csp(
+                            connect_src=AMJ_CONNECT_SRC,
+                            hardened_scripts=False,  # compat: the frozen old site only
                             native_social_embeds=native_embeds,
                         ),
                         override=True,
@@ -650,6 +699,43 @@ class WebStack(Stack):
                 ),
                 # Cache behaviors — ORDER MATTERS: most-specific first.
                 cache_behaviors=[
+                    # #3048: /legacy/* — same S3 origin + caching as the default
+                    # behavior, but the COMPAT security-headers policy (the frozen
+                    # old site keeps 'unsafe-inline'; the hardened CSP would blank
+                    # every legacy page). No v4-redirects function: /legacy paths
+                    # are redirect DESTINATIONS, nothing 301s away from them
+                    # (contrast #2859's /archive/* which needs the function).
+                    # PRIVACY_MODE parity mirrors the default behavior so the
+                    # cf-auth gate cannot be bypassed via /legacy/ if it is on.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/legacy/*",
+                        target_origin_id="S3SiteOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
+                            query_string=False,
+                            cookies=cloudfront.CfnDistribution.CookiesProperty(
+                                forward="whitelist" if PRIVACY_MODE else "none",
+                                whitelisted_names=["__lp_auth"] if PRIVACY_MODE else None,
+                            ),
+                        ),
+                        default_ttl=0 if PRIVACY_MODE else 3600,
+                        max_ttl=0 if PRIVACY_MODE else 86400,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                        response_headers_policy_id=legacy_security_headers.ref,
+                        lambda_function_associations=(
+                            [
+                                cloudfront.CfnDistribution.LambdaFunctionAssociationProperty(
+                                    event_type="viewer-request",
+                                    lambda_function_arn=CF_AUTH_VERSION_ARN,
+                                    include_body=True,
+                                ),
+                            ]
+                            if PRIVACY_MODE
+                            else None
+                        ),
+                    ),
                     # /api/subscribe* — email-subscriber Lambda.
                     # POST body must be forwarded; responses must NOT be cached.
                     # Query strings forwarded for ?action=confirm&token=... flow.

@@ -82,14 +82,18 @@ def run_axe(page):
     """Inject the vendored axe bundle (once per page) and return its violations.
 
     Returns a list of {id, impact, help, helpUrl, nodes, targets} dicts.
-    Injection is add_script_tag(content=…) — the live site's CSP carries
-    script-src 'unsafe-inline' so this works today; if the CSP ever tightens,
-    the raised exception surfaces as an explicit "audit did not run" warning
-    in visual_qa (never a silent pass). Raises on injection/run failure.
+    Injection is page.evaluate(<bundle source>) — CDP Runtime.evaluate, which
+    the page's CSP does not govern. It must NOT be add_script_tag(content=…):
+    that creates a real inline <script> element, which the hardened site CSP
+    (script-src 'self', no 'unsafe-inline' — #3048/DIL-015) blocks, and the
+    audit would raise "audit did not run" on every page. Same approach as
+    @axe-core/playwright. Raises on injection/run failure (never a silent pass).
     """
     if not page.evaluate("() => typeof window.axe !== 'undefined'"):
         with open(AXE_JS_PATH, encoding="utf-8") as f:
-            page.add_script_tag(content=f.read())
+            page.evaluate(f.read())
+        if not page.evaluate("() => typeof window.axe !== 'undefined'"):
+            raise RuntimeError("axe bundle evaluated but window.axe is undefined — audit did not run")
     return page.evaluate(_RUN_AXE_JS)
 
 

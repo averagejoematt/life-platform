@@ -178,16 +178,10 @@ FONTS = (
     '<link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>'
     '<link rel="stylesheet" href="/assets/css/fonts.css">'
 )
-THEME = (
-    '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
-    'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
-)
-MOTION_HEAD = (
-    '<script>(function(){try{if(!("IntersectionObserver" in window))return;'
-    'if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;'
-    'document.documentElement.classList.add("mo");'
-    'window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>'
-)
+# #3048: extracted to a real asset so the site CSP can drop 'unsafe-inline' for
+# scripts — synchronous head script, so theme still applies before first paint.
+THEME = '<script src="/assets/js/boot_theme.js"></script>'
+MOTION_HEAD = '<script src="/assets/js/boot_motion.js"></script>'
 MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
 
 

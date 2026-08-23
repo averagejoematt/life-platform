@@ -4,6 +4,7 @@
   calibration/prediction/benchmark readouts. Split out of evidence.js (#581) — no behavior
   change.
 */
+import { pageData } from "/assets/js/page_data.js";
 import { lineChart, dualWeight, nDots } from "/assets/js/charts.js";
 import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note, warmup } from "/assets/js/evidence_shared.js";
@@ -418,7 +419,7 @@ export function renderCalibration(d) {
 // (2) never drop `must_ship_with` — those caveats are the difference between a
 // measurement and a boast.
 function _judgeBlock() {
-  const j = (typeof window !== "undefined" && window.__JUDGE_CALIBRATION__) || null;
+  const j = pageData().judge_calibration || (typeof window !== "undefined" && window.__JUDGE_CALIBRATION__) || null;
   const figures = (j && j.figures) || {};
   const keys = Object.keys(figures);
   if (!keys.length)

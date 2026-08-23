@@ -97,7 +97,7 @@ SHELL = """<!DOCTYPE html>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <!-- PWA island (#1020): /coaching/ is INSIDE the cockpit-PWA island (home + /cockpit/ + /coaching/) —
        the daily check-in loop — so these shells deliberately register sw.js. -->
-  <script>if("serviceWorker" in navigator){{window.addEventListener("load",function(){{navigator.serviceWorker.register("/sw.js").catch(function(){{}});}});}}</script>
+  <script src="/assets/js/boot_sw.js"></script>
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
     <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/v4/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2" as="font" type="font/woff2" crossorigin>
@@ -105,8 +105,8 @@ SHELL = """<!DOCTYPE html>
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
-  <script>(function(){{try{{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}}catch(e){{}}}})();</script>
-  <script>(function(){{try{{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){{document.documentElement.classList.remove("mo");}},2600);}}catch(e){{}}}})();</script>
+  <script src="/assets/js/boot_theme.js"></script>
+  <script src="/assets/js/boot_motion.js"></script>
 </head>
 <body class="dx-page">
   <a class="skip" href="#dx">Skip to the coaching</a>
@@ -152,7 +152,7 @@ SHELL = """<!DOCTYPE html>
     </nav>
     <p class="sf-base label"><span>averagejoematt · the coaching</span><a href="/">← home</a></p>
   </footer>
-  <script>window.__COACHING_START__ = "{start}";</script>
+  <script type="application/json" id="page-data">{{"start": "{start}"}}</script>
   <script src="/assets/js/motion.js" defer></script>
   <script type="module" src="/assets/js/coaching.js"></script>
 </body>

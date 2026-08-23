@@ -125,7 +125,7 @@ PAGE = """<!DOCTYPE html>
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
-  <script>(function(){{try{{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}}catch(e){{}}}})();</script>
+  <script src="/assets/js/boot_theme.js"></script>
 {style}
 </head>
 <body class="dx-page">
@@ -163,24 +163,7 @@ PAGE = """<!DOCTYPE html>
 </div>
 </main>
 {loop_forward}{site_footer}
-<script>
-  (function(){{
-    var b=document.querySelector('.theme-toggle');
-    if(b){{b.addEventListener('click',function(){{
-      var r=document.documentElement;
-      var cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
-      var next=cur==='light'?'dark':'light';
-      r.dataset.theme=next;
-      try{{localStorage.setItem('ajm-theme',next);}}catch(e){{}}
-    }});}}
-    var rp=document.getElementById('rp');
-    window.addEventListener('scroll',function(){{
-      if(!rp)return;
-      var pct=window.scrollY/(document.body.scrollHeight-window.innerHeight)*100;
-      rp.style.width=Math.min(pct,100)+'%';
-    }});
-  }})();
-</script>
+<script src="/assets/js/essay_reader.js"></script>
 </body>
 </html>
 """
