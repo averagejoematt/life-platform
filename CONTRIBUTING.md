@@ -21,7 +21,7 @@ The hooks it installs:
 1. **Branch** off up-to-date `main` (it's branch-protected: PRs required, no direct pushes, no force-push/deletions, delete-on-merge enabled).
 2. **Make the change.** One logical change per PR. Owners are routed per area in [`.github/CODEOWNERS`](.github/CODEOWNERS) and requested as reviewers automatically.
 3. **Run the local checks** (below) — same gates as CI, so failures surface before the push.
-4. **Commit** with a Conventional-Commits subject (the commit-msg hook enforces it). AI-authored changes carry a `Co-Authored-By` trailer.
+4. **Commit** with a Conventional-Commits subject (the commit-msg hook enforces it). **No tool-attribution trailers** — commits carry the work, not the tooling (owner decision 2026-08-12; see CLAUDE.md "Authorship").
 5. **Open the PR.** The body is prefilled from [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md); include `Fixes #<issue>` and the post-merge deploy/ops steps.
 6. **Merge ≠ deploy.** Lambda/infra code deploys from `main` via the playbook after merge; `site/**` auto-deploys on merge. See the PR template's deploy-notes section and [`.claude/commands/deploy.md`](.claude/commands/deploy.md).
 

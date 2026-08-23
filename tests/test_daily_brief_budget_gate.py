@@ -153,6 +153,10 @@ def test_pipeline_takes_data_only_path_when_budget_denies(monkeypatch):
         # #2221: the AI-failure stub marker — False on the budget-denied path, which
         # never called the journal coach at all.
         "journal_coach_is_stub": False,
+        # #2944: the denied path is a designed pause — declared, so the AI-3
+        # validator can skip fabricating BLOCK+fallback text for empty outputs.
+        "journal_coach_absent": False,
+        "ai_paused": True,
         "tldr_guidance": {},
         "sleep_coach_v2_text": "",
         "nutrition_coach_v2_text": "",
@@ -197,6 +201,62 @@ def test_pipeline_journal_coach_only_called_with_journal_entries(monkeypatch):
     kwargs["data"] = {"date": "2026-07-06"}  # no journal_entries key
     m._run_ai_coach_pipeline(**kwargs)
     m.ai_calls.call_journal_coach.assert_not_called()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #2944 — absence semantics: empty journal INPUT is declared, not narrated
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_pipeline_declares_journal_absent_when_no_entries(monkeypatch):
+    """#2944 planted empty-input case: no journal entries → the pipeline must
+    mark the absence explicitly (journal_coach_absent=True) so downstream
+    validation/rendering treat it as a declared absence (ADR-104), never as a
+    blocked AI failure. Live shape: 2026-08-20 → 08-22, zero journal rows since
+    the cycle-14 reset, JOURNAL_COACH 'BLOCKED empty output' three days running."""
+    import daily_brief_lambda as m
+
+    _mock_ai_calls(monkeypatch, m)
+    monkeypatch.setattr(m, "_daily_brief_ai_allowed", lambda: True)
+
+    kwargs = dict(_PIPELINE_KWARGS)
+    kwargs["data"] = {"date": "2026-08-21"}  # no journal_entries key
+    result = m._run_ai_coach_pipeline(**kwargs)
+
+    assert result["journal_coach_absent"] is True
+    assert result["journal_coach_text"] == ""
+    assert result["ai_paused"] is False
+
+
+def test_pipeline_journal_not_absent_when_entries_exist(monkeypatch):
+    """#2944 mutation guard: with journal input present the absent flag must
+    stay False — an empty model return with input present remains a blockable
+    failure (the validator's BLOCK path is preserved for it)."""
+    import daily_brief_lambda as m
+
+    _mock_ai_calls(monkeypatch, m)
+    monkeypatch.setattr(m, "_daily_brief_ai_allowed", lambda: True)
+
+    result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
+
+    assert result["journal_coach_absent"] is False
+    m.ai_calls.call_journal_coach.assert_called_once()
+
+
+def test_brief_wires_absence_flags_into_validator_and_renderer():
+    """#2944 wiring guard (the #2703 lesson — a param nobody passes fixes
+    nothing): the handler source must (a) hand journal_coach_absent_reason to
+    validate_daily_brief_outputs off the pipeline's absent flag, (b) skip the
+    AI-3 validation block when the pipeline was tier-paused, and (c) pass the
+    absent flag through to build_html for the labelled section."""
+    import inspect
+
+    import daily_brief_lambda as m
+
+    src = inspect.getsource(m)
+    assert "journal_coach_absent_reason=" in src
+    assert "_ai_paused" in src
+    assert "journal_coach_absent=_journal_coach_absent" in src
 
 
 @pytest.mark.parametrize("tier", [0, 1, 2])

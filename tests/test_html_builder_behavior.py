@@ -363,6 +363,53 @@ def test_hrv_trend_rounds_the_percent_before_banding():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# §3b — Journal Coach absence labelling (#2944 / ADR-104)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _journal_coaches_html(journal_coach_text, journal_coach_absent):
+    return hb._brief_journal_coaches(
+        "",  # bod_insight
+        {},  # data
+        None,  # explorer_coach_v2_text
+        None,  # glucose_coach_v2_text
+        journal_coach_text,
+        None,  # labs_coach_v2_text
+        None,  # mind_coach_v2_text
+        None,  # nutrition_coach_v2_text
+        None,  # physical_coach_v2_text
+        {},  # profile
+        None,  # sleep_coach_v2_text
+        None,  # training_coach_v2_text
+        None,  # weekly_habit_review
+        journal_coach_absent=journal_coach_absent,
+    )
+
+
+def test_journal_coach_declared_absent_renders_explicit_label():
+    """#2944: with no journal input the section says so plainly — neither a
+    silently-missing block nor fabricated fallback coaching text."""
+    out = _journal_coaches_html("", True)
+    assert "JOURNAL COACH" in out
+    assert "No journal entries yesterday" in out
+
+
+def test_journal_coach_empty_without_absence_renders_no_section_body():
+    """Mutation guard: absent=False + empty text is the pre-#2944 behavior —
+    no label, no fabricated content (an upstream failure shows nothing here)."""
+    out = _journal_coaches_html("", False)
+    assert "No journal entries yesterday" not in out
+    assert "JOURNAL COACH" not in out
+
+
+def test_journal_coach_real_text_wins_over_absence_flag():
+    """Belt-and-braces: if text exists it renders, whatever the flag says."""
+    out = _journal_coaches_html("A real reflection. || One real tactic.", True)
+    assert "A real reflection." in out
+    assert "No journal entries yesterday" not in out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # §4 — _section_error_html
 # ══════════════════════════════════════════════════════════════════════════════
 
