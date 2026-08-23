@@ -42,7 +42,15 @@ import re
 # green-main "Unit Tests" runs in the post-#2132 era: 704/945/745/745/922/764/
 # 985/833s (avg ~830s, max 985s). See ci-test.yml's comment for the full
 # derivation.
-BUDGET_SECONDS = 1200
+# #3025 (2026-08-23): raised 1200 -> 1500 with CI's own --durations measurement as
+# the rationale (green run 32613992699): 20,509 tests in 1394s, of which 180.85s was
+# ONE pathological test (unmocked _trigger_cover network attempt — fixed in the same
+# PR) and ~166s the platform-model drift family. Post-fix projection ~1215s; 1500s is
+# ~23% headroom, against a budget that had been breached 5 times in 3 weeks at 1200s —
+# a warning firing on every green run is background noise, not an instrument. The NEW
+# per-test warner (conftest.py PER_TEST_WARN_SECONDS, #3025) now owns the
+# single-test-regression half; this aggregate budget owns honest broad growth.
+BUDGET_SECONDS = 1500
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)

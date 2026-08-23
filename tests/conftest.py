@@ -227,6 +227,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_wallclock_fixture_bombs_2376.py",  # #2376: dated fixture + unfrozen handler clock (the #2354 midnight red)
         "test_raw_key_registry_guard.py",  # #2286: no hand-built raw/ S3 keys
         "test_site_api_namespace_guard_3002.py",  # #3002: one site-API metric namespace, no casing twins — repo-shape sweep, pre-merge
+        "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
         # #2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔
@@ -437,3 +438,37 @@ def pytest_collection_modifyitems(config, items):
         name = os.path.basename(str(getattr(item, "fspath", "")))
         if name.endswith(_PREMERGE_FILENAME_SUFFIX) or name in _PREMERGE_EXTRA_FILES or item.get_closest_marker("deploy_critical"):
             item.add_marker(pytest.mark.premerge)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PER-TEST DURATION WARNER  (#3025, folding #2692)
+# ══════════════════════════════════════════════════════════════════════════════
+# The total wall-clock budget (tests/test_duration_budget_ratchet.py) cannot
+# distinguish "the suite grew a little" from "one test regressed badly" — the
+# 180.85s test_add_book_dry_run_then_commit hid inside a 1394s total for weeks.
+# This emits a `::warning` per test whose CALL phase crosses the bar, in every
+# lane, so the wrap's standing-warning triage gate (#1966, e11) sees the next
+# single-test regression the day it lands. A warning, not a failure: a slow but
+# correct test must never red main; the ratchet owns the aggregate.
+PER_TEST_WARN_SECONDS = 90.0
+_SLOW_TESTS: list = []
+
+
+def slow_test_warning_lines(slow, bar=PER_TEST_WARN_SECONDS):
+    """Pure half, unit-tested in tests/test_full_suite_premerge_3025.py."""
+    return [
+        f"::warning title=Per-test duration (#3025)::{nodeid} took {dur:.1f}s "
+        f"(bar {bar:.0f}s) — one test hiding inside the total budget; fix or justify it"
+        for nodeid, dur in slow
+        if dur >= bar
+    ]
+
+
+def pytest_runtest_logreport(report):
+    if report.when == "call" and report.duration >= PER_TEST_WARN_SECONDS:
+        _SLOW_TESTS.append((report.nodeid, report.duration))
+
+
+def pytest_sessionfinish(session, exitstatus):
+    for line in slow_test_warning_lines(_SLOW_TESTS):
+        print(f"\n{line}")
