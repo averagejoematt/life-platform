@@ -4,10 +4,19 @@ content block (#1385, epic #1080).
 
 The chronicle (Elena Voss) and "State of Matthew" reason over the whole installment
 archive that is IN SCOPE for the run, not a trimmed 4-week window. The archive is
-large and byte-stable within a run, so it rides as an Anthropic ``cache_control``
-block with a **1-hour TTL** (reads at ~0.1x, writes at ~2x) instead of inline
-uncached user text — the weekly run's several calls (first draft, the ADR-104
-regen-once, Margaret's edit pass) all reuse the one cache write.
+large and byte-stable within a run, so on the chronicle path it rides as an
+Anthropic ``cache_control`` block with a **1-hour TTL** (reads at ~0.1x, writes at
+~2x) instead of inline uncached user text — the weekly run's several calls (first
+draft, the ADR-104 regen-once, Margaret's edit pass) all reuse the one cache write.
+
+State of Matthew does NOT cache its archive block (#2883): it makes exactly ONE
+Bedrock call per run, so a write there can never be read back within the run, and
+the next run is 7 days later — long past even the 1h TTL. Measured live
+(``LifePlatform/AI``, trailing 30d, 2026-08-22): 24,159 cache-write tokens, 0
+cache-read tokens for that caller — the ~2x write premium bought zero discount,
+every week. Pass ``with_cached_archive(..., cache=False)`` for any caller in the
+same shape (one call per run); the default stays cached for callers that reuse
+the write.
 
 SCOPE, STATED HONESTLY (#1829). Both callers pass ADR-058's ``with_phase_filter``,
 so the query returns the PHASE-VISIBLE installments: the current experiment cycle
@@ -54,7 +63,7 @@ def cached_block(text: str, *, ttl: str = ARCHIVE_TTL) -> dict:
     return {"type": "text", "text": text, "cache_control": {"type": "ephemeral", "ttl": ttl}}
 
 
-def with_cached_archive(system, archive_text, *, ttl: str = ARCHIVE_TTL):
+def with_cached_archive(system, archive_text, *, ttl: str = ARCHIVE_TTL, cache: bool = True):
     """Return a `system` value that carries the persona prompt AND the multi-cycle
     archive as a **1-hour cached block** (the archive is its own breakpoint, placed
     after the persona prompt so both are a stable cacheable prefix).
@@ -62,13 +71,39 @@ def with_cached_archive(system, archive_text, *, ttl: str = ARCHIVE_TTL):
     `system` may be a plain string (the persona prompt) or an already-built list of
     content blocks. Returns:
       - `system` unchanged when `archive_text` is falsy (no archive → no rewrite);
-      - otherwise a list: [persona block(s) (cached), archive block (cached 1h)].
+      - otherwise a list: [persona block(s) (cached), archive block (cached 1h)]
+        when `cache=True`, or a plain concatenated string when `cache=False`.
 
     A string persona prompt is wrapped as its own cached block so the archive block
     has a byte-stable prefix in front of it (a cache hit needs an unchanged prefix).
+
+    `cache=False` (#2883): for a caller that makes exactly ONE Bedrock call per run
+    (no second call in the same run left to reuse the write), a cache write can
+    NEVER be read back — the 1h TTL still expires long before the caller's next
+    invocation. Anthropic prices a cache write at ~2x the base input rate, so an
+    unreadable write pays double for zero discount, forever. Measured live for
+    State of Matthew (`LifePlatform/AI`, trailing 30d, 2026-08-22):
+    `AnthropicCacheWriteTokens` = 24,159, `AnthropicCacheReadTokens` = 0 — a 100%
+    wasted premium every week, the same pattern `ai_calls.py`'s D-01 note already
+    documented and fixed for daily-brief (measured 0 reads / 10K writes per 14d
+    there). `cache=False` keeps the SAME archive content and scope-logging
+    behavior — it only drops the `cache_control` wrapper, so the caller pays the
+    normal (uncached) per-token input rate instead of the write premium. The
+    multi-call chronicle path (`chronicle_prompt.py`, several calls per run —
+    first draft, the ADR-104 regen-once, Margaret's edit pass — that genuinely
+    reuse one write) is unaffected; this parameter defaults to the prior
+    (cached) behavior.
     """
     if not archive_text:
         return system
+    if not cache:
+        # Same content, no cache_control: one plain string (or, if `system` was
+        # already a structured list, its text concatenated) followed by the archive.
+        if isinstance(system, list):
+            persona_text = "".join(b.get("text", "") for b in system if isinstance(b, dict))
+        else:
+            persona_text = system or ""
+        return "\n\n".join(p for p in (persona_text, archive_text) if p)
     if isinstance(system, list):
         base_blocks = list(system)
     elif system:
