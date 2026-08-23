@@ -1042,6 +1042,31 @@ the day it lands instead of a month later.
 
 ---
 
+## 10. Filing discipline — file into the class, not the symptom (2026-08-23)
+
+Measured 2026-08-23 (backlog campaign, session 1): **312 issues filed / 311 closed
+in 14 days** (~22/day each way) while the open debt corpus held ~50 — the board
+churns, it does not grow or drain. Per-symptom filings are the churn engine, and
+they can mask a worsening class: #2978 exists because 5 closed per-symptom issues
+read as class closure while the deploy-race false-positive rate worsened to 1 per
+1.5 days.
+
+The rule, binding on every filer — sessions, review fan-outs, and the
+`issue-filer` agent:
+
+- **Before filing, look for the open class owner** — an epic or umbrella whose
+  class the finding instantiates (`gh issue list --label type:epic --state open`,
+  plus open UMBRELLA-titled stories). An instance of an open class becomes a
+  checkbox or comment on the owner, never a standalone issue.
+- **A standalone filing requires a novel class** (no open owner) **with verified
+  evidence** — or a P1/P2 whose fix genuinely shares no lane with any owner's.
+- **A fold must move the work whole**: the surviving issue's acceptance gains the
+  instance verbatim. Folded findings are invisible to `#NNNN`-greps (the #2797
+  lesson), so the owner's own acceptance list is the only honest closure test —
+  a fold that drops detail is a deletion wearing a fold's name.
+
+---
+
 ## Facts that drift: run the command, never quote a number
 
 These values change and must **never** be hand-written in docs or memory. Read them:
