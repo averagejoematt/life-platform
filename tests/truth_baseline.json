@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "captured_at": "2026-08-23T22:13:28+00:00",
+    "captured_at": "2026-08-23T23:27:08+00:00",
     "note": "Committed reader-truth debt ledger \u2014 honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) \u2014 `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
   },
   "pages": {
@@ -78,6 +78,15 @@
         "issue": "#2957",
         "added": "2026-08-22",
         "note_sample": "The cycle 14 row displays 'cycle 14 | 2026-08-17 | \u00b7\u00b7\u00b7\u00b7\u00b7 | 0/5 | day 5 \u00b7 live' which correctly identifies the cycle as live on day 5. However, Surface 1 (/method/postmortems/) treats cycle 14 as a clo"
+      }
+    ],
+    "/method/verify/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2957",
+        "added": "2026-08-23",
+        "severity_observed": "high",
+        "note_sample": "The 'WHOOP VS GARMIN, NIGHT BY NIGHT' table contains 30 rows spanning 2026-04-29 through 2026-06-15, presented as live data on a Day-7 cycle-14 page without 'prior cycle'/'lifetime' labeling (Garmin p"
       }
     ],
     "/method/voicefidelity/": [
