@@ -1182,6 +1182,17 @@ def run_sweep(
     os.makedirs(screenshot_dir, exist_ok=True)
 
     results = []
+    # #3030 — ONE CLOCK PER SWEEP: pin the PT calendar date now, before the first
+    # capture, and judge every phase-aware verdict against it. Assess-time "today"
+    # let a midnight-PT-straddling run flag screenshots whose chrome was correct
+    # when captured. Canonical frame only (#1964): common.pacific_time, never a
+    # locally-built ZoneInfo.
+    _lam = os.path.join(os.path.dirname(__file__), "..", "lambdas")
+    if _lam not in sys.path:
+        sys.path.insert(0, _lam)
+    from common.pacific_time import pacific_today
+
+    capture_today_pt = pacific_today()  # already an ISO YYYY-MM-DD string
     # AI-QA needs the screenshots, so force-enable capture when --ai-qa is set.
     if ai_qa:
         save_screenshots = True
@@ -1254,7 +1265,7 @@ def run_sweep(
             sys.path.insert(0, os.path.dirname(__file__))
             from visual_ai_qa import assess_reader_truth
         print("\n── Reader-truth QA (phase-aware, Claude / Bedrock) ──")
-        reader_truth_status = assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
+        reader_truth_status = assess_reader_truth(results, today_iso=capture_today_pt)  # mutates results; one clock (#3030)
 
         # Deliberate ledger rewrite (#2956) — a11y --update-baseline's sibling.
         # Only pages this sweep actually captured prose for are touched; fresh
@@ -1399,6 +1410,7 @@ def run_sweep(
         json.dump(
             {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
+                "capture_today_pt": capture_today_pt,  # the sweep's ONE clock (#3030)
                 "browser": browser_name,
                 "mobile": mobile,
                 "max_tier": max_tier,

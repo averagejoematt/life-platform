@@ -235,7 +235,7 @@ class TestWire(unittest.TestCase):
         rubric = types.SimpleNamespace(
             BUDGET_FEATURE="reader_truth_qa",
             emit_budget_pause_metric=lambda *a, **k: None,
-            assess_prose=lambda surfaces, invoke: ([finding], []),
+            assess_prose=lambda surfaces, invoke, today_iso=None: ([finding], []),
             phase_context=lambda: {"pre_start": False, "day_n": 5},
         )
         budget = types.SimpleNamespace(allow=lambda *a: True, current_tier=lambda: 0)
