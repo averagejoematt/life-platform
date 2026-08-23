@@ -174,7 +174,18 @@
       "Bash(aws s3api get-* *)",
       "Bash(aws ssm describe-parameters *)",
       "Bash(gh label list *)",
-      "Bash(gh run watch *)"
+      "Bash(gh run watch *)",
+      "Bash(python3 deploy/session_postflight.py *)",
+      "Bash(python3 scripts/assert_pr_green.py *)",
+      "Bash(python3 scripts/check_proportionality_ledger.py *)",
+      "Bash(aws logs get-log-events *)",
+      "Bash(gh run download *)",
+      "Bash(aws cloudwatch describe-alarm-history *)",
+      "Bash(python3 scripts/blast_radius.py *)",
+      "Bash(python3 scripts/wrap_gates.py *)",
+      "Bash(python3 deploy/sync_doc_metadata.py --check*)",
+      "Bash(python3 scripts/incident_log_patterns.py --check*)",
+      "Bash(python3 scripts/operating_calendar.py --check*)"
     ]
   }
 }
