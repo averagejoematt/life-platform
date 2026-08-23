@@ -51,7 +51,8 @@
         "ssm:GetParameter"
       ],
       "Resource": [
-        "arn:aws:ssm:us-west-2:205930651321:parameter/life-platform/experiment-cycle"
+        "arn:aws:ssm:us-west-2:205930651321:parameter/life-platform/experiment-cycle",
+        "arn:aws:ssm:us-west-2:205930651321:parameter/life-platform/budget-tier"
       ]
     },
     {

@@ -208,26 +208,26 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-23 evening (Fable 5, mixed→autonomous — *"Boot Phase D0 of the A-Grade
-Program"*). **Phase D0 is done: every P0 the diligence CONFIRMED is fixed, deployed, and verified
-live.** Owner decisions taken up front (S3 owner-prefix · anonymize-at-unsubscribe · full-surface
-Tier-2 consent), then 5 PRs merged+deployed: **#3043** containment (5 PRIVATE docs → S3, 404×5
-verified, inverted visibility gate now reads LIVE `gh api`, marker guard), **#3044** subscriber
-trust (HMAC unsub tokens ×7 senders, anonymize-at-unsubscribe 548d→0, honest /privacy/ live),
-**#3045** ADR-155 (TIER_OWNER_PUBLISHED, 42-pair registry port, DATA_GOVERNANCE guarded — the
-served surface was WIDER than the report saw, all consented), **#3046** gradeability (emission
-contract, pending 83→34 + 49 observational live, GradableShare alarm), **#3051** doc-truth sweep
-(16 ledger rows re-verified + dead-man; site $85 literals fixed at generators; check_doc_facts
-scans 183 site files). **#3047 CodeQL closed on verified 0.** #2959's two debts paid: SSM
-cycle-grant live in the gating path + the WEEK-1 banner-misread ruling (structural, both wire
-notes fixtured) — the receipts caption is live after **three consecutive green gated site
-deploys** (one more rollback first: 2 novel highs on genuinely-unlabeled cross-phase surfaces,
-baselined as #2957 debt via the sanctioned path). Honest bumps: the merge train redded main on 5
-gates (module-size/premerge — DG gate extracted to `doc_facts_governance.py`, marker sweep
-registered); main reads "stranded" on a TRANSIENT Plan-red that planned before the 17:40Z hand
-cdk deploy (decoded; every artifact live at its merged sha; 4 leases rejected with decodes).
-**Next:** owner batch (① RECONCILE_PUSH_TOKEN PAT → unblocks D0.6 required checks ② janitor
-token #3021 ③ respiratory_rate/disturbance_count consent ④ #2961/#2834/#2828/#2890), then
-Phase D1 (control boundaries) per `~/.claude/plans/lively-juggling-candle.md`. Full narrative:
+**Verified:** 2026-08-23 night (Fable 5, autonomous + one owner call — *"Boot Phase D1 of the
+A-Grade Program"*). **Phase D1 (control boundaries) is done: every scoped finding fixed or
+decided, deployed, verified live** (7 PRs #3056–#3063). **#3059** budget guard fails CLOSED for
+public inference on unreadable budget state (`FAIL_CLOSED_FEATURES`, split excepts,
+`budget-tier-unreadable` alarm live — it proved itself same-day by surfacing the CI diagnosis
+role's missing budget-tier SSM grant, fixed + parity CLEAN); **#3058** nightly
+`ratelimit:edge_429` observation live (real 429 observed first run, $0 model cost, premise
+AST-pinned); **owner WAF call executed:** no WAF — dated priced acceptance, **revisit
+2026-10-15** (#2828 CLOSED, PROPORTIONALITY row); **#3060** CSP hardened live — 266 inline
+blocks→0, `script-src 'self'`, jsdelivr dropped, /legacy/ compat-isolated, smoke 246/0
+(**#3048 CLOSED**); **#3056** SECRETS_MAP rotation register + us-east-1 justified, #2890
+re-scoped per-family (notion deletion = owner batch: LastAccessed 2026-07-25, a reader still
+exists). Two merge-union main-reds repaired structurally (**#3061** cross-file alarm-seam
+counting + `alarm_discovery.py` split, ratchet 1780→1253; **#3063** #2372 registrations +
+permanence tests follow the extracted asset). **Honest lesson:** both reds were merge-past-red —
+the slow full-suite premerge lane hadn't ATTACHED when a fail/pending filter sampled "green";
+assert the expected check set BY NAME. Main **green (bf11b366)**. Wrap-beats rollback diagnosed
+(transient data-state AA contrast, class filed #3057); D0 dispatch published. **Next:** owner
+batch (① RECONCILE_PUSH_TOKEN PAT → D0.6 ② janitor token #3021 ③ respiratory_rate/
+disturbance_count consent ④ notion pre-check+delete ⑤ #2961/#2834), then Phase D2 (truth
+manifest) per `~/.claude/plans/lively-juggling-candle.md`. Full narrative:
 `handovers/HANDOVER_LATEST.md`.
 

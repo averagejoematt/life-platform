@@ -1,142 +1,149 @@
-# Handover — 2026-08-23 (evening, Fable 5, mixed→autonomous): Phase D0 of the A-Grade Program — every P0 the diligence confirmed is now fixed, deployed, and verified live
+# Handover — 2026-08-23 (night, Fable 5, autonomous + one owner call): Phase D1 of the A-Grade Program — control boundaries closed: CSP hardened, budget guard fails closed, edge enforcement observed nightly, WAF decided
 
-**Session:** Fable 5. Drove: "Boot Phase D0 of the A-Grade Program" — the plan's
-"P0 truth: privacy, trust, and the claims that lied" phase
-(`~/.claude/plans/lively-juggling-candle.md`), MIXED mode: three owner decisions
-surfaced first, then autonomous merge+deploy. Owner calls received up front:
-**#3043 → S3 owner-prefix** (`config/coaching/`) · **#3044 → anonymize-at-unsubscribe
-+ honest copy** · **#3045 → the FULL currently-served surface consented** (nothing
-stripped). Previous handover archived as
-`HANDOVER_2026-08-23_agrade-program-diligence.md` on `session-archive`.
+**Session:** Fable 5. Drove: *"Boot Phase D1 of the A-Grade Program"* — the plan's
+"Control boundaries" phase (`~/.claude/plans/lively-juggling-candle.md`), AUTONOMOUS
+with merge+deploy authority, ONE owner decision surfaced first (WAF). Owner call
+received mid-session: **defer the WAF — dated priced acceptance, revisit ~2026-10-15.**
+Previous handover archived as `HANDOVER_2026-08-23_agrade-d0-p0-truth.md` on
+`session-archive`.
 
-## What shipped (all merged AND deployed, postflight sha-verified)
+## What shipped (all merged AND deployed AND live-verified; 7 PRs #3056–#3063)
 
-- **#3043 coaching containment (DIL-001/012, P0)** — PR #3052. 5 PRIVATE-marked docs
-  uploaded to `s3://matthew-life-platform/config/coaching/` BEFORE the repo removal
-  merged; **verified live: raw.githubusercontent 404 ×5, S3 objects ×5**. DATA_GOVERNANCE
-  scope note tells the truth (repo PUBLIC since 07-20); the inverted
-  `check_doc_facts.py` visibility gate now asserts LIVE `gh api` visibility (offline =
-  loud SKIP); marker guard over `git ls-files` (mutation-proved); DIL-012 recon pass
-  (break-glass ordering redacted; account id/IAM/secret-names accepted with dated notes);
-  dated historical-exposure risk acceptance in the register. CLOSED, realized.
-- **#3044 subscriber trust (DIL-003/013, P0)** — PR #3054. Signed-HMAC unsubscribe
-  tokens (email HASH, never the address) across all 7 senders; anonymize-at-unsubscribe
-  inline (548d window → 0, weekly sweep = backstop ≤7d); `/privacy/` §05 rewritten to
-  the implemented contract. **Deployed 17:40–42Z**: cdk Email+Web (token-secret grants
-  on 6 roles + all sender code), `delete-user-data` backstop; **live /privacy/ verified**
-  ("anonymized on the spot", hash-as-suppression-record, 7-day hard-delete SLA). No new
-  secret needed (reuses `subscriber-token-secret`). Legacy plaintext links sunset
-  2026-09-22 (dated in code). CLOSED, realized.
-- **#3045 Tier-2 publication ADR (DIL-008/011, gate:owner)** — PR #3055. **ADR-155**
-  records the owner consent; `TIER_OWNER_PUBLISHED` stamp in `field_tiers.py` (above
-  OWNER_ONLY so naive `>=` fails closed); full registry port (42 wired field pairs + 15
-  source-level tiers incl. private_intake/flourishing/felt_probe); DATA_GOVERNANCE now
-  GUARDED against the registry both directions. Discovery: the served surface was WIDER
-  than the report saw (sleep stages, lean mass, full DEXA summary) — all brought inside
-  recorded consent. **MCP Lambda deployed 17:45Z.** CLOSED, realized.
-- **#3046 prediction gradeability (DIL-007, P0)** — PR #3053. Emission contract
-  (`gradeable_by` stamped; qualitative → `observation`, never pending; #715 criterion 3
-  is now a regression test); evaluator retires legacy qualitative rows at window end;
-  due-context scorecard **verified live: pending 83→34 with 49 observational split out,
-  "0 due yet — earliest verdict due 2026-08-31" derived from the corpus**; `GradableShare`
-  + `prediction-gradable-share-low` alarm live (new `monitoring_prediction_alarms.py` —
-  monitoring_stack was at its exact ratchet cap). Agent also found+fixed a real JS bug:
-  created-dates used as due-dates made the scorecard claim windows closed a week early.
-  CLOSED, realized.
-- **D0.5 doc-truth sweep** — PR #3051 (Part of #3042/#2986). All 16 MANAGED_WHERE_LEDGER
-  rows re-verified live + per-row Verified column + monthly `managed-where-reverify`
-  dead-man on the #2832 calendar; client_ip docstrings, CONTRIBUTING, README ($85 →
-  ADR-133 wording, "100% IaC" → declared out-of-IaC ring), evidence_meta.js + /method/build
-  + org-chart essay fixed at their GENERATORS; `check_doc_facts.py` ceiling scan now covers
-  183 site js/html/generator files (planted-defect mutation proof).
-- **D0.7 CodeQL (#3047)** — 7 alerts triaged: js/redos FIXED (d02e64d63), #152 dismissed
-  false-positive (integer counter, name heuristic — NOT a real #1902 recurrence), #153–157
-  dismissed intentional (emoji-block ranges). **Verified 0 open post-re-scan; CLOSED.**
-  Sentinel can-it-fail question filed on #2578.
-- **#2959 oracle debts (both)** — the visual-qa/diagnosis CI role now has
-  `ssm:GetParameter` on the experiment-cycle param (applied live from the checked-in
-  permissions file, `verify_oidc_iam.py` CLEAN); the WEEK-1 finding got a **structural
-  ruling** (`is_position_banner_misread` — the position banner is a clock, not a content
-  label; both wire notes are fixtures; the #2941 banner-actually-wrong residue survives
-  at full severity) instead of a ledger entry (the ledger's own contract forbids
-  hand-growing, and the predicate covers the shape on every page).
-- **The receipts-caption re-deploy went green** after one more rollback round: the ruling
-  killed the WEEK-1 shape, but the tail raised 2 novel highs on `/coaching/lab-notes/` +
-  `/method/wrong/` (cross-phase content genuinely unlabeled — the producer gap is
-  #2957's scope); both baselined via the sanctioned `--update-truth-baseline` sweeps,
-  a doomed queued sweep cancelled pre-gate, and dispatch 32654357546 passed
-  **smoke + visual-qa end-to-end, no rollback**. Two more gated deploys (privacy copy,
-  regenerated scorecard shells) also green — three consecutive green gated site deploys.
-- **Main-red repair mid-train:** the #3051+#3052 merges redded 5 gates (module-size ×3,
-  premerge registration ×2 — caught by the #3044 agent's full-suite run). Fixed by
-  extracting the DG fact gate to `scripts/doc_facts_governance.py` (#1665 ceiling),
-  re-wrapping one comment, registering the marker sweep with premerge (#2372). Also
-  fixed at boot: the wrap's own INCIDENT_LOG Patterns staleness and the #3005 guard
-  tripping on the previous handover's own wording.
+- **Budget-guard fail-closed (DIL-036 → FIXED)** — PR #3059 (worktree agent). The bare
+  `except → tier 0` SSM read split into named classes logging
+  `BUDGET_TIER_UNREADABLE reason=<class>`; exported `FAIL_CLOSED_FEATURES=("website_ai",)`
+  consulted by `allow()` — public /api/ask + /api/board_ask DENY tier-3-equivalent on
+  unreadable budget state (AST-pinned to the real `_ai_paused_response` wire path);
+  `current_tier()` stays fail-open fleet-wide (protect-longest deliberate; a phantom
+  tier 3 would take the brief down with the public surface). 23 tests mutation-proved
+  both directions. **Deployed:** cdk Monitoring (`budget-tier-unreadable` alarm live,
+  metric filter scoped to site-api-ai's log group) + site-api-ai deploy_and_verify PASS.
+  **The control proved itself same-day:** the split logging surfaced the CI diagnosis
+  role's missing `ssm:GetParameter` on the budget-tier param (silently swallowed
+  pre-#3059) — grant added to `infra/iam/github-actions-diagnosis-role.permissions.json`,
+  applied live, `verify_oidc_iam.py` CLEAN (second member of the #2959 cycle-param class).
+- **Edge-429 observation + the WAF decision (DIL-014; #2828 CLOSED)** — PR #3058 (inline).
+  Nightly qa-smoke check `ratelimit:edge_429` (`qa_check_edge_429.py`, sibling module —
+  qa_smoke sits at 1198/1200): ≤6 too-short POSTs at board_ask ($0 model cost — rate
+  charged BEFORE validation, ordering AST-pinned), requiring one real 429 with
+  Retry-After + JSON shape. Outcome vocabulary has no vacuous green: RED on no-429 (the
+  08-14 signature) · YELLOW could-not-observe · ⏸ on tier-3 pause. **First live run
+  observed a real 429.** #1439's manual-only posture re-decided on the record (script
+  header + RUNBOOK). **Owner decision executed:** no WAF — dated priced acceptance
+  (PROPORTIONALITY row names the compensating stack), **revisit 2026-10-15** or on
+  observed abuse / non-self-inflicted spike fire / commercialization. Docs PR #3062.
+- **CSP hardening (DIL-015 → FIXED; #3048 CLOSED)** — PR #3060 (worktree agent). Real
+  surface was **266 inline blocks / ~920KB / 91 pages** (the issue's V2 numbers were
+  stale) → **0**; production `script-src` exactly `'self'` (extraction + non-executable
+  `application/json` data islands — no hash entries needed); **jsdelivr DROPPED**
+  (axe-core already vendored; `a11y_audit.py:86` moved to CDP evaluate); `/legacy/`
+  isolated on a compat policy. **Deployed both halves** (site auto-deploy green
+  end-to-end incl. real-browser visual-QA; hand `cdk deploy LifePlatformWeb` for the
+  header). **Live: smoke 246/0** with the new source-derived CSP assertion (hardened on
+  `/`, compat on `/legacy/`).
+- **Secrets re-scope (DIL-016 → partial)** — PR #3056 (inline). SECRETS_MAP gains the
+  rotation-ownership register (owner + expiry/next-action per family, ⚠️ loud-gap
+  convention for GitHub-UI PAT expiries); us-east-1 "replicas" justified in writing
+  (cf-auth/buddy-auth are edge-native and were MISSING from the map — now rows;
+  site-api-origin-secret is the one true CFN-region-local twin); #2890 re-scoped to
+  per-family PRICED split/merge/keep decisions (never a default consolidation target).
+  `notion` deletion batched to owner with a REQUIRED pre-check: live LastAccessedDate
+  is **2026-07-25**, not the recorded 03-09 — something still reads it.
+- **Two main-red repairs (PRs #3061, #3063)** — both #3059/#3060 merge-union
+  registration reds: (1) the #2372 premerge classifier needed both agents' new
+  tree-sweeping test files registered; (2) the alarm COUNTER was blind to cross-file
+  extraction seams (a single-alarm module helper counts at call sites, which live in a
+  different file → counted 0; fixed structurally: a helper with zero in-file callers
+  counts at its definition), which forced the cap-bound cohesive split of
+  `deploy/alarm_discovery.py` out of sync_doc_metadata (ratchet TIGHTENED 1780→1253);
+  (3) the permanence tests followed the extracted `privacy_permanence.js` (all 8
+  asserted literals verified present exactly once — test-shape, not a regression).
+- **Also:** D0's build dispatch published (the wrap-beats rollback diagnosed as a
+  transient data-state AA violation — class filed #3057, INCIDENT row added); recall
+  corpus gap backfilled (2026-08-18 installment, $0); #3064 (auto-filed standalone
+  visual-QA red) fully diagnosed — FP build-dispatches verdict (verified both schemes
+  locally), the `/method/cycles/` matched-window misread baselined citing #2957 (third
+  member), and the real IAM gap fixed (above); re-run dispatched, auto-closes on green.
 
-## Deploys (hand-deployed from exact merged shas; leases rejected with decodes)
+## Deploys (hand, from exact merged/reconciled shas, postflight-verified)
 
-qa-smoke 17:29Z · coach-prediction-evaluator + coach-state-updater 17:20Z · site-api
-17:2xZ · life-platform-mcp 17:45Z · delete-user-data 17:42Z · cdk LifePlatformMonitoring
-17:24Z + LifePlatformEmail/Web 17:40Z · site ×3 gated green (receipts+D0.5 → privacy copy
-→ scorecard shells). 4 production leases disposed (rejected with #2467 decodes); no
-waiting leases at close.
+cdk LifePlatformMonitoring 19:5xZ (stale-checkout guard caught the reconcile-bot race —
+pulled + redeployed) · site-api-ai deploy_and_verify PASS · qa-smoke 19:00Z (sha
+7c2ffecc; dry-run invoke verified the new check live) · site-api ×2 (first raced my own
+concurrent pull — the postflight mismatch caught it; clean redeploy verified
+`/api/platform_stats` alarms:111) · cdk LifePlatformWeb 19:5xZ (hardened CSP) · site ×2
+green gated deploys (D0-beats rerun + CSP) · IAM put-role-policy diagnosis-role
+(budget-tier grant, parity CLEAN). Leases: 3 rejected with decodes (superseded,
+artifacts hand-deployed), 1 APPROVED (fac0826e0 fleet deploy — Deploy/smoke/visual-QA
+green; its unit-test red was #3063's repair), final run bf11b366 **completed/success**.
 
 ## Gate lines
 
-**Build beat:** 2026-08-23-d0-p0-truth
-**Docs:** DATA_GOVERNANCE (scope note, retention row v2, ADR-155 carve-out + tier guard) ·
-MANAGED_WHERE_LEDGER (16 rows re-verified, dead-man) · README · CONTRIBUTING ·
-DECISIONS (ADR-155 + index) · SCHEMA (PREDICTION# row) · API.md · INCIDENT_LOG (+1 row +
-Patterns regen) · PROPORTIONALITY (+1 row) · alarm_citations untouched ·
-docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md (all D0 rows flipped to FIXED+DEPLOYED
-with evidence)
-**Decisions:** ADR-155 filed (Tier-2 self-publication by owner consent, #3045)
-**Main:** stranded — run 32655256700 R8-ST6 Plan-red at 53e0a357 (#1901 class),
-transient: it planned against live BEFORE the 17:40Z hand cdk deploy of the same IAM
-diff; both subsequent runs planned green and are rejected-superseded leases (#2467,
-hand-deployed + verified above). No recovery dispatch owed — every artifact is live at
-its merged sha.
-**Incidents:** 1 row added — the receipts-re-deploy auto-rollback (2 novel oracle highs
-on genuinely-unlabeled cross-phase surfaces → baselined as #2957 debt, next dispatch
-green)
+**Build beat:** 2026-08-23-d1-control-boundaries
+**Docs:** SECRETS_MAP (rotation register + us-east-1 + counts) · PROPORTIONALITY (+3
+rows: WAF acceptance, edge-429 observation, budget fail-closed channel) · RUNBOOK
+(probe posture) · INCIDENT_LOG (+1 row + header) · DILIGENCE register (DIL-014/015/016/036
+flipped with live evidence) · alarm_citations (+1 by #3059) · ARCHITECTURE/INFRASTRUCTURE
+(alarm-count literals via --apply)
+**Decisions:** none needed — the WAF deferral is recorded as a dated PROPORTIONALITY
+acceptance + the #2828 closure (revisit 2026-10-15); below ADR threshold per the
+priced-acceptance vocabulary the register defines
+**Main:** green (bf11b366)
+**Incidents:** 1 row added — the wrap-beats site auto-rollback (transient data-state AA
+contrast on /method/board/; class filed #3057; full rerun green)
 **Stash/hooks:** clean
-**Closures:** #3043, #3044, #3045, #3046, #3047 commented (5 ADR-099 verdicts, all
-realized with live deploy evidence)
-**Backlog:** Now live at 5 actionable; no stale Later issues; hygiene OK (69 issues
-clean)
-**Alarms:** 0 red >72h; 4 flaps in the window, decoded — `ingest-auth-unhealthy-24h`/
-`-dropbox` + `ingest-liveness-unhealthy` (the known #2976 recovery-episode cluster,
-single cycle each) and `site-api-invocation-spike` ×3 (self-inflicted: this session's
-three full-surface QA sweeps during deploy verification; no reader symptom). Closed with
-`--decoded`.
-**CI warnings:** none — the newest completed main run isn't green (a rejected-superseded
-lease), so there is nothing to triage (that's the main-green gate's finding, decoded
-above).
-**Ledger:** Prediction-gradeability contract row added (posture + rent + demote trigger;
-the #2832 calendar row already covers the new managed-where-reverify dead-man entry)
+**Closures:** #2828, #3048 commented (ADR-099 two-line verdicts, both realized with
+live evidence); #3064 auto-closes on the dispatched green run (diagnosis comment on it)
+**Backlog:** Now live at 5 actionable (+2 epics); no stale Later issues; hygiene: the 5
+violations found at the gate all fixed this session (#3057 labels + epic coverage,
+#3064 labels + outcome form) — the auto-filed-vs-hygiene structural tension filed as
+#3065
+**Alarms:** 0 red >72h; 5 flaps in the window, decoded — `ai-daily-spend-high` ×1 (two
+heavy dev sessions same day: D0's oracle sweeps + D1's agents; cleared on its own),
+`ingest-auth-unhealthy-24h`/`-dropbox` + `ingest-liveness-unhealthy` ×1 each (the known
+#2976 recovery-episode cluster, same decode as the D0 wrap), `site-api-invocation-spike`
+×4 (self-inflicted: this session's full-surface QA sweeps during deploy verification —
+three visual-QA passes + smoke 246 + probes; no reader symptom). Closed with `--decoded`.
+**CI warnings:** none
+**Ledger:** 3 rows added — WAF priced acceptance (#2828), nightly edge-429 observation
+(#3058), budget-integrity fail-closed channel (#3059)
+
+## Owner batch (ONE ask — everything needing Matthew)
+
+1. **RECONCILE_PUSH_TOKEN PAT** (unblocks D0.6 — main's first required checks): mint a
+   fine-grained PAT (Contents read-write, this repo only) as a repo secret, then next
+   session runs `apply_branch_protection.py --apply` + adds the #3025 context.
+2. **DEPLOY_GATE_JANITOR_TOKEN** secret (#3021 — arms the lease janitor).
+3. **respiratory_rate + disturbance_count consent** (#3045 residual — stamp
+   TIER_OWNER_PUBLISHED or strip; currently default-public deliberately pending your call).
+4. **notion secret deletion** (#2890): pre-check required — live LastAccessedDate
+   2026-07-25 says something still calls GetSecretValue on it; identify that reader
+   (start: freshness-checker / pipeline-health-check), then delete or adopt.
+5. Carried: **#2961** billing-alarm dupes · **#2834** IAM posture decision.
+   (WAF is DECIDED — nothing left on it until the 2026-10-15 revisit.)
 
 ## Residuals / next picks
 
-- **D0.6 branch protection — BLOCKED ON OWNER:** `apply_branch_protection.py --apply`
-  structurally refuses until a fine-grained PAT (Contents read-write, this repo only,
-  owned by averagejoematt) exists as the `RECONCILE_PUSH_TOKEN` repo secret + ci-cd.yml's
-  reconcile checkout uses it (CONVENTIONS §4c). Then: `--apply`, add the #3025 full-suite
-  context to `deploy/github_posture.json`, re-apply. not-work — owner-only PAT mint, in
-  the batched ask below.
-- **Owner batch (ONE ask):** ① RECONCILE_PUSH_TOKEN PAT (unblocks D0.6, main's first
-  required checks) · ② `DEPLOY_GATE_JANITOR_TOKEN` secret (#3021, arms the lease
-  janitor) · ③ respiratory_rate + disturbance_count consent call (#3045 left them
-  default-public deliberately — stamp or consent) · ④ carried: billing-alarm dupes
-  (#2961) · #2834 IAM posture · WAF decision (#2828) · notion-secret retire (#2890).
-- **#2957 got two new class members** (lab-notes diary reaction, /method/wrong validator
-  table) — the producer fix (cycle labels on cross-phase content) drains both baseline
-  entries; commented on the issue.
-- **Scheduled observations (not-work — dated):** `prediction-gradable-share-low` may
-  fire ~3d on the legacy corpus and clears as retirement drains it from 08-24;
-  first real prediction grades as windows mature (corpus earliest 2026-08-31); #2978
-  30-day re-measure ~09-22; legacy unsubscribe-link sunset 2026-09-22; next Monday's
-  retention sweep anonymizes the legacy subscriber backlog.
-- **Next phase:** D1 (control boundaries — WAF/#2828, budget-guard fail-closed under
-  #2824, secrets #2890, CSP #3048) per `~/.claude/plans/lively-juggling-candle.md`;
-  the D0 register rows are the re-grade evidence pack.
+- **D0.6 branch protection** — blocked on owner item 1 above (#3042 program). not-work —
+  owner-only PAT mint.
+- **#2957 got a third class member** (/method/cycles/ matched-window misread, baselined) —
+  the producer fix (judge-legible cycle/window framing) drains all three.
+- **#3057** (AA clamp on data-supplied coach colors) — filed this session, S-effort,
+  prevents the next transient-roster rollback; on epic #2842.
+- **#3065** (auto-filed trackers vs the hygiene gate) — Later; gate-design decision.
+- **#2890 residual** — the per-family disposition table + CE delta (issue re-scoped with
+  boxes).
+- **Scheduled observations (not-work — dated):** WAF revisit **2026-10-15** (#2828
+  closure + PROPORTIONALITY row carry it) · first edge-429 nightly runs tonight 18:30 UTC
+  (a RED would be real) · `prediction-gradable-share-low` may fire ~3d on the legacy
+  corpus, clears from 08-24 · first real prediction grades ~2026-08-31 · #2978 30-day
+  re-measure ~09-22 · legacy unsubscribe-link sunset 2026-09-22 · Monday retention sweep
+  anonymizes the legacy subscriber backlog · #3064 auto-closes on the dispatched
+  standalone run going green (in flight at wrap).
+- **Next phase:** D2 (the truth manifest — platform_facts artifact + public-claims
+  registry, closes #2898, advances #2986/#2842) per
+  `~/.claude/plans/lively-juggling-candle.md`; D0+D1 register rows are the re-grade
+  evidence pack. **Honest lesson worth carrying:** two merge-past-red incidents in one
+  session from sampling PR checks with a fail/pending filter before the slow full-suite
+  lane attached — assert the expected check set BY NAME (memory:
+  absent-check-invisible-to-fail-filter).

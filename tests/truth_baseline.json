@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "captured_at": "2026-08-23T17:15:34+00:00",
-    "note": "Committed reader-truth debt ledger \u2014 honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) \u2014 `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
+    "captured_at": "2026-08-23T21:35:32+00:00",
+    "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
   },
   "pages": {
     "/coaching/lab-notes/": [
@@ -18,7 +18,7 @@
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
-        "note_sample": "Prose states 'STAGE COMPOSITION OVER THE WEEK' with a chart labeled 'DEEP \u00b7 REM \u00b7 LIGHT \u00b7 HOURS BY STAGE \u00b7 PER NIGHT' spanning days 17\u201321, but on Day 5 (2026-08-21) only 5 days of data can exist. The "
+        "note_sample": "Prose states 'STAGE COMPOSITION OVER THE WEEK' with a chart labeled 'DEEP · REM · LIGHT · HOURS BY STAGE · PER NIGHT' spanning days 17–21, but on Day 5 (2026-08-21) only 5 days of data can exist. The "
       }
     ],
     "/data/vitals/": [
@@ -26,7 +26,7 @@
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
-        "note_sample": "Prose states 'No training logged \u2014 57 days' on Day 5 of a 5-day experiment (Day 1 = 2026-08-17). A 57-day history is impossible; the experiment has only existed for 5 days maximum. This asserts a pre-"
+        "note_sample": "Prose states 'No training logged — 57 days' on Day 5 of a 5-day experiment (Day 1 = 2026-08-17). A 57-day history is impossible; the experiment has only existed for 5 days maximum. This asserts a pre-"
       }
     ],
     "/method/board/": [
@@ -35,7 +35,7 @@
         "issue": "#3018",
         "added": "2026-08-22",
         "severity_observed": "high",
-        "note_sample": "Dr. Lisa Park addresses the subject directly: 'Matthew \u2014 and I want to name that plainly', 'I want to put to you directly', 'you were actively logging', 'When you're ready, I'd like you to resume'. Th"
+        "note_sample": "Dr. Lisa Park addresses the subject directly: 'Matthew — and I want to name that plainly', 'I want to put to you directly', 'you were actively logging', 'When you're ready, I'd like you to resume'. Th"
       }
     ],
     "/method/calibration/": [
@@ -43,7 +43,16 @@
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
-        "note_sample": "States 'THIS SEASON \u00b7 CYCLE 14' with '26 GRADED FORECASTS' on Day 5, but only 5 days of data can exist in the current cycle (started 2026-08-17). On Day 5, a maximum of 5 days of in-cycle data is poss"
+        "note_sample": "States 'THIS SEASON · CYCLE 14' with '26 GRADED FORECASTS' on Day 5, but only 5 days of data can exist in the current cycle (started 2026-08-17). On Day 5, a maximum of 5 days of in-cycle data is poss"
+      }
+    ],
+    "/method/cycles/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2957",
+        "added": "2026-08-23",
+        "severity_observed": "high",
+        "note_sample": "Table row 'CYCLE 14 · NOW' shows Genesis date 2026-08-17 (Day 1 of current cycle) and lists 'Days with data: 7', but also shows '—' (no data) for 'Start weight', 'Weight change (first 7d)', and 'Avg r"
       }
     ],
     "/method/postmortems/": [
@@ -51,7 +60,7 @@
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
-        "note_sample": "CYCLE 14 entry states 'Restarted 2026-08-17 as cycle 14' but then shows strip '\u00b7\u00b7\u00b7\u00b7\u00b7' (5 dots = 5 silent days). The cycle start date is 2026-08-17 (Day 1 of current experiment). On Day 5 (2026-08-21),"
+        "note_sample": "CYCLE 14 entry states 'Restarted 2026-08-17 as cycle 14' but then shows strip '·····' (5 dots = 5 silent days). The cycle start date is 2026-08-17 (Day 1 of current experiment). On Day 5 (2026-08-21),"
       }
     ],
     "/method/survival/": [
@@ -59,7 +68,7 @@
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
-        "note_sample": "The cycle 14 row displays 'cycle 14 | 2026-08-17 | \u00b7\u00b7\u00b7\u00b7\u00b7 | 0/5 | day 5 \u00b7 live' which correctly identifies the cycle as live on day 5. However, Surface 1 (/method/postmortems/) treats cycle 14 as a clo"
+        "note_sample": "The cycle 14 row displays 'cycle 14 | 2026-08-17 | ····· | 0/5 | day 5 · live' which correctly identifies the cycle as live on day 5. However, Surface 1 (/method/postmortems/) treats cycle 14 as a clo"
       }
     ],
     "/method/voicefidelity/": [
@@ -67,7 +76,7 @@
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
-        "note_sample": "States 'NEXT ON THE LOOP the coaching \u2014 See what the AI team makes of it' but this appears to be navigational chrome. However, the surface shows 'N=16' voice-fidelity judgments with 11 correct on Day "
+        "note_sample": "States 'NEXT ON THE LOOP the coaching — See what the AI team makes of it' but this appears to be navigational chrome. However, the surface shows 'N=16' voice-fidelity judgments with 11 correct on Day "
       }
     ],
     "/method/wrong/": [
@@ -76,7 +85,7 @@
         "issue": "#2957",
         "added": "2026-08-23",
         "severity_observed": "high",
-        "note_sample": "The table shows two catches dated 2026-06-18 and 2026-05-19, which are before the cycle start of 2026-08-17. The page header correctly states 'DAY 7 \u00b7 WEEK 1, SINCE AUGUST 17 2026', but the catch tabl"
+        "note_sample": "The table shows two catches dated 2026-06-18 and 2026-05-19, which are before the cycle start of 2026-08-17. The page header correctly states 'DAY 7 · WEEK 1, SINCE AUGUST 17 2026', but the catch tabl"
       }
     ],
     "/story/attempts/": [
@@ -84,7 +93,7 @@
         "category": "temporal_contradiction",
         "issue": "#2957",
         "added": "2026-08-22",
-        "note_sample": "Attempt #14 marked 'SHOWED UP 0 OF 5 DAYS' (past-tense finality) beside 'live \u2014 day 5' \u2014 the live-cycle-as-closed class, sibling of /method/postmortems/"
+        "note_sample": "Attempt #14 marked 'SHOWED UP 0 OF 5 DAYS' (past-tense finality) beside 'live — day 5' — the live-cycle-as-closed class, sibling of /method/postmortems/"
       }
     ]
   }
