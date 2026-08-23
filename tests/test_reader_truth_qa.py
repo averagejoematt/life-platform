@@ -1035,3 +1035,72 @@ def test_assess_prose_drops_prior_cycle_archive_findings():
     kept = [f["page"] for f in findings]
     assert "/story/diary/" not in kept, "the dated prior-cycle archive finding must drop (#2959)"
     assert "/now/" in kept, "in-cycle temporal findings must keep gating"
+
+
+# ── #2959: the position banner is a clock, not a content label ────────────────
+
+_DAY_7 = (_START + timedelta(days=6)).isoformat()
+
+# Verbatim wire notes from run 32650063358 — the high that auto-rolled-back the
+# receipts-caption deploy (fixture must be the wire).
+_NOTE_BANNER_STORY = (
+    "Chronicle piece dated 2026-08-18 is listed as 'WEEK 1 · 2026-08-18', but the prose intro "
+    "states 'DAY 7 · WEEK 1, SINCE AUGUST 17 2026'. August 18 is Day 2 (Aug 17 = Day 1), not "
+    "Day 7. The chronicle's own date (2026-08-18) contradicts the page header claiming it is "
+    "Day 7 content."
+)
+_NOTE_BANNER_CHRONICLE = (
+    "Chronicle piece dated 2026-08-18 is listed as 'WEEK 1 · 2026-08-18', but the page header "
+    "states 'DAY 7 · WEEK 1, SINCE AUGUST 17 2026'. August 18 is Day 2, not Day 7. Same "
+    "contradiction as /story/."
+)
+
+
+def test_position_banner_misread_fires_on_both_wire_notes():
+    for page, note in (("/story/", _NOTE_BANNER_STORY), ("/story/chronicle/", _NOTE_BANNER_CHRONICLE)):
+        f = {"page": page, "category": "temporal_contradiction", "severity": "high", "note": note}
+        assert rtq.is_position_banner_misread(f, _DAY_1, today=_DAY_7) is True, page
+
+
+def test_position_banner_misread_spares_a_banner_that_is_actually_wrong():
+    """A note mapping TODAY to a conflicting day number is the #2941 real-defect
+    class — the banner itself lying about the clock — and must keep gating."""
+    day7_date = (_START + timedelta(days=6)).strftime("%B %-d, %Y").replace(" 0", " ")
+    note = (
+        f"The page header states 'DAY 9 · WEEK 2, SINCE AUGUST 17 2026', but today is "
+        f"{day7_date}. {day7_date.split(',')[0]} is Day 7, not Day 9 — the banner overstates the cycle position."
+    )
+    f = {"page": "/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_position_banner_misread(f, _DAY_1, today=_DAY_7) is False
+
+
+def test_position_banner_misread_spares_notes_without_the_banner_quote():
+    f = {
+        "page": "/story/",
+        "category": "temporal_contradiction",
+        "severity": "high",
+        "note": "Chronicle piece dated 2026-08-18 claims a 60-day trailing window. August 18 is Day 2, not Day 60.",
+    }
+    assert rtq.is_position_banner_misread(f, _DAY_1, today=_DAY_7) is False
+
+
+def test_position_banner_misread_never_touches_other_categories():
+    f = {"page": "/story/", "category": "stale_data", "severity": "high", "note": _NOTE_BANNER_STORY}
+    assert rtq.is_position_banner_misread(f, _DAY_1, today=_DAY_7) is False
+
+
+def test_assess_prose_demotes_a_position_banner_misread_high_to_low(capsys):
+    """The predicate is wired: the /story/ WEEK-1 high reaches the gate as low."""
+    verdict = {
+        "findings": [
+            {"page": "/story/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_BANNER_STORY},
+        ],
+        "severity": "high",
+        "summary": "x",
+    }
+    pages = [{"name": "Story", "path": "/story/", "prose": "2026-08-18 — Day One Actually Happened · Week 1"}]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_7)
+    assert errors == []
+    assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"
+    assert findings[0]["severity"] == "low"
+    assert "demoted a position-banner misread" in capsys.readouterr().out

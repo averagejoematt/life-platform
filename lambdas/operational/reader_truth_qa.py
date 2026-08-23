@@ -108,6 +108,7 @@ from operational.reader_truth_rulings import (  # noqa: F401
     is_code_owned_temporal,
     is_day_counter_bound_inference,
     is_durable_design_copy,
+    is_position_banner_misread,
     is_prior_cycle_archive,
     is_self_refuted,
     is_utc_offset_misread,
@@ -636,6 +637,20 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     print(
                         f"  ↩ reader-truth: demoted a day-counter-bound finding on {f['page']} "
                         f"{f['severity']}→low (the day counter is not a data bound, #2959): {f['note'][:120]}"
+                    )
+                    f = dict(f, severity="low")
+                # #2959 (2026-08-23): the position banner ('DAY N · WEEK K') is
+                # today's clock, not a label on the dated content beneath it — the
+                # model mapped a chronicle piece's own (correct) date to "Day 2, not
+                # Day 7" and gated on the banner as if it claimed the piece was Day-7
+                # content (run 32650063358, the receipts-caption rollback). DEMOTED to
+                # low, never gating; a note whose day-mapping is about TODAY (the
+                # banner itself wrong, the #2941 class) survives at full severity.
+                # Printed, never silently swallowed.
+                if f["severity"] != "low" and is_position_banner_misread(f, phase["start_date"], today_iso):
+                    print(
+                        f"  ↩ reader-truth: demoted a position-banner misread on {f['page']} "
+                        f"{f['severity']}→low (the banner is a clock, not a content label, #2959): {f['note'][:120]}"
                     )
                     f = dict(f, severity="low")
                 # #3003: a "contradiction" whose own objection resolves to vagueness is

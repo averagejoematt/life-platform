@@ -464,6 +464,74 @@ def is_prior_cycle_archive(finding, start_date, cycle=None):
     return False
 
 
+# ── #2959 (2026-08-23): the position banner is a clock, not a content label ───
+#
+# THE OBSERVED FAILURE (run 32650063358 — the high that auto-rolled-back the
+# receipts-caption deploy): /story/ and /story/chronicle/ list a chronicle piece
+# correctly dated 'WEEK 1 · 2026-08-18' (cycle-14 genesis 2026-08-17 ⇒ 08-18 IS
+# Day 2 of Week 1 — the label is arithmetically right), and the model raised it
+# `high`: "the prose intro states 'DAY 7 · WEEK 1, SINCE AUGUST 17 2026'.
+# August 18 is Day 2 (Aug 17 = Day 1), not Day 7. The chronicle's own date …
+# contradicts the page header claiming it is Day 7 content." The header claims
+# no such thing: 'DAY N · WEEK K, SINCE <genesis>' is the site-wide position
+# banner — TODAY's coordinate on the cycle, rendered identically on every page —
+# not a label on the content listed beneath it. Earlier-in-cycle entries under
+# today's banner are the design of a chronological archive. This is the #2959
+# non-stationary tail producing a novel shape: prior sweeps carried the same
+# banner on the same pages and never flagged it.
+#
+# THE RULING: a temporal_contradiction that (a) quotes the position banner as a
+# header/intro claim, and (b) derives its contradiction by mapping a cited
+# CONTENT date to a day number different from the banner's, is a misread of the
+# clock as a content label. The residue that stays fully flaggable: a note that
+# maps TODAY to a day number conflicting with the banner (the banner itself
+# being wrong IS a real defect — the #2941 class) — the mapping check skips any
+# date that is today; and a note that never quotes the banner survives
+# untouched. DEMOTED to low, not dropped (the day-counter precedent): visible
+# as advisory, recorded by the baseline machinery, never gating.
+_POSITION_BANNER_RE = re.compile(
+    r"\b(?:header|intro|banner)\b[^.?!]{0,80}?\bDAY\s+(\d{1,3})\s*[·\-]\s*WEEK\s+\d{1,2}\b",
+    re.I,
+)
+# "<Month> <day>[, <year>] is Day M" and "<ISO date> is Day M" mappings.
+_CONTENT_DAY_MAP_RE = re.compile(
+    r"\b(?:(january|february|march|april|may|june|july|august|september|october|november|december)"
+    r"\s+(\d{1,2})(?:,?\s+(\d{4}))?|(\d{4})-(\d{2})-(\d{2}))\s+is\s+Day\s+(\d{1,3})\b",
+    re.I,
+)
+
+
+def is_position_banner_misread(finding, start_date, today=None):
+    """True when a temporal_contradiction reads the DAY/WEEK position banner as a
+    label on dated content rather than as today's clock (#2959).
+
+    Structural conditions, all required: temporal_contradiction; the note quotes
+    the banner ("header/intro … 'DAY N · WEEK K'"); and the note maps a cited
+    content date — in-cycle, and not today — to a day number ≠ N. A note whose
+    day-mapping is about TODAY (the banner itself wrong) survives untouched.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    note = finding.get("note") or ""
+    banner = _POSITION_BANNER_RE.search(note)
+    if not banner:
+        return False
+    banner_day = int(banner.group(1))
+    default_year = str(start_date)[:4]
+    for m in _CONTENT_DAY_MAP_RE.finditer(note):
+        mon, day, year, iso_y, iso_m, iso_d = m.groups()[:6]
+        mapped_day = int(m.group(7))
+        if mon:
+            date_iso = f"{year or default_year}-{_MONTHS[mon.lower()]:02d}-{int(day):02d}"
+        else:
+            date_iso = f"{iso_y}-{iso_m}-{iso_d}"
+        if today and date_iso == today:
+            continue
+        if date_iso >= start_date and mapped_day != banner_day:
+            return True
+    return False
+
+
 # ── #2959 (2026-08-23): the coach-surface audience ruling, ADJUDICATED ─────────
 # The first armed full sweep (run 32545820852) raised audience_violation on
 # /coaching/ and /coaching/by-coach/#physical_coach for coaches addressing Matthew
