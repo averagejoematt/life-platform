@@ -226,6 +226,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_singleton_tombstone_guards.py",  # 2026-08-10: Wave-2 call sites + Wave-3 exemptions split across PRs = main red between them
         "test_wallclock_fixture_bombs_2376.py",  # #2376: dated fixture + unfrozen handler clock (the #2354 midnight red)
         "test_raw_key_registry_guard.py",  # #2286: no hand-built raw/ S3 keys
+        "test_site_api_namespace_guard_3002.py",  # #3002: one site-API metric namespace, no casing twins — repo-shape sweep, pre-merge
         "test_no_hardcoded_feature_tier.py",
         "test_budget_guard_ladder.py",
         # #2818: the producer-cron mirror pair (cdk/stacks/compute_stack.py ↔
