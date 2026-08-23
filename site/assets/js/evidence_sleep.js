@@ -91,7 +91,15 @@ export async function renderSleep(d) {
     : "";
   if (Object.values(s).some(has)) {
     parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
-    if (s.deep_sleep_hours != null && s.rem_sleep_hours != null) parts.push(sec("Last night's stages", stackedBar([{ label: "Deep", value: s.deep_sleep_hours, tone: "ember" }, { label: "REM", value: s.rem_sleep_hours, tone: "ink" }, { label: "Light", value: Math.max(0, (s.total_sleep_hours || 0) - (s.deep_sleep_hours || 0) - (s.rem_sleep_hours || 0)), tone: "faint" }], { label: "Hours by stage", unit: "h" })));
+    // #2921: ONE device's own stage hours, not Eight Sleep's total against Whoop's
+    // stages (the bug — a total that could read smaller than the stages beside it).
+    // `s.whoop` is additive (may be absent pre-deploy of the API change), so this
+    // whole section degrades to blank rather than erroring on the old payload shape.
+    const _whStage = s.whoop || {};
+    if (_whStage.deep_hours != null && _whStage.rem_hours != null) {
+      const _whLight = _whStage.light_hours != null ? _whStage.light_hours : Math.max(0, (_whStage.total_sleep_hours || 0) - (_whStage.deep_hours || 0) - (_whStage.rem_hours || 0));
+      parts.push(sec("Last night's stages", stackedBar([{ label: "Deep", value: _whStage.deep_hours, tone: "ember" }, { label: "REM", value: _whStage.rem_hours, tone: "ink" }, { label: "Light", value: _whLight, tone: "faint" }], { label: "Hours by stage · Whoop", unit: "h" })));
+    }
     // §2 — dual-device stage agreement (P0.3): Eight Sleep % vs Whoop % per stage.
     const _wh = s.whoop_hours; const _dev = [];
     if (_wh) {
