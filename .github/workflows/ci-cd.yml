@@ -509,30 +509,21 @@ jobs:
             echo "::warning::CDK diff detected inline policy drift — a manual console fix may not be in CDK yet"
           fi
 
-          # ── Undeployed Lambda CONFIG drift (R20-F02, 2026-06-08) ──
+          # ── Undeployed Lambda CONFIG drift (R20-F02, 2026-06-08; classifier #2993) ──
           # CI deploys Lambda CODE only (deploy_lambda.sh). Config properties —
           # Handler, Runtime, Memory, Timeout, Environment, Layers — ship ONLY via
           # `cdk deploy`, so a merged config change silently does NOT reach AWS until
           # someone runs it (this is exactly how the og-image handler fix sat
-          # undeployed for ~3 months). Surface it LOUDLY + actionably. Code/asset-hash
-          # drift is expected from deploy_lambda.sh and intentionally NOT flagged here.
-          awk '
-            /^Stack / { stack = $2 }
-            /\[~\] (Handler|Runtime|MemorySize|Timeout|Environment|Layers|Architectures)/ {
-              if (stack && !seen[stack]++) print stack
-            }
-          ' /tmp/cdk_diff.txt > /tmp/config_drift_stacks.txt
-          if [ -s /tmp/config_drift_stacks.txt ]; then
-            echo "════════════════════════════════════════════════════════════"
-            echo "  ⚠️  MERGED LAMBDA CONFIG CHANGES NOT DEPLOYED BY CI"
-            echo "  (CI ships CODE only — config needs a manual cdk deploy)"
-            echo "════════════════════════════════════════════════════════════"
-            while read -r s; do
-              echo "  • $s   →   cd cdk && npx cdk deploy $s"
-              echo "::warning title=Run: cdk deploy $s::$s has a Lambda config change (handler/runtime/memory/timeout/env/layer) that CI's code-deploy cannot ship. Run locally: cd cdk && npx cdk deploy $s"
-            done < /tmp/config_drift_stacks.txt
-            echo "════════════════════════════════════════════════════════════"
-          fi
+          # undeployed for ~3 months). Surface it LOUDLY + actionably. The classifier
+          # lives in deploy/classify_cdk_diff.py (#2993, unit-tested): per-function
+          # property paths, so Code/asset-hash churn (expected from deploy_lambda.sh)
+          # never fires it, a property line under a non-Lambda resource never fires
+          # it, and the CDK-internal LogRetention singleton's toolchain-chosen
+          # Runtime (aws-cdk-lib regionalFact skew, #2468 — the #2993 live false
+          # positive) surfaces as an honest ::notice instead of a "run a manual
+          # production cdk deploy" warning. Residual config diffs still ::warning
+          # per stack, now naming the exact function.property that triggered.
+          python3 "$GITHUB_WORKSPACE/deploy/classify_cdk_diff.py" /tmp/cdk_diff.txt
 
           if [ "$CDK_EXIT" -ne 0 ]; then
             echo "::warning::cdk diff exited $CDK_EXIT (non-zero is normal when changes detected)"
