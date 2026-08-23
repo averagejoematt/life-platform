@@ -295,6 +295,15 @@ DURABLE_DESIGN_COPY = (
     "starts at the Day-1 weigh-in",
     "tap any day",
     "the week ahead",
+    # #3003 (2026-08-22): /data/habits/' 90-day adherence heatmap caption. The heatmap
+    # deliberately shows pre-genesis history (ADR-077 cross-phase, "clamped, not
+    # hidden") and this caption is the DISCLOSURE that makes it honest — the page
+    # saying, in as many words, that the history predates the cut. The oracle raised
+    # a high temporal_contradiction against the disclosure itself; render-verified
+    # against the live page (the current-cycle series next to it is separately and
+    # correctly windowed "AUG 17–AUG 22 · 6 PTS"). Habitual-present design copy,
+    # correct in every phase.
+    "90-day history predates the cut",
 )
 
 # The model quotes page copy with the page's own typography — the live notes carry
@@ -350,6 +359,60 @@ _MIN_FRAGMENT_CHARS = 8
 
 def _is_registered_span(span, registry):
     return any(r in span or (len(span) >= _MIN_FRAGMENT_CHARS and span in r) for r in registry)
+
+
+# ── a "contradiction" whose own objection resolves to vagueness (#3003) ────────
+#
+# THE OBSERVED FAILURE (2026-08-22, CI run 32601989142 — one of the two highs that
+# held the site publish path). /story/timeline/ rendered "DAY 6 · WEEK 1, SINCE
+# AUGUST 17 2026" and "The logs have gone quiet — 4 days without an entry" (fed by
+# the fail-closed /api/presence, which reported gap_days=4.0 at that moment — the
+# copy was TRUE). The oracle's note did the arithmetic itself — "the last entry
+# would have been on Day 2 or earlier" — which places the last entry INSIDE the
+# cycle, i.e. its own arithmetic establishes consistency, not contradiction. It
+# then retreated to "The phrase '4 days without an entry' is vague abou[t]…" and
+# still graded the finding `high`, the severity that FAILs a blocking gate.
+#
+# THE RULING (#3003 acceptance): "vague" is not a temporal_contradiction. The
+# category is defined as prose asserting a history the phase makes IMPOSSIBLE;
+# an objection that resolves to the phrasing being vague/ambiguous/unclear is by
+# construction not an impossibility claim, and the rubric's own severity bar
+# ("high = a first-time reader would conclude the site is lying or broken")
+# cannot be met by an admitted ambiguity. A high that resolves to vagueness
+# costs a deploy.
+#
+# WHY CODE AND NOT ONLY A PROMPT CLAUSE. This file's own measured record
+# (#2613: 3 of 3 runs ignored the ruling clause; #2741: 25 of 60 runs flagged
+# copy the DO-NOT-FLAG list named exempt) is that prose alone does not retire a
+# false-positive class. The prompt states the principle (category 1 below) AND
+# this predicate enforces it. DEMOTED to "low" rather than dropped — the model's
+# observation may still be worth a human glance as an advisory warning, it just
+# never gates. Printed, never silently swallowed.
+#
+# SCOPE — narrow on purpose. Fires only on temporal_contradiction, and only when
+# the note EXPLICITLY rests on vagueness ("is vague", "vague about", "ambiguous
+# as to", "unclear whether", …). A note that asserts an impossibility without
+# hedging language survives at full severity. The residue accepted: a note that
+# both proves a real impossibility AND uses this hedging language gets demoted —
+# but a note that hedges its own accusation is the model telling us it is not
+# sure, and per ADR-105 an unsure verdict does not get to fail a gate.
+_VAGUENESS_OBJECTION_RE = re.compile(
+    r"\b(?:is|are|was|were|being|remains?|seems?|appears?)\s+(?:somewhat\s+|rather\s+|too\s+)?(?:vague|ambiguous|unclear|imprecise)\b"
+    r"|\b(?:vague|ambiguous|unclear|imprecise)\s+(?:about|as\s+to|whether|on|regarding)\b",
+    re.I,
+)
+
+
+def is_vagueness_objection(finding):
+    """True when a temporal_contradiction's note explicitly rests on vagueness (#3003).
+
+    Structural conditions, both required: the finding is a temporal_contradiction,
+    and its note states that the flagged phrasing is vague/ambiguous/unclear —
+    which is an editorial complaint, not an impossibility, and never `high`.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    return bool(_VAGUENESS_OBJECTION_RE.search(finding.get("note") or ""))
 
 
 # Batch 4-6 surfaces per call so the duplicated-narrative check sees pages
@@ -564,7 +627,10 @@ checked deterministically by code before you run and are not your concern. NEITH
 IN AN /api/… PAYLOAD: every date and timestamp in those payloads is compared against the cycle \
 start by code on this same run, so do not reason about whether one of them falls before the \
 experiment began — that verdict is already made and is not yours. Judge the human-readable \
-sentences there instead.
+sentences there instead. A temporal_contradiction must be an IMPOSSIBILITY your own arithmetic \
+establishes against the phase above. Prose being vague, ambiguous, or imprecise about exactly when \
+something happened is NOT a contradiction — if your objection resolves to "the phrase is \
+vague/unclear/ambiguous", do not flag it in this category, and never above severity low.
 2. "duplicated_narrative" — the SAME substantive narrative paragraph (or a near-identical one) \
 appearing on two or more of the surfaces below. Shared navigation, footers, taglines, and short \
 labels do NOT count — only real narrative/analysis prose.
@@ -675,7 +741,13 @@ def _normalize_finding(f, batch_paths):
         norm = "/" + page.strip("/") + "/" if page.strip("/") else page
         if norm in batch_paths:
             page = norm
-    return {"page": page, "category": cat, "severity": sev, "note": str(f.get("note") or "")[:300]}
+    # #3003: the note is stored IN FULL — this used to be `[:300]`, which meant the
+    # artifact of record (qa-screenshots/report.json) kept only a mid-word fragment
+    # of every finding's evidence, and triage necessarily worked from a partial
+    # sentence (the [never diagnose from a truncated log line] trap built into the
+    # instrument's own record). The note is already bounded by the model's own
+    # max_tokens (1500/batch); truncation belongs at PRINT time only.
+    return {"page": page, "category": cat, "severity": sev, "note": str(f.get("note") or "")}
 
 
 # ── assessment loop ────────────────────────────────────────────────────────────
@@ -754,6 +826,15 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                         f"(the rubric names this copy exempt in every phase, #2741): {f['note'][:120]}"
                     )
                     continue
+                # #3003: a "contradiction" whose own objection resolves to vagueness is
+                # an editorial complaint, not an impossibility — DEMOTED to low (kept
+                # visible as advisory, never gating). Printed, never silently swallowed.
+                if f["severity"] != "low" and is_vagueness_objection(f):
+                    print(
+                        f"  ↩ reader-truth: demoted a vagueness-objection finding on {f['page']} "
+                        f"{f['severity']}→low ('vague' is not a temporal_contradiction, #3003): {f['note'][:120]}"
+                    )
+                    f = dict(f, severity="low")
                 findings.append(f)
         except Exception as e:
             errors.append(f"batch [{', '.join(str(p.get('path')) for p in batch)}]: {str(e)[:140]}")

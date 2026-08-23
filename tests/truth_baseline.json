@@ -64,6 +64,15 @@
         "note_sample": "Character sheet states 'FOUNDATION \u00b7 LEVEL 1 OF 100 \u00b7 AS OF 2026-08-20' but today is 2026-08-21 (Day 5). The date is one day in the past, suggesting either the page was not updated or the timestamp is"
       }
     ],
+    "/data/habits/": [
+      {
+        "category": "temporal_contradiction",
+        "issue": "#2959",
+        "added": "2026-08-22",
+        "severity_observed": "high",
+        "note_sample": "The 90-DAY ADHERENCE HEATMAP section states '90-DAY HISTORY PREDATES THE CUT' and shows a heatmap with 90 days of history, but the experiment phase only allows 6 days of current-experiment data (Day 1"
+      }
+    ],
     "/data/physical/": [
       {
         "category": "temporal_contradiction",

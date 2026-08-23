@@ -166,3 +166,28 @@ def test_a_short_common_word_inside_registered_copy_does_not_count():
     reg = [rt._normalize_copy(s) for s in rt.DURABLE_DESIGN_COPY]
     for word in ("the", "day", "week", "at the"):
         assert rt._is_registered_span(word, reg) is False, word
+
+
+# ── #3003: the /data/habits/ heatmap disclosure is registered durable copy ────
+# The recorded 2026-08-22 finding (run 32601989142) flagged the caption that IS
+# the page's honesty disclosure: "90-DAY HISTORY PREDATES THE CUT" — the ADR-077
+# cross-phase shape correctly labelled. Render-verified against the live page.
+# NB: the stored evidence for this run was truncated at 300 chars (the defect
+# #3003 also fixes), so the fixture is the recorded prefix; the drop requires
+# EVERY quoted span to be registered, and a fuller note quoting other page copy
+# would rightly survive to the (page, category) baseline instead.
+
+_HABITS_NOTE_3003 = (
+    "The 90-DAY ADHERENCE HEATMAP section states '90-DAY HISTORY PREDATES THE CUT' and shows a heatmap "
+    "with 90 days of history, but the experiment phase only allows 6 days of current-experiment data "
+    "(Day 1 = 2026-08-17, today = 2026-08-22). This heatmap narrative implies 90 days of tracked habit data"
+)
+
+
+def test_the_habits_heatmap_disclosure_is_dropped():
+    assert rt.is_durable_design_copy(_f(_HABITS_NOTE_3003, page="/data/habits/")) is True
+
+
+def test_habits_note_quoting_other_copy_alongside_survives():
+    note = _HABITS_NOTE_3003 + " and the section also states 'Tier-0 adherence held for 90 days straight'."
+    assert rt.is_durable_design_copy(_f(note, page="/data/habits/")) is False
