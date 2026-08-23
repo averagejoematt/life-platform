@@ -13,6 +13,17 @@
       ]
     },
     {
+      "Sid": "AiCostTelemetry",
+      "Effect": "Allow",
+      "Action": "cloudwatch:PutMetricData",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "cloudwatch:namespace": "LifePlatform/AI"
+        }
+      }
+    },
+    {
       "Sid": "QaArchiveScreenshotWrite",
       "Effect": "Allow",
       "Action": [

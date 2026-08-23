@@ -133,6 +133,7 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
     dimensionless AnthropicOutputTokens (feeds the existing platform-total
     alarm) and EstimatedCostUSD both per-feature and dimensionless (the latter
     feeds the daily-spend anomaly alarm, G2). Fully fail-open."""
+    md: list = []
     try:
         in_tok = int(usage.get("input_tokens", 0) or 0)
         out_tok = int(usage.get("output_tokens", 0) or 0)
@@ -159,7 +160,15 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
             md.append({"MetricName": "AnthropicCacheWriteTokens", "Dimensions": fn_dim, "Value": cache_write, "Unit": "Count"})
         _cw().put_metric_data(Namespace=_CW_NAMESPACE, MetricData=md)
     except Exception as e:  # never break an AI call on telemetry
-        print(f"[WARN] bedrock cost telemetry emit failed (non-fatal): {e}")
+        # ERROR, not WARN — a fail-open side channel that fails 100% of the time is
+        # invisible at WARN (#2974: the visual-qa CI role lacked PutMetricData, so
+        # every CI Bedrock call billed but never recorded, undercounting the AI-cost
+        # self-metric #2883 measures). Name the namespace + dropped metrics so the
+        # loss is greppable/alarmable; still never raise to the AI caller.
+        dropped = ", ".join(sorted({m["MetricName"] for m in md})) or "n/a"
+        print(
+            f"[ERROR] bedrock cost telemetry emit failed (non-fatal, datapoints DROPPED): namespace={_CW_NAMESPACE} metrics=[{dropped}]: {e}"
+        )
 
 
 def _client():

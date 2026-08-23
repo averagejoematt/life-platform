@@ -127,6 +127,22 @@ def test_emit_is_fail_open(monkeypatch):
     bc._emit_usage_metrics({"input_tokens": 1, "output_tokens": 1}, "haiku")  # must not raise
 
 
+def test_emit_failure_is_visible_with_namespace_and_metric_names(monkeypatch, capsys):
+    # #2974: the visual-qa CI role lacked PutMetricData and every CI Bedrock call
+    # dropped its datapoints behind a WARN nothing watched. The failure stays
+    # fail-open but must be VISIBLE: ERROR level, naming the namespace and the
+    # dropped metric names, so a silent-regression is greppable/alarmable.
+    boom = MagicMock()
+    boom.put_metric_data.side_effect = RuntimeError("AccessDenied on PutMetricData")
+    monkeypatch.setattr(bc, "_cw", lambda: boom)
+    bc._emit_usage_metrics({"input_tokens": 1, "output_tokens": 1}, "haiku")  # still must not raise
+    out = capsys.readouterr().out
+    assert "[ERROR]" in out
+    assert "LifePlatform/AI" in out
+    assert "EstimatedCostUSD" in out and "AnthropicOutputTokens" in out
+    assert "AccessDenied on PutMetricData" in out
+
+
 # ── invoke() integration ─────────────────────────────────────────────────────
 
 

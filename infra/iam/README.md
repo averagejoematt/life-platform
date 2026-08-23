@@ -159,6 +159,33 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > `verify_oidc_iam.py --strict` reports the pending drift on
 > `github-actions-diagnosis-role:diagnosis-permissions`.
 
+## Diagnosis-role AI cost telemetry — STAGED (#2974), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live** (verified 2026-08-22: live policy ==
+> pre-#2974 JSON, so the #1441/#1435 grants above ARE applied and this is the only
+> pending statement). #2974 adds ONE statement to
+> `github-actions-diagnosis-role.permissions.json`: `AiCostTelemetry` —
+> `cloudwatch:PutMetricData` namespace-conditioned to `LifePlatform/AI` (same
+> least-privilege pattern as the golden-eval role's `GoldenBriefMetrics`), so the
+> visual-qa CI job's Bedrock calls can record their token/cost metrics at the
+> `bedrock_client.invoke()` chokepoint (G1). Without it every CI Bedrock call bills
+> but never records — the largest single AI consumer in CI silently missing from the
+> AI-cost self-metric that #2883 measures. The emit stays fail-open (a telemetry
+> error never reds the QA sweep) but logs at ERROR with the dropped metric names
+> since #2974. Apply (attended):
+>
+> ```bash
+> aws iam put-role-policy \
+>   --role-name github-actions-diagnosis-role \
+>   --policy-name diagnosis-permissions \
+>   --policy-document file://infra/iam/github-actions-diagnosis-role.permissions.json
+> python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
+> ```
+>
+> Post-apply proof: the next CI run's `Visual + AI-vision QA` job log shows **zero**
+> `bedrock cost telemetry emit failed` lines, and `LifePlatform/AI EstimatedCostUSD`
+> gains datapoints timestamped during the run.
+
 ### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
 
 > Precondition: attended, matthew-admin, with rollback ready. Same discipline as #687 —
