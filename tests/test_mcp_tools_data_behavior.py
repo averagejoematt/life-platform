@@ -467,11 +467,19 @@ def test_find_days_strips_tier2_fields_from_matched_rows(fake_query_source):
     assert got[0]["weight_lbs"] == 180
 
 
-def test_tier2_strip_fields_registry_names_exactly_the_documented_trio():
-    """Structural guard: the strip set matches docs/SCHEMA.md's PhenoAge-posture
-    trio exactly — not a subset (a partial strip is still a leak) and not a
-    superset (a wider strip would silently start hiding non-Tier-2 data)."""
-    assert td.TIER2_STRIP_FIELDS["withings"] == TIER2_TRIO
+def test_tier2_strip_fields_registry_matches_the_declared_registry():
+    """Structural guard: the strip set IS the field_tiers derivation — it still covers
+    docs/SCHEMA.md's PhenoAge-posture trio (a partial strip is a leak), and it cannot
+    be wider or narrower than the registry declares (#3045 widened the declared set
+    deliberately, per ADR-155; owner-published fields like weight_lbs must NOT appear —
+    strip_map() excludes them by construction, so the owner's row dumps are never
+    stricter than the public site)."""
+    from privacy.field_tiers import strip_map
+
+    assert td.TIER2_STRIP_FIELDS["withings"] >= TIER2_TRIO
+    assert {s: set(f) for s, f in td.TIER2_STRIP_FIELDS.items()} == {s: set(f) for s, f in strip_map().items()}
+    assert "weight_lbs" not in td.TIER2_STRIP_FIELDS["withings"]
+    assert "hrv" not in td.TIER2_STRIP_FIELDS.get("whoop", frozenset())
 
 
 # ──────────────────────────────────────────────────────────────────────────────

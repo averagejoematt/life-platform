@@ -84,7 +84,12 @@ def family_of(rel_path: str) -> str:
 
 # ── Decisions ─────────────────────────────────────────────────────────────────
 SAW = "SAW"  # this module legitimately handles the field
-EXCLUDED = "EXCLUDED"  # the mention is not a value read, or the value is stripped here
+# EXCLUDED: the mention is not a value read of the governed source's field — a string
+# constant that is not a data access, a cross-source NAME COLLISION (#3045 widened the
+# vocabulary enough that unrelated computed outputs and other partitions' dict keys can
+# share a governed name; the registry is per-source, the scan is name-based), or a site
+# where the value is stripped rather than read.
+EXCLUDED = "EXCLUDED"
 VALID_DECISIONS = frozenset({SAW, EXCLUDED})
 
 
@@ -124,7 +129,145 @@ CONSUMERS: dict[tuple[str, str], dict] = {
         "panel was withheld and names which one. No value is read, and naming a "
         "withheld panel is the opposite of publishing it.",
     ),
+    # ── #3045 vocabulary widening (ADR-155 port of DATA_GOVERNANCE Tier-2) ───────
+    # time_awake_hours: the one whoop sleep-stage field the public surface does NOT
+    # serve (deep/rem/light are OWNER_PUBLISHED). Its consumers are all owner-facing.
+    ("lambdas/ingestion/whoop_lambda.py", "time_awake_hours"): _d(
+        SAW,
+        "The ingester: _extract_sleep computes it from total_awake_time_milli and "
+        "writes it. The writer is where the tier is assigned, not where it leaks.",
+    ),
+    ("lambdas/common/digest_utils.py", "time_awake_hours"): _d(
+        SAW,
+        "Owner-facing digest assembly (daily brief internals). Reads the value to "
+        "render the owner's private sleep breakdown; never feeds a public payload.",
+    ),
+    ("lambdas/compute/daily_metrics_compute_lambda.py", "time_awake_hours"): _d(
+        SAW,
+        "Pre-computes the owner's daily metrics rollup stored to DDB for the brief. "
+        "Internal compute path; the public site reads separate aggregate fields.",
+    ),
+    ("lambdas/emails/daily_brief_lambda.py", "time_awake_hours"): _d(
+        SAW,
+        "The owner's private 17:00 UTC email. Tier-2 owner-only content is exactly "
+        "what this surface exists to carry — it is the owner's own inbox.",
+    ),
+    ("mcp/helpers.py", "time_awake_hours"): _d(
+        SAW,
+        "Owner MCP surface: the sleep-stage percentage helper reads it alongside the "
+        "published stage trio. Field-selective owner read, sanctioned by the SCHEMA "
+        "ruling's own carve-out (#2809 distinction).",
+    ),
+    # bmr_kcal: NAME COLLISION verified 2026-08-23 — the withings device field (measure
+    # 226) is written only by the ingester; tdee.py and tools_health.py bind the same
+    # name to their own computed Mifflin-St Jeor output, never a withings row read.
+    ("lambdas/health/tdee.py", "bmr_kcal"): _d(
+        SAW,
+        "Computes its OWN Mifflin-St Jeor BMR (ADR-152) and names the output "
+        "bmr_kcal. Cross-name collision with the withings device field, not a read "
+        "of it — this module never touches withings rows.",
+    ),
+    ("mcp/tools_health.py", "bmr_kcal"): _d(
+        SAW,
+        "Owner MCP energy-budget tool: reads tdee.py's computed bmr_kcal output "
+        "(the Mifflin value, not the withings device measurement) and returns it on "
+        "the owner's own surface.",
+    ),
+    ("lambdas/ingestion/withings_lambda.py", "bmr_kcal"): _d(
+        SAW,
+        "The ingester: MEAS_TYPES maps device measure 226 (BodyScan BMR) to this "
+        "name and writes it. The other two mentions of the name in the tree are the "
+        "Mifflin collision, classified above.",
+    ),
+    # fat_mass_lbs: cross-source collision — both mentions read the DEXA report's
+    # body_composition dict (source `dexa`, TIER_OWNER_PUBLISHED source-level per
+    # ADR-155), never a withings row. The withings stamp governs withings rows.
+    ("lambdas/content/output_writers.py", "fat_mass_lbs"): _d(
+        EXCLUDED,
+        "AI/content family, but the read is bc.get('fat_mass_lbs') on the dexa "
+        "partition's body_composition dict — a TIER_OWNER_PUBLISHED source "
+        "(ADR-155), not a withings row. Cross-source name collision; this module "
+        "does not read the governed withings field.",
+    ),
+    ("lambdas/emails/nutrition_review_lambda.py", "fat_mass_lbs"): _d(
+        SAW,
+        "Owner's private nutrition-review email; reads the DEXA report dict "
+        "(fat_mass_lb source key), not withings rows. Owner-facing surface either "
+        "way — sanctioned.",
+    ),
+    # Reading retention fields (ADR-097): owner-only per DATA_GOVERNANCE's reading row;
+    # the server-side enforcement point is reading_visibility.project_public.
+    ("lambdas/reading/reading_recall.py", "retentionScore"): _d(
+        SAW,
+        "The writer: computes and updates the spaced-retrieval retention score on "
+        "READING# records. Where the field is born, not where it leaks.",
+    ),
+    ("lambdas/reading/reading_store.py", "moodSnapshot"): _d(
+        SAW,
+        "The writer: persists the session moodSnapshot on reading-session records. " "Owner-only at birth per the ADR-097 spec (§10).",
+    ),
+    ("lambdas/reading/reading_visibility.py", "retentionScore"): _d(
+        EXCLUDED,
+        "The STRIP POINT: project_public exists to remove this field from every "
+        "public projection (spec §10, enforced server-side). The mention is the "
+        "strip, not a publication.",
+    ),
+    ("lambdas/reading/reading_visibility.py", "moodSnapshot"): _d(
+        EXCLUDED,
+        "Same strip point as retentionScore: project_public removes it from the "
+        "public shelf projection. The mention is the removal itself.",
+    ),
+    ("mcp/tools_reading.py", "retentionScore"): _d(
+        SAW,
+        "Owner MCP reading tools: field-selective read of the owner's own retention "
+        "data — the exact surface DATA_GOVERNANCE's reading row names as sanctioned "
+        "(owner's toggle, owner's eyes).",
+    ),
 }
+
+# The withings BodyScan family (#2782) and the remaining whoop raw-biometric fields:
+# every name below was verified 2026-08-23 (tree-wide grep + this scan) to have a
+# WRITER-ONLY footprint — the ingester's measure map / extractor names it, and no other
+# module in lambdas/ or mcp/ mentions it. One homogeneous class, one verified fact, so
+# the entries are generated rather than hand-restated 25 times; any NEW consumer of any
+# of these names still reds the build until it gets its own hand-written entry above.
+_WRITER_ONLY = {
+    "lambdas/ingestion/withings_lambda.py": (
+        "body_temperature_c",
+        "bone_mass_kg",
+        "eda_feet",
+        "eda_left_foot",
+        "eda_right_foot",
+        "extracellular_water_kg",
+        "fat_mass_kg",
+        "fat_ratio_pct",
+        "heart_pulse",
+        "height_m",
+        "hydration_kg",
+        "intracellular_water_kg",
+        "muscle_mass_kg",
+        "pr_interval_ms",
+        "pulse_wave_velocity_mps",
+        "qrs_interval_ms",
+        "qt_interval_ms",
+        "skin_temperature_c",
+        "temperature_c",
+        "visceral_fat_index",
+    ),
+    "lambdas/ingestion/whoop_lambda.py": (
+        "skin_temp_celsius",
+        "sleep_consistency_percentage",
+        "spo2_percentage",
+    ),
+}
+for _path, _fields in _WRITER_ONLY.items():
+    for _field in _fields:
+        CONSUMERS[(_path, _field)] = _d(
+            SAW,
+            f"The ingester's measure map / extractor defines and writes `{_field}` "
+            "(writer-only footprint, verified tree-wide 2026-08-23 for the #3045 "
+            "port). The writer is where the tier is assigned, not where it leaks.",
+        )
 
 
 # ── The derivation ────────────────────────────────────────────────────────────

@@ -27,9 +27,14 @@ sys.path.insert(0, os.path.join(REPO, "lambdas"))
 import privacy_tier_wiring as wiring  # noqa: E402
 from privacy.field_tiers import (  # noqa: E402
     FIELD_TIERS,
+    SOURCE_TIERS,
     TIER_OWNER_ONLY,
+    TIER_OWNER_PUBLISHED,
+    TIER_PUBLIC,
     VALID_TIERS,
     fields_at_tier,
+    is_publishable,
+    source_tier_of,
     strip_map,
     tier_of,
 )
@@ -59,8 +64,85 @@ def test_the_schema_ruling_is_represented():
 
 
 def test_an_unlisted_field_defaults_to_public():
-    assert tier_of("withings", "weight_lbs") == 0
+    """The honest default stands — but weight_lbs is no longer the example: #3045
+    stamped it TIER_OWNER_PUBLISHED (an explicit consent, not an omission)."""
+    assert tier_of("withings", "steps_total_nosuch") == 0
     assert tier_of("nosuchsource", "nosuchfield") == 0
+    assert source_tier_of("nosuchsource") == 0
+
+
+# ── #3045: publication is a stamp, never an omission ─────────────────────────
+def test_owner_published_is_a_distinct_valid_tier():
+    assert TIER_OWNER_PUBLISHED in VALID_TIERS
+    assert TIER_OWNER_PUBLISHED not in (TIER_PUBLIC, TIER_OWNER_ONLY)
+
+
+def test_the_consented_vitals_surface_is_stamped_not_omitted():
+    """The ADR-155 consent set: every field /api/vitals serves, plus the sleep-stage
+    trio and the lean-mass pair the public surface verifiably serves today. Pinned by
+    name — dropping one from the registry would silently return it to
+    public-by-omission, the exact state DIL-008/DIL-011 flagged."""
+    for field in (
+        "hrv",
+        "resting_heart_rate",
+        "recovery_score",
+        "sleep_duration_hours",
+        "rem_sleep_hours",
+        "slow_wave_sleep_hours",
+        "light_sleep_hours",
+    ):
+        assert tier_of("whoop", field) == TIER_OWNER_PUBLISHED, f"whoop.{field} lost its ADR-155 stamp"
+    for field in ("weight_lbs", "weight_kg", "fat_free_mass_lbs", "fat_free_mass_kg"):
+        assert tier_of("withings", field) == TIER_OWNER_PUBLISHED, f"withings.{field} lost its ADR-155 stamp"
+    for source in ("labs", "dexa"):
+        assert source_tier_of(source) == TIER_OWNER_PUBLISHED, f"source {source} lost its ADR-155 stamp"
+
+
+def test_is_publishable_fails_closed():
+    assert is_publishable(TIER_PUBLIC)
+    assert is_publishable(TIER_OWNER_PUBLISHED)
+    assert not is_publishable(TIER_OWNER_ONLY)
+    assert not is_publishable(1)  # internal
+    assert not is_publishable(99)  # an unknown tier reads as restricted, never public
+
+
+def test_source_tiers_are_valid_and_owner_grade():
+    """Source-level entries exist only for the owner-published / owner-only grades —
+    a TIER_PUBLIC source entry would be a no-op masquerading as a decision."""
+    for source, tier in SOURCE_TIERS.items():
+        assert tier in VALID_TIERS, f"source {source} declares tier {tier!r}"
+        assert tier in (TIER_OWNER_ONLY, TIER_OWNER_PUBLISHED), f"source {source} declares a non-decision tier {tier!r}"
+
+
+def test_owner_published_never_enters_a_strip_set():
+    """The #3045 semantics: owner-published fields are deliberately public (ADR-155),
+    so no strip set at any threshold may contain them — the owner's own MCP row dumps
+    must not be stricter than the public site."""
+    published = {(s, f) for s, fields in FIELD_TIERS.items() for f, t in fields.items() if t == TIER_OWNER_PUBLISHED}
+    assert published, "no owner-published fields declared — the ADR-155 stamp vanished"
+    for threshold in (1, TIER_OWNER_ONLY):
+        stripped = strip_map(threshold)
+        for source, field in published:
+            assert field not in stripped.get(source, frozenset()), f"strip_map({threshold}) strips owner-published {source}.{field}"
+
+
+def test_owner_only_is_still_stripped_from_row_dumps():
+    """The complement — the widened owner-only vocabulary all lands in the strip set
+    tools_data derives, so a whole-row dump on the owner MCP surface (the #2809 shape)
+    sheds every owner-only field while keeping the published ones."""
+    stripped = strip_map()
+    for source, fields in FIELD_TIERS.items():
+        for field, tier in fields.items():
+            if tier == TIER_OWNER_ONLY:
+                assert field in stripped.get(source, frozenset()), f"owner-only {source}.{field} missing from the derived strip set"
+
+
+def test_owner_published_is_not_in_the_tier2_scan_vocabulary():
+    """The wiring scan guards owner-ONLY fields. A published field in the vocabulary
+    would force EXCLUDED entries onto every legitimate public consumer of a consented
+    field — noise that would rot the registry."""
+    vocab = fields_at_tier(TIER_OWNER_ONLY)
+    assert "hrv" not in vocab and "weight_lbs" not in vocab and "rem_sleep_hours" not in vocab
 
 
 # ── the derivation must see the tree ─────────────────────────────────────────
@@ -172,8 +254,10 @@ def test_tools_data_strip_set_is_derived_from_the_registry():
     name = fn.id if isinstance(fn, ast.Name) else getattr(fn, "attr", None)
     assert name == "strip_map", f"TIER2_STRIP_FIELDS derives from {name!r}, not strip_map()"
 
-    # And the derivation still covers the #2809 trio at the source.
-    assert strip_map()["withings"] == frozenset(
+    # And the derivation still covers the #2809 trio at the source (#3045 widened the
+    # set — superset assertion now; exact membership is owned by the registry itself
+    # and test_owner_only_is_still_stripped_from_row_dumps).
+    assert strip_map()["withings"] >= frozenset(
         {"vascular_age", "metabolic_age", "afib_result"}
     ), "the derived strip set no longer covers the #2809 trio"
 
