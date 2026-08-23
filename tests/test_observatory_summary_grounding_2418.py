@@ -42,7 +42,10 @@ SURFACE_KEY = "lambdas/coach/coach_state_updater.py::_gate_derived_prose"
 DIRECT_READERS = frozenset(
     {
         "lambdas/web/site_api_coach_narrative.py",
-        "lambdas/web/site_api_lambda.py",
+        # site_api_lambda LEFT this set deliberately (#2972): its one read was the
+        # public dashboard blurb slot, which now serves ONLY the audience-guarded
+        # `public_summary` (coach/audience_guard.public_blurb) — the coaching-register
+        # fallthrough to observatory_summary/content was the audience_violation defect.
         "lambdas/coach/coach_observatory_renderer.py",
     }
 )
@@ -126,8 +129,10 @@ class TestTheSixServingPaths:
             assert "coach_derived_prose.served_summary(" in source, f"{rel} no longer uses the shared derived-prose read seam"
             assert 'observatory_summary") or ""' not in source, f"{rel} still ends its chain at the empty string"
 
-    def test_the_census_is_six_paths(self):
-        assert len(DIRECT_READERS | HELPER_READERS) == 6
+    def test_the_census_is_five_paths(self):
+        # Six until #2972 moved site_api_lambda's dashboard blurb slot off
+        # observatory_summary entirely (see the DIRECT_READERS note above).
+        assert len(DIRECT_READERS | HELPER_READERS) == 5
 
     def test_a_held_record_still_serves_the_gated_narrative(self):
         """The whole point of the fallback: HOLD degrades, it does not blank."""
@@ -270,7 +275,9 @@ class TestRegenerateOrHold:
 class TestTheHoldIsScopedToTheArtifact:
     def test_hold_nulls_only_the_derived_prose(self):
         held = coach_derived_prose.hold({"observatory_summary": "x", "key_recommendation": "y", "themes": ["a"], "content": "n"})
-        assert [held[f] for f in coach_derived_prose.DERIVED_PROSE_FIELDS] == [None, None, None]
+        # The whole set — four since #2972 added public_summary — derived, not hand-counted.
+        assert [held[f] for f in coach_derived_prose.DERIVED_PROSE_FIELDS] == [None] * len(coach_derived_prose.DERIVED_PROSE_FIELDS)
+        assert len(coach_derived_prose.DERIVED_PROSE_FIELDS) == 4
         assert held["themes"] == ["a"] and held["content"] == "n"
 
     def test_hold_does_not_mutate_the_caller(self):

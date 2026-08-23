@@ -85,7 +85,10 @@ const WIRE = {
       const out = document.querySelector("[data-board-read]");
       out.innerHTML = `<p class="rd-archive"><span class="shimmer">Reading ${esc(name)}…</span></p>`;
       const [an, tl] = await Promise.all([tryJSON(`/api/coach_analysis?domain=${encodeURIComponent(id)}`), tryJSON(`/api/coach_timeline?coach_id=${encodeURIComponent(id)}`)]);
-      const analysis = an && an.analysis; const ms = (tl && tl.milestones) || [];
+      // #2972: the board is a READER surface — render only the public-audience read
+      // (third person about the experiment, audience-guarded server-side). Never fall
+      // back to `an.analysis`: that is the coaching register, written TO Matthew.
+      const analysis = an && an.public_read; const ms = (tl && tl.milestones) || [];
       const refreshNote = an ? coachRefreshNote(an.generated_at, !!an.regeneration_paused) : "";
       out.innerHTML = `<div class="coach-detail"><p class="dx-kicker label">${esc(title)} · ${esc(name)}</p>` +
         (analysis && !isBad(analysis) ? `<p class="rd-prose">${esc(analysis)}</p>` : `<p class="rd-archive">${esc(name)}'s read posts here as data in their domain accrues.</p>`) +

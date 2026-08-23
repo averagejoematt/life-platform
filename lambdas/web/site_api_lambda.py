@@ -51,7 +51,6 @@ from decimal import Decimal  # noqa: F401 — kept for backward-compat with hand
 import boto3  # noqa: F401 — kept for handlers that create clients
 from boto3.dynamodb.conditions import Key
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE spelling, imported, never retyped
-from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 
 # bundled shared module
 from experiment.phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
@@ -699,6 +698,7 @@ def _dispatch_route(event, path, method):
             # only `observatory_link` is still hand-typed — it is a ROUTING fact (which
             # page a domain's card links to), not a persona-identity fact, so it stays a
             # small local map rather than moving into the persona registry.
+            from coach import audience_guard  # #2972 — the public-audience frame for the blurb slot
             from coach.persona_registry import display_map as _registry_display_map
 
             _cd_observatory_link = {
@@ -802,11 +802,16 @@ def _dispatch_route(event, path, method):
                     _cd_out_items = _cd_out.get("Items", [])
                     if _cd_out_items:
                         _cd_out_item = _decimal_to_float(_cd_out_items[0])
-                        coach_entry["position_summary"] = (
-                            _cd_out_item.get("position_summary")
-                            or truncate_at_word(_cd_out_item.get("observatory_summary", ""), 200)  # #1224: word boundary
-                            or truncate_at_word(_cd_out_item.get("content", ""), 200)  # #1224: word boundary
-                        )
+                        # #2972: this slot is served to site VISITORS, so it carries ONLY the
+                        # audience-guarded public register (`public_summary`, guarded on the FULL
+                        # text before the #1224 word-boundary truncation). `position_summary` is
+                        # RETIRED from this read path: the OUTPUT# rows never carried it (it is
+                        # written to SOURCE#coach_thread — a different partition, the #2569
+                        # reader/writer-mismatch class), so the old chain always fell through to
+                        # `observatory_summary`/`content`, both written TO Matthew — the exact
+                        # audience_violation the reader-truth oracle flagged. The response key
+                        # keeps its historical name; the front-ends drop empty entries honestly.
+                        coach_entry["position_summary"] = audience_guard.public_blurb(_cd_out_item)
                         coach_entry["emotional_investment"] = _cd_out_item.get("emotional_investment", "neutral")
                         # #1226: as-of date for the digest card kicker. Prefer the
                         # OUTPUT# record's ISO timestamp (matches the observatory

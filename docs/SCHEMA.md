@@ -2434,6 +2434,11 @@ Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, 
 | `lens` | string | Analytical lens used this cycle |
 | `voice_version` | string | Voice spec version used |
 | `quality_score` | number | Quality gate score (0.0-1.0) |
+| `observatory_summary` | string\|null | Coach-register condensation (first person, speaks TO Matthew) — owner/coach surfaces only (#2418) |
+| `key_recommendation` | string\|null | Single most actionable recommendation (coach register, #2418) |
+| `elena_quote` | string\|null | Elena Voss meta-observation, third person (#2418) |
+| `public_summary` | string\|null | **The PUBLIC-audience read (#2972)** — third person about Matthew, for site visitors; written through `coach/audience_guard.reader_safe` (owner-directed candidates held as null); the ONLY coach field the public board/blurb seams serve |
+| `derived_prose_held` | bool | Present/true when the ADR-104 grounding gate held the derived-prose set (#2418) |
 
 **THREAD#{date} fields:**
 
