@@ -122,7 +122,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `reviews/` | Dated board/consultancy reviews (see [R21](reviews/R21_BACKLOG.md), the 2026-07-06 definitive review; [FRONTIER_REVIEW_2026-07-18](reviews/FRONTIER_REVIEW_2026-07-18.md), the quantified-life strategy review → label `review:frontier-2026-07-18`). [PLATFORM_PRODUCT_REVIEW_2026-07](reviews/PLATFORM_PRODUCT_REVIEW_2026-07.md) also holds the **parked register** — the gated/won't-do/owner-capture items the ADR-099 backlog deliberately does not file as issues (ADR-101); pointer issue [#423](https://github.com/averagejoematt/life-platform/issues/423), never duplicated here |
 | `design/` | Current design assets + the portrait runbook |
 | `design-review/` | The paste-ready design-review prompt kit (current tooling) |
-| `coaching/` | Coaching program docs (PRIVATE-flagged content — never surface publicly) |
+| `coaching/` | Coaching *system* docs (deliberately public); owner-private coaching material lives at the S3 owner prefix — see [coaching/README.md](coaching/README.md) (#3043) |
 | `content/` | Content-production checklists (build dispatches etc.) + [REDDIT_PLAYBOOK.md](content/REDDIT_PLAYBOOK.md) — the manual Reddit operating procedure (**do-not-automate**, #1625) |
 | `briefs/` | Dated feature briefs (historical) |
 | `audits/` · `v2-audits/` · `rca/` | Dated audit + post-mortem records |

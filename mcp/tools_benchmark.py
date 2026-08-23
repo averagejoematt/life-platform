@@ -22,7 +22,8 @@ from datetime import datetime, timedelta, timezone
 
 from mcp.core import get_profile, query_source
 
-# Run gate from PROVEN_BLUEPRINT.md — zero runs logged above ~240 lb in his own history.
+# Run gate from PROVEN_BLUEPRINT.md (owner-private: s3://matthew-life-platform/config/coaching/,
+# #3043) — zero runs logged above ~240 lb in his own history.
 RUN_GATE_LB = 240.0
 
 TRAINING_REFERENCE_SOURCE = "training_reference"

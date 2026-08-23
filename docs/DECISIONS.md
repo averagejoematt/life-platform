@@ -2809,9 +2809,9 @@ We are not an allowlisted customer, so this path is closed to us and will not re
 ## ADR-089: Cut benchmarking (BENCH-1) — descriptive divergence vs his own proven cut, weekly-computed, no predictor
 
 **Date:** 2026-06-19
-**Status:** Implemented (code + tests shipped; CDK deploy of `episode-detect` + one-time backfill + MCP redeploy pending — Matthew runs all deploys per the work order). **Related:** `docs/coaching/WORKORDER_BENCH1_benchmarking.md`, `docs/coaching/PROVEN_BLUEPRINT.md`, `lambdas/compute/episode_detect_lambda.py`, `mcp/tools_benchmark.py`. **Privacy:** PRIVATE — nothing in BENCH-1 may surface to Elena Voss or any public surface.
+**Status:** Implemented (code + tests shipped; CDK deploy of `episode-detect` + one-time backfill + MCP redeploy pending — Matthew runs all deploys per the work order). **Related:** `WORKORDER_BENCH1_benchmarking.md` + `PROVEN_BLUEPRINT.md` (owner-private at `s3://matthew-life-platform/config/coaching/` since #3043), `lambdas/compute/episode_detect_lambda.py`, `mcp/tools_benchmark.py`. **Privacy:** PRIVATE — nothing in BENCH-1 may surface to Elena Voss or any public surface.
 
-**Context.** PROVEN_BLUEPRINT mined Matthew's 14-year Withings/Strava/Hevy history: 16 distinct ≥15 lb loss episodes, **0 that held** (regain ≈ 0.79× as fast as loss; walking volume collapses ~8 wk post-trough). Losing is proven; holding has never been solved. BENCH-1 operationalizes that finding as a tool the coach can consult.
+**Context.** PROVEN_BLUEPRINT mined Matthew's 14-year Withings/Strava/Hevy history for his repeated loss episodes and their regain signature (the per-episode ledger and rate specifics are owner-private with the blueprint — #3043). Losing is proven; holding has never been solved. BENCH-1 operationalizes that finding as a tool the coach can consult.
 
 **Decision.**
 - **New partition (two thin derived computed sources), not a separate store** (Omar). `weight_episodes` (one item per detected episode) + `training_reference` (singleton: by-band proven volumes + the proven trajectory curve). Both keyed + serialized exactly like `computed_metrics` (PK `USER#…#SOURCE#{source}`, SK `DATE#…`, Decimal), read via `query_source`. Written **without** a `phase` attribute = cross-phase reference data: survives an experiment reset and passes the ADR-058 default filter. No TTL.

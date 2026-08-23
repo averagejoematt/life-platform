@@ -1,5 +1,13 @@
 # `infra/iam/` — the OIDC automation identities, codified (#401 / ADR-120)
 
+> **Dated publication note (2026-08-23, #3043 DIL-012):** these policy documents —
+> and the AWS account id inside their ARNs — are published **deliberately** in the
+> public repo. The account id is not a secret by itself (it appears in every ARN
+> across `cdk/`; AWS guidance treats it as an identifier, not a credential), and the
+> policies contain no credentials: the security boundary is the OIDC trust
+> conditions + STS, not obscurity. Publishing them is what makes every trust change
+> a reviewable PR with `git revert` as the rollback.
+
 This directory is the **reviewable, git-revertible source of truth** for the
 hand-managed AWS identities that gate all automated access to the cloud:
 

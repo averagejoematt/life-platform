@@ -8,13 +8,16 @@ Tanaka (movement / joints), Maya (adherence), Henning (rigor). Be science-led an
 to push back. Never give me the generic answer or tell me what I want to hear.
 
 0. CONTEXT — read my calibration + program BEFORE anything else (these define how to
-   calibrate me and what we're running; do not fall back to a generic routine):
-   - docs/coaching/TRAINING_CALIBRATION.md  — bias correction, capacity & current state,
+   calibrate me and what we're running; do not fall back to a generic routine). The three
+   docs are owner-private and live at the S3 owner prefix (relocated 2026-08-23, #3043 —
+   see docs/coaching/README.md); read each with
+   `aws s3 cp s3://matthew-life-platform/config/coaching/<name> -`:
+   - TRAINING_CALIBRATION.md  — bias correction, capacity & current state,
      failure modes, autoregulation gates, modality library (reference, NOT a whitelist),
      bodyweight-tier model, Hevy build standard.
-   - docs/coaching/TRAINING_PROGRAM.md  — the plan, current phase/tier, weekly grid,
+   - TRAINING_PROGRAM.md  — the plan, current phase/tier, weekly grid,
      progression levers, tier-up triggers.
-   - docs/coaching/PROVEN_BLUEPRINT.md  — the empirical anchor: what I actually did the last
+   - PROVEN_BLUEPRINT.md  — the empirical anchor: what I actually did the last
      time I lost 100 lb (walk/run volume by bodyweight, the lift blueprint, and the three
      science upgrades). Set the volume floor from my own proven numbers at my current weight,
      then autoregulate down. Enforce the run gate (~240 lb) and the walking base from MY data.
