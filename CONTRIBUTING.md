@@ -18,7 +18,7 @@ The hooks it installs:
 
 ## Land a change (one change → one branch → one PR)
 
-1. **Branch** off up-to-date `main` (it's branch-protected: PRs required, no direct pushes, no force-push/deletions, delete-on-merge enabled).
+1. **Branch** off up-to-date `main`. The branch posture is whatever [`deploy/github_posture.json`](deploy/github_posture.json) declares — that file is the source of truth, not a hand-stated claim here (this sentence previously claimed "PRs required"; live `main` had no such rule — the DIL-005 lesson). The weekly drift sentinel asserts live GitHub state against the posture file, and `python3 scripts/apply_branch_protection.py --check` reports the live-vs-declared state on demand (`--apply` is the only sanctioned writer). Force-pushes and deletions on `main` are blocked; work lands via PR by convention, with the required-checks ruleset enforced iff applied.
 2. **Make the change.** One logical change per PR. Owners are routed per area in [`.github/CODEOWNERS`](.github/CODEOWNERS) and requested as reviewers automatically.
 3. **Run the local checks** (below) — same gates as CI, so failures surface before the push.
 4. **Commit** with a Conventional-Commits subject (the commit-msg hook enforces it). **No tool-attribution trailers** — commits carry the work, not the tooling (owner decision 2026-08-12; see CLAUDE.md "Authorship").

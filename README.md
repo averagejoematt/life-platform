@@ -20,8 +20,8 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 | **76 MCP tools** | Claude reads the data back via a Model Context Protocol server |
 | **Single-table DynamoDB** | `USER#…#SOURCE#…` / `DATE#…`, on-demand, 2 sanctioned GSIs (ADR-097; PITR + KMS) |
 | **AWS Bedrock** | Claude Sonnet 4.6 (narrative) + Haiku 4.5 (structured), prompt-cached |
-| **9 CDK stacks** | 100% infrastructure-as-code; OIDC CI/CD with a production-approval gate + auto-rollback |
-| **$85/mo, enforced** | A cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
+| **9 CDK stacks** | CDK-managed application infra with a declared out-of-IaC ring ([`docs/MANAGED_WHERE_LEDGER.md`](docs/MANAGED_WHERE_LEDGER.md)); OIDC CI/CD with a production-approval gate + auto-rollback |
+| **Enforced budget ceiling** | $150/mo base, $176 in reader-traffic surge (ADR-133 owns the number) — a cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
 | **v4 site** | Three doors — Cockpit (`/cockpit/`), Story (`/story/`), Evidence (`/evidence/`) |
 
 ## Architecture (one line)
@@ -51,7 +51,7 @@ Python 3.12 (stdlib-only HTTP — no `requests`/`httpx`) · AWS Lambda · Dynamo
 
 ## Conventions (the short version)
 
-- **IaC only** — change AWS via `cdk/`, never the console (see [`CLAUDE.md`](CLAUDE.md)).
+- **IaC by default** — change AWS via `cdk/`, never the console (see [`CLAUDE.md`](CLAUDE.md)); the deliberate exceptions are enumerated in [`docs/MANAGED_WHERE_LEDGER.md`](docs/MANAGED_WHERE_LEDGER.md).
 - **Secrets** live in AWS Secrets Manager under `life-platform/`; never in the repo.
 - **Decimal**, not float, for DynamoDB. **Single table**, no GSIs without an ADR.
 - Every non-trivial decision is an **ADR** in `docs/DECISIONS.md`; internal tag-codes are decoded in [`docs/TAG_CODES.md`](docs/TAG_CODES.md).

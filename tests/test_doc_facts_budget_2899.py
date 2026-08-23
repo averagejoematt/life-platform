@@ -178,3 +178,67 @@ def test_live_repo_states_no_stale_ceiling(facts):
         for line in doc.read_text(encoding="utf-8").splitlines():
             hits += [f"{doc.relative_to(ROOT)}: ${a}" for a in facts._budget_offenders(line)]
     assert hits == [], "live docs state a stale ceiling:\n" + "\n".join(hits)
+
+
+# ── #3042 D0.5: the published-site surface (.js/.html + v4 generators) ────────
+# The 2026-08-23 diligence fact-check found "$85 hard ceiling" shipping live in
+# evidence_meta.js, in every /method/ shell's embedded registry blurb, and in two
+# editorial strings inside scripts/v4_build_evidence.py — none of it scanned by any
+# gate (register finding 4: check_doc_facts scanned .md and lambdas/*.py only).
+# The site's most-quoted number must not ship un-guarded again.
+
+
+def test_site_surface_includes_the_files_that_actually_shipped_stale(facts):
+    """Guard the SET: the surface must contain the exact classes the miss lived in —
+    the hand-maintained assets JS, a generated method shell, and the generator whose
+    string literals are the editorial's source (fix-the-HTML-only is the
+    drift-on-next-build trap). site/legacy/ (frozen mirror) must stay out."""
+    rels = {str(p.relative_to(ROOT)) for p in facts._scan_site_surface()}
+    assert "site/assets/js/evidence_meta.js" in rels
+    assert "site/method/build/index.html" in rels
+    assert "site/journal/essays/org-chart-of-one/body.html" in rels
+    assert "scripts/v4_build_evidence.py" in rels
+    assert not any(r.startswith("site/legacy/") for r in rels), "the frozen legacy mirror is history, not a claim"
+    assert len(rels) >= 100, "the site surface collapsed — the scan went near-vacuous"
+
+
+def test_planted_stale_ceiling_in_site_js_flags(facts, tmp_path):
+    """Mutation proof (CONVENTIONS §9): the widened scan FAILS on a planted stale
+    literal in a .js file — the exact renderCost shape that shipped for weeks."""
+    js = tmp_path / "planted.js"
+    js.write_text(
+        'export function renderCost(d) { return fig("$85", "hard ceiling") + "a self-imposed $85 hard ceiling"; }\n',
+        encoding="utf-8",
+    )
+    hits = facts._source_hits([js])
+    assert any("$85" in h for h in hits), f"planted stale .js ceiling must flag, got {hits}"
+
+
+def test_planted_stale_ceiling_in_site_html_flags(facts, tmp_path):
+    """Same proof for the generated-shell shape: a registry blurb quoting a retired
+    ceiling inside a one-line embedded JSON script tag."""
+    page = tmp_path / "index.html"
+    page.write_text(
+        '<script>window.__X__ = [{"blurb": "the meter behind the $85 ceiling, live."}]</script>\n',
+        encoding="utf-8",
+    )
+    hits = facts._source_hits([page])
+    assert any("$85" in h for h in hits), f"planted stale .html ceiling must flag, got {hits}"
+
+
+def test_live_site_surface_states_no_stale_ceiling_now_and_after_the_window_reverts(facts):
+    """Integration: the live site is clean under today's allowed set AND under the
+    post-September set — a site string quoting August's temporary $200 would pass
+    today and rot on 2026-09-01 with no deploy to catch it, so the revert case is
+    asserted here rather than discovered by October's first red CI run."""
+    hits_now = facts._source_hits(facts._scan_site_surface())
+    assert hits_now == [], "live site states a stale ceiling:\n" + "\n".join(hits_now)
+
+    post_revert, _ = facts._governor_ceilings(today=dt.date(2026, 9, 2))
+    saved = facts.BUDGET_OK
+    try:
+        facts.BUDGET_OK = post_revert
+        hits_post = facts._source_hits(facts._scan_site_surface())
+    finally:
+        facts.BUDGET_OK = saved
+    assert hits_post == [], "site quotes a dated-window ceiling that rots on revert:\n" + "\n".join(hits_post)
