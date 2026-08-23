@@ -14,6 +14,12 @@ monitoring_stack.py and asserts the hard-stop alarm is declared on the right met
 threshold, and routing (urgent), and sits strictly above the existing ≥2 digest
 alarm. Mirrors the approach in test_role_policies.py.
 
+Also covers `budget-tier-sustained-7d` (#1927, re-cut #2989): a duration alarm that
+fires only when the tier never drops below its threshold across a full week. #2989
+raised that threshold from 1 to 2 — ADR-133 set the permanent $150 base FROM a
+measured steady state that lands inside band 1, so a threshold=1 alarm fired on the
+platform's designed operating state, not an anomaly.
+
 Run:  python3 -m pytest tests/test_budget_tier_alarms.py -v
 """
 
@@ -112,23 +118,42 @@ def test_hardstop_is_strictly_above_escalation():
 # QAPausedByBudget is per-day, so it fired 26 times and read as background. The
 # whole cutoff-1 band was off for the month — including reader_truth_qa and
 # visual_ai_qa, two CI gates that report green when paused.
+#
+# ---------------------------------------------------------------------------
+# #2989 — the tier-1 cut alarmed on the DESIGNED steady state, not an anomaly
+# ---------------------------------------------------------------------------
+# ADR-133 (#2836) derived the permanent $150/month base FROM a measured steady
+# state ($4.12/day = 82.4% of $150) that itself lands inside band 1 (the fixed
+# 73-87% fraction of the ceiling). So "the platform running normally" sits
+# inside the band the threshold=1 alarm watched, and it fired continuously from
+# 2026-08-12 (17+ consecutive days) for a condition that is working as
+# intended — the same "signal becomes background noise" failure #1927 was
+# filed to prevent, one band up. #1927's own amendment had already moved the
+# two CI gates (reader_truth_qa, visual_ai_qa) out of band 1, so what remains
+# there is five internal/dev-only features, not a reader-facing degradation.
+# The alarm now covers band >= 2 (reader narratives paused) sustained for a
+# full week — genuinely rare, and unambiguously worth a human's attention.
 
 
-def test_sustained_tier_alarm_present_and_covers_tier_1():
+def test_sustained_tier_alarm_present_and_covers_tier_2():
     a = _by_name("budget-tier-sustained-7d")
-    assert a is not None, "budget-tier-sustained-7d missing — nothing watches a tier-1 band that never lifts (#1927)"
+    assert a is not None, "budget-tier-sustained-7d missing — nothing watches a band-2 sustained condition (#1927/#2989)"
     assert a["namespace"] == "LifePlatform/Budget"
     assert a["metric_name"] == "BudgetTier"
-    assert a["threshold"] == 1, "must cover tier 1 — the existing alarms both start at 2"
+    assert a["threshold"] == 2, (
+        "must cover band >= 2 (reader narratives paused) — band 1 alone is the ADR-133 "
+        "designed steady state (82.4% of the $150 base), not an anomaly worth a standing alarm (#2989)"
+    )
     assert a["to_digest"] is True, "routine-but-important: digest, not an urgent page"
 
 
 def test_sustained_alarm_requires_an_unbroken_week():
-    """Minimum + every datapoint means one tier-0 reading anywhere clears it.
+    """Minimum + every datapoint means one sub-2 reading anywhere clears it.
 
     With Statistic=Maximum, or datapoints_to_alarm < evaluation_periods, this would
-    fire during ordinary end-of-month pressure and become the same background noise
-    it exists to replace.
+    fire during ordinary end-of-month pressure — or on the designed band-1 steady
+    state under the OLD threshold=1 cut — and become the same background noise it
+    exists to replace.
     """
     a = _by_name("budget-tier-sustained-7d")
     assert a["statistic"] == "Minimum", "Maximum would fire on a single spike, not on a sustained condition"
@@ -144,12 +169,38 @@ def test_sustained_alarm_window_is_within_the_cloudwatch_ceiling():
     assert window == 604800, "the window is meant to be exactly 7 days"
 
 
-def test_sustained_alarm_is_distinct_from_the_tier2_escalation():
-    """It must add tier-1 duration coverage, not restate the tier-2 level alarm."""
+def test_sustained_alarm_does_not_undercut_the_designed_band_1_steady_state():
+    """#2989's whole point: threshold must be strictly ABOVE band 1, or the alarm
+    re-fires on the platform's designed steady state the day it deploys.
+
+    ADR-133's own measured steady state is 82.4% of the $150 base — inside band 1
+    (73-87%) by construction — so threshold == 1 is provably wrong post-ADR-133,
+    not merely a stricter reading of the same intent.
+    """
+    a = _by_name("budget-tier-sustained-7d")
+    assert a["threshold"] > 1, "threshold=1 would alarm on band 1 alone, which ADR-133 made the designed steady state"
+
+
+def test_sustained_alarm_shares_a_level_with_the_tier2_escalation_but_differs_in_duration():
+    """#2989: raising the threshold to 2 makes `budget-tier-sustained-7d` share its
+    LEVEL with `life-platform-budget-tier-escalation` (both threshold=2) — they are
+    no longer distinguished by threshold. They stay distinct because they answer
+    different questions: escalation fires the moment tier touches 2 for even a
+    single hour (Maximum, 1 period); sustained only fires if the tier's Minimum
+    never drops back below 2 for a full week (21 x 8h periods). A level alarm and
+    a duration alarm at the same level are not redundant — collapsing this
+    distinction (e.g. by also shortening sustained's window) would be the same
+    "no signal for a genuinely rare condition" defect #2989 exists to fix.
+    """
     sustained = _by_name("budget-tier-sustained-7d")
     escalation = _by_name("life-platform-budget-tier-escalation")
-    assert sustained["threshold"] < escalation["threshold"]
-    assert sustained["evaluation_periods"] > (escalation["evaluation_periods"] or 1)
+    assert sustained["threshold"] == escalation["threshold"], "both now watch band >= 2 — they differ in duration, not level"
+    assert sustained["evaluation_periods"] > (escalation["evaluation_periods"] or 1), (
+        "sustained must require strictly more evaluation periods than escalation's single period, " "or it stops meaning 'sustained' at all"
+    )
+    assert sustained["statistic"] == "Minimum" and escalation["statistic"] == "Maximum", (
+        "Minimum-over-the-week (sustained) vs. Maximum-in-the-hour (escalation) is what makes " "the shared threshold non-redundant"
+    )
 
 
 def test_alarm_helper_defaults_to_a_single_period():
