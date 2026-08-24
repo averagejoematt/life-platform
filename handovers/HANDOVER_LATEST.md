@@ -2,69 +2,35 @@
 
 ## SESSION_STATE — Session A (shimmering-snacking-quokka), live block, replace at each phase boundary
 
-**Updated:** 2026-08-24 ~20:35Z · **Phase:** A3 merging + A4 drain in flight · **Driver:** Fable 5.
+**Updated:** 2026-08-24 ~23:30Z · **Phase:** A5 deploys DONE, wrap pending · **Driver:** Fable 5.
 If resuming on Opus: *"Resume ~/.claude/plans/shimmering-snacking-quokka.md from SESSION_STATE"*.
 
-**MERGED tonight (8):** #3109 (→#3102 closed) · #3110 (→#3103 closed) · #3121 (→#2997
-closed, alarm was honest) · #3116 (→#3066 closed) · #3112 (CodeQL sentinel never read the
-API — 3 defects fixed, D0.7 answered on #2578) · #3123 (→#3108 closed — ALL 8 coaches'
-relationship-state writes were crashing since 08-13) · #3124 (→#2815 closed, OUTPUT#
-frame → PT atomically) · #3127 (#2883 stays open: ratio 1.384; golden-eval PutMetricData
-grant STAGED→**APPLIED live, verify_oidc_iam --strict CLEAN**).
-**OPEN PRs:** #3120 (DIL-026, trim pushed, checks re-running) · #3122 (DIL-027, 2× merge
-seams resolved incl. a live test_count conflict, re-running) · #3125 (DIL-028) · #3126
-(#3000 — sent back: PUSH_TRIGGER_GLOBS lockstep + sync_doc_metadata size cap) · #3132
-(DIL-025: 28 senders not 7, live replay vector, brief send-ledger) · #3133 (#2957
-residuals, Fixes #2958) · #3134 (#3106: suite budget 1500→1950s measured).
-**AGENTS still out:** #3049 (opus) · #3101 (opus) · #2823 · #3018 · #2888 (opus) ·
-#3126-fix resume.
-**Leases:** 4 intermediates REJECTED with decode (9bbf374, 9c2fea33, 8c31257, fd276c6);
-**end-of-train lease gets APPROVED** — it must deploy: coach-state-updater (#3123),
-ai_calls carriers (#3124), daily-brief (#3132), site-api (#3133) + cdk Monitoring (#3120)
-+ Backup bootstrap us-east-2 (#3122 — order-sensitive steps in its PR body) +
-apply_s3_lifecycle.sh (#3120).
-**Filed tonight:** #3108(closed) #3111 #3117 #3128 #3129 #3130 + DIL-025's five
-(#3113/#3114/#3115/#3118/#3119). **CodeQL alert #161 dismissed** (used-in-tests, fail-strict
-direction); code scanning 0 open. Remediation workflow_dispatch verify run launched
-(sentinel record should show codeql_alerts ≠ unreadable — check drift-log/latest.json).
-
-- **A0 DONE.** Main green at `5fa985dd8` (wrap commit's Docs CI red fixed by `ceffdb2e1` —
-  fact-scanner misread "#2989 alarm fix" as an alarm count + stale INCIDENT_LOG patterns;
-  citations commit `5fa985dd8`). Fleet deploy confirmed complete (qa-smoke LastModified
-  2026-08-24 18:51Z). No waiting leases. `gh secret list`: NO RECONCILE_PUSH_TOKEN, NO
-  DEPLOY_GATE_JANITOR_TOKEN → D0.6 + #3021 skipped silently per plan.
-- **Scheduled observations read:** first real nightly edge-429 = **GREEN** (PASS among 58;
-  registered qa_smoke_lambda.py:1015, deployed pre-run; the 3 PAUSE + 1 WARN + 1 FAIL all
-  enumerated and edge_429 not among them). Baselines: RegenDiscarded 0/24h ·
-  TruncatedResponses 15 (D2's own burn window) · CallerClass dimension live (prod-cron/ci)
-  · GenerationSkippedUnchanged no data yet (#3107 known). Recall corpus GREEN tonight.
-- **qa-smoke-failures still lit, NEW cause:** nightly FAIL = cross_surface:weight — Webb
-  (nutrition_coach) cites 321 lb (generated 08-23) vs cockpit 326 (weighed 08-24) because
-  today's regen was HELD twice by the ADR-108 quality gate (score 62 both attempts).
-  Evidence commented on #3083; alarm re-cited with expiry 2026-08-25T18:00Z. Also filed
-  #3108 (coach-state-updater float('early') bug, glucose_coach RELATIONSHIP#state stalls).
-  ai-tokens-daily + s3-bucket-size alarms decoded + cited (latter folded into DIL-026 lane).
-- **Agents in flight (11, all worktree-implementer, PRs never self-merged):** #3103
-  wait_pr_green (sonnet) · #3102 confirm-before-gate (sonnet) · #3101 literal-conflict
-  (opus) · #3049 source-completeness (opus) · DIL-025 idempotency census (opus) · DIL-028
-  raw-layout replay (sonnet) · DIL-026 lifecycle + bucket-size disposition (sonnet) ·
-  DIL-027 cross-account/region raw/ backup (opus) · #2997 qa-smoke-warnings reconcile
-  (sonnet) · #3000 census lane (sonnet) · #2578 CodeQL-sentinel can-it-fail (opus).
-- **Next:** merge trains for foundation trio first (use #3103's tool once landed), then D3
-  lanes + register flips; A4 drain wave (#2815, #2957 residuals, #3066, #2823, #3018,
-  #2888, #2847, #2883 residuals, #3108) launches as slots free; epic acceptance passes
-  #2986/#2798/#2799/#2801/#2578. Owner batch surfaced in-conversation (8 items, unanswered
-  → wrap). Merge discipline: verdicts read in their OWN command, check sets by name.
-
-**Session:** Fable 5. Drove: *"Boot Phase D2 of the A-Grade Program"*
-(`~/.claude/plans/ticklish-soaring-teapot.md`), then owner-directed scope expansion:
-*"clear as much of the open issues backlog as possible with sub-agents … non-fable
-where possible"*, *"make sure all pull requests are done"*, *"pay down as many open
-items as possible"*. AUTONOMOUS with merge+deploy authority. Previous handover archived
-as `HANDOVER_2026-08-23_agrade-d1-control-boundaries.md` on `session-archive`.
-**Next session:** Session A of `~/.claude/plans/shimmering-snacking-quokka.md`
-(owner-approved: D3 + foundation + drain; Fable drives A, Opus drives B).
-
+**MERGED: 23 PRs** (#3109 #3110 #3121 #3116 #3112 #3123 #3124 #3127 #3133 #3134 #3125
+#3132 #3140 #3122 #3138 #3137 #3136 #3126 #3120 #3135 #3131 #3141 + pending #3142).
+**Issues closed: 15** (#3102 #3103 #2997 #3066 #3108 #2815 #2958 #3106 #3018 #2823
+#3000 #3049 #3101 + earlier #2889-class) — all with ADR-099 verdicts. **A2 foundation
+COMPLETE** (wait_pr_green + confirm-before-gate + literal-removal — the conflict class is
+dead; tonight paid it ~10 more times first). **ALL five D3 lanes MERGED** + alarm/gate
+truth (#2997 #3000 CodeQL-sentinel-never-read-the-API fixed+live-verified clean).
+**DEPLOYED + postflight-verified:** fleet 105/0 at 1e21a9fc · site-api (403-OK probe) ·
+cdk Monitoring (65GiB + telegram-hold alarm) · cdk Backup us-east-2 (bootstrap + stack;
+first attempt redded on a U+2192 in an IAM description — fixed) · S3 lifecycle 15 rules
+(imports/ covered) · raw/* replication config applied · golden-eval IAM applied,
+verify_oidc_iam --strict CLEAN.
+**OPEN/PENDING:** site-deploy full RERUN in flight (first run failed visual-QA at 20:43Z
+BEFORE site-api deployed — the API-before-frontend race; rolled back correctly) → then
+post-deploy truth sweep retires /method/wrong/ + /method/verify/ baselines → close #2957.
+PR #3142 (cdk_stacks 8→10 literal) pending checks → merge → one more site-api deploy.
+Two CI/CD runs in progress will Plan-fail on R8-ST6 (IAM diffs — expected; deploys were
+manual) or mint leases → REJECT with decode (7 rejected so far; decode ledger in run
+comments). **S3 Batch Replication backfill = owner step** (console: Replicate existing
+objects; ≈$0.49; sentinel_replication reports drift BY DESIGN until then).
+**Filed tonight:** #3111 #3113 #3114 #3115 #3117 #3118 #3119 #3128 #3129 #3130 #3139
+#3143 (+#3108 filed+closed same session). **CodeQL 0 open** (#161 dismissed used-in-tests).
+**Epic statuses:** #2798 open (#2811 #2817 remain) · #2578 open (#2999 #3129) · #2986
+open (re-stamp rule; evidence logged) · #2801/#2799/#2883/#2888/#2957/#3104 open with
+dated status comments. **Wrap remains:** #2957 close-out post-sweep · epic acceptance
+comments · register D3 flip comment on #3042 · scorecard · build beat · #365 wrap.
 ## What shipped (28 PRs merged AND deployed AND live-verified)
 
 **D2 — the truth manifest (all three lanes done; DIL-010/035 flipped, #3097):**
