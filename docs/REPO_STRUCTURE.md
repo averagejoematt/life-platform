@@ -11,7 +11,7 @@ The canonical top-level layout. Read this before adding a new file so things lan
 |---|---|
 | `lambdas/` | All Lambda source, fully packaged by domain (ADR-146, #1653 — no loose modules at the root): handlers in `ingestion/ compute/ emails/ web/ operational/ intelligence/ reading/`, shared engine code in `common/ ai/ experiment/ coach/ health/ training/ content/ privacy/`. The whole tree is bundled into every function (#781), staged at the zip root — so runtime imports read `from common import constants`. |
 | `mcp/` | MCP server — 76 tools across `tools_*.py` domain modules, wired in `registry.py`. |
-| `cdk/` | Infrastructure-as-code — 9 CDK stacks (`stacks/*.py`), entry `app.py`. **The only way infra changes.** |
+| `cdk/` | Infrastructure-as-code — 10 CDK stacks (`stacks/*.py`), entry `app.py`. **The only way infra changes.** |
 | `deploy/` | Build/deploy scripts — `build_bundle.py`, `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh`, `sync_site_to_s3.sh`, `restart_pipeline.py`, `sync_doc_metadata.py`, smoke tests, `lib/`. |
 | `scripts/` | Operational helpers — `v4_build_*.py` site generators, `generate_adr_index.py`, `content_policy_scan.py`, migration tooling. |
 | `tests/` | pytest (unit/contract/structural) + Playwright `visual_qa.py` + AI-vision QA. |

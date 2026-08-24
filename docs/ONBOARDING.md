@@ -62,7 +62,7 @@ MCP Lambda (76 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
 site-api Lambda (~134 endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
-~104 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 9 CDK stacks. Run-rate: ~$25–40/mo against a $150 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
+~104 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 10 CDK stacks. Run-rate: ~$25–40/mo against a $150 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
 
 ---
 
@@ -221,7 +221,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 | **DLQ** | Dead Letter Queue — failed async Lambda invocations. Drained every 6 hours by `dlq-consumer`. |
 | **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep). See `mcp/config.py`. |
 | **PITR** | Point-in-Time Recovery — DynamoDB's 35-day rolling backup. |
-| **CDK** | AWS Cloud Development Kit — Python IaC. 9 stacks in `cdk/stacks/`. |
+| **CDK** | AWS Cloud Development Kit — Python IaC. 10 stacks in `cdk/stacks/`. |
 | **P40** | Protocol 40 — the 65-habit personal framework tracked via Habitify. 9 P40 groups with T0/T1/T2 tier weighting. |
 | **Character Sheet** | Gamified scoring aggregating 7 health pillars into a level 1-100 with RPG tiers (Foundation → Elite). |
 | **Board of Directors** | Three boards: Personal (14 advisors), Technical (12), Product (8). All configured in S3 (Personal) or code (Tech/Product). See `docs/BOARDS.md`. |

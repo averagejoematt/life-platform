@@ -17,10 +17,11 @@
 | Single DDB item lost / overwritten | 5 min (PITR query) | 35 days |
 | Full DDB table lost | ~15 min measured (PITR restore 4m32s + one-env-var fleet cutover ≈6 min — drilled 2026-07-12, #936) | 35 days |
 | S3 bucket corruption (specific path) | 5 min (versioned restore) | Versioning enabled — every put |
-| S3 bucket deletion (catastrophic) | ⚠️ NOT RECOVERABLE — cross-region replication not enabled (ADR-057 W-03 deferred) | — |
+| S3 bucket deletion (catastrophic) — **`raw/` zone** | Hours (re-create the bucket, copy back from `matthew-life-platform-raw-backup` in us-east-2 — DIL-027, 2026-08-24). **Restore not yet drilled**; owner-present timed drill is a scheduled appointment | Replication lag (seconds–minutes; delete markers deliberately NOT replicated, so a source delete does not reach the replica) |
+| S3 bucket deletion (catastrophic) — **everything except `raw/`** | Hours-days — recompute. `site/` + `generated/` rebuild from git + the generators; `deploys/` rebuild from `deploy/build_bundle.py`; `config/`, `uploads/`, `imports/` have NO replica | ⚠️ `config/` + `uploads/` + `imports/` are **not replicated** — versioning only |
 | Account compromise | Hours (rotate all secrets + audit CloudTrail) | Depends on compromise window |
 | Stolen / lost laptop | Hours (rotate device-resident creds + rebuild on a new machine) | Pushed git = last push; Claude memory ≤24h behind (#1026 daily backup is live); `datadrops/` as fresh as the last manual push (low-churn originals; no-FDA posture, NEW_MACHINE_BOOTSTRAP §3c) — see Scenario 8 |
-| us-west-2 region outage | Hours-days (no DR region — ADR-057 W-03 deferred) | — |
+| us-west-2 region outage | Hours-days — no warm DR region; the platform still stops. What changed 2026-08-24 (DIL-027): the irreplaceable `raw/` captures remain **readable** in us-east-2 throughout, so an outage is downtime rather than a data horizon | `raw/`: replication lag. Everything else: unchanged (compute stops) |
 | Anthropic API outage | Auto-degrade — see below | — |
 
 ---
@@ -29,6 +30,12 @@
 
 ✅ **DynamoDB PITR** enabled (35-day point-in-time recovery)
 ✅ **S3 versioning** enabled on `matthew-life-platform` — every PUT keeps prior version
+✅ **Cross-region replication of `raw/*`** → `matthew-life-platform-raw-backup` (us-east-2) —
+   DIL-027/#3042, 2026-08-24. `raw/` is the only unrecomputable data on the platform. The
+   replica is versioned, public-access-blocked, `RETAIN`, has its own delete-protection Deny,
+   and does **not** replicate delete markers, so deleting on the source does not delete the
+   backup. Asserted weekly by `deploy/sentinel_replication.py` (config parity + destination
+   versioning + a wire-real object probe). **Same account** — see the NOT-protected list.
 ✅ **S3 lifecycle** — old versions expire (raw/* 7d, config/* 30d → Glacier IR, uploads/* 30d)
 ✅ **CloudTrail** management events + data events on `raw/*` and `uploads/*` (90-day S3 retention)
 ✅ **Git** — code in 2 places: local + GitHub. Multiple commits per session.
@@ -38,11 +45,20 @@
 
 ## What is NOT protected (accepted risk per ADR-057)
 
-❌ **Cross-region replication** — single-region (us-west-2 + us-east-1 for CloudFront/edge)
+❌ **Cross-region replication of anything except `raw/`** — `config/`, `uploads/`, `imports/`,
+   `site/`, `generated/`, `deploys/` are single-region (versioning only). Everything but
+   `config/`/`uploads/`/`imports/` is recomputable from `raw/` + git; those three are the
+   honest residual gap
 ❌ **External secret backup** — if Secrets Manager region is wiped, OAuth tokens are gone (re-auth via setup scripts)
 ❌ **Anthropic API key backup** — stored only in Secrets Manager `life-platform/ai-keys`; user must keep a backup elsewhere
 ❌ **Multi-region DDB** — Global Tables not enabled
-❌ **Cross-account backups** — single AWS account
+❌ **Cross-account backups** — single AWS account (`aws organizations list-accounts` returns
+   exactly one, verified 2026-08-24). The `raw/` replica above lives in the SAME account, so it
+   survives regional failure and primary-bucket destruction but **not an account-level
+   compromise**. Dated priced acceptance + revisit triggers: `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md` (DIL-027)
+❌ **A drilled restore of the `raw/` replica** — the configuration is asserted weekly; the
+   recovery itself has not been performed. Owner-present timed restore drill is a scheduled
+   appointment, not yet held
 
 ---
 
@@ -236,12 +252,64 @@ aws cloudtrail lookup-events --region us-west-2 \
   aws lambda invoke --function-name daily-brief --payload '{}' --region us-west-2 /tmp/out.json
   ```
 
+**What is NOT at risk during the outage (since 2026-08-24, DIL-027):** the `raw/` captures.
+They replicate continuously to `matthew-life-platform-raw-backup` in us-east-2, so a us-west-2
+event is downtime, not a data horizon — the unrecomputable half of the platform stays readable
+and every derived surface can be rebuilt from it afterwards.
+
 **Long-term mitigation (if outages become recurrent):**
 - Enable DynamoDB Global Tables (us-west-2 + us-east-1)
 - Replicate S3 bucket to us-east-1 (or different account)
 - Lambda functions deployed to both regions, Route53 health-check failover
 
-Per ADR-057 W-03, this is deferred — overkill for current scale.
+Per ADR-057 W-03, the compute/DDB half of this is still deferred — overkill for current
+scale. The **data** half shipped 2026-08-24 (DIL-027): `raw/*` replicates to us-east-2.
+
+---
+
+## Scenario 6b — Restore `raw/` from the us-east-2 replica
+
+**When:** the primary bucket (or its `raw/` prefix) is gone, corrupted, or unreachable.
+
+> ⚠️ **This sequence has NOT been drilled.** It is written from the resource definitions,
+> not from a timed rehearsal — treat the RTO as an estimate until the owner-present restore
+> drill is held. That drill is a scheduled appointment (DIL-027 residual).
+
+```bash
+# 1. Confirm the replica is what you think it is BEFORE trusting it.
+aws s3 ls s3://matthew-life-platform-raw-backup/raw/ --recursive --summarize \
+    | tail -3                       # object count + total bytes vs. the last known-good
+aws s3api get-bucket-versioning --bucket matthew-life-platform-raw-backup
+
+# 2. If the primary bucket still exists, copy back in place. Nothing here deletes:
+#    raw/* is delete-protected on the primary, and the replica's own Deny blocks
+#    DeleteObject for matthew-admin. NEVER add --delete to either side.
+aws s3 sync s3://matthew-life-platform-raw-backup/raw/ \
+            s3://matthew-life-platform/raw/ \
+            --source-region us-east-2 --region us-west-2
+
+# 3. If the primary bucket is GONE, recreate it first (the name is global and is
+#    referenced by cdk/stacks/constants.py S3_BUCKET, every Lambda env var and the
+#    CloudFront origins), then re-apply its policy and lifecycle, THEN sync:
+#      aws s3api create-bucket --bucket matthew-life-platform --region us-west-2 \
+#          --create-bucket-configuration LocationConstraint=us-west-2
+#      aws s3api put-bucket-versioning --bucket matthew-life-platform \
+#          --versioning-configuration Status=Enabled
+#      aws s3api put-bucket-policy --bucket matthew-life-platform \
+#          --policy file://deploy/bucket_policy.json
+#      bash deploy/apply_s3_lifecycle.sh --apply
+#      bash deploy/apply_s3_replication.sh --apply     # re-establish the backup itself
+
+# 4. Rebuild everything downstream FROM raw/ — that is the whole premise of backing up
+#    only this prefix. DDB metrics come back via each ingestion Lambda's gap-aware
+#    backfill; the site + generated artifacts rebuild from git + the generators.
+
+# 5. Re-assert, do not assume:
+python3 deploy/drift_sentinel.py --no-write     # raw_replication must return to clean
+```
+
+**What this cannot restore:** anything outside `raw/` (see the NOT-protected list) and any
+capture written during the outage window that never reached S3 at all.
 
 ---
 
@@ -354,7 +422,7 @@ key file paths here (defense-in-depth — this doc is exportable and the repo ca
 ### What's recoverable vs. what's truly lost
 
 **Recoverable from AWS + git (the ~90%):**
-- All Lambda code, the 9 CDK stacks, and the site — reproducible from git +
+- All Lambda code, the 10 CDK stacks, and the site — reproducible from git +
   `deploy/build_bundle.py` + `cdk deploy --all` (see "What IS protected").
 - All production data — DynamoDB via 35-day PITR, S3 via versioning.
 - All wiki/docs — in git.
