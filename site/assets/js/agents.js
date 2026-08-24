@@ -159,7 +159,7 @@ function render(data) {
   renderFeed(data);
   // Don't let readers page into the future.
   const next = $("[data-week-next]");
-  if (next) next.disabled = addDays(state.week, 7) > ISO(mondayOf(new Date()));
+  if (next) next.disabled = addDays(state.week, 7) > ISO(mondayOf(ptToday)); // PT week too (#2506 class)
 }
 
 let seq = 0; // rapid week-nav taps race their fetches — only the latest may paint
