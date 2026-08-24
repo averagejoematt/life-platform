@@ -148,7 +148,9 @@ def call_anthropic_api(
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
     # Auth is IAM — no API key. See lambdas/bedrock_client.py.
     import botocore.exceptions as _bce
-    from ai.bedrock_client import first_text as _first_text, invoke as _bedrock_invoke
+    from ai.bedrock_client import budget_stop_cls as _budget_stop_cls, first_text as _first_text, invoke as _bedrock_invoke
+
+    _BudgetStop = _budget_stop_cls()
 
     # #2893: ONLY the transport call lives inside the retry `try`. It used to end
     # `return resp["content"][0]["text"].strip()` in here, so an empty `content`
@@ -162,6 +164,16 @@ def call_anthropic_api(
         try:
             resp = _bedrock_invoke(body, model_name=body["model"])
             break
+
+        except _BudgetStop as e:
+            # #3084: a tier-3 budget stop is a refusal raised BEFORE invoke_model —
+            # nothing billed, nothing that another attempt could change. The generic
+            # handler below used to retry it, sleeping 5+15+45 = 65s per call and
+            # logging a transport-shaped WARN that buried the real cause. Re-raise
+            # now; the caller's own degrade path (fallback brief, skip-AI) engages
+            # in seconds instead of minutes.
+            print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
+            raise
 
         except _bce.ClientError as e:
             code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -216,7 +228,9 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
     system message (the wire format is identical on Bedrock).
     """
     import botocore.exceptions as _bce
-    from ai.bedrock_client import invoke as _bedrock_invoke
+    from ai.bedrock_client import budget_stop_cls as _budget_stop_cls, invoke as _bedrock_invoke
+
+    _BudgetStop = _budget_stop_cls()
 
     if isinstance(req, dict):
         body = req
@@ -232,6 +246,11 @@ def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeo
             resp = _bedrock_invoke(body, model_name=body.get("model"))
             # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
             return resp
+
+        except _BudgetStop as e:
+            # #3084 — same refusal-not-failure rule as call_anthropic_api above.
+            print(f"[INFO] Bedrock call refused by the budget guard (tier 3) — NOT a transport error, not retried: {e}")
+            raise
 
         except _bce.ClientError as e:
             code = e.response.get("Error", {}).get("Code", "Unknown")

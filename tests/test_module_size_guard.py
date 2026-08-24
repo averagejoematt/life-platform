@@ -172,7 +172,17 @@ BASELINE = {
     # 2409 -> 2424 (+15) 2026-08-09, #2351: find_days mode='similar' schema (mode/target_date/
     # features/k params + description). Deliberate feature addition, reasoned in the commit.
     "mcp/registry.py": 2424,
-    "lambdas/ai/ai_calls.py": 2396,
+    # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
+    # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
+    # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict
+    # xfail in the tree because the three-line fix reds this gate. The Bedrock TRANSPORT
+    # layer (call_anthropic + _build_system_block + _emit_failure_metric + the model ids,
+    # backoff ladder, CW failure series and AI-3 validator hook) moved to the cohesive
+    # sibling lambdas/ai/ai_transport.py (241 lines, well under the ceiling), re-exported
+    # unchanged. 132 lines came out; 26 of them (a fifth — the #2610 earned-headroom rule)
+    # are banked so the re-bill fix and the #3084 budget-stop clause have room, and 106 are
+    # handed back. Measured 2264. Terminal cure is still under 1200 and pruning this line.
+    "lambdas/ai/ai_calls.py": 2290,
     # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
     # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
     # honest-numbers fixes could land without raising this number. The ratchet tightening.

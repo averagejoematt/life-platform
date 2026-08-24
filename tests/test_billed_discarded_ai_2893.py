@@ -21,8 +21,13 @@ Three mechanisms, each pinned here by the measurement that found it (30 days to
    the exact shape of a `max_tokens` stop with no emitted text — raises
    IndexError, is caught by the generic `except Exception`, and re-invokes the
    model up to 4×. Zero occurrences in the 30-day window, so this is latent, not
-   active. Fixed in `common/retry_utils`; `ai/ai_calls` carries the same defect
-   and is deliberately left as a strict xfail — see that test's reason.
+   active. Fixed in `common/retry_utils` here; `ai/ai_calls` carried the same
+   defect behind a strict xfail (it was at 2396/2396 on the #1665 ratchet, so the
+   fix could not land without an extraction) and was fixed by **#3082**, which
+   moved the transport layer to `lambdas/ai/ai_transport.py`. That xfail is now a
+   live assertion. #3084 then narrowed what retries at all: `BudgetExceeded` is a
+   refusal raised before `invoke_model`, never a transport error — pinned in
+   `tests/test_budget_stop_not_retried_3084.py`.
 
 3. **Blind by construction.** `stop_reason` was read in exactly ZERO places
    across the tree, so mechanism 1 could only ever be found by a hand audit.
@@ -173,21 +178,19 @@ def test_retry_utils_does_not_rebill_on_an_empty_content_response(monkeypatch):
     assert calls["n"] == 1, f"an already-billed response was re-invoked {calls['n']}× (the #2893 re-bill)"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#2893 KNOWN, NOT FIXED HERE. ai_calls.call_anthropic carries the same re-bill as "
-        "retry_utils did — `resp['content'][0]['text']` inside the retry `try`. The identical "
-        "four-line fix reds tests/test_module_size_guard.py: lambdas/ai/ai_calls.py sits at "
-        "2396/2396, FULL, and the #1665 ratchet's rule is 'do NOT raise the number — extract a "
-        "cohesive sibling and pay for your lines'. That extraction (the transport layer: "
-        "call_anthropic + _build_system_block + _emit_failure_metric -> ai/ai_transport.py) is a "
-        "real refactor with its own blast radius and belongs in its own PR, not bundled into a "
-        "cost audit. strict=True so this flips red the moment the behaviour changes."
-    ),
-)
 def test_ai_calls_does_not_rebill_on_an_empty_content_response(monkeypatch):
-    from ai import ai_calls
+    """Was a strict xfail when #3081 landed; FIXED by #3082 and now a live assertion.
+
+    The blocker was never the fix, it was where the fix had to go: `lambdas/ai/
+    ai_calls.py` sat at 2396/2396 on the #1665 ratchet and the standing rule is
+    'do NOT raise the number — extract a cohesive sibling and pay for your lines'.
+    #3082 did the extraction (the transport layer → `lambdas/ai/ai_transport.py`),
+    which is why this can now assert instead of documenting its own absence.
+
+    Deliberately driven through `ai_calls.call_anthropic` — the facade name every
+    caller in the fleet actually imports — so the pin covers the re-export too.
+    """
+    from ai import ai_calls, ai_transport
 
     calls = {"n": 0}
 
@@ -196,8 +199,8 @@ def test_ai_calls_does_not_rebill_on_an_empty_content_response(monkeypatch):
         return _EMPTY_CONTENT
 
     monkeypatch.setattr(bedrock_client, "invoke", _invoke)
-    monkeypatch.setattr(ai_calls, "_emit_failure_metric", lambda metric_name="AnthropicAPIFailure": None)
-    monkeypatch.setattr(ai_calls.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ai_transport, "_emit_failure_metric", lambda metric_name="AnthropicAPIFailure": None)
+    monkeypatch.setattr(ai_transport.time, "sleep", lambda s: pytest.fail(f"backoff slept {s}s on an already-billed response"))
 
     out = ai_calls.call_anthropic("hello", max_tokens=600)
 
