@@ -223,7 +223,21 @@ def _sweep_ci():
     return gaps, seen_roles, dynamic
 
 
-CI_GAPS, CI_ROLES, CI_DYNAMIC = _sweep_ci()
+# PyYAML is a dev dependency; the deploy-critical lane installs no packages and
+# still IMPORTS this module during collection (2026-08-24: it redded the whole
+# fleet lane exactly like the 2026-08-08 undeclared-PyYAML class). Collection
+# must survive; the CI-half tests below skip LOUDLY instead of passing vacuously.
+try:
+    CI_GAPS, CI_ROLES, CI_DYNAMIC = _sweep_ci()
+    _CI_SWEEP_UNAVAILABLE = None
+except ImportError as _e:
+    CI_GAPS, CI_ROLES, CI_DYNAMIC = {}, set(), set()
+    _CI_SWEEP_UNAVAILABLE = f"CI-jobs sweep unavailable: {_e}"
+
+require_ci_sweep = pytest.mark.skipif(
+    _CI_SWEEP_UNAVAILABLE is not None,
+    reason="PyYAML absent — the CI-jobs half cannot run in this lane (loud skip, never a vacuous pass)",
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -308,6 +322,7 @@ def test_helper_baseline_is_derived_and_classified():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@require_ci_sweep
 def test_ci_jobs_that_assume_a_role_are_discovered():
     """Non-vacuity for the CI half: the workflow scan must find the jobs and roles."""
     jobs = ge.ci_jobs()
@@ -331,6 +346,7 @@ def test_ci_jobs_that_assume_a_role_are_discovered():
     assert {"/life-platform/budget-tier", "/life-platform/experiment-cycle"} <= diagnosis["ssm"], diagnosis["ssm"]
 
 
+@require_ci_sweep
 def test_every_ci_consumer_is_granted_its_channel():
     """A CI job's OIDC role must grant every fail-closed channel its entrypoints
     reach. #3059 found the diagnosis role's missing budget-tier read by accident,
@@ -347,11 +363,13 @@ def test_every_ci_consumer_is_granted_its_channel():
     )
 
 
+@require_ci_sweep
 def test_open_ci_gap_ratchet_only_shrinks():
     stale = sorted(key for key in _OPEN_CI_GAPS if key not in CI_GAPS)
     assert not stale, "These _OPEN_CI_GAPS entries no longer reproduce — delete them (#2824):\n  " + "\n  ".join(map(str, stale))
 
 
+@require_ci_sweep
 def test_every_ci_role_has_a_checked_in_permissions_doc():
     """A role assumed by a workflow with no `infra/iam/*.permissions.json` is
     invisible to both this sweep and `deploy/verify_oidc_iam.py`."""
@@ -498,6 +516,7 @@ def _has_aws() -> bool:
 
 
 @pytest.mark.integration
+@require_ci_sweep
 def test_live_oidc_role_grants_cover_the_derived_consumer_set():
     """Everything above compares code to the REPO's IAM. `infra/iam/*.json` is the
     source of truth only in the sense that drift from it is a finding — applying it
