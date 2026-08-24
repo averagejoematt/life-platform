@@ -55,7 +55,9 @@ _SITE = os.path.join(_ROOT, "site")
 
 # Inline (no src=) script blocks; type="application/json"/ld+json are exempt —
 # they are data islands, not executable, and need no script-src allowance.
-_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc=)([^>]*)>(.*?)</script>", re.S | re.I)
+_SCRIPT_RE = re.compile(
+    r"<script(?![^>]*\bsrc=)([^>]*)>(.*?)</script\s*>", re.S | re.I
+)  # \s* — '</script >' is a valid end tag (CodeQL #160)
 _LOCAL_SRC_RE = re.compile(r"<script[^>]*\bsrc=[\"'](/assets/js/[^\"']+)[\"']", re.I)
 
 # #2790 pattern: a sweep over an empty walk passes vacuously — floor the surface.
