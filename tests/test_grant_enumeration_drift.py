@@ -128,26 +128,7 @@ _OPEN_CI_GAPS: dict[tuple, str] = {}
 #: The credentialed run that observes the grant HAS landed reds on the stale entry, so this
 #: list cannot outlive its apply either.
 #: (role, channel, reference) → the apply that clears it
-_PENDING_LIVE_APPLY: dict[tuple, str] = {
-    (
-        "github-actions-golden-eval-role",
-        "ssm",
-        "/life-platform/budget-tier",
-    ): "#2824 2026-08-23: BudgetTierRead statement added to the checked-in doc; cleared by "
-    "`aws iam put-role-policy --role-name github-actions-golden-eval-role "
-    "--policy-name golden-eval-permissions --policy-document file://infra/iam/"
-    "github-actions-golden-eval-role.permissions.json` (infra/iam/README.md).",
-    (
-        "github-actions-golden-eval-role",
-        "s3config",
-        "config/personas.json",
-    ): "#2824 2026-08-23: EvalConfigRead statement added to the checked-in doc; same one apply.",
-    (
-        "github-actions-golden-eval-role",
-        "s3config",
-        "config/coaches/*.json",
-    ): "#2824 2026-08-23: EvalConfigRead statement added to the checked-in doc; same one apply.",
-}
+_PENDING_LIVE_APPLY: dict[tuple, str] = {}
 
 #: Channel references whose id is computed at runtime, so no static grant check is
 #: possible. Informational (ADR-103: near-zero false-red rent) — the assertion is
