@@ -14,8 +14,10 @@ Covers:
   - the normal (tier 0) path still merges high/med/low verdicts exactly as before.
 """
 
+import base64
 import json
 import os
+import re
 import struct
 import sys
 
@@ -389,11 +391,14 @@ def test_oversized_capture_is_downscaled_and_actually_evaluated(tmp_path, monkey
 
     assert status == {"status": "ok", "evaluated": 1, "unevaluated": 0, "no_shots": 0}
     assert results[0]["status"] == "PASS" and "ai_verdict" in results[0]
-    import base64
-
-    sent = base64.b64decode(calls[0]["body"]["messages"][0]["content"][0]["source"]["data"])
-    w, h = visual_ai_qa._png_dims(sent)
-    assert h <= visual_ai_qa._BEDROCK_MAX_DIM and w >= 1, f"payload still oversized: {w}x{h}"
+    # Every image block that reaches Bedrock is inside the reject limits. (#3067 later
+    # split tall captures into several such blocks; #2973's contract is per-payload and
+    # holds for each of them, so this asserts over all of them rather than content[0].)
+    sent = [base64.b64decode(b["source"]["data"]) for b in calls[0]["body"]["messages"][0]["content"] if b.get("type") == "image"]
+    assert sent, "the page must actually have been submitted"
+    for payload in sent:
+        w, h = visual_ai_qa._png_dims(payload)
+        assert h <= visual_ai_qa._BEDROCK_MAX_DIM and w >= 1, f"payload still oversized: {w}x{h}"
 
 
 def test_prepare_image_passes_small_pngs_through_untouched(tmp_path):
@@ -448,6 +453,190 @@ def test_mid_run_budget_exceeded_is_the_sanctioned_pause_not_page_failures(tmp_p
         assert r["status"] == "PASS", "a budget pause must never fabricate page failures"
         assert not r.get("ai_unevaluated")
         assert any("SKIPPED-BY-BUDGET" in w for w in r["warnings"])
+
+
+# ── #3067: a page the judge cannot READ is not a page the judge has seen ─────
+# Run 32668047541 FAILed 'Story · build dispatches' with an AI-vision high —
+# "text appears as tiny, illegible gray-on-dark text". The capture is
+# 1440x17271; #2973's downscale kept it inside Bedrock's 8000px REJECT limit,
+# but the model's own input pipeline then resized it to a 1568px long edge, so
+# 17px body text reached the judge at ~1.5px. The verdict described the
+# degraded input, not the page. These tests pin (a) the bound's derivation,
+# (b) the tiling that removes the cause, (c) that normal pages are untouched.
+
+
+def _tall_png(tmp_path, w, h, name="tall.png"):
+    """A real (not header-faked) PNG of `w`x`h` — the tiler crops actual pixels."""
+    from PIL import Image
+
+    shot = tmp_path / name
+    Image.new("RGB", (w, h), "white").save(shot)
+    return shot
+
+
+def _sent_images(call):
+    """(w, h) of every image block in a recorded Bedrock call, in order."""
+    out = []
+    for block in call["body"]["messages"][0]["content"]:
+        if block.get("type") == "image":
+            out.append(visual_ai_qa._png_dims(base64.b64decode(block["source"]["data"])))
+    return out
+
+
+def _sent_prompt(call):
+    return call["body"]["messages"][0]["content"][-1]["text"]
+
+
+def test_legibility_floor_is_the_sites_own_floor_not_a_new_magic_number():
+    """The 11px end of the ratio is visual_qa's SVG_TEXT_FLOOR_PX (#1210) — the same
+    floor the deterministic text audits enforce. Two copies of a threshold drift."""
+    assert visual_ai_qa._MIN_LEGIBLE_TEXT_PX == visual_qa.SVG_TEXT_FLOOR_PX
+
+
+def test_body_text_px_is_derived_from_the_shipped_token():
+    """The other end of the ratio is --fs-body in tokens.css. If the design system
+    re-sizes body copy, this test reds rather than letting the bound go stale."""
+    css = os.path.join(os.path.dirname(_TESTS_DIR), "site", "assets", "css", "tokens.css")
+    with open(css) as f:
+        m = re.search(r"--fs-body:\s*([0-9.]+)rem", f.read())
+    assert m, "--fs-body not found in tokens.css — update the #3067 legibility bound's source"
+    assert visual_ai_qa._BODY_TEXT_PX == float(m.group(1)) * 16
+
+
+def test_model_scale_matches_the_documented_standard_tier_resize():
+    """_model_scale must reproduce the published rule (long edge 1568 AND a 1568
+    visual-token budget of 28x28px patches), not an approximation of it."""
+    assert visual_ai_qa._model_scale(1092, 1092) == 1.0  # under both caps — untouched
+    for w, h, exp_w, exp_h in [(1920, 1080, 1456, 819), (3840, 2160, 1456, 819), (2000, 1500, 1269, 952)]:
+        s = visual_ai_qa._model_scale(w, h)
+        assert (round(w * s), round(h * s)) == (exp_w, exp_h), f"{w}x{h} -> {w * s:.0f}x{h * s:.0f}"
+
+
+def test_bound_is_the_model_resize_not_bedrocks_reject_limit():
+    """The regression this issue exists to prevent: sizing tiles to _BEDROCK_MAX_DIM.
+    A 1440x8000 tile passes Bedrock and is still illegible — scale ~0.20."""
+    assert visual_ai_qa._model_scale(1440, visual_ai_qa._BEDROCK_MAX_DIM) < visual_ai_qa._MIN_LEGIBLE_SCALE
+    bound = visual_ai_qa._max_legible_height(1440)
+    assert bound < visual_ai_qa._BEDROCK_MAX_DIM
+    assert visual_ai_qa._model_scale(1440, bound) >= visual_ai_qa._MIN_LEGIBLE_SCALE
+    assert visual_ai_qa._model_scale(1440, bound + 200) < visual_ai_qa._MIN_LEGIBLE_SCALE  # the bound is tight
+
+
+def test_the_production_capture_is_over_the_bound_and_illegible_untiled():
+    """The concrete #3067 case, stated as data: the real capture's dimensions."""
+    assert visual_ai_qa._model_scale(1440, 17271) < visual_ai_qa._MIN_LEGIBLE_SCALE
+    assert 17271 * visual_ai_qa._model_scale(1440, 17271) <= visual_ai_qa._MODEL_MAX_LONG_EDGE
+
+
+def test_ultra_tall_capture_is_tiled_and_every_tile_stays_legible(tmp_path, monkeypatch):
+    """The acceptance test, on the real wire: assess_results -> _assess_page ->
+    _image_blocks -> the actual Bedrock body. Mutation-proof — delete the tiling and
+    this reds twice over (one block, and that block below the legibility bound)."""
+    pytest.importorskip("PIL")
+    shot = _tall_png(tmp_path, 1440, 9000)
+
+    calls = []
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT, calls=calls))
+    results = [_result_with_shot(tmp_path, name="Story", path="/story/build/", png=shot.read_bytes())]
+    status = visual_ai_qa.assess_results(results)
+
+    assert status == {"status": "ok", "evaluated": 1, "unevaluated": 0, "no_shots": 0}
+    sent = _sent_images(calls[0])
+    assert len(sent) > 1, "a 9000px capture must be tiled, not sent as one illegible image"
+    for w, h in sent:
+        assert (
+            visual_ai_qa._model_scale(w, h) >= visual_ai_qa._MIN_LEGIBLE_SCALE
+        ), f"tile {w}x{h} reaches the judge at scale {visual_ai_qa._model_scale(w, h):.2f} — below the 11px floor"
+
+
+def test_tiles_cover_the_whole_page_not_just_the_top(tmp_path, monkeypatch):
+    """'Capped to above-the-fold' would fix the verdict by hiding most of the page.
+    Tiles must span the full height, with overlap so no seam can swallow an element."""
+    pytest.importorskip("PIL")
+    shot = _tall_png(tmp_path, 1440, 9000)
+    calls = []
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT, calls=calls))
+    visual_ai_qa.assess_results([_result_with_shot(tmp_path, name="Story", path="/story/build/", png=shot.read_bytes())])
+
+    sent = _sent_images(calls[0])
+    assert all(w == 1440 for w, _ in sent), "tiles are full-width slices — never cropped horizontally"
+    assert sum(h for _, h in sent) > 9000, "tiles must cover the page and overlap, not sample it"
+
+
+def test_normal_height_capture_is_not_tiled_and_costs_nothing_extra(tmp_path, monkeypatch):
+    """Cost guard: a page inside the bound goes to Bedrock as ONE image whose bytes
+    are byte-identical to the pre-#3067 payload."""
+    pytest.importorskip("PIL")
+    shot = _tall_png(tmp_path, 1440, 1200, name="short.png")
+    calls = []
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT, calls=calls))
+    visual_ai_qa.assess_results([_result_with_shot(tmp_path, name="Cockpit", path="/cockpit/", png=shot.read_bytes())])
+
+    blocks = calls[0]["body"]["messages"][0]["content"]
+    assert [b["type"] for b in blocks] == ["image", "text"], "an in-bound page gains no tile labels"
+    assert base64.b64decode(blocks[0]["source"]["data"]) == shot.read_bytes()
+
+
+def test_tiled_call_tells_the_judge_seams_are_not_breakage(tmp_path, monkeypatch):
+    """Without this the fix trades one FP class for another — an element sliced at a
+    tile boundary reads as clipped/truncated content."""
+    pytest.importorskip("PIL")
+    shot = _tall_png(tmp_path, 1440, 9000)
+    calls = []
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT, calls=calls))
+    visual_ai_qa.assess_results([_result_with_shot(tmp_path, name="Story", path="/story/build/", png=shot.read_bytes())])
+
+    prompt = _sent_prompt(calls[0])
+    assert "SECTIONS" in prompt and "never report content as clipped" in prompt
+    labels = [b["text"] for b in calls[0]["body"]["messages"][0]["content"] if b.get("type") == "text"]
+    assert any(lbl.startswith("Section 1 of ") for lbl in labels), "each tile is labelled for the verdict to refer to"
+
+
+def test_untiled_call_does_not_carry_the_seam_note(tmp_path, monkeypatch):
+    """The note must not leak onto normal pages — it would license real clipping."""
+    pytest.importorskip("PIL")
+    shot = _tall_png(tmp_path, 1440, 1200, name="short.png")
+    calls = []
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT, calls=calls))
+    visual_ai_qa.assess_results([_result_with_shot(tmp_path, name="Cockpit", path="/cockpit/", png=shot.read_bytes())])
+    assert "SECTIONS" not in _sent_prompt(calls[0])
+
+
+def test_tiling_without_pillow_is_a_named_loud_failure(tmp_path, monkeypatch):
+    """#2973's contract, extended to the tiling path: a page the oracle cannot be
+    shown legibly FAILs with a named reason — never a silently illegible payload."""
+    monkeypatch.setitem(sys.modules, "PIL", None)  # forces `from PIL import Image` to raise
+    calls = []
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT, calls=calls))
+    results = [_result_with_shot(tmp_path, name="Story", path="/story/build/", png=_png_bytes(w=1440, h=17271))]
+    status = visual_ai_qa.assess_results(results)
+    assert calls == [], "must not send a payload the judge provably cannot read"
+    assert status["unevaluated"] == 1 and status["evaluated"] == 0
+    assert results[0]["status"] == "FAIL"
+    assert any("#3067" in i and "17271" in i for i in results[0]["issues"])
+
+
+def test_more_tiles_than_the_ceiling_is_a_named_failure_not_a_partial_view(tmp_path, monkeypatch):
+    """Sending the first N tiles of a page is the #2973 silent-coverage defect in a
+    new costume. Over the ceiling the page must FAIL, loudly and by name."""
+    pytest.importorskip("PIL")
+    monkeypatch.setattr(visual_ai_qa, "_MAX_IMAGE_BLOCKS_PER_CALL", 2)
+    calls = []
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr(visual_ai_qa, "_import_bedrock", lambda: _fake_bedrock(_OK_VERDICT, calls=calls))
+    shot = _tall_png(tmp_path, 1440, 9000)
+    results = [_result_with_shot(tmp_path, name="Story", path="/story/build/", png=shot.read_bytes())]
+    status = visual_ai_qa.assess_results(results)
+    assert calls == []
+    assert status["unevaluated"] == 1
+    assert results[0]["status"] == "FAIL"
+    assert any("#3067" in i and "ceiling" in i for i in results[0]["issues"])
 
 
 def test_pillow_is_wired_into_every_ai_qa_lane():
