@@ -339,6 +339,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # #2653: sweeps lambdas/ docstrings and cdk/stacks/role_policies*.py to assert no
         # docstring names a secret no role grants — a repo-shape ratchet, source only.
         "test_docstring_secret_ids_2653.py",
+        # #2898: sweeps `git ls-files` over lambdas/ cdk/ mcp/ scripts/ deploy/ tests/ and
+        # site/ for a hand-typed copy of the budget ceiling. Its covered population is the
+        # whole tracked tree and its forbidden VALUES are derived from the cost governor,
+        # so both halves change size without anyone editing the file — a repo-shape
+        # ratchet by construction, and it must red BEFORE the merge that adds the copy.
+        "test_budget_ceiling_registry_2898.py",
         # the derivation guard itself — its own docstring/synthetic-fixture text
         # mentions the three sweep idioms, so it self-matches; it belongs pre-merge
         # regardless (it IS the structural gate this whole entry is about).

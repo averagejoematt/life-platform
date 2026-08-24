@@ -37,8 +37,8 @@ USAGE
   python3 scripts/check_doc_facts.py --list     # print the ground-truth values and exit
 """
 
-import ast
-import datetime as _dt
+# `ast` and `datetime` are imported function-locally where they are used — the last
+# module-level users left with the ceiling parse (#2898, now scripts/budget_ceilings.py).
 import importlib.util
 import re
 import sys
@@ -182,75 +182,19 @@ BUDGET_NEAR = re.compile(
 # that catches drift: a doc still quoting August's $200 on September 1st flags
 # itself, with no deploy and no one remembering — the same auto-revert the governor
 # already has.
-_GOVERNOR_SRC = ROOT / "lambdas" / "operational" / "cost_governor_lambda.py"
-
-
-def _const_number(node):
-    """A numeric literal out of `X = 5.0` or `X = float(os.environ.get("Y", "5"))`.
-
-    For a `.get(key, default)` call the DEFAULT is the last arg, not the first —
-    reading args[0] there would return the env-var name and silently yield nothing.
-    """
-    if isinstance(node, ast.Constant):
-        try:
-            return float(node.value)
-        except (TypeError, ValueError):
-            return None
-    if isinstance(node, ast.Call) and node.args:
-        is_get = isinstance(node.func, ast.Attribute) and node.func.attr == "get"
-        return _const_number(node.args[-1] if is_get else node.args[0])
-    return None
-
-
-def _const_date(node):
-    """`date(2026, 8, 1)` → datetime.date(2026, 8, 1); anything else → None."""
-    if isinstance(node, ast.Call) and len(node.args) == 3:
-        parts = [a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, int)]
-        if len(parts) == 3:
-            try:
-                return _dt.date(*parts)
-            except ValueError:
-                return None
-    return None
-
-
-def _governor_ceilings(today=None) -> tuple[set[int], str]:
-    """(allowed ceiling figures, provenance string), parsed from the cost governor.
-
-    `today` is injectable so the regression tests can stand inside and outside the
-    dated window without depending on wall-clock — the live gate passes None.
-    """
-    today = today or _dt.date.today()
-    if not _GOVERNOR_SRC.exists():
-        return set(), "cost_governor_lambda.py not found"
-    consts, window = {}, None
-    tree = ast.parse(_GOVERNOR_SRC.read_text(encoding="utf-8"))
-    for node in tree.body:
-        if not isinstance(node, ast.Assign) or not isinstance(node.targets[0], ast.Name):
-            continue
-        name = node.targets[0].id
-        if name == "_TEMP_CEILING_WINDOW" and isinstance(node.value, ast.Tuple) and len(node.value.elts) == 2:
-            lo, hi = (_const_date(e) for e in node.value.elts)
-            if lo and hi:
-                window = (lo, hi)
-        else:
-            val = _const_number(node.value)
-            if val is not None:
-                consts[name] = val
-
-    allowed, why = set(), []
-    for key in ("MONTHLY_CEILING", "SURGE_CEILING_USD"):
-        if key in consts:
-            allowed.add(int(consts[key]))
-    why.append(f"base/surge {sorted(allowed)}")
-    if window and window[0] <= today < window[1]:
-        temp = {int(consts[k]) for k in ("_TEMP_CEILING_USD", "_TEMP_SURGE_CEILING_USD") if k in consts}
-        allowed |= temp
-        why.append(f"dated window {sorted(temp)} in effect {window[0]}..{window[1]}")
-    elif window:
-        why.append(f"dated window {window[0]}..{window[1]} NOT in effect")
-    return allowed, "; ".join(why)
-
+#
+# #2898: the parse itself moved to `scripts/budget_ceilings.py`, unchanged, because
+# CDK synth needs the same four numbers and a SECOND copy of the parser would be the
+# same charter violation one level up. This file keeps the names it always had
+# (`_governor_ceilings`, `_GOVERNOR_SRC`) so its callers and regression tests are
+# untouched; they are now thin aliases over the shared derivation.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from budget_ceilings import (  # noqa: E402,F401
+    GOVERNOR_SRC as _GOVERNOR_SRC,
+    _const_date,
+    _const_number,
+    governor_ceilings as _governor_ceilings,
+)
 
 BUDGET_OK, BUDGET_PROVENANCE = _governor_ceilings()
 
@@ -375,7 +319,15 @@ EXEMPT_DIRS = (
 # calibration reference (cost_governor._THRESHOLD_REFERENCE_CEILING = 75.0 + the comments
 # that explain it) — policing comments would false-flag that real constant. The defect
 # class that ever reaches a reader is always a literal/string, never an inline comment.
-SRC_ROOTS = (ROOT / "lambdas",)
+#
+# #2898: `cdk/stacks` joined this surface. It held one of the five authoritative ceiling
+# sites (`core_stack.py`'s AWS Budgets backstop) plus an alarm docstring naming the budget
+# (`web_alarms.py`), and NOTHING scanned either — they were free to go stale silently while
+# the number they described moved. Measured clean the day it was added, so the widening
+# costs nothing now and catches the next move. Deliberately `cdk/stacks`, NOT `cdk`:
+# `cdk/_bundle_staging/` and `cdk/_mcp_staging/` are build artifacts holding a full COPY of
+# lambdas/ (the governor included), and an rglob over `cdk` would scan them as source.
+SRC_ROOTS = (ROOT / "lambdas", ROOT / "cdk" / "stacks")
 # a ceiling-named dict/JSON key assigned a bare integer, e.g. `"budget_ceiling_usd": 75`.
 # `(?!\.\d)` skips floats like `"ceiling": 100.0` so a real breakdown dict never trips.
 CEILING_LITERAL = re.compile(r"""["']?[A-Za-z_]*ceiling[A-Za-z_]*["']?\s*:\s*(\d{2,3})\b(?!\.\d)""")
@@ -420,7 +372,11 @@ def _source_hits(files) -> list[str]:
             flagged.update(_budget_offenders(line))
             for amt in sorted(flagged):
                 hits.append(
-                    f"{rel}:{lineno}: hardcoded ${amt} budget ceiling, truth is $150 base / $176 surge (ADR-133)\n"
+                    # #2898: the "truth is ..." half of this message used to hand-type
+                    # `$150 base / $176 surge` — a stale-number gate whose own error
+                    # text could go stale. It now states BUDGET_PROVENANCE, the same
+                    # derivation that produced BUDGET_OK.
+                    f"{rel}:{lineno}: hardcoded ${amt} budget ceiling, truth is {BUDGET_PROVENANCE} (ADR-133)\n"
                     f"      | {stripped[:120]}"
                 )
     return hits
@@ -781,7 +737,10 @@ HOURLY_CLAIM_RE = re.compile(r"\bhourly\b|\bevery\s+hour\b", re.I)
 # a specific every-N-hours cadence that disagrees with the CDK cron is stale.
 EVERY_NH_CLAIM_RE = re.compile(r"\bevery\s+(\d{1,2})\s*h(?:ours?|rs?)?\b", re.I)
 _GOVERNOR_CRON_STEP_RE = re.compile(r"cron\(\d+\s+0/(\d+)")
-GOVERNOR_SOURCE_DIRS = (ROOT / "lambdas", ROOT / "mcp")
+# #2898: `cdk/stacks` joined this surface too, for the same reason it joined SRC_ROOTS
+# above (see that comment for the `cdk/stacks`-not-`cdk` staging-artifact caveat) — a CDK
+# docstring claiming the governor's cadence was as unscanned as one claiming its ceiling.
+GOVERNOR_SOURCE_DIRS = (ROOT / "lambdas", ROOT / "mcp", ROOT / "cdk" / "stacks")
 SITE_DIR = ROOT / "site"
 SITE_EXEMPT_DIRS = ("site/legacy/",)
 # #1354: docs/COST_TRACKER.md sits in EXEMPT_FILES for the *number* scans (a cost
