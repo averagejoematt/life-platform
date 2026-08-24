@@ -75,6 +75,17 @@ SKIPPED_CONSENT = "skipped:consent"
 # outcomes. Collapsing them would let a broken embedder read as a quiet no-op.
 FAILED = "failed"
 
+# #2977: the loud half of fail-soft. The 2026-08-18 installment published through the
+# chronicle-approve auto-publish sweep, the hook here ran, Bedrock returned
+# AccessDeniedException (the approve role had never been granted bedrock:InvokeModel),
+# this module logged an ERROR — and nothing heard it. Three nightly qa-smoke FAILs later
+# a human read the log. Fail-soft stays the contract (indexing must never block a
+# publish), but every FAILED return now logs this literal token, and
+# cdk/stacks/monitoring_stack.py keys a MetricFilter + alarm on it in the two publish
+# lambdas' log groups (chronicle-approve, wednesday-chronicle) — the twin literal is
+# pinned by tests/test_recall_publish_self_heal_2977.py, #2654 pattern.
+INDEX_FAILED_TOKEN = "RECALL-INDEX-FAILED"  # noqa: S105 — a log token, not a credential
+
 CHRONICLE_SOURCE = "chronicle"
 
 
@@ -289,7 +300,7 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
             try:
                 refresh_metadata(table, sk, drift)
             except Exception as e:  # noqa: BLE001 — a failed repair is a fault the freshness guard keeps reporting
-                logger.error("[recall] metadata repair FAILED for %s %s: %s", doc.get("kind"), doc.get("date"), e)
+                logger.error("[recall] %s metadata repair FAILED for %s %s: %s", INDEX_FAILED_TOKEN, doc.get("kind"), doc.get("date"), e)
                 return FAILED
             return REPAIRED
 
@@ -329,7 +340,7 @@ def index_document(table, doc: dict, *, embed=None, now=None, model: str = "", f
             )
         )
     except Exception as e:  # noqa: BLE001 — indexing is never load-bearing; the freshness guard reports the gap
-        logger.error("[recall] embed/write FAILED for %s %s: %s", doc.get("kind"), doc.get("date"), e)
+        logger.error("[recall] %s embed/write FAILED for %s %s: %s", INDEX_FAILED_TOKEN, doc.get("kind"), doc.get("date"), e)
         return FAILED
     return INDEXED
 
@@ -399,7 +410,7 @@ def index_chronicle_installment(table, chronicle_pk: str, date_str: str, *, sk: 
         resp = table.query(KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").begins_with("DATE#"))
         items = list(resp.get("Items", []))
     except Exception as e:  # noqa: BLE001 — indexing must never block a publish
-        logger.error("[recall] chronicle partition read FAILED for %s: %s", date_str, e)
+        logger.error("[recall] %s chronicle partition read FAILED for %s: %s", INDEX_FAILED_TOKEN, date_str, e)
         return FAILED
 
     item = next((i for i in items if str(i.get("sk", "")) == target_sk), None)

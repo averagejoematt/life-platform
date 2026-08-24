@@ -6,7 +6,7 @@
     },
     "between-chronicle-scrub-failed-closed": {
       "routing": "digest",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_silence_alarms"
     },
     "budget-tier-unreadable": {
       "routing": "digest",
@@ -26,7 +26,7 @@
     },
     "expert-gate-infra-hold": {
       "routing": "digest",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_silence_alarms"
     },
     "freshness-checker-errors": {
       "routing": "digest",
@@ -147,6 +147,14 @@
     "prediction-gradable-share-low": {
       "routing": "digest",
       "stack": "monitoring_prediction_alarms"
+    },
+    "recall-index-failed-chronicle-approve": {
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms"
+    },
+    "recall-index-failed-wednesday-chronicle": {
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms"
     },
     "site-api-ai-errors": {
       "routing": "digest",
@@ -6102,7 +6110,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 53,
+      "alarms": 55,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,

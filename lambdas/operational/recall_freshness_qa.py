@@ -51,6 +51,11 @@ PAUSED = "paused"
 # (a single miss vs. "the writer has been dead for months") without an unreadable check line.
 _MAX_NAMED = 6
 
+# #2977: how many missing installments one nightly run will pay to re-index. Bounds the
+# Bedrock spend of a single sweep (one Titan embed per healed installment, ~cheap) while
+# still draining any realistic backlog in one or two nights.
+_MAX_HEAL = 6
+
 
 def published_installment_dates(installments) -> list:
     """The dates of chronicle installments that a reader can actually open.
@@ -177,6 +182,32 @@ def assess(published, embedded, *, expected_links=None, stored_links=None, index
     return OK, f"all {len(published)} published installment(s) are in the recall corpus{parity}"
 
 
+def self_heal(table, chronicle_pk, gaps, indexer=None) -> dict:
+    """#2977: detection auto-repairs. {date: status} for each missing installment this
+    run tried to re-index through the SANCTIONED publish-time path
+    (`recall_indexer.index_chronicle_installment` — status gate, consent gate, budget
+    gate and idempotency all included; `indexer` is injectable for tests only).
+
+    WHY HERE. The 2026-08-18 installment published through the chronicle-approve sweep
+    whose role had no bedrock:InvokeModel grant — the hook failed AccessDenied, fail-soft,
+    and this check then reported the hole for three consecutive nights while repairing
+    nothing (the second recurrence of the class: #2705 was 2026-08-11, #2858 was
+    2026-08-16, each closed by a hand-run backfill). The qa-smoke role already carries
+    the Titan-embed grant and dynamodb:PutItem, so the sensor that detects the hole is
+    also the one place structurally guaranteed able to close it — charter pattern:
+    the guard repairs, the alarm (`recall-index-failed-*`, monitoring_stack) still names
+    the broken publish path so the root cause cannot hide behind the nightly repair.
+
+    Never raises (`index_chronicle_installment` returns status strings by contract).
+    A heal that cannot fix (role gap, Bedrock down) returns `failed` statuses and the
+    caller keeps reporting the hole — self-heal must never be able to green a sensor
+    without the corpus actually changing.
+    """
+    if indexer is None:
+        from ai.recall_indexer import index_chronicle_installment as indexer
+    return {d: indexer(table, chronicle_pk, d) for d in list(gaps)[:_MAX_HEAL]}
+
+
 def _indexing_paused() -> bool:
     """Band-2 budget state. An absent guard means a test harness, not a paused platform."""
     try:
@@ -210,23 +241,54 @@ def _chronicle_corpus_links(table) -> dict:
         kwargs["ExclusiveStartKey"] = lek
 
 
-def checks(table, chronicle_pk, Check, partition):  # noqa: N803 — `Check` is the injected class
-    """The nightly check. Returns a one-element list, matching the sweep's contract."""
+def checks(table, chronicle_pk, Check, partition, indexer=None):  # noqa: N803 — `Check` is the injected class
+    """The nightly check. Returns a one-element list, matching the sweep's contract.
+
+    #2977: no longer detection-only. A missing installment is first re-indexed through
+    the sanctioned path (`self_heal`), THEN the corpus is re-read and assessed — so a
+    hole the publish path left (the recurring class: #2705, #2858, #2977) closes the
+    night it is detected instead of waiting days for a hand-run backfill. A successful
+    heal reports a non-chronic WARN, never a silent green: the corpus is fixed but the
+    publish path that failed to write it is still broken, and the warn (plus the
+    `recall-index-failed-*` alarm at publish time) is what keeps that visible.
+    """
     from boto3.dynamodb.conditions import Key
 
     c = Check("recall:corpus_freshness", CATEGORY, partition)
     try:
         resp = table.query(KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").begins_with("DATE#"))
         installments = resp.get("Items", [])
+        published = published_installment_dates(installments)
         corpus = _chronicle_corpus_links(table)
+        paused = _indexing_paused()
+
+        healed: dict = {}
+        gaps = missing_dates(published, list(corpus))
+        if gaps and not paused:
+            healed = self_heal(table, chronicle_pk, gaps, indexer=indexer)
+            from ai.recall_indexer import INDEXED, REPAIRED
+
+            if any(s in (INDEXED, REPAIRED) for s in healed.values()):
+                # The corpus changed under us — re-read it so the assessment (and the
+                # link-parity side) grades the healed state, not the stale snapshot.
+                corpus = _chronicle_corpus_links(table)
+
         state, msg = assess(
-            published_installment_dates(installments),
+            published,
             list(corpus),
             expected_links=published_link_expectations(installments),
             stored_links=corpus,
-            indexing_paused=_indexing_paused(),
+            indexing_paused=paused,
         )
     except Exception as e:  # noqa: BLE001 — an unreadable table is a warn, not a false accusation
         return [c.warn(f"could not assess recall-corpus freshness: {e}")]
+
+    if healed and state == OK:
+        # Repaired, not merely green: the publish-time indexer failed and this sweep
+        # closed the hole. WARN (non-chronic, alarmed) — a self-heal firing is news
+        # about a broken publish path, and a green here would bury it (#2977).
+        return [c.warn(f"self-healed: re-indexed {_named(sorted(healed))} — the publish-time indexer had missed them (#2977 class)")]
+    if healed and state == FAIL:
+        msg += " Self-heal attempted this run: " + ", ".join(f"{d}={s}" for d, s in sorted(healed.items())) + "."
 
     return [{OK: c.ok, FAIL: c.fail, PAUSED: c.pause}[state](msg)]

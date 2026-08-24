@@ -72,6 +72,7 @@ from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 from stacks.monitoring_budget_alarms import add_budget_alarms  # #2824: budget-unreadable, same seam
 from stacks.monitoring_dashboards import add_dashboards  # #2610: the dashboards live in a sibling
 from stacks.monitoring_prediction_alarms import add_prediction_alarms  # #727/#3046: the science alarms, same seam
+from stacks.monitoring_silence_alarms import add_silence_alarms  # #2977: the fail-soft token alarms, same seam
 
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
@@ -1001,60 +1002,16 @@ class MonitoringStack(Stack):
         mem_alarm_db.add_alarm_action(cw_actions.SnsAction(digest))
 
         # ══════════════════════════════════════════════════════════════
-        # #2654: between-chronicle scrub failed CLOSED
-        # The lambda logs this literal token when its privacy scrub cannot run
-        # and the send is aborted. Nothing leaked when this fires — but the
-        # friends&family digest went dark, and silence must not be the only
-        # signal (#2503 class). Token must equal
-        # between_chronicle_lambda.SCRUB_FAILED_TOKEN — pinned by
-        # tests/test_between_chronicle_scrub_2654.py::test_metric_filter_token_twin.
+        # The fail-soft SILENCE alarms (#2654 scrub-failed-closed, #2763
+        # expert-gate-infra-hold, #2977 recall-index-failed-*) live in the
+        # cohesive sibling stacks/monitoring_silence_alarms.py. They are one
+        # concern — a MetricFilter on a literal token a lambda logs when it
+        # swallows a failure — and this module was at 1357/1358, so #2977's
+        # pair could not be added at all without the extraction the size
+        # guard's own rule prescribes (#2604/#2610 precedent). Same scope,
+        # same construct ids: no deployed alarm is replaced.
         # ══════════════════════════════════════════════════════════════
-        bc_scrub_lg = logs.LogGroup.from_log_group_name(self, "ScrubFailLgBetweenChronicle", "/aws/lambda/between-chronicle")
-        bc_scrub_mf = logs.MetricFilter(
-            self,
-            "ScrubFailFilterBetweenChronicle",
-            log_group=bc_scrub_lg,
-            filter_pattern=logs.FilterPattern.literal('"BETWEEN-CHRONICLE-SCRUB-FAILED-CLOSED"'),
-            metric_name="BetweenChronicleScrubFailedClosed",
-            metric_namespace="LifePlatform/Privacy",
-            metric_value="1",
-        )
-        bc_scrub_alarm = cloudwatch.Alarm(
-            self,
-            "ScrubFailAlarmBetweenChronicle",
-            alarm_name="between-chronicle-scrub-failed-closed",
-            metric=bc_scrub_mf.metric(period=Duration.seconds(300), statistic="Sum"),
-            evaluation_periods=1,
-            threshold=1,
-            comparison_operator=GTE,
-            treat_missing_data=NB,
-        )
-        bc_scrub_alarm.add_alarm_action(cw_actions.SnsAction(digest))
-
-        # #2763: the analyzer's gate-INFRA arm HOLDS and logs this token (nothing
-        # wrong served; analyses stopped refreshing — the #2654 silence shape).
-        # Token twin-pinned to the lambda literal by test_analyzer_gate_all_paths_2421.
-        gi_lg = logs.LogGroup.from_log_group_name(self, "GateInfraLgExpert", "/aws/lambda/ai-expert-analyzer")
-        gi_mf = logs.MetricFilter(
-            self,
-            "GateInfraFilterExpert",
-            log_group=gi_lg,
-            filter_pattern=logs.FilterPattern.literal('"EXPERT-GATE-INFRA-HOLD"'),
-            metric_name="ExpertGateInfraHold",
-            metric_namespace="LifePlatform/AI",
-            metric_value="1",
-        )
-        gi_alarm = cloudwatch.Alarm(
-            self,
-            "GateInfraAlarmExpert",
-            alarm_name="expert-gate-infra-hold",
-            metric=gi_mf.metric(period=Duration.seconds(300), statistic="Sum"),
-            evaluation_periods=1,
-            threshold=1,
-            comparison_operator=GTE,
-            treat_missing_data=NB,
-        )
-        gi_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+        add_silence_alarms(self, digest)
 
         # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm

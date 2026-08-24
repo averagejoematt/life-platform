@@ -302,12 +302,15 @@ class TestGateInfraHoldsNotPublishes:
 
 def test_gate_infra_token_twin_with_monitoring_filter():
     """The CDK MetricFilter literal and the lambda's token may not drift (#2763,
-    same twin discipline as the between-chronicle scrub token, #2654)."""
-    import re
+    same twin discipline as the between-chronicle scrub token, #2654).
+
+    Resolved across the whole cdk/stacks tree rather than out of monitoring_stack.py by
+    name — #2977 moved this alarm to the cohesive sibling monitoring_silence_alarms.py
+    and a file-named regex would simply stop finding it. See tests/cdk_alarm_pins."""
+    import cdk_alarm_pins
 
     lam = open(os.path.join(_REPO, MODULE)).read()
-    stack = open(os.path.join(_REPO, "cdk/stacks/monitoring_stack.py")).read()
-    m = re.search(r'"GateInfraFilterExpert".*?FilterPattern\.literal\(\'"([^"]+)"\'\)', stack, re.DOTALL)
-    assert m, "monitoring_stack.py must define GateInfraFilterExpert with a literal token"
-    assert m.group(1) == "EXPERT-GATE-INFRA-HOLD"
+    tokens = cdk_alarm_pins.filter_tokens_for("expert-gate-infra-hold")
+    assert tokens, "no CDK stack wires the expert-gate-infra-hold alarm to a literal filter token"
+    assert tokens == {"EXPERT-GATE-INFRA-HOLD"}, f"CDK filter token(s) {sorted(tokens)} != EXPERT-GATE-INFRA-HOLD"
     assert "[EXPERT-GATE-INFRA-HOLD]" in lam, "the lambda must log the exact token the filter scans for"
