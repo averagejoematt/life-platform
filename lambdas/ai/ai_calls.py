@@ -1925,31 +1925,10 @@ Write your {domain_label} coaching section now."""
 
         # Step 5: Generate with Sonnet
         print(f"[COACH-V2:{coach_id}] Generating output...")
-        # #2888: `system_prompt` goes in the SYSTEM slot, not concatenated into the
-        # user turn. It used to ride as `system_prompt + "\n\n" + user_message_full`,
-        # which left `body["system"]` unset (ai_transport._build_system_block returns
-        # None for a falsy `system`) — so the ADR-049 auto-wrap had nothing to wrap and
-        # the seven largest calls in the brief carried no cache_control at all.
-        # Measured live (LifePlatform/AI, trailing 30d, 2026-08-24): daily-brief
-        # 4,673,440 uncached input tokens, 0 cache-read, 0 cache-WRITE — the zero on
-        # the write side is the tell that no breakpoint existed, not that one missed.
-        #
-        # The model sees the same bytes in the same order (render order is
-        # tools -> system -> messages), and the ADR-104 allow-list is unaffected: it
-        # derives from `_allowlist_prompt(system_prompt, few_shot_block)` and
-        # `user_message` directly, never from this concatenation.
-        #
-        # What it buys: `system_prompt` is 9.5-13.4KB (~2,360-3,340 tok) per coach,
-        # comfortably over claude-sonnet-4-6's 1,024-token minimum cacheable prefix,
-        # and is byte-identical across this coach's base call AND its up-to-four
-        # regens (grounding, quality gate, presence-ack, self-graded verdict). The
-        # base call writes the cache; every regen for the same coach reads it at ~0.1x.
-        # It does NOT cache across coaches — each coach's voice spec and few-shot block
-        # differ, so the shared goals/facts run sits mid-prompt rather than in a common
-        # prefix. Hoisting that run to the front would cache across all seven, but it
-        # means putting data ahead of "You are {display_name}" on a persona-driven
-        # reader-facing surface with an open coach-identity-drift issue (#2757) — a
-        # separate, deliberate change, not a drive-by.
+        # #2888: `system_prompt` rides the SYSTEM slot, never concatenated into the
+        # user turn — that left body["system"] unset, so ADR-049's auto-wrap had
+        # nothing to wrap and these seven calls carried no cache_control at all.
+        # Rationale, measurements and the cross-coach follow-up: ai/prompt_cache.py.
         output = call_anthropic(user_message_full, api_key, max_tokens=600, system=system_prompt)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
 
@@ -2022,13 +2001,8 @@ Write your {domain_label} coaching section now."""
             coach_id,
             output,
             brief_with_grounding(generation_brief, _canon_facts, _allowed),  # #2573: deterministic grounding context
-            regenerate_fn=lambda _note: call_anthropic(
-                # #2888: system in the system slot; the gate note stays user-side.
-                user_message_full + "\n\n" + _note,
-                api_key,
-                max_tokens=600,
-                system=system_prompt,
-            ),
+            # #2888: system in the system slot; the gate note stays user-side (dynamic).
+            regenerate_fn=lambda _note: call_anthropic(user_message_full + "\n\n" + _note, api_key, max_tokens=600, system=system_prompt),
         )
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
@@ -2049,13 +2023,8 @@ Write your {domain_label} coaching section now."""
                 output, _ack_finding = _ec.enforce_presence_acknowledgment(
                     output,
                     _psig,
-                    # #2888: system in the system slot; the gate note stays user-side.
-                    regenerate_fn=lambda _note: call_anthropic(
-                        user_message_full + "\n\n" + _note,
-                        api_key,
-                        max_tokens=600,
-                        system=system_prompt,
-                    ),
+                    # #2888: system slot; gate note stays user-side (dynamic).
+                    regenerate_fn=lambda _n: call_anthropic(user_message_full + "\n\n" + _n, api_key, max_tokens=600, system=system_prompt),
                 )
                 if _ack_finding:
                     print(f"[COACH-V2:{coach_id}] presence-ack gate fired: {_ack_finding.get('detail')}")
