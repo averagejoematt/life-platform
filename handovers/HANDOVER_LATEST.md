@@ -2,8 +2,31 @@
 
 ## SESSION_STATE — Session A (shimmering-snacking-quokka), live block, replace at each phase boundary
 
-**Updated:** 2026-08-24 ~19:45Z · **Phase:** A2+A3 agents in flight · **Driver:** Fable 5.
+**Updated:** 2026-08-24 ~20:35Z · **Phase:** A3 merging + A4 drain in flight · **Driver:** Fable 5.
 If resuming on Opus: *"Resume ~/.claude/plans/shimmering-snacking-quokka.md from SESSION_STATE"*.
+
+**MERGED tonight (8):** #3109 (→#3102 closed) · #3110 (→#3103 closed) · #3121 (→#2997
+closed, alarm was honest) · #3116 (→#3066 closed) · #3112 (CodeQL sentinel never read the
+API — 3 defects fixed, D0.7 answered on #2578) · #3123 (→#3108 closed — ALL 8 coaches'
+relationship-state writes were crashing since 08-13) · #3124 (→#2815 closed, OUTPUT#
+frame → PT atomically) · #3127 (#2883 stays open: ratio 1.384; golden-eval PutMetricData
+grant STAGED→**APPLIED live, verify_oidc_iam --strict CLEAN**).
+**OPEN PRs:** #3120 (DIL-026, trim pushed, checks re-running) · #3122 (DIL-027, 2× merge
+seams resolved incl. a live test_count conflict, re-running) · #3125 (DIL-028) · #3126
+(#3000 — sent back: PUSH_TRIGGER_GLOBS lockstep + sync_doc_metadata size cap) · #3132
+(DIL-025: 28 senders not 7, live replay vector, brief send-ledger) · #3133 (#2957
+residuals, Fixes #2958) · #3134 (#3106: suite budget 1500→1950s measured).
+**AGENTS still out:** #3049 (opus) · #3101 (opus) · #2823 · #3018 · #2888 (opus) ·
+#3126-fix resume.
+**Leases:** 4 intermediates REJECTED with decode (9bbf374, 9c2fea33, 8c31257, fd276c6);
+**end-of-train lease gets APPROVED** — it must deploy: coach-state-updater (#3123),
+ai_calls carriers (#3124), daily-brief (#3132), site-api (#3133) + cdk Monitoring (#3120)
++ Backup bootstrap us-east-2 (#3122 — order-sensitive steps in its PR body) +
+apply_s3_lifecycle.sh (#3120).
+**Filed tonight:** #3108(closed) #3111 #3117 #3128 #3129 #3130 + DIL-025's five
+(#3113/#3114/#3115/#3118/#3119). **CodeQL alert #161 dismissed** (used-in-tests, fail-strict
+direction); code scanning 0 open. Remediation workflow_dispatch verify run launched
+(sentinel record should show codeql_alerts ≠ unreadable — check drift-log/latest.json).
 
 - **A0 DONE.** Main green at `5fa985dd8` (wrap commit's Docs CI red fixed by `ceffdb2e1` —
   fact-scanner misread "#2989 alarm fix" as an alarm count + stale INCIDENT_LOG patterns;

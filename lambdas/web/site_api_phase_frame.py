@@ -108,3 +108,17 @@ def archival_frame(when: DateLike, genesis: DateLike, cycle: Optional[int] = Non
         "genesis": g.isoformat(),
         "label": (f"from a previous cycle — {days_before} day{'s' if days_before != 1 else ''} before {cycle_phrase} {g.isoformat()}"),
     }
+
+
+def lifetime_scope() -> str:
+    """The scope word a CROSS_PHASE accumulator's own count wears.
+
+    Some counters (voice-fidelity's judgment tally, calibration's career ledger)
+    have no window at all — per ``docs/PHASE_TAXONOMY.md``'s ``cross_phase`` class
+    they are never tagged and never wiped at a restart, so unlike a ``spans_cycle``
+    gap (which only *sometimes* reaches back past a genesis) they are
+    unconditionally the platform's whole history, never "this cycle's" number.
+    One shared word so a future page can't drift to "every cycle" or "career" for
+    the same fact — reuse this rather than writing the string again.
+    """
+    return "all cycles"
