@@ -1895,7 +1895,7 @@ Write your {domain_label} coaching section now."""
                 print(f"[COACH-V2:{coach_id}] brief unchanged since {_unchanged_since} — reusing gated output, skipping generation")
                 _today = _date_cls.today().isoformat()
                 _gen_cache.record_reuse(_cache_tbl, coach_id, output_type, _today)
-                _gen_cache.emit_skip_metric(_cw, _CW_NAMESPACE, coach_id)
+                _gen_cache.emit_skip_metric(_cw, _CW_NAMESPACE, coach_id, surface="coach_brief")
                 # Still record today's section (no Bedrock generation cost) so the
                 # downstream contract — today has a coach record + thread state — is
                 # unchanged from a real generation.

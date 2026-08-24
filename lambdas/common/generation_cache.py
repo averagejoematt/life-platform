@@ -139,6 +139,77 @@ def check_reuse_or_explain(table, coach_id: str, output_type: str, parts: dict):
     return fingerprint, None, None
 
 
+def reflection_parts(persona, voice_rules, example, facts) -> dict:
+    """The named semantic parts of a coach DAILY REFLECTION generation (#2889).
+
+    Same contract as `brief_parts`: the names live here so a call site cannot
+    quietly drop one (dropping a part narrows the fingerprint, the direction that
+    could serve stale output as fresh).
+    """
+    return {
+        "persona": persona,
+        "voice_rules": voice_rules,
+        "example": example,
+        "facts": facts,
+    }
+
+
+def ensemble_parts(coach_data, expected_coach_ids, system_prompt) -> dict:
+    """The named semantic parts of an ENSEMBLE DIGEST generation (#2889).
+
+    `cycle_date` is deliberately NOT a part. It is bookkeeping for this surface —
+    the digest synthesizes the coaches' stored outputs, and if not one coach moved
+    since yesterday the cross-coach reading has not changed either. The date still
+    cannot smuggle staleness through, because the reuse path re-runs the ADR-104
+    grounding gate (which owns the fabricated-date and cycle-freshness classes)
+    against TODAY's inputs before anything is served — see `reuse_if_still_valid`.
+    """
+    return {
+        "coach_data": coach_data,
+        "expected_coach_ids": expected_coach_ids,
+        "system_prompt": system_prompt,
+    }
+
+
+def reuse_if_still_valid(table, coach_id: str, output_type: str, parts: dict, revalidate):
+    """`check_reuse_or_explain` + a mandatory re-gate. Returns the same triple.
+
+    THE RULE THIS ENCODES (#2889): **a cache hit skips the GENERATION, never the
+    GATE.**
+
+    ADR-126's original coach-brief path reuses the gate VERDICT along with the text,
+    which is sound there only because that gate's inputs are exactly the fingerprinted
+    inputs. It does not generalize. Every other daily narrative surface on this
+    platform is gated by `grounded_generation`, whose fabricated-date (#1242) and
+    cycle-freshness (#1691/#1897) classes are functions of *today*, not of the
+    generation inputs: a reflection that honestly said "Day 4" when it was generated
+    is a stale-Day-N violation when it is republished on Day 9. Reusing the verdict
+    would republish it; re-running the gate catches it and forces a fresh generation.
+
+    `revalidate(stored_output)` must therefore re-run the surface's own publish gate
+    against today's context and return truthy only if the stored text would pass
+    NOW. It is called ONLY on a fingerprint hit, so the cost is a deterministic
+    check on a day that was about to cost a full model call.
+
+    Fail-CLOSED in both directions a caller can get wrong: a falsy verdict AND a
+    raising `revalidate` both fall through to regeneration. The asymmetry from this
+    module's header still holds — a spurious regeneration costs money, a spurious
+    reuse costs the truth.
+    """
+    fingerprint, stored, unchanged_since = check_reuse_or_explain(table, coach_id, output_type, parts)
+    if not stored:
+        return fingerprint, None, None
+    try:
+        still_passes = bool(revalidate(stored))
+    except Exception as e:  # noqa: BLE001
+        print(f"[GEN-CACHE-REGATE:{coach_id}] {output_type} re-gate raised ({e}) — regenerating (fail-closed)")
+        return fingerprint, None, None
+    if not still_passes:
+        print(f"[GEN-CACHE-REGATE:{coach_id}] {output_type} inputs unchanged but the stored output fails TODAY's gate — regenerating")
+        return fingerprint, None, None
+    return fingerprint, stored, unchanged_since
+
+
 def part_fingerprints(parts: dict) -> dict:
     """Per-part digests, so a MISS can say WHICH part changed (#2889).
 
@@ -228,16 +299,31 @@ def record_reuse(table, coach_id: str, output_type: str, today: str) -> None:
         print(f"[GEN-CACHE] reuse bookkeeping failed for {coach_id}/{output_type}: {e}")
 
 
-def emit_skip_metric(cw, namespace: str, coach_id: str) -> None:
-    """Emit LifePlatform/AI::GenerationSkippedUnchanged{Coach} = 1 so the
-    regenerations-skipped/day rate is visible in the spend attribution. Non-fatal."""
+def emit_skip_metric(cw, namespace: str, coach_id: str, surface: str | None = None) -> None:
+    """Emit LifePlatform/AI::GenerationSkippedUnchanged{Coach[,Surface]} = 1 so the
+    regenerations-skipped/day rate is visible in the spend attribution. Non-fatal.
+
+    #2889 — `Surface` is a SECOND dimension, added once the gate spread past the coach
+    brief, so a nonzero skip-rate can be attributed to the surface that earned it
+    instead of collapsing three different generators into one number. Adding a
+    dimension normally forks the series and orphans the old one; here it costs
+    nothing, because the measured fact on 2026-08-23 was that this metric had **zero
+    variants in CloudWatch** — it had never once been emitted, so there was no
+    existing series to preserve and no dashboard reading it. Coach x Surface is
+    8 + 8 + 1 = 17 series at full saturation, which is why `surface` is a coarse
+    label ("coach_brief") and not the per-coach `output_type` (#2837: 743 EMF series
+    across 35 namespaces is already an open finding — this must not feed it).
+    """
     try:
+        dims = [{"Name": "Coach", "Value": coach_id}]
+        if surface:
+            dims.append({"Name": "Surface", "Value": surface})
         cw.put_metric_data(
             Namespace=namespace,
             MetricData=[
                 {
                     "MetricName": "GenerationSkippedUnchanged",
-                    "Dimensions": [{"Name": "Coach", "Value": coach_id}],
+                    "Dimensions": dims,
                     "Value": 1,
                     "Unit": "Count",
                 }

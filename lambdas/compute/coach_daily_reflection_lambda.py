@@ -77,17 +77,24 @@ def _gather_facts(table, coach_id):
     summary = coach_derived_prose.served_summary(it)
     if not summary:
         return None
-    themes = it.get("themes") or []
+    return facts_from(summary, it.get("themes") or [], it.get("word_count"))
+
+
+def facts_from(summary, themes, word_count):
+    """The facts dict, derived from a coach's stored output. Split out of
+    `_gather_facts` (#2889) so it is reachable without DynamoDB — the reuse gate is
+    judged against exactly this structure, and a test that hand-rolled a lookalike
+    would be testing its own fixture rather than the wire."""
     facts = summary + (" " + " ".join(str(t) for t in themes) if themes else "")
     return {
         "summary": summary,
-        "themes": themes[:4],
+        "themes": list(themes)[:4],
         "numbers": er03_gate.numbers_in(facts),
         # #2430: the grounding allow-lists, derived from the SAME text the model is
         # shown (summary + themes) — literally the vocabulary it was given.
         "allowed": grounded_generation.allowed_numbers(facts),
         "allowed_dates": grounded_generation.allowed_dates(facts),
-        "n": int(it.get("word_count") or 10),  # small-sample → forces a hedge
+        "n": int(word_count or 10),  # small-sample → forces a hedge
     }
 
 
@@ -162,6 +169,60 @@ def _generate(persona, voice_rules, example, facts, stricter=False):
         return None
 
 
+OUTPUT_TYPE = "daily_reflection"  # #2889: the generation_cache slot for this surface
+SURFACE = "daily_reflection"  # #2889: the GenerationSkippedUnchanged metric dimension
+
+
+def _reuse_or_none(table, cw, coach_id, persona, voice_rules, example, facts, today):
+    """#2889 (ADR-126 extended): skip the Haiku call when nothing this coach reflects
+    on has changed. Returns `(fingerprint, reused_text_or_None, unchanged_since)`.
+
+    This surface is a textbook fit for the hash-and-reuse seam and was paying for it
+    daily: `_gather_facts` reads the coach's LATEST `OUTPUT#` record, so on any day a
+    coach did not publish — a quality-gate HOLD (ADR-108), a budget pause, a stalled
+    coach — the facts are byte-identical to yesterday's and the model is paid to
+    re-say the same 120 words.
+
+    What it is NOT allowed to skip is the gate. `_accepts` arms the #2430 grounding
+    classes, two of which (fabricated-date, cycle freshness) are judged against
+    TODAY: text that was honest on Day 4 can be a stale-Day-N violation on Day 9 with
+    identical inputs. So the stored text is re-gated against `today` before it is
+    reused — `generation_cache.reuse_if_still_valid` makes that mandatory rather than
+    a convention this call site could quietly drop.
+
+    Entirely fail-soft: any error anywhere degrades to "generate as before".
+    """
+    try:
+        from common import generation_cache as gc
+
+        parts = gc.reflection_parts(persona, voice_rules, example, facts)
+        fingerprint, reused, unchanged_since = gc.reuse_if_still_valid(
+            table, coach_id, OUTPUT_TYPE, parts, lambda text: _accepts(text, facts, today)[0]
+        )
+        if reused:
+            gc.record_reuse(table, coach_id, OUTPUT_TYPE, today)
+            gc.emit_skip_metric(cw, "LifePlatform/AI", coach_id, surface=SURFACE)
+            logger.info("[coach_daily] %s unchanged since %s — reusing gated reflection, no generation", coach_id, unchanged_since)
+        return fingerprint, reused, unchanged_since
+    except Exception as e:
+        logger.warning("[coach_daily] generation cache unavailable for %s (non-blocking): %s", coach_id, e)
+        return None, None, None
+
+
+def _store(table, coach_id, fingerprint, persona, voice_rules, example, facts, text, today):
+    """Persist a freshly generated, gate-passed reflection under its input fingerprint."""
+    if not fingerprint:
+        return
+    try:
+        from common import generation_cache as gc
+
+        gc.store_entry(
+            table, coach_id, OUTPUT_TYPE, fingerprint, text, today, parts=gc.reflection_parts(persona, voice_rules, example, facts)
+        )
+    except Exception as e:
+        logger.warning("[coach_daily] generation cache store failed for %s (non-blocking): %s", coach_id, e)
+
+
 def lambda_handler(event, context):
     # PG-10: budget self-skip — never run when spend is elevated.
     try:
@@ -175,6 +236,7 @@ def lambda_handler(event, context):
         pass  # fail-open: a budget blip must not break the batch
 
     s3 = boto3.client("s3", region_name=REGION)
+    cw = boto3.client("cloudwatch", region_name=REGION)
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     reg = persona_registry.load_registry(s3, S3_BUCKET).get("personas", {})
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -187,6 +249,14 @@ def lambda_handler(event, context):
             skipped.append(coach_id)
             continue  # honest empty — nothing to reflect on yet
         voice_rules, example = _voice(s3, persona.get("coach_config_key", coach_id))
+
+        # #2889: hash-and-reuse BEFORE any generation. The reused text was gate-passed
+        # when it was written AND has just been re-gated against today (see _reuse_or_none).
+        fingerprint, reused, unchanged_since = _reuse_or_none(table, cw, coach_id, persona, voice_rules, example, facts, today)
+        if reused:
+            reflections[coach_id] = {"text": reused, "date": today, "framing": "correlative", "unchanged_since": unchanged_since}
+            continue
+
         text = _generate(persona, voice_rules, example, facts)
         ok, reasons = _accepts(text, facts, today)
         if not ok:
@@ -195,6 +265,7 @@ def lambda_handler(event, context):
             ok, _reasons2 = _accepts(text, facts, today)
         if ok:
             reflections[coach_id] = {"text": text, "date": today, "framing": "correlative"}
+            _store(table, coach_id, fingerprint, persona, voice_rules, example, facts, text, today)
         else:
             skipped.append(coach_id)
 
