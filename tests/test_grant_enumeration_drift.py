@@ -27,10 +27,14 @@ What it asserts
      every channel its python entrypoints reach is granted by
      `infra/iam/<role>.permissions.json`. This is where #3059's second casualty
      lived (the diagnosis role's missing budget-tier read); the sweep found a
-     third, still open, on the golden-eval role.
-  C. **Ratchets that only shrink** — the open live gaps and the dynamic
-     (unparseable) references are dated whitelists; a stale entry fails as loudly
-     as a new gap, so neither list can quietly become a graveyard.
+     third on the golden-eval role, repaired 2026-08-23 (see `_PENDING_LIVE_APPLY`
+     — the doc is fixed, the out-of-band apply is the remaining step).
+  C. **Ratchets that only shrink** — the open live gaps, the pending live applies
+     and the dynamic (unparseable) references are dated whitelists; a stale entry
+     fails as loudly as a new gap, so no list can quietly become a graveyard.
+     The sweep's first run recorded 13 live gaps (2026-08-23); the repair PR the
+     same day closed 12, leaving one deferred behind #3037's concurrent rework of
+     `role_policies_email.py`.
   D. **Deploy path** — every `config/` object a Lambda reads has a producer (the
      L110 shape: a prefix nothing deploys).
   E. **Watch surface** — the derived content-filter/privacy-guard consumer set is
@@ -88,92 +92,61 @@ pytestmark = pytest.mark.deploy_critical
 #: one is fixed and not deleted here.
 #:
 #: (source_file, channel, reference) → why it is open
+#:
+#: SHRUNK 2026-08-23 (#2824 repair PR): nine of the ten original entries were fixed in
+#: `cdk/stacks/role_policies_{ingestion,operational,serve,compute}.py` and deleted here —
+#: the guard passing IS the proof, because `test_open_gap_ratchet_only_shrinks` reds on a
+#: recorded gap that no longer reproduces and `test_every_lambda_consumer_is_granted_its_channel`
+#: reds on one that does. The single survivor is deferred, with its reason, below.
 _OPEN_GAPS: dict[tuple, str] = {
-    (
-        "lambdas/ingestion/bluesky_lambda.py",
-        "s3config",
-        "config/content_filter.json",
-    ): "#2824 2026-08-23: inbound-social sensitivity gate reaches the ER-06 vocabulary via "
-    "privacy_guard; ingestion_bluesky() grants s3:PutObject on raw/ only — the exact #2503 shape",
-    (
-        "lambdas/ingestion/mastodon_lambda.py",
-        "s3config",
-        "config/content_filter.json",
-    ): "#2824 2026-08-23: same as bluesky — ingestion_mastodon() has no config/ GetObject",
-    (
-        "lambdas/ingestion/youtube_lambda.py",
-        "s3config",
-        "config/content_filter.json",
-    ): "#2824 2026-08-23: same as bluesky — ingestion_youtube() has no config/ GetObject",
     (
         "lambdas/emails/chronicle_email_sender_lambda.py",
         "s3config",
         "config/personas.json",
     ): "#2824 2026-08-23: _derive_board_members → persona_registry.load_registry; "
-    "email_chronicle_sender() has no S3 config read",
-    (
-        "lambdas/ingestion/journal_enrichment_lambda.py",
-        "s3config",
-        "config/personas.json",
-    ): "#2824 2026-08-23: persona_registry reached; ingestion_journal_enrichment() has no config/ read",
-    (
-        "lambdas/ingestion/social_enrichment_lambda.py",
-        "s3config",
-        "config/personas.json",
-    ): "#2824 2026-08-23: persona_registry reached; ingestion_social_enrichment() has no config/ read",
-    (
-        "lambdas/operational/ai_quality_canary_lambda.py",
-        "s3config",
-        "config/personas.json",
-    ): "#2824 2026-08-23: operational_ai_quality_canary() grants config/content_filter.json "
-    "EXACTLY (#2655's fix) — personas.json was not in that repair's scope",
-    (
-        "lambdas/web/site_api_ai_lambda.py",
-        "ssm",
-        "/life-platform/experiment-cycle",
-    ): "#2824 2026-08-23: _write_board_interaction → phase_taxonomy.experiment_stamp → "
-    "coach_checkin.read_cycle; site_api_ai() has no SSM statement (site_api() does)",
-    (
-        "lambdas/operational/qa_smoke_lambda.py",
-        "ssm",
-        "/life-platform/experiment-cycle",
-    ): "#2824 2026-08-23: reader-truth phase_context → read_cycle; operational_qa_smoke() "
-    "grants budget-tier only — the #2959 cycle-param class",
-    (
-        "lambdas/compute/coach_memoir_lambda.py",
-        "ssm",
-        "/life-platform/experiment-cycle",
-    ): "#2824 2026-08-23: compute_coach_memoir() grants config/* S3 but no experiment-cycle read",
+    "email_chronicle_sender() has no S3 config read. DEFERRED (not fixed with its nine "
+    "siblings on 2026-08-23): the repair lands in cdk/stacks/role_policies_email.py, which "
+    "#3037 is concurrently reworking — a second editor there buys a merge-union conflict on "
+    "the file this class is least able to afford one in. Close it on top of #3037.",
 }
 
 #: OPEN LIVE GAPS on the CI OIDC identities. Same rule: defects with an owner,
 #: recorded because applying IAM is an out-of-band watched step (infra/iam/README.md)
 #: and IAM is off the auto-merge ALLOWLIST until ADR-129 re-promotion (#2611).
 #: (role, entrypoint, channel, reference) → why it is open
-_OPEN_CI_GAPS: dict[tuple, str] = {
+#:
+#: EMPTIED 2026-08-23 (#2824 repair PR): all three golden-eval gaps are granted in
+#: `infra/iam/github-actions-golden-eval-role.permissions.json`. The checked-in doc is now
+#: AHEAD of live until the out-of-band `aws iam put-role-policy` runs — that window is
+#: `_PENDING_LIVE_APPLY` below, NOT this list, because the repo-side defect is closed and
+#: the two states fail for different reasons and get fixed by different people.
+_OPEN_CI_GAPS: dict[tuple, str] = {}
+
+#: Repo-side FIXED, live apply PENDING. Read ONLY by the live-parity half — the
+#: `infra/iam/README.md` "STAGED, NOT yet applied" idiom, expressed where the check is.
+#: An entry here means: the statement is checked in, and the account has not received it.
+#: The credentialed run that observes the grant HAS landed reds on the stale entry, so this
+#: list cannot outlive its apply either.
+#: (role, channel, reference) → the apply that clears it
+_PENDING_LIVE_APPLY: dict[tuple, str] = {
     (
         "github-actions-golden-eval-role",
-        "tests/golden_brief_eval.py",
         "ssm",
         "/life-platform/budget-tier",
-    ): "#2824 2026-08-23: _run_voice_judge → bedrock_client.invoke → budget_guard.current_tier. "
-    "The role grants Bedrock+PutMetricData+DDB only, so current_tier() fails open to 0 and the "
-    "ADR-125 tier-3 hard stop cannot stop this job's spend. Third member of the #2959 class "
-    "(#3059 fixed the diagnosis role's copy).",
+    ): "#2824 2026-08-23: BudgetTierRead statement added to the checked-in doc; cleared by "
+    "`aws iam put-role-policy --role-name github-actions-golden-eval-role "
+    "--policy-name golden-eval-permissions --policy-document file://infra/iam/"
+    "github-actions-golden-eval-role.permissions.json` (infra/iam/README.md).",
     (
         "github-actions-golden-eval-role",
-        "tests/golden_surface_eval.py",
         "s3config",
         "config/personas.json",
-    ): "#2824 2026-08-23: _eval_generic imports state_of_matthew_lambda, whose module scope calls "
-    "persona_registry.short_id_names(); the role has no s3:GetObject at all",
+    ): "#2824 2026-08-23: EvalConfigRead statement added to the checked-in doc; same one apply.",
     (
         "github-actions-golden-eval-role",
-        "tests/golden_brief_eval.py",
         "s3config",
         "config/coaches/*.json",
-    ): "#2824 2026-08-23: the brief's coach-dossier read (config/coaches/{id}.json) on a role with "
-    "no s3:GetObject — confirmed against the LIVE inline policy, not just the checked-in doc",
+    ): "#2824 2026-08-23: EvalConfigRead statement added to the checked-in doc; same one apply.",
 }
 
 #: Channel references whose id is computed at runtime, so no static grant check is
@@ -576,6 +549,7 @@ def test_live_oidc_role_grants_cover_the_derived_consumer_set():
                 bucket[channel] |= refs[channel]
 
     findings, checked = [], 0
+    still_pending: set = set()
     for role, spec in verify_oidc_iam.ROLES.items():
         consumer = consumers.get(role)
         if not consumer or not any(consumer[c] for c in ge.CHANNELS):
@@ -583,14 +557,24 @@ def test_live_oidc_role_grants_cover_the_derived_consumer_set():
         live = iam.get_role_policy(RoleName=role, PolicyName=spec["inline_policy_name"])["PolicyDocument"]
         checked += 1
         for channel, ref in ge.missing_refs(consumer, ge.doc_grants(live)):
-            if (role, "<any entrypoint>", channel, ref) in _OPEN_CI_GAPS or any(
-                k[0] == role and k[2] == channel and k[3] == ref for k in _OPEN_CI_GAPS
-            ):
-                continue
+            if any(k[0] == role and k[2] == channel and k[3] == ref for k in _OPEN_CI_GAPS):
+                continue  # a repo-side gap, already recorded and owned
+            if (role, channel, ref) in _PENDING_LIVE_APPLY:
+                still_pending.add((role, channel, ref))
+                continue  # checked in, apply not run yet
             findings.append(f"{role}: LIVE policy does not grant {channel} {ref}")
 
     assert checked, "no OIDC role with a derived consumer set was checked live — the derivation broke, not the account"
     assert not findings, "LIVE IAM does not grant what the code reaches (repo↔live drift on top of a consumer):\n  " + "\n  ".join(findings)
+
+    # Shrink-only, the same rule as every other ratchet here: once the apply lands, the
+    # live policy DOES grant it and the entry must be deleted rather than left behind.
+    # This is the only lane that can tell — it is the only one that asks the account.
+    landed = sorted(set(_PENDING_LIVE_APPLY) - still_pending)
+    assert not landed, (
+        "These _PENDING_LIVE_APPLY entries are granted LIVE now — the out-of-band apply ran. "
+        "Delete them so the list stays a queue, not a graveyard (#2824):\n  " + "\n  ".join(map(str, landed))
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

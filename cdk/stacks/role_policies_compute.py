@@ -195,12 +195,24 @@ def compute_coach_memoir() -> list[iam.PolicyStatement]:
     DynamoDB statement), uses Bedrock (Sonnet, narrative tier) for the
     first-person retrospective, writes generated/coach_memoirs.json.
     Budget-tier SSM read is granted to every CDK role by create_platform_lambda.
-    #1441: + generated/qa_archive/text/* — the generation-time AI-surface archive (text leg only)."""
+    #1441: + generated/qa_archive/text/* — the generation-time AI-surface archive (text leg only).
+
+    #2824: + ssm:GetParameter on experiment-cycle. The MEMOIR# write-back runs
+    phase_taxonomy.experiment_stamp() -> coach_checkin.read_cycle() (the same ADR-077
+    write-time provenance #1858 granted compute_daily_metrics); the helper baseline covers
+    budget-tier only, so the cycle read fail-softed to an unstamped quarterly memoir."""
     return _compute_base(
         needs_kms=True,
         needs_ai_keys=True,
         needs_s3_config=True,
         needs_s3_write=["generated/coach_memoirs.json", "generated/qa_archive/text/*"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="ExperimentCycleRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+            ),
+        ],
     )
 
 
