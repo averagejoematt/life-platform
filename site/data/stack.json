@@ -3,7 +3,7 @@
   "_meta": {
     "generated_by": "scripts/v4_build_stack_manifest.py — derived from source_registry.py + the public protocol/supplement catalogues (#1401); never hand-edit",
     "schema_version": "1.0.0",
-    "updated": "2026-08-19",
+    "updated": "2026-08-23",
     "framing": "Fork the architecture, not the data. This describes the instrument — what measures and how — and contains no health metrics, no personal records, and no account-specific identifiers.",
     "license": "The manifest is published for reuse. It is a description, not a guarantee."
   },
@@ -847,7 +847,7 @@
       ],
       "scope_note": "One budget covers the WHOLE platform, not just the AI. CI minutes are billed by the code host on a separate plan and are not inside this figure.",
       "verifiability": "These are not the platform's own claims about itself: the live endpoints above serve the governor's own numbers, refreshed every 8 hours, and omit dollars rather than freeze them when the upstream reading goes stale.",
-      "monthly_usd_typical": "~$80",
+      "monthly_usd_typical": "~$100",
       "monthly_usd_typical_basis": "the run-rate published on /method/cost/, read from the same constant the /api/platform_stats endpoint serves — not a second opinion about it.",
       "ceiling_usd": 150.0,
       "surge_ceiling_usd": 176.0,
