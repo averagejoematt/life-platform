@@ -1925,7 +1925,32 @@ Write your {domain_label} coaching section now."""
 
         # Step 5: Generate with Sonnet
         print(f"[COACH-V2:{coach_id}] Generating output...")
-        output = call_anthropic(system_prompt + "\n\n" + user_message_full, api_key, max_tokens=600)
+        # #2888: `system_prompt` goes in the SYSTEM slot, not concatenated into the
+        # user turn. It used to ride as `system_prompt + "\n\n" + user_message_full`,
+        # which left `body["system"]` unset (ai_transport._build_system_block returns
+        # None for a falsy `system`) — so the ADR-049 auto-wrap had nothing to wrap and
+        # the seven largest calls in the brief carried no cache_control at all.
+        # Measured live (LifePlatform/AI, trailing 30d, 2026-08-24): daily-brief
+        # 4,673,440 uncached input tokens, 0 cache-read, 0 cache-WRITE — the zero on
+        # the write side is the tell that no breakpoint existed, not that one missed.
+        #
+        # The model sees the same bytes in the same order (render order is
+        # tools -> system -> messages), and the ADR-104 allow-list is unaffected: it
+        # derives from `_allowlist_prompt(system_prompt, few_shot_block)` and
+        # `user_message` directly, never from this concatenation.
+        #
+        # What it buys: `system_prompt` is 9.5-13.4KB (~2,360-3,340 tok) per coach,
+        # comfortably over claude-sonnet-4-6's 1,024-token minimum cacheable prefix,
+        # and is byte-identical across this coach's base call AND its up-to-four
+        # regens (grounding, quality gate, presence-ack, self-graded verdict). The
+        # base call writes the cache; every regen for the same coach reads it at ~0.1x.
+        # It does NOT cache across coaches — each coach's voice spec and few-shot block
+        # differ, so the shared goals/facts run sits mid-prompt rather than in a common
+        # prefix. Hoisting that run to the front would cache across all seven, but it
+        # means putting data ahead of "You are {display_name}" on a persona-driven
+        # reader-facing surface with an open coach-identity-drift issue (#2757) — a
+        # separate, deliberate change, not a drive-by.
+        output = call_anthropic(user_message_full, api_key, max_tokens=600, system=system_prompt)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
 
         # #952 (ai-content-6): Bedrock outage / tier-3 cutoff returns the
@@ -1972,7 +1997,9 @@ Write your {domain_label} coaching section now."""
                 output, _left, _corrected = _gg_mod.regen_once(
                     output,
                     _findings_fn,
-                    lambda _corr: call_anthropic(system_prompt + "\n\n" + user_message_full + "\n\n" + _corr, api_key, max_tokens=600),
+                    # #2888: system in the system slot; the correction stays in the
+                    # user turn (dynamic — it must never enter the cached prefix).
+                    lambda _corr: call_anthropic(user_message_full + "\n\n" + _corr, api_key, max_tokens=600, system=system_prompt),
                     surface=f"coach_v2:{coach_id}",
                 )
                 if _corrected:
@@ -1996,7 +2023,11 @@ Write your {domain_label} coaching section now."""
             output,
             brief_with_grounding(generation_brief, _canon_facts, _allowed),  # #2573: deterministic grounding context
             regenerate_fn=lambda _note: call_anthropic(
-                system_prompt + "\n\n" + user_message_full + "\n\n" + _note, api_key, max_tokens=600
+                # #2888: system in the system slot; the gate note stays user-side.
+                user_message_full + "\n\n" + _note,
+                api_key,
+                max_tokens=600,
+                system=system_prompt,
             ),
         )
         if output is None:
@@ -2018,8 +2049,12 @@ Write your {domain_label} coaching section now."""
                 output, _ack_finding = _ec.enforce_presence_acknowledgment(
                     output,
                     _psig,
+                    # #2888: system in the system slot; the gate note stays user-side.
                     regenerate_fn=lambda _note: call_anthropic(
-                        system_prompt + "\n\n" + user_message_full + "\n\n" + _note, api_key, max_tokens=600
+                        user_message_full + "\n\n" + _note,
+                        api_key,
+                        max_tokens=600,
+                        system=system_prompt,
                     ),
                 )
                 if _ack_finding:
@@ -2162,10 +2197,12 @@ Write your {domain_label} coaching section now."""
             _sgv_findings = _gg_sgv.self_graded_verdict_findings(output or "", evaluated_predictions=_eval_n)
             if _sgv_findings:
                 print(f"[COACH-V2:{coach_id}] self-graded-verdict gate fired: " + "; ".join(f.get("detail", "") for f in _sgv_findings))
+                # #2888: system in the system slot; the correction stays user-side.
                 _regen = call_anthropic(
-                    system_prompt + "\n\n" + user_message_full + "\n\n" + _gg_sgv.correction_prompt(_sgv_findings),
+                    user_message_full + "\n\n" + _gg_sgv.correction_prompt(_sgv_findings),
                     api_key,
                     max_tokens=600,
+                    system=system_prompt,
                 )
                 if _regen and not _is_ai_unavailable(_regen):
                     _still = _gg_sgv.self_graded_verdict_findings(_regen, evaluated_predictions=_eval_n)
