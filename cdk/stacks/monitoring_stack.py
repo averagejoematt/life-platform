@@ -477,7 +477,7 @@ class MonitoringStack(Stack):
             "WarnCount",
             86400,
             "Maximum",
-            1,
+            4,  # ADR-076 chronic-warn floor is 4-11; threshold was 1 and fired daily. Raised to 4.
             GTE,
             to_digest=True,
         )
