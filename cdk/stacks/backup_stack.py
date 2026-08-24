@@ -152,7 +152,7 @@ class BackupStack(Stack):
             "RawReplicationRole",
             role_name=RAW_REPLICATION_ROLE_NAME,
             assumed_by=iam.ServicePrincipal("s3.amazonaws.com"),
-            description="S3 CRR: matthew-life-platform/raw/* → the us-east-2 backup bucket (DIL-027)",
+            description="S3 CRR: matthew-life-platform/raw/* to the us-east-2 backup bucket (DIL-027)",
         )
         self.replication_role.add_to_policy(
             iam.PolicyStatement(
