@@ -77,6 +77,91 @@ def test_bucket_policy_error_is_soft(monkeypatch):
     assert res["status"] == "error"
 
 
+# ── S3 lifecycle declared-vs-live (DIL-026, #2799) ───────────────────────────
+
+
+class _FakeS3Lifecycle:
+    def __init__(self, cfg):
+        self._cfg = cfg
+
+    def get_bucket_lifecycle_configuration(self, Bucket):  # noqa: N803 — boto3 kwarg casing
+        if self._cfg is None:
+            raise RuntimeError("no lifecycle configuration")
+        return self._cfg
+
+
+def _declared_lifecycle():
+    with open(os.path.join(_ROOT, "deploy", "s3_lifecycle.json")) as f:
+        return json.load(f)
+
+
+def test_s3_lifecycle_declared_has_imports_rule():
+    # DIL-026: this is the specific coverage gap the finding named.
+    rules = {r["ID"]: r for r in _declared_lifecycle()["Rules"]}
+    assert "imports-expire-noncurrent-versions-7d" in rules
+    r = rules["imports-expire-noncurrent-versions-7d"]
+    assert r["Filter"] == {"Prefix": "imports/"}
+    assert r["NoncurrentVersionExpiration"]["NoncurrentDays"] == 7
+
+
+def test_s3_lifecycle_clean_when_live_matches_declared(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeS3Lifecycle(_declared_lifecycle()))
+    res = ds.check_s3_lifecycle()
+    assert res["status"] == "clean"
+    assert res["missing_rule_ids"] == []
+    assert res["extra_rule_ids"] == []
+    assert res["changed_rule_ids"] == []
+
+
+def test_s3_lifecycle_drift_when_declared_rule_missing_live(monkeypatch):
+    # Mutation proof for the DIL-026 shape: a declared rule (imports/) that never
+    # got applied live must surface as drift, by name.
+    live = json.loads(json.dumps(_declared_lifecycle()))
+    live["Rules"] = [r for r in live["Rules"] if r["ID"] != "imports-expire-noncurrent-versions-7d"]
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeS3Lifecycle(live))
+    res = ds.check_s3_lifecycle()
+    assert res["status"] == "drift"
+    assert "imports-expire-noncurrent-versions-7d" in res["missing_rule_ids"]
+
+
+def test_s3_lifecycle_drift_when_live_rule_weakened(monkeypatch):
+    # A rule present both sides but with a dropped/weakened NoncurrentVersionExpiration
+    # (e.g. an out-of-band console edit) must also surface — not just wholesale removal.
+    live = json.loads(json.dumps(_declared_lifecycle()))
+    for r in live["Rules"]:
+        if r["ID"] == "imports-expire-noncurrent-versions-7d":
+            r["NoncurrentVersionExpiration"] = {"NoncurrentDays": 365}
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeS3Lifecycle(live))
+    res = ds.check_s3_lifecycle()
+    assert res["status"] == "drift"
+    assert "imports-expire-noncurrent-versions-7d" in res["changed_rule_ids"]
+
+
+def test_s3_lifecycle_drift_when_live_has_undeclared_rule(monkeypatch):
+    # An out-of-band-added live rule (never declared) is exactly as invisible as a
+    # missing one on an imported bucket — must also count as drift.
+    live = json.loads(json.dumps(_declared_lifecycle()))
+    live["Rules"].append({"ID": "console-added-rule", "Status": "Enabled", "Filter": {"Prefix": "oops/"}})
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeS3Lifecycle(live))
+    res = ds.check_s3_lifecycle()
+    assert res["status"] == "drift"
+    assert "console-added-rule" in res["extra_rule_ids"]
+
+
+def test_s3_lifecycle_error_is_soft(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeS3Lifecycle(None))
+    res = ds.check_s3_lifecycle()
+    assert res["status"] == "error"
+
+
+def test_s3_lifecycle_error_when_declared_file_unreadable(monkeypatch, tmp_path):
+    # Point _ROOT at an empty tree so deploy/s3_lifecycle.json doesn't exist —
+    # exercises the same fail-soft "error, never crash" contract as the other checks.
+    monkeypatch.setattr(ds, "_ROOT", str(tmp_path))
+    res = ds.check_s3_lifecycle()
+    assert res["status"] == "error"
+
+
 # ── orphan allowlist (AC2 — no functions outside IaC) ────────────────────────
 
 
@@ -167,6 +252,7 @@ def _patch_all(
     codeql=None,
     hae=None,
     raw_replication=None,
+    s3_lifecycle=None,
 ):
     # DIL-027 (#3042): the raw/ cross-region backup check. Patched here like every
     # other AWS-touching check so the sweep-shape tests stay offline.
@@ -179,6 +265,11 @@ def _patch_all(
     monkeypatch.setattr(ds, "check_postflight", lambda: post)
     monkeypatch.setattr(ds, "check_orphan_functions", lambda: orphan)
     monkeypatch.setattr(ds, "check_bucket_policy", lambda: bucket)
+    monkeypatch.setattr(
+        ds,
+        "check_s3_lifecycle",
+        lambda: s3_lifecycle or {"status": "clean", "missing_rule_ids": [], "extra_rule_ids": [], "changed_rule_ids": []},
+    )
     monkeypatch.setattr(ds, "check_doc_literals", lambda: doc or {"status": "clean", "mismatches": []})
     monkeypatch.setattr(ds, "check_site_sha_ancestry", lambda: site or {"status": "clean", "live_sha": "deadbeef"})
     monkeypatch.setattr(ds, "check_oidc_iam", lambda: oidc or {"status": "clean"})
@@ -256,6 +347,33 @@ def test_sweep_site_sha_drift(monkeypatch):
     rec = ds.run_sweep()
     assert rec["status"] == "drift"
     assert "live site SHA not on main" in rec["summary"]
+
+
+def test_sweep_s3_lifecycle_drift(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean"},
+        s3_lifecycle={
+            "status": "drift",
+            "missing_rule_ids": ["imports-expire-noncurrent-versions-7d"],
+            "extra_rule_ids": [],
+            "changed_rule_ids": [],
+            "detail": "declared but missing live: ['imports-expire-noncurrent-versions-7d']",
+        },
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "S3 lifecycle configuration diverges from declared rules" in rec["summary"]
+    # AC4 / #2578-class check: the drift must actually reach the triage path, not just
+    # the sweep record — this is what run_sweep's generic checks-dict → as_signal
+    # plumbing (drift_report.py) turns into a needs-human item on the curated report.
+    sig = drift_report.as_signal(rec)
+    assert sig is not None
+    assert "s3_lifecycle" in sig["flagging"]
+    assert sig["flagging"]["s3_lifecycle"]["status"] == "drift"
 
 
 # ── report seam (AC4) ────────────────────────────────────────────────────────

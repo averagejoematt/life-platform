@@ -53,6 +53,18 @@ _SANCTIONED_REGISTRY_FILES = {
     "lambdas/ingestion/source_registry.py",
     "lambdas/experiment/phase_taxonomy.py",  # the partition census (ADR-077)
     "lambdas/coach/persona_registry.py",
+    # The compute-input census (#3049/DIL-024): which source partitions each of the
+    # five compute Lambdas reads. Sanctioned on the same grounds as phase_taxonomy —
+    # it is a census, not a copy of one. No existing registry holds this fact
+    # (source_registry states each source's CADENCE, never its consumers; the #2845
+    # platform model resolves only literal pk constructions, which misses every read
+    # routed through a `fetch_date(src, ...)` helper — it derives 0 sources for
+    # hypothesis-engine). Adding it here is paid for immediately: the two copies that
+    # WERE carried as debt — `hypothesis_engine_lambda.py::sources::...` and
+    # `daily_metrics_compute_lambda.py::sources::...`, both dated 2026-08-17 — now
+    # derive from the census and came OUT of the ledger, so the ratchet counted down
+    # (charter standing rule 2), it did not grow sideways.
+    "lambdas/common/input_manifest.py",
 }
 
 _MIN_MEMBERS = 2  # a one-string literal is a reference, not an enumeration

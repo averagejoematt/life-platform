@@ -74,6 +74,7 @@ from common import (
     stats_core,  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 )
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -230,18 +231,13 @@ def gather_data(days=LOOKBACK_DAYS):
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date = (datetime.now(timezone.utc) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
-    sources = [
-        "whoop",
-        "garmin",
-        "macrofactor",
-        "apple_health",
-        "withings",
-        "strava",
-        "notion",
-        "habitify",
-        "eightsleep",
-        "computed_metrics",  # #1843: diary_sessions lives here (daily-metrics-compute)
-    ]
+    # #3049: the ingest set is DECLARED ONCE in the compute-input census
+    # (common.input_manifest.COMPUTE_INPUTS). This list was a second copy of it,
+    # carried as conformance debt since 2026-08-17 (#2844 ledger) — deriving it
+    # retires that entry and makes the manifest judge exactly what is read here.
+    # computed_metrics is a DERIVED partition with no registry cadence, so it is
+    # named here, not in the census (#1843: diary_sessions lives in it).
+    sources = list(COMPUTE_INPUTS["hypothesis-engine"]) + ["computed_metrics"]
 
     data = {}
     for source in sources:

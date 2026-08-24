@@ -6,16 +6,16 @@ Covers:
                               surface-registry parity with eval_retention
   - tests/qa_manifest.py      ai_surface facet + the ai-screens emitter (slug
                               rule must mirror tests/visual_qa.py capture_page)
-  - deploy/apply_s3_lifecycle.sh   the 90-day qa-archive rule is DECLARED (the
-                              script is the bucket's full-config source of truth
-                              — an undeclared rule is deleted on the next run)
+  - deploy/s3_lifecycle.json       the 90-day qa-archive rule is DECLARED (the
+                              JSON is the bucket's full-config source of truth —
+                              applied verbatim by deploy/apply_s3_lifecycle.sh;
+                              an undeclared rule is deleted on the next apply run)
 
 Run with:   python3 -m pytest tests/test_qa_archive.py -v
 """
 
 import json
 import os
-import re
 import sys
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
@@ -178,36 +178,37 @@ def test_ai_screenshot_slugs_mirror_visual_qa_slug_rule():
 
 
 def test_lifecycle_script_declares_90d_qa_archive_rules():
-    """deploy/apply_s3_lifecycle.sh REPLACES the whole bucket config on each run —
-    if a qa-archive rule ever drops out of it, the next run silently deletes the
-    retention. Pin BOTH rules, and pin the versioned-bucket mechanics: a bare
-    Days-90 expiration on this versioned bucket only writes a delete marker, and
-    the overlapping generated/ rule's NewerNoncurrentVersions:1 carve-out would
-    keep the (write-once) data version's bytes forever. The qa-archive rule must
-    therefore carry its own NoncurrentVersionExpiration WITHOUT a keep-newest
-    carve-out, plus a separate expired-delete-marker sweep rule."""
-    with open(os.path.join(REPO, "deploy", "apply_s3_lifecycle.sh")) as f:
-        src = f.read()
+    """deploy/apply_s3_lifecycle.sh PUTs deploy/s3_lifecycle.json verbatim, which
+    REPLACES the whole bucket config on each run — if a qa-archive rule ever drops
+    out of the JSON, the next apply run silently deletes the retention. Pin BOTH
+    rules, and pin the versioned-bucket mechanics: a bare Days-90 expiration on
+    this versioned bucket only writes a delete marker, and the overlapping
+    generated/ rule's NewerNoncurrentVersions:1 carve-out would keep the
+    (write-once) data version's bytes forever. The qa-archive rule must therefore
+    carry its own NoncurrentVersionExpiration WITHOUT a keep-newest carve-out,
+    plus a separate expired-delete-marker sweep rule. (#2799/DIL-026 externalized
+    the rules from the script's heredoc into this JSON — the declared source is
+    now the file both the apply script and deploy/drift_sentinel.py's
+    check_s3_lifecycle read, so this guard reads the same JSON, not script text.)"""
+    with open(os.path.join(REPO, "deploy", "s3_lifecycle.json")) as f:
+        rules = {r["ID"]: r for r in json.load(f)["Rules"]}
 
-    idx = src.find('"ID": "qa-archive-expire-90d"')
-    assert idx != -1, "qa-archive-expire-90d rule missing from apply_s3_lifecycle.sh"
-    rule = src[idx : idx + 400]  # the rule's own lines, before the next rule's ID
-    rule = rule.split('"ID":', 2)[1] if rule.count('"ID":') > 1 else rule  # never read into the next rule
-    assert '"Prefix": "generated/qa_archive/"' in rule
-    assert re.search(r'"Expiration":\s*\{"Days":\s*90\}', rule)
-    assert re.search(
-        r'"NoncurrentVersionExpiration":\s*\{"NoncurrentDays":\s*\d+\}', rule
-    ), "qa-archive rule must expire noncurrent versions (versioned bucket — else bytes are retained forever)"
+    assert "qa-archive-expire-90d" in rules, "qa-archive-expire-90d rule missing from deploy/s3_lifecycle.json"
+    rule = rules["qa-archive-expire-90d"]
+    assert rule["Filter"] == {"Prefix": "generated/qa_archive/"}
+    assert rule["Expiration"] == {"Days": 90}
     assert (
-        "NewerNoncurrentVersions" not in rule
+        "NoncurrentVersionExpiration" in rule
+    ), "qa-archive rule must expire noncurrent versions (versioned bucket — else bytes are retained forever)"
+    assert isinstance(rule["NoncurrentVersionExpiration"].get("NoncurrentDays"), int)
+    assert (
+        "NewerNoncurrentVersions" not in rule["NoncurrentVersionExpiration"]
     ), "no keep-newest carve-out: qa_archive keys are write-once, the newest noncurrent version IS the bytes"
 
-    idx2 = src.find('"ID": "qa-archive-clean-delete-markers"')
-    assert idx2 != -1, "qa-archive-clean-delete-markers rule missing (expired delete markers would accrete)"
-    rule2 = src[idx2 : idx2 + 300]
-    rule2 = rule2.split('"ID":', 2)[1] if rule2.count('"ID":') > 1 else rule2
-    assert '"Prefix": "generated/qa_archive/"' in rule2
-    assert re.search(r'"Expiration":\s*\{"ExpiredObjectDeleteMarker":\s*true\}', rule2)
+    assert "qa-archive-clean-delete-markers" in rules, "qa-archive-clean-delete-markers rule missing (expired delete markers would accrete)"
+    rule2 = rules["qa-archive-clean-delete-markers"]
+    assert rule2["Filter"] == {"Prefix": "generated/qa_archive/"}
+    assert rule2["Expiration"] == {"ExpiredObjectDeleteMarker": True}
 
 
 if __name__ == "__main__":
