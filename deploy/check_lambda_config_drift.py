@@ -41,7 +41,10 @@ STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")
 # cdk/app.py). Without this, every web_stack lambda (us-east-1, e.g.
 # email-subscriber) reads as "NOT DEPLOYED" from a us-west-2 client — the false
 # positive the 2026-07-26 sentinel sweep surfaced.
-STACK_FILE_REGION = {"web_stack.py": "us-east-1"}
+# backup_stack.py holds no Lambdas today, but the entry is required for parity with
+# cdk/app.py (tests/test_drift_checker_stack_regions.py) — and if a restore-helper
+# function is ever added there, it starts out checked against the right region.
+STACK_FILE_REGION = {"web_stack.py": "us-east-1", "backup_stack.py": "us-east-2"}
 
 # Mirrors cdk/stacks/lambda_helpers.py::create_platform_lambda defaults.
 DEFAULT_TIMEOUT = 120

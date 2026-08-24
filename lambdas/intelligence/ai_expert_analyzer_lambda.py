@@ -94,6 +94,8 @@ AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 
 # #2334: derived from the persona registry; EXPERT_PERSONAS coverage asserted in the set guard.
+# #3018: the integrator's public-audience register, guarded like #2972's public_summary.
+from coach import audience_guard
 from coach.persona_registry import OPERATIONAL_SHORT_IDS
 
 from intelligence.expert_personas import BANNED_OPENER_SCAFFOLDS, EXPERT_PERSONAS  # noqa: F401  (re-export, #1654)
@@ -828,10 +830,20 @@ def _presence_block():
 # integrator_prompts.py — pure builders, each carrying the mandatory #1086
 # phase-context block. Dual import path per the grounding_guard convention.
 try:
-    from intelligence.integrator_prompts import build_arc_prompt, build_month_rollup_prompt, build_synthesis_prompt
+    from intelligence.integrator_prompts import (
+        build_arc_prompt,
+        build_month_rollup_prompt,
+        build_synthesis_prompt,
+        gate_json_record as _integrator_gate_json_record,
+    )
 except ImportError:  # pragma: no cover — flat-staged runtime layout
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
-        from integrator_prompts import build_arc_prompt, build_month_rollup_prompt, build_synthesis_prompt  # noqa: F401
+        from integrator_prompts import (  # noqa: F401
+            build_arc_prompt,
+            build_month_rollup_prompt,
+            build_synthesis_prompt,
+            gate_json_record as _integrator_gate_json_record,
+        )
 
 
 def _build_shared_system_prompt():
@@ -1078,29 +1090,10 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
     return text
 
 
+# #2421/#3018: gating wrapper — the JSON-record logic itself lives in
+# integrator_prompts.gate_json_record (extracted at the #1665 size ratchet).
 def _gate_json_record(label, parsed, key, partial, prompt, api_key):
-    """#2421: gate the reader-bound field of a JSON-shaped generator (the weekly-priority
-    synthesis, the experiment arc, the month rollup — none of which was gated before).
-    `_gate_prose`'s rewrite comes back as raw JSON, so the extractor re-parses it and keeps
-    the WHOLE rewritten record: publishing a corrected headline beside the uncorrected
-    chapters/notes it was generated with would be the post-gate-mutation bug in another
-    costume. Returns the grounded record, or None to hold (prior record keeps serving)."""
-    fresh: dict = {}
-
-    def _extract(_raw):
-        _p = _lenient_json(_raw, key, partial)
-        if _p and _p.get(key):
-            fresh["parsed"] = _p
-            return _p[key]
-        return ""
-
-    text = _gate_prose(label, parsed[key], prompt, api_key, extract=_extract)
-    if not text:
-        logger.warning("%s HELD by the grounding gate (#2421/#2391) — prior cached record keeps serving", label)
-        return None
-    out = fresh.get("parsed", parsed)
-    out[key] = text
-    return out
+    return _integrator_gate_json_record(label, parsed, key, partial, prompt, api_key, gate_prose=_gate_prose, lenient_json=_lenient_json)
 
 
 def generate_and_cache(expert_key, shared_system=None):
@@ -1481,10 +1474,9 @@ def generate_synthesis(all_coach_outputs):
         logger.error("Synthesis generation failed after retries: %s", last_err)
         return None
 
-    # #2421: the Chair's weekly priority is the /cockpit/ headline verdict — gate it.
-    synthesis = _gate_json_record(
-        "weekly_priority", synthesis, "weekly_priority", {"cross_domain_notes": {}, "disagreements": []}, prompt, api_key
-    )
+    # #2421/#3018: the Chair's weekly priority AND public_summary — same call, graded together.
+    _synth_partial = {"cross_domain_notes": {}, "disagreements": []}
+    synthesis = _gate_json_record("weekly_priority", synthesis, ("weekly_priority", "public_summary"), _synth_partial, prompt, api_key)
     if synthesis is None:
         return None
 
@@ -1497,6 +1489,8 @@ def generate_synthesis(all_coach_outputs):
             "sk": "EXPERT#integrator",
             "expert_key": "integrator",
             "analysis": synthesis.get("weekly_priority", ""),
+            # #3018: the reader-addressed register, write-side guarded (belt: read-side re-checks too).
+            "public_summary": audience_guard.reader_safe(synthesis.get("public_summary"), coach_id="integrator", logger=logger),
             "cross_domain_notes": synthesis.get("cross_domain_notes", {}),
             "disagreements": synthesis.get("disagreements", []),
             "generated_at": now.isoformat(),
@@ -1505,9 +1499,10 @@ def generate_synthesis(all_coach_outputs):
         }
         table.put_item(Item=item)
         logger.info(
-            "Synthesis generated and cached: %d chars priority, %d domain notes",
+            "Synthesis generated and cached: %d chars priority, %d domain notes, public_summary %s",
             len(synthesis.get("weekly_priority", "")),
             len(synthesis.get("cross_domain_notes", {})),
+            "present" if item["public_summary"] else "absent",
         )
         return synthesis
 

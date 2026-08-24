@@ -342,6 +342,63 @@ def _note_truncation(parsed: dict, bedrock_body: dict, model_id: str) -> None:
         print(f"[ERROR] bedrock truncation telemetry emit failed (non-fatal, datapoints DROPPED): {e}")
 
 
+def _note_cache_noop(parsed: dict, bedrock_body: dict, model_id: str) -> None:
+    """Meter requests that ASKED for prompt caching and got none (#2888).
+
+    Strictly fail-open, and deliberately at the same chokepoint as the spend it
+    explains.
+
+    A `cache_control` block on a prefix shorter than the model's minimum
+    cacheable length is accepted by the API and then silently does nothing —
+    no error, no warning, `cache_creation_input_tokens` just stays 0. Nothing
+    anywhere read that field back, so the defect had no observable surface at
+    all: five features (daily-brief, ai-expert-analyzer, life-platform-qa-smoke,
+    coach-quality-gate, coach-state-updater) carried the wrapper and cached
+    nothing, indefinitely, while the 2026-05-29 audit's "0% hit rate" finding
+    sat in a document rather than in a metric.
+
+    `PromptCacheNoOp` closes that: asked-for-caching AND zero cache tokens is a
+    defect with a name, per-LambdaFunction and platform-wide. A request that
+    never asked for caching emits nothing (not a defect), and a genuine cache
+    MISS on a first call is indistinguishable from a no-op on that one call —
+    which is why this is a metric to trend, not an alarm to page on. A feature
+    whose series is pinned at its call count has a wrapper that has never once
+    engaged; a feature that writes then reads shows up as a decaying series.
+
+    The log line names the shortfall in tokens so the fix is actionable without
+    a second investigation: `prompt_cache.cache_floor()` is the documented
+    minimum and `cacheable_prefix_text()` is the lower bound on what was
+    actually sent.
+    """
+    try:
+        from ai.prompt_cache import cache_floor, cacheable_prefix_text, estimate_tokens, requests_caching
+
+        if not requests_caching(bedrock_body):
+            return  # never asked to cache — nothing to report
+        usage = parsed.get("usage") or {}
+        cache_read = int(usage.get("cache_read_input_tokens", 0) or 0)
+        cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
+        if cache_read or cache_write:
+            return  # caching engaged (write on a first call, read thereafter)
+        fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        _cw().put_metric_data(
+            Namespace=_CW_NAMESPACE,
+            MetricData=[
+                {"MetricName": "PromptCacheNoOp", "Dimensions": fn_dim, "Value": 1, "Unit": "Count"},
+                {"MetricName": "PromptCacheNoOp", "Value": 1, "Unit": "Count"},
+            ],
+        )
+        floor = cache_floor(model_id)
+        est = estimate_tokens(cacheable_prefix_text(bedrock_body))
+        print(
+            f"[WARN] prompt cache NO-OP: request carried cache_control but usage reported 0 cache tokens "
+            f"(model={model_id}, cacheable prefix ~{est} tok vs {floor} tok minimum, "
+            f"short by ~{max(0, floor - est)}) — the wrapper is billing full-price input (#2888)"
+        )
+    except Exception as e:  # never break an AI call on telemetry
+        print(f"[ERROR] bedrock prompt-cache telemetry emit failed (non-fatal, datapoints DROPPED): {e}")
+
+
 def _client():
     """Lazy-init bedrock-runtime client. Read timeout generous for long
     Sonnet narrative passes; botocore adaptive retries on throttling."""
@@ -454,6 +511,8 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     _emit_usage_metrics(parsed.get("usage") or {}, model_id)
     # #2893: meter billed-but-unparseable output at the same chokepoint. Fail-open.
     _note_truncation(parsed, bedrock_body, model_id)
+    # #2888: meter cache_control that asked for caching and got none. Fail-open.
+    _note_cache_noop(parsed, bedrock_body, model_id)
     return parsed
 
 

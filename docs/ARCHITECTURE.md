@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-08-24 (v8.6.0 — 76 tools, 38-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 113 alarms, 9 CDK stacks deployed).
+Last updated: 2026-08-24 (v8.6.0 — 76 tools, 38-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 114 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **153 ADRs** (ADR-001 → ADR-155 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -71,6 +71,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 |---|---|---|
 | DynamoDB table | NoSQL database | `life-platform` (deletion protection + PITR enabled) |
 | S3 bucket | Object storage + static website | `matthew-life-platform` (static hosting on `dashboard/*`) |
+| S3 bucket (backup) | Cross-region replica of the irreplaceable zone | `matthew-life-platform-raw-backup` (**us-east-2**) — receives `raw/*` by S3 replication (DIL-027/#3042). Versioned, public-access-blocked, `RETAIN`, its own delete-protection Deny; delete markers are **not** replicated. CDK-owned in `backup_stack.py`; the source-side replication rule is out-of-IaC (`deploy/s3_replication.json`, see MANAGED_WHERE_LEDGER). Same account — see the DIL-027 priced residual |
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
@@ -83,8 +84,8 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
-| CloudWatch | Alarms + logs | **~113 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
-| CDK | Infrastructure as Code | `cdk/` — 9 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`. |
+| CloudWatch | Alarms + logs | **~114 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
+| CDK | Infrastructure as Code | `cdk/` — 10 stacks. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`, `backup_stack` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**; the only stack outside us-west-2 other than `web_stack`'s us-east-1). |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | **$150/mo all-in cap** (ADR-063; base $75 -> $85 -> $150, surge-to-$176 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
 | Concurrency quota | Account-level | **100** (raised 2026-05-19 from the account default of 10 — AWS Support case 177921309700709) |
@@ -202,7 +203,7 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 
 DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. Alarm actions route to SNS `life-platform-alerts`.
 
-CloudWatch carries **~113 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
+CloudWatch carries **~114 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
 
 Additional safeguards: DLQ Consumer Lambda, Canary Lambda (synthetic health check every 30 min), item size guard.
 
@@ -505,7 +506,7 @@ Target: within the **$150/mo all-in budget ceiling** (ADR-063; surge-to-$176 per
 
   docs/                           ← All documentation
   deploy/                         ← ~120 deploy scripts
-  cdk/                            ← 9 CDK stacks
+  cdk/                            ← 10 CDK stacks
   tests/                          ← the pytest suite (live count: docs/TESTING.md) + 8 CI linters
   handovers/                      ← The live session pointer (HANDOVER_LATEST.md); history on the session-archive branch
 ```

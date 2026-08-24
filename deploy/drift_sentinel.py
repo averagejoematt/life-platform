@@ -123,6 +123,7 @@ STACKS = {
     "LifePlatformMcp": REGION,
     "LifePlatformMonitoring": REGION,
     "LifePlatformWeb": "us-east-1",
+    "LifePlatformBackup": "us-east-2",  # DIL-027 raw/ replica — see cdk/stacks/backup_stack.py
 }
 
 # Live Lambdas that are legitimately not one of OUR create_platform_lambda functions:
@@ -729,6 +730,13 @@ from sentinel_quota import (  # noqa: E402,F401
 #       in its `flagging` map. The check's entire trace was one clause at the tail
 #       of a summary already reading "6 stack(s) drifted; …". Surfacing that lands
 #       nowhere is the same as not firing — so an unreadable list is now DRIFT.
+# ── 10. raw/ cross-region backup (DIL-027, #3042) ────────────────────────────
+# Own module (same split shape as sentinel_github/sentinel_quota): the backup is
+# the platform's only protection for unrecomputable data, and a replication
+# configuration is exactly the control that gets verified once and believed
+# forever. Read that module's docstring for what it can and cannot fail on.
+from sentinel_replication import check_raw_replication  # noqa: E402,F401
+
 CODEQL_ALERT_BUDGET = 0
 
 # The one-time fix for a scope-gapped code-scanning read (#2578), carried in the
@@ -916,6 +924,7 @@ def run_sweep():
         "github_quota": check_github_quota(),
         "codeql_alerts": check_codeql_alerts(),
         "hae_webhook_ingress": check_hae_webhook_ingress(),
+        "raw_replication": check_raw_replication(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -955,6 +964,7 @@ def _summary(status, checks):
         ("github_config", "GitHub config diverges from documented posture"),
         ("github_push_runs", "main-push workflow runs not queuing"),
         ("hae_webhook_ingress", "HAE webhook ingress grant drift"),
+        ("raw_replication", "raw/ cross-region backup not verified"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -991,7 +1001,7 @@ def print_summary(record):
     print(f"{icon} {record['status'].upper()}: {record['summary']}")
     for name, c in record["checks"].items():
         st = c.get("status")
-        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "unavailable": "⚪"}.get(st, "·")
+        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "degraded": "🟡", "unavailable": "⚪"}.get(st, "·")
         detail = ""
         if st == "drift":
             if name == "cfn_drift":
@@ -1023,6 +1033,13 @@ def print_summary(record):
             elif name == "codeql_alerts":
                 # #2578: a drift line with no detail is a finding nobody can act on.
                 detail = f" — {c.get('detail', '')}"
+            elif name == "raw_replication":
+                detail = f" — {c.get('detail', '')}"
+        elif st == "degraded":
+            # DIL-027: "could not observe" is a distinct verdict from clean and must
+            # print its reason — a check that sampled nothing has not passed.
+            detail = f" — {c.get('detail', '')}"
+
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")

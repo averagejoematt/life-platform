@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "SOURCE OF TRUTH for matthew-life-platform's replication configuration (DIL-027, #3042).",
+    "put-bucket-replication REPLACES the whole configuration — a rule not declared here is",
+    "DELETED on the next apply. Change rules HERE, never in the console.",
+    "",
+    "Why this file and not CDK: the primary bucket is imported (Bucket.from_bucket_name in",
+    "cdk/stacks/core_stack.py), so CDK cannot attach a replication configuration to it — the",
+    "same constraint that puts the bucket policy and the lifecycle configuration in the",
+    "out-of-IaC ring (docs/MANAGED_WHERE_LEDGER.md). The DESTINATION bucket and the ROLE are",
+    "fully CDK-owned in cdk/stacks/backup_stack.py; only this source-side put is out.",
+    "",
+    "DeleteMarkerReplication is Disabled ON PURPOSE. A delete on the source must not",
+    "propagate to the backup — that is the difference between a backup and a mirror. The IAM",
+    "half says the same thing: the role has no s3:ReplicateDelete.",
+    "",
+    "Filter/Prefix is raw/ ONLY. Everything outside raw/ is recomputable from raw/.",
+    "",
+    "Applied by: bash deploy/apply_s3_replication.sh --apply",
+    "Asserted by: deploy/sentinel_replication.py (weekly drift sentinel)",
+    "Parity-tested against cdk/stacks/constants.py by tests/test_raw_replication_dil027.py"
+  ],
+  "Role": "arn:aws:iam::205930651321:role/life-platform-raw-replication",
+  "Rules": [
+    {
+      "ID": "raw-zone-crr-us-east-2",
+      "Priority": 0,
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "raw/"
+      },
+      "DeleteMarkerReplication": {
+        "Status": "Disabled"
+      },
+      "Destination": {
+        "Bucket": "arn:aws:s3:::matthew-life-platform-raw-backup",
+        "StorageClass": "STANDARD"
+      }
+    }
+  ]
+}

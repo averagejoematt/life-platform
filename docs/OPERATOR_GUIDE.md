@@ -23,7 +23,7 @@ AWS run-rate: measured steady state **~$124/mo** ($4.12/day, sd 0.66, n=6; 95% C
 
 > The long-standing "~$25-40/mo" figure here was a 2026-06-08 CE sweep that went stale by ~3x — July 2026 closed at **$98.35**, the first month over the then-$85 base. Restated 2026-08-19 (#2838) from the live governor parameter, not from a re-stamped date.
 
-All infrastructure is CDK-managed across 9 stacks (`cdk/stacks/`).
+All infrastructure is CDK-managed across 10 stacks (`cdk/stacks/`).
 
 ---
 
