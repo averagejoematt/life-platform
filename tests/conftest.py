@@ -220,6 +220,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # and a guard placed in the wrong lane must red on the PR that placed it there.
         # Post-merge-only is the exact defect this registry was filed about.
         "test_derived_artifact_registry_2986.py",
+        # #3042 (Phase D2): the public-claims registry. Verdict is repo shape + published
+        # prose — a new page or generator restating a registered behavioural claim must be
+        # registered BEFORE the merge. Post-merge is too late by construction: the site
+        # auto-deploys on merge, so an unregistered stale claim is live before the red.
+        "test_public_claims_registry_3042.py",
         "test_chat_behavioral_gate_2564.py",  # #2564: every build_grounder call site supplies available_logs
         "test_observatory_summary_grounding_2418.py",  # same registry, derived-prose surface (#2418)
         "test_coach_identity_drift_2757.py",  # #2757: AST sweep — no lambda module may hand-type a persona title/color map
