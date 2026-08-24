@@ -50,7 +50,25 @@ import re
 # a warning firing on every green run is background noise, not an instrument. The NEW
 # per-test warner (conftest.py PER_TEST_WARN_SECONDS, #3025) now owns the
 # single-test-regression half; this aggregate budget owns honest broad growth.
-BUDGET_SECONDS = 1500
+# #3106 (2026-08-24): the 1500s budget breached on green main at 9331995b (1507s, 7s
+# over) after the D2 session (2026-08-23/24) merged ~230 more tests across 15 PRs —
+# ADR-105 measure-first, not a blind bump. Sampled ALL 10 green-main "test / Unit
+# Tests" job runs since #3025 landed the 1500s budget (via the GitHub API,
+# runs 32637512129..32762278235, 2026-08-23 11:50 through 2026-08-24 18:29):
+# 1175/1022/1179/1204/1358/1580/1255/1305/1467/1507s (avg ~1305s, max 1580s) —
+# TWO of those 10 already breached 1500s outright (1580s and 1507s), a 20% breach
+# rate on a budget raised the same session. `pytest --durations=25` on the current
+# run (21,146 tests) shows no single test over 51s and no dominating outlier: the
+# top 5 (50.07/27.31/27.24/25.03/24.89s) are all tests/test_platform_model_drift.py
+# — the same known, already-assessed generation/drift family #3025 priced at ~166s
+# total (real work asserting real generated artifacts, not a slow-test mistake to
+# trim). Honest broad growth again, so re-derive rather than shed: applying the
+# same ~23% above-observed-max headroom #1966/#2152/#3025 each used (1580 * 1.23 ≈
+# 1943s), raised 1500 -> 1950 (~49% above the 10-run average, ~23% above the
+# observed max) — enough headroom to absorb the next few weeks of this session's
+# growth curve without flapping on every green run, while a genuine regression
+# still trips it.
+BUDGET_SECONDS = 1950
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
