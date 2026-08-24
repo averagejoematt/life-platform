@@ -21,6 +21,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from common.pacific_time import pacific_today  # #2815: the OUTPUT# frame's no-generation_date fallback
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1969
 
 from coach import audience_guard, coach_derived_prose, published_vitals  # #2972 public frame; #2418 derived-prose SET; #2575 vitals stamp
@@ -167,6 +168,8 @@ def _metric_has_recent_data(metric_key, liveness_cache):
     if base in liveness_cache:
         return liveness_cache[base]
     try:
+        # utc-exempt(#2815): widened DATE#-keyed DDB scan bound (30-day liveness
+        # window), not the OUTPUT# frame — off by an hour changes it by <=1 day.
         end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         start = (datetime.now(timezone.utc) - timedelta(days=_LIVENESS_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
         kwargs = {
@@ -1021,8 +1024,15 @@ def lambda_handler(event, context):
     if not output_text:
         raise ValueError("Missing required field: output_text")
     if not generation_date:
-        generation_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        logger.warning("No generation_date provided — defaulting to %s", generation_date)
+        # #2815: OUTPUT# frame — every producer that invokes this Lambda now sends
+        # an explicit `common.pacific_time.pacific_today()` generation_date, so this
+        # fallback is reached only on a partial/legacy caller. It must resolve the
+        # SAME Pacific day those producers do (and the same day
+        # coach_quality_gate.py's same-day self-exclusion reads), never naive UTC —
+        # converting this fallback alone from the rest of the set would have been
+        # exactly the desync #2815 fixed.
+        generation_date = pacific_today()
+        logger.warning("No generation_date provided — defaulting to %s (Pacific)", generation_date)
 
     logger.info(
         "Starting state update for %s — output_type: %s, date: %s, text_length: %d",
