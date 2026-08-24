@@ -89,6 +89,11 @@ CORE = [
     "lambdas/ai/ai_calls.py",
     "lambdas/ai/ai_context.py",
     "lambdas/ai/ai_summaries.py",
+    # #3082: the Bedrock transport layer split out of ai_calls. `lambdas/ai` is already in
+    # CLEAN_DIRS so the (non-recursive) glob picks it up automatically — it is named here
+    # because it is the daily brief's single door to Bedrock, i.e. exactly the "crown jewel
+    # the glob must never silently drop" this list exists to pin.
+    "lambdas/ai/ai_transport.py",
     "lambdas/web/site_api_common.py",
     "lambdas/web/site_api_coach.py",
     "lambdas/web/site_api_data.py",

@@ -87,6 +87,20 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 PASS_SCORE_THRESHOLD = 60  # Score below this = failed
 VOICE_DISTINCTIVENESS_MINIMUM = 40  # Below this = flagged as generic
 
+# #2893 — the report did not fit in the cap it was given (the #2668 class).
+# MEASURED 30d to 2026-08-23 from CloudWatch:
+#   • 84 of 484 metered calls (17.4%) logged `Quality gate LLM returned non-dict
+#     for … — using fallback`; the fallback is `_build_fallback_report`, which
+#     returns passed=True. Chronic — it fired on 24 of the 30 days.
+#   • LifePlatform/AI AnthropicOutputTokens for coach-quality-gate: Maximum ==
+#     800.0 exactly (Average 632, n=484). Over the trailing 14d, ≥55 of 175 calls
+#     (31.4%) ended at the cap — i.e. billed in full, then discarded.
+# Truncation censors the length the report actually wants, so the new cap is sized
+# by the #2668 precedent (600 → 1500 ≈ 2.5× the observed ceiling) rather than the
+# next round number. The residual is no longer a hand audit: bedrock_client emits
+# LifePlatform/AI TruncatedResponses whenever stop_reason == "max_tokens".
+QUALITY_GATE_MAX_TOKENS = 2000
+
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "coach-quality-gate")
@@ -142,11 +156,14 @@ def _emit_failure_metric():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _call_haiku(system, user_message, max_tokens=800, temperature=0.1):
+def _call_haiku(system, user_message, max_tokens=QUALITY_GATE_MAX_TOKENS, temperature=0.1):
     """Call Anthropic Haiku with exponential backoff + CloudWatch metrics.
 
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
     Raises on final failure after all retry attempts.
+
+    #2893 (2026-08-23): the cap was 800 and the report did not fit in it — see
+    QUALITY_GATE_MAX_TOKENS for the measurement.
     """
     body = {
         "model": AI_MODEL_HAIKU,
@@ -693,7 +710,7 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
         result = _call_haiku(
             system=QUALITY_GATE_SYSTEM_PROMPT,
             user_message=user_message,
-            max_tokens=800,
+            max_tokens=QUALITY_GATE_MAX_TOKENS,
             temperature=0.1,
         )
 

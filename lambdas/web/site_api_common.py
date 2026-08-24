@@ -206,19 +206,26 @@ PLATFORM_STATS = {
     "cdk_stacks": 8,
     "alarms": 111,
     "adrs": 153,
-    "monthly_cost": "~$80",  # GROUND-TRUTH run-rate, pinned (#1232). Source = the budget
-    # governor's own numbers: June 2026 actual $79.80 (Cost Explorer), July projects $82.22
-    # (SSM /life-platform/budget-breakdown "projected"; governor emits it as the
-    # LifePlatform/Budget ProjectedMonthlySpend metric). Two consecutive months at ~$80, so
-    # "~$80" is the honest trailing run-rate. The prior "~$60" understated it ~25% and its
-    # comment cited the RETIRED "$75 cap" — the effective ceiling is $85, floating to $100 in
-    # surge (ADR-133). This is a hand-maintained judgment field (never rewritten by
-    # sync_doc_metadata); tests/test_platform_stats_cost.py is the offline drift guard.
+    "monthly_cost": "~$100",  # GROUND-TRUTH run-rate, pinned (#1232, re-grounded #2898).
+    # Source = Cost Explorer UnblendedCost, read 2026-08-23: June 2026 $79.80 and July 2026
+    # $98.35, both closed months. The LAST CLOSED MONTH is the honest trailing run-rate, so
+    # "~$100". The prior "~$80" was July's mid-month PROJECTION frozen as if it were an
+    # outcome, and the month it described finished 23% above it.
+    # August is running hotter still (MTD $123.97 at day 23) under the ADR-133 dated raise
+    # window that auto-reverts 2026-09-01 — a live, moving number, which is exactly why it
+    # does not belong in a static literal: /method/receipts/ serves the governor's own
+    # month-to-date and projection, and that page is the authority for "right now".
+    # Deliberately NO ceiling figure in this comment. The previous one asserted a base and
+    # a surge ceiling, both of which had moved by the time anyone re-read it — the ceiling
+    # family has exactly one source (cost_governor_lambda.MONTHLY_CEILING / SURGE_CEILING_USD)
+    # and everything else derives from it (#2898).
+    # This is a hand-maintained judgment field (never rewritten by sync_doc_metadata);
+    # tests/test_platform_stats_cost.py is the offline drift guard.
     "review_count": 19,
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 16446,
+    "test_count": 16573,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

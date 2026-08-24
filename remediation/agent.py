@@ -683,6 +683,8 @@ async def run_agent(prompt):
     # is already running` at process exit — benign but noisy in the logs.
     agen = query(prompt=prompt, options=options)
     chunks = []
+    cost_usd = None
+    usage = None
     try:
         async for message in agen:
             # Final ResultMessage carries is_error + result; capture, don't crash.
@@ -692,6 +694,10 @@ async def run_agent(prompt):
                     chunks.append(res)
                 if getattr(message, "is_error", False):
                     print(f"[warn] agent result flagged error " f"(subtype={getattr(message, 'subtype', None)})")
+                # #2883: the ResultMessage is the ONLY place this run's real spend is
+                # ever visible — see _emit_cost_telemetry below for why that matters.
+                cost_usd = getattr(message, "total_cost_usd", None)
+                usage = getattr(message, "usage", None)
                 break
             # AssistantMessage: pull text from content blocks.
             content = getattr(message, "content", None)
@@ -707,7 +713,59 @@ async def run_agent(prompt):
             await agen.aclose()
         except Exception:
             pass
+    _emit_cost_telemetry(cost_usd, usage)
     return "\n".join(chunks)
+
+
+# #2883: this agent's Bedrock spend runs entirely inside the Agent SDK (the `claude`
+# CLI on Bedrock, CLAUDE_CODE_USE_BEDROCK=1) — it never touches
+# lambdas/ai/bedrock_client.py's ADR-062 chokepoint, so it billed AWS/Bedrock (and
+# counted in CostMetricDriftRatio's native AWS/Bedrock-metric numerator, `_ai_cost`
+# in cost_governor_lambda.py) while contributing NOTHING to the self-reported
+# `LifePlatform/AI::EstimatedCostUSD` denominator. That's one of the two out-of-repo
+# residual candidates named when the ratio stalled at ~1.4x — the other is
+# interactive dev-session Bedrock usage, which stays out of scope here on purpose
+# (it isn't a platform cost the #2836 base decision should attribute to a caller).
+# `ResultMessage.total_cost_usd`/`.usage` are the Agent SDK's own per-run figures
+# (same attributes the `logfire` claude_agent_sdk integration reads — verified
+# against that library's source, not guessed). Mirrors
+# bedrock_client._emit_usage_metrics's metric shape (dimensionless +
+# LambdaFunction-dimensioned) so this feeds the SAME CloudWatch series the drift
+# ratio already sums — no new query needed anywhere downstream. Fail-open, and
+# ERROR (not WARN) on failure — a fail-open channel that silently drops every
+# emission is invisible at WARN, the exact #2974 lesson for the visual-qa CI role.
+_REMEDIATION_CALLER = "remediation-agent"
+
+
+def _emit_cost_telemetry(cost_usd, usage) -> None:
+    if not cost_usd:
+        return
+    try:
+        fn_dim = [{"Name": "LambdaFunction", "Value": _REMEDIATION_CALLER}]
+        data = [
+            {"MetricName": "EstimatedCostUSD", "Dimensions": fn_dim, "Value": float(cost_usd), "Unit": "None"},
+            {"MetricName": "EstimatedCostUSD", "Value": float(cost_usd), "Unit": "None"},
+        ]
+
+        def _tok(key):
+            v = usage.get(key) if isinstance(usage, dict) else getattr(usage, key, None)
+            return int(v or 0)
+
+        if usage:
+            in_tok, out_tok = _tok("input_tokens"), _tok("output_tokens")
+            cache_read, cache_write = _tok("cache_read_input_tokens"), _tok("cache_creation_input_tokens")
+            if in_tok:
+                data.append({"MetricName": "AnthropicInputTokens", "Dimensions": fn_dim, "Value": in_tok, "Unit": "Count"})
+            if out_tok:
+                data.append({"MetricName": "AnthropicOutputTokens", "Dimensions": fn_dim, "Value": out_tok, "Unit": "Count"})
+                data.append({"MetricName": "AnthropicOutputTokens", "Value": out_tok, "Unit": "Count"})
+            if cache_read:
+                data.append({"MetricName": "AnthropicCacheReadTokens", "Dimensions": fn_dim, "Value": cache_read, "Unit": "Count"})
+            if cache_write:
+                data.append({"MetricName": "AnthropicCacheWriteTokens", "Dimensions": fn_dim, "Value": cache_write, "Unit": "Count"})
+        _cw.put_metric_data(Namespace="LifePlatform/AI", MetricData=data)
+    except Exception as e:
+        print(f"[error] remediation cost telemetry emit failed (dropped ${cost_usd:.4f}, #2883): {e}")
 
 
 def parse_report(text):

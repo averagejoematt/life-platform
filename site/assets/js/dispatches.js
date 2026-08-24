@@ -20,6 +20,7 @@ import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — rea
 import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-article, reset-safe audio join
 import { quotesArchiveHTML } from "/assets/js/journal_quotes.js"; // #1568 — consent-per-line pull-quotes (ADR-142)
 import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
+import { entryAgeSuffix } from "/assets/js/entry_age.js"; // #2957 — PT-calendar age of a dated installment, shared with story.js
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -651,7 +652,12 @@ async function renderRead(s, id) {
   const chapterArt = s.key === "chronicle"
     ? `<div class="art-band art-chapter" aria-hidden="true">${ruleBand("chronicle:" + (ent.date || ent.id || ""), { emphasis: wkm ? Number(wkm[1]) : 0 })}</div>`
     : "";
-  read.innerHTML = chapterArt + art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : s.key === "chronicle" && ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+  // #2957: this reader opens on the NEWEST installment, and in a weekly serial "newest"
+  // is routinely days old — on Day 7 of cycle 14 the Day-2 piece was the featured read
+  // carrying nothing but its ISO date, which reads (and was judged) as today's. The age
+  // comes from the shared entry_age helper so Home's teaser and this reader can never
+  // disagree about the same entry, and so the PT-calendar arithmetic lives in one place.
+  read.innerHTML = chapterArt + art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : s.key === "chronicle" && ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}${entryAgeSuffix(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     prevRail + `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   read.querySelectorAll(".dx-prevlink").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));

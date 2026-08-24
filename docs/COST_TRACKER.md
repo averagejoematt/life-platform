@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-18
 
-Last updated: 2026-08-23 (v8.6.0)
+Last updated: 2026-08-24 (v8.6.0)
 
 > Budget ceiling: **$150/month all-in** base, floating to **$176 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated
@@ -150,6 +150,29 @@ At each month rollover, append a row to Monthly Actuals with three facts:
 3. **Cost per reader-week** (derived) — monthly bill ÷ (trailing-7d uniques × weeks in
    month), uniques from `LifePlatform/Traffic::UniqueVisitors7d`. Jul 2026: $80.11
    projected ÷ (972 × 4.43) ≈ **$0.02 per unique-visitor-week**.
+4. **Spike vs. steady** (#2892) — how much of the month's AI spend was the platform
+   running itself versus a human working on it. `bedrock_client.invoke()` stamps a
+   `CallerClass` dimension (`prod-cron` · `remediation` · `ci` · `dev-session`) on
+   every metered call:
+
+   ```bash
+   for c in prod-cron remediation ci dev-session; do
+     printf '%-12s ' "$c"
+     aws cloudwatch get-metric-statistics --namespace LifePlatform/AI \
+       --metric-name EstimatedCostUSD --dimensions Name=CallerClass,Value="$c" \
+       --start-time <mo>-01T00:00:00Z --end-time <next-mo>-01T00:00:00Z \
+       --period 2678400 --statistics Sum --region us-west-2 \
+       --query 'Datapoints[0].Sum' --output text
+   done
+   ```
+
+   Record the `dev-session + ci` share in the Notes column. This is the self-emitted
+   metric, so the absolute dollars under-count (see the guardrails note on
+   `CostMetricDriftRatio`) — the **share** is the fact worth recording, and it is what
+   the governor's month-end projection now runs on: `prod-cron + remediation` recur and
+   get extrapolated over the days remaining, `ci + dev-session` do not. Tier decisions
+   are unchanged and still ride TOTAL spend — a dev-heavy month is still a real bill,
+   it just stops reading as a permanent run-rate change.
 
 Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 days stale.
 

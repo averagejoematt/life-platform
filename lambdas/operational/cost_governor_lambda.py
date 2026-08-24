@@ -11,6 +11,23 @@ is the lagged secondary backstop + notice.
 Estimate = non-AI (Cost Explorer, all services EXCEPT Bedrock, month-to-date)
          + AI    (AWS/Bedrock per-model token metrics × Bedrock prices, ×buffer)
 
+CALLER-CLASS ATTRIBUTION (#2892, epic #2801). Month-to-date spend — the actual
+money, the thing the ceiling is about — is TOTAL, unchanged, and remains what
+bounds the tier (`_decide_tier` caps the tier at what actual mtd justifies, so a
+dev spike still counts in full the moment it is billed). What changed is the
+FORWARD extrapolation: the projection multiplies a trailing daily rate by the
+days remaining, and only spend that will recur belongs in that multiplication.
+`bedrock_client.invoke()` now stamps a `CallerClass` dimension on
+LifePlatform/AI::EstimatedCostUSD (prod-cron | ci | dev-session | remediation,
+derived from the execution context, not self-reported); this Lambda reads that
+split, applies the prod-class SHARE to the authoritative AWS/Bedrock trailing
+figure, and projects on that — reporting the dev/CI remainder as its own
+breakdown line. Before #2892 a single dev session ($18.33 on 2026-08-10 against
+a ~$1.9/day steady state) extrapolated into a permanent run-rate change and
+tripped tiers. Fail-closed: with no CallerClass datapoints (nothing redeployed
+yet, or CloudWatch unreadable) the share is None and the arithmetic is
+bit-identical to the pre-#2892 projection. See PROJECTED_CALLER_CLASSES.
+
 Tiers (projected month-end total vs the EFFECTIVE ceiling — base $150 since the
 ADR-133 amendment 2026-07-08, $100 in surge mode). The tier bands are fixed
 FRACTIONS of the ceiling (≈73%/87%/97%, the original $75 calibration in
@@ -93,6 +110,29 @@ except ImportError:  # pragma: no cover - packaging drift; fail safe = gauge rea
     def is_within_token_alarm_window(check_date: date | None = None) -> bool:
         return False
 
+
+try:
+    from ai.bedrock_client import CALLER_CLASS_DIMENSION, CALLER_CLASSES
+except ImportError:  # pragma: no cover - packaging drift; the class split degrades to "no signal"
+    CALLER_CLASS_DIMENSION = "CallerClass"
+    CALLER_CLASSES = ("prod-cron", "ci", "dev-session", "remediation")
+
+# ── #2892: which caller classes the month-end projection extrapolates ────────
+# The projection multiplies a trailing daily rate by the days REMAINING in the
+# month, so the only spend that belongs in it is spend that will actually recur.
+#   • prod-cron   — EventBridge-scheduled Lambdas. Recurs by definition.
+#   • remediation — the Mon/Wed/Fri remediation-agent cron. Also calendar-driven,
+#                   so its trailing rate genuinely repeats; excluding a real
+#                   recurring cost would systematically UNDER-project, which is
+#                   the opposite of what this guard is for.
+#   • ci          — tracks merge cadence, which tracks a human's session.
+#   • dev-session — a laptop or an MCP session. The $18.33 on 2026-08-10.
+# The last two are EPISODIC: their trailing rate says what a human did last week,
+# not what the calendar will do next week. They are still fully counted in ACTUAL
+# month-to-date spend — see _decide_tier: the tier is bounded by actual mtd, so
+# this changes only the FORWARD extrapolation, never the money already spent.
+PROJECTED_CALLER_CLASSES = ("prod-cron", "remediation")
+EPISODIC_CALLER_CLASSES = ("ci", "dev-session")
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ACCT = os.environ.get("CDK_ACCOUNT", "205930651321")
@@ -595,6 +635,9 @@ def _write_breakdown(
     ceiling: float = None,
     surge_active: bool = False,
     recent_uniques=None,
+    ai_class_split: dict | None = None,
+    prod_class_share=None,
+    projected_all_classes: float | None = None,
 ) -> None:
     """Persist the projection breakdown alongside the tier (#822).
 
@@ -644,6 +687,17 @@ def _write_breakdown(
         # and run-rate, so the brief can say WHEN the next pause arrives, not
         # just that headroom is thin. Derivation in _tier_crossing_forecast.
         "tier_crossings": _tier_crossing_forecast(mtd, projected, ai_daily + non_ai_daily, now, ceiling),
+        # ── #2892: spike vs. steady, as a reportable line ────────────────────
+        # `ai_daily` above stays the TOTAL AI burn (honest: that is the money).
+        # These say how it splits. `prod_class_share` is None when the CallerClass
+        # dimension has produced no data yet, in which case `projected` and
+        # `projected_all_classes` are equal by construction and no attribution
+        # claim is being made.
+        "ai_class_split": {k: round(float(v or 0.0), 4) for k, v in (ai_class_split or {}).items()},
+        "prod_class_share": None if prod_class_share is None else round(float(prod_class_share), 4),
+        "projected_all_classes": None if projected_all_classes is None else round(projected_all_classes, 2),
+        "projected_classes": list(PROJECTED_CALLER_CLASSES),
+        "episodic_classes": list(EPISODIC_CALLER_CLASSES),
     }
     try:
         _ssm.put_parameter(Name=SSM_BREAKDOWN_PARAM, Value=json.dumps(payload), Type="String", Overwrite=True)
@@ -779,7 +833,66 @@ def _self_reported_cost_mtd(start: datetime, now: datetime) -> float:
         return 0.0
 
 
-def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: float, ai: float) -> None:
+def _self_reported_cost_by_class(start: datetime, now: datetime) -> dict:
+    """LifePlatform/AI::EstimatedCostUSD split by CallerClass over [start, now).
+
+    One GetMetricStatistics per class (4 total, ~12/day at the 8h cadence — noise
+    against the CloudWatch line). Same self-emitted metric as
+    _self_reported_cost_mtd(); the absolute dollars under-count for the reasons
+    that function documents, but the SHARE between classes is what this is used
+    for, and the undercount (missing cache tokens, un-metered paths) is not
+    class-specific. Any class with no datapoints reads 0.0 — and a class that is
+    genuinely 0 is indistinguishable from a class that failed to query, which is
+    why _projected_class_share() treats an all-zero split as NO SIGNAL rather than
+    as "100% episodic."
+    """
+    out: dict = {}
+    for cls in CALLER_CLASSES:
+        try:
+            resp = _cw.get_metric_statistics(
+                Namespace="LifePlatform/AI",
+                MetricName="EstimatedCostUSD",
+                Dimensions=[{"Name": CALLER_CLASS_DIMENSION, "Value": cls}],
+                StartTime=start,
+                EndTime=now,
+                Period=2678400,
+                Statistics=["Sum"],
+            )
+            out[cls] = sum(d["Sum"] for d in resp.get("Datapoints", []))
+        except Exception as e:
+            logger.warning(f"caller-class cost query failed for {cls} (non-critical): {e}")
+            out[cls] = 0.0
+    return out
+
+
+def _projected_class_share(by_class: dict):
+    """Fraction of self-reported AI spend belonging to PROJECTED_CALLER_CLASSES.
+
+    Returns None when there is no signal at all (every class zero — no fleet has
+    redeployed with the CallerClass dimension yet, or CloudWatch was unreadable).
+    None is the FAIL-CLOSED answer: the handler then projects on the full AI rate,
+    i.e. exactly the pre-#2892 arithmetic. The guard is never loosened by a
+    telemetry gap — it is only tightened by evidence.
+
+    Negative sums are impossible for a cost metric but are clamped anyway so a
+    corrupt datapoint can't produce a share above 1.0 (which would INFLATE the
+    projected prod rate above the measured total).
+    """
+    values = {c: max(float(by_class.get(c, 0.0) or 0.0), 0.0) for c in CALLER_CLASSES}
+    total = sum(values.values())
+    if total <= 0:
+        return None
+    return sum(values[c] for c in PROJECTED_CALLER_CLASSES) / total
+
+
+def _emit_metrics(
+    mtd: float,
+    projected: float,
+    tier: int,
+    self_reported_mtd: float,
+    ai: float,
+    projected_all_classes: float | None = None,
+) -> None:
     data = [
         {"MetricName": "EstimatedMonthToDateSpend", "Value": mtd, "Unit": "None"},
         {"MetricName": "ProjectedMonthlySpend", "Value": projected, "Unit": "None"},
@@ -793,6 +906,12 @@ def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: fl
         # CostMetricDriftRatio divides, not what this metric means.
         {"MetricName": "AuthoritativeCostMTD", "Value": mtd, "Unit": "None"},
     ]
+    # #2892: ProjectedMonthlySpend is now the PROD-CLASS projection (the one that
+    # gates the tier). Publish the all-class figure alongside it rather than
+    # silently changing what the existing series means — the delta between the two
+    # IS the dev/CI spike, visible on the ops dashboard without a query.
+    if projected_all_classes is not None:
+        data.append({"MetricName": "ProjectedMonthlySpendAllClasses", "Value": projected_all_classes, "Unit": "None"})
     # Drift metric: how much the AI estimate under-counts self-reported AI spend.
     # #2883 box 2: `mtd` (= non_ai + ai) and self_reported_mtd are NOT the same scope —
     # mtd is the whole AWS bill (non-AI + AI) and self_reported_mtd is AI-only, so
@@ -872,7 +991,23 @@ def lambda_handler(event, context):
         ai_recent = _ai_cost(trailing_start, now)
         ai_daily = ai_recent / trailing_days
         non_ai_daily = non_ai_recent / trailing_days
-        projected = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent, trailing_days)
+
+        # #2892: extrapolate only the AI classes that recur. The authoritative
+        # AWS/Bedrock token metrics carry no caller dimension (they are dimensioned
+        # by ModelId), so the SPLIT comes from the self-emitted
+        # LifePlatform/AI::EstimatedCostUSD CallerClass series and is applied as a
+        # SHARE to the authoritative trailing figure — the accurate dollars keep
+        # setting the magnitude, the self-report only says how they divide.
+        # prod_class_share is None until the fleet redeploys with the dimension;
+        # then ai_recent_projected == ai_recent and this is a no-op.
+        ai_class_split = _self_reported_cost_by_class(trailing_start, now)
+        prod_class_share = _projected_class_share(ai_class_split)
+        ai_recent_projected = ai_recent if prod_class_share is None else ai_recent * prod_class_share
+        ai_dev_ci_daily = (ai_recent - ai_recent_projected) / trailing_days
+        projected = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent_projected, trailing_days)
+        # The pre-#2892 projection, kept as a published series so the change in what
+        # ProjectedMonthlySpend means is auditable instead of silent.
+        projected_all_classes = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent, trailing_days)
 
         # ADR-133 (#739): surge-mode ceiling. Pure function of reader traffic
         # (trailing 7d uniques) — never of spend — so it floats the ceiling up
@@ -894,9 +1029,11 @@ def lambda_handler(event, context):
             f"non_ai ~${non_ai_daily:.2f}/day + ai ~${ai_daily:.2f}/day) mtd=${mtd:.2f} projected=${projected:.2f} "
             f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE} "
             f"self_reported_mtd=${self_reported:.2f} recent_uniques={recent_uniques} "
-            f"surge_active={surge_active} effective_ceiling=${effective_ceiling:.0f}"
+            f"surge_active={surge_active} effective_ceiling=${effective_ceiling:.0f} "
+            f"prod_class_share={prod_class_share} ai_class_split={ai_class_split} "
+            f"ai_dev_ci ~${ai_dev_ci_daily:.2f}/day projected_all_classes=${projected_all_classes:.2f}"
         )
-        _emit_metrics(mtd, projected, computed_tier, self_reported, ai)
+        _emit_metrics(mtd, projected, computed_tier, self_reported, ai, projected_all_classes)
         # #2116: independent of OBSERVE_MODE/budget-tier enforcement — the
         # genesis-window gauge is a pure calendar fact, not a spend decision.
         _emit_token_alarm_window_gauge()
@@ -916,6 +1053,9 @@ def lambda_handler(event, context):
                         "non_ai_per_day": round(non_ai_daily, 2),
                         "mtd_total": round(mtd, 2),
                         "projected": round(projected, 2),
+                        "projected_all_classes": round(projected_all_classes, 2),
+                        "prod_class_share": None if prod_class_share is None else round(prod_class_share, 4),
+                        "ai_dev_ci_per_day": round(ai_dev_ci_daily, 2),
                         "computed_tier": computed_tier,
                         "active_tier": prev,
                         "ceiling": effective_ceiling,
@@ -948,7 +1088,20 @@ def lambda_handler(event, context):
         # burn rates, not the ones from whenever the tier last flipped. Now also
         # carries the surge state (ADR-133) so the headroom line is honest about
         # which ceiling is actually in effect.
-        _write_breakdown(tier, mtd, projected, ai_daily, non_ai_daily, now, effective_ceiling, surge_active, recent_uniques)
+        _write_breakdown(
+            tier,
+            mtd,
+            projected,
+            ai_daily,
+            non_ai_daily,
+            now,
+            effective_ceiling,
+            surge_active,
+            recent_uniques,
+            ai_class_split=ai_class_split,
+            prod_class_share=prod_class_share,
+            projected_all_classes=projected_all_classes,
+        )
 
         return {
             "statusCode": 200,
@@ -960,6 +1113,9 @@ def lambda_handler(event, context):
                     "non_ai_per_day": round(non_ai_daily, 2),
                     "mtd_total": round(mtd, 2),
                     "projected": round(projected, 2),
+                    "projected_all_classes": round(projected_all_classes, 2),
+                    "prod_class_share": None if prod_class_share is None else round(prod_class_share, 4),
+                    "ai_dev_ci_per_day": round(ai_dev_ci_daily, 2),
                     "tier": tier,
                     "prev_tier": prev,
                     "ceiling": effective_ceiling,

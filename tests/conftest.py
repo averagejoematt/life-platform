@@ -220,6 +220,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # and a guard placed in the wrong lane must red on the PR that placed it there.
         # Post-merge-only is the exact defect this registry was filed about.
         "test_derived_artifact_registry_2986.py",
+        # #3042 (Phase D2): the public-claims registry. Verdict is repo shape + published
+        # prose — a new page or generator restating a registered behavioural claim must be
+        # registered BEFORE the merge. Post-merge is too late by construction: the site
+        # auto-deploys on merge, so an unregistered stale claim is live before the red.
+        "test_public_claims_registry_3042.py",
         "test_chat_behavioral_gate_2564.py",  # #2564: every build_grounder call site supplies available_logs
         "test_observatory_summary_grounding_2418.py",  # same registry, derived-prose surface (#2418)
         "test_coach_identity_drift_2757.py",  # #2757: AST sweep — no lambda module may hand-type a persona title/color map
@@ -339,6 +344,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # #2653: sweeps lambdas/ docstrings and cdk/stacks/role_policies*.py to assert no
         # docstring names a secret no role grants — a repo-shape ratchet, source only.
         "test_docstring_secret_ids_2653.py",
+        # #2898: sweeps `git ls-files` over lambdas/ cdk/ mcp/ scripts/ deploy/ tests/ and
+        # site/ for a hand-typed copy of the budget ceiling. Its covered population is the
+        # whole tracked tree and its forbidden VALUES are derived from the cost governor,
+        # so both halves change size without anyone editing the file — a repo-shape
+        # ratchet by construction, and it must red BEFORE the merge that adds the copy.
+        "test_budget_ceiling_registry_2898.py",
         # the derivation guard itself — its own docstring/synthetic-fixture text
         # mentions the three sweep idioms, so it self-matches; it belongs pre-merge
         # regardless (it IS the structural gate this whole entry is about).

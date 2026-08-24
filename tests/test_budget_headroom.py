@@ -111,6 +111,14 @@ def test_governor_persists_breakdown_payload(gov, monkeypatch):
         # #2381: the per-band crossing forecast, derived from this same call's
         # mtd/burn/ceiling so the payload and the forecast can never disagree.
         "tier_crossings": gov._tier_crossing_forecast(13.434, 83.239, 1.789 + 0.894, now, gov.MONTHLY_CEILING),
+        # #2892: the spike-vs-steady line. Defaulted (and making NO attribution
+        # claim) when the caller doesn't pass a caller-class split — pre-#2892
+        # call sites keep working unchanged, exactly as the #739 surge fields did.
+        "ai_class_split": {},
+        "prod_class_share": None,
+        "projected_all_classes": None,
+        "projected_classes": list(gov.PROJECTED_CALLER_CLASSES),
+        "episodic_classes": list(gov.EPISODIC_CALLER_CLASSES),
     }
 
 
