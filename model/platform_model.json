@@ -196,6 +196,10 @@
       "routing": "digest",
       "stack": "mcp_stack"
     },
+    "telegram-coach-hold": {
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms"
+    },
     "telegram-event-sweep-heartbeat": {
       "routing": "digest",
       "stack": "serve_stack"
@@ -6110,7 +6114,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 55,
+      "alarms": 56,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,

@@ -287,6 +287,7 @@ readers under the `life-platform-mcp` lambda.
 | `site-api-throttles` | serve_stack | digest |
 | `slo-mcp-availability` | mcp_stack | digest |
 | `slo-warmer-completeness` | mcp_stack | digest |
+| `telegram-coach-hold` | monitoring_silence_alarms | digest |
 | `telegram-event-sweep-heartbeat` | serve_stack | digest |
 | `telegram-webhook-throttles` | serve_stack | digest |
 | `telegram-worker-errors` | serve_stack | digest |
@@ -298,6 +299,6 @@ readers under the `life-platform-mcp` lambda.
 
 - Edge sites: 1113 total · 802 resolved · 311 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 55 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
+- Alarms: 56 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled
