@@ -398,6 +398,9 @@ def lambda_handler(event: dict, context) -> dict:
     except Exception:
         pass  # fail-open: a budget blip must not break the quarterly batch
 
+    # utc-exempt(#2815): quarterly batch cadence, not the OUTPUT# frame this issue
+    # converts — a UTC/PT boundary hour only matters within the first few hours of
+    # a calendar-quarter's first day, and this runs as a scheduled quarterly batch.
     quarter = quarter_utils.previous_quarter_key(datetime.now(timezone.utc).date().isoformat())
 
     s3 = boto3.client("s3", region_name=REGION)

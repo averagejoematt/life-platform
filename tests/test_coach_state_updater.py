@@ -909,12 +909,39 @@ class TestHandlerValidation:
             su.lambda_handler({"coach_id": "sleep_coach"}, None)
 
     def test_a_missing_generation_date_defaults_to_today(self, monkeypatch):
+        """#2815: the OUTPUT# frame's own no-generation_date fallback resolves the
+        Pacific day, via the real `common.pacific_time.pacific_today()` — NOT the
+        `su.datetime` fixture-frozen clock (`_hermetic` pins that for the
+        UTC-instant bookkeeping fields elsewhere in this module; the fallback
+        deliberately does not read it, exactly like every other OUTPUT# writer)."""
+        from common import pacific_time
+
         t = FakeTable()
         monkeypatch.setattr(su, "table", t)
         monkeypatch.setattr(su, "_call_haiku", lambda **k: _extraction())
+        monkeypatch.setattr(pacific_time, "pacific_now", lambda: datetime(2026, 6, 30, 12, 0, 0, tzinfo=pacific_time.PACIFIC))
         su.lambda_handler({"coach_id": "sleep_coach", "output_text": "body"}, None)
-        # now() is pinned to 2026-06-30 — no wall clock in this assertion.
         assert t.sk_of("OUTPUT#") == ["OUTPUT#2026-06-30#weekly_email"]
+
+    def test_a_missing_generation_date_defaults_to_the_pacific_day_not_utc(self, monkeypatch):
+        """The actual #2815 regression: at a PT-evening instant the UTC calendar
+        day has already rolled to tomorrow. The fallback must land on the Pacific
+        day the platform's own OUTPUT# frame uses everywhere else, not the day a
+        naive `datetime.now(timezone.utc))` would have picked."""
+        from datetime import timezone
+
+        from common import pacific_time
+
+        # 2026-08-24 20:00 PDT == 2026-08-25 03:00 UTC — the two frames disagree.
+        instant = datetime(2026, 8, 24, 20, 0, 0, tzinfo=pacific_time.PACIFIC)
+        assert instant.astimezone(timezone.utc).strftime("%Y-%m-%d") == "2026-08-25"  # sanity: frames really differ
+
+        t = FakeTable()
+        monkeypatch.setattr(su, "table", t)
+        monkeypatch.setattr(su, "_call_haiku", lambda **k: _extraction())
+        monkeypatch.setattr(pacific_time, "pacific_now", lambda: instant)
+        su.lambda_handler({"coach_id": "sleep_coach", "output_text": "body"}, None)
+        assert t.sk_of("OUTPUT#") == ["OUTPUT#2026-08-24#weekly_email"], "must land on the Pacific day, not the UTC one"
 
 
 class TestHandlerEndToEnd:

@@ -49,5 +49,5 @@ DISCOVERED_COUNTS = {
     "lambdas": 104,
     "alarms": 113,
     "adrs": 153,
-    "test_count": 16716,
+    "test_count": 16727,
 }
