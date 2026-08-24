@@ -94,6 +94,59 @@ class TestWeekMath:
         assert icd.iso_week(datetime(2026, 7, 5, tzinfo=timezone.utc)) == "2026-W27"
 
 
+class TestOutputFrameWriteDate:
+    """#2815: `_air_one`'s OUTPUT# writer must record the Pacific day both coaches'
+    state updaters key their sk from — not the naive UTC day `now` (kept for the
+    frame-free `created_at` instant) would have produced."""
+
+    def test_air_one_records_the_pacific_day_not_utc(self, monkeypatch):
+        import json
+        from datetime import datetime, timezone
+        from unittest.mock import MagicMock
+
+        from coach import persona_registry
+        from common import pacific_time
+
+        # 2026-08-24 20:00 PDT == 2026-08-25 03:00 UTC — the two frames disagree.
+        instant = datetime(2026, 8, 24, 20, 0, 0, tzinfo=pacific_time.PACIFIC)
+        pt_day = "2026-08-24"
+        assert instant.astimezone(timezone.utc).strftime("%Y-%m-%d") == "2026-08-25"  # sanity: frames really differ
+        monkeypatch.setattr(pacific_time, "pacific_now", lambda: instant)
+
+        monkeypatch.setattr(persona_registry, "load_registry", lambda s3, bucket: {"personas": {}})
+        monkeypatch.setattr(icd, "generate_gated_turn", lambda system, user, allowed_sources: ("a reply in voice", []))
+
+        fake_table = MagicMock()
+        monkeypatch.setattr(icd, "table", fake_table)
+
+        fake_lambda = MagicMock()
+        fake_s3 = MagicMock()
+        fake_s3.get_object.side_effect = RuntimeError("no S3 in this test — _voice() degrades to ('', '')")
+
+        def _fake_client(service, **kw):
+            return fake_lambda if service == "lambda" else fake_s3
+
+        monkeypatch.setattr(icd.boto3, "client", _fake_client)
+
+        pick = {
+            "topic": {"sk": "ACTIVE#dispute_x", "topic": "a real disagreement", "cycle_count": 2},
+            "coach_a": "sleep_coach",
+            "coach_b": "training_coach",
+            "influence_weight": 0.7,
+        }
+        result = icd._air_one(pick, "2026-W34")
+        assert result is not None
+
+        recorded = [
+            json.loads(c.kwargs["Payload"])
+            for c in fake_lambda.invoke.call_args_list
+            if c.kwargs.get("FunctionName") == "coach-state-updater"
+        ]
+        assert len(recorded) == 2, "both coaches must record the exchange"
+        for payload in recorded:
+            assert payload["generation_date"] == pt_day, "must land on the Pacific day, not the UTC one"
+
+
 class TestTurnPrompt:
     def test_reply_contains_the_specific_claim(self):
         sysb, user = icd.build_turn_prompt(

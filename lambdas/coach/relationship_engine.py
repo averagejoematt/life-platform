@@ -96,6 +96,37 @@ def _phase_for(rapport: float, interaction_count: int, tenure_days: int) -> str:
     return PHASE_CLINICAL
 
 
+# Pre-#536 seed records (COACH_INTELLIGENCE_DESIGN_SPEC.md v1, April 2026 — deleted
+# in the v8.0.0 doc audit but still archaeologically findable via `git log -S`) used a
+# 3-word qualitative rapport scale — "early" / "building" / "established" — instead of
+# the continuous 0.05-1.0 score this module has written since #536. All 8 coaches still
+# carry one of those un-migrated records (no `phase` stamp, so restart's tombstone
+# filter in `_get_item`/`singleton_visible` never touches them — #1969 — and they
+# survive every reset), and every cycle since has done a naked `float("early")` and lost
+# the write (#3108). Map the legacy word onto its numeric equivalent so the record
+# migrates forward cleanly on its very next cycle, instead of being silently skipped
+# forever by the caller's non-fatal try/except.
+LEGACY_STAGE_RAPPORT = {
+    "early": DEFAULT_RAPPORT,  # "brand-new, clinical" — matches DEFAULT_RAPPORT's own semantics
+    "building": (DEFAULT_RAPPORT + FAMILIAR_MIN_RAPPORT) / 2,  # partway toward "familiar"
+    "established": FAMILIAR_MIN_RAPPORT,  # at least "familiar" already
+}
+
+
+def _coerce_rapport_level(value) -> float:
+    """Numeric rapport score — routes a pre-#536 legacy stage word to its numeric
+    equivalent (not a swallow: known words are mapped explicitly), and only falls
+    back to the default for a genuinely unrecognized value (defense-in-depth)."""
+    if isinstance(value, str):
+        mapped = LEGACY_STAGE_RAPPORT.get(value.strip().lower())
+        if mapped is not None:
+            return mapped
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return DEFAULT_RAPPORT
+
+
 def default_relationship_state(coach_id: str, generation_date: str) -> dict:
     """The record for a coach's very first cycle — a genuinely new relationship."""
     return {
@@ -128,7 +159,7 @@ def compute_relationship_update(current: dict | None, coach_id: str, generation_
     if not current:
         current = default_relationship_state(coach_id, generation_date)
 
-    rapport = float(current.get("rapport_level", DEFAULT_RAPPORT))
+    rapport = _coerce_rapport_level(current.get("rapport_level", DEFAULT_RAPPORT))
     interaction_count = int(current.get("interaction_count", 0))
     first_interaction_date = current.get("first_interaction_date") or generation_date
     last_interaction_date = current.get("last_interaction_date")

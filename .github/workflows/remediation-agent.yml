@@ -29,6 +29,13 @@ permissions:
                                     # `gh run list` top-consuming-workflows proxy — the
                                     # billing-usage endpoint itself needs a `user`-scoped
                                     # PAT this token doesn't have, and fails soft without it.
+  security-events: read             # #2578: GET /code-scanning/alerts is 403 without this.
+                                    # An explicit permissions block zeroes every unlisted
+                                    # scope, so drift_sentinel.check_codeql_alerts reported
+                                    # "API unavailable" on 3/3 runs since #1902 shipped it
+                                    # while 7 open alerts sat 13-14 days un-triaged on main.
+                                    # The check now fails CLOSED, so a future regression
+                                    # here reds the sentinel instead of going quiet.
 
 concurrency:
   group: remediation

@@ -304,7 +304,7 @@ def _self_repetition_report(coach_id, output_text):
     verdict is absence, never a green "no repetition".
     """
     try:
-        from datetime import datetime, timezone
+        from common.pacific_time import pacific_today
 
         from coach import coach_repetition_detector as repdet
 
@@ -319,16 +319,18 @@ def _self_repetition_report(coach_id, output_text):
             scan_forward=False,
             limit=repdet.TRAILING_WINDOW + 1,
         )
-        # utc-exempt(#2815): the OUTPUT# frame, consumer side. This ONLY excludes
-        # THIS run's own same-day draft from the repetition history — it does not
-        # judge day-phase content. Every OUTPUT# writer keys the sk from the SAME
-        # naive-UTC clock (ai_calls.py's coach-state-updater invoke,
-        # coach_state_updater.py:1041's own fallback, inter_coach_dialogue_lambda.py:291),
-        # so producer and consumer share one frame by construction. Converting
-        # this read alone to Pacific would desync it from the sk it's matching
-        # against and BREAK the same-day-draft exclusion — either the whole
-        # OUTPUT# frame moves together, or (as here) it stays UTC on purpose.
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # #2815: the OUTPUT# frame, consumer side — converted atomically with every
+        # writer. This ONLY excludes THIS run's own same-day draft from the
+        # repetition history — it does not judge day-phase content. Every OUTPUT#
+        # writer keys the sk from the SAME `common.pacific_time.pacific_today()` now
+        # (ai_calls.py's coach-state-updater invoke — both the fresh-generation and
+        # cache-reuse writes, coach_state_updater.py's own no-generation_date
+        # fallback, inter_coach_dialogue_lambda.py's writer), so producer and
+        # consumer keep sharing one frame — Pacific, not naive UTC. The old
+        # `utc-exempt(#2815)` marker here is retired: the marker existed because
+        # converting this ONE read in isolation would have desynced it from the sk
+        # it matches against; the fix converts the whole set together instead.
+        today = pacific_today()
         history = []
         for it in items:
             sk = it.get("sk", "")

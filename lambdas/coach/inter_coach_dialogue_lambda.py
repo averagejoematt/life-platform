@@ -43,6 +43,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_today  # #2815: the OUTPUT# frame's writer
 
 logger = logging.getLogger("inter-coach-dialogue")
 logger.setLevel(logging.INFO)
@@ -66,6 +67,9 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 def iso_week(dt=None):
+    # utc-exempt(#2815): the weekly cooldown/THREAD# key, not the OUTPUT# frame this
+    # issue converts — this cron runs Sunday 18:00 UTC (11am PT), nowhere near a
+    # day boundary that could also cross an ISO week boundary.
     d = (dt or datetime.now(timezone.utc)).isocalendar()
     return f"{d[0]}-W{d[1]:02d}"
 
@@ -331,7 +335,11 @@ def _air_one(pick, this_week):
     # Both coaches remember the exchange.
     lambda_client = boto3.client("lambda", region_name=REGION)
     thread_text = f"Inter-coach dispute — {topic_text}\n\n" + "\n\n".join(f"{t['name']}: {t['line']}" for t in turns)
-    date_str = now.strftime("%Y-%m-%d")
+    # #2815: OUTPUT# frame — the SAME `pacific_today()` every other OUTPUT# writer
+    # (ai_calls.py, coach_state_updater.py's own fallback) and the consumer
+    # (coach_quality_gate.py's same-day exclusion) now resolve, not `now`'s naive
+    # UTC day (created_at above stays a UTC instant, which is frame-free by design).
+    date_str = pacific_today()
     _record_on_coach(lambda_client, a_id, thread_text, date_str)
     _record_on_coach(lambda_client, b_id, thread_text, date_str)
 
