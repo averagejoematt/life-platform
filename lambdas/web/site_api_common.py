@@ -211,7 +211,7 @@ CORS_HEADERS = {
 # judgment field, because a duplicate key would be caught by the guard test.
 PLATFORM_STATS = {
     **DISCOVERED_COUNTS,
-    "cdk_stacks": 8,
+    "cdk_stacks": 10,  # 8 was stale by TWO stack additions (serve split #793, backup DIL-027) — evidence this belongs in platform_counts.py (#3143)
     "monthly_cost": "~$100",  # GROUND-TRUTH run-rate, pinned (#1232, re-grounded #2898).
     # Source = Cost Explorer UnblendedCost, read 2026-08-23: June 2026 $79.80 and July 2026
     # $98.35, both closed months. The LAST CLOSED MONTH is the honest trailing run-rate, so
