@@ -5,6 +5,7 @@
 import { lineChart, stackedBar, correlationChip, dualLineChart, sparkline, targetSpine, stackedDayColumns, dumbbell } from "/assets/js/charts.js";
 import { explainMount } from "/assets/js/explain.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, todayPT, fig, figs, sec, empty, note, socialContextSection } from "/assets/js/evidence_shared.js";
+import { genesisCount } from "/assets/js/coach_popover.js"; // #2941 — THE PT day-index, so #2957's window copy states a checked cause
 
 // §0 Forecast hero (P0.1) — the circadian-compliance forecast, PROMOTED to lead. A 0→100
 // "tonight's odds" gauge + the four anchors (each with the lever to pull now) + two-voice.
@@ -121,7 +122,37 @@ export async function renderSleep(d) {
       const light = n.hours != null ? Math.max(0, n.hours - n.deep_sleep_hours - n.rem_sleep_hours) : 0;
       return { date: n.date, deep: n.deep_sleep_hours, rem: n.rem_sleep_hours, light };
     }).filter(Boolean);
-    if (_stageNights.length) parts.push(sec("Stage composition over the week", stackedDayColumns(_stageNights, [{ key: "deep", label: "deep", tone: "lift" }, { key: "rem", label: "REM", tone: "cardio" }, { key: "light", label: "light", tone: "mob" }], { label: "hours by stage · per night", legendUnit: "h", minPoints: 4, emptyMsg: "Stage composition draws in at 4+ nights." })));
+    // #2957: "over the week" was authored copy over a genesis-CLAMPED window — on Day 5
+    // of cycle 14 it captioned 5 nights as a week, which the reader-truth judge read as
+    // a temporal contradiction (and it was one: the chart never spanned seven nights).
+    //
+    // Three rules the copy now follows, all of them the same rule:
+    //  1. The heading counts the nights actually DRAWN. Below the chart's own 4-night
+    //     floor nothing is drawn, so the heading must not promise a chart — it says
+    //     what the section IS ("Stage composition") and the chart's empty state says
+    //     when it arrives. A heading reading "the last 1 night" over zero bars was the
+    //     first bug's mirror image.
+    //  2. The shortfall's CAUSE is checked before it is claimed. Fewer than seven bars
+    //     can mean the cycle is young (the clamp) OR that Whoop has no staging for some
+    //     nights inside a mature window — `_stageNights` filters on Whoop's deep/REM
+    //     fields, so both produce the same count. `genesisCount()` is the one PT
+    //     day-index (#2941), so the young-cycle branch is a fact, not an assumption.
+    //  3. Nothing is said at all once seven nights are drawn.
+    const _stageN = _stageNights.length;
+    const _stageDrawn = _stageN >= 4; // stackedDayColumns' minPoints below
+    const _dayN = genesisCount().dayN;
+    const _stageWindow = !_stageDrawn
+      ? "Stage composition"
+      : _stageN >= 7
+        ? "Stage composition over the week"
+        : `Stage composition — the last ${_stageN} nights`;
+    let _stageNote = "";
+    if (_stageDrawn && _stageN < 7) {
+      _stageNote = _dayN <= 7
+        ? `<p class="rd-meta label">${_stageN} bars, not seven: this cycle is only ${_dayN} days old, so the window is clamped to it. It fills to a full week as the cycle runs.</p>`
+        : `<p class="rd-meta label">${_stageN} bars, not seven — the other nights in the window carry no stage data from Whoop. An absent night is left out rather than drawn as a zero.</p>`;
+    }
+    if (_stageN) parts.push(sec(_stageWindow, stackedDayColumns(_stageNights, [{ key: "deep", label: "deep", tone: "lift" }, { key: "rem", label: "REM", tone: "cardio" }, { key: "light", label: "light", tone: "mob" }], { label: "hours by stage · per night", legendUnit: "h", minPoints: 4, emptyMsg: "Stage composition draws in at 4+ nights." }) + _stageNote));
     // §5 — environment (bed temp vs deep sleep): RETIRED (ADR-118, #489). The
     // Eight Sleep temperature pipeline is dead (dead /v2/intervals endpoint, no
     // bed_temp_f for 4+ months), so this section only ever rendered an empty

@@ -65,11 +65,42 @@ _BEDROCK = None
 # a telemetry error must never surface to an AI caller.
 _CW_NAMESPACE = "LifePlatform/AI"
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
-# COST-05: "prod" for scheduled production triggers; set to "dev" on the MCP Lambda
-# so that interactive debugging sessions are attributable separately in CloudWatch
-# (June's breach was dev sessions driving $4-5 spike days on a ~$1.50 baseline).
-# Default to "prod" so untagged scheduled lambdas don't inflate the dev bucket.
-_INVOCATION_CONTEXT = os.environ.get("INVOCATION_CONTEXT", "prod")
+
+# ── Caller-class attribution (#2892) ────────────────────────────────────────
+# The governor's month-end projection extrapolates a trailing daily rate over the
+# days remaining in the month. Before this dimension existed it extrapolated ONE
+# undifferentiated AI rate, so a single dev session (08-10: $18.33 against a
+# ~$1.9/day steady state) read as a permanent run-rate change — that is what trips
+# tiers and what forced the August ceiling window. Splitting spend by the CLASS of
+# execution context lets the projection extrapolate only the classes that actually
+# recur, while total spend (the real money, the real ceiling) is unchanged.
+#
+# Exactly FOUR values, fixed — the cardinality is part of the contract (#2837's EMF
+# budget). CALLER_CLASSES is the registry both sides read: cost_governor_lambda
+# partitions THIS tuple into projected vs. episodic, and its test fails if a fifth
+# class appears here without being assigned a side.
+CALLER_CLASS_DIMENSION = "CallerClass"
+CALLER_CLASS_PROD_CRON = "prod-cron"
+CALLER_CLASS_CI = "ci"
+CALLER_CLASS_DEV_SESSION = "dev-session"
+CALLER_CLASS_REMEDIATION = "remediation"
+CALLER_CLASSES = (
+    CALLER_CLASS_PROD_CRON,
+    CALLER_CLASS_CI,
+    CALLER_CLASS_DEV_SESSION,
+    CALLER_CLASS_REMEDIATION,
+)
+
+# COST-05 legacy: the MCP Lambda sets INVOCATION_CONTEXT=dev (cdk/stacks/mcp_stack.py)
+# because its traffic is Matthew debugging interactively, not a cron. That env var is
+# still honored, but ONLY as a DE-ESCALATION: it can move spend out of prod-cron and
+# into dev-session, never the other way. See caller_class() for why that direction is
+# the whole security property.
+_SELF_DECLARED_DEV_VALUES = frozenset({"dev", "dev-session", "interactive", "local"})
+# GitHub Actions marks its own environment; the remediation agent's workflow is
+# `name: Remediation Agent` (.github/workflows/remediation-agent.yml), which GHA
+# exports as GITHUB_WORKFLOW (and inside GITHUB_WORKFLOW_REF as the file path).
+_REMEDIATION_WORKFLOW_MARKER = "remediation"
 # $/1M tokens, keyed by a substring of the resolved model id. Mirrors
 # cost_governor._PRICES; an unmapped model prices as the most expensive tier so
 # a new/unknown model can never under-report spend.
@@ -106,6 +137,46 @@ def _cw():
     return _CW
 
 
+def caller_class(env=None) -> str:
+    """Which of CALLER_CLASSES this Bedrock call is running under (#2892).
+
+    Derived from the EXECUTION CONTEXT, never from a caller-supplied argument.
+    That is deliberate: with ~40 call sites, a new `caller_class=` parameter would
+    (a) need all 40 to adopt it and (b) let any one of them mislabel dev spend as
+    prod, which is precisely the number the projection extrapolates. Instead:
+
+      • `AWS_LAMBDA_FUNCTION_NAME` — set by the Lambda runtime itself, not by us —
+        means a real Lambda container, i.e. a scheduled/production trigger:
+        `prod-cron`. (The absence of this var is also what produces the `unknown`
+        LambdaFunction bucket the 2026-08-18 drift audit traced to CI.)
+      • No Lambda container + GitHub Actions markers → `ci`, or `remediation` when
+        the workflow is the remediation agent's.
+      • Anything else — a laptop, an MCP session, a scratch script → `dev-session`.
+
+    The one self-reported input, INVOCATION_CONTEXT, is honored in a single
+    direction: it can only move a call OUT of `prod-cron` and into `dev-session`.
+    Nothing a caller can set moves spend INTO the class the projection trusts, so
+    the classification cannot be gamed to hide a dev spike inside the prod rate —
+    the worst a misconfigured Lambda can do is under-project its own recurring cost,
+    which shows up immediately in ACTUAL mtd (the tier's binding constraint).
+
+    Pure: reads a mapping (defaults to os.environ) and returns a string. `env` is a
+    parameter so this is testable without mutating process state.
+    """
+    env = os.environ if env is None else env
+    if (env.get("AWS_LAMBDA_FUNCTION_NAME") or "").strip():
+        declared = (env.get("INVOCATION_CONTEXT") or "").strip().lower()
+        if declared in _SELF_DECLARED_DEV_VALUES:
+            return CALLER_CLASS_DEV_SESSION
+        return CALLER_CLASS_PROD_CRON
+    if (env.get("GITHUB_ACTIONS") or "").strip() or (env.get("CI") or "").strip():
+        workflow = f"{env.get('GITHUB_WORKFLOW') or ''} {env.get('GITHUB_WORKFLOW_REF') or ''}".lower()
+        if _REMEDIATION_WORKFLOW_MARKER in workflow:
+            return CALLER_CLASS_REMEDIATION
+        return CALLER_CLASS_CI
+    return CALLER_CLASS_DEV_SESSION
+
+
 def _price_for(model_id: str) -> dict:
     mid = (model_id or "").lower()
     for key, price in _PRICES.items():
@@ -132,7 +203,9 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
     Emits per-LambdaFunction token metrics (per-feature attribution) plus a
     dimensionless AnthropicOutputTokens (feeds the existing platform-total
     alarm) and EstimatedCostUSD both per-feature and dimensionless (the latter
-    feeds the daily-spend anomaly alarm, G2). Fully fail-open."""
+    feeds the daily-spend anomaly alarm, G2), plus a per-CallerClass copy of
+    EstimatedCostUSD (#2892 — the split the cost governor projects on).
+    Fully fail-open."""
     md: list = []
     try:
         in_tok = int(usage.get("input_tokens", 0) or 0)
@@ -143,7 +216,7 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
             return
         cost = estimate_cost_usd(usage, model_id)
         fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
-        ctx_dim = [{"Name": "Context", "Value": _INVOCATION_CONTEXT}]
+        class_dim = [{"Name": CALLER_CLASS_DIMENSION, "Value": caller_class()}]
         md = [
             {"MetricName": "AnthropicInputTokens", "Dimensions": fn_dim, "Value": in_tok, "Unit": "Count"},
             {"MetricName": "AnthropicOutputTokens", "Dimensions": fn_dim, "Value": out_tok, "Unit": "Count"},
@@ -152,8 +225,15 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
             # Estimated spend: per-feature attribution + a dimensionless aggregate (G2 alarm).
             {"MetricName": "EstimatedCostUSD", "Dimensions": fn_dim, "Value": cost, "Unit": "None"},
             {"MetricName": "EstimatedCostUSD", "Value": cost, "Unit": "None"},
-            # COST-05: Context-tagged spend — enables prod vs dev attribution in CloudWatch.
-            {"MetricName": "EstimatedCostUSD", "Dimensions": ctx_dim, "Value": cost, "Unit": "None"},
+            # #2892: caller-class-tagged spend. ADDITIVE — the dimensionless
+            # EstimatedCostUSD above is untouched, so the ai-daily-spend-high alarm and
+            # the governor's _self_reported_cost_mtd()/CostMetricDriftRatio math see no
+            # discontinuity; this dimension only lets the governor SPLIT that same total
+            # into the classes that recur vs. the ones that track a human's session.
+            # Supersedes the 2-valued COST-05 `Context` dimension, which had no consumer
+            # (no alarm, no dashboard, no script) and self-reported "prod" for every CI
+            # run — the exact misattribution #2892 exists to fix.
+            {"MetricName": "EstimatedCostUSD", "Dimensions": class_dim, "Value": cost, "Unit": "None"},
         ]
         if cache_read or cache_write:
             md.append({"MetricName": "AnthropicCacheReadTokens", "Dimensions": fn_dim, "Value": cache_read, "Unit": "Count"})
@@ -169,6 +249,97 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
         print(
             f"[ERROR] bedrock cost telemetry emit failed (non-fatal, datapoints DROPPED): namespace={_CW_NAMESPACE} metrics=[{dropped}]: {e}"
         )
+
+
+def first_text(resp: dict) -> str | None:
+    """The first text block of a Messages response, or None if there isn't one.
+
+    #2893: `resp["content"][0]["text"]` raises IndexError on an empty `content`
+    list — which is exactly the shape a `max_tokens` stop with no emitted text
+    returns. Both retry wrappers used to do that destructure INSIDE their retry
+    `try`, so a shape error on an already-billed response was caught by the
+    generic `except Exception` and re-invoked the model up to 4×. Callers use
+    this helper and handle None themselves, outside the retry loop.
+    """
+    if not isinstance(resp, dict):
+        return None
+    for block in resp.get("content") or []:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            return block["text"]
+    return None
+
+
+class _BudgetGuardUnavailable(BaseException):
+    """Never raised. The `except` target when `budget_guard` cannot be imported.
+
+    Keeps `budget_stop_cls()` fail-open in the same shape `invoke()` already is:
+    if the guard is missing there is no tier-3 stop to special-case, so the
+    caller's generic retry path must be left exactly as it was.
+    """
+
+
+def budget_stop_cls() -> type[BaseException]:
+    """The exception class the tier-3 budget backstop raises (#3084).
+
+    A budget stop is a REFUSAL, not a transport error: `invoke()` raises it
+    *before* `invoke_model`, so nothing is billed, and nothing about attempt 2
+    would differ. Both retry wrappers (`common/retry_utils`, `ai/ai_transport`)
+    except this class ahead of their generic `except Exception` so it returns or
+    re-raises immediately — the generic catch used to sleep 5+15+45 = 65s per
+    call, which across the daily brief's ~62 AI calls is ~67 minutes of pointless
+    backoff against a Lambda timeout, exactly when the platform is already over
+    its ceiling, and logged the stop as a transport-shaped WARN that buried the
+    real cause.
+
+    Returned as a class rather than imported at either wrapper's module scope for
+    the same reason `invoke()` imports the guard lazily: `common/` must not take a
+    hard import-time dependency on `ai/`, and a missing guard must degrade to
+    "no budget stop exists", never to an ImportError on the AI path.
+    """
+    try:
+        from ai.budget_guard import BudgetExceeded
+
+        return BudgetExceeded
+    except ImportError:
+        return _BudgetGuardUnavailable
+
+
+def _note_truncation(parsed: dict, bedrock_body: dict, model_id: str) -> None:
+    """Meter responses that stopped at `max_tokens` (#2893). Strictly fail-open.
+
+    A truncated response is billed in full and is then unparseable by every JSON
+    caller in the fleet — the #2668 class. Before this, `stop_reason` was read in
+    exactly zero places, so the only way to find the class was a hand audit of
+    CloudWatch logs. `TruncatedResponses` / `TruncatedCostUSD` make it a standing
+    measurement (per-LambdaFunction and platform-wide) instead.
+
+    Deliberately a metric plus a WARN, not an ERROR: a few call sites cap on
+    purpose (e.g. the podcast's 5-token yes/no classifier), so a truncation is
+    evidence to weigh, not an automatic failure.
+    """
+    try:
+        if (parsed.get("stop_reason") or "") != "max_tokens":
+            return
+        usage = parsed.get("usage") or {}
+        cap = int(bedrock_body.get("max_tokens") or 0)
+        out_tok = int(usage.get("output_tokens", 0) or 0)
+        cost = estimate_cost_usd(usage, model_id)
+        fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        _cw().put_metric_data(
+            Namespace=_CW_NAMESPACE,
+            MetricData=[
+                {"MetricName": "TruncatedResponses", "Dimensions": fn_dim, "Value": 1, "Unit": "Count"},
+                {"MetricName": "TruncatedResponses", "Value": 1, "Unit": "Count"},
+                {"MetricName": "TruncatedCostUSD", "Dimensions": fn_dim, "Value": cost, "Unit": "None"},
+                {"MetricName": "TruncatedCostUSD", "Value": cost, "Unit": "None"},
+            ],
+        )
+        print(
+            f"[WARN] bedrock response TRUNCATED at max_tokens={cap} (output_tokens={out_tok}, "
+            f"est ${cost:.6f}, model={model_id}) — billed in full; any JSON parse of it will fail (#2893)"
+        )
+    except Exception as e:  # never break an AI call on telemetry
+        print(f"[ERROR] bedrock truncation telemetry emit failed (non-fatal, datapoints DROPPED): {e}")
 
 
 def _client():
@@ -281,6 +452,8 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     parsed = json.loads(resp["body"].read())
     # G1: meter token usage + estimated spend at the single chokepoint. Fail-open.
     _emit_usage_metrics(parsed.get("usage") or {}, model_id)
+    # #2893: meter billed-but-unparseable output at the same chokepoint. Fail-open.
+    _note_truncation(parsed, bedrock_body, model_id)
     return parsed
 
 

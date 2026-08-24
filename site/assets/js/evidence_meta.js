@@ -51,7 +51,44 @@ export async function renderBoard(d) {
 
 export function renderPlatform(d) { return figs([fig(d.data_sources, "data sources (incl. derived)"), fig(d.mcp_tools, "MCP tools"), fig(d.lambdas, "lambdas"), fig(d.cdk_stacks, "CDK stacks")]) + sec("By the numbers", kvtable({ adrs: d.adrs, review_grade: d.review_grade, site_pages: d.site_pages })) + note("Built with the wearables already on his body — not a million-dollar lab. The full architecture (alarms, tests, the deeper counts) lives in the build write-up; this page keeps the human-legible ones."); }
 
-export function renderCost(d) { return figs([fig("$" + String(d.monthly_cost || "").replace("$", ""), "per month"), fig("$150", "hard ceiling (ADR-133)")]) + `<p class="rd-archive">The whole platform runs for about ${esc(d.monthly_cost || "$20")}/month against a self-imposed hard ceiling — $150 base, floating to $176 only in reader-traffic surge mode (ADR-063 set the original $75; ADR-133 owns the current number). Radical accessibility is the point: an ordinary person did this with a model and consumer wearables, not a lab.</p>` + note("Cost is the receipt for 'you could do this too.'"); }
+/* The ceiling is the platform's most-quoted number, and this function used to hand-type
+   it three times — once in the figure and twice in the prose (base and surge). That is
+   how the page went on quoting a retired ceiling for weeks after the base moved, and it
+   was stale AGAIN on the day #2898 landed: the ADR-133 dated raise window had lifted the
+   live base and this file had not heard about it. A number no reader can see going stale
+   is a number that will.
+   It now reads the governor's own envelope off /api/receipts (base_ceiling_usd /
+   surge_ceiling_usd / ceiling_window — site_api_budget._ceiling_envelope), the same
+   payload /method/receipts/ renders. ADR-104 omit-when-stale, exactly like renderReceipts
+   below: when the governor's breakdown is missing or stale the dollar figures are LEFT OUT
+   and the gap is stated, never frozen at a last-known value.
+   tests/test_budget_ceiling_registry_2898.py fails if any current ceiling figure comes
+   back as a literal anywhere under site/ — including here. The ADR-063 original stays,
+   because it is dated history and no longer a figure the governor owns. */
+export async function renderCost(d) {
+  const r = await tryJSON("/api/receipts");
+  const live = r && !r.stale && r.base_ceiling_usd != null ? r : null;
+  const base = live ? `$${fmt(live.base_ceiling_usd)}` : null;
+  const surge = live && live.surge_ceiling_usd != null ? `$${fmt(live.surge_ceiling_usd)}` : null;
+  const w = (live && live.ceiling_window) || null;
+  const windowClause = w && w.end_exclusive && w.reverts_to_base_ceiling != null
+    ? ` That base is a dated raise; it reverts to $${fmt(w.reverts_to_base_ceiling)} on ${esc(String(w.end_exclusive))}, on its own.`
+    : "";
+  const provenance = "(ADR-063 set the original $75; ADR-133 owns the current number)";
+  const ceilingProse = base
+    ? `against a self-imposed hard ceiling — ${base} base${surge ? `, floating to ${surge} only in reader-traffic surge mode` : ""} ${provenance}.${windowClause}`
+    : `against a self-imposed hard ceiling ${provenance}. The current figure is deliberately blank: the budget governor's last projection is unavailable or stale, and a cost page that quietly freezes a number is worse than one that admits the gap.`;
+  // The run-rate is omitted rather than defaulted for the same ADR-104 reason: the old
+  // `|| "$20"` fallback printed a figure nobody had measured whenever the feed was down.
+  // It is also used VERBATIM: the served string already carries its own "$" and its own
+  // approximation marker ("~$80"), and the old `"$" + …replace("$","")` round-trip
+  // re-prefixed the marker instead of the digits — the live page reads "$~80" today.
+  const spend = isBad(d.monthly_cost) ? "" : String(d.monthly_cost).trim();
+  const spendPhrase = spend ? `runs for ${esc(spend)}/month` : "runs on a monthly cost the platform-stats feed isn't reporting right now —";
+  return figs([spend && fig(spend, "per month"), base && fig(base, "hard ceiling (ADR-133)")]) +
+    `<p class="rd-archive">The whole platform ${spendPhrase} ${ceilingProse} Radical accessibility is the point: an ordinary person did this with a model and consumer wearables, not a lab.</p>` +
+    note("Cost is the receipt for 'you could do this too.'");
+}
 
 export function renderData(d) { const src = d.sources || []; if (!src.length) return empty("Data-source registry unavailable."); const by = {}; for (const s of src) (by[s.category || "other"] ||= []).push(s); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><tbody>${rows.map((s) => `<tr><td class="rd-name">${esc(s.name)}</td><td>${esc(s.metrics || "")}</td><td class="rd-range">${esc(s.method || "")}</td></tr>`).join("")}</tbody></table>`)).join(""); return figs([fig(src.length, "sources catalogued")]) + secs + note(`The full catalogue (live + manual + derived). The Pipeline page shows which are actively monitored right now${d._meta && d._meta.updated ? ` · updated ${esc(d._meta.updated)}` : ""}.`); }
 /* ── PG-14 Tier-A: "the data figure" ──────────────────────────────────────────

@@ -342,6 +342,9 @@ body { overflow-x: hidden; }
 .dx-empty { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); padding: var(--sp-3) 0; }
 .dx-read { min-width: 0; }
 .dx-kicker { color: var(--ember); }
+/* #2957 — the prior-cycle frame on an archived lab-notes reaction. Muted, not alarming:
+   the entry is honest and worth keeping; it just isn't a reading of the live cycle. */
+.dx-archival { color: var(--ink-muted); margin-top: var(--sp-2); }
 .dx-title { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.12; margin-top: var(--sp-2); }
 .dx-stats { color: var(--ink-faint); margin-top: var(--sp-2); }
 .dx-prose { margin-top: var(--sp-4); color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
@@ -902,7 +905,14 @@ body { overflow-x: hidden; }
 .rd-btn:hover { border-left-color: var(--coach, var(--ember)); }
 .rd-top { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; }
 .rd-dom { color: var(--ember); }
-.rd-name { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--coach, var(--ink-muted)); }
+/* #3057 — a SECOND .rd-name definition (this file loads after tokens.css, so on
+   any page that loads both, this rule is the one that actually wins the cascade).
+   Same AA clamp as tokens.css's combined .rd-name/.th-name/.cv-name/.coach-name
+   rule — see that comment for the derivation. Anchored on --ink rather than this
+   rule's own --ink-muted fallback: --ink-muted's own AA margin (~4.5-4.9:1 on the
+   paper ramp, tests/test_paper_ramp_contrast.py) is too thin to survive blending
+   any adversarial --coach at all, where --ink's margin comfortably absorbs it. */
+.rd-name { font-family: var(--font-mono); font-size: var(--fs-small); color: color-mix(in oklch, var(--coach, var(--ink-muted)) 25%, var(--ink) 75%); }
 .rd-say { font-family: var(--font-sans); color: var(--ink); line-height: 1.5; }
 .read-week { margin-top: var(--sp-5); }
 .rw-list { margin: var(--sp-2) 0 0; }

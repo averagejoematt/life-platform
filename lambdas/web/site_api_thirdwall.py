@@ -27,6 +27,7 @@ from boto3.dynamodb.conditions import Key
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 from web.site_api_common import (
+    EXPERIMENT_START,
     PT,
     USER_PREFIX,
     _decimal_to_float,
@@ -34,6 +35,7 @@ from web.site_api_common import (
     _scrub_blocked_terms,
     logger,
 )
+from web.site_api_phase_frame import archival_frame  # #2957 — cross-phase framing
 
 
 def handle_field_notes(event, *, _g):
@@ -144,6 +146,24 @@ def handle_diary_reactions(event, *, _g):
             "reaction": _scrub_blocked_terms(str(i.get("reaction") or "")),
             "generated_at": i.get("generated_at"),
         }
+        # #2957 (ADR-104 / phase rubric): lab-notes leads with the most recent reaction,
+        # and after a restart the most recent surviving one can predate the live genesis
+        # by weeks — a 2026-07-26 diary reaction was the featured "current coaching" on
+        # Day 7 of cycle 14. The reaction is real and worth keeping; what was missing is
+        # that it belongs to a previous cycle. The producer says so on the wire, so the
+        # front-end kicker and the reader-truth judge read the same frame. In-cycle rows
+        # carry no key at all — an always-on badge would train the reader to skip it.
+        #
+        # NB: the row's own stored ``cycle`` is the cycle it was ARCHIVED from (ADR-077
+        # stamps the closing cycle), never the live one — passing it as the live cycle
+        # number would print a confidently wrong sentence. The live number needs SSM,
+        # which this read path deliberately does not touch, so the label names the
+        # genesis date instead and the row's provenance rides along as ``from_cycle``.
+        _frame = archival_frame(out["date"], EXPERIMENT_START)
+        if _frame:
+            if i.get("cycle") is not None:
+                _frame["from_cycle"] = i.get("cycle")
+            out["archival"] = _frame
         # The single owner-cleared verbatim line (quote tier only) — the consented sliver
         # of the HUMAN voice. All-or-nothing content screen (same as _public_decision_note):
         # if scrubbing would alter it at all, drop it rather than serve a mangled quote.
