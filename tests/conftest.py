@@ -255,6 +255,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # are spec-loaded from scripts/ — invisible to premerge_derivation's
         # tests/-scoped helper detection, hence hand-listed here.
         "test_qa_window_derivation_2818.py",
+        # #2813: the PT-day producer/gate contract sweep. Its verdict depends only
+        # on repo shape — an os.walk(lambdas/) AST scan for any function accepting
+        # a generation_date/day_n-shaped default with neither a @pt_day_contract
+        # registration nor a written EXEMPT_PT_DAY_CANDIDATES reason. A new gate
+        # that silently defaults to UTC (the #2675/#2812/#2815 defect class) must
+        # red BEFORE the merge, not surface in production during the next PT
+        # evening — the exact post-merge-only failure mode #2372 exists to stop.
+        "test_pt_day_contract_sweep_2813.py",
         # ── tree hygiene + safety sweeps ──────────────────────────────────────
         "test_lambdas_packaging_guard.py",  # ADR-146: no loose modules at the lambdas/ root
         "test_bundle_deploy_trigger_registry.py",  # #2920: every path build_bundle.py stages is a deploy trigger or a dated exemption

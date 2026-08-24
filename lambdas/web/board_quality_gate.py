@@ -194,6 +194,42 @@ def cycle_boundary_violations(output_text: str, day_n: int = None) -> list:
     ]
 
 
+def _pt_day_contract_extract_day_n(findings):
+    """#2813 sweep extractor: recover the calendar date `_day_n_today()` resolved
+    to from the finding's own reason text, so the standing sweep can compare it
+    against `common.pacific_time.pacific_today()` like every other registered
+    entry (a day_n int alone isn't a calendar date; this converts it back via
+    the same EXPERIMENT_START_DATE the gate itself anchors to)."""
+    import re as _re
+    from datetime import date as _date, timedelta as _timedelta
+
+    from common.constants import EXPERIMENT_START_DATE as _genesis
+
+    if not findings:
+        raise AssertionError(
+            "cycle_boundary_violations produced no finding at the sweep's PT-evening instant — "
+            "either the fixture text stopped matching _GRADED_CALL_RE, or day_n fell outside the 1-3 window"
+        )
+    m = _re.search(r"Day (\d+) of a new cycle", findings[0]["reason"])
+    if not m:
+        raise AssertionError(f"could not recover day_n from cycle_boundary_violations' finding: {findings[0]!r}")
+    return (_date.fromisoformat(_genesis) + _timedelta(days=int(m.group(1)) - 1)).isoformat()
+
+
+try:  # #2813 — register with the standing PT-day producer/gate contract sweep
+    # (tests/test_pt_day_contract_sweep_2813.py). `day_n=None` resolves via
+    # `_day_n_today()` — the #2812 instance of this exact defect class, already
+    # fixed. Optional and inert on a partial bundle.
+    from common.pt_day_contract import pt_day_contract as _pt_day_contract
+
+    cycle_boundary_violations = _pt_day_contract(
+        extract=_pt_day_contract_extract_day_n,
+        args=("I called this outcome last week.",),
+    )(cycle_boundary_violations)
+except Exception:  # noqa: BLE001
+    pass
+
+
 def enforce(pid: str, answer: str, regenerate_fn, is_grounded_fn, retain_fn, endpoint: str = "board_ask") -> str:
     """#968: run the ADR-108 quality gate over a grounded board answer.
 

@@ -66,3 +66,15 @@ def cycle_gate_params(generation_date_iso: Optional[str] = None) -> Dict[str, An
         "start_date_iso": EXPERIMENT_START_DATE,
         "baseline_lbs": EXPERIMENT_BASELINE_WEIGHT_LBS,
     }
+
+
+try:  # #2813 — register with the standing PT-day producer/gate contract sweep
+    # (tests/test_pt_day_contract_sweep_2813.py). Optional and inert if the shared
+    # module is ever missing from a partial bundle — this module's own fail-soft
+    # contract stated above ("a grounding gate must never be the thing that takes
+    # a narrative surface down"), kept intact; registration is never load-bearing.
+    from common.pt_day_contract import pt_day_contract as _pt_day_contract
+
+    cycle_gate_params = _pt_day_contract(extract=lambda r: r["generation_date_iso"])(cycle_gate_params)
+except Exception:  # noqa: BLE001 — see the fail-soft contract above
+    pass

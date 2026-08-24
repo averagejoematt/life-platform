@@ -188,6 +188,18 @@ def phase_context(today_iso=None, cycle=None):
     }
 
 
+try:  # #2813 — register with the standing PT-day producer/gate contract sweep
+    # (tests/test_pt_day_contract_sweep_2813.py) — the reader-truth window rules'
+    # own phase anchor. A local, optional import so the module's own "stdlib-only,
+    # safe to import anywhere" contract (see the module docstring) stays intact —
+    # this is registration, never a runtime dependency of the rubric itself.
+    from common.pt_day_contract import pt_day_contract as _pt_day_contract
+
+    phase_context = _pt_day_contract(extract=lambda r: r["today"])(phase_context)
+except Exception:  # noqa: BLE001 — never let registration break an import
+    pass
+
+
 def _cycle_line(phase):
     # #2959: the first armed sweep's oracle MISSTATED the current cycle as 10 —
     # it was never told, so it inferred from a labeled prior-cycle diary card.
