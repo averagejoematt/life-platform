@@ -54,7 +54,13 @@ jobs:
   fast-lane:
     name: Collect + deploy-critical + format
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 10 -> 15 (2026-08-24, Session A): the lane crossed its 10m ceiling and GitHub
+    # reported the timeout as `cancelled`, which reads as an external cancellation
+    # rather than a budget breach (3 PRs hit it in one evening: 9m27s pass earlier
+    # that day, then 10m0s kills). Same headroom idiom as the #3134 suite-budget
+    # re-derivation: observed max ~10m x 1.23 + the session's own test growth -> 15m.
+    # Re-measure before trusting this number again; do not bump silently.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

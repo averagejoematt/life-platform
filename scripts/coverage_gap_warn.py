@@ -26,7 +26,13 @@ THE PROBLEM THIS SOLVES:
   merged ~200 more tests and breached the new 900s budget too (985s), proof the
   gate does its job (#2152, 2026-08-06). Re-derived from ALL 8 green-main runs in
   the post-#2132 era (704-985s, avg ~830s) — budget moved to 1200s (~22%
-  headroom above the observed max / ~45% above the average). See ci-test.yml's
+  headroom above the observed max / ~45% above the average). #3025 (2026-08-23)
+  re-derived again from CI's own --durations measurement, moving 1200 -> 1500.
+  #3106 (2026-08-24) bred the same class a third time — the D2 session's ~230
+  new tests breached 1500s on green main (1507s) within the day; 10 sampled
+  green-main runs at the 1500s budget averaged ~1305s (max 1580s, 2 outright
+  breaches) with no dominating single-test outlier, so the budget moved
+  1500 -> 1950 (~23% headroom above the observed max). See ci-test.yml's
   comment for the full derivation.
 
 WHAT IT DOES:
@@ -36,13 +42,14 @@ WHAT IT DOES:
       and emits a GitHub Actions `::warning::` annotation when the gap exceeds a
       threshold (default 10 points) — so a human is reminded to ratchet the floor
       up.
-  (2) Suite-duration budget (optional, #1349, raised #1966, re-raised #2152): when
-      `--duration-seconds` is passed (the caller measures its own job
-      wall-clock — this script has no way to observe it), emits a `::warning::`
-      when the measured duration exceeds `--duration-budget-seconds` (default
-      1200s / 20min, derived #2152 — see ci-test.yml's comment for the
-      measure-first derivation) — the same self-reminding-ratchet shape as (1),
-      applied to suite cost instead of coverage.
+  (2) Suite-duration budget (optional, #1349, raised #1966, re-raised #2152,
+      #3025, #3106): when `--duration-seconds` is passed (the caller measures
+      its own job wall-clock — this script has no way to observe it), emits a
+      `::warning::` when the measured duration exceeds
+      `--duration-budget-seconds` (default 1950s / 32.5min, derived #3106 —
+      see ci-test.yml's comment for the measure-first derivation) — the same
+      self-reminding-ratchet shape as (1), applied to suite cost instead of
+      coverage.
   (3) MEASURED-coverage high-water ratchet (#1658, added 2026-08-06): the hole
       the other two leave open. `--cov-fail-under` is deliberately set a few
       points BELOW measured coverage so normal fluctuation doesn't red main —
@@ -90,7 +97,7 @@ from typing import Optional, Tuple
 # tests/test_duration_budget_ratchet.py asserts this constant, the ci-test.yml
 # literal, and its own committed high-water mark all agree, so the three can't
 # silently drift apart the way the coverage floor could before #1658.
-DEFAULT_DURATION_BUDGET_SECONDS = 1500.0
+DEFAULT_DURATION_BUDGET_SECONDS = 1950.0
 
 # How far measured coverage may fall below the committed high-water mark before the
 # regression check (3) fails the build (#1658). This is NOT slack to spend — it

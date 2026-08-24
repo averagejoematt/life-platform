@@ -465,6 +465,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/common/send_ledger.py",
+      "partition": "email_log",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": "acwr-compute",
       "module": "lambdas/compute/acwr_compute_lambda.py",
@@ -1449,13 +1456,6 @@
       "lambda": "daily-brief",
       "module": "lambdas/emails/daily_brief_lambda.py",
       "partition": "day_grade",
-      "via": "pk"
-    },
-    {
-      "direction": "write",
-      "lambda": "daily-brief",
-      "module": "lambdas/emails/daily_brief_lambda.py",
-      "partition": "email_log",
       "via": "pk"
     },
     {
