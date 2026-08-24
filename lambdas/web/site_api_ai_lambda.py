@@ -1064,7 +1064,7 @@ def _handle_ask(event: dict) -> dict:
                     _emit_token_metrics(_r2.get("usage", {}), endpoint="api_ask")
                     return "".join(b["text"] for b in _r2.get("content", []) if b.get("type") == "text")
 
-                answer, _left, _ = _gg.regen_once(answer, _ask_findings, _ask_regen)
+                answer, _left, _ = _gg.regen_once(answer, _ask_findings, _ask_regen, surface="api_ask")
                 if _left:
                     answer = (
                         "I couldn't ground part of that answer in the data I actually have, "

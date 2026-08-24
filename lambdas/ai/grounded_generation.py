@@ -78,6 +78,14 @@ try:
 except ImportError:  # pragma: no cover — flat/layer bundle layout
     import night_scope as _night_scope  # type: ignore[no-redef]
 
+# 7. Discard telemetry (#3086) lives in ai/regen_discard_telemetry.py — same §2-ceiling
+# reason as night_scope above, plus this module's own "no AWS" contract (its put_metric_data
+# call does not belong here).
+try:
+    from ai import regen_discard_telemetry as _regen_telemetry
+except ImportError:  # pragma: no cover — flat/layer bundle layout
+    import regen_discard_telemetry as _regen_telemetry  # type: ignore[no-redef]
+
 # 5. Behavioral-log (#1699) moved to ai/behavior_logs.py with #2056, for the same §2
 # ceiling reason — and because deriving its per-generation-date availability map is real
 # work that belongs next to the gate, not smeared across every caller. Re-exported here
@@ -1160,12 +1168,14 @@ def correction_prompt(findings: list) -> str:
     return "\n".join(lines)
 
 
-def regen_once(text: str, findings_fn, regen_fn):
+def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown"):
     """One corrective rewrite, kept only if strictly better. Never regresses.
 
     findings_fn(text) -> list of findings (e.g. a grounding_findings closure).
     regen_fn(correction: str) -> str — the caller's single regeneration call
     (model, tokens, prompt assembly all stay the caller's business).
+    surface -- caller identity for discard telemetry (#3086); same convention
+    as ai_calls._ground_legacy_output's `label` param.
 
     Returns (best_text, findings_for_best_text, corrected: bool).
     """
@@ -1174,11 +1184,17 @@ def regen_once(text: str, findings_fn, regen_fn):
         return text, [], False
     try:
         fixed = regen_fn(correction_prompt(findings))
-    except Exception:
+    except (TimeoutError, ConnectionError, OSError) as e:  # #3059 precedent: named, not bare
+        _regen_telemetry.log_discard("transport_error", surface, len(findings), reason=type(e).__name__)
+        return text, findings, False
+    except Exception as e:
+        _regen_telemetry.log_discard("unexpected_error", surface, len(findings), reason=type(e).__name__)
         return text, findings, False
     if not (fixed or "").strip():
+        _regen_telemetry.log_discard("empty_response", surface, len(findings))
         return text, findings, False
     fixed_findings = findings_fn(fixed)
     if len(fixed_findings) < len(findings):
         return fixed, fixed_findings, True
+    _regen_telemetry.log_discard("not_strictly_better", surface, len(findings))
     return text, findings, False

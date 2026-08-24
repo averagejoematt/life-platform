@@ -508,7 +508,7 @@ def _gate_derived_prose(coach_id, date, output_text, extraction):
         holder["latest"] = coach_derived_prose.recondense(coach_id, output_text, extraction, correction, _call_haiku)
         return coach_derived_prose.prose_blob(holder["latest"])
 
-    _best, findings, corrected = regen_once(text, _findings_fn, _regen_fn)
+    _best, findings, corrected = regen_once(text, _findings_fn, _regen_fn, surface=f"coach_state_condense:{coach_id}")
     return (holder["latest"] if corrected else extraction), findings
 
 

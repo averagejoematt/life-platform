@@ -185,7 +185,7 @@ def generate_gated_turn(system, user, allowed_sources):
     def findings_fn(t):
         return gg.grounding_findings(t, allowed=allowed, allowed_dates=allowed_date_set, **cycle_gate_params())
 
-    text, left, _corrected = gg.regen_once(text, findings_fn, lambda corr: _call("\n\n" + corr))
+    text, left, _corrected = gg.regen_once(text, findings_fn, lambda corr: _call("\n\n" + corr), surface="inter_coach_dialogue")
     return text, left
 
 
