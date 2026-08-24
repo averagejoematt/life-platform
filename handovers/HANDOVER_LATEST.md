@@ -1,149 +1,145 @@
-# Handover — 2026-08-23 (night, Fable 5, autonomous + one owner call): Phase D1 of the A-Grade Program — control boundaries closed: CSP hardened, budget guard fails closed, edge enforcement observed nightly, WAF decided
+# Handover — 2026-08-24 (Fable 5, autonomous, ~19h incl. overnight watchers): Phase D2 of the A-Grade Program + the deploy plane healed + the biggest single-session drain yet (28 PRs, 17 closures)
 
-**Session:** Fable 5. Drove: *"Boot Phase D1 of the A-Grade Program"* — the plan's
-"Control boundaries" phase (`~/.claude/plans/lively-juggling-candle.md`), AUTONOMOUS
-with merge+deploy authority, ONE owner decision surfaced first (WAF). Owner call
-received mid-session: **defer the WAF — dated priced acceptance, revisit ~2026-10-15.**
-Previous handover archived as `HANDOVER_2026-08-23_agrade-d0-p0-truth.md` on
-`session-archive`.
+**Session:** Fable 5. Drove: *"Boot Phase D2 of the A-Grade Program"*
+(`~/.claude/plans/ticklish-soaring-teapot.md`), then owner-directed scope expansion:
+*"clear as much of the open issues backlog as possible with sub-agents … non-fable
+where possible"*, *"make sure all pull requests are done"*, *"pay down as many open
+items as possible"*. AUTONOMOUS with merge+deploy authority. Previous handover archived
+as `HANDOVER_2026-08-23_agrade-d1-control-boundaries.md` on `session-archive`.
+**Next session:** Session A of `~/.claude/plans/shimmering-snacking-quokka.md`
+(owner-approved: D3 + foundation + drain; Fable drives A, Opus drives B).
 
-## What shipped (all merged AND deployed AND live-verified; 7 PRs #3056–#3063)
+## What shipped (28 PRs merged AND deployed AND live-verified)
 
-- **Budget-guard fail-closed (DIL-036 → FIXED)** — PR #3059 (worktree agent). The bare
-  `except → tier 0` SSM read split into named classes logging
-  `BUDGET_TIER_UNREADABLE reason=<class>`; exported `FAIL_CLOSED_FEATURES=("website_ai",)`
-  consulted by `allow()` — public /api/ask + /api/board_ask DENY tier-3-equivalent on
-  unreadable budget state (AST-pinned to the real `_ai_paused_response` wire path);
-  `current_tier()` stays fail-open fleet-wide (protect-longest deliberate; a phantom
-  tier 3 would take the brief down with the public surface). 23 tests mutation-proved
-  both directions. **Deployed:** cdk Monitoring (`budget-tier-unreadable` alarm live,
-  metric filter scoped to site-api-ai's log group) + site-api-ai deploy_and_verify PASS.
-  **The control proved itself same-day:** the split logging surfaced the CI diagnosis
-  role's missing `ssm:GetParameter` on the budget-tier param (silently swallowed
-  pre-#3059) — grant added to `infra/iam/github-actions-diagnosis-role.permissions.json`,
-  applied live, `verify_oidc_iam.py` CLEAN (second member of the #2959 cycle-param class).
-- **Edge-429 observation + the WAF decision (DIL-014; #2828 CLOSED)** — PR #3058 (inline).
-  Nightly qa-smoke check `ratelimit:edge_429` (`qa_check_edge_429.py`, sibling module —
-  qa_smoke sits at 1198/1200): ≤6 too-short POSTs at board_ask ($0 model cost — rate
-  charged BEFORE validation, ordering AST-pinned), requiring one real 429 with
-  Retry-After + JSON shape. Outcome vocabulary has no vacuous green: RED on no-429 (the
-  08-14 signature) · YELLOW could-not-observe · ⏸ on tier-3 pause. **First live run
-  observed a real 429.** #1439's manual-only posture re-decided on the record (script
-  header + RUNBOOK). **Owner decision executed:** no WAF — dated priced acceptance
-  (PROPORTIONALITY row names the compensating stack), **revisit 2026-10-15** or on
-  observed abuse / non-self-inflicted spike fire / commercialization. Docs PR #3062.
-- **CSP hardening (DIL-015 → FIXED; #3048 CLOSED)** — PR #3060 (worktree agent). Real
-  surface was **266 inline blocks / ~920KB / 91 pages** (the issue's V2 numbers were
-  stale) → **0**; production `script-src` exactly `'self'` (extraction + non-executable
-  `application/json` data islands — no hash entries needed); **jsdelivr DROPPED**
-  (axe-core already vendored; `a11y_audit.py:86` moved to CDP evaluate); `/legacy/`
-  isolated on a compat policy. **Deployed both halves** (site auto-deploy green
-  end-to-end incl. real-browser visual-QA; hand `cdk deploy LifePlatformWeb` for the
-  header). **Live: smoke 246/0** with the new source-derived CSP assertion (hardened on
-  `/`, compat on `/legacy/`).
-- **Secrets re-scope (DIL-016 → partial)** — PR #3056 (inline). SECRETS_MAP gains the
-  rotation-ownership register (owner + expiry/next-action per family, ⚠️ loud-gap
-  convention for GitHub-UI PAT expiries); us-east-1 "replicas" justified in writing
-  (cf-auth/buddy-auth are edge-native and were MISSING from the map — now rows;
-  site-api-origin-secret is the one true CFN-region-local twin); #2890 re-scoped to
-  per-family PRICED split/merge/keep decisions (never a default consolidation target).
-  `notion` deletion batched to owner with a REQUIRED pre-check: live LastAccessedDate
-  is **2026-07-25**, not the recorded 03-09 — something still reads it.
-- **Two main-red repairs (PRs #3061, #3063)** — both #3059/#3060 merge-union
-  registration reds: (1) the #2372 premerge classifier needed both agents' new
-  tree-sweeping test files registered; (2) the alarm COUNTER was blind to cross-file
-  extraction seams (a single-alarm module helper counts at call sites, which live in a
-  different file → counted 0; fixed structurally: a helper with zero in-file callers
-  counts at its definition), which forced the cap-bound cohesive split of
-  `deploy/alarm_discovery.py` out of sync_doc_metadata (ratchet TIGHTENED 1780→1253);
-  (3) the permanence tests followed the extracted `privacy_permanence.js` (all 8
-  asserted literals verified present exactly once — test-shape, not a regression).
-- **Also:** D0's build dispatch published (the wrap-beats rollback diagnosed as a
-  transient data-state AA violation — class filed #3057, INCIDENT row added); recall
-  corpus gap backfilled (2026-08-18 installment, $0); #3064 (auto-filed standalone
-  visual-QA red) fully diagnosed — FP build-dispatches verdict (verified both schemes
-  locally), the `/method/cycles/` matched-window misread baselined citing #2957 (third
-  member), and the real IAM gap fixed (above); re-run dispatched, auto-closes on green.
+**D2 — the truth manifest (all three lanes done; DIL-010/035 flipped, #3097):**
+- **Lane 1 (#2898 CLOSED, PR #3080)** — the ceiling family collapsed to ONE source
+  (`cost_governor_lambda` constants): `site_api_budget` imports it, `core_stack`
+  derives at synth (template proven byte-identical), `renderCost` reads live
+  `/api/receipts` with ADR-104 omit-when-stale, derivation guard in the premerge lane
+  (`scripts/budget_ceilings.py` = the one parser; a second parser is itself forbidden by
+  test). Mutation-proved 5 ways. **Found live: /method/cost/ told readers $150 while the
+  August window base is $200**, plus a "$~80" string-concat display bug — both dead.
+  Live: receipts serves 200/235 + window flag; auto-reverts 09-01 with no deploy.
+- **Lane 2 (PR #3072)** — public-claims registry: 4 behavioral claims (remediation mode,
+  deploy lanes, deletion promise, auto-merge caps) with wire-real comparators both
+  directions (comparator reds on drift; discovery reds an unregistered claim-bearing
+  generator). Runtime-state claims use the permanence-terms recorded-value pattern.
+  PROPORTIONALITY row. Scope-disciplined to exactly four.
+- **Lane 3** — verified already-closed by intervening work (catalog current + `--check`
+  in docs-ci; platform-model `--check` pre-merge in docs-ci); epic #2986 commented with
+  per-box acceptance, ONE honest residual keeps it open (the generic re-stamp rule).
 
-## Deploys (hand, from exact merged/reconciled shas, postflight-verified)
+**The deploy plane, broken at boot, fully healed:** D1's wrap site-deploy had rolled
+back; #3064's rerun failed with three NEW causes. All diagnosed and fixed at producers:
+#3057 AA clamp on data-supplied coach colors (PR #3071, closes it); #3067 vision-judge
+tall-page tiling — bound derived from the model's 1568px resize tier, NOT Bedrock's 8000
+reject limit (PR #3078); #2957 got two new members (chronicle archival framing, the
+verify-table), then **PR #3074 fixed six members at the producer** via the shared
+`site_api_phase_frame` vocabulary and drained 6 baseline entries; #3066 hero as-of
+framing (PR #3075); a REAL #2506-class front-end bug on /story/agents/ (UTC week seed —
+PR #3095); and a main-level landmine from the CSP extraction (page_data.js broke the JS
+unit lane for every site PR — PR #3077). Site-deploys green end-to-end since; #3064
+auto-closed on a green standalone run.
 
-cdk LifePlatformMonitoring 19:5xZ (stale-checkout guard caught the reconcile-bot race —
-pulled + redeployed) · site-api-ai deploy_and_verify PASS · qa-smoke 19:00Z (sha
-7c2ffecc; dry-run invoke verified the new check live) · site-api ×2 (first raced my own
-concurrent pull — the postflight mismatch caught it; clean redeploy verified
-`/api/platform_stats` alarms:111) · cdk LifePlatformWeb 19:5xZ (hardened CSP) · site ×2
-green gated deploys (D0-beats rerun + CSP) · IAM put-role-policy diagnosis-role
-(budget-tier grant, parity CLEAN). Leases: 3 rejected with decodes (superseded,
-artifacts hand-deployed), 1 APPROVED (fac0826e0 fleet deploy — Deploy/smoke/visual-QA
-green; its unit-test red was #3063's repair), final run bf11b366 **completed/success**.
+**The drain (owner-directed):** every Now story + a Next wave, all via sonnet/opus
+worktree agents (18 agents; ~0 Fable tokens in implementation): #2989 alarm banding
+(cleared live same-session), #2893 waste audit ($1.66/mo eliminated; surfaced the
+ADR-108 gate green-lighting 84/484 unevaluated drafts → #3083 owner call), #2889
+gen-cache extension (measured skip-rate was ZERO; causes fixed/filed #3107), #2813
+PT-day contract sweep, #2883 remediation-spend attribution (PR #3070 + IAM applied),
+#2892 caller-class dimension at the bedrock chokepoint, #3082+#3084 transport extraction
+(ai_calls 2396→2264, re-bill + budget-retry dead), #3086 regen-discard telemetry, #2824
+grant-enumeration call-graph sweep (**found 12 live IAM gaps** incl. golden-eval running
+Bedrock outside the budget ceiling — PR #3094 closed 12/13 + both out-of-band applies,
+`verify_oidc_iam --strict` CLEAN), #2837 EMF ledger (**premise inverted: the bill tracks
+~102 dense series ≈ $19/mo, not the 703-series inventory**), #3037 unparked (recall
+publish-path grants + self-heal + silence-alarm extraction, monitoring ratchet TIGHTENED
+1358→1331), plus both dependabot PRs and the CodeQL pair (#160 fixed + rescan-confirmed,
+#159 dismissed with reason — **code scanning at 0 open**).
+
+**Deploys (all postflight-verified):** fleet pass **105 lambdas / 0 failed** at HEAD
+9331995b · 6 cdk stacks (Monitoring ×2, Email, Ingestion, Operational, Serve, Compute) ·
+site-api ×2 + site auto-deploys ×4 (final green) · qa-smoke + chronicle-approve +
+coach-quality-gate + coach-state-updater · IAM put-role-policy ×2 (remediation
+AiCostTelemetry, golden-eval BudgetTierRead/EvalConfigRead) with strict parity CLEAN.
+
+## Retrospective (owner-requested) + the foundation it produced
+
+~Half the 12h+ wall-clock was process friction, now filed: **#3101** literal-conflict
+surface removal (the serial merge tax — 15 PRs × 12–18 min check cycles + reconcile-bot
+races), **#3102** confirm-before-gate for truth verdicts (3 rollbacks on single-run
+judge flips), **#3103** `wait_pr_green.sh` (the blessed named-check-set watcher),
+**#3104** merge-train mode. Fifth lesson to memory: combine finding→fix in ONE agent
+brief (the #3092→#3094 and #3081→#3091 stacks each paid a doubled check cycle).
 
 ## Gate lines
 
-**Build beat:** 2026-08-23-d1-control-boundaries
-**Docs:** SECRETS_MAP (rotation register + us-east-1 + counts) · PROPORTIONALITY (+3
-rows: WAF acceptance, edge-429 observation, budget fail-closed channel) · RUNBOOK
-(probe posture) · INCIDENT_LOG (+1 row + header) · DILIGENCE register (DIL-014/015/016/036
-flipped with live evidence) · alarm_citations (+1 by #3059) · ARCHITECTURE/INFRASTRUCTURE
-(alarm-count literals via --apply)
-**Decisions:** none needed — the WAF deferral is recorded as a dated PROPORTIONALITY
-acceptance + the #2828 closure (revisit 2026-10-15); below ADR threshold per the
-priced-acceptance vocabulary the register defines
-**Main:** green (bf11b366)
-**Incidents:** 1 row added — the wrap-beats site auto-rollback (transient data-state AA
-contrast on /method/board/; class filed #3057; full rerun green)
+**Build beat:** 2026-08-24-d2-truth-manifest
+**Docs:** DILIGENCE register (DIL-010/035 flipped, #3097) · PROPORTIONALITY (+3 rows via
+PRs: claims registry #3072, grant sweep #3092/#3094 with the 13-gap correction, EMF
+ledger #3093) · INCIDENT_LOG (+3 rows + header) · alarm_citations (+4 entries) ·
+SECRETS_MAP-adjacent: infra/iam README (both staged grants stamped APPLIED) ·
+MONITORING (regenerated: derived ledger pointer, #3093) · COACH_STANCE (fail-open
+posture documented, #3081) · engines/ADR-126 amendment (#3073) · sync_doc_metadata
+--apply run at the wrap commit
+**Decisions:** none needed — no governance-class choice beyond dispositions already
+recorded in the register/PROPORTIONALITY rows (the fail-open gate call is deliberately
+DEFERRED to the owner as #3083)
+**Main:** green (9331995b)
+**Incidents:** 3 rows added — two merge-train site auto-rollbacks (one #2957 member
+baselined, one real UTC-week bug fixed #3095; single-run-verdict exposure filed #3102);
+the deploy-critical PyYAML collection red ~1.5h (#3100/#3105); the ~15.5h
+production-lease chain (2 leases rejected with decode; janitor token = owner batch)
 **Stash/hooks:** clean
-**Closures:** #2828, #3048 commented (ADR-099 two-line verdicts, both realized with
-live evidence); #3064 auto-closes on the dispatched green run (diagnosis comment on it)
-**Backlog:** Now live at 5 actionable (+2 epics); no stale Later issues; hygiene: the 5
-violations found at the gate all fixed this session (#3057 labels + epic coverage,
-#3064 labels + outcome form) — the auto-filed-vs-hygiene structural tension filed as
-#3065
-**Alarms:** 0 red >72h; 5 flaps in the window, decoded — `ai-daily-spend-high` ×1 (two
-heavy dev sessions same day: D0's oracle sweeps + D1's agents; cleared on its own),
-`ingest-auth-unhealthy-24h`/`-dropbox` + `ingest-liveness-unhealthy` ×1 each (the known
-#2976 recovery-episode cluster, same decode as the D0 wrap), `site-api-invocation-spike`
-×4 (self-inflicted: this session's full-surface QA sweeps during deploy verification —
-three visual-QA passes + smoke 246 + probes; no reader symptom). Closed with `--decoded`.
-**CI warnings:** none
-**Ledger:** 3 rows added — WAF priced acceptance (#2828), nightly edge-429 observation
-(#3058), budget-integrity fail-closed channel (#3059)
+**Closures:** #3057, #3064, #3067, #2989, #2977, #2898, #2893, #2892, #2889, #2837,
+#2824, #2813, #3082, #3084, #3086, #3096, #3098 all commented (ADR-099 two-line
+verdicts; #2889/#2892/#2824/#3084 honestly `partial` with residuals named — #3107 filed
+for the coach-brief cache gap, the chronicle-sender grant rides the _OPEN_GAPS ratchet)
+**Backlog:** Now live at 3 actionable (promoted #3101, #3102, #3103 by stored rank —
+also Session A's first work); Later sweep — no stale Later issues; hygiene OK across 67
+open (14 violations found at the gate all fixed: 4 epics' Stories coverage, outcome
+audiences, #3083 label, #3098 wedge tracker closed, score-line milestones)
+**Alarms:** 0 red >72h uncited; 10 flap episodes in the 72h window all decoded in
+alarm_citations (ai-daily-spend ×2 + site-api-invocation-spike ×7 + coherence ×1 — all
+the session's own agent burn/QA traffic, each with an expiry clause);
+qa-smoke-failures re-cited as a dated self-clearing window (stale corpus evidence;
+expires 2026-08-25T19:00Z — if still lit after the first post-#3037 nightly, file fresh)
+**CI warnings:** 1 — unit-suite 1507s vs 1500s budget (7s over; this session added ~230
+tests); filed #3106 for the measure-first budget re-decision (--decoded)
+**Ledger:** 3 rows added (public-claims registry · grant-enumeration sweep · EMF
+namespace ledger — each in its shipping PR, ADR-103/144 shape)
 
-## Owner batch (ONE ask — everything needing Matthew)
+## Owner batch (ONE ask — everything needing Matthew; front-loaded next session per plan A1)
 
-1. **RECONCILE_PUSH_TOKEN PAT** (unblocks D0.6 — main's first required checks): mint a
-   fine-grained PAT (Contents read-write, this repo only) as a repo secret, then next
-   session runs `apply_branch_protection.py --apply` + adds the #3025 context.
-2. **DEPLOY_GATE_JANITOR_TOKEN** secret (#3021 — arms the lease janitor).
-3. **respiratory_rate + disturbance_count consent** (#3045 residual — stamp
-   TIER_OWNER_PUBLISHED or strip; currently default-public deliberately pending your call).
-4. **notion secret deletion** (#2890): pre-check required — live LastAccessedDate
-   2026-07-25 says something still calls GetSecretValue on it; identify that reader
-   (start: freshness-checker / pipeline-health-check), then delete or adopt.
-5. Carried: **#2961** billing-alarm dupes · **#2834** IAM posture decision.
-   (WAF is DECIDED — nothing left on it until the 2026-10-15 revisit.)
+1. **RECONCILE_PUSH_TOKEN PAT** (unblocks D0.6 required checks — also the structural fix
+   for tonight's reconcile-bot races).
+2. **DEPLOY_GATE_JANITOR_TOKEN** (#3021 — would have caught tonight's 15.5h lease chain).
+3. **respiratory_rate + disturbance_count consent** (#3045 residual).
+4. **notion secret deletion pre-check** (#2890 — LastAccessed 2026-07-25 reader).
+5. **#2961 cdk-import approval** (D3 alarm lane) · **#2834 IAM posture**.
+6. **NEW: #3083** — the ADR-108 quality gate fail-opens on its own fallback report
+   (84/484 drafts green-lit unevaluated): pass-for-availability stays, or hold?
+7. **NEW: schedule the DIL-027 timed restore drill** (a ~30–60 min owner appointment;
+   Session A ships the cross-account raw/ backup + priced row without it).
 
 ## Residuals / next picks
 
-- **D0.6 branch protection** — blocked on owner item 1 above (#3042 program). not-work —
-  owner-only PAT mint.
-- **#2957 got a third class member** (/method/cycles/ matched-window misread, baselined) —
-  the producer fix (judge-legible cycle/window framing) drains all three.
-- **#3057** (AA clamp on data-supplied coach colors) — filed this session, S-effort,
-  prevents the next transient-roster rollback; on epic #2842.
-- **#3065** (auto-filed trackers vs the hygiene gate) — Later; gate-design decision.
-- **#2890 residual** — the per-family disposition table + CE delta (issue re-scoped with
-  boxes).
-- **Scheduled observations (not-work — dated):** WAF revisit **2026-10-15** (#2828
-  closure + PROPORTIONALITY row carry it) · first edge-429 nightly runs tonight 18:30 UTC
-  (a RED would be real) · `prediction-gradable-share-low` may fire ~3d on the legacy
-  corpus, clears from 08-24 · first real prediction grades ~2026-08-31 · #2978 30-day
-  re-measure ~09-22 · legacy unsubscribe-link sunset 2026-09-22 · Monday retention sweep
-  anonymizes the legacy subscriber backlog · #3064 auto-closes on the dispatched
-  standalone run going green (in flight at wrap).
-- **Next phase:** D2 (the truth manifest — platform_facts artifact + public-claims
-  registry, closes #2898, advances #2986/#2842) per
-  `~/.claude/plans/lively-juggling-candle.md`; D0+D1 register rows are the re-grade
-  evidence pack. **Honest lesson worth carrying:** two merge-past-red incidents in one
-  session from sampling PR checks with a fail/pending filter before the slow full-suite
-  lane attached — assert the expected check set BY NAME (memory:
-  absent-check-invisible-to-fail-filter).
+- **Session A** = `~/.claude/plans/shimmering-snacking-quokka.md` (owner-approved):
+  D3 lanes + foundation (#3101/#3102/#3103 now on Now) + drain toward zero. Boot prompt
+  delivered in-conversation 2026-08-24.
+- **Scheduled observations (not-work — dated):** first REAL nightly edge-429 2026-08-24
+  18:30Z (RED is real) · qa-smoke-failures self-clear window expires 2026-08-25T19:00Z ·
+  new metric baselines accruing (RegenDiscarded / CallerClass / TruncatedResponses /
+  GenerationSkippedUnchanged — read at Session A boot, no alarms until baselined) ·
+  first prod-class governor share after one 8h cycle · first real prediction grades
+  ~2026-08-31 · WAF revisit 2026-10-15 · legacy unsubscribe sunset 2026-09-22.
+- **#2883 stays open** (boxes 2/4: ratio re-measure post-telemetry + CE reconciliation)
+  — Session A drain list.
+- **#2824's last gap** (chronicle-sender personas.json) is now unblocked (#3037 merged)
+  — rides the `_OPEN_GAPS` ratchet, which reds the day it's fixed and not deleted.
+- **Honest lessons worth carrying:** (1) the absent-check class recurred TWICE as a
+  compound-command slip (watcher output + merge in one command) — #3103 makes the fix
+  structural; separate-command merges from now. (2) Two stranded leases accumulated
+  because mid-train gate arrivals had no watcher — janitor token + #3103. (3) The
+  yaml-less-lane collection break is the 2026-08-08 class recurring — module-scope work
+  in test files must be import-guarded.

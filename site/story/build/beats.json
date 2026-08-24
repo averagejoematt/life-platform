@@ -3092,6 +3092,41 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3058"
         }
       ]
+    },
+    {
+      "id": "2026-08-24-d2-truth-manifest",
+      "date": "2026-08-24",
+      "title": "The platform's numbers now derive instead of drift — and a 26-PR night proved the machinery on itself",
+      "shipped": "The self-description layer became executable. The monthly budget ceiling — previously hand-copied across five code sites and ~18 prose sites — now lives in exactly ONE constant that everything else derives from: the AWS Budgets backstop reads it at build time (proven byte-identical), the public cost page reads it from the live API, and a guard test reds any hand-typed copy. In the process the guard caught the site telling readers the ceiling was $150 while the real August number was $200. Four public behavioral claims (how the remediation agent merges, how deploys gate, what the deletion promise means, what the auto-merge caps are) got wire-real comparators that check the prose against the actual code and runtime state. Around that core, a 26-PR autonomous run drained the backlog: an IAM sweep that traces real call graphs found 12 live permission gaps (one of them let the weekly eval's AI spend run outside the budget ceiling entirely) and closed them; the AI fleet stopped paying for output it throws away ($1.66/mo of measured truncation waste eliminated, and a metric now watches for more); the vision judge that grades site pages learned to tile ultra-tall screenshots it previously couldn't read; and every custom-metric namespace got an owner. Everything deployed: a 105-Lambda fleet pass, six CDK stacks, and two IAM applies, all postflight-verified.",
+      "why_it_mattered": "An external audit had scored this platform 4.47/10, and the sharpest finding wasn't in the report — it was that the report's own false positives were manufactured by the platform's stale self-descriptions. This session was the structural answer: numbers and claims that DERIVE from the code can't quietly lie to the next auditor, the next reader, or the next session. The backlog drain matters for the same reason — a dozen of tonight's fixes were the platform's own new gates catching real defects (the grant sweep's 12 gaps, the truth judge's UTC-week bug) rather than a human noticing.",
+      "gotcha": "The reader-truth judge is nondeterministic, and tonight it rolled back three deploys on findings that appeared in one sweep and vanished in the next. Two were real bugs it deserves credit for (a page computing 'this week' from UTC on a Sunday evening, an unlabeled cross-cycle table); but the single-run-verdict mechanism turns borderline content into a deploy coin flip. The fix is filed: a NEW finding must reproduce on a second judge pass before it can roll anything back.",
+      "honest_miss": "Twice during the merge train, a compound command merged a PR before its check verdict had actually been read — once past a swallowed-push state with zero checks, once past a CodeQL meta-red. Both were retroactively verified safe, but it's the exact absent-check failure mode this platform already documented after the last session, recurring under time pressure. The correction is now structural: a blessed watcher script that asserts the expected checks BY NAME and never merges is filed as the next session's first build.",
+      "prs": [
+        {
+          "label": "PR #3080",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3080"
+        },
+        {
+          "label": "PR #3072",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3072"
+        },
+        {
+          "label": "PR #3092",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3092"
+        },
+        {
+          "label": "PR #3094",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3094"
+        },
+        {
+          "label": "PR #3081",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3081"
+        },
+        {
+          "label": "PR #3078",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3078"
+        }
+      ]
     }
   ]
 }
