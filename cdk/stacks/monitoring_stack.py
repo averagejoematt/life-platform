@@ -1026,9 +1026,8 @@ class MonitoringStack(Stack):
         # ══════════════════════════════════════════════════════════════
         # OBS-08: S3 bucket storage size alarm (period 86400s, daily metric).
         # Threshold re-derived 50GB→65GiB 2026-08-24 (DIL-026/#2799, ADR-105 —
-        # from measured growth, not a guess; full derivation + prefix sizing in
-        # the DIL-026 row of docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md and
-        # the PROPORTIONALITY.md row for check_s3_lifecycle). Summary: deploys/
+        # from measured growth; full derivation + prefix sizing in the DIL-026
+        # register row + the check_s3_lifecycle PROPORTIONALITY row). deploys/
         # noncurrent (41.5GB, #2642's rule confirmed live and correct) is a
         # 7-day rolling-window artifact of routine deploy velocity, not a gap;
         # imports/ WAS a real gap (2.07GB, zero coverage — fixed alongside this).
