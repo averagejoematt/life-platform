@@ -76,7 +76,7 @@ repo-visibility change, or GitHub shipping ref-level purge tooling.
 | 024 clock-based sequencing | **CONFIRMED** | 5 compute lambdas run blind on cron; no completeness manifest | D3 source-completeness contract |
 | 025 idempotency/replay | **CONFIRMED (arch risk)** | 7 email senders + write-MCP + webhooks; no enterprise-wide inventory | D3 idempotency census |
 | 026 S3 noncurrent growth | **CONFIRMED** | `imports/` uncovered (2.23GB); no drift assertion (only post-hoc 50GB alarm) | D3 (#2799 home) |
-| 027 single-region recovery | **CONFIRMED** | SECURITY accepts no cross-region | PRICED + cross-account backup for raw/ (D3) |
+| 027 single-region recovery | **CONFIRMED → COMPROMISE BUILD LANDED 2026-08-24** (autonomy-safe half) | SECURITY accepted no cross-region; DISASTER_RECOVERY scored "S3 bucket deletion" **NOT RECOVERABLE** and "us-west-2 outage" **hours-days, no DR region**. The irreplaceable surface is `raw/` alone — **measured 2026-08-24: 37,665 objects / 541,451,065 bytes (0.50 GiB), +563 objects / 16.2 MiB per 30d** — everything else (DDB metrics, derived artifacts, the whole site) recomputes from it. **Cross-ACCOUNT was investigated first and is not reachable**: `aws organizations list-accounts` returns exactly ONE account (205930651321, `o-zfnwrqb9mx`), so there is no second account to replicate into today | **Cross-REGION replication of `raw/*` built** (us-west-2 → us-east-2, deliberately not us-east-1 where LifePlatformWeb's ACM/CloudFront control plane already lives): new CDK-owned `LifePlatformBackup` stack (`cdk/stacks/backup_stack.py`) with a versioned, public-access-blocked, `RETAIN` replica bucket carrying its own `ProtectRawBackupFromDeployScripts` Deny (mirrors the primary's pattern, extended to `DeleteBucket`) + its own 30d noncurrent expiry; a replication role scoped to `raw/*` read and replica write, **with no `s3:ReplicateDelete`**; `DeleteMarkerReplication: Disabled` so source deletes never propagate (both halves guarded, `tests/test_raw_replication_dil027.py`). Source-side config is out-of-IaC by the imported-bucket constraint (`deploy/s3_replication.json` + `apply_s3_replication.sh`, the established lifecycle-script pattern; ledger row added). Source versioning was **already Enabled** (verified live, not assumed). Standing assertion: `deploy/sentinel_replication.py` in the weekly sentinel — config parity, destination versioning, and a registry-driven wire probe that reds on FAILED / stuck-PENDING / COMPLETED-but-absent-replica / **un-backfilled history**, and reports `degraded` rather than `clean` when it observed nothing (#2578). **Covers regional failure + primary-bucket destruction; does NOT cover account-level compromise** — that residual is the dated priced row below. **The owner-present timed restore drill is a scheduled owner appointment and remains open** |
 | 028 raw-layout drift | **STALE (reverify)** | #1256 closed; `raw_layout` facets exist | D3 replay-proof test |
 | 029 stale-cycle grounding | **STALE (reverify)** | closed coach-correction epic; standing assurance = D4 | D4 eval matrix |
 | 030 stored-text injection | **STALE (reverify)** | #811 closed; expansion coverage = D4 | D4 eval matrix |
@@ -106,11 +106,65 @@ repo-visibility change, or GitHub shipping ref-level purge tooling.
 
 ## Priced-acceptance register (dated; revisit triggers)
 
-_Populated as PROPORTIONALITY rows land. Standing entries: DIL-027 single-region residual
-(after cross-account raw/ backup) · DIL-031 full clinical operating model · DIL-033/034/037/
-043/044/045/046 commercial control plane — all **revisit trigger = a commercialization
-decision**; DIL-004 self-approval residual — **structural to a solo operator**, priced under
-#2834 · DIL-047/048 key-person — priced after the owner-handoff drill._
+_Populated as PROPORTIONALITY rows land. Standing entries: DIL-031 full clinical operating
+model · DIL-033/034/037/043/044/045/046 commercial control plane — all **revisit trigger = a
+commercialization decision**; DIL-004 self-approval residual — **structural to a solo
+operator**, priced under #2834 · DIL-047/048 key-person — priced after the owner-handoff drill._
+
+### DIL-027 — single-ACCOUNT recovery residual (dated 2026-08-24)
+
+**What was built instead of the ideal.** The ideal control is a backup in a *different AWS
+account*, so that a compromise of this account's credentials cannot reach it. That was
+investigated first and is **not available**: `aws organizations list-accounts` returns exactly
+one ACTIVE account (205930651321, org `o-zfnwrqb9mx`, joined 2026-07-12). Standing up a second
+account, its billing relationship, its OIDC trust and its break-glass path is an owner
+decision with real ongoing operational rent — not an autonomous build. So the compromise the
+owner approved shipped: **cross-region replication of `raw/*` into an isolated, delete-protected
+bucket in us-east-2.**
+
+**What the backup DOES cover**
+- **Regional failure.** us-west-2 goes away; `raw/` is readable in us-east-2. Deliberately not
+  us-east-1 — LifePlatformWeb's ACM certs and CloudFront config already live there, so a
+  us-east-1 event would otherwise take the platform and its backup together.
+- **Primary-bucket destruction.** A separate bucket, separate versioning, its own Deny on
+  `DeleteObject` / `DeleteObjectVersion` / `DeleteBucket` for `matthew-admin`, and
+  `DeleteMarkerReplication: Disabled` + no `s3:ReplicateDelete` on the role — a delete on the
+  source does not propagate. `RemovalPolicy.RETAIN`, so a `cdk destroy` cannot take it either.
+- **Silent decay of the above.** `deploy/sentinel_replication.py` re-asserts the whole chain
+  weekly and can turn red on five independent causes.
+
+**What it does NOT cover — the accepted residual**
+- **Account-level compromise.** Same account, same root, same credential blast radius. An
+  attacker (or a catastrophic mistake) with account-level power can reach both buckets. The
+  Deny statements name `matthew-admin` specifically and are removable by a principal that can
+  edit bucket policies.
+- **Everything outside `raw/`.** By design and by definition: DDB metrics, generated artifacts
+  and the site are all recomputable from `raw/` plus git. DDB's own protection stays PITR (35d).
+- **A proven restore.** The configuration is asserted; the *recovery* is not yet drilled. The
+  owner-present timed restore drill is a scheduled appointment, explicitly out of scope here.
+
+**Measured cost of the control** (ADR-105 — from the live inventory 2026-08-24, not a guess).
+raw/ = 37,665 objects / 541,451,065 bytes = **0.504 GiB**, growing **563 objects / 16.2 MiB per
+30 days**. At us-east-2 S3 Standard rates: storage 0.504 GiB × $0.023 = **$0.0116/mo**;
+replication PUTs 563 × $0.005/1,000 = **$0.0028/mo**; cross-region transfer 0.0158 GiB × $0.02 =
+**$0.0003/mo**. **Ongoing ≈ $0.015/month (~$0.18/year)**, rising about $0.0004/mo each month at
+the current capture rate. One-time backfill of the pre-existing history ≈ **$0.49** (37,665 PUTs
+$0.19 + 0.50 GiB transfer $0.01 + S3 Batch Operations job $0.29). **S3 Standard was chosen over
+Standard-IA on the measurement, not the reflex**: mean object size is 14.4 KB against IA's 128 KB
+minimum billable size, so IA would bill ~4.8 GB for 0.50 GB and cost ~5× more (~$0.06/mo).
+
+**So the residual is not priced in dollars — the backup is effectively free. It is priced in
+blast radius**: one account's compromise still reaches everything.
+
+**Revisit triggers** (any one):
+1. A second AWS account exists for any reason (then the destination moves cross-account — the
+   stack and the replication configuration are already parameterized in
+   `cdk/stacks/constants.py`).
+2. The owner-present restore drill is performed and finds the replica unusable.
+3. Commercialization, a second user, or any regulated/contractual data obligation.
+4. `raw/` grows past ~50 GiB, at which point the storage line stops being a rounding error and
+   the tiering decision should be re-measured rather than re-assumed.
+5. Otherwise: **2027-02-24** (six months), re-read with the quarterly PROPORTIONALITY pass.
 
 ---
 *Register opened 2026-08-23 (A-Grade Program, Phase S2-close). Updated per phase; D5 runs

@@ -95,7 +95,19 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 - DDB PITR 35 days
 - S3 versioning enabled
 - Lambda deploy artifacts (`previous.zip`) for rollback
-- Cross-region replication NOT enabled (accepted risk)
+- **Cross-region replication of `raw/*` → `matthew-life-platform-raw-backup` (us-east-2)** —
+  DIL-027, #3042. The `raw/` zone (original wearable/API captures) is the platform's only
+  unrecomputable data; everything else rebuilds from it plus git. The replica is versioned,
+  public-access-blocked, `RETAIN`, carries its own delete-protection Deny, and does **not**
+  replicate delete markers, so a delete on the source does not propagate. Asserted weekly by
+  `deploy/sentinel_replication.py`.
+- ⚠️ **Nothing outside `raw/` is replicated, and the backup is in the SAME ACCOUNT** — it
+  survives a regional failure and the primary bucket's destruction, not an account-level
+  compromise. `aws organizations list-accounts` shows one account, so cross-account has no
+  destination today. Dated priced acceptance + revisit triggers:
+  `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md` (DIL-027).
+- ⚠️ **The restore has not been drilled** — the configuration is asserted, the recovery is not.
+  Owner-present timed restore drill is a scheduled appointment.
 
 ### Layer 8 — Endpoint hardening
 
@@ -123,7 +135,8 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 | Gap | Documented in | Reopen if |
 |---|---|---|
 | `'unsafe-inline'` in CSP | ADR-057 W-08 | XSS becomes a real threat |
-| No cross-region DR | ADR-057 W-03 | Regulated data or SLA |
+| No cross-region DR **for anything except `raw/`** (partially closed 2026-08-24, DIL-027 — `raw/*` now replicates to us-east-2; DDB, generated artifacts and the site remain single-region, all recomputable from `raw/` + git) | ADR-057 W-03 | Regulated data or SLA |
+| **Backup is in the same AWS account** (DIL-027 residual — dated priced acceptance 2026-08-24) | `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md` | A second AWS account exists · the restore drill finds the replica unusable · commercialization / second user / regulated obligation · otherwise re-read 2027-02-24 |
 | Anthropic API key has no rotation API | docs/SECRETS_ROTATION.md | Anthropic ships one |
 | Per-user secrets isolation | ADR-057 W-02 | Second user onboards |
 | IAM Access Analyzer findings not remediated | This doc | Annual security review |

@@ -166,7 +166,11 @@ def _patch_all(
     quota=None,
     codeql=None,
     hae=None,
+    raw_replication=None,
 ):
+    # DIL-027 (#3042): the raw/ cross-region backup check. Patched here like every
+    # other AWS-touching check so the sweep-shape tests stay offline.
+    monkeypatch.setattr(ds, "check_raw_replication", lambda *a, **k: raw_replication or {"status": "clean", "objects_confirmed": 2})
     monkeypatch.setattr(ds, "check_codeql_alerts", lambda: codeql or {"status": "clean", "open_count": 0, "sample": []})
     monkeypatch.setattr(
         ds, "check_hae_webhook_ingress", lambda: hae or {"status": "clean", "cdk_api_id": "p6clybdkkc", "invoke_statements": []}
