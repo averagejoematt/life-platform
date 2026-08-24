@@ -28,6 +28,14 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
   4. BUCKET-POLICY DELETE-PROTECTION — the `ProtectDataFromDeployScripts` Deny statement
      that guards raw data (raw/*, config/*, uploads/*, …) is verified live against the
      source of truth (deploy/bucket_policy.json). A loosened or dropped Deny is loud.
+  4b. S3 LIFECYCLE CONFIGURATION (DIL-026, #2799) — the bucket is imported into CDK, so
+     lifecycle rules live in deploy/s3_lifecycle.json / deploy/apply_s3_lifecycle.sh
+     instead of a template. Live `get-bucket-lifecycle-configuration` is compared
+     rule-by-ID against that same JSON (the file `apply_s3_lifecycle.sh` PUTs verbatim —
+     single writer). Closes the gap the DIL-026 finding named: `imports/` had zero
+     NoncurrentVersionExpiration coverage (2.23GB, unbounded age) and nothing detected
+     it — the only backstop was the post-hoc bucket-size alarm, which cannot name which
+     prefix drifted.
   5. SITE/MAIN SHA ANCESTRY (#751) — the live https://averagejoematt.com/version.json
      build SHA must be an ancestor of (or equal to) origin/main HEAD. CI's I22
      (tests/test_integration_aws.py::test_i22_site_version_sha_on_main) checks this
@@ -115,6 +123,7 @@ STACKS = {
     "LifePlatformMcp": REGION,
     "LifePlatformMonitoring": REGION,
     "LifePlatformWeb": "us-east-1",
+    "LifePlatformBackup": "us-east-2",  # DIL-027 raw/ replica — see cdk/stacks/backup_stack.py
 }
 
 # Live Lambdas that are legitimately not one of OUR create_platform_lambda functions:
@@ -467,6 +476,79 @@ def _protect_prefixes(policy):
     return out
 
 
+# ── 4b. S3 lifecycle declared-vs-live (DIL-026, #2799) ───────────────────────
+# The bucket is imported into CDK (`Bucket.from_bucket_name`), so lifecycle rules
+# live in deploy/s3_lifecycle.json / deploy/apply_s3_lifecycle.sh instead of a
+# template — exactly the shape `check_bucket_policy` above already covers for the
+# bucket POLICY. Lifecycle had no equivalent: `imports/` sat with zero
+# NoncurrentVersionExpiration coverage (2.23GB of noncurrent versions, unbounded
+# age) and nothing would ever have said so — the only backstop was the post-hoc
+# `life-platform-s3-bucket-size-high` alarm, which fires on the SUM across every
+# prefix and cannot name which one drifted. Compared by rule ID against the same
+# JSON `apply_s3_lifecycle.sh` PUTs verbatim (single writer, #886): a declared ID
+# absent live, a live ID absent from the declaration, or a rule whose Filter /
+# Expiration / NoncurrentVersionExpiration / Transitions / AbortIncompleteMultipartUpload
+# differs is drift.
+_LIFECYCLE_COMPARE_KEYS = (
+    "Filter",
+    "Status",
+    "Expiration",
+    "NoncurrentVersionExpiration",
+    "Transitions",
+    "AbortIncompleteMultipartUpload",
+)
+
+
+def _lifecycle_rule_diff(expected_rule, live_rule):
+    """True if any comparison-relevant field differs between the declared and
+    live version of the SAME rule ID (caller has already matched them by ID)."""
+    return any(expected_rule.get(k) != live_rule.get(k) for k in _LIFECYCLE_COMPARE_KEYS)
+
+
+def check_s3_lifecycle():
+    """The live S3 lifecycle configuration must match deploy/s3_lifecycle.json
+    exactly — the same file `apply_s3_lifecycle.sh` PUTs verbatim, so this is a
+    declared-vs-live comparison with a single writer on the declared side (never a
+    second, independently-maintained expectation to drift against the first)."""
+    try:
+        with open(os.path.join(_ROOT, "deploy", "s3_lifecycle.json")) as f:
+            expected_cfg = json.load(f)
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"read declared s3_lifecycle.json: {e}"}
+    expected = {r["ID"]: r for r in expected_cfg.get("Rules", [])}
+
+    try:
+        s3 = _client("s3")
+        live_cfg = s3.get_bucket_lifecycle_configuration(Bucket=BUCKET)
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"get_bucket_lifecycle_configuration: {e}"}
+    live = {r["ID"]: r for r in live_cfg.get("Rules", [])}
+
+    missing = sorted(set(expected) - set(live))
+    extra = sorted(set(live) - set(expected))
+    changed = sorted(rid for rid in (set(expected) & set(live)) if _lifecycle_rule_diff(expected[rid], live[rid]))
+
+    status = "drift" if (missing or extra or changed) else "clean"
+    result = {
+        "status": status,
+        "missing_rule_ids": missing,
+        "extra_rule_ids": extra,
+        "changed_rule_ids": changed,
+        "expected_count": len(expected),
+        "live_count": len(live),
+    }
+    if status == "drift":
+        parts = []
+        if missing:
+            parts.append(f"declared but missing live: {missing}")
+        if extra:
+            parts.append(f"live but not declared: {extra}")
+        if changed:
+            parts.append(f"present both sides but differ: {changed}")
+        result["detail"] = "; ".join(parts)
+    return result
+
+
 def _fetch_live_version(url):
     """GET /version.json and parse it. Raises on any network/parse failure — the
     caller turns that into a soft 'error' status, never a crash."""
@@ -648,6 +730,13 @@ from sentinel_quota import (  # noqa: E402,F401
 #       in its `flagging` map. The check's entire trace was one clause at the tail
 #       of a summary already reading "6 stack(s) drifted; …". Surfacing that lands
 #       nowhere is the same as not firing — so an unreadable list is now DRIFT.
+# ── 10. raw/ cross-region backup (DIL-027, #3042) ────────────────────────────
+# Own module (same split shape as sentinel_github/sentinel_quota): the backup is
+# the platform's only protection for unrecomputable data, and a replication
+# configuration is exactly the control that gets verified once and believed
+# forever. Read that module's docstring for what it can and cannot fail on.
+from sentinel_replication import check_raw_replication  # noqa: E402,F401
+
 CODEQL_ALERT_BUDGET = 0
 
 # The one-time fix for a scope-gapped code-scanning read (#2578), carried in the
@@ -826,6 +915,7 @@ def run_sweep():
         **check_postflight(),
         "orphan_functions": check_orphan_functions(),
         "bucket_policy": check_bucket_policy(),
+        "s3_lifecycle": check_s3_lifecycle(),
         "oidc_iam": check_oidc_iam(),
         "doc_literals": check_doc_literals(),
         "site_sha_ancestry": check_site_sha_ancestry(),
@@ -834,6 +924,7 @@ def run_sweep():
         "github_quota": check_github_quota(),
         "codeql_alerts": check_codeql_alerts(),
         "hae_webhook_ingress": check_hae_webhook_ingress(),
+        "raw_replication": check_raw_replication(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -867,11 +958,13 @@ def _summary(status, checks):
         ("asset_completeness", "asset gap"),
         ("orphan_functions", "orphan function(s)"),
         ("bucket_policy", "delete-protection gap"),
+        ("s3_lifecycle", "S3 lifecycle configuration diverges from declared rules"),
         ("doc_literals", "doc-literal drift"),
         ("site_sha_ancestry", "live site SHA not on main"),
         ("github_config", "GitHub config diverges from documented posture"),
         ("github_push_runs", "main-push workflow runs not queuing"),
         ("hae_webhook_ingress", "HAE webhook ingress grant drift"),
+        ("raw_replication", "raw/ cross-region backup not verified"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -908,7 +1001,7 @@ def print_summary(record):
     print(f"{icon} {record['status'].upper()}: {record['summary']}")
     for name, c in record["checks"].items():
         st = c.get("status")
-        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "unavailable": "⚪"}.get(st, "·")
+        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "degraded": "🟡", "unavailable": "⚪"}.get(st, "·")
         detail = ""
         if st == "drift":
             if name == "cfn_drift":
@@ -918,6 +1011,8 @@ def print_summary(record):
                 detail = f" — {', '.join(c.get('orphans', []))}"
             elif name == "bucket_policy":
                 detail = f" — missing {c.get('missing_prefixes')}"
+            elif name == "s3_lifecycle":
+                detail = f" — {c.get('detail', '')}"
             elif name == "config_drift":
                 detail = f" — {[i.get('function') for i in c.get('items', [])]}"
             elif name == "layer_uniformity":
@@ -938,6 +1033,13 @@ def print_summary(record):
             elif name == "codeql_alerts":
                 # #2578: a drift line with no detail is a finding nobody can act on.
                 detail = f" — {c.get('detail', '')}"
+            elif name == "raw_replication":
+                detail = f" — {c.get('detail', '')}"
+        elif st == "degraded":
+            # DIL-027: "could not observe" is a distinct verdict from clean and must
+            # print its reason — a check that sampled nothing has not passed.
+            detail = f" — {c.get('detail', '')}"
+
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")

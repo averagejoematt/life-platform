@@ -20,7 +20,7 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 | **76 MCP tools** | Claude reads the data back via a Model Context Protocol server |
 | **Single-table DynamoDB** | `USER#…#SOURCE#…` / `DATE#…`, on-demand, 2 sanctioned GSIs (ADR-097; PITR + KMS) |
 | **AWS Bedrock** | Claude Sonnet 4.6 (narrative) + Haiku 4.5 (structured), prompt-cached |
-| **9 CDK stacks** | CDK-managed application infra with a declared out-of-IaC ring ([`docs/MANAGED_WHERE_LEDGER.md`](docs/MANAGED_WHERE_LEDGER.md)); OIDC CI/CD with a production-approval gate + auto-rollback |
+| **10 CDK stacks** | CDK-managed application infra with a declared out-of-IaC ring ([`docs/MANAGED_WHERE_LEDGER.md`](docs/MANAGED_WHERE_LEDGER.md)); OIDC CI/CD with a production-approval gate + auto-rollback |
 | **Enforced budget ceiling** | $150/mo base, $176 in reader-traffic surge (ADR-133 owns the number) — a cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
 | **v4 site** | Three doors — Cockpit (`/cockpit/`), Story (`/story/`), Evidence (`/evidence/`) |
 

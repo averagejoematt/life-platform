@@ -292,6 +292,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # are blindness detectors — a derivation that returns [] must red BEFORE the
         # merge, not after, which is the entire point of this list.
         "test_gate_census_2578.py",
+        # #3000: the census's OWN lane + visibility ratchet (epic #2578's fourth
+        # acceptance box) — sibling to the entry above. Its verdict is pure repo shape
+        # (the live gate count against a committed ceiling), so it belongs here for the
+        # same reason as its sibling: post-merge is too late for a gate that entered
+        # unverified.
+        "test_gate_census_lane_3000.py",
         # #2632: the bundle-boot gate's WIRING. The gate itself is a pre-merge step and
         # a deploy-path step; this file is what stops the call site vanishing again, and
         # the removal it guards against is invisible in any diff that does not touch it.

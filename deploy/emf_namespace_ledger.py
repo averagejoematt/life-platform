@@ -287,9 +287,14 @@ LEDGER: dict[str, dict] = {
         verdict=KEEP,
         cardinality=FIXED,
         driver=None,
-        live_series=2,
+        live_series=3,
         series_budget=5,
-        note="Alarmed in serve_stack (epic #2363 coach chat).",
+        note=(
+            "Alarmed in serve_stack (epic #2363 coach chat). #2823 added a third, "
+            "dimensionless series (TelegramCoachHold) minted by a log-token MetricFilter "
+            "in monitoring_silence_alarms.py rather than a direct put_metric_data call — "
+            "the operator signal for a held coach reply."
+        ),
     ),
     "LifePlatform/Pipeline": _row(
         owner="lambdas/operational/pipeline_health_check_lambda.py",

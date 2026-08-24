@@ -15,7 +15,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/README.md` — **the full doc index** (everything in `docs/`, categorized)
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
-- `docs/ARCHITECTURE.md` — full system design, ~104 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py`), 9 CDK stacks, data flows
+- `docs/ARCHITECTURE.md` — full system design, ~104 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py`), 10 CDK stacks, data flows
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
 - **The forward-work backlog is GitHub Issues (ADR-099)** — epics (`type:epic`) + ranked stories (`type:story`) on Now/Next/Later milestones (+ `Roadmap` for parked product vision — outside the debt count, one promotion per cycle; ADR-099 amendment 2026-08-22); seed sessions from `python3 scripts/backlog_next.py` (ranks the open corpus by each issue's own stored score, #1866); a shipping PR carries `Fixes #N`. `docs/BACKLOG.md` is a frozen archive.
@@ -115,7 +115,7 @@ The tool registry in `mcp/registry.py` wires all tools. `tests/test_wiring_cover
 
 ## CDK Structure
 
-9 stacks in `cdk/stacks/`: `ingestion`, `core`, `email`, `compute`, `mcp`, `operational`, `serve` (public serving path — site-api + site-api-ai, #793), `web`, `monitoring`. Entry point: `cdk/app.py`. Each stack creates its own IAM roles (least-privilege, one role per Lambda).
+10 stacks in `cdk/stacks/`: `ingestion`, `core`, `email`, `compute`, `mcp`, `operational`, `serve` (public serving path — site-api + site-api-ai, #793), `web`, `monitoring`, `backup` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**, deliberately not us-east-1 where `web` already lives). Entry point: `cdk/app.py`. Each stack creates its own IAM roles (least-privilege, one role per Lambda). **A non-default-region stack must be added to BOTH region maps** (`drift_sentinel.STACKS`, `check_lambda_config_drift.STACK_FILE_REGION`) with a string-literal `region=` in `app.py` — `tests/test_drift_checker_stack_regions.py` enforces it (#1816/#1817).
 
 ## CI/CD
 

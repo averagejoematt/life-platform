@@ -1,0 +1,100 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-lambda-deploy-artifacts",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "deploys/"},
+      "Expiration": {"Days": 30},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+    },
+    {
+      "ID": "site-expire-noncurrent-7d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "site/"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+    },
+    {
+      "ID": "raw-expire-noncurrent-versions-7d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "raw/"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+    },
+    {
+      "ID": "raw-abort-incomplete-multipart-7d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "raw/"},
+      "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 7}
+    },
+    {
+      "ID": "imports-expire-noncurrent-versions-7d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "imports/"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+    },
+    {
+      "ID": "uploads-expire-30d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "uploads/"},
+      "Expiration": {"Days": 30},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
+    },
+    {
+      "ID": "generated-expire-noncurrent-7d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "generated/"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+    },
+    {
+      "ID": "qa-archive-expire-90d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "generated/qa_archive/"},
+      "Expiration": {"Days": 90},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
+    },
+    {
+      "ID": "qa-archive-clean-delete-markers",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "generated/qa_archive/"},
+      "Expiration": {"ExpiredObjectDeleteMarker": true}
+    },
+    {
+      "ID": "claude-memory-backup-expire-noncurrent-90d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "claude-memory-backup/"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 90}
+    },
+    {
+      "ID": "datadrops-archive-expire-noncurrent-30d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "datadrops-archive/"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 30, "NewerNoncurrentVersions": 1}
+    },
+    {
+      "ID": "config-expire-noncurrent-30d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "config/"},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 30, "NewerNoncurrentVersions": 3}
+    },
+    {
+      "ID": "cloudtrail-expire-90d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "cloudtrail/"},
+      "Expiration": {"Days": 90},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
+    },
+    {
+      "ID": "remediation-dispatch-dedupe-expire-1d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "remediation-log/dispatch-dedupe/"},
+      "Expiration": {"Days": 1}
+    },
+    {
+      "ID": "mcp-audit-ia-30d-expire-90d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "mcp-audit/"},
+      "Transitions": [{"Days": 30, "StorageClass": "STANDARD_IA"}],
+      "Expiration": {"Days": 90},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
+    }
+  ]
+}

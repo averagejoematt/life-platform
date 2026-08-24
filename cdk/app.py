@@ -30,6 +30,7 @@ To import existing resources (first time only):
 """
 
 import aws_cdk as cdk
+from stacks.backup_stack import BackupStack
 from stacks.compute_stack import ComputeStack
 from stacks.core_stack import CoreStack
 from stacks.email_stack import EmailStack
@@ -125,5 +126,21 @@ web = WebStack(app, "LifePlatformWeb", env=cdk.Environment(account=account, regi
 #
 monitoring = MonitoringStack(app, "LifePlatformMonitoring", env=env, alerts_topic=core.alerts_topic, digest_topic=core.digest_topic)
 # monitoring stack wired ✅
+#
+# ── Backup stack (DIL-027, #3042): the cross-region replica of raw/ ──
+# Standalone by construction — it must NOT take a cross-stack reference on Core's
+# imported bucket, because the whole point is that it survives the primary's
+# destruction. us-east-2 is chosen over us-east-1 deliberately: LifePlatformWeb
+# already depends on us-east-1, so the backup would otherwise share a region with
+# the thing it backs up the control plane of. See stacks/constants.py.
+#
+# The region is a STRING LITERAL here, not `constants.RAW_BACKUP_REGION`, because
+# tests/test_drift_checker_stack_regions.py AST-parses this call offline and a Name
+# node resolves to the DEFAULT region — which would silently point the deploy guard
+# and the drift sentinel at us-west-2 for this stack (the #1816 class). The literal
+# is pinned to the constant by tests/test_raw_replication_dil027.py, so the two
+# cannot drift.
+backup = BackupStack(app, "LifePlatformBackup", env=cdk.Environment(account=account, region="us-east-2"))
+# backup stack wired ✅
 
 app.synth()

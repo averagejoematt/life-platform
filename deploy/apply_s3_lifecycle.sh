@@ -2,18 +2,27 @@
 # apply_s3_lifecycle.sh — Apply the FULL S3 lifecycle configuration for matthew-life-platform.
 #
 # ┌─────────────────────────────────────────────────────────────────────────────┐
-# │ THIS FILE IS THE SOURCE OF TRUTH for the bucket's lifecycle configuration.  │
+# │ deploy/s3_lifecycle.json IS THE SOURCE OF TRUTH for the bucket's lifecycle  │
+# │ configuration (externalized #DIL-026/#2799 so `deploy/drift_sentinel.py`'s  │
+# │ check_s3_lifecycle() can compare live vs. declared without parsing shell).  │
 # │ `put-bucket-lifecycle-configuration` REPLACES the entire config — a rule    │
-# │ not declared below is DELETED on the next run. Add/change rules HERE,       │
-# │ never out-of-band in the console or ad-hoc CLI calls.                       │
+# │ not declared in that JSON is DELETED on the next run. Add/change rules      │
+# │ THERE, never out-of-band in the console or ad-hoc CLI calls, and never by   │
+# │ hand-editing the live config — this script is the only writer.             │
 # └─────────────────────────────────────────────────────────────────────────────┘
 #
 # The bucket is imported into CDK (`Bucket.from_bucket_name`, core_stack.py), so
 # CDK cannot own lifecycle rules — this script is the sanctioned management path
 # (see docs/MANAGED_WHERE_LEDGER.md). Retention values mirror the policy table
-# in docs/DATA_GOVERNANCE.md — change them together.
+# in docs/DATA_GOVERNANCE.md — change them together. The weekly drift sentinel
+# (deploy/drift_sentinel.py::check_s3_lifecycle, run from the remediation
+# workflow) asserts live `get-bucket-lifecycle-configuration` still matches this
+# same deploy/s3_lifecycle.json rule-for-rule — a rule edited here but never
+# applied, or a live rule that drifted out of band, both surface as drift within
+# a week instead of silently diverging (the DIL-026 finding: `imports/` sat
+# completely uncovered — 2.23GB of noncurrent versions — with no detector at all).
 #
-# Rules (one per managed prefix):
+# Rules (one per managed prefix; declared in deploy/s3_lifecycle.json):
 #   deploys/       expire (current) 30d (rollback artifacts; latest.zip age resets
 #                  each deploy); noncurrent versions 7d (keep 1) — added #2642. The
 #                  bucket is versioned, so `deploy_lambda.sh` copying latest.zip to
@@ -32,6 +41,17 @@
 #                  re-hash → sync + version.json restamp, #418/ADR-117) and never
 #                  reads S3 noncurrent versions, so this expiry cannot affect it.
 #   raw/           keep current forever; noncurrent versions 7d (keep 1); abort MPU 7d
+#   imports/       keep current forever; noncurrent versions 7d (keep 1) — added
+#                  DIL-026/#2799 (2026-08-24). Same shape as raw/: `imports/` (Apple
+#                  Health XML / MacroFactor CSV / measurements backfills) carries the
+#                  SAME `ProtectDataFromDeployScripts` DeleteObject Deny as raw/, but
+#                  had NO NoncurrentVersionExpiration at all — every re-upload or
+#                  ingestion-lambda overwrite left the prior version live forever.
+#                  Measured 2026-08-24: 2.07 GB noncurrent across 452 versions under
+#                  ~0 current bytes (i.e. almost the entire prefix was dead noncurrent
+#                  weight, unbounded in age). Lifecycle expiration is enforced by the
+#                  S3 service itself, not IAM, so this rule coexists with the Deny
+#                  exactly like the raw/ rule already does (see the note below).
 #   uploads/       expire 30d; noncurrent 7d
 #   generated/     keep current forever; noncurrent 7d (keep 1)
 #   generated/qa_archive/  expire 90d AT THE BYTE LEVEL (#1441 — generation-time
@@ -90,105 +110,14 @@
 set -euo pipefail
 
 BUCKET="matthew-life-platform"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIFECYCLE_JSON="${SCRIPT_DIR}/s3_lifecycle.json"
 
-echo "Applying full S3 lifecycle configuration to s3://${BUCKET} ..."
+echo "Applying full S3 lifecycle configuration to s3://${BUCKET} from ${LIFECYCLE_JSON} ..."
 
 aws s3api put-bucket-lifecycle-configuration \
   --bucket "${BUCKET}" \
-  --lifecycle-configuration '{
-    "Rules": [
-      {
-        "ID": "expire-lambda-deploy-artifacts",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "deploys/"},
-        "Expiration": {"Days": 30},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
-      },
-      {
-        "ID": "site-expire-noncurrent-7d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "site/"},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
-      },
-      {
-        "ID": "raw-expire-noncurrent-versions-7d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "raw/"},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
-      },
-      {
-        "ID": "raw-abort-incomplete-multipart-7d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "raw/"},
-        "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 7}
-      },
-      {
-        "ID": "uploads-expire-30d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "uploads/"},
-        "Expiration": {"Days": 30},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
-      },
-      {
-        "ID": "generated-expire-noncurrent-7d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "generated/"},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
-      },
-      {
-        "ID": "qa-archive-expire-90d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "generated/qa_archive/"},
-        "Expiration": {"Days": 90},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
-      },
-      {
-        "ID": "qa-archive-clean-delete-markers",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "generated/qa_archive/"},
-        "Expiration": {"ExpiredObjectDeleteMarker": true}
-      },
-      {
-        "ID": "claude-memory-backup-expire-noncurrent-90d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "claude-memory-backup/"},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 90}
-      },
-      {
-        "ID": "datadrops-archive-expire-noncurrent-30d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "datadrops-archive/"},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 30, "NewerNoncurrentVersions": 1}
-      },
-      {
-        "ID": "config-expire-noncurrent-30d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "config/"},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 30, "NewerNoncurrentVersions": 3}
-      },
-      {
-        "ID": "cloudtrail-expire-90d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "cloudtrail/"},
-        "Expiration": {"Days": 90},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
-      },
-      {
-        "ID": "remediation-dispatch-dedupe-expire-1d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "remediation-log/dispatch-dedupe/"},
-        "Expiration": {"Days": 1}
-      },
-      {
-        "ID": "mcp-audit-ia-30d-expire-90d",
-        "Status": "Enabled",
-        "Filter": {"Prefix": "mcp-audit/"},
-        "Transitions": [{"Days": 30, "StorageClass": "STANDARD_IA"}],
-        "Expiration": {"Days": 90},
-        "NoncurrentVersionExpiration": {"NoncurrentDays": 7}
-      }
-    ]
-  }'
+  --lifecycle-configuration "file://${LIFECYCLE_JSON}"
 
 echo ""
 echo "Done. Verifying..."

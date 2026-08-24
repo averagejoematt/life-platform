@@ -1925,7 +1925,11 @@ Write your {domain_label} coaching section now."""
 
         # Step 5: Generate with Sonnet
         print(f"[COACH-V2:{coach_id}] Generating output...")
-        output = call_anthropic(system_prompt + "\n\n" + user_message_full, api_key, max_tokens=600)
+        # #2888: `system_prompt` rides the SYSTEM slot, never concatenated into the
+        # user turn — that left body["system"] unset, so ADR-049's auto-wrap had
+        # nothing to wrap and these seven calls carried no cache_control at all.
+        # Rationale, measurements and the cross-coach follow-up: ai/prompt_cache.py.
+        output = call_anthropic(user_message_full, api_key, max_tokens=600, system=system_prompt)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
 
         # #952 (ai-content-6): Bedrock outage / tier-3 cutoff returns the
@@ -1972,7 +1976,9 @@ Write your {domain_label} coaching section now."""
                 output, _left, _corrected = _gg_mod.regen_once(
                     output,
                     _findings_fn,
-                    lambda _corr: call_anthropic(system_prompt + "\n\n" + user_message_full + "\n\n" + _corr, api_key, max_tokens=600),
+                    # #2888: system in the system slot; the correction stays in the
+                    # user turn (dynamic — it must never enter the cached prefix).
+                    lambda _corr: call_anthropic(user_message_full + "\n\n" + _corr, api_key, max_tokens=600, system=system_prompt),
                     surface=f"coach_v2:{coach_id}",
                 )
                 if _corrected:
@@ -1995,9 +2001,8 @@ Write your {domain_label} coaching section now."""
             coach_id,
             output,
             brief_with_grounding(generation_brief, _canon_facts, _allowed),  # #2573: deterministic grounding context
-            regenerate_fn=lambda _note: call_anthropic(
-                system_prompt + "\n\n" + user_message_full + "\n\n" + _note, api_key, max_tokens=600
-            ),
+            # #2888: system in the system slot; the gate note stays user-side (dynamic).
+            regenerate_fn=lambda _note: call_anthropic(user_message_full + "\n\n" + _note, api_key, max_tokens=600, system=system_prompt),
         )
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
@@ -2018,9 +2023,8 @@ Write your {domain_label} coaching section now."""
                 output, _ack_finding = _ec.enforce_presence_acknowledgment(
                     output,
                     _psig,
-                    regenerate_fn=lambda _note: call_anthropic(
-                        system_prompt + "\n\n" + user_message_full + "\n\n" + _note, api_key, max_tokens=600
-                    ),
+                    # #2888: system slot; gate note stays user-side (dynamic).
+                    regenerate_fn=lambda _n: call_anthropic(user_message_full + "\n\n" + _n, api_key, max_tokens=600, system=system_prompt),
                 )
                 if _ack_finding:
                     print(f"[COACH-V2:{coach_id}] presence-ack gate fired: {_ack_finding.get('detail')}")
@@ -2162,10 +2166,12 @@ Write your {domain_label} coaching section now."""
             _sgv_findings = _gg_sgv.self_graded_verdict_findings(output or "", evaluated_predictions=_eval_n)
             if _sgv_findings:
                 print(f"[COACH-V2:{coach_id}] self-graded-verdict gate fired: " + "; ".join(f.get("detail", "") for f in _sgv_findings))
+                # #2888: system in the system slot; the correction stays user-side.
                 _regen = call_anthropic(
-                    system_prompt + "\n\n" + user_message_full + "\n\n" + _gg_sgv.correction_prompt(_sgv_findings),
+                    user_message_full + "\n\n" + _gg_sgv.correction_prompt(_sgv_findings),
                     api_key,
                     max_tokens=600,
+                    system=system_prompt,
                 )
                 if _regen and not _is_ai_unavailable(_regen):
                     _still = _gg_sgv.self_graded_verdict_findings(_regen, evaluated_predictions=_eval_n)
