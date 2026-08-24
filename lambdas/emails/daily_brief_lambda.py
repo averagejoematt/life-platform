@@ -2480,6 +2480,11 @@ def lambda_handler(event, context):
                     "recovery_pct": float(profile.get("baseline_recovery_pct", 55)),
                 },
                 elena_hero_line=_elena_hero_line,
+                # #3066: the exact data day the line's numbers describe (this brief run's
+                # `yesterday`, not the write time) — lets the homepage stamp the line
+                # "as of <date>" in the cockpit's own vocabulary instead of leaving it
+                # unqualified.
+                elena_hero_line_as_of=yesterday if _elena_hero_line else None,
                 # PB-R1: Character sheet headline data for homepage heartbeat + nav badge
                 character=(
                     {

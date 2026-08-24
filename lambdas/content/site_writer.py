@@ -296,6 +296,7 @@ def write_public_stats(
     baseline: dict = None,
     group_narratives: dict = None,
     elena_hero_line: str = None,
+    elena_hero_line_as_of: str = None,
     character: dict = None,
 ) -> bool:
     """
@@ -328,6 +329,12 @@ def write_public_stats(
                       Populated from profile fields or known journey-start readings.
         elena_hero_line: optional one-sentence Elena Voss observation for homepage
                       hero section. Updated weekly when Chronicle publishes.
+        elena_hero_line_as_of: ISO date (YYYY-MM-DD) the elena_hero_line's numbers
+                      describe — the daily brief's data day (`yesterday`), NOT the
+                      write time. #3066: the hero binds this alongside the line so
+                      the homepage can carry the same "as of <date>" vocabulary the
+                      cockpit stamp uses, sourced from the same generation metadata
+                      that produced the line rather than a freshly computed "now".
         character:    optional dict with character sheet headline data:
                       { level, tier, tier_emoji, xp_total, composite_score,
                         next_level_xp, xp_to_next, days_active }
@@ -355,6 +362,7 @@ def write_public_stats(
             }
             brief_excerpt = None  # a neglect-era AI line must not narrate launch eve
             elena_hero_line = None  # the stored hero line can narrate the wiped cycle
+            elena_hero_line_as_of = None  # no line survives pre-start; no date to stamp either
 
         # BS-02: Fetch latest Chronicle headline for below-fold section
         chronicle_headline = None
@@ -391,6 +399,10 @@ def write_public_stats(
             "group_narratives": _json_safe(group_narratives or {}),
             # HP-12: Elena Voss hero one-liner (updated weekly by chronicle/digest)
             "elena_hero_line": elena_hero_line,
+            # #3066: the data day elena_hero_line describes — lets the homepage stamp
+            # it "as of <date>", the same vocabulary the cockpit stamp uses, instead of
+            # only the relative "yesterday's read" kicker.
+            "elena_hero_line_as_of": elena_hero_line_as_of,
             # HP-14: Recent Chronicle entries for homepage cards
             "chronicle_recent": _json_safe(chronicle_recent) if chronicle_recent else [],
             # PB-R1: Character sheet headline data for homepage heartbeat + nav badge
