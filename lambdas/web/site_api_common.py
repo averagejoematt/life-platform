@@ -204,7 +204,7 @@ PLATFORM_STATS = {
     "mcp_tools": 76,
     "lambdas": 104,
     "cdk_stacks": 8,
-    "alarms": 111,
+    "alarms": 113,
     "adrs": 153,
     "monthly_cost": "~$100",  # GROUND-TRUTH run-rate, pinned (#1232, re-grounded #2898).
     # Source = Cost Explorer UnblendedCost, read 2026-08-23: June 2026 $79.80 and July 2026
@@ -225,7 +225,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 16629,
+    "test_count": 16641,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

@@ -239,7 +239,18 @@ BASELINE = {
     # 60 of them (a fifth — the earned-headroom rule) are banked so the extraction does not
     # land the file straight back at zero, and 241 are handed back to the ratchet.
     # Measured 1322. The terminal cure is still getting under 1200 and pruning this line.
-    "cdk/stacks/monitoring_stack.py": 1358,
+    # 2026-08-23 (#2977): 1358 → 1331. Same wall, same shape, two years of this file's
+    # habits later: it stood at 1357/1358 — ONE line of headroom — and #2977's two
+    # recall-index-failed alarms needed 33. Extracted rather than raised. The fail-soft
+    # SILENCE alarms (a MetricFilter on a literal token a lambda logs when it swallows a
+    # failure: #2654 scrub-failed-closed, #2763 expert-gate-infra-hold, and the new #2977
+    # pair) are one concern and now live in cdk/stacks/monitoring_silence_alarms.py (163
+    # lines, well under the ceiling). 88 lines came out for a 12-line call site + import;
+    # measured 1314, of which 17 (a fifth of the 88 extracted — the #2610 earned-headroom
+    # rule) are banked so the file does not land straight back at zero headroom. The two
+    # moved alarms keep their construct ids, so the synthesized template shows the two new
+    # alarms + filters added and nothing replaced.
+    "cdk/stacks/monitoring_stack.py": 1331,
     # 2026-08-09 (#2420): 1556 → 1637. The +81 is the ADR-104 grounding gate for the
     # module's two reader-bound prose paths — kept IN-module deliberately: the #2390
     # census matches SURFACES by module, so extracting the gate would unclassify the

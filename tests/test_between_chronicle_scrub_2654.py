@@ -20,7 +20,6 @@ These tests pin the fix:
 """
 
 import os
-import re
 import sys
 
 import pytest
@@ -33,13 +32,13 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 import between_chronicle_lambda as bc  # noqa: E402
+import cdk_alarm_pins  # noqa: E402
 from privacy import (
     content_filter_channel as channel,  # noqa: E402
     privacy_guard,  # noqa: E402
 )
 
 LAMBDA_SRC = open(os.path.join(_REPO, "lambdas/emails/between_chronicle_lambda.py")).read()
-STACK_SRC = open(os.path.join(_REPO, "cdk/stacks/monitoring_stack.py")).read()
 
 # A digest with real content in every scrubbed field class.
 _PLANT = "zebrafish747"
@@ -151,14 +150,14 @@ def test_scrub_failure_logs_the_alarm_token(monkeypatch):
 
 
 def test_metric_filter_token_twin():
-    """The CDK filter literal and the lambda constant may not drift apart."""
-    m = re.search(
-        r'"ScrubFailFilterBetweenChronicle".*?FilterPattern\.literal\(\'"([^"]+)"\'\)',
-        STACK_SRC,
-        re.DOTALL,
-    )
-    assert m, "monitoring_stack.py must define ScrubFailFilterBetweenChronicle with a literal token pattern"
-    assert m.group(1) == bc.SCRUB_FAILED_TOKEN
+    """The CDK filter literal and the lambda constant may not drift apart.
+
+    Resolved across the whole cdk/stacks tree, not out of a named file: #2977 moved this
+    alarm from monitoring_stack.py into the cohesive sibling monitoring_silence_alarms.py
+    and the old file-named regex here went dark on it. See tests/cdk_alarm_pins."""
+    tokens = cdk_alarm_pins.filter_tokens_for("between-chronicle-scrub-failed-closed")
+    assert tokens, "no CDK stack wires the between-chronicle-scrub-failed-closed alarm to a literal filter token"
+    assert tokens == {bc.SCRUB_FAILED_TOKEN}, f"CDK filter token(s) {sorted(tokens)} != lambda SCRUB_FAILED_TOKEN {bc.SCRUB_FAILED_TOKEN!r}"
     # and the lambda actually logs the constant in the failure path (not a copy)
     assert "SCRUB_FAILED_TOKEN," in LAMBDA_SRC
 
