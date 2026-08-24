@@ -301,8 +301,11 @@ def test_log_metric_filter_namespaces_are_producers():
     sweep reports them as alarms watching a namespace nothing writes.
     """
     minted = disc.discover_cdk_log_filter_namespaces()
-    for ns in ("LifePlatform/Lambda", "LifePlatform/Privacy"):
-        assert "monitoring_stack.py" in minted.get(ns, set()), f"{ns}: expected a MetricFilter producer"
+    # Privacy's filter moved to the #3037 silence-alarm sibling (the #2654 scrub
+    # token); the pin names each namespace's REAL home so an extraction is a
+    # deliberate edit here, not a silent hole.
+    for ns, home in (("LifePlatform/Lambda", "monitoring_stack.py"), ("LifePlatform/Privacy", "monitoring_silence_alarms.py")):
+        assert home in minted.get(ns, set()), f"{ns}: expected a MetricFilter producer in {home}"
         assert PRODUCERS[ns].get(disc.PRODUCER_EMIT) is None, f"{ns}: has no Python emitter by construction"
         assert disc.CONSUMER_ALARM in _kinds(ns), f"{ns}: the alarm built on the filter must resolve as a consumer"
 
