@@ -68,6 +68,23 @@ _READER_BOUND_WRITERS = ("lambdas/coach/coach_observatory_renderer.py",)
 # for this class enters the guarded surface here, never a whitelist.
 _PT_FRAME_INSTRUMENTS = ("lambdas/operational/coherence_sentinel_lambda.py",)
 
+# The OUTPUT# frame (#2815): every writer that keys a coach's OUTPUT#{date}#...
+# DynamoDB sk, plus the sibling naive-clock defaults swept in the same pass, plus
+# the consumer whose same-day self-exclusion has to agree with all of them. The
+# two `# utc-exempt(#2815)` annotations that used to live in ai_calls.py and
+# coach_quality_gate.py are RETIRED — the whole set converted to
+# `common.pacific_time.pacific_today()` atomically instead of one side staying
+# UTC to avoid desyncing from the other — so these enter the guarded surface
+# rather than keep the naive-clock class invisible to this scan.
+_OUTPUT_FRAME_WRITERS = (
+    "lambdas/ai/ai_calls.py",
+    "lambdas/ai/quality_gate_contract.py",
+    "lambdas/coach/coach_quality_gate.py",
+    "lambdas/coach/coach_state_updater.py",
+    "lambdas/coach/inter_coach_dialogue_lambda.py",
+    "lambdas/compute/coach_memoir_lambda.py",
+)
+
 _EXEMPT_MARKER = "utc-exempt(#"
 
 # A date-ONLY strftime format: names the day, carries no clock time.
@@ -78,11 +95,11 @@ _TIME_MARKERS = ("%H", "%M", "%S", "%X", "%c")
 def _surface_files() -> list[pathlib.Path]:
     """The DERIVED scan surface: lambdas/web/**/*.py + the additional whole-package
     dirs (lambdas/content/, #2816) + the reader-bound writers + the PT-frame
-    instruments — never a hand-list."""
+    instruments + the OUTPUT# frame writers (#2815) — never a hand-list."""
     files = [p for p in (ROOT / "lambdas" / "web").rglob("*.py") if not any(m in str(p) for m in _SKIP_PATH_MARKERS)]
     for rel_dir in _ADDITIONAL_SURFACE_DIRS:
         files += [p for p in (ROOT / rel_dir).rglob("*.py") if not any(m in str(p) for m in _SKIP_PATH_MARKERS)]
-    files += [ROOT / rel for rel in _READER_BOUND_WRITERS + _PT_FRAME_INSTRUMENTS]
+    files += [ROOT / rel for rel in _READER_BOUND_WRITERS + _PT_FRAME_INSTRUMENTS + _OUTPUT_FRAME_WRITERS]
     return sorted(files)
 
 
@@ -252,6 +269,12 @@ def test_surface_is_derived_and_nonempty():
         "lambdas/operational/coherence_sentinel_lambda.py",
         "lambdas/content/site_writer.py",
         "lambdas/content/output_writers.py",
+        "lambdas/ai/ai_calls.py",
+        "lambdas/ai/quality_gate_contract.py",
+        "lambdas/coach/coach_quality_gate.py",
+        "lambdas/coach/coach_state_updater.py",
+        "lambdas/coach/inter_coach_dialogue_lambda.py",
+        "lambdas/compute/coach_memoir_lambda.py",
     ):
         assert expected in rels, f"derived surface lost {expected}"
     for p in files:
