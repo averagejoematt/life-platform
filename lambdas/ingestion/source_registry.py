@@ -99,17 +99,35 @@ DEFAULT_STALE_HOURS = 48
 #   metrics        what the source measures — public catalogue text.
 #   posture        value-per-source verdict from the 2026-07 data-source health
 #                  review: 'load-bearing' | 'portfolio' | 'paused' | 'archive'.
-#   raw_layout     the ACTUAL raw-S3 shape: {prefix, scheme, filename[, note]} where
-#                  scheme is 'date-tree' ({prefix}/{YYYY}/{MM}/{filename}), 'flat-uuid'
-#                  ({prefix}/{id}.json), or 'timestamped'; None = no raw archive.
-#                  filename names the ACTUAL leaf form — do NOT assume {DD}.json. Every
-#                  current date-tree write is 'YYYY-MM-DD.json'; the SIMP-2 framework
-#                  migration flipped the legacy 'DD.json' form to the full date mid-2026
-#                  IN-PLACE within the same date tree (#1256), so pre-2026 objects on the
-#                  flipped sources (todoist, garmin) still carry 'DD.json'. Read this
-#                  facet — never construct a key from the prefix alone; `raw_date_key()`
-#                  builds the per-day key for you. A source that fans out into several
-#                  raw trees (apple_health's HAE datatypes) carries them as a
+#   raw_layout     the ACTUAL raw-S3 shape: {prefix, scheme, filename[, filename_legacy]
+#                  [, note]} where scheme is 'date-tree' ({prefix}/{YYYY}/{MM}/{filename}),
+#                  'flat-uuid' ({prefix}/{id}.json), or 'timestamped'; None = no raw archive.
+#                  filename names the CURRENT leaf form — do NOT assume {DD}.json. Every
+#                  current date-tree write is 'YYYY-MM-DD.json'; the 2026-05-17 SIMP-2
+#                  migration (ADR-056) flipped the legacy 'DD.json' form to the full date
+#                  IN-PLACE within the same date tree (#1256) for the 7 sources it moved onto
+#                  the framework that day (weather migrated separately, 2026-03-09, straight
+#                  to 'YYYY-MM-DD.json' — no legacy generation exists for it).
+#   filename_legacy  (DIL-028/#3042, reverified 2026-08-24) present ONLY on sources with
+#                  LIVE-confirmed frozen pre-migration objects still on disk under the SAME
+#                  prefix: garmin, todoist, eightsleep, withings, strava. Deliberately NOT a
+#                  {filename_legacy, cutover_date} pair — live evidence rules out a clean date
+#                  threshold: garmin's 2026-05-05..05-16 records were re-fetched by the NEW
+#                  framework on 2026-05-19 (a post-migration gap-fill) and landed as
+#                  'YYYY-MM-DD.json' despite representing PRE-migration calendar dates, while
+#                  garmin's 2026-05-01..05-03 (fetched by the OLD code, never touched since)
+#                  remain 'DD.json' — the generation a historical date resolves to depends on
+#                  WHEN it was (re)written, not what date it names. A hard cutover would
+#                  silently mis-resolve exactly the backfilled dates it exists to protect
+#                  (#2278's failure mode again: a plausible key that resolves to nothing).
+#                  habitify was fully backfilled to the new filename by a 2026-05-30 sweep —
+#                  zero legacy objects survive there, so it carries no `filename_legacy`.
+#                  Read by `raw_date_key_candidates()`, which returns every generation a
+#                  replay/backfill tool should try for a historical date, current-generation
+#                  first. `raw_date_key()` itself is UNCHANGED — current-generation only.
+#                  Read this facet — never construct a key from the prefix alone;
+#                  `raw_date_key()` builds the per-day key for you. A source that fans out
+#                  into several raw trees (apple_health's HAE datatypes) carries them as a
 #                  `sub_layouts` sub-dict, each with its own prefix/scheme/filename
 #                  (#2278 — a prose `note` is not something a reader can resolve).
 #   inbound_mode   (#1677) how a record can arrive AT ALL. Absent = a fetch of some kind
@@ -223,7 +241,16 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "method": "OAuth API pull, hourly",
         "metrics": "Weight, body composition",
         "posture": "load-bearing",
-        "raw_layout": {"prefix": "raw/matthew/withings/measurements", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
+        "raw_layout": {
+            "prefix": "raw/matthew/withings/measurements",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            # DIL-028 reverify (2026-08-24): undocumented drift found live — 2026-05-01
+            # through 2026-05-17 are still 'DD.json' on disk (2026-05-18 on is
+            # 'YYYY-MM-DD.json'); the registry previously claimed a single generation.
+            "filename_legacy": "DD.json",
+            "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped 'DD.json'→'YYYY-MM-DD.json'; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
+        },
         # #914: weigh-ins are a manual engagement channel — he has to step on the
         # scale. Sporadic (~weekly is healthy), so a lenient ~10d before "quiet".
         "engagement_channel": {"label": "measurement", "stale_days": 10},
@@ -243,7 +270,16 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "method": "OAuth API pull, hourly",
         "metrics": "Activities, walks, heart rate",
         "posture": "load-bearing",
-        "raw_layout": {"prefix": "raw/matthew/strava/activities", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
+        "raw_layout": {
+            "prefix": "raw/matthew/strava/activities",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            # DIL-028 reverify (2026-08-24): undocumented drift found live — March/April
+            # 2026 activities are still 'DD.json' (e.g. 2026/03/03.json), June+ are
+            # 'YYYY-MM-DD.json'; the registry previously claimed a single generation.
+            "filename_legacy": "DD.json",
+            "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped 'DD.json'→'YYYY-MM-DD.json'; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
+        },
         # DI-2: the original source-of-truth reconciler (the Jun-2026 evening-walk
         # fix). strava_lambda._reconcile, wired in ingestion_stack. TR-07 generalized
         # this facet so whoop opts in the same way.
@@ -263,7 +299,16 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "method": "API pull, hourly",
         "metrics": "Sleep stages, HR/HRV, restlessness",  # bed temp retired — ADR-118, #489
         "posture": "portfolio",
-        "raw_layout": {"prefix": "raw/matthew/eightsleep", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
+        "raw_layout": {
+            "prefix": "raw/matthew/eightsleep",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            # DIL-028 reverify (2026-08-24): undocumented drift found live — 2026-04-30
+            # through 2026-05-16 are still 'DD.json' (e.g. 2026/05/01.json), 2026-05-17
+            # on is 'YYYY-MM-DD.json'; the registry previously claimed a single generation.
+            "filename_legacy": "DD.json",
+            "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped 'DD.json'→'YYYY-MM-DD.json'; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
+        },
     },
     "apple_health": {
         "label": "Apple Health",
@@ -373,7 +418,10 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "prefix": "raw/todoist",
             "scheme": "date-tree",
             "filename": "YYYY-MM-DD.json",
-            "note": "legacy — no user segment (X-9); filename flipped DD→YYYY-MM-DD at SIMP-2, pre-2026 objects are DD.json (#1256)",
+            # Live-confirmed 2026-08-24 (DIL-028 reverify): 2026-05-01..05-16 remain
+            # 'DD.json' (e.g. raw/todoist/2026/05/16.json), 2026-05-17 on is the new form.
+            "filename_legacy": "DD.json",
+            "note": "legacy — no user segment (X-9); 2026-05-17 SIMP-2 migration (ADR-056) flipped DD.json→YYYY-MM-DD.json, pre-migration objects are DD.json (#1256) — use raw_date_key_candidates() for historical dates.",
         },
     },
     "habitify": {
@@ -533,7 +581,17 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "prefix": "raw/matthew/garmin",
             "scheme": "date-tree",
             "filename": "YYYY-MM-DD.json",
-            "note": "filename flipped DD.json→YYYY-MM-DD.json mid-tree at SIMP-2 (2026); pre-2026 objects are DD.json (#1256)",
+            # Live-confirmed 2026-08-24 (DIL-028 reverify): 2026-05-01..05-03 remain
+            # 'DD.json' (fetched by the pre-migration code, never touched since); 05-04 is
+            # a genuine gap (no object either generation); 05-05..05-31 are ALL
+            # 'YYYY-MM-DD.json' — including 05-05..05-16, which predate the 05-17 cutover
+            # but were re-fetched by the NEW framework on 2026-05-19 (a post-migration
+            # gap-fill) and so landed in the CURRENT format despite the date they name.
+            # This is exactly why there is no `filename_legacy_cutover` date field: the
+            # generation a historical date resolves to depends on when it was (re)written,
+            # not what date it names.
+            "filename_legacy": "DD.json",
+            "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped DD.json→YYYY-MM-DD.json mid-tree; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
         },
         # TR-07 (#415): NO provider_reconcile facet — deliberate. Garmin is paused
         # (ADR-074, datacenter-IP 429 block) and even when live is capped at 4x/day
@@ -1048,14 +1106,55 @@ def raw_date_key(source: str, date_str: str, sub: str | None = None) -> str:
     if scheme != "date-tree":
         raise ValueError(f"raw_date_key: {source!r}{'/' + sub if sub else ''} is {scheme!r}, not a date tree — no per-day key exists")
     day = date.fromisoformat(date_str)
-    filename = layout.get("filename")
+    return f"{layout['prefix']}/{day:%Y}/{day:%m}/{_raw_leaf(layout.get('filename'), day, source)}"
+
+
+def _raw_leaf(filename: str | None, day: date, source: str) -> str:
+    """The leaf segment for one `filename` convention on one calendar `day`.
+
+    Shared by `raw_date_key` (current generation) and `raw_date_key_candidates`
+    (every generation) so the two leaf-naming rules can never drift apart.
+    """
     if filename == "YYYY-MM-DD.json":
-        leaf = f"{day:%Y-%m-%d}.json"
-    elif filename == "DD.json":
-        leaf = f"{day:%d}.json"
-    else:
-        raise ValueError(f"raw_date_key: unhandled leaf filename {filename!r} for {source!r}")
-    return f"{layout['prefix']}/{day:%Y}/{day:%m}/{leaf}"
+        return f"{day:%Y-%m-%d}.json"
+    if filename == "DD.json":
+        return f"{day:%d}.json"
+    raise ValueError(f"raw_date_key: unhandled leaf filename {filename!r} for {source!r}")
+
+
+def raw_date_key_candidates(source: str, date_str: str, sub: str | None = None) -> list[str]:
+    """Every PLAUSIBLE raw-S3 key for one day of `source` — for REPLAY/BACKFILL
+    tooling walking historical dates (DIL-028/#3042 reverify).
+
+    `raw_date_key()` returns the CURRENT-generation key only — correct for any
+    date once the archive has fully moved onto it, which is the common case a
+    caller resolving TODAY's or a recent gap's key wants. This function is for
+    the harder case: a tool replaying an OLDER date on a source whose leaf
+    filename changed over time (`filename_legacy` facet, #1256/#2278).
+
+    There is deliberately no date-threshold parameter. Live evidence (garmin,
+    2026-08-24) rules one out: a post-migration gap-fill can re-fetch a
+    PRE-migration calendar date and write it in the NEW filename, so which
+    generation a given date resolves to depends on when the object was
+    (re)written, not what date it names — a single cutover would silently
+    mis-resolve exactly the backfilled dates it exists to protect. Instead,
+    every source with a documented `filename_legacy` gets BOTH candidates for
+    EVERY date, current-generation first (the more likely hit for anything
+    backfilled or native-recent); a caller checks existence across the list
+    rather than trusting one guess.
+
+    Sources with no `filename_legacy` facet return the single `raw_date_key()`
+    result unchanged — this is a strict superset of that function's contract,
+    never a behavior change to it.
+    """
+    primary = raw_date_key(source, date_str, sub)
+    layout = raw_layout_for(source, sub)
+    legacy_filename = layout.get("filename_legacy")
+    if not legacy_filename:
+        return [primary]
+    day = date.fromisoformat(date_str)
+    legacy_key = f"{layout['prefix']}/{day:%Y}/{day:%m}/{_raw_leaf(legacy_filename, day, source)}"
+    return [primary, legacy_key]
 
 
 def raw_year_prefix(source: str, year: int, sub: str | None = None) -> str:
