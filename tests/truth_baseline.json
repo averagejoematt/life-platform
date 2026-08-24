@@ -4,15 +4,6 @@
     "note": "Committed reader-truth debt ledger \u2014 honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) \u2014 `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
   },
   "pages": {
-    "/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#3066",
-        "added": "2026-08-23",
-        "severity_observed": "high",
-        "note_sample": "Home page states 'HRV crashed to 24ms (35% below your 7-day average)' but Cockpit surface shows 'HRV 22.8 ms'. These are inconsistent readings for the same day (2026-08-23). Additionally, the Cockpit "
-      }
-    ],
     "/method/board/": [
       {
         "category": "audience_violation",

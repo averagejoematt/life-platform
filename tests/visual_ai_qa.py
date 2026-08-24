@@ -594,6 +594,85 @@ def _truth_line(f):
     return f"Reader-truth ({f['severity']}) [{f['category']}]: {f['note']}"
 
 
+def _truth_finding_key(f):
+    """A (page, category) identity for a reader-truth finding — same coarseness
+    as `truth_baseline_audit`'s gate key and #2741's `finding_group` (deliberately
+    NOT the note: the model rewords its rationale every run, #2613). Kept local
+    rather than importing `operational.qa_check.finding_group` — this module is
+    exercised with `operational` fully stubbed in tests (test_truth_baseline_audit's
+    TestWire), and a bare-namespace stub has no `__path__` for a real submodule
+    import to resolve against."""
+    return (f.get("page"), f.get("category"))
+
+
+def _confirm_new_truth_highs(would_gate, surfaces_by_path, invoke, today_iso):
+    """#3102: confirm-before-gate for NEW reader-truth highs — the CI deploy-time
+    gate's sibling to #2741's `qa_check_reader_truth._confirm_high_findings`
+    (the nightly post-deploy check already learned this lesson: the same
+    durable-design-copy finding appeared in 2 of 8 runs against byte-identical
+    content, at two different severities, because a single non-deterministic
+    Bedrock call decided a gating verdict). This surface had no such
+    confirmation — three site-deploys rolled back in the 2026-08-23/24 session
+    on single-run verdicts, two of which did not reproduce minutes later.
+
+    `would_gate` are findings already filtered to `truth_baseline_audit.gate_finding
+    == "new"` (NOT baselined debt, NOT a warning-tier finding) — only a would-gate
+    NEW high is re-judged; baselined findings, warnings, and deterministic FAILs
+    never reach this function.
+
+    One immediate second judge pass PER DISTINCT PAGE (not per finding — a page
+    with two new-high categories costs one extra call, not two) over the SAME
+    already-captured prose (`surfaces_by_path`, written once by
+    visual_qa.capture_page — never re-rendered; re-rendering would introduce a
+    second variable into what is supposed to be a same-content re-judge).
+    Historically 0-2 pages per sweep would-gate at all, so the bound is
+    0-2 extra Haiku calls per sweep (ADR-105).
+
+    Returns (confirmed, unconfirmed, note_or_None) — `confirmed` + `unconfirmed`
+    partition `would_gate` exactly (every finding lands in exactly one).
+
+    FAIL-CLOSED (#2973's rule, restated for this surface): if the re-judge pass
+    cannot run for a page — BudgetExceeded, transport error, any exception —
+    every would-gate finding on that page is returned as CONFIRMED, i.e. the
+    original verdict stands. A missing second opinion can only fail to demote a
+    finding, never fail to gate one.
+    """
+    from operational import reader_truth_qa
+
+    by_page = {}
+    for f in would_gate:
+        by_page.setdefault(f["page"], []).append(f)
+
+    confirmed, unconfirmed, errors = [], [], []
+    for page, page_findings in sorted(by_page.items()):
+        surface = surfaces_by_path.get(page)
+        if surface is None:
+            # A mangled/claimed page with no matching capture can't be re-judged
+            # on "the same rendered content" — nothing to re-judge, fail closed.
+            confirmed.extend(page_findings)
+            continue
+        try:
+            again, _errs = reader_truth_qa.assess_prose([surface], invoke, today_iso=today_iso)
+        except Exception as e:  # noqa: BLE001 — includes BudgetExceeded; any exception fails closed
+            confirmed.extend(page_findings)
+            errors.append(f"{page}: {str(e)[:120]}")
+            continue
+        second_pass_highs = {_truth_finding_key(g) for g in again if (g or {}).get("severity") == "high"}
+        for f in page_findings:
+            (confirmed if _truth_finding_key(f) in second_pass_highs else unconfirmed).append(f)
+
+    notes = []
+    if errors:
+        notes.append("re-judge unavailable for " + "; ".join(errors) + " — treating those highs as confirmed (fail-closed, #3102)")
+    if unconfirmed:
+        ids = ", ".join(sorted(f"{p} [{c}]" for p, c in {_truth_finding_key(f) for f in unconfirmed}))
+        notes.append(
+            f"{len(unconfirmed)} NEW high finding(s) did NOT reproduce on an immediate second judge pass over "
+            f"the same content and were NOT gated (#3102 — mirrors #2741's measured 2/8 flake): {ids}"
+        )
+    return confirmed, unconfirmed, ("; ".join(notes) if notes else None)
+
+
 def assess_reader_truth(results, today_iso=None):
     """Phase-aware reader-truth QA (#1095) over the harness's prose captures; mutates `results`.
 
@@ -609,6 +688,13 @@ def assess_reader_truth(results, today_iso=None):
     call (so duplicated-narrative is checkable), and merges findings like the
     vision pass: high → issue + FAIL, med/low → warning. Fail-soft on every
     dependency (Bedrock, budget tier, missing prose) with an explicit skip.
+
+    #3102: a would-gate NEW high (not baselined debt, #2956) does not gate on a
+    single verdict — it must reproduce on one immediate re-judge of the SAME
+    rendered content first (`_confirm_new_truth_highs`). A finding that does not
+    reproduce is demoted to a visible NON-REPRODUCED warning, never dropped and
+    never silently gated. Baselined findings, warnings, and deterministic FAILs
+    are unaffected — this only touches the would-gate NEW-high path.
 
     Returns a status dict `{"status": ..., ...}` — NOT the mutated `results` (no
     caller used the old return value; `results` is still mutated in place exactly
@@ -674,19 +760,48 @@ def assess_reader_truth(results, today_iso=None):
     # every site deploy regardless of its diff).
     truth_baseline = truth_baseline_audit.load_baseline()
 
+    # Resolve (finding, result-row, gate-verdict) once per finding — the path
+    # correction below (claimed-page mangling) must happen before either the
+    # gate check or the #3102 confirm pass sees the finding.
+    resolved = []
+    would_gate = []
     for f in findings:
         r = by_path.get(f["page"])
         if r is None:
             # model mangled the path — keep the finding visible on the first surface
             r = by_path[surfaces[0]["path"]]
             f = dict(f, note=f"(claimed page {f['page']!r}) {f['note']}")  # full note — #3003
+        verdict = truth_baseline_audit.gate_finding(f, truth_baseline)
+        resolved.append((f, r, verdict))
+        if verdict == "new":
+            would_gate.append(f)
+
+    # #3102: confirm-before-gate — a would-gate NEW high only gates once it
+    # reproduces on an immediate second judge pass over the SAME rendered
+    # content. Baselined findings, warnings, and deterministic FAILs never
+    # enter this path; only NEW highs (verdict == "new") do, and only the
+    # pages that actually carry one pay for a re-judge call.
+    reproduced_ids = set()
+    if would_gate:
+        surfaces_by_path = {s["path"]: s for s in surfaces}
+        confirmed, _unconfirmed, conf_note = _confirm_new_truth_highs(would_gate, surfaces_by_path, bedrock.invoke, today_iso)
+        reproduced_ids = {_truth_finding_key(f) for f in confirmed}
+        if conf_note:
+            print(f"  ⟳ reader-truth confirm (#3102): {conf_note}")
+
+    for f, r, verdict in resolved:
         r.setdefault("truth_findings", []).append(f)
         line = _truth_line(f)
-        verdict = truth_baseline_audit.gate_finding(f, truth_baseline)
         if verdict == "new":
-            print(f"  {_ICON.get(f['severity'], '?')} truth · {f['page']}: [{f['category']}] {f['note'][:96]}")
-            r.setdefault("issues", []).append(line)
-            r["status"] = "FAIL"
+            if _truth_finding_key(f) in reproduced_ids:
+                print(f"  {_ICON.get(f['severity'], '?')} truth · {f['page']}: [{f['category']}] {f['note'][:96]}")
+                r.setdefault("issues", []).append(line)
+                r["status"] = "FAIL"
+            else:
+                # Did not reproduce on the immediate second judge pass — demoted
+                # to a warning, visibly named as non-reproduced (never silent).
+                print(f"  {_ICON.get(f['severity'], '?')} truth · {f['page']}: NON-REPRODUCED (#3102) [{f['category']}] {f['note'][:80]}")
+                r.setdefault("warnings", []).append(f"NON-REPRODUCED on immediate second judge pass (#3102, not gated): {line}")
         elif verdict == "baselined":
             issue_ref = truth_baseline_audit.baselined_issue(f, truth_baseline)
             print(f"  🟡 truth · {f['page']}: BASELINED debt ({issue_ref}) [{f['category']}] {f['note'][:80]}")

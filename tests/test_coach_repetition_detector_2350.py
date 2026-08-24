@@ -265,9 +265,12 @@ def test_gate_repetition_queries_own_partition(gate, monkeypatch):
 
 
 def test_gate_excludes_same_day_identical_self_record(gate, monkeypatch):
-    from datetime import datetime, timezone
+    # #2815: the consumer reads `common.pacific_time.pacific_today()` — the SAME
+    # primitive every OUTPUT# writer now keys the sk from — so an un-pinned real
+    # wall-clock read on both sides of this assertion still agrees by construction.
+    from common.pacific_time import pacific_today
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     candidate = HISTORY_TEXTS[3]
     items = [{"sk": f"OUTPUT#{today}#daily", "content": candidate}] + _ddb_items(_history(HISTORY_TEXTS[:3] + HISTORY_TEXTS[4:]))
     # History no longer contains texts[3]-as-earlier-output — only the same-day
@@ -277,6 +280,42 @@ def test_gate_excludes_same_day_identical_self_record(gate, monkeypatch):
     rep = result["repetition"]
     assert rep["most_similar"]["shingle_jaccard"] < 1.0
     assert rep["verdict"] == "novel"
+
+
+def test_gate_excludes_same_day_self_record_by_the_pacific_day_not_utc(gate, monkeypatch):
+    """The actual #2815 regression, pinned: at a PT-evening instant the UTC
+    calendar day has already rolled to tomorrow. A same-day self-record keyed on
+    the PACIFIC day (what every OUTPUT# writer now produces) must be excluded;
+    one keyed on the UTC day (what the pre-fix consumer would have matched, and
+    what a producer that reverted to a naive clock would still write) must NOT
+    be — proving the exclusion genuinely tracks the Pacific frame, not merely
+    "some string that happens to be called today"."""
+    from datetime import datetime, timezone
+
+    from common import pacific_time
+
+    # 2026-08-24 20:00 PDT == 2026-08-25 03:00 UTC — the two frames disagree.
+    instant = datetime(2026, 8, 24, 20, 0, 0, tzinfo=pacific_time.PACIFIC)
+    pt_day = "2026-08-24"
+    utc_day = instant.astimezone(timezone.utc).strftime("%Y-%m-%d")
+    assert utc_day == "2026-08-25" and utc_day != pt_day  # sanity: frames really differ
+    monkeypatch.setattr(pacific_time, "pacific_now", lambda: instant)
+
+    candidate = HISTORY_TEXTS[3]
+    rest_of_history = _ddb_items(_history(HISTORY_TEXTS[:3] + HISTORY_TEXTS[4:]))
+
+    # A same-day self-record keyed on the PACIFIC day: excluded, verdict "novel".
+    pt_items = [{"sk": f"OUTPUT#{pt_day}#daily", "content": candidate}] + rest_of_history
+    monkeypatch.setattr(gate, "_query_begins_with", lambda pk, prefix, **k: pt_items)
+    pt_result = gate.lambda_handler(_gate_event(candidate), None)["repetition"]
+    assert pt_result["verdict"] == "novel", "the Pacific-day self-record must be excluded"
+
+    # The identical record keyed on the UTC day: NOT excluded — it reads as an
+    # earlier, distinct output and fires the repeat verdict at score 1.0.
+    utc_items = [{"sk": f"OUTPUT#{utc_day}#daily", "content": candidate}] + rest_of_history
+    monkeypatch.setattr(gate, "_query_begins_with", lambda pk, prefix, **k: utc_items)
+    utc_result = gate.lambda_handler(_gate_event(candidate), None)["repetition"]
+    assert utc_result["verdict"] == "repeat" and utc_result["score"] == 1.0, "a UTC-day key must NOT be treated as today's self-record"
 
 
 def test_gate_ddb_failure_degrades_to_no_verdict_not_green(gate, monkeypatch):

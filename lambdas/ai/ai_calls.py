@@ -1893,7 +1893,10 @@ Write your {domain_label} coaching section now."""
             _brief_fp, _reuse, _unchanged_since = _gen_cache.check_reuse_or_explain(_cache_tbl, coach_id, output_type, _fp_parts)
             if _reuse:
                 print(f"[COACH-V2:{coach_id}] brief unchanged since {_unchanged_since} — reusing gated output, skipping generation")
-                _today = _date_cls.today().isoformat()
+                # #2815: OUTPUT# frame — this feeds coach-state-updater's `generation_date`
+                # (the OUTPUT# sk) exactly like the fresh-generation write below, so it must
+                # resolve the SAME Pacific day, not a naive UTC one.
+                _today = pacific_today()
                 _gen_cache.record_reuse(_cache_tbl, coach_id, output_type, _today)
                 _gen_cache.emit_skip_metric(_cw, _CW_NAMESPACE, coach_id, surface="coach_brief")
                 # Still record today's section (no Bedrock generation cost) so the
@@ -2040,7 +2043,10 @@ Write your {domain_label} coaching section now."""
         # fingerprint so an unchanged brief tomorrow reuses it. Only reached on a
         # cache MISS, so first_generated resets the unchanged-since clock.
         if _gen_cache is not None and _cache_tbl is not None and _brief_fp and output:
-            _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, _date_cls.today().isoformat(), parts=_fp_parts)
+            # #2815: Pacific frame — consistent with the reuse-path `_today` above and the
+            # OUTPUT# write below, so the cache's first_generated/last_generated bookkeeping
+            # never disagrees with the sk it corresponds to.
+            _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, pacific_today(), parts=_fp_parts)
 
         # #1691 (epic #1687): baseline-freshness gate — ADVISORY. The DATA-grounding
         # gates above pass a brief that is digit-grounded yet cites a STALE cycle
@@ -2210,8 +2216,13 @@ Write your {domain_label} coaching section now."""
                         "coach_id": coach_id,
                         "output_text": output,
                         "output_type": output_type,
-                        # utc-exempt(#2815): OUTPUT# frame — coach_state_updater.py:1041/coach_quality_gate.py:305 share this clock; converting only here would desync the sk.
-                        "generation_date": _date_cls.today().isoformat(),
+                        # #2815: OUTPUT# frame, converted atomically with its whole writer/
+                        # consumer set — coach_state_updater.py's own no-generation_date
+                        # fallback, inter_coach_dialogue_lambda.py's writer, and
+                        # coach_quality_gate.py's same-day self-exclusion all resolve the
+                        # SAME `common.pacific_time.pacific_today()` now, so the sk this
+                        # writes and the sk that read matches against never desync.
+                        "generation_date": pacific_today(),
                     }
                 ).encode(),
             )
