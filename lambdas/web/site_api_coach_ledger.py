@@ -492,6 +492,13 @@ def handle_calibration(event, *, _g):
                 "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
                 "voided": voided,
                 "cycle": _current_cycle(),
+                # #2957: the season card said "THIS SEASON · CYCLE 14" beside a career
+                # forecast count and the reader-truth judge read the pair as one claim —
+                # 26 graded forecasts inside a 5-day cycle. Both numbers were right; the
+                # season card never said WHEN its season started, so the reader had no
+                # way to bound it. The genesis date ships with the payload so the card
+                # can name its own window instead of leaving it to proximity.
+                "cycle_start": EXPERIMENT_START,
                 "prereg_seal": seal,
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "

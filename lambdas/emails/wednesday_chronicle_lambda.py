@@ -733,7 +733,7 @@ def _handler_core(event: dict, context) -> dict:
             _draft_before_gate = raw_installment  # #812/#744: keep the pre-gate draft for retention
             _findings_fn = lambda t: installment_grounding_findings(elena_prompt, user_message, t, archive_text=_archive_text)  # noqa: E731
             _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr, archive_text=_archive_text)  # noqa: E731
-            raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn)
+            raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn, surface="wednesday_chronicle")
             if _corrected:
                 logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
             elif _residual:

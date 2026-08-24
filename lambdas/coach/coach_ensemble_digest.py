@@ -639,7 +639,7 @@ def _apply_grounding_gate(digest, user_message):
         return _digest_prose_blob(candidate)
 
     text = _digest_prose_blob(digest)
-    _best_text, findings, corrected = regen_once(text, _findings_fn, _regen_fn)
+    _best_text, findings, corrected = regen_once(text, _findings_fn, _regen_fn, surface="coach_ensemble_digest")
     best = holder["latest"] if corrected else digest
     return best, findings
 

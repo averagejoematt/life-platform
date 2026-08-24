@@ -14,6 +14,15 @@ a structured JSON verdict. Verdicts merge back into the harness `results`:
   - severity "high"  → adds an issue + flips the page to FAIL
   - severity "med"/"low" → adds a warning (advisory)
 
+The judge only ever grades an image it can actually READ (#3067). Fitting Bedrock's
+8000px reject limit is not enough: the model's own input pipeline then resizes to its
+native resolution tier, so a 1440x17271 full-page capture arrives at ~9% scale with
+every glyph illegible, and the model returns a high "illegibly small text" verdict
+about the degraded input rather than the page. `_prepare_tiles` slices any capture
+taller than the derived legibility bound into overlapping full-width sections — the
+judge still sees the whole page, at a resolution where body text clears the site's own
+11px floor. Pages inside the bound are sent unchanged, as one image, at no extra cost.
+
 Degrades cleanly: if Bedrock/`bedrock_client` is unavailable, AI-QA is skipped with a
 warning — the deterministic checks still stand. Budget-aware (#1428): checks
 budget_guard feature "visual_ai_qa" (OPERATOR-TRUTH band — pauses at tier 3 only since
@@ -45,8 +54,10 @@ amended by #1927) with an honest printed/warned skip, never silent green.
 """
 
 import base64
+import functools
 import io
 import json
+import math
 import os
 import re
 import struct
@@ -69,6 +80,45 @@ _MAX_IMAGES_PER_PAGE = int(os.environ.get("VISUAL_AI_MAX_IMAGES", "3"))
 # nothing the oracle would have seen.
 _BEDROCK_MAX_DIM = 8000
 _BEDROCK_MAX_BYTES = 5 * 1024 * 1024
+
+# ── Judge-legibility bound (#3067) ────────────────────────────────────────────
+# The caps above are only the REJECT limits. Fitting them does NOT mean the
+# judge can read the page: before the model sees an image, Anthropic's own input
+# pipeline downscales it to the model's native resolution tier. For the STANDARD
+# tier — every model released before Claude 4.7, which includes the Haiku this
+# judge runs on — that tier is a 1568px long edge AND a 1568 visual-token
+# budget, where one visual token is a 28x28px patch
+# (platform.claude.com/docs/en/build-with-claude/vision).
+#
+# So the Story/build-dispatches capture (1440x17271) reaches the judge at scale
+# 1568/17271 = 0.09: body text set at 17px renders ~1.5px, every glyph is mush,
+# and the model returns a high "illegibly small text" verdict that describes the
+# degraded INPUT, not the page (run 32668047541, and once before that). Sizing
+# tiles to _BEDROCK_MAX_DIM would not fix it — a 1440x8000 tile still lands at
+# scale 0.20. The bound has to come from the resize the model actually applies.
+_MODEL_MAX_LONG_EDGE = 1568
+_MODEL_MAX_VISUAL_TOKENS = 1568
+_VISUAL_TOKEN_PX = 28
+
+# The two ends of the legibility ratio, both derived rather than invented:
+#   - body text ships at --fs-body: 1.0625rem == 17px (site/assets/css/tokens.css)
+#   - 11px is the site's own legibility floor — visual_qa.SVG_TEXT_FLOOR_PX (#1210),
+#     the same number the deterministic SVG/HTML text-floor audits enforce.
+# Both are pinned to their sources by tests/test_visual_ai_qa.py, so neither can
+# drift into a magic number.
+_BODY_TEXT_PX = 17.0
+_MIN_LEGIBLE_TEXT_PX = 11.0
+_MIN_LEGIBLE_SCALE = _MIN_LEGIBLE_TEXT_PX / _BODY_TEXT_PX
+
+# Neighbouring tiles share this fraction of their height, so an element sliced at
+# a seam still appears whole in one of the two tiles.
+_TILE_OVERLAP_FRAC = 0.05
+
+# Ceiling on image blocks in ONE Bedrock message. The API allows 100 per request
+# on a 200k-context model like Haiku 4.5; this sits far below that so a
+# pathologically tall capture becomes a NAMED failure (→ UNEVALUATED → FAIL,
+# #2973) instead of a silently truncated view of the page.
+_MAX_IMAGE_BLOCKS_PER_CALL = 40
 
 # budget_guard._FEATURE_CUTOFF key (#1428) — operator-truth band, pauses at tier 3
 # only (ADR-125 as amended by #1927), same posture as reader_truth_qa below.
@@ -105,6 +155,19 @@ Respond with ONLY a JSON object, no prose, no markdown fences:
 "severity": "ok"|"low"|"med"|"high", "summary": "one sentence"}}
 Set top-level "severity" to the maximum of the issue severities, or "ok" if there are none; \
 "template_gloss" NEVER counts toward severity."""
+
+# #3067 — appended only when a capture had to be tiled to stay legible. Without
+# it the fix trades one false-positive class for another: the judge sees an
+# element sliced at a tile boundary and reports it as clipped/truncated content.
+_TILED_NOTE = (
+    "NOTE ON THE IMAGES: this page is too tall to stay readable in one screenshot, so it is "
+    "supplied as consecutive full-width horizontal SECTIONS of the SAME page, in order from top "
+    "to bottom, with a small overlap between neighbours. Judge them together as ONE page. A "
+    "section boundary is an artifact of how the screenshot was split, NOT a rendering fault: "
+    "never report content as clipped, truncated, cut off, or overflowing merely because it "
+    "continues into the next section, and never report the page as short, empty, or incomplete "
+    "because a section begins or ends mid-element."
+)
 
 _ICON = {"ok": "✅", "low": "🔵", "med": "🟡", "high": "🔴"}
 
@@ -183,9 +246,153 @@ def _prepare_image(path):
     raise RuntimeError(f"{os.path.basename(path)} still exceeds {_BEDROCK_MAX_BYTES // (1024 * 1024)}MB after repeated downscaling")
 
 
-def _image_block(path):
-    b64 = base64.b64encode(_prepare_image(path)).decode()
+def _visual_tokens(w, h):
+    """Visual-token cost of a w x h image: ceil(w/28) * ceil(h/28) whole patches."""
+    # round() before ceil() so an exact patch multiple can't be pushed up a patch by
+    # float representation error (1456/28 landing at 52.000000000000007).
+    return math.ceil(round(w / _VISUAL_TOKEN_PX, 9)) * math.ceil(round(h / _VISUAL_TOKEN_PX, 9))
+
+
+@functools.lru_cache(maxsize=4096)
+def _model_scale(w, h):
+    """The factor the model's OWN input pipeline applies before the judge looks (#3067).
+
+    The documented rule is the largest scale that keeps BOTH the long edge under the
+    tier cap and the *whole-patch* token count within the tier budget; images already
+    inside both pass through untouched. The patch count is a ceiling on each axis, so
+    a plain area calculation is optimistic — it predicts 1920x1080 survives at
+    1478x832 when the real pipeline delivers 1456x819. Being optimistic here would
+    silently put tiles under the legibility floor, which is the bug, so this walks
+    the candidate patch-height rows and takes the best exactly-feasible scale.
+
+    Text in the delivered image renders at this factor times its CSS size.
+    """
+    if w <= 0 or h <= 0:
+        return 0.0
+    cap = min(1.0, _MODEL_MAX_LONG_EDGE / max(w, h))
+    if _visual_tokens(w * cap, h * cap) <= _MODEL_MAX_VISUAL_TOKENS:
+        return cap
+    best = 0.0
+    for patch_h in range(1, _MODEL_MAX_VISUAL_TOKENS + 1):
+        patch_w = _MODEL_MAX_VISUAL_TOKENS // patch_h
+        if patch_w < 1:
+            break
+        s = min(cap, patch_h * _VISUAL_TOKEN_PX / h, patch_w * _VISUAL_TOKEN_PX / w)
+        if s > best and _visual_tokens(w * s, h * s) <= _MODEL_MAX_VISUAL_TOKENS:
+            best = s
+    return best
+
+
+@functools.lru_cache(maxsize=256)
+def _max_legible_height(w):
+    """Tallest slice of a `w`-wide capture whose text survives the model downscale.
+
+    The largest h with _model_scale(w, h) >= _MIN_LEGIBLE_SCALE. _model_scale is
+    non-increasing in h, so this is a binary search — exact against the real rule,
+    where a closed form would have to re-derive its patch ceilings. At the 1440px
+    desktop viewport the token budget binds and the answer is ~2038px, which puts
+    17px body text at the 11px floor.
+    """
+    if w <= 0 or _model_scale(w, 1) < _MIN_LEGIBLE_SCALE:
+        return 1
+    lo, hi = 1, _BEDROCK_MAX_DIM
+    if _model_scale(w, hi) >= _MIN_LEGIBLE_SCALE:
+        return hi
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if _model_scale(w, mid) >= _MIN_LEGIBLE_SCALE:
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
+def _encode_within_byte_cap(im, box, name):
+    """PNG bytes for `im` cropped to `box`, split further if the encode busts the byte cap.
+
+    Splitting (rather than downscaling) is deliberate: shrinking a tile to fit the
+    byte cap would silently undo the legibility guarantee the tile exists for.
+    """
+    out, pending = [], [box]
+    while pending:
+        left, top, right, bottom = pending.pop(0)
+        buf = io.BytesIO()
+        im.crop((left, top, right, bottom)).save(buf, format="PNG", optimize=True)
+        payload = buf.getvalue()
+        if len(payload) <= _BEDROCK_MAX_BYTES:
+            out.append(payload)
+            continue
+        if bottom - top <= 1:
+            raise RuntimeError(f"{name}: a single-pixel row still exceeds {_BEDROCK_MAX_BYTES // (1024 * 1024)}MB")
+        mid = top + (bottom - top) // 2
+        pending[:0] = [(left, top, right, mid), (left, mid, right, bottom)]
+    return out
+
+
+def _prepare_tiles(path):
+    """PNG payload(s) for one capture, each legible to the judge after its resize (#3067).
+
+    A capture at or under the legibility bound returns exactly ONE payload, byte-identical
+    to what _prepare_image produces — normal pages are unchanged and cost no more. A taller
+    capture is sliced into overlapping full-width tiles covering the WHOLE page, so the
+    judge still sees everything, just at a resolution it can actually read.
+
+    Raises RuntimeError with a NAMED reason when no legible payload can be produced; the
+    caller records the page UNEVALUATED and FAILS it (#2973). There is no silent-skip and
+    no silent-degrade path — those are the defect classes this function exists to avoid.
+    """
+    with open(path, "rb") as f:
+        data = f.read()
+    dims = _png_dims(data)
+    if dims is None:
+        raise RuntimeError(f"{os.path.basename(path)} is not a valid PNG — cannot submit to Bedrock")
+    w, h = dims
+    tile_h = _max_legible_height(w)
+    if h <= tile_h:
+        return [_prepare_image(path)]
+
+    name = os.path.basename(path)
+    try:
+        from PIL import Image
+    except ImportError:
+        raise RuntimeError(
+            f"{name} is {w}x{h}px — taller than the {tile_h}px judge-legibility bound (#3067), so a single "
+            f"image reaches the model at scale {_model_scale(w, h):.2f} with unreadable text, and Pillow is "
+            f"not installed to tile it"
+        )
+
+    step = max(1, tile_h - int(tile_h * _TILE_OVERLAP_FRAC))
+    tiles, top = [], 0
+    with Image.open(io.BytesIO(data)) as im:
+        im.load()
+        while top < h:
+            bottom = min(h, top + tile_h)
+            tiles.extend(_encode_within_byte_cap(im, (0, top, w, bottom), name))
+            if bottom >= h:
+                break
+            top += step
+    return tiles
+
+
+def _png_block(payload):
+    b64 = base64.b64encode(payload).decode()
     return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
+
+
+def _image_blocks(path):
+    """Content blocks for one capture — one image, or a labelled run of tiles (#3067).
+
+    Multiple images in one message is a supported Bedrock/Claude shape; labelling each
+    one is the documented way to keep them referable in the verdict.
+    """
+    payloads = _prepare_tiles(path)
+    if len(payloads) == 1:
+        return [_png_block(payloads[0])]
+    blocks = []
+    for i, payload in enumerate(payloads, 1):
+        blocks.append({"type": "text", "text": f"Section {i} of {len(payloads)} of this page, top to bottom:"})
+        blocks.append(_png_block(payload))
+    return blocks
 
 
 def _parse_verdict(text):
@@ -228,10 +435,22 @@ def _assess_page(bedrock, name, path, shots):
     shots = [s for s in shots if os.path.getsize(s["path"]) > 256]
     if not shots:
         raise RuntimeError("no usable screenshots — every capture for this page is empty/near-empty")
-    content = [_image_block(s["path"]) for s in shots]
+    content = []
+    for s in shots:
+        content.extend(_image_blocks(s["path"]))
+    n_images = sum(1 for b in content if b.get("type") == "image")
+    if n_images > _MAX_IMAGE_BLOCKS_PER_CALL:
+        # Loud + named rather than "send the first N tiles": a partial view of the
+        # page is exactly the silent-coverage defect #2973 closed.
+        raise RuntimeError(
+            f"{n_images} image blocks are needed to show this page legibly (#3067) — over the "
+            f"{_MAX_IMAGE_BLOCKS_PER_CALL}-block per-call ceiling; this page cannot be assessed as captured"
+        )
     prompt = _PROMPT.format(name=name, path=path)
     if path in _PAGE_RULES:  # #2383 — page-specific semantic rule (not .format-ed: rules may carry literal braces)
         prompt += "\n\n" + _PAGE_RULES[path]
+    if n_images > len(shots):  # #3067 — at least one capture was tiled
+        prompt += "\n\n" + _TILED_NOTE
     content.append({"type": "text", "text": prompt})
     body = {"messages": [{"role": "user", "content": content}], "max_tokens": 700}
     resp = bedrock.invoke(body, model_name=_VISION_MODEL)

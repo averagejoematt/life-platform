@@ -221,6 +221,13 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
     "lambdas/common/retry_utils.py": _ex(
         SEAM_DEF, "DEFINES call_anthropic_raw/call_anthropic_api and relays to bedrock_client.invoke. A transport, not a generation site."
     ),
+    "lambdas/ai/ai_transport.py": _ex(
+        SEAM_DEF,
+        "DEFINES call_anthropic (the daily brief's only door to Bedrock) and relays to bedrock_client.invoke — the retry ladder, the "
+        "CloudWatch failure series and the AI-3 output hook, and nothing that knows what a coach or a brief is. Split out of ai_calls.py "
+        "by #3082; the two grounding surfaces that own this path — ai_calls.py::_ground_legacy_output and ::_run_coach_v2_pipeline — "
+        "stayed behind in ai_calls and are still registered in SURFACES, so the extraction moved the transport, not the decision.",
+    ),
     # — delegated: the generation is gated, at a surface another module owns —
     "lambdas/coach/telegram_worker_lambda.py": _ex(
         DELEGATED_GATED,

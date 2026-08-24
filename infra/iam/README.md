@@ -194,6 +194,37 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > `bedrock cost telemetry emit failed` lines, and `LifePlatform/AI EstimatedCostUSD`
 > gains datapoints timestamped during the run.
 
+## Remediation-role AI cost telemetry — STAGED (#2883), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live.** #2883 adds ONE statement to
+> `github-actions-remediation-role.permissions.json`: `AiCostTelemetry` —
+> `cloudwatch:PutMetricData` namespace-conditioned to `LifePlatform/AI` (identical
+> least-privilege shape to the diagnosis role's #2974 grant above), so
+> `remediation/agent.py` can record the remediation agent's own Bedrock spend. The
+> agent runs entirely inside the Agent SDK on Bedrock (`CLAUDE_CODE_USE_BEDROCK=1`)
+> — it never calls `lambdas/ai/bedrock_client.py`'s ADR-062 chokepoint, so its spend
+> bills AWS/Bedrock (and counts in `CostMetricDriftRatio`'s native-metric numerator)
+> while contributing nothing to the self-reported `LifePlatform/AI::EstimatedCostUSD`
+> denominator — one of the two out-of-repo residual sources named when the drift
+> ratio stalled at ~1.4x against the <1.15 bar (#2883). The emit stays fail-open (a
+> telemetry error never fails a remediation run) but logs at ERROR with the dropped
+> dollar amount, same as the #2974 precedent. Apply (attended):
+>
+> ```bash
+> aws iam put-role-policy \
+>   --role-name github-actions-remediation-role \
+>   --policy-name remediation-permissions \
+>   --policy-document file://infra/iam/github-actions-remediation-role.permissions.json
+> python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
+> ```
+>
+> Post-apply proof: the next scheduled/dispatched remediation run's log shows no
+> `remediation cost telemetry emit failed` line, and `LifePlatform/AI EstimatedCostUSD`
+> (dimension `LambdaFunction=remediation-agent`) gains a datapoint timestamped during
+> the run. This alone will not land `CostMetricDriftRatio` under 1.15 — the other
+> named residual (interactive dev-session Bedrock usage) is out of scope by design —
+> but it closes the one attributable, in-repo-fixable gap.
+
 ### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
 
 > Precondition: attended, matthew-admin, with rollback ready. Same discipline as #687 —

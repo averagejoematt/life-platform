@@ -344,7 +344,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* clickable expert picker + the selected coach's read */
 .coach-pick { cursor: pointer; text-align: left; width: 100%; font: inherit; }
 .coach-pick:hover { border-color: var(--coach, var(--ember)); }
-.coach-pick.is-active { background: color-mix(in oklch, var(--coach, var(--ember)) 12%, var(--surface)); border-left-width: 3px; }
+/* #3057 — the active pick's background carries the .coach-name text (tokens.css),
+   so its 12% tint must be clamped too: nesting the same 25/75 AA clamp inside the
+   12% mix keeps the tinted background itself within the already-AA-proven paper
+   ramp's neighborhood, so the clamped text sitting on top never loses ground to
+   an adversarial raw --coach dragging the tint somewhere unproven. */
+.coach-pick.is-active { background: color-mix(in oklch, color-mix(in oklch, var(--coach, var(--ember)) 25%, var(--ink) 75%) 12%, var(--surface)); border-left-width: 3px; }
 .coach-pick:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 .coach-read { margin-top: var(--sp-5); }
 .coach-detail .rd-prose { margin-top: var(--sp-3); color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }

@@ -136,7 +136,7 @@ manifest above enumerates every source, protocol and cost figure.
 
 | | |
 | --- | --- |
-| typical run-rate | ~$80 / month |
+| typical run-rate | ~$100 / month |
 | self-imposed ceiling | $150 / month (floats to $176 under reader-traffic surge) |
 | non-AI floor | $36-$43 / month |
 | AI, variable | $24-$44 / month |

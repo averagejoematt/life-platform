@@ -482,29 +482,28 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
-        # #1927: a budget PAUSE is routine; a budget pause that never lifts is a
-        # different fact, and the existing machinery could not tell them apart.
+        # #1927: a budget PAUSE is routine; one that never lifts is a different
+        # fact — a daily alarm (#1440 QAPausedByBudget) fired 26x 2026-07-06..08-01
+        # and read as background while the whole cutoff-1 band sat off, incl. two
+        # CI gates that report green when paused. This alarm only fires when the
+        # tier never drops back down across a full week — rarity IS the escalation.
         #
-        # #1440's QAPausedByBudget alarm is per-day and correct — but between
-        # 2026-07-06 and 2026-08-01 the tier sat at >= 1 for 26 CONSECUTIVE days, so
-        # it fired 26 times, read as background, and nothing moved. In that window
-        # the whole budget_guard cutoff-1 band was off: ensemble, chronicle_editor,
-        # coherence_semantic, reader_truth_qa, visual_ai_qa, eyeball_estimate,
-        # conversation_enrichment — including two CI gates, both of which report
-        # green when paused. A daily alarm on a permanent condition is not a signal.
-        #
-        # This one can only fire when the tier NEVER returned to 0 across a full
-        # week. Statistic=Minimum per 8h period + datapoints_to_alarm == all 21
-        # periods means a single tier-0 datapoint anywhere in the window clears it,
-        # so it stays silent through ordinary end-of-month pressure and speaks only
-        # when band 1 has become the default operating state rather than an
-        # exception. Rarity IS the escalation: it says something the daily alarm
-        # structurally cannot.
-        #
-        # 28800 x 21 = 604800s, exactly CloudWatch's evaluation-window ceiling — do
-        # not lengthen the period or the count without shortening the other.
-        # cost_governor emits BudgetTier every 8h (measured: 91 datapoints/30d, no
-        # gaps), so all 21 periods are genuinely populated.
+        # #2989 RE-CUT (was threshold=1): ADR-133 (#2836) set the permanent $150
+        # base FROM a measured steady state (82.4% of $150) that lands INSIDE band
+        # 1 by construction, so threshold=1 alarmed on the DESIGNED steady state —
+        # 17+ consecutive days red from 2026-08-12, the exact background-noise
+        # failure #1927 was filed to prevent, one band up (#1927's amendment had
+        # already moved the two CI gates out of band 1; what's left there is five
+        # internal/dev features, not reader-facing). Band 2 (reader narratives
+        # paused) is not the designed state at ~81% MTD spend, so a week pinned
+        # there is genuinely rare. Threshold=2 now shares its LEVEL with
+        # `life-platform-budget-tier-escalation` below (also threshold=2) but
+        # differs in DURATION: escalation fires on one Maximum-in-an-hour reading;
+        # this fires only if Minimum never drops below 2 for all 21 x 8h periods
+        # (604800s, CloudWatch's evaluation-window ceiling — don't lengthen one
+        # factor without shortening the other). cost_governor emits BudgetTier
+        # every 8h (measured: 91 datapoints/30d, no gaps), so all 21 periods are
+        # genuinely populated.
         _alarm(
             "BudgetTierSustained",
             "budget-tier-sustained-7d",
@@ -512,7 +511,7 @@ class MonitoringStack(Stack):
             "BudgetTier",
             28800,
             "Minimum",
-            1,
+            2,
             GTE,
             to_digest=True,
             evaluation_periods=21,

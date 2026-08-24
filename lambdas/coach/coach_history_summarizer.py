@@ -1013,7 +1013,9 @@ def _apply_compression_gate(coach_id, meta, state, user_message, result, presenc
         holder["latest"] = _finalize_compressed(retry, coach_id, meta, state, result.get("compressed_at"))
         return _compressed_prose_blob(holder["latest"])
 
-    _best_text, findings, corrected = regen_once(_compressed_prose_blob(result), _findings_fn, _regen_fn)
+    _best_text, findings, corrected = regen_once(
+        _compressed_prose_blob(result), _findings_fn, _regen_fn, surface=f"coach_history_compress:{coach_id}"
+    )
     best = holder["latest"] if corrected else result
     return best, findings
 
@@ -1393,7 +1395,7 @@ def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message
         return _stance_prose_blob(retry)
 
     text = _stance_prose_blob(result)
-    _best_text, findings, corrected = regen_once(text, _findings_fn, _regen_fn)
+    _best_text, findings, corrected = regen_once(text, _findings_fn, _regen_fn, surface=f"coach_stance:{coach_id}")
     best = holder["latest"] if corrected else result
     best["grounding_flag"] = _vital_hits(best) > 0
     return best, findings

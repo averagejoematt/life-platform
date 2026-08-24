@@ -201,7 +201,7 @@ def _grounding_gate(pick: dict, text: str, invoke) -> tuple:
             ]
             return _extract_text(invoke(body))
 
-        best, findings, _corrected = _gg.regen_once(text, _findings_fn, _regen_fn)
+        best, findings, _corrected = _gg.regen_once(text, _findings_fn, _regen_fn, surface="horizons_retrospective")
         return best, findings
     except Exception as e:  # noqa: BLE001 — a broken gate withholds; it never waves text through
         return text, [{"type": "gate_error", "detail": f"grounding gate failed ({type(e).__name__})"}]

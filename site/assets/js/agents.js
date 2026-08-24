@@ -125,7 +125,11 @@ function renderFeed(data) {
     .join("");
 }
 
-const state = { week: ISO(mondayOf(new Date())) };
+// The site's day is Pacific (#2506/#2675): seed the week from the PT calendar
+// date, not the raw UTC now — between 17:00 PT Sunday and midnight, bare
+// new Date() is already Monday UTC and labels NEXT week "this week".
+const ptToday = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) + "T00:00:00Z");
+const state = { week: ISO(mondayOf(ptToday)) };
 
 /* ── Loading skeletons + a per-week session cache (#1019) ─────────────────────
    The feed endpoint can take seconds cold; a bare "Loading…" string reads as
@@ -155,7 +159,7 @@ function render(data) {
   renderFeed(data);
   // Don't let readers page into the future.
   const next = $("[data-week-next]");
-  if (next) next.disabled = addDays(state.week, 7) > ISO(mondayOf(new Date()));
+  if (next) next.disabled = addDays(state.week, 7) > ISO(mondayOf(ptToday)); // PT week too (#2506 class)
 }
 
 let seq = 0; // rapid week-nav taps race their fetches — only the latest may paint

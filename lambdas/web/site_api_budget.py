@@ -30,7 +30,7 @@ from common.pacific_time import parse_iso_utc  # #1964: the ONE ISO-8601 parser
 # cloudwatch/ssm/sns/ce boto3 clients (pure local object construction, no network call,
 # no new IAM requirement since site-api's role never calls their methods) — a deliberate,
 # informed cold-start tradeoff over a second hand-maintained copy that can drift.
-from operational.cost_governor_lambda import _AI_SAFETY_BUFFER, _PRICES as _BEDROCK_PRICES
+from operational.cost_governor_lambda import _AI_SAFETY_BUFFER, _PRICES as _BEDROCK_PRICES, MONTHLY_CEILING as _GOVERNOR_BASE_CEILING_USD
 
 from web.site_api_common import _error, _ok, logger
 
@@ -75,17 +75,29 @@ def _price_for_model(model_id: str):
     return None
 
 
-# #1230: the ADR-133 base ceiling (amendment 2026-07-08, $75→$85). The live ceiling is
-# derived from the governor's /life-platform/budget-breakdown param (#822) — it floats to
-# $100 in reader-traffic surge mode. This constant is ONLY the fail-closed fallback when
-# that read fails; never the retired $75.
+# #1230: the ADR-133 permanent base ceiling. The live ceiling is derived from the
+# governor's /life-platform/budget-breakdown param (#822) — it floats in reader-traffic
+# surge mode and under a dated window. This constant is ONLY the fail-closed fallback
+# when that read fails; never the retired ADR-063 original.
 #
-# #1999: it is now a fallback in the strict sense. The breakdown payload carries
+# #1999: it is a fallback in the strict sense. The breakdown payload carries
 # `base_ceiling`/`surge_ceiling`/`ceiling_window`, and the handlers below read the base
-# from there. This literal is reached only when the payload is missing, unreadable, or
+# from there. This value is reached only when the payload is missing, unreadable, or
 # predates that schema (old payloads persist until the governor's next 8h run rewrites
 # them) — never as the published number when the governor has stated one.
-_ADR133_BASE_CEILING_USD = 150.0
+#
+# #2898: it is no longer a hand-copied literal. It is `MONTHLY_CEILING` itself, imported
+# from the governor at the same import site that already brings in the price table and
+# the safety buffer — the ceiling hand-copy was the one anomaly in a module that
+# otherwise derives everything from the governor, and it is what made moving the base
+# $85 → $150 a 26-file sweep (#2836).
+#
+# Deliberately the PERMANENT base, not `_active_ceilings()`'s dated-window value: this
+# is the number to serve when the governor is unreachable, and a window that has quietly
+# expired must not raise a fail-closed fallback. The window's raised base reaches readers
+# only via the governor's own payload, which carries the window descriptor that explains
+# it (`_ceiling_window_clause`). Fail-closed semantics unchanged.
+_ADR133_BASE_CEILING_USD = _GOVERNOR_BASE_CEILING_USD
 
 
 def _ceiling_envelope(breakdown):
@@ -315,9 +327,10 @@ def inference_receipt() -> dict:
             tier = None
 
         # #1230: derive the ceiling from the governor's breakdown param (#822 / ADR-133)
-        # rather than a hardcoded literal — the base is $85 and floats to $100 in surge
-        # mode, so a hardcoded number is guaranteed to be a lie. Fail closed to the $85
-        # base (never the retired $75) if the breakdown read fails.
+        # rather than a hardcoded literal — the base floats in surge mode and under a
+        # dated window, so a hardcoded number is guaranteed to be a lie. Fail closed to
+        # the permanent base (never the retired ADR-063 original) if the read fails; that
+        # fallback is the governor's own MONTHLY_CEILING, imported above (#2898).
         ceiling_usd = _ADR133_BASE_CEILING_USD
         surge_active = False
         breakdown = None

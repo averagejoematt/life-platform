@@ -1063,7 +1063,7 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
     _pre = _findings_fn(text)
     if _pre:
         logger.warning("[grounding] %s finding(s): %s", label, [f["detail"] for f in _pre][:6])
-    _new_text, _left, _corrected = _gg.regen_once(text, _findings_fn, _regen)
+    _new_text, _left, _corrected = _gg.regen_once(text, _findings_fn, _regen, surface=label)
     if _corrected:
         text = _new_text
         logger.info("[grounding] %s self-corrected: %d→%d finding(s)", label, len(_pre), len(_left))

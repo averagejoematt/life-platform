@@ -4,9 +4,15 @@ ai_calls.py — Anthropic API call functions for the Daily Brief.
 Extracted from daily_brief_lambda.py (Phase 2 monolith extraction).
 Handles all four AI calls plus data-summary builders consumed by those calls.
 
+The Bedrock TRANSPORT layer lives in ``ai/ai_transport.py`` (#3082) — model ids,
+the retry ladder, the CloudWatch failure series, ``_build_system_block`` and
+``call_anthropic`` itself. Every one of those names is re-exported here, so
+``from ai.ai_calls import call_anthropic`` and
+``monkeypatch.setattr(ai_calls, "call_anthropic", ...)`` behave exactly as before.
+
 Exports:
   init(s3_client, bucket, has_board_loader)  — must call before using module
-  call_anthropic(prompt, api_key, max_tokens, system) — raw Anthropic API call with exponential backoff + token metrics
+  call_anthropic(prompt, api_key, max_tokens, system) — re-exported from ai_transport
   call_training_nutrition_coach(data, profile, api_key)
   call_journal_coach(data, profile, api_key)
   call_board_of_directors(data, profile, day_grade, grade, component_scores, api_key, ...)
@@ -19,9 +25,8 @@ Exports:
 
 import json
 import os
-import time
 from datetime import date as _date_cls, timedelta as _timedelta_cls
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
@@ -70,51 +75,28 @@ from ai.ai_summaries import (  # noqa: F401
     build_workout_summary,
 )
 
-# AI-3 middleware: lazy import of output validator (transparent fail-safe)
-try:
-    from ai.ai_output_validator import AIOutputType, validate_ai_output as _validate_ai_output
-
-    _AI_VALIDATOR_AVAILABLE = True
-except ImportError:
-    _validate_ai_output = None
-    AIOutputType = None  # type: ignore[misc]
-    _AI_VALIDATOR_AVAILABLE = False
-
-# AI model constants — read from env so model can be updated without redeployment
-AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-6")
-AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
-
-# CloudWatch client for token usage + failure metrics (P1.8/P1.9)
-_cw = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2"))
-_LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
-_CW_NAMESPACE = "LifePlatform/AI"
-
-# Exponential backoff delays (seconds) between retry attempts
-_BACKOFF_DELAYS = [5, 15, 45]  # attempts 1→2, 2→3, 3→4
-
-
-def _emit_failure_metric(metric_name: str = "AnthropicAPIFailure"):
-    """Emit a failure metric to CloudWatch (P1.8).
-
-    #2668: named, so a pass failing for its OWN reason gets its own series — an
-    IC-3 truncation returned 200 and would corrupt the AnthropicAPIFailure metric
-    that `slo-ai-coaching-success` keys on.
-    """
-    try:
-        _cw.put_metric_data(
-            Namespace=_CW_NAMESPACE,
-            MetricData=[
-                {
-                    "MetricName": metric_name,
-                    "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
-                    "Value": 1,
-                    "Unit": "Count",
-                }
-            ],
-        )
-    except Exception as e:
-        print(f"[WARN] CloudWatch failure metric emit failed (non-fatal): {e}")
-
+# God-module split (#3082): the Bedrock TRANSPORT layer — model ids, the retry
+# ladder, the CloudWatch failure series, the system-block cache wrapper, the AI-3
+# validator hook and `call_anthropic` itself — moved to ai_transport.py. This file
+# is now purely prompt construction + coaching pipeline, reaching Bedrock through
+# one door. Re-exported so every caller (`from ai.ai_calls import call_anthropic`,
+# `import ai_calls` in the bundle) and every test that monkeypatches
+# `ai_calls.call_anthropic` is unchanged.
+from ai.ai_transport import (  # noqa: F401
+    _AI_VALIDATOR_AVAILABLE,
+    _BACKOFF_DELAYS,
+    _CW_NAMESPACE,
+    _LAMBDA_NAME,
+    AI_MODEL,
+    AI_MODEL_HAIKU,
+    AI_UNAVAILABLE_SENTINEL,
+    AIOutputType,
+    _build_system_block,
+    _cw,
+    _emit_failure_metric,
+    _validate_ai_output,
+    call_anthropic,
+)
 
 # ==============================================================================
 # MODULE STATE (set by init())
@@ -276,115 +258,6 @@ def daily_brief_shared_system(
     return "\n".join(parts)
 
 
-def _build_system_block(system, cache_system):
-    """Convert system prompt to cached content block format if caching enabled."""
-    if not system:
-        return None
-    if isinstance(system, list):
-        return system  # already structured
-    if cache_system:
-        return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
-    return system
-
-
-def call_anthropic(  # type: ignore[return]  # loop always returns text or the AI_UNAVAILABLE sentinel on the final attempt; the fall-through is unreachable
-    prompt: str,
-    api_key: str = "",  # ADR-062: ignored — Bedrock uses IAM auth. Kept default for compat.
-    max_tokens: int = 200,
-    system: Union[str, list[dict[str, Any]], None] = None,
-    output_type: Any = None,
-    health_context: Optional[dict[str, Any]] = None,
-    model: Optional[str] = None,
-    cache_system: bool = True,
-) -> str:
-    """Call Anthropic API with exponential backoff (4 attempts: 5s/15s/45s delays).
-
-    P1.8: Exponential backoff replaces fixed 2-attempt/5s retry.
-    P1.9: Token usage emitted to CloudWatch LifePlatform/AI namespace.
-    COST-OPT: Prompt caching — 90% discount on cached system message tokens.
-    AI-3 middleware: validates output when output_type is specified (transparent fail-safe).
-    R17-16: Graceful degradation — returns "[AI_UNAVAILABLE]" after all retries exhausted
-            instead of raising. Callers should check for AI_UNAVAILABLE.
-
-    Args:
-        model:          Model ID override — defaults to AI_MODEL env var.
-        cache_system:   Enable prompt caching on system message (default True).
-        output_type:    AIOutputType enum value — enables AI-3 output validation.
-                        Pass None (default) to skip — used for JSON callers and IC passes.
-        health_context: Dict of health metrics for context-aware validation checks
-                        (e.g. {"recovery_score": 45, "tsb": -12}).
-    Returns text string, or "[AI_UNAVAILABLE]" if Anthropic is unavailable after all retries.
-    """
-    body = {
-        "model": model or AI_MODEL,
-        "max_tokens": max_tokens,
-        "messages": [{"role": "user", "content": prompt}],
-    }
-    sys_block = _build_system_block(system, cache_system)
-    if sys_block:
-        body["system"] = sys_block
-
-    # ADR-062 (2026-05-27): migrated from direct Anthropic API (urllib POST to
-    # api.anthropic.com) to AWS Bedrock invoke_model. Auth is IAM (api_key
-    # param now ignored — kept for signature compatibility). Prompt caching
-    # preserved via cache_control blocks in sys_block. Response shape is
-    # identical to the direct API, so parsing/validation below is unchanged.
-    import botocore.exceptions as _bce
-
-    from ai.bedrock_client import invoke as _bedrock_invoke
-
-    max_attempts = len(_BACKOFF_DELAYS) + 1  # 4
-    for attempt in range(1, max_attempts + 1):
-        try:
-            resp = _bedrock_invoke(body, model_name=body["model"])
-            # Token usage + estimated spend are now metered centrally at the
-            # bedrock_client.invoke() chokepoint (G1) — no per-caller emit here.
-            text = resp["content"][0]["text"].strip()
-            # AI-3 middleware: validate output when output_type is specified
-            if output_type is not None and _AI_VALIDATOR_AVAILABLE:
-                try:
-                    vr = _validate_ai_output(text, output_type, health_context or {})
-                    if vr.blocked:
-                        print(f"[AI-3] BLOCKED {output_type}: {vr.block_reason}")
-                    elif vr.warnings:
-                        print(f"[AI-3] WARN {output_type}: {vr.warnings}")
-                    return vr.sanitized_text
-                except Exception as _ve:
-                    print(f"[WARN] ai_output_validator non-fatal: {_ve}")
-            return text
-        except _bce.ClientError as e:
-            code = e.response.get("Error", {}).get("Code", "Unknown")
-            # Retryable Bedrock errors: throttling + transient service issues.
-            retryable = code in (
-                "ThrottlingException",
-                "ModelTimeoutException",
-                "ServiceUnavailableException",
-                "InternalServerException",
-                "ModelNotReadyException",
-            )
-            print(f"[WARN] Bedrock {code} attempt {attempt}/{max_attempts}")
-            if retryable and attempt < max_attempts:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                # R17-16: graceful degradation — return sentinel so callers know AI
-                # failed (not just empty output). Callers check for AI_UNAVAILABLE.
-                print(f"[ERROR] Bedrock unavailable after {max_attempts} attempts ({code}).")
-                return "[AI_UNAVAILABLE]"
-        except Exception as e:
-            print(f"[WARN] Bedrock error attempt {attempt}/{max_attempts}: {e}")
-            if attempt < max_attempts:
-                delay = _BACKOFF_DELAYS[attempt - 1]
-                print(f"[INFO] Retrying in {delay}s...")
-                time.sleep(delay)
-            else:
-                _emit_failure_metric()
-                print(f"[ERROR] Bedrock unreachable after {max_attempts} attempts: {e}.")
-                return "[AI_UNAVAILABLE]"
-
-
 # ==============================================================================
 # AI PROMPT HELPERS
 # ==============================================================================
@@ -454,7 +327,7 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources, available_log
         _pre = _findings_fn(output)
         if _pre:
             print(f"[LEGACY-GROUNDING:{label}] grounding finding(s): {[f['detail'] for f in _pre][:5]}")
-        output, _left, _corrected = _gg.regen_once(output, _findings_fn, regen_fn)
+        output, _left, _corrected = _gg.regen_once(output, _findings_fn, regen_fn, surface=label)
         if _corrected:
             print(f"[LEGACY-GROUNDING:{label}] self-corrected: {len(_pre)}→{len(_left)} finding(s)")
         elif _pre:
@@ -1235,14 +1108,9 @@ _comp_results_cache = None
 # the grounding gate (ADR-104) elsewhere in this same pipeline.
 _QUALITY_GATE_MAX_REGENERATIONS = 1
 
-# R17-16 outage sentinel returned by call_anthropic when Bedrock is unreachable
-# or tier-3 BudgetExceeded fires. #952 (ai-content-6): the coach v2 pipeline must
-# treat it as "no output" — it contains no numbers so it sails through the
-# grounding gate, and on the same outage the quality-gate lambda's own Bedrock
-# call fails open — so without an explicit check the literal gets cached under
-# the brief fingerprint (sticky reuse), recorded by coach-state-updater, and
-# rendered in the brief.
-AI_UNAVAILABLE_SENTINEL = "[AI_UNAVAILABLE]"
+# AI_UNAVAILABLE_SENTINEL — the R17-16 outage literal — is defined next to the
+# transport that emits it (ai_transport.py, #3082) and re-exported at the top of
+# this module. `ai_calls.AI_UNAVAILABLE_SENTINEL` is unchanged for every caller.
 
 
 def _is_ai_unavailable(text):
@@ -2102,6 +1970,7 @@ Write your {domain_label} coaching section now."""
                     output,
                     _findings_fn,
                     lambda _corr: call_anthropic(system_prompt + "\n\n" + user_message_full + "\n\n" + _corr, api_key, max_tokens=600),
+                    surface=f"coach_v2:{coach_id}",
                 )
                 if _corrected:
                     print(f"[COACH-V2:{coach_id}] grounding self-corrected: {len(_pre)}→{len(_left)} finding(s)")

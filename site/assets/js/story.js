@@ -22,6 +22,7 @@ import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season bann
 import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
 import { heroProofLine, BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label
 import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
+import { entryAgeSuffix } from "/assets/js/entry_age.js"; // #2957 — PT-calendar age of a dated installment, shared with dispatches.js
 import { familyChip, isDark } from "/assets/js/absence_read.js"; // #2388 — a dark source never renders a trend verb
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -657,6 +658,7 @@ function dxEntries(src, data) {
   return sortChronicleNewestFirst(posts).map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.sequence ?? p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
 }
 
+
 async function dxRenderRead(src, id) {
   const read = document.querySelector("[data-dx-read]");
   if (src === "labnotes") {
@@ -674,8 +676,14 @@ async function dxRenderRead(src, id) {
   const data = await dxFetch(src);
   const ent = dxEntries(src, data).find((x) => String(x.id) === String(id));
   if (!ent) { read.innerHTML = `<p class="beat-note">Pick an entry to read it here.</p>`; return; }
+  // #2957: the reader opens on the NEWEST entry, and "newest" in a weekly serial is
+  // routinely days old — on Day 7 of cycle 14 the Day-2 installment was the featured
+  // read with nothing but its own date to say so, which the reader-truth judge read as
+  // a temporal contradiction. Home's teaser already stated its age (dxTeaser below);
+  // the full reader did not. Same arithmetic, same words, stated once per entry — an
+  // archive entry now reads as an archive entry.
   read.innerHTML =
-    `<p class="dx-kicker label">${src === "chronicle" ? "chronicle · Elena Voss" : "journal"} · ${esc(ent.label || `week ${ent.id}`)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+    `<p class="dx-kicker label">${src === "chronicle" ? "chronicle · Elena Voss" : "journal"} · ${esc(ent.label || `week ${ent.id}`)}${ent.date ? ` · ${esc(ent.date)}${entryAgeSuffix(ent.date)}` : ""}</p>` +
     `<h3 class="dx-title">${esc(ent.title)}</h3>` +
     (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     `<p class="dx-prose">${esc(ent.excerpt || "")}</p>` +
@@ -718,11 +726,10 @@ async function dxTeaser() {
     if (latest) {
       // Freshness stated plainly: "latest" from a weekly serial can honestly be
       // days old — say how many, so a stale beat never masquerades as today's.
-      let ago = "";
-      if (latest.date) {
-        const days = Math.max(0, Math.round((Date.now() - Date.parse(latest.date)) / 86400000));
-        ago = days >= 2 ? ` · ${days} days ago` : days === 1 ? " · yesterday" : " · today";
-      }
+      // #2957: through the shared `entryAgeSuffix`, so this teaser, the Story reader
+      // (dispatches.js) and Home cannot drift into disagreeing about the same entry — and
+      // so the PT-calendar arithmetic is fixed in exactly one place.
+      const ago = latest.date ? entryAgeSuffix(latest.date) : "";
       // Editorial cover (visual uplevel P3): the same duotone treatment the Story
       // reader uses — fills the teaser's empty left column when a cover exists.
       const cover = latest.image_url
