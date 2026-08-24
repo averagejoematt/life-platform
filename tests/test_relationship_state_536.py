@@ -182,6 +182,97 @@ class TestPhaseTransitions:
         assert state["phase_history"] == []
 
 
+class TestLegacyStageWordMigration:
+    """#3108: RELATIONSHIP#state update failed for glucose_coach (and, verified live,
+    all 8 coaches) with "could not convert string to float: 'early'". Root cause:
+    every coach's live RELATIONSHIP#state row was still the pre-#536 seed record
+    (COACH_INTELLIGENCE_DESIGN_SPEC.md v1), which used a qualitative rapport_level
+    scale ("early"/"building"/"established") instead of #536's numeric 0.05-1.0
+    score — and carries no `phase` stamp, so it survives every experiment reset
+    untouched (#1969) and was never migrated. `LIVE_LEGACY_GLUCOSE_COACH_RECORD`
+    below is the exact wire shape pulled from DynamoDB
+    (`COACH#glucose_coach` / `RELATIONSHIP#state`) that reproduced the crash —
+    fixture is the wire, not a hand-guessed minimal dict.
+    """
+
+    LIVE_LEGACY_GLUCOSE_COACH_RECORD = {
+        "pk": "COACH#glucose_coach",
+        "sk": "RELATIONSHIP#state",
+        "journey_phase": "early_baseline",
+        "rapport_level": "early",
+        "last_updated": "2026-08-13T04:46:46.259403+00:00",
+        "known_responsiveness": {
+            "engages_with": ["data-driven insights", "specific actionable steps"],
+            "resistant_to": ["vague encouragement", "overly cautious hedging"],
+            "motivational_profile": "responds to direct honesty over diplomacy",
+        },
+        "topics_covered_depth": {},
+        "inside_references": [],
+    }
+
+    def test_live_legacy_record_no_longer_crashes(self):
+        # Previously: ValueError: could not convert string to float: 'early'
+        updated = re_.compute_relationship_update(
+            self.LIVE_LEGACY_GLUCOSE_COACH_RECORD, "glucose_coach", "2026-08-24", NO_SIGNALS, "2026-08-24T17:08:41+00:00"
+        )
+        assert isinstance(updated["rapport_level"], float)
+        assert re_.MIN_RAPPORT <= updated["rapport_level"] <= re_.MAX_RAPPORT
+
+    def test_live_legacy_record_routes_early_to_its_numeric_equivalent(self):
+        # "early" is DEFAULT_RAPPORT's own starting point ("brand-new, clinical"),
+        # then the normal single-cycle engagement nudge applies — not silently
+        # defaulted, and not left as the string.
+        updated = re_.compute_relationship_update(
+            self.LIVE_LEGACY_GLUCOSE_COACH_RECORD, "glucose_coach", "2026-08-24", NO_SIGNALS, "2026-08-24T17:08:41+00:00"
+        )
+        expected = re_.DEFAULT_RAPPORT + (re_.MAX_RAPPORT - re_.DEFAULT_RAPPORT) * re_.ENGAGEMENT_FRACTION
+        assert updated["rapport_level"] == round(expected, 4)
+        assert updated["interaction_count"] == 1
+        assert updated["journey_phase"] == re_.PHASE_CLINICAL
+
+    def test_coerce_rapport_level_routes_full_documented_vocabulary(self):
+        assert re_._coerce_rapport_level("early") == re_.DEFAULT_RAPPORT
+        assert re_._coerce_rapport_level("building") == (re_.DEFAULT_RAPPORT + re_.FAMILIAR_MIN_RAPPORT) / 2
+        assert re_._coerce_rapport_level("established") == re_.FAMILIAR_MIN_RAPPORT
+        # Case/whitespace tolerant — the vocabulary is a fixed word set, not free text.
+        assert re_._coerce_rapport_level(" Early ") == re_.DEFAULT_RAPPORT
+
+    def test_coerce_rapport_level_still_casts_genuine_numbers(self):
+        assert re_._coerce_rapport_level(0.42) == 0.42
+        assert re_._coerce_rapport_level("0.42") == 0.42
+
+    def test_coerce_rapport_level_defense_in_depth_for_truly_unexpected_value(self):
+        # Not one of the documented stage words and not numeric — the try/except
+        # is a fallback for genuinely unrecognized input, not the primary path.
+        assert re_._coerce_rapport_level("garbled-value") == re_.DEFAULT_RAPPORT
+        assert re_._coerce_rapport_level(None) == re_.DEFAULT_RAPPORT
+
+    def test_update_relationship_state_integration_no_longer_raises(self, monkeypatch):
+        """Mirrors coach_state_updater._update_relationship_state's real call path
+        (the one the #3108 WARNING fired from) with the live legacy record."""
+        written = {}
+
+        monkeypatch.setattr(
+            su,
+            "_get_item",
+            lambda pk, sk: self.LIVE_LEGACY_GLUCOSE_COACH_RECORD if sk == "RELATIONSHIP#state" else None,
+        )
+        monkeypatch.setattr(su, "_query_begins_with", lambda pk, prefix, scan_forward=True: [])
+
+        def fake_put(item):
+            written.update(item)
+            return True
+
+        monkeypatch.setattr(su, "_put_item", fake_put)
+
+        result = su._update_relationship_state("glucose_coach", "2026-08-24")
+
+        assert written["pk"] == "COACH#glucose_coach"
+        assert written["sk"] == "RELATIONSHIP#state"
+        assert isinstance(written["rapport_level"], float)
+        assert result == written
+
+
 class TestGatherSignalsCursor:
     def test_no_since_date_returns_all_zero(self):
         signals = su._gather_relationship_signals("sleep_coach", None)

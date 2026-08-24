@@ -454,6 +454,16 @@ class MonitoringStack(Stack):
         # (sampleCount >= 1 throughout). SNS fires per transition so notifications survive; the STATE
         # does not carry the signal. The honest audit surface is transition history:
         # scripts/check_alarm_citations.py (the /wrap e10 gate) reads describe-alarm-history and forces every fired-and-cleared episode in 72h to be answered.
+        #
+        # #2997 — RECONCILED 2026-08-24: qa-smoke-warnings looked unowned because a 28h log sample
+        # happened to catch only [chronic]-tagged WARN lines while the metric read nonzero on 7 of 8
+        # days — read as a leak in the #1958 split. It was not: an 8-day reconciliation of every
+        # WarnCount datapoint against the qa-smoke log group's `[QA] WARN` lines (336 lines, 313
+        # chronic / 23 non-chronic) found the metric and each run's own log agree exactly, every time.
+        # The split, the 86400s Maximum window, and the single-producer metric are all correct as
+        # designed — see docs/alarm_citations.json's qa-smoke-warnings entry for the full reconciliation
+        # and the currently-owned non-chronic source (`reader_truth`, real content-truth findings that
+        # SHOULD stay alarmed — #1958's chronic contract deliberately does not cover them).
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",

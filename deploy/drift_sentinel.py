@@ -706,20 +706,87 @@ from sentinel_quota import (  # noqa: E402,F401
 # regressed). NB a just-merged fix stays open until CodeQL's next analysis of
 # main; that window self-clears within one push cycle and is not worth a grace
 # knob.
+#
+# #2578 AUTOPSY (2026-08-24) — this check shipped armed and has never once read the
+# API. Every persisted sentinel record since it landed (drift-log/2026-08-03,
+# -08-10, -08-24) carries `codeql_alerts: {"status": "error"}`, 3/3, while 7 open
+# alerts (2 high) sat 13–14 days un-triaged on main. Three independent defects, all
+# fixed here + in the workflow's permissions block:
+#
+#   (a) CREDENTIAL — the check called `sentinel_quota._gh_api_json`, whose #1613
+#       contract is to swap GH_TOKEN for GH_BILLING_TOKEN/GH_POSTURE_TOKEN whenever
+#       either is set. GH_BILLING_TOKEN IS set live (repo secret since 2026-07-26),
+#       so every code-scanning GET went out on a billing-scoped user PAT. Now uses
+#       `_gh_api_result` (the #1320 classified GET) via `_codeql_api`, which also
+#       retries on the ambient token when the posture PAT is scope-gapped.
+#   (b) PERMISSION — .github/workflows/remediation-agent.yml declares an explicit
+#       `permissions:` block, which zeroes every unlisted scope. It never granted
+#       `security-events: read`, which GET /code-scanning/alerts requires, so even
+#       the built-in GITHUB_TOKEN 403'd. Granted in that workflow by this change.
+#   (c) FAIL-SOFT — an unreadable list returned `status: "error"`, and `error` is
+#       NOT `drift`: `remediation/drift_report.as_signal` only emits a needs-human
+#       triage signal for `drift`, and only checks whose own status is `drift` land
+#       in its `flagging` map. The check's entire trace was one clause at the tail
+#       of a summary already reading "6 stack(s) drifted; …". Surfacing that lands
+#       nowhere is the same as not firing — so an unreadable list is now DRIFT.
 CODEQL_ALERT_BUDGET = 0
+
+# The one-time fix for a scope-gapped code-scanning read (#2578), carried in the
+# finding itself so the report names the remedy instead of "auth/scope?".
+CODEQL_SCOPE_FIX = (
+    "fix: grant `security-events: read` in the calling workflow's `permissions:` block "
+    "(GET /code-scanning/alerts is 403 without it), and give any PAT that overrides the "
+    "ambient GITHUB_TOKEN the repository permission `Code scanning alerts: read`"
+)
+
+
+def _codeql_api(path, timeout=60):
+    """Classified GET of the code-scanning API on a credential that can actually read it.
+
+    Deliberately NOT `sentinel_quota._gh_api_json` — see defect (a) above. Prefers the
+    posture PAT (that is `_gh_api_result`'s contract) but retries ONCE on the ambient
+    GITHUB_TOKEN when the PAT comes back scope-gapped, so adding a PAT without
+    `Code scanning alerts: read` cannot re-dark this check the way GH_BILLING_TOKEN did.
+
+    Returns `_gh_api_result`'s `(data, errinfo)` pair."""
+    data, err = _gh_api_result(path, timeout=timeout)
+    if err and err.get("classification") == "scope" and os.environ.get("GH_POSTURE_TOKEN"):
+        saved = os.environ.pop("GH_POSTURE_TOKEN")
+        try:
+            data, err = _gh_api_result(path, timeout=timeout)
+        finally:
+            os.environ["GH_POSTURE_TOKEN"] = saved
+    return data, err
 
 
 def check_codeql_alerts():
-    data = _gh_api_json("repos/{owner}/{repo}/code-scanning/alerts?state=open&per_page=100")
-    if not isinstance(data, list):
-        return {"status": "error", "detail": "code-scanning API unavailable (gh api failed — auth/scope?)"}
+    data, err = _codeql_api("repos/{owner}/{repo}/code-scanning/alerts?state=open&per_page=100")
+    if err or not isinstance(data, list):
+        # FAIL CLOSED (#2578, defect (c)): an alert list we cannot read is
+        # indistinguishable from an un-triaged one, and proving main is triaged is the
+        # entire job of this check. "Couldn't run" is therefore drift — it reaches
+        # drift_report.as_signal's needs-human triage path, which `error` never did.
+        detail = (err or {}).get("detail") or "code-scanning API returned a non-list body"
+        return {
+            "status": "drift",
+            "reason": "unreadable",
+            "open_count": None,
+            "sample": [],
+            "detail": f"CodeQL alert list UNREADABLE — cannot prove main is triaged ({detail}). {CODEQL_SCOPE_FIX}",
+        }
     n = len(data)
     sample = []
     for a in data[:10]:
         loc = (a.get("most_recent_instance") or {}).get("location") or {}
         sample.append(f"{(a.get('rule') or {}).get('id')} @ {loc.get('path')}:{loc.get('start_line')}")
-    result = {"status": "clean" if n <= CODEQL_ALERT_BUDGET else "drift", "open_count": n, "sample": sample}
-    if result["status"] == "drift":
+    drifted = n > CODEQL_ALERT_BUDGET
+    result = {
+        "status": "drift" if drifted else "clean",
+        "reason": "regrowth" if drifted else "triaged",
+        "open_count": n,
+        "sample": sample,
+    }
+    if drifted:
         result["detail"] = (
             f"{n} open CodeQL alert(s) on main (budget {CODEQL_ALERT_BUDGET}) — triage each to fixed or "
             "dismissed-with-reason (#1902); a fix merged since the last CodeQL analysis of main clears on its own"
@@ -887,12 +954,20 @@ def _summary(status, checks):
         ("site_sha_ancestry", "live site SHA not on main"),
         ("github_config", "GitHub config diverges from documented posture"),
         ("github_push_runs", "main-push workflow runs not queuing"),
-        ("codeql_alerts", "un-triaged open CodeQL alert(s)"),
         ("hae_webhook_ingress", "HAE webhook ingress grant drift"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
             parts.append(label)
+    # codeql_alerts has TWO drift shapes and a fixed label would lie about one of them
+    # (#2578): real regrowth vs. an unreadable list. Both are drift; say which.
+    cq = checks.get("codeql_alerts", {})
+    if cq.get("status") == "drift":
+        parts.append(
+            "CodeQL alert list UNREADABLE (fail-closed)"
+            if cq.get("reason") == "unreadable"
+            else f"{cq.get('open_count')} un-triaged open CodeQL alert(s)"
+        )
     gq = checks.get("github_quota", {})
     if gq.get("status") == "drift" and gq.get("warn"):
         parts.append(gq["warn"])
@@ -945,6 +1020,9 @@ def print_summary(record):
                 detail = f" — {c.get('detail', '')}"
             elif name == "github_quota":
                 detail = f" — {c.get('warn', '')}"
+            elif name == "codeql_alerts":
+                # #2578: a drift line with no detail is a finding nobody can act on.
+                detail = f" — {c.get('detail', '')}"
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")
