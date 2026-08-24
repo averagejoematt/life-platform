@@ -106,7 +106,7 @@ def _build_system_block(
     return system
 
 
-def call_anthropic_api(  # type: ignore[return]  # loop always returns on success or re-raises on the final attempt; the fall-through is unreachable
+def call_anthropic_api(
     prompt: str,
     max_tokens: int = 500,
     system: Union[str, list[dict[str, Any]], None] = None,
@@ -148,13 +148,20 @@ def call_anthropic_api(  # type: ignore[return]  # loop always returns on succes
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
     # Auth is IAM — no API key. See lambdas/bedrock_client.py.
     import botocore.exceptions as _bce
-    from ai.bedrock_client import invoke as _bedrock_invoke
+    from ai.bedrock_client import first_text as _first_text, invoke as _bedrock_invoke
 
+    # #2893: ONLY the transport call lives inside the retry `try`. It used to end
+    # `return resp["content"][0]["text"].strip()` in here, so an empty `content`
+    # list — the exact shape of a max_tokens stop with no emitted text — raised
+    # IndexError, was caught by the generic `except Exception` below, and
+    # re-invoked the model: up to 4 billed calls, zero usable output, logged at
+    # WARN with Errors flat. Transport failures retry; a response you have
+    # already paid for does not.
+    resp: dict[str, Any] = {}
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
             resp = _bedrock_invoke(body, model_name=body["model"])
-            # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
-            return resp["content"][0]["text"].strip()
+            break
 
         except _bce.ClientError as e:
             code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -182,6 +189,16 @@ def call_anthropic_api(  # type: ignore[return]  # loop always returns on succes
             else:
                 _emit_failure_metric()
                 raise
+
+    # Token usage + spend metered centrally at bedrock_client.invoke() (G1).
+    text = _first_text(resp)
+    if text is None:
+        _emit_failure_metric()
+        raise ValueError(
+            f"Bedrock response carried no text block (stop_reason={resp.get('stop_reason')!r}) "
+            "— NOT retried, the call was already billed (#2893)"
+        )
+    return text.strip()
 
 
 def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeout: int = 55) -> dict[str, Any]:  # type: ignore[return]  # loop always returns on success or re-raises on the final attempt; the fall-through is unreachable

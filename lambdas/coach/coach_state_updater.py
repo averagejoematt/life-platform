@@ -1039,10 +1039,18 @@ def lambda_handler(event, context):
     user_message = _build_extraction_message(coach_id, output_text, output_type, voice_spec)
 
     try:
+        # #2893: this call site used to pass max_tokens=1500 — the exact value the
+        # 2026-05-03 fix in _call_haiku's docstring raised the default AWAY from,
+        # for this exact failure. The override silently reinstated the defect.
+        # MEASURED (30d to 2026-08-23, CloudWatch): 116 of 359 metered calls (32.3%)
+        # ended with `LLM returned non-dict extraction … — using default`, and
+        # LifePlatform/AI AnthropicOutputTokens for coach-state-updater has
+        # Maximum == 1500.0 exactly (Average 1297) — i.e. a third of the calls were
+        # billed to the cap and then discarded. Take the module default (3000) so
+        # the 2026-05-03 sizing actually applies.
         extraction = _call_haiku(
             system=EXTRACTION_SYSTEM_PROMPT,
             user_message=user_message,
-            max_tokens=1500,
             temperature=0.1,
         )
 
