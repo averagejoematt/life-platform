@@ -225,9 +225,11 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > named residual (interactive dev-session Bedrock usage) is out of scope by design —
 > but it closes the one attributable, in-repo-fixable gap.
 
-## Golden-eval-role budget tier + eval config reads — STAGED (#2824), NOT yet applied
+## Golden-eval-role budget tier + eval config reads — APPLIED 2026-08-24 (#2824, #3099)
 
-> **Status: the checked-in JSON is AHEAD of live.** #2824's grant-enumeration sweep
+> **Status: APPLIED live 2026-08-24** (`put-role-policy`; `verify_oidc_iam.py --strict`
+> CLEAN per #3099 — the `_PENDING_LIVE_APPLY` entries these grants used to hold in
+> `tests/test_grant_enumeration_drift.py` were deleted the same day). #2824's grant-enumeration sweep
 > (`tests/test_grant_enumeration_drift.py`) derived three fail-closed channels this role's
 > entrypoints reach and its policy did not grant — all three confirmed against the **LIVE**
 > inline policy, not just the checked-in doc. Two statements close them:
@@ -248,7 +250,7 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 >   inside the harness that is supposed to catch it. Object-scoped (plus the one coaches
 >   prefix), not bucket- or `config/*`-wide.
 >
-> Both ship in the one file, so a single apply lands them. Apply (attended):
+> Both shipped in the one file, applied by the one command (attended):
 >
 > ```bash
 > aws iam put-role-policy \
@@ -258,10 +260,54 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
 > ```
 >
-> Post-apply proof: `tests/test_grant_enumeration_drift.py`'s live-parity half
-> (`test_live_oidc_role_grants_cover_the_derived_consumer_set`, credentialed run) reds on
-> its three `_PENDING_LIVE_APPLY` entries until they are deleted — that red **is** the
-> confirmation the apply landed, and deleting them is the ratchet shrink.
+> Post-apply proof (confirmed 2026-08-24): `tests/test_grant_enumeration_drift.py`'s
+> live-parity half (`test_live_oidc_role_grants_cover_the_derived_consumer_set`,
+> credentialed run) reds until the three `_PENDING_LIVE_APPLY` entries are deleted —
+> they were deleted in #3099, the confirmation the apply landed and the ratchet shrink.
+
+## Golden-eval-role AI cost telemetry — STAGED (#2883), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live** (confirmed live 2026-08-24, the same
+> day the two grants above were applied). This statement adds `AiCostTelemetry` to
+> `infra/iam/github-actions-golden-eval-role.permissions.json`: `cloudwatch:PutMetricData`
+> namespace-conditioned to `LifePlatform/AI`, the identical least-privilege shape as the
+> diagnosis-role (#2974) and remediation-role (#2883/#3070) grants above.
+>
+> **Confirmed live and still failing today.** The 2026-08-24T15:54 UTC `golden-brief-eval.yml`
+> run — the first since `HaikuJudge`/`BudgetTierRead` started actually letting the judge
+> call Bedrock — logged 8x `[ERROR] bedrock cost telemetry emit failed …
+> namespace=LifePlatform/AI … AccessDenied … github-actions-golden-eval-role … is
+> not authorized to perform: cloudwatch:PutMetricData`. The role's only `PutMetricData`
+> grant is `GoldenBriefMetrics`, scoped to the `LifePlatform/GoldenBrief` namespace —
+> it does not cover `bedrock_client.invoke()`'s own telemetry emit, which targets
+> `LifePlatform/AI`.
+>
+> This is the third instance of the #2974 class (a Bedrock-calling CI identity billing
+> `AWS/Bedrock` natively while silently dropping every `LifePlatform/AI` self-report), and
+> it is **not caught by any existing gate**: the #2824 grant-enumeration sweep
+> (`tests/grant_enumeration.py`) only derives `ssm`/`secret`/`s3config`/`ses` fail-closed
+> channels by design (see its module docstring); the narrower #1196
+> `test_put_metric_data_grant_lockstep.py` only walks `create_platform_lambda`-wired
+> Lambda source files, never GitHub Actions OIDC roles. Both diagnosis-role and
+> remediation-role needed a hand-found fix for the same reason — this is a recurring
+> blind spot in the grant-derivation tooling, not just a one-off gap. Filed against
+> #2883's box-4 residual finding.
+>
+> Apply (attended):
+>
+> ```bash
+> aws iam put-role-policy \
+>   --role-name github-actions-golden-eval-role \
+>   --policy-name golden-eval-permissions \
+>   --policy-document file://infra/iam/github-actions-golden-eval-role.permissions.json
+> python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
+> ```
+>
+> Post-apply proof: the next scheduled `golden-brief-eval.yml` run's log shows zero
+> `bedrock cost telemetry emit failed` lines, and `LifePlatform/AI EstimatedCostUSD` gains
+> a `CallerClass=ci` datapoint timestamped during the run. Dollar size is small (weekly
+> cadence, ~8 Haiku judge calls/run) — this closes an attribution gap, not a material
+> share of #2883's residual.
 
 ### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
 

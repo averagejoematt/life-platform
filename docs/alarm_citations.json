@@ -6,8 +6,9 @@
   },
   "cost-metric-drift-sustained": {
     "citation": "#2883",
-    "note": "Expected RED from ~7 days after its first deploy: the alarm states a true, known condition. CostMetricDriftRatio has held ~1.37 since 2026-08-19 (measured live, #2883's 2026-08-20 comment) against the 1.15 acceptance bar — the residual self-report undercount (#2883 box 2: un-instrumented Bedrock callers outside Lambda, e.g. CI runners without AWS_LAMBDA_FUNCTION_NAME, plus partial cache-token capture) is still open. The alarm exists precisely so this residual cannot rot silently the way #357's regression did. Remove this entry when box 2 lands the ratio < 1.15 for a full week AND the alarm has actually cleared live.",
-    "added": "2026-08-21"
+    "note": "Expected RED from ~7 days after its first deploy: the alarm states a true, known condition. Re-measured live 2026-08-24T16:00 UTC governor cycle: ratio 1.384 (down from the 1.4177 peak on 08-23, but still far above the 1.15 bar; CE reconciliation the same day: Bedrock UnblendedCost $82.96 MTD vs self-reported LifePlatform/AI EstimatedCostUSD $60.25 MTD, a $22.71 gap). Two of the three named residual candidates are now partially closed: #3070 landed remediation-agent self-attribution (~$0.43 recovered so far, small); #2892/#3089 added a CallerClass dimension for future breakdown (does not itself move the ratio — additive). The third candidate, golden-eval's Bedrock spend, is CONFIRMED still fully unattributed live as of the 2026-08-24T15:54 UTC golden-brief-eval.yml run (8x AccessDenied on cloudwatch:PutMetricData to LifePlatform/AI — the role's only PutMetricData grant is namespace-scoped to LifePlatform/GoldenBrief) — staged fix in infra/iam/README.md 'Golden-eval-role AI cost telemetry', not yet applied; dollar size is small (weekly, ~8 Haiku calls). The dominant unattributed residual remains interactive Claude Code dev-session usage (out of scope per #3070's design — never reaches the ADR-062 chokepoint), still unsized. Remove this entry when box 2 lands the ratio < 1.15 for a full week AND the alarm has actually cleared live.",
+    "added": "2026-08-21",
+    "updated": "2026-08-24"
   },
   "budget-tier-sustained-7d": {
     "citation": "#2989",

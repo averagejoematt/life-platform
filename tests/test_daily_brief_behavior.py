@@ -1080,23 +1080,37 @@ class TestFoodDeliveryStreakFreshness2235:
 
 
 class TestRecordEmailSend:
+    """DIL-025 changed the signature to take the BRIEF DATE the letter covered.
+    The row the status page reads is otherwise byte-for-byte what it always was —
+    these assertions are unchanged on purpose, so a regression in the status
+    surface would still fail here rather than being masked by the new attribute.
+    """
+
     def test_a_completion_row_is_written_for_the_status_page(self):
         t = FakeTable()
-        brief.record_email_send(t, "daily_brief")
+        brief.record_email_send(t, "daily_brief", "2026-08-23")
         item = t.puts[0]
         assert item["pk"].endswith("#email_log#daily_brief")
         assert item["sk"] == "DATE#" + TODAY
         assert item["status"] == "success"
 
+    def test_the_row_records_which_brief_it_was_not_merely_when_it_went(self):
+        """DIL-025: the sort key is the UTC day of the SEND; `period_key` is the
+        day the brief was ABOUT. They differ whenever a replay crosses UTC
+        midnight, which is exactly when a sort-key-only replay check misses."""
+        t = FakeTable()
+        brief.record_email_send(t, "daily_brief", "2026-08-23")
+        assert t.puts[0]["period_key"] == "2026-08-23"
+
     def test_the_row_expires_so_the_log_cannot_grow_without_bound(self):
         t = FakeTable()
-        brief.record_email_send(t, "daily_brief")
+        brief.record_email_send(t, "daily_brief", "2026-08-23")
         assert t.puts[0]["ttl"] > 0
 
     def test_a_failed_status_write_never_re_raises_after_the_mail_has_gone(self):
         t = FakeTable()
         t.put_error = RuntimeError("throttled")
-        brief.record_email_send(t, "daily_brief")  # must not raise
+        brief.record_email_send(t, "daily_brief", "2026-08-23")  # must not raise
 
 
 # ══════════════════════════════════════════════════════════════════════════════

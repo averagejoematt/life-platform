@@ -39,6 +39,7 @@ from web.site_api_common import (
     logger,
     prereg_seal_meta,
 )
+from web.site_api_phase_frame import lifetime_scope  # #2957 — cross-phase framing
 
 
 def handle_panel_ledger(event, *, _g):
@@ -540,6 +541,12 @@ def handle_voice_fidelity(event, *, _g):
         return _ok(
             {
                 "n": board.get("n", 0),
+                # #2957: `n` is `_load_cumulative_judgments` — every judgment ever
+                # scored, never reset at a restart (VOICEFIDELITY# is PHASE_TAXONOMY's
+                # cross_phase class). Unlabeled, "N=16" on Day 8 of a fresh cycle reads
+                # as this cycle's own count; it never is one. Ship the scope word so
+                # the render and the reader-truth judge read the same frame.
+                "scope": lifetime_scope(),
                 "correct": board.get("correct"),
                 "accuracy_pct": board.get("accuracy_pct"),
                 "chance_accuracy_pct": board.get("chance_accuracy_pct"),
@@ -555,7 +562,10 @@ def handle_voice_fidelity(event, *, _g):
                     "recent output and guesses which of the 8 coaches wrote it — no attribution shown. "
                     "Accuracy is scored deterministically against ground truth, never an LLM's opinion of "
                     '"does this sound right." Chance accuracy at an 8-coach roster is 12.5% — a coach '
-                    "scoring near chance is confusable with the rest of the team, not genuinely distinct."
+                    "scoring near chance is confusable with the rest of the team, not genuinely distinct. "
+                    "The tally accumulates across every cycle and is never reset at a restart — a "
+                    "cross-phase measurement of whether the coaches sound distinct, not a claim about the "
+                    "live cycle."
                 ),
             },
             cache_seconds=3600,

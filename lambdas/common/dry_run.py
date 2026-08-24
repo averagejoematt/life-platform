@@ -109,6 +109,23 @@ def resolve(event: Mapping[str, Any]) -> bool:
     return any(_truthy(os.environ.get(name, "")) for name in SUPPRESSOR_ENV_VARS)
 
 
+def force_requested(event: Mapping[str, Any]) -> bool:
+    """True when the caller explicitly asked for a one-off real run.
+
+    Exposed (DIL-025) so the *replay* guard in `common.send_ledger` can honour
+    the same `force_send` override the dry-run gate already honours, without
+    re-deriving the vocabulary. `send_guard` learned this lesson the hard way
+    (#2255/#2222): two modules each answering "did the operator ask for X" with
+    their own key list is how `{"no_send": true}` came to suppress 17 Lambdas
+    and be silently ignored by the 18th. One list, one reader.
+
+    Note this is deliberately NOT `not resolve(event)` — `resolve` folds in the
+    environment and the suppressor precedence rules. This answers only the
+    narrow question "is `force_send` present and truthy on this event".
+    """
+    return _any_flag(event, FORCE_SEND_EVENT_KEYS)
+
+
 def stash(event: MutableMapping[str, Any]) -> bool:
     """Resolve the dry-run decision and record it on the event under `FLAG`."""
     decided = resolve(event)
