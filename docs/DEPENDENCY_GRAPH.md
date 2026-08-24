@@ -159,7 +159,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `effect_fits` | — | — |
 | `eightsleep` | — | ai_expert_analyzer_lambda.py, site_api_sleep.py, tools_nutrition.py, tools_training.py |
 | `email_digest` | between_chronicle_lambda.py | between_chronicle_lambda.py |
-| `email_log` | ai_review_pack_lambda.py, anomaly_detector_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, daily_brief_lambda.py, monday_compass_lambda.py, nutrition_review_lambda.py, weekly_digest_lambda.py, weekly_plate_lambda.py | — |
+| `email_log` | ai_review_pack_lambda.py, anomaly_detector_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, monday_compass_lambda.py, nutrition_review_lambda.py, weekly_digest_lambda.py, weekly_plate_lambda.py | — |
 | `engagement_state` | adaptive_mode_lambda.py | ai_expert_analyzer_lambda.py, character_sheet_lambda.py, coach_chat_grounding.py, coach_panel_podcast_lambda.py, daily_brief_lambda.py, daily_debrief_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_freshness.py, state_of_matthew_lambda.py, tools_coach_checkin.py, weekly_digest_lambda.py |
 | `evening_ritual` | — | site_api_fulfillment.py |
 | `experiment_suggestions` | site_api_social_experiments.py | — |
