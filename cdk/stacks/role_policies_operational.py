@@ -505,6 +505,16 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             actions=["ssm:GetParameter"],
             resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
         ),
+        # #2824: the reader-truth pass builds its phase_context through
+        # coach_checkin.read_cycle() (the ADR-077 cycle stamp). This role granted
+        # budget-tier only, so read_cycle() fail-softs to no cycle and the nightly
+        # check grades against the wrong experiment generation — the #2959
+        # cycle-param class (#3059 fixed the CI diagnosis role's copy).
+        iam.PolicyStatement(
+            sid="ExperimentCycleRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+        ),
         iam.PolicyStatement(
             sid="DynamoDB",
             # #1953: + PutItem — check_predict_week_freshness persists its
@@ -788,9 +798,16 @@ def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
                 # failure presented as "no source available" rather than
                 # "permission denied" — and with no DLQ the three retries
                 # vanished. Scoped to the one object it actually reads.
+                #
+                # #2824: + config/personas.json. The canary runs the ask pipeline's
+                # OWN context builders, which reach persona_registry.load_registry()
+                # for the coach identity on a board answer; #2655's repair granted
+                # content_filter.json EXACTLY, so personas.json was out of its scope
+                # and the registry read still fail-softs to an empty registry.
+                # Object-scoped, same as its sibling — not the house-standard config/*.
                 sid="S3ConfigRead",
                 actions=["s3:GetObject"],
-                resources=_s3("config/content_filter.json"),
+                resources=_s3("config/content_filter.json", "config/personas.json"),
             ),
             _bedrock_statement(),
             iam.PolicyStatement(

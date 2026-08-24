@@ -31,6 +31,23 @@
           "dynamodb:LeadingKeys": ["EVALRET#*"]
         }
       }
+    },
+    {
+      "Sid": "BudgetTierRead",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter"],
+      "Resource": [
+        "arn:aws:ssm:us-west-2:205930651321:parameter/life-platform/budget-tier"
+      ]
+    },
+    {
+      "Sid": "EvalConfigRead",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/config/personas.json",
+        "arn:aws:s3:::matthew-life-platform/config/coaches/*"
+      ]
     }
   ]
 }

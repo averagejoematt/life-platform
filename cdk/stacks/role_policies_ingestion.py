@@ -185,10 +185,17 @@ def ingestion_youtube() -> list[iam.PolicyStatement]:
     # origin:human post at ingestion (broadcast_sensitivity_gate) before it can appear in
     # the S4 feed. Its off-topic layer is a cheap Haiku pass via bedrock_client (ADR-062 —
     # IAM auth, no raw key), budget-gated and fail-closed, so this role needs bedrock:InvokeModel.
+    #
+    # #2824: that same gate's FIRST layer is the ER-06 blocked-term screen —
+    # broadcast_sensitivity_gate -> privacy_guard -> content_filter_channel, whose S3 leg
+    # reads config/content_filter.json (#2503 moved the vocabulary off-repo). This role had
+    # s3:PutObject on raw/ and no GetObject anywhere, the exact shape #2655 fixed on the AI
+    # canary. Scoped to the one object it reads.
     return _ingestion_base(
         "youtube",
         secret_name="life-platform/youtube",
         s3_prefix="raw/matthew/youtube/*",
+        extra_s3_read=["config/content_filter.json"],
     ) + [_bedrock_statement()]
 
 
@@ -203,10 +210,16 @@ def ingestion_bluesky() -> list[iam.PolicyStatement]:
     # origin:human post at ingestion (broadcast_sensitivity_gate) before it can appear in
     # the S4 feed. Its off-topic layer is a cheap Haiku pass via bedrock_client (ADR-062 —
     # IAM auth, no raw key), budget-gated and fail-closed, so this role needs bedrock:InvokeModel.
+    #
+    # #2824: same gate, same missing first layer as ingestion_youtube — the ER-06
+    # blocked-term screen (broadcast_sensitivity_gate -> privacy_guard ->
+    # content_filter_channel) reads config/content_filter.json (#2503). Scoped to that
+    # one object.
     return _ingestion_base(
         "bluesky",
         secret_name="life-platform/bluesky",
         s3_prefix="raw/matthew/bluesky/*",
+        extra_s3_read=["config/content_filter.json"],
     ) + [_bedrock_statement()]
 
 
@@ -222,10 +235,16 @@ def ingestion_mastodon() -> list[iam.PolicyStatement]:
     # origin:human post at ingestion (broadcast_sensitivity_gate) before it can appear in
     # the S4 feed. Its off-topic layer is a cheap Haiku pass via bedrock_client (ADR-062 —
     # IAM auth, no raw key), budget-gated and fail-closed, so this role needs bedrock:InvokeModel.
+    #
+    # #2824: same gate, same missing first layer as ingestion_youtube — the ER-06
+    # blocked-term screen (broadcast_sensitivity_gate -> privacy_guard ->
+    # content_filter_channel) reads config/content_filter.json (#2503). Scoped to that
+    # one object.
     return _ingestion_base(
         "mastodon",
         secret_name="life-platform/mastodon",
         s3_prefix="raw/matthew/mastodon/*",
+        extra_s3_read=["config/content_filter.json"],
     ) + [_bedrock_statement()]
 
 
@@ -327,6 +346,17 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
         ),
         _bedrock_statement(),  # ADR-062: AI-calling enrichment role → Bedrock invoke
         iam.PolicyStatement(
+            # #2824: the coach reaction resolves WHO is reacting through
+            # persona_registry.load_registry(), which reads config/personas.json from S3.
+            # This role had no s3:GetObject at all, so the registry read failed
+            # AccessDenied and fail-softed to an empty registry — the #2469 shape
+            # (a nameless, persona-free coach) on the diary-reaction path. Scoped to the
+            # one object it reads.
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=_s3("config/personas.json"),
+        ),
+        iam.PolicyStatement(
             sid="SSMRead",  # #1756: budget_guard tier gate + the ADR-077 cycle stamp
             actions=["ssm:GetParameter"],
             resources=[
@@ -407,6 +437,15 @@ def ingestion_social_enrichment() -> list[iam.PolicyStatement]:
             resources=[_secret_arn("life-platform/ai-keys")],
         ),
         _bedrock_statement(),  # ADR-062: AI-calling enrichment role → Bedrock invoke
+        iam.PolicyStatement(
+            # #2824: same gap as ingestion_journal_enrichment — the coach reaction
+            # resolves its persona through persona_registry.load_registry(), which reads
+            # config/personas.json from S3, and this role had no s3:GetObject at all.
+            # Scoped to the one object it reads.
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=_s3("config/personas.json"),
+        ),
         iam.PolicyStatement(
             sid="SSMRead",  # #1675: budget_guard tier gate + the ADR-077 cycle stamp
             actions=["ssm:GetParameter"],

@@ -194,9 +194,9 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > `bedrock cost telemetry emit failed` lines, and `LifePlatform/AI EstimatedCostUSD`
 > gains datapoints timestamped during the run.
 
-## Remediation-role AI cost telemetry — STAGED (#2883), NOT yet applied
+## Remediation-role AI cost telemetry — APPLIED 2026-08-24 (#2883)
 
-> **Status: the checked-in JSON is AHEAD of live.** #2883 adds ONE statement to
+> **Status: APPLIED live 2026-08-24 (put-role-policy; `verify_oidc_iam.py` CLEAN).** #2883 adds ONE statement to
 > `github-actions-remediation-role.permissions.json`: `AiCostTelemetry` —
 > `cloudwatch:PutMetricData` namespace-conditioned to `LifePlatform/AI` (identical
 > least-privilege shape to the diagnosis role's #2974 grant above), so
@@ -224,6 +224,44 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > the run. This alone will not land `CostMetricDriftRatio` under 1.15 — the other
 > named residual (interactive dev-session Bedrock usage) is out of scope by design —
 > but it closes the one attributable, in-repo-fixable gap.
+
+## Golden-eval-role budget tier + eval config reads — STAGED (#2824), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live.** #2824's grant-enumeration sweep
+> (`tests/test_grant_enumeration_drift.py`) derived three fail-closed channels this role's
+> entrypoints reach and its policy did not grant — all three confirmed against the **LIVE**
+> inline policy, not just the checked-in doc. Two statements close them:
+>
+> - **`BudgetTierRead`** — `ssm:GetParameter` on `/life-platform/budget-tier`, the same
+>   shape #3059 added to the diagnosis role. Consumer path:
+>   `tests/golden_brief_eval.py::_run_voice_judge` → `bedrock_client.invoke` →
+>   `budget_guard.current_tier`. `current_tier()` fails **open** to tier 0 without the read,
+>   so the ADR-125 tier-3 hard stop cannot stop the weekly judge's Bedrock spend — this job
+>   has been billing outside the ceiling by construction. Third member of the #2959
+>   cycle-param class.
+> - **`EvalConfigRead`** — `s3:GetObject` on `config/personas.json` and `config/coaches/*`.
+>   Consumer paths: `tests/golden_surface_eval.py::_eval_generic` imports
+>   `state_of_matthew_lambda`, whose module scope calls `persona_registry.short_id_names()`
+>   (`config/personas.json`); `tests/golden_brief_eval.py` reads the coach dossier
+>   (`config/coaches/{id}.json`). The role held **no `s3:GetObject` at all**, so both reads
+>   fail AccessDenied and the eval grades a nameless, persona-free surface — the #2469 shape
+>   inside the harness that is supposed to catch it. Object-scoped (plus the one coaches
+>   prefix), not bucket- or `config/*`-wide.
+>
+> Both ship in the one file, so a single apply lands them. Apply (attended):
+>
+> ```bash
+> aws iam put-role-policy \
+>   --role-name github-actions-golden-eval-role \
+>   --policy-name golden-eval-permissions \
+>   --policy-document file://infra/iam/github-actions-golden-eval-role.permissions.json
+> python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
+> ```
+>
+> Post-apply proof: `tests/test_grant_enumeration_drift.py`'s live-parity half
+> (`test_live_oidc_role_grants_cover_the_derived_consumer_set`, credentialed run) reds on
+> its three `_PENDING_LIVE_APPLY` entries until they are deleted — that red **is** the
+> confirmation the apply landed, and deleting them is the ratchet shrink.
 
 ### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
 

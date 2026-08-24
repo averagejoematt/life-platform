@@ -245,6 +245,16 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             actions=["s3:GetObject"],
             resources=[f"{BUCKET_ARN}/config/*", f"{BUCKET_ARN}/site/config/*"],
         ),
+        # #2824: board_ask's write-back (_write_board_interaction) stamps each stored
+        # COACH#/INTERACTION# row through phase_taxonomy.experiment_stamp() ->
+        # coach_checkin.read_cycle(). This role carried NO SSM statement at all (site_api()
+        # has held one since #1371), so the stamp fail-softed to no cycle and the reader-
+        # facing board's episodic memory landed unattributable to an experiment generation.
+        iam.PolicyStatement(
+            sid="ExperimentCycleRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+        ),
         # #1441: generation-time AI-surface archive — every published board answer
         # is copied to generated/qa_archive/text/ (fail-soft in code). PutObject only,
         # scoped to the one archive prefix; this role stays read-only everywhere
