@@ -48,6 +48,17 @@
         "arn:aws:s3:::matthew-life-platform/config/personas.json",
         "arn:aws:s3:::matthew-life-platform/config/coaches/*"
       ]
+    },
+    {
+      "Sid": "AiCostTelemetry",
+      "Effect": "Allow",
+      "Action": "cloudwatch:PutMetricData",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "cloudwatch:namespace": "LifePlatform/AI"
+        }
+      }
     }
   ]
 }
