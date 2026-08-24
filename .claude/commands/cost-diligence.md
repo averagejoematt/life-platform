@@ -52,7 +52,7 @@ aws ce get-cost-and-usage --time-period Start=<month>-01,End=<today+1> --granula
 
 # 5. Live estates (the physical inventory behind the CloudWatch bill)
 aws cloudwatch describe-alarms --query 'length(MetricAlarms)'          # alarm count
-aws cloudwatch list-metrics | <count custom (non-AWS/*) series by namespace>  # EMF estate
+python3 deploy/emf_series_census.py --strict                          # EMF estate, graded (#2837)
 
 # 6. The governor's own view (drift check: its numbers vs CE's)
 aws ssm get-parameter --name /life-platform/budget-breakdown --query Parameter.Value --output text
@@ -128,10 +128,19 @@ Decisions Log and open #2801 stories before writing it down.
    `docs/COST_TRACKER.md` (CE actual, days at tier ≥1, cost per reader-week), append the
    row, update the Verified stamps **only for numbers actually re-read this run** (#2838:
    a fresh stamp on unverified prose is the defect, not diligence).
-4. **File the net-new stories** under the cost epic via the issue-filer contract —
+4. **EMF series-count line** (#2837) — append this run's census line to the *EMF series
+   census log* in `docs/PROPORTIONALITY.md`:
+   `python3 deploy/emf_series_census.py --line`. That dated line is the only thing that
+   advances the `emf-series-census` operating-calendar clock, and its exit code is the
+   grade: **1 means a namespace went over its ledger budget or appeared unregistered** —
+   fix the ledger row (or the cardinality) in the same close, do not append a line over
+   a red. The retirement candidates are in `deploy/emf_namespace_ledger.py --retire`;
+   acting on one is a code change with its own PR, and ADR-116 governs it — never trade
+   silent-failure coverage for metric-months.
+5. **File the net-new stories** under the cost epic via the issue-filer contract —
    plain `#N` references, never closing keywords (a negated closing keyword still
    closes).
-5. If the ceiling or bands changed: `scripts/check_doc_facts.py`'s `BUDGET_OK` set and
+6. If the ceiling or bands changed: `scripts/check_doc_facts.py`'s `BUDGET_OK` set and
    the AWS Budgets backstop amount (never the budget's name) move in the same PR.
 
 ## Reference run

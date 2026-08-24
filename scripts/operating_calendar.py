@@ -181,6 +181,32 @@ CALENDAR: dict[str, dict] = {
             "proportionality-reread does (a bumped literal is not a re-read, #2986)."
         ),
     ),
+    "emf-series-census": _entry(
+        # A step OF the monthly cost close, not a ritual of its own — and `skill` is
+        # graded against the review-skill discovery set (names containing "review"),
+        # so naming `cost-diligence` here would register as a phantom skill. The
+        # obligation below carries the wiring instead.
+        skill=None,
+        cadence_days=31,
+        grace_days=7,
+        attendance=SESSION,
+        probe=(REGEX_IN_FILE, "docs/PROPORTIONALITY.md", r"^- EMF census: (\d{4}-\d{2}-\d{2})"),
+        obligations=(
+            "Run `python3 deploy/emf_series_census.py --strict`; resolve any over-budget "
+            "or unregistered namespace in deploy/emf_namespace_ledger.py BEFORE appending "
+            "the dated line the probe reads — a line appended over a red records a number "
+            "nobody acted on",
+        ),
+        reason=(
+            "#2837: CloudWatch MetricMonitorUsage grew 9x in three months (7.4 -> 66.9 "
+            "metric-months, $0 -> $18.88) and flipped past AlarmMonitorUsage with nothing "
+            "watching — 743 series across 35 namespaces had no inventory, budget or owner, "
+            "so the only detector was the invoice. The ledger makes each namespace name a "
+            "consumer; this entry is what keeps the count a LIVE measurement rather than a "
+            "one-time audit. It rides the monthly cost close (cost-diligence Phase 5) "
+            "because the series count is only meaningful next to the dollars it explains."
+        ),
+    ),
     # ── Quarterly ─────────────────────────────────────────────────────────────
     "sdlc-review": _entry(
         skill="sdlc-review",
