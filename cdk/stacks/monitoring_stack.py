@@ -21,7 +21,7 @@ Covers:
     life-platform-ddb-item-size-warning  LifePlatform/DynamoDB ItemSizeBytes Max >= 307200, 300s
 
   S3 storage size alarm (1):  OBS-08
-    life-platform-s3-bucket-size-high  BucketSizeBytes Max >= 50GB, 86400s
+    life-platform-s3-bucket-size-high  BucketSizeBytes Max >= 65GiB, 86400s (was 50GB, DIL-026/#2799)
 
   #411 / ADR-116 (CloudWatch cost audit, 2026-07 — docs/reviews/CLOUDWATCH_AUDIT_2026-07.md):
     Adopted 2 previously-orphan silent-failure signals into IaC:
@@ -1014,9 +1014,17 @@ class MonitoringStack(Stack):
         add_silence_alarms(self, digest)
 
         # ══════════════════════════════════════════════════════════════
-        # OBS-08: S3 bucket storage size alarm
-        # BucketSizeBytes is a daily metric — period must be 86400s.
-        # Alerts if raw/ accumulation exceeds 50 GB unexpectedly.
+        # OBS-08: S3 bucket storage size alarm (period 86400s, daily metric).
+        # Threshold re-derived 50GB→65GiB 2026-08-24 (DIL-026/#2799, ADR-105 —
+        # from measured growth, not a guess; full derivation + prefix sizing in
+        # the DIL-026 row of docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md and
+        # the PROPORTIONALITY.md row for check_s3_lifecycle). Summary: deploys/
+        # noncurrent (41.5GB, #2642's rule confirmed live and correct) is a
+        # 7-day rolling-window artifact of routine deploy velocity, not a gap;
+        # imports/ WAS a real gap (2.07GB, zero coverage — fixed alongside this).
+        # 30d history shows a ~52-55GB post-fix steady state, i.e. 50GB sat AT
+        # the median and would page most weeks; 65GiB gives ~20-25% headroom.
+        # Revisit on a real steady-state shift — re-derive, never silently re-bump.
         # ══════════════════════════════════════════════════════════════
         _alarm(
             "S3BucketSizeHigh",
@@ -1025,7 +1033,7 @@ class MonitoringStack(Stack):
             "BucketSizeBytes",
             86400,
             "Maximum",
-            50 * 1024**3,
+            65 * 1024**3,
             GTE,
             {"BucketName": S3_BUCKET, "StorageType": "StandardStorage"},
             to_digest=True,

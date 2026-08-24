@@ -75,7 +75,7 @@ repo-visibility change, or GitHub shipping ref-level purge tooling.
 | 023 heartbeat silent-fail | **STALE** | #1196 fixed; `test_heartbeat_completeness.py` + live liveness gauge | — |
 | 024 clock-based sequencing | **CONFIRMED** | 5 compute lambdas run blind on cron; no completeness manifest | D3 source-completeness contract |
 | 025 idempotency/replay | **CONFIRMED (arch risk)** | 7 email senders + write-MCP + webhooks; no enterprise-wide inventory | D3 idempotency census |
-| 026 S3 noncurrent growth | **CONFIRMED** | `imports/` uncovered (2.23GB); no drift assertion (only post-hoc 50GB alarm) | D3 (#2799 home) |
+| 026 S3 noncurrent growth | **CONFIRMED → FIXED 2026-08-24 (pending post-merge apply)** | Was: `imports/` uncovered (2.23GB measured 08-23, 2.07GB reconfirmed 08-24); no drift assertion (only post-hoc 50GB alarm, which cannot name which prefix drifted). Live sizing (`list_object_versions` by top-level prefix, 08-24): `deploys/` dominates noncurrent bytes (41.5GB) but its #2642 rule IS live and matches declared config exactly — a 7-day rolling-window artifact of this session's deploy velocity, not a coverage gap | `imports/` covered (`deploy/s3_lifecycle.json` + `apply_s3_lifecycle.sh`, 7d noncurrent/keep-1, same shape as `raw/`); declared-vs-live drift assertion live in `deploy/drift_sentinel.py::check_s3_lifecycle` (weekly, mutation-proved missing/extra/changed-rule both directions, wired into the existing report → needs-human path); `life-platform-s3-bucket-size-high` re-derived 50GB→65GiB from the measured ~52-55GB steady state (ADR-105, ~20-25% headroom). Deploy note: needs `bash deploy/apply_s3_lifecycle.sh` post-merge in addition to `cdk deploy LifePlatformMonitoring` — the lifecycle bucket is out-of-IaC and CDK does not touch it |
 | 027 single-region recovery | **CONFIRMED** | SECURITY accepts no cross-region | PRICED + cross-account backup for raw/ (D3) |
 | 028 raw-layout drift | **STALE (reverify)** | #1256 closed; `raw_layout` facets exist | D3 replay-proof test |
 | 029 stale-cycle grounding | **STALE (reverify)** | closed coach-correction epic; standing assurance = D4 | D4 eval matrix |
@@ -102,7 +102,7 @@ repo-visibility change, or GitHub shipping ref-level purge tooling.
 4. `check_doc_facts.py` **scans no `.js`** — the site's most-quoted number ships un-guarded. → **CLOSED 2026-08-23** (D0.5 sweep: the ceiling-literal scan now covers `site/**/*.js` + `site/**/*.html` (legacy excepted) + the `v4_*` generators, with planted-defect mutation proof in `tests/test_doc_facts_budget_2899.py`). D2 owns the wider truth manifest.
 5. Privacy-tier registry and DATA_GOVERNANCE prose are **unreconciled twin sources**. → **CLOSED 2026-08-23** (#3045/ADR-155: full port + `tests/test_data_governance_tier_guard_3045.py` reconciles both directions — an unported prose row OR an ungoverned registry entry reds the build, mutation-proved on planted defects both ways).
 6. `GradableCount` metric emitted but **no ratio alarm** — a permanently-ungradeable majority is invisible. → D0.4.
-7. `imports/` (health uploads) noncurrent versions **uncovered by lifecycle**, no drift assertion. → D3.
+7. `imports/` (health uploads) noncurrent versions **uncovered by lifecycle**, no drift assertion. → **CLOSED 2026-08-24** (see DIL-026 row): coverage + `check_s3_lifecycle` drift assertion landed; `bash deploy/apply_s3_lifecycle.sh` still pending post-merge.
 
 ## Priced-acceptance register (dated; revisit triggers)
 

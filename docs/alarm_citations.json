@@ -50,8 +50,8 @@
     "cited": "2026-08-24"
   },
   "life-platform-s3-bucket-size-high": {
-    "citation": "#3049-adjacent — folded into the DIL-026 S3 lifecycle lane (Session A)",
-    "note": "BucketSizeBytes crossed 50GiB (54.6GB) on 2026-08-22. Bucket size only grows — this will NOT self-clear. The DIL-026 lifecycle lane (Session A, 2026-08-24) must size top prefixes and either add lifecycle coverage (imports/ noncurrent 2.23GB known) or re-derive the threshold with a dated decision; until that lane lands this citation is the owner.",
+    "citation": "#2799 — DIL-026 S3 lifecycle lane, fix landed 2026-08-24 (pending post-merge apply)",
+    "note": "BucketSizeBytes crossed 50GiB (54.6GB) on 2026-08-22. Live sizing (2026-08-24) found deploys/ dominates (41.5GB noncurrent, but its #2642 rule is live and correctly configured — a 7-day rolling-window artifact of routine deploy velocity, not a gap) and imports/ was a real gap (2.07GB, zero coverage). Fix: imports/ lifecycle coverage added (deploy/s3_lifecycle.json) + declared-vs-live drift assertion (deploy/drift_sentinel.py::check_s3_lifecycle) + threshold re-derived 50GB→65GiB from the measured ~52-55GB steady state (ADR-105). Two post-merge steps required before this clears: `bash deploy/apply_s3_lifecycle.sh` (imports/ rule; out-of-IaC, cdk deploy does not touch it) and `bash deploy/cdk_deploy.sh LifePlatformMonitoring` (new threshold). Expect clear within ~24-48h of both landing (next BucketSizeBytes daily period + imports/ lifecycle sweep). Re-check before pruning this citation.",
     "cited": "2026-08-24"
   }
 }
