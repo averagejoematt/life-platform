@@ -1294,33 +1294,166 @@ def test_quota_html_empty_when_no_record_or_no_quota_check():
     assert drift_report.quota_html({"checks": {}}) == ""
 
 
-# ── codeql_alerts regrowth check (#1902) ─────────────────────────────────────
+# ── codeql_alerts regrowth check (#1902) + its can-it-fail proof (#2578) ─────
+#
+# `check_codeql_alerts` is DEFINED in drift_sentinel, so `ds._gh_api_result` /
+# `ds._codeql_api` ARE its patch points (unlike the sentinel_github-defined checks
+# above, where the re-export is not). Patched at two depths on purpose:
+#   * `ds._gh_api_result` — exercises the real `_codeql_api` (credential choice,
+#     the scope-gapped retry, the fail-closed branch).
+#   * `ds._codeql_api`    — exercises the real `check_codeql_alerts` end-to-end
+#     through run_sweep into the triage path.
+
+_PLANTED_ALERT = {
+    "rule": {"id": "py/clear-text-logging-sensitive-data"},
+    "most_recent_instance": {"location": {"path": "setup/x.py", "start_line": 7}},
+}
 
 
 def test_codeql_alerts_clean_at_zero(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", lambda path, timeout=30: [])
+    monkeypatch.setattr(ds, "_codeql_api", lambda path, timeout=60: ([], None))
     res = ds.check_codeql_alerts()
     assert res["status"] == "clean"
     assert res["open_count"] == 0
+    assert res["reason"] == "triaged"
 
 
 def test_codeql_alerts_drift_on_any_open_alert(monkeypatch):
-    alert = {
-        "rule": {"id": "py/clear-text-logging-sensitive-data"},
-        "most_recent_instance": {"location": {"path": "setup/x.py", "start_line": 7}},
-    }
-    monkeypatch.setattr(ds, "_gh_api_json", lambda path, timeout=30: [alert])
+    monkeypatch.setattr(ds, "_codeql_api", lambda path, timeout=60: ([_PLANTED_ALERT], None))
     res = ds.check_codeql_alerts()
     assert res["status"] == "drift"
+    assert res["reason"] == "regrowth"
     assert res["open_count"] == 1
     assert "py/clear-text-logging-sensitive-data @ setup/x.py:7" in res["sample"]
     assert "triage" in res["detail"]
 
 
-def test_codeql_alerts_error_when_api_unavailable(monkeypatch):
-    monkeypatch.setattr(ds, "_gh_api_json", lambda path, timeout=30: None)
+def test_codeql_alerts_fails_closed_when_the_list_is_unreadable(monkeypatch):
+    """#2578 root cause (c). This returned `status: "error"` for its whole life —
+    3/3 persisted sentinel records since #1902 shipped it — and `error` never reaches
+    drift_report.as_signal. An unreadable alert list is indistinguishable from an
+    un-triaged one, so it must be DRIFT."""
+    err = {"classification": "scope", "detail": "HTTP 403: Resource not accessible by integration"}
+    monkeypatch.setattr(ds, "_codeql_api", lambda path, timeout=60: (None, err))
     res = ds.check_codeql_alerts()
-    assert res["status"] == "error"
+    assert res["status"] == "drift"
+    assert res["reason"] == "unreadable"
+    assert res["open_count"] is None
+    assert "UNREADABLE" in res["detail"]
+    # The finding names its own remedy rather than shrugging "auth/scope?".
+    assert "security-events: read" in res["detail"]
+    assert "Code scanning alerts: read" in res["detail"]
+
+
+def test_codeql_alerts_fails_closed_on_a_non_list_body(monkeypatch):
+    monkeypatch.setattr(ds, "_codeql_api", lambda path, timeout=60: ({"message": "Not Found"}, None))
+    res = ds.check_codeql_alerts()
+    assert res["status"] == "drift"
+    assert res["reason"] == "unreadable"
+
+
+def test_codeql_read_never_goes_through_the_billing_token_helper(monkeypatch):
+    """#2578 root cause (a). The check called `sentinel_quota._gh_api_json`, whose
+    #1613 contract swaps GH_TOKEN for GH_BILLING_TOKEN when that is set — and it IS
+    set live (repo secret since 2026-07-26), so every code-scanning GET went out on a
+    billing-scoped user PAT and 403'd. Regression guard: touching that helper reds."""
+
+    def _forbidden(*a, **k):
+        raise AssertionError("check_codeql_alerts must not read code-scanning through the billing-token helper (#2578)")
+
+    monkeypatch.setattr(ds, "_gh_api_json", _forbidden)
+    monkeypatch.setattr(ds, "_gh_api_result", lambda path, timeout=60: ([], None))
+    assert ds.check_codeql_alerts()["status"] == "clean"
+
+
+def test_codeql_api_retries_on_the_ambient_token_when_the_pat_is_scope_gapped(monkeypatch):
+    """A PAT that overrides GITHUB_TOKEN but lacks `Code scanning alerts: read` must
+    not be able to re-dark this check the way GH_BILLING_TOKEN did (#2578)."""
+    monkeypatch.setenv("GH_POSTURE_TOKEN", "pat-without-code-scanning")
+    seen = []
+
+    def _fake(path, timeout=60):
+        seen.append(os.environ.get("GH_POSTURE_TOKEN"))
+        if len(seen) == 1:
+            return None, {"classification": "scope", "detail": "HTTP 403"}
+        return [_PLANTED_ALERT], None
+
+    monkeypatch.setattr(ds, "_gh_api_result", _fake)
+    data, err = ds._codeql_api("repos/{owner}/{repo}/code-scanning/alerts?state=open")
+    assert err is None and data == [_PLANTED_ALERT]
+    # First attempt carried the PAT; the retry deliberately did not — and the env is restored.
+    assert seen == ["pat-without-code-scanning", None]
+    assert os.environ.get("GH_POSTURE_TOKEN") == "pat-without-code-scanning"
+
+
+def _sweep_with_real_codeql(monkeypatch, codeql_api):
+    """run_sweep with every OTHER check stubbed clean and the REAL check_codeql_alerts
+    running against a planted code-scanning response."""
+    real = ds.check_codeql_alerts
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean", "missing_prefixes": []},
+    )
+    monkeypatch.setattr(ds, "check_codeql_alerts", real)  # undo _patch_all's stub
+    monkeypatch.setattr(ds, "_codeql_api", codeql_api)
+    return ds.run_sweep()
+
+
+def test_planted_open_alert_reaches_the_triage_path(capsys, monkeypatch):
+    """#2578 can-it-fail proof, regrowth leg: a planted OPEN alert must BOTH appear in
+    the report AND reach a triage path. Surfacing that lands nowhere is the same as
+    not firing — so the assert runs all the way through drift_report.as_signal, which
+    is what remediation/agent.py feeds into `signals["drift"]`."""
+    rec = _sweep_with_real_codeql(monkeypatch, lambda path, timeout=60: ([_PLANTED_ALERT], None))
+
+    # (1) it appears in the report
+    assert rec["status"] == "drift"
+    assert rec["checks"]["codeql_alerts"]["status"] == "drift"
+    assert "1 un-triaged open CodeQL alert(s)" in rec["summary"]
+    ds.print_summary(rec)
+    printed = capsys.readouterr().out
+    assert "codeql_alerts: drift" in printed
+    assert "open CodeQL alert(s) on main" in printed  # the detail, not a bare status word
+
+    # (2) it reaches the triage path
+    sig = drift_report.as_signal(rec)
+    assert sig is not None, "an open CodeQL alert produced no triage signal"
+    assert sig["class"] == "needs-human"
+    assert "codeql_alerts" in sig["flagging"]
+    assert drift_report.status_html(rec).count("CodeQL") >= 1
+
+
+def test_unreadable_alert_list_also_reaches_the_triage_path(monkeypatch):
+    """The fail-closed leg of the same proof — the shape that actually occurred. Under
+    the old `error` status this record was `degraded`, as_signal returned None, and the
+    only trace was a summary tail-clause behind six drifted stacks."""
+    err = {"classification": "scope", "detail": "HTTP 403: Resource not accessible by integration"}
+    rec = _sweep_with_real_codeql(monkeypatch, lambda path, timeout=60: (None, err))
+
+    assert rec["status"] == "drift"  # not "degraded"
+    assert "CodeQL alert list UNREADABLE (fail-closed)" in rec["summary"]
+    sig = drift_report.as_signal(rec)
+    assert sig is not None, "an unreadable CodeQL alert list produced no triage signal (#2578)"
+    assert "codeql_alerts" in sig["flagging"]
+
+
+def test_remediation_workflow_grants_security_events_read():
+    """#2578 root cause (b): the workflow declares an explicit `permissions:` block,
+    which zeroes every unlisted scope. Without `security-events: read` the built-in
+    GITHUB_TOKEN cannot GET /code-scanning/alerts, so the check is dark no matter what
+    the code does. Asserted against the live YAML, not a fixture."""
+    yaml = pytest.importorskip("yaml")  # same guard as test_push_trigger_globs_match_workflows (#3100)
+
+    path = os.path.join(_ROOT, ".github", "workflows", "remediation-agent.yml")
+    with open(path) as f:
+        wf = yaml.safe_load(f)
+    assert wf["permissions"].get("security-events") == "read", (
+        "remediation-agent.yml must grant `security-events: read` — drift_sentinel."
+        "check_codeql_alerts reads GET /code-scanning/alerts (#2578)"
+    )
 
 
 def test_sweep_surfaces_codeql_drift_in_summary(monkeypatch):
