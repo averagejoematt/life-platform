@@ -385,6 +385,7 @@ def test_every_ci_role_has_a_checked_in_permissions_doc():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@require_ci_sweep  # unions FLEET_DYNAMIC | CI_DYNAMIC — half the observed set needs the yaml sweep
 def test_dynamic_reference_ratchet_does_not_grow():
     """Runtime-computed channel ids cannot be grant-checked statically. Recording
     them is informational — the rule is only that a NEW one is a deliberate entry,
