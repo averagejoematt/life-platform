@@ -1,3 +1,13 @@
+# module-size-exception: canonical per-source data-facet registry (#392/#498), not logic
+# — SOURCE_REGISTRY is a dict of per-source facet rows plus their thin derivation helpers.
+# Growth is linear in the number of SOURCES (~20 today, each ~10-25 facet lines +
+# rationale comments), not in feature complexity, and #1256/DIL-028 just added one more
+# machine-readable facet (`filename_legacy`) across five existing rows — exactly the shape
+# this file is FOR. Splitting it (e.g. one file per source) would create a second place to
+# look up a source's facets and reintroduce the exact enumeration drift #392/#2003/X-10
+# eliminated by centralizing here — every consumer listed below reads ONE dict. See
+# docs/ENGINEERING_STANDARDS.md §2 (registry/dispatch-table exemption) and the module
+# docstring immediately below for the full list of derived consumers.
 """source_registry.py — THE canonical data-source registry (#392, facets #498).
 
 One place a source's identity, staleness threshold, behavioral-vs-infrastructure
