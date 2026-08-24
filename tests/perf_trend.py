@@ -14,8 +14,8 @@ it a trend you can see:
          generated/qa_archive/perf/runs/{YYYY-MM-DD}/{HHMMSS}--{uuid8}.json
      (S3, ADR-046 generated/ prefix — CloudFront/site sync can never touch it; the
      existing `qa-archive-expire-90d` lifecycle rule already bounds retention to
-     ~97 days at the byte level, no new lifecycle rule needed — see
-     deploy/apply_s3_lifecycle.sh).
+     ~97 days at the byte level, no new lifecycle rule needed — declared in
+     deploy/s3_lifecycle.json, applied by deploy/apply_s3_lifecycle.sh).
 
   2. rollup() reads the last window_days of snapshots, medians each page's metrics
      per ISO week, detects a step-change regression against the trailing baseline,
