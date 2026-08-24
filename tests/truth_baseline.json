@@ -1,35 +1,17 @@
 {
-  "_meta": {
-    "captured_at": "2026-08-23T23:27:08+00:00",
-    "note": "Committed reader-truth debt ledger \u2014 honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) \u2014 `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
-  },
-  "pages": {
-    "/method/board/": [
-      {
-        "category": "audience_violation",
-        "issue": "#3018",
-        "added": "2026-08-22",
-        "severity_observed": "high",
-        "note_sample": "Dr. Lisa Park addresses the subject directly: 'Matthew \u2014 and I want to name that plainly', 'I want to put to you directly', 'you were actively logging', 'When you're ready, I'd like you to resume'. Th"
-      }
-    ],
-    "/method/verify/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#2957",
-        "added": "2026-08-23",
-        "severity_observed": "high",
-        "note_sample": "The 'WHOOP VS GARMIN, NIGHT BY NIGHT' table contains 30 rows spanning 2026-04-29 through 2026-06-15, presented as live data on a Day-7 cycle-14 page without 'prior cycle'/'lifetime' labeling (Garmin p"
-      }
-    ],
-    "/method/wrong/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#2957",
-        "added": "2026-08-23",
-        "severity_observed": "high",
-        "note_sample": "The table shows two catches dated 2026-06-18 and 2026-05-19, which are before the cycle start of 2026-08-17. The page header correctly states 'DAY 7 \u00b7 WEEK 1, SINCE AUGUST 17 2026', but the catch tabl"
-      }
-    ]
-  }
+ "_meta": {
+  "captured_at": "2026-08-23T23:27:08+00:00",
+  "note": "Committed reader-truth debt ledger — honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) — `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
+ },
+ "pages": {
+  "/method/wrong/": [
+   {
+    "category": "temporal_contradiction",
+    "issue": "#2957",
+    "added": "2026-08-23",
+    "severity_observed": "high",
+    "note_sample": "The table shows two catches dated 2026-06-18 and 2026-05-19, which are before the cycle start of 2026-08-17. The page header correctly states 'DAY 7 · WEEK 1, SINCE AUGUST 17 2026', but the catch tabl"
+   }
+  ]
+ }
 }
