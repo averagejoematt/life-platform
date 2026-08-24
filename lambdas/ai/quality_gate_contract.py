@@ -74,6 +74,16 @@ def quality_gate_event(
     }
 
 
+try:  # #2813 — register with the standing PT-day producer/gate contract sweep
+    # (tests/test_pt_day_contract_sweep_2813.py). Optional and inert on a partial
+    # bundle; registration is never load-bearing for the wire event this builds.
+    from common.pt_day_contract import pt_day_contract as _pt_day_contract
+
+    quality_gate_event = _pt_day_contract(extract=lambda r: r["generation_date"], args=("test-coach", "text", {}))(quality_gate_event)
+except Exception:  # noqa: BLE001
+    pass
+
+
 def brief_with_grounding(
     generation_brief: Any,
     canonical_facts: Optional[dict] = None,
