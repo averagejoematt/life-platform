@@ -228,6 +228,11 @@ READER_INVENTORY = {
     # (todoist among the names it classifies) for the newest DATE# sort key. It
     # reads no record fields at all — see NON_RECORD_KEYS above.
     "operational/continuity_watch.py",
+    # #3049: the compute-input census names todoist as an input of two compute
+    # Lambdas, and the manifest probes its partition with a Limit-1 newest-first
+    # read projecting ONLY `sk`. It reads no record fields — same shape as
+    # pillar_absence and continuity_watch above.
+    "common/input_manifest.py",
 }
 
 

@@ -52,6 +52,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import (
@@ -928,12 +929,11 @@ def get_source_fingerprints(yesterday_str, sources=None):
       ingested_at          — Scheduled Lambda writes (Strava, Habitify, etc.)
     """
     if sources is None:
-        # TB7-16: When adding a new data source (e.g. google_calendar, monarch_money),
-        # add it to this list. If a source is omitted, late-arriving data for that
-        # source will NOT trigger a recompute — the Daily Brief may silently reflect
-        # stale values. Sources should be included only if they materially affect
-        # day grade scoring or the AI coaching context.
-        sources = ["whoop", "apple_health", "macrofactor", "strava", "habitify", "withings", "hevy"]
+        # TB7-16 / #3049: the set is DECLARED ONCE in the compute-input census
+        # (common.input_manifest.COMPUTE_INPUTS) — this was a second copy, carried as
+        # conformance debt since 2026-08-17 (#2844 ledger). Add a new source THERE and
+        # both the recompute fingerprint and the freshness manifest pick it up.
+        sources = list(COMPUTE_INPUTS["daily-metrics-compute"])
     fps = {}
     for src in sources:
         if src == "hevy":

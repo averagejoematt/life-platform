@@ -68,14 +68,52 @@ def scan_quiet_behavioral_sources(table, today_d, user_id=None):
     return quiet
 
 
-def build_data_status_banner_html(stale, quiet):
-    """The WR-48 "Data Status" banner + the #2326 "Quiet inputs" notice, as one
-    HTML string ("" when there is nothing to say). Pure — testable without SES.
+def qualified_compute_outputs(records):
+    """#3049 (DIL-024): the compute outputs this brief is reading that were built
+    on stale/missing input.
+
+    ``records`` is ``{label: record_or_None}`` — whatever the brief already
+    fetched. A record with no ``input_status`` predates the contract and is
+    skipped (silence is not a claim, in either direction); ``complete`` is
+    likewise skipped because there is nothing to say. Returns
+    ``[{label, status, note}]``, sorted, ready for the renderer below.
+
+    Deliberately a DIFFERENT signal from ``scan_stale_sources``: that one asks
+    "is a source stale right NOW, at brief time"; this one reports what the
+    compute run observed when it ran, hours earlier. A connector that recovered
+    in between makes the first say "fine" while the day's score is still built
+    on the gap — which is precisely the blindness #3049 names.
+    """
+    from common.input_manifest import MANIFEST_COMPLETE, manifest_note
+
+    out = []
+    for label, rec in sorted((records or {}).items()):
+        if not isinstance(rec, dict):
+            continue
+        status = rec.get("input_status")
+        if not status or status == MANIFEST_COMPLETE:
+            continue
+        note = manifest_note(rec.get("input_manifest"))
+        if not note:
+            continue
+        out.append({"label": label, "status": str(status), "note": note})
+    return out
+
+
+def build_data_status_banner_html(stale, quiet, compute_partial=None):
+    """The WR-48 "Data Status" banner + the #2326 "Quiet inputs" notice + the
+    #3049 "Computed on partial input" notice, as one HTML string ("" when there
+    is nothing to say). Pure — testable without SES.
 
     Honesty split (ADR-104): a load-bearing behavioral source that has crossed
     its quiet threshold is re-homed OUT of the amber "stale" list (which reads
     as breakage) into a calm block that states the absence — nothing is broken,
     there is simply nothing to ingest, and nothing pages.
+
+    ``compute_partial`` (from ``qualified_compute_outputs``) is the third,
+    distinct block: not "a source is stale" but "the number below was computed
+    without it". Rendered even when the stale list is empty, because the whole
+    point is that these two can disagree.
     """
     quiet_keys = {q["source"] for q in quiet}
     stale = [s for s in stale if s["source"] not in quiet_keys]
@@ -119,6 +157,22 @@ def build_data_status_banner_html(stale, quiet):
             '<div style="margin-top:8px;font-size:11px;color:#4338ca">'
             "These only produce data when you log, weigh in, or train — the pipes are not broken "
             "and nothing is paging. This is a note about absence, not an outage (#2326)."
+            "</div></div>"
+        )
+    if compute_partial:
+        _c_parts = []
+        for _c in compute_partial:
+            _c_parts.append(f'<li style="margin:2px 0"><strong>{_c["label"]}</strong> ({_c["status"]}) — {_c["note"]}</li>')
+        html_parts.append(
+            '<div style="background:#fef2f2;border-left:4px solid #ef4444;padding:14px 18px;'
+            'margin:0 0 16px;font-family:-apple-system,sans-serif;font-size:13px;color:#7f1d1d">'
+            f'<strong style="color:#991b1b">Computed on partial input — {len(compute_partial)} '
+            f'output{"s" if len(compute_partial) > 1 else ""} qualified</strong>'
+            f'<ul style="margin:6px 0 0;padding-left:18px;color:#7f1d1d">{"".join(_c_parts)}</ul>'
+            '<div style="margin-top:8px;font-size:11px;color:#991b1b">'
+            "These are the compute run's OWN record of what it could see when it ran (#3049). "
+            "A source that has recovered since does not un-qualify the numbers below — they were "
+            "computed without it."
             "</div></div>"
         )
     return "".join(html_parts)

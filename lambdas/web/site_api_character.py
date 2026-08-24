@@ -23,8 +23,10 @@ import json
 import os
 import re as _re
 from datetime import date as _date, timedelta
+from typing import Optional
 
 from boto3.dynamodb.conditions import Key
+from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024
 from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
@@ -37,6 +39,49 @@ from web.site_api_common import (
     _ok,
     logger,
 )
+
+
+def _public_input_manifest(record) -> Optional[dict]:
+    """#3049 (DIL-024) — the compute run's own input-freshness manifest, for readers.
+
+    Sibling to the #2388 pillar-absence state, and deliberately NOT a re-derivation
+    of it: ``_attach_pillar_absence`` asks "is this pillar's behavior dark *right
+    now*, at serve time"; this reports what the compute Lambda actually observed
+    *when it ran*. They can honestly disagree — a connector that recovered between
+    9:30 AM and the page load leaves a stale-input sheet with a live pillar — and
+    collapsing them would hide exactly that.
+
+    Returns None for a record written before the contract shipped. That absence is
+    the honest answer ("this record predates the contract"); synthesizing a
+    ``complete`` for an unstamped record is the failure mode this whole issue is
+    about. Values arrive already ``_decimal_to_float``-ed by the caller.
+    """
+    manifest = record.get("input_manifest")
+    if not isinstance(manifest, dict):
+        return None
+    sources = manifest.get("sources")
+    if not isinstance(sources, dict):
+        sources = {}
+    return {
+        "status": manifest.get("status"),
+        "complete": bool(manifest.get("complete")),
+        "as_of_day": manifest.get("as_of_day"),
+        "degraded": [str(s) for s in (manifest.get("degraded") or [])],
+        "unobserved": [str(s) for s in (manifest.get("unobserved") or [])],
+        # One sentence, built by the shared helper so the brief and the site can
+        # never word the same manifest two different ways.
+        "note": _manifest_note(manifest),
+        "sources": {
+            str(k): {
+                "status": (v or {}).get("status"),
+                "latest_day": (v or {}).get("latest_day"),
+                "age_hours": (v or {}).get("age_hours"),
+                "stale_after_hours": (v or {}).get("stale_after_hours"),
+            }
+            for k, v in sources.items()
+            if isinstance(v, dict)
+        },
+    }
 
 
 def _attach_pillar_absence(pillars, *, table, now, window_start) -> None:
@@ -323,6 +368,10 @@ def character(date: str | None = None, *, _g) -> dict:
                 ],
             },
             "pillars": pillars,
+            # #3049 (DIL-024): what the compute run was actually built from. None on
+            # pre-contract records — the front end renders a qualification only when
+            # there is one to render, and never invents "complete" from silence.
+            "input_manifest": _public_input_manifest(record),
         },
         cache_seconds=86400 if date else 900,  # the past is immutable
     )

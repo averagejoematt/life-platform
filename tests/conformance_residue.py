@@ -9,6 +9,12 @@ is not a thing; entries only ever come OUT (the #1964 ratchet precedent).
 
 Populated honestly by the initial sweep on 2026-08-17 (37 sites). Every entry
 is real debt: convert the site to a registry projection, then delete its line.
+
+2026-08-24 (#3049): -2. The two compute Lambdas that hand-typed their own ingest
+set now derive it from the compute-input census
+(`lambdas/common/input_manifest.py`, sanctioned in conformance_guard_lib) — one
+declaration feeding both the recompute fingerprint and the input-freshness
+manifest, instead of two copies of the same list feeding neither.
 """
 
 CONFORMANCE_RESIDUE: dict[str, str] = {
@@ -17,8 +23,6 @@ CONFORMANCE_RESIDUE: dict[str, str] = {
     "cdk/stacks/monitoring_stack.py::sources::dropbox,habitify,todoist,whoop": "2026-08-17",
     "cdk/stacks/monitoring_stack.py::sources::eightsleep,hevy,strava,whoop,withings": "2026-08-17",
     "cdk/stacks/monitoring_stack.py::sources::garmin,notion": "2026-08-17",
-    "lambdas/compute/daily_metrics_compute_lambda.py::sources::apple_health,habitify,hevy,macrofactor,strava,whoop,withings": "2026-08-17",
-    "lambdas/compute/hypothesis_engine_lambda.py::sources::apple_health,eightsleep,garmin,habitify,macrofactor,notion,strava,whoop,withings": "2026-08-17",
     "lambdas/content/engagement_core.py::sources::apple_health,eightsleep,whoop": "2026-08-17",
     "lambdas/content/html_builder.py::sources::habitify,macrofactor,strava,whoop": "2026-08-17",
     "lambdas/content/insight_writer.py::sources::garmin,strava,whoop": "2026-08-17",

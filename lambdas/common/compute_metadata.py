@@ -67,6 +67,14 @@ def tag_record(record: dict, source_id: str = "unknown", phase: str | None = Non
       3. Auto-infer from record["sk"] if it matches DATE#YYYY-MM-DD:
          date < EXPERIMENT_START_DATE → "pilot", else "experiment".
       4. Default: EXPERIMENT_PHASE_CURRENT ("experiment").
+
+    #3049 (DIL-024): this is also where a compute output picks up its
+    SOURCE-COMPLETENESS manifest — what the run could actually see when it ran.
+    Same reason phase resolution lives here: this function is the one place every
+    compute write already passes through on its way to put_item, so a contract
+    stamped here cannot be forgotten at a call site. Only the partitions on
+    ``input_manifest.MANIFEST_OUTPUTS`` are stamped, and the whole thing is inert
+    outside a Lambda — see that module's docstring.
     """
     record["run_id"] = _get_run_id()
     record["computed_at"] = datetime.now(timezone.utc).isoformat()
@@ -74,6 +82,12 @@ def tag_record(record: dict, source_id: str = "unknown", phase: str | None = Non
         record["phase"] = phase
     elif "phase" not in record:
         record["phase"] = _infer_phase_from_record(record)
+    try:
+        from common.input_manifest import stamp_output
+
+        stamp_output(record, source_id)
+    except Exception:  # noqa: BLE001 — provenance must never be what breaks a write
+        pass
     _emit_write_metric(source_id)
     return record
 
