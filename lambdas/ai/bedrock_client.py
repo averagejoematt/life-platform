@@ -189,6 +189,41 @@ def first_text(resp: dict) -> str | None:
     return None
 
 
+class _BudgetGuardUnavailable(BaseException):
+    """Never raised. The `except` target when `budget_guard` cannot be imported.
+
+    Keeps `budget_stop_cls()` fail-open in the same shape `invoke()` already is:
+    if the guard is missing there is no tier-3 stop to special-case, so the
+    caller's generic retry path must be left exactly as it was.
+    """
+
+
+def budget_stop_cls() -> type[BaseException]:
+    """The exception class the tier-3 budget backstop raises (#3084).
+
+    A budget stop is a REFUSAL, not a transport error: `invoke()` raises it
+    *before* `invoke_model`, so nothing is billed, and nothing about attempt 2
+    would differ. Both retry wrappers (`common/retry_utils`, `ai/ai_transport`)
+    except this class ahead of their generic `except Exception` so it returns or
+    re-raises immediately — the generic catch used to sleep 5+15+45 = 65s per
+    call, which across the daily brief's ~62 AI calls is ~67 minutes of pointless
+    backoff against a Lambda timeout, exactly when the platform is already over
+    its ceiling, and logged the stop as a transport-shaped WARN that buried the
+    real cause.
+
+    Returned as a class rather than imported at either wrapper's module scope for
+    the same reason `invoke()` imports the guard lazily: `common/` must not take a
+    hard import-time dependency on `ai/`, and a missing guard must degrade to
+    "no budget stop exists", never to an ImportError on the AI path.
+    """
+    try:
+        from ai.budget_guard import BudgetExceeded
+
+        return BudgetExceeded
+    except ImportError:
+        return _BudgetGuardUnavailable
+
+
 def _note_truncation(parsed: dict, bedrock_body: dict, model_id: str) -> None:
     """Meter responses that stopped at `max_tokens` (#2893). Strictly fail-open.
 
