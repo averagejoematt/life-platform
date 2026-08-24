@@ -38,7 +38,15 @@ write surface is your own worktree and your own branch.
    targeted pytest for what you touched. Re-run tests after ANY post-test formatting.
 7. **Verify the push actually landed** (`git log origin/<branch> -1`) before opening the
    PR — squash-merge of an unpushed branch has silently dropped commits before.
-8. **PR:** title in conventional-commit style, body explains what/why + post-merge ops
+8. **Waiting on a PR's checks (yours or another agent's) is `deploy/wait_pr_green.sh
+   <pr>`, the ONLY sanctioned watcher (#3103)** — never hand-roll a `gh api
+   actions/runs?head_sha=...` query or a bare `gh pr checks --watch`. It uses full
+   40-char shas throughout, asserts the expected check set BY NAME (an absent check
+   fails the wait, it is never invisible just because everything else went green),
+   treats "no checks reported" as a failure rather than a pass, and reports a
+   WAITING gated-deployment check distinctly. It NEVER merges — read its printed
+   verdict, then run the merge as your own separate, deliberate command.
+9. **PR:** title in conventional-commit style, body explains what/why + post-merge ops
    steps (which lambdas/site need deploying), contains `Fixes #<N>`, and ends with the
    attribution footer the driver brief supplies.
 

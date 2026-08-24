@@ -93,7 +93,19 @@ git checkout -B <branch> HEAD                                        # reattach 
 Only safe when the rebase todo shows "No commands remaining" (a single-commit branch);
 with more commits pending, re-rebase the remainder instead.
 
-### 5. Before deploying anything from the merged queue
+### 5. Watching a PR's checks before you merge it
+
+`bash deploy/wait_pr_green.sh <pr>` is the ONLY sanctioned way to wait for a PR's
+checks (#3103) — never hand-roll `gh api actions/runs?head_sha=...` or a bare
+`gh pr checks --watch`. It asserts the expected check set BY NAME (derived from the
+PR's changed paths, extendable with `--expect`), uses the PR's full 40-char sha
+throughout, treats "no checks reported" and an absent expected check as failures
+rather than silent passes, reports a WAITING gated-deployment check distinctly, and
+**never merges** — it only prints a verdict and exits. Read the verdict, THEN run
+the merge as its own separate command; never chain them in one compound command
+(the exact class that redded main twice on 2026-08-23/24).
+
+### 6. Before deploying anything from the merged queue
 
 `cdk diff` — read it. An unexplained `[-]`/destroy on a resource nobody touched means
 `main` is behind live (a squash-heavy session dropped something), not that it's safe to
