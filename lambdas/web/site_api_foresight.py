@@ -33,6 +33,7 @@ from web.site_api_common import (
     _ok,
     logger,
 )
+from web.site_api_phase_frame import archival_frame  # #2957 — cross-phase framing
 
 
 def forecast(*, _g) -> dict:
@@ -231,6 +232,7 @@ def _wrong_obituary(coach: str, rec: dict) -> dict:
 def wrong(*, _g) -> dict:
     """GET /api/wrong — the public ledger of AI misses."""
     table = _g["table"]
+    EXPERIMENT_START = _g["EXPERIMENT_START"]
 
     try:
         # 1. Validator catches (last 120 days)
@@ -243,12 +245,27 @@ def wrong(*, _g) -> dict:
         checks_run = int(sum(i.get("checks_run", 0) or 0 for i in items))
         catches, numeric_caught = [], 0
         for i in items:
+            # #2957: the 120-day validator window reaches well past the live
+            # genesis — two of the table's rows can be from cycle 14 and two from
+            # cycles that ended months ago, rendered with equal weight. Same cure
+            # as the lab-notes reactions (site_api_thirdwall): the producer decides
+            # once per catch's own date, and the front-end (never re-deriving the
+            # boundary) just renders the badge when it's there.
+            _arch = archival_frame(i.get("date"), EXPERIMENT_START)
             for field, sev in (("errors", "error"), ("flags", "flag")):
                 v = i.get(field)
                 if isinstance(v, list):
                     for e in v:
                         what = (e.get("detail") or e.get("check") or str(e)) if isinstance(e, dict) else str(e)
-                        catches.append({"date": i.get("date"), "coach": i.get("coach_id"), "severity": sev, "what": str(what)[:240]})
+                        catches.append(
+                            {
+                                "date": i.get("date"),
+                                "coach": i.get("coach_id"),
+                                "severity": sev,
+                                "what": str(what)[:240],
+                                "archival": _arch,
+                            }
+                        )
                 elif isinstance(v, (int, float)) and v:
                     numeric_caught += int(v)  # older records store counts, not detail
         catches.sort(key=lambda c: c.get("date") or "", reverse=True)

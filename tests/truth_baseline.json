@@ -4,15 +4,6 @@
     "note": "Committed reader-truth debt ledger \u2014 honest capture of standing findings per page. The gate reds only on NEW (page, category) HIGH findings vs this file; baselined entries surface as warnings naming their issue every run. Entries are recorded at any observed severity (#2981) \u2014 `severity_observed` is context, never part of the key. Update DELIBERATELY via `python3 tests/visual_qa.py --reader-truth --update-truth-baseline` and review the diff; every entry must carry a real issue ref (UNTRIAGED reds the unit suite). Never hand-grow, never auto-regenerate; hand-SHRINKING (deleting a fixed entry) is fine."
   },
   "pages": {
-    "/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#3066",
-        "added": "2026-08-23",
-        "severity_observed": "high",
-        "note_sample": "Home page states 'HRV crashed to 24ms (35% below your 7-day average)' but Cockpit surface shows 'HRV 22.8 ms'. These are inconsistent readings for the same day (2026-08-23). Additionally, the Cockpit "
-      }
-    ],
     "/method/board/": [
       {
         "category": "audience_violation",
@@ -20,22 +11,6 @@
         "added": "2026-08-22",
         "severity_observed": "high",
         "note_sample": "Dr. Lisa Park addresses the subject directly: 'Matthew \u2014 and I want to name that plainly', 'I want to put to you directly', 'you were actively logging', 'When you're ready, I'd like you to resume'. Th"
-      }
-    ],
-    "/method/postmortems/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#2957",
-        "added": "2026-08-22",
-        "note_sample": "CYCLE 14 entry states 'Restarted 2026-08-17 as cycle 14' but then shows strip '\u00b7\u00b7\u00b7\u00b7\u00b7' (5 dots = 5 silent days). The cycle start date is 2026-08-17 (Day 1 of current experiment). On Day 5 (2026-08-21),"
-      }
-    ],
-    "/method/survival/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#2957",
-        "added": "2026-08-22",
-        "note_sample": "The cycle 14 row displays 'cycle 14 | 2026-08-17 | \u00b7\u00b7\u00b7\u00b7\u00b7 | 0/5 | day 5 \u00b7 live' which correctly identifies the cycle as live on day 5. However, Surface 1 (/method/postmortems/) treats cycle 14 as a clo"
       }
     ],
     "/method/verify/": [
@@ -47,14 +22,6 @@
         "note_sample": "The 'WHOOP VS GARMIN, NIGHT BY NIGHT' table contains 30 rows spanning 2026-04-29 through 2026-06-15, presented as live data on a Day-7 cycle-14 page without 'prior cycle'/'lifetime' labeling (Garmin p"
       }
     ],
-    "/method/voicefidelity/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#2957",
-        "added": "2026-08-22",
-        "note_sample": "States 'NEXT ON THE LOOP the coaching \u2014 See what the AI team makes of it' but this appears to be navigational chrome. However, the surface shows 'N=16' voice-fidelity judgments with 11 correct on Day "
-      }
-    ],
     "/method/wrong/": [
       {
         "category": "temporal_contradiction",
@@ -62,14 +29,6 @@
         "added": "2026-08-23",
         "severity_observed": "high",
         "note_sample": "The table shows two catches dated 2026-06-18 and 2026-05-19, which are before the cycle start of 2026-08-17. The page header correctly states 'DAY 7 \u00b7 WEEK 1, SINCE AUGUST 17 2026', but the catch tabl"
-      }
-    ],
-    "/story/attempts/": [
-      {
-        "category": "temporal_contradiction",
-        "issue": "#2957",
-        "added": "2026-08-22",
-        "note_sample": "Attempt #14 marked 'SHOWED UP 0 OF 5 DAYS' (past-tense finality) beside 'live \u2014 day 5' \u2014 the live-cycle-as-closed class, sibling of /method/postmortems/"
       }
     ]
   }

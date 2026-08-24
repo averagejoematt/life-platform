@@ -165,7 +165,10 @@ except ImportError:
     logger.setLevel(_log.INFO)
 
 from ai import ai_calls  # -- Extracted module imports ---------------------------------------------------
-from common import dry_run  # #2255: one definition of what DRY_RUN suppresses
+from common import (
+    dry_run,  # #2255: one definition of what DRY_RUN suppresses
+    send_ledger,  # DIL-025: the durable replay guard (redrive/async-retry)
+)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from content import html_builder, output_writers
 from experiment import phase_taxonomy  # ADR-077: the class registry the reads derive from (#2089)
@@ -1128,24 +1131,23 @@ def get_food_delivery_brief_signal():
         return None
 
 
-def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track last send."""
-    import time as _time
+def record_email_send(table, lambda_name, period_key):
+    """Record a completed send: the status page's row, plus the replay guard's.
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.error(f"Status tracking write failed — monitoring will be blind: {e}")
-        # Don't re-raise (email already sent) but log as ERROR for CloudWatch alarm
+    Same row the status page has always read (DIL-025 added `period_key`, which
+    names the BRIEF DATE this letter covered rather than merely the UTC day the
+    send happened — see common/send_ledger.py for why the distinction matters
+    across a UTC midnight). Delegates so the writer and `already_sent`'s reader
+    cannot drift apart.
+
+    Still non-fatal: the mail is already on the wire by the time this runs, and
+    raising here would trigger the very retry the ledger exists to make safe.
+    """
+    # The clock is read HERE, from this module's `datetime`, and handed down —
+    # so the row's send-date still comes from the same clock every other date in
+    # this handler comes from (and stays freezable by the test suite's module-wide
+    # time freeze, rather than silently escaping it into a helper).
+    send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
 def _daily_brief_ai_allowed() -> bool:
@@ -1447,6 +1449,17 @@ def lambda_handler(event, context):
         logger.warning("[#2860] daily-brief %s dry_run=%s already in flight — skipping", yesterday, _dry_run)
         return {"statusCode": 200, "body": f"Daily brief for {yesterday} (dry_run={_dry_run}) already in flight — skipped"}
 
+    # DIL-025 replay guard — the DURABLE half of the pair above. #2860's lease is
+    # 1200s, deliberately short so a genuine crash gets a real retry; the DLQ
+    # consumer re-invokes with the ORIGINAL payload on a rate(6 hours) schedule,
+    # by which time no lease survives. Only a completed-send record can answer
+    # "this brief already went out". Skipped for dry runs (they send nothing to
+    # replay) and for an operator's explicit {"force_send": true}.
+    if not _dry_run and not send_ledger.force_resend_requested(event):
+        if send_ledger.already_sent(table, "daily_brief", yesterday, logger=logger):
+            logger.warning("[DIL-025] daily-brief %s was already sent — refusing to send it twice (pass force_send to override)", yesterday)
+            return {"statusCode": 200, "body": f"Daily brief for {yesterday} already sent — skipped (replay guard)"}
+
     profile = fetch_profile()
     if not profile:
         # RAISE so the daily-brief Errors alarm fires — a returned 500 reads as a
@@ -1576,7 +1589,7 @@ def lambda_handler(event, context):
         # sick day raised a false missed-brief alarm. #2255 rule still applies: a dry
         # run wrote nothing, so it logs nothing.
         if not _dry_run:
-            record_email_send(table, "daily_brief")
+            record_email_send(table, "daily_brief", yesterday)
 
         # #2255: report honestly — a dry run generated it, it did not send it.
         return {"statusCode": 200, "body": f"Recovery brief {'generated (DRY_RUN, not sent)' if _dry_run else 'sent'} for {yesterday}"}
@@ -2139,6 +2152,11 @@ def lambda_handler(event, context):
             ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
             EmailTags=[{"Name": "message_type", "Value": "daily_brief"}],
         )
+        # DIL-025: record the send HERE, one line after the wire — not at the end
+        # of the handler. ~445 lines of post-send work follow, and a crash in any
+        # of them used to lose the only evidence this letter went out, leaving the
+        # DLQ redrive (6h later, long past the #2860 lease) free to send it again.
+        record_email_send(table, "daily_brief", yesterday)
         logger.info("Sent: " + subject)
 
     if _persist:  # #2255: demo_mode OR dry_run
@@ -2568,10 +2586,8 @@ def lambda_handler(event, context):
         except Exception as _sw_e:
             logger.warning(f"site_writer failed (non-fatal): {_sw_e}")
 
-    # #2255: a dry run sent no mail, so it must not write the row the status
-    # page and the missing-send alarm read as proof that it did.
-    if _dry_run:
-        logger.info("[DRY_RUN] skipping record_email_send — no mail was sent, so no email_log row is written")
-    else:
-        record_email_send(table, "daily_brief")
+    # DIL-025: the email_log row is now written immediately after the SES call
+    # (see the send site above), not here. #2255's rule is unchanged and is
+    # enforced at that site: a dry run never reaches the send branch, so it
+    # still writes no row the status page would read as proof it mailed.
     return {"statusCode": 200, "body": ("Daily brief v2.77.0 " + ("generated (DRY_RUN, not sent): " if _dry_run else "sent: ") + subject)}
