@@ -226,23 +226,28 @@ _**113** CloudWatch alarms are defined in `cdk/stacks/*.py` and AST-discovered b
 
 ## CloudWatch namespaces
 
-The platform emits custom metrics across these namespaces:
+**The inventory lives in `deploy/emf_namespace_ledger.py` — one row per namespace with its
+owner, its consumer (alarm / dashboard / code reader / dated ritual) and a keep-or-retire
+verdict (#2837).** Print it with `python3 deploy/emf_namespace_ledger.py --table`; the
+producers and consumers in that table are derived from the tree by AST at print time, so
+they cannot drift. Grade the live estate against it with
+`python3 deploy/emf_series_census.py`, and see `docs/PROPORTIONALITY.md` for the monthly
+census log and the cost framing.
 
-| Namespace | Source | What it measures |
-|---|---|---|
-| `AWS/Lambda` | AWS auto | Invocations, errors, duration, throttles |
-| `AWS/DynamoDB` | AWS auto | Capacity consumption, throttles |
-| `AWS/CloudFront` | AWS auto | Hits, error rates, cache hit ratio |
-| `AWS/SES` | AWS auto | Send, Delivery, Open, Click, Bounce, Complaint |
-| `AWS/SQS` | AWS auto | Queue depth, message age |
-| `LifePlatform/AI` | retry_utils + site_api_ai | AnthropicInputTokens, AnthropicOutputTokens, AnthropicCacheReadTokens, AnthropicCacheWriteTokens, AnthropicAPIFailure |
-| `LifePlatform/MCP` | mcp/handler.py | ToolInvocations (by tool name), ToolDuration, ToolError |
-| `LifePlatform/SiteApi` | site_api_lambda emit_route_log | RouteHits, RouteDuration, RouteErrors |
-| `LifePlatform/Freshness` | freshness_checker | StaleSourceCount, WarningSourceCount, PartialCompletenessCount |
-| `LifePlatform/DailyBrief` | daily_brief EMF blobs | DataPresent (by source), PassFail (by component) |
-| `LifePlatform/Pipeline` | pipeline_health_check | ComputeOutputsMissing, PipelineLatency |
-| `LifePlatform/Compute` | compute_metadata.tag_record | RecordWritten (per compute Lambda) |
-| `LifePlatform/Canary` | canary_lambda | CanaryMCPFail, CanaryAnthropicFail |
+A hand-maintained table used to sit here, and it is worth recording what it had become,
+because it is the argument for deriving this one. It listed **8** of the platform's **31**
+`LifePlatform/*` namespaces. It named `LifePlatform/SiteApi` — the casing twin #3002
+removed — with three metrics (`RouteHits`/`RouteDuration`/`RouteErrors`) that have never
+existed in the live estate. It gave `LifePlatform/Canary` the metrics `CanaryMCPFail` and
+`CanaryAnthropicFail`; the live names are `CanaryMCPPass` and `CanaryAnthropicPass`, so
+the polarity was inverted. `LifePlatform/MCP`'s `ToolError` is really `ToolErrors`. Every
+one of those was wrong in a way that reads as authoritative, sitting directly below a
+machine-maintained alarm inventory that had been correct the whole time.
+
+AWS's own namespaces are unchanged and out of the ledger's scope (they are free and not
+inventoried): `AWS/Lambda` (invocations, errors, duration, throttles), `AWS/DynamoDB`
+(capacity, throttles), `AWS/CloudFront` (hits, error rates, cache hit ratio), `AWS/SES`
+(send, delivery, open, click, bounce, complaint), `AWS/SQS` (queue depth, message age).
 
 ---
 

@@ -19,6 +19,7 @@ dated artifact, and the dead-man reds when a window closes empty.
 | fullreview-delta | `/fullreview` | 7d | +3d | autonomous | `docs/reviews/` · `^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partial)?\.json$` |
 | accuracy-full | `/accuracy-review` | 31d | +7d | session | `docs/reviews/` · `^EDITORIAL_ACCURACY_REVIEW_(\d{4}-\d{2}-\d{2})\.md$` |
 | craft-review | `/craft-review` | 31d | +7d | session | `docs/reviews/` · `^craft_grades_(\d{4}-\d{2}-\d{2})\.json$` |
+| emf-series-census | ledger re-read | 31d | +7d | session | dated line in `docs/PROPORTIONALITY.md` · `^- EMF census: (\d{4}-\d{2}-\d{2})` |
 | fullreview-full | `/fullreview` | 31d | +7d | session | `docs/reviews/` · `^fullreview_grades_(\d{4}-\d{2}-\d{2})\.json$` |
 | managed-where-reverify | ledger re-read | 31d | +7d | session | dated line in `docs/MANAGED_WHERE_LEDGER.md` · `^- Re-verified: (\d{4}-\d{2}-\d{2})` |
 | frontier-plan | `/frontier-plan` | 92d | +14d | owner-attended | `docs/reviews/` · `^FRONTIER_REVIEW_(\d{4}-\d{2}-\d{2})\.md$` |
@@ -27,6 +28,7 @@ dated artifact, and the dead-man reds when a window closes empty.
 
 ## Standing obligations (re-homed onto entries — they die with sessions otherwise)
 
+- **emf-series-census**: Run `python3 deploy/emf_series_census.py --strict`; resolve any over-budget or unregistered namespace in deploy/emf_namespace_ledger.py BEFORE appending the dated line the probe reads — a line appended over a red records a number nobody acted on
 - **managed-where-reverify**: Walk every ledger row against LIVE state (gh api for the GitHub rows, read-only aws for the AWS rows); update each probed row's Verified cell and append the dated log line the probe reads
 - **proportionality-reread**: Walk the whole ledger: every posture either re-earns its keep or gets its demote trigger pulled (the ADR-129 worked precedent)
 - **sdlc-review**: Re-grade the QA-strategy scorecard against the #1425 targets (the #1451 obligation — it stopped when this ritual did)
@@ -36,6 +38,7 @@ dated artifact, and the dead-man reds when a window closes empty.
 
 - **accuracy-full** — The truth audit of the public surface (does the site say what the data says?). Last full run 2026-07-10 at #2832's filing — six weeks dark while the nightly reader-truth oracle only samples. ADR-104/105 are enforced per-surface by gates; this is the whole-estate pass.
 - **craft-review** — Had NEVER executed at #2832's filing despite its own instruction to register a scheduled run — the exact silent-stop this calendar exists to make impossible. Its first run creates docs/reviews/craft_grades_<date>.json and starts the clock for real; until then the adoption anchor holds the window.
+- **emf-series-census** — #2837: CloudWatch MetricMonitorUsage grew 9x in three months (7.4 -> 66.9 metric-months, $0 -> $18.88) and flipped past AlarmMonitorUsage with nothing watching — 743 series across 35 namespaces had no inventory, budget or owner, so the only detector was the invoice. The ledger makes each namespace name a consumer; this entry is what keeps the count a LIVE measurement rather than a one-time audit. It rides the monthly cost close (cost-diligence Phase 5) because the series count is only meaningful next to the dollars it explains.
 - **frontier-plan** — The full-horizon review (quantified self → quantified life). Its report is docs/reviews/FRONTIER_REVIEW_<date>.md — the command file names that path as canonical so a run cannot land its artifact somewhere this probe cannot see.
 - **fullreview-delta** — The one review family that was still alive at #2832's filing — weekly-ish and shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to session; any fullreview run (full, delta or partial) resets this clock, because the weekly claim is 'the platform was looked at', not 'the look was small'.
 - **fullreview-full** — Deltas drift: each one grades against the last, so a slow slide can stay invisible to every individual delta. A monthly FULL run re-grades every area from scratch. The probe deliberately excludes _delta/_partial filenames — only a full-suffix-free grades file resets this clock.

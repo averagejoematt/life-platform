@@ -46,10 +46,32 @@ a re-read (the stale-behind-a-fresh-timestamp class); only a line here advances
 the calendar's clock. First calendar-driven re-read due within one quarterly
 window of the 2026-08-22 adoption.
 
+## EMF series census log (#2837 — the calendar's `emf-series-census` probe reads these lines)
+
+The CloudWatch custom-metric estate is inventoried in `deploy/emf_namespace_ledger.py`
+(one row per namespace: owner, consumer, verdict, series budget) and graded live by
+`python3 deploy/emf_series_census.py`. Each monthly cost close appends one line here —
+`- EMF census: YYYY-MM-DD — …` — and **only such a line advances the clock**, for the
+same reason the re-read log exists: the count that matters is the one somebody actually
+looked at. `live-orphan` counts namespaces with live series that nothing in the tree
+writes; they need no action and age out of CloudWatch's window by themselves.
+
+Read the two series numbers as different things. `list-metrics` returns everything with a
+datapoint in the last **14 days**; `--recently-active PT3H` returns the last **3 hours**.
+CloudWatch prorates a custom metric by the hours it receives data, so the second is far
+closer to the invoice — on 2026-08-23 the estate was 703 series by the first measure, 102
+by the second, against ~67 billed metric-months in Cost Explorer. Multiplying the 703 by
+$0.30 gives ~$211/mo against a measured ~$19; the naive count is wrong by an order of
+magnitude **and points at the wrong namespaces** (`LifePlatform/SiteAPI`: 288 series, 2
+active — `LifePlatform/IngestLiveness`: 27 series, 22 active).
+
+- EMF census: 2026-08-23 — 703 series / 30 namespaces live (14d), 102 active (PT3H sample, n=1); 0 over budget, 0 unregistered, 2 live-orphan
+
 ## Active ledger
 
 | Subsystem | Posture | Rent | Earns its keep by / demote trigger |
 |---|---|---|---|
+| CloudWatch custom-metric estate (#2837: `deploy/emf_namespace_ledger.py` + `emf_series_census.py` + the pre-merge drift guard) | Load-bearing (small) | $ (~$19/mo MetricMonitorUsage, the platform's largest non-AI AWS line), CI seconds (one AST sweep), attention at the monthly close | The estate grew 9x in three months (7.4 → 66.9 billed metric-months) with no inventory, budget or owner — the only detector was the invoice, three weeks late. Each namespace now names its consumer (alarm / dashboard / code reader / dated ritual) or carries a retirement verdict, and the guard reds at PR time on an unregistered namespace in BOTH directions. Honest limit, stated: the audit found **no large prune** — 9 unread namespaces totalling ~32 series, nearly all sparse; the value is the growth detector, not the cut. Demote trigger: two consecutive closes where every over-budget red is resolved by raising the budget rather than examining the cardinality — then the budget is a rubber stamp, derive it from the driver population instead (row added 2026-08-23) |
 | Phase machinery (ADR-077 taxonomy + restart pipeline) | Load-bearing | mind, CI | The experiment's reset semantics; coverage-asserted. 11 cycles of worked use |
 | Coherence sentinel + canonical-facts contracts | Load-bearing | CI, attention | The honesty moat's enforcement layer (ADR-104/105) |
 | Permanence archive (nightly public snapshot + continuity switch, #2572) | Load-bearing | S3 (~GBs), one nightly writer | The stolen-laptop/continuity contract in writing — the site survives its operator. Demote: if the nightly writer fails silently >7d with no alarm catching it, the machinery is theater — alarm it or fold it |
