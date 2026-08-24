@@ -177,7 +177,11 @@ from ingestion import source_registry  # #2003: the canonical freshness set + th
 from intelligence import weight_recency  # #1894/#1924: a weigh-in carries its own date
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
-from emails.brief_data_status import build_data_status_banner_html, scan_quiet_behavioral_sources  # #2326 quiet notice
+from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
+    build_data_status_banner_html,
+    qualified_compute_outputs,
+    scan_quiet_behavioral_sources,
+)
 from emails.daily_brief_lock import acquire_daily_brief_lock  # #2860 in-flight guard
 
 # ai_calls can be init'd at import time (no dependency on locally-defined functions)
@@ -1742,6 +1746,9 @@ def lambda_handler(event, context):
     # Fetch pre-computed adaptive mode (computed by adaptive-mode-compute Lambda at 9:36 AM)
     brief_mode = "standard"
     engagement_score = None
+    # #3049: bound BEFORE the try — a fetch_date exception previously left this
+    # name undefined, which was invisible only because nothing downstream read it.
+    adaptive_rec = None
     try:
         adaptive_rec = fetch_date("adaptive_mode", yesterday)
         if adaptive_rec:
@@ -2099,7 +2106,16 @@ def lambda_handler(event, context):
         _scan_today = datetime.now(timezone.utc).date()
         _stale = scan_stale_sources(_scan_today)
         _quiet = scan_quiet_behavioral_sources(table, _scan_today)
-        _banner = build_data_status_banner_html(_stale, _quiet)
+        # #3049 (DIL-024): the compute runs' OWN verdicts on what they could see,
+        # read off the records this brief already fetched — no extra DDB reads.
+        _compute_partial = qualified_compute_outputs(
+            {
+                "Day grade / readiness (computed_metrics)": _computed,
+                "Character sheet": character_sheet,
+                "Brief mode (adaptive_mode)": adaptive_rec,
+            }
+        )
+        _banner = build_data_status_banner_html(_stale, _quiet, compute_partial=_compute_partial)
         if _banner:
             # Inject banner immediately after <body...> tag
             import re as _re
