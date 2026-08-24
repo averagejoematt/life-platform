@@ -327,7 +327,7 @@ def _ground_legacy_output(label, output, regen_fn, *allow_sources, available_log
         _pre = _findings_fn(output)
         if _pre:
             print(f"[LEGACY-GROUNDING:{label}] grounding finding(s): {[f['detail'] for f in _pre][:5]}")
-        output, _left, _corrected = _gg.regen_once(output, _findings_fn, regen_fn)
+        output, _left, _corrected = _gg.regen_once(output, _findings_fn, regen_fn, surface=label)
         if _corrected:
             print(f"[LEGACY-GROUNDING:{label}] self-corrected: {len(_pre)}→{len(_left)} finding(s)")
         elif _pre:
@@ -1970,6 +1970,7 @@ Write your {domain_label} coaching section now."""
                     output,
                     _findings_fn,
                     lambda _corr: call_anthropic(system_prompt + "\n\n" + user_message_full + "\n\n" + _corr, api_key, max_tokens=600),
+                    surface=f"coach_v2:{coach_id}",
                 )
                 if _corrected:
                     print(f"[COACH-V2:{coach_id}] grounding self-corrected: {len(_pre)}→{len(_left)} finding(s)")
