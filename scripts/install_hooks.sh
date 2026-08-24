@@ -99,8 +99,12 @@ if [[ -f "$PROJ_ROOT/deploy/sync_doc_metadata.py" ]]; then
   python3 "$PROJ_ROOT/deploy/sync_doc_metadata.py" --apply 2>&1 | sed 's/^/  /'
 
   # Stage whatever the sync touched (it may write any of these, not just
-  # ARCHITECTURE.md — see the RULES table in sync_doc_metadata.py)
-  SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/site_api_common.py || true)
+  # ARCHITECTURE.md — see the RULES table in sync_doc_metadata.py).
+  # #3101: the counters moved to lambdas/web/platform_counts.py. Listing
+  # site_api_common.py here after the move would be actively harmful — the sync no
+  # longer writes it, so the only diff this pathspec could pick up would be the
+  # committer's OWN unstaged edits to a hot shared module, swept in unasked.
+  SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/platform_counts.py || true)
   if [[ -n "$SYNCED_CHANGED" ]]; then
     git -C "$PROJ_ROOT" add $SYNCED_CHANGED
     echo "[pre-commit] Staged doc-sync updates:"

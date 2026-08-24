@@ -504,11 +504,11 @@ def _count_test_functions() -> int | None:
 # rotted: 2026-07-01 the dict claimed 303 tests vs ~1,290 actual, 138 tools vs 144,
 # 65 ADRs vs 85. These fields are rewritten from the discoverers above; judgment /
 # live-AWS fields (monthly_cost, review_grade, active_secrets, site_pages…) are
-# never touched. tests/test_platform_stats_truth.py reds CI if the literal drifts.
-_PLATFORM_STATS_PATH = ROOT / "lambdas" / "web" / "site_api_common.py"
+# never touched. #3101: stamped into the GENERATED module below — see ITS docstring.
+_PLATFORM_COUNTS_PATH = ROOT / "lambdas" / "web" / "platform_counts.py"
 
 
-def _platform_stats_values(facts: dict) -> dict:
+def _platform_counts_values(facts: dict) -> dict:
     return {
         "mcp_tools": facts.get("tool_count"),
         "lambdas": facts.get("lambda_count"),
@@ -519,26 +519,26 @@ def _platform_stats_values(facts: dict) -> dict:
     }
 
 
-def _sync_platform_stats(facts: dict, dry_run: bool) -> list[str]:
-    """Rewrite the discoverable fields of PLATFORM_STATS in site_api_common.py."""
-    if not _PLATFORM_STATS_PATH.exists():
-        return [f"  SKIP (not found): {_PLATFORM_STATS_PATH}"]
-    src = _PLATFORM_STATS_PATH.read_text(encoding="utf-8")
+def _sync_platform_counts(facts: dict, dry_run: bool) -> list[str]:
+    """Rewrite the discovered literals in lambdas/web/platform_counts.py (#3101)."""
+    if not _PLATFORM_COUNTS_PATH.exists():
+        return [f"  SKIP (not found): {_PLATFORM_COUNTS_PATH}"]
+    src = _PLATFORM_COUNTS_PATH.read_text(encoding="utf-8")
     changes = []
-    for field, value in _platform_stats_values(facts).items():
+    for field, value in _platform_counts_values(facts).items():
         if value is None:
             continue
         pattern = rf'("{field}": )\d+'
         m = re.search(pattern, src)
         if not m:
-            changes.append(f"  ! PLATFORM_STATS field {field!r} not found (literal int expected)")
+            changes.append(f"  ! DISCOVERED_COUNTS field {field!r} not found (literal int expected)")
             continue
         old = int(m.group(0).split(":")[1])
         if old != int(value):
             src = re.sub(pattern, rf"\g<1>{int(value)}", src, count=1)
-            changes.append(f"  ~ PLATFORM_STATS {field}: {old} → {value}")
+            changes.append(f"  ~ DISCOVERED_COUNTS {field}: {old} → {value}")
     if changes and not dry_run:
-        _PLATFORM_STATS_PATH.write_text(src, encoding="utf-8")
+        _PLATFORM_COUNTS_PATH.write_text(src, encoding="utf-8")
     return changes
 
 
@@ -1033,12 +1033,12 @@ RULES = [
         "**Tools:** {tool_count} | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** {module_count}",
     ),
     # ── TESTING.md suite size ────────────────────────────────────────────────
-    # Was a hand-typed "1,217 passing (as of 2026-05-19)" — 2.9× stale. The tool
-    # already computes the count for /api/platform_stats; now it also writes here.
+    # Hand-typed and 2.9x stale, then stamped, which collided with every concurrent
+    # test-adding PR (#3101). Now DERIVED — identity rule, so re-typing a number reds.
     (
         "docs/TESTING.md",
-        r"\*\*Total tests:\*\* [\d,]+ `def test_` functions",
-        "**Total tests:** {test_count} `def test_` functions",
+        r"\*\*Total tests:\*\* derived, never committed[^\n]*",
+        "**Total tests:** derived, never committed — `test_count` in the generated `lambdas/web/platform_counts.py`, served at `/api/platform_stats` (#3101).",
     ),
 ]
 
@@ -1189,9 +1189,9 @@ def main():
     print(f"{'='*60}\n")
 
     # Served credibility numbers (/api/platform_stats) sync from the same facts.
-    stats_changes = _sync_platform_stats(PLATFORM_FACTS, dry_run)
+    stats_changes = _sync_platform_counts(PLATFORM_FACTS, dry_run)
     if stats_changes:
-        print("[lambdas/web/site_api_common.py]")
+        print(f"[{_PLATFORM_COUNTS_PATH.relative_to(ROOT)}]")
         for c in stats_changes:
             print(c)
         print()
@@ -1207,7 +1207,7 @@ def main():
     # Get unique docs to process
     docs_to_process = sorted(set(doc for doc, _, _ in RULES))
     total_changes = len([c for c in stats_changes if c.startswith("  ~")])
-    drifted_docs = ["lambdas/web/site_api_common.py"] if any(c.startswith("  ~") for c in stats_changes) else []
+    drifted_docs = [str(_PLATFORM_COUNTS_PATH.relative_to(ROOT))] if any(c.startswith("  ~") for c in stats_changes) else []
     # A "~" (regenerated) or "!" (markers missing / discovery failed) both count as drift
     # that --check must fail on and --apply must resolve.
     alarm_inv_drift = [c for c in alarm_inv_changes if c.startswith("  ~") or c.startswith("  !")]

@@ -223,7 +223,9 @@ jobs:
 
           # THE ENUMERATED GENERATORS — each has committed output asserted by a
           # CI gate. Keep this list and ALLOWED below in lockstep.
-          #   sync_doc_metadata --apply  → doc-sync literals: lambdas/web/site_api_common.py
+          #   sync_doc_metadata --apply  → doc-sync literals: lambdas/web/platform_counts.py
+          #                                (#3101 — the generated single-writer counter module;
+          #                                it replaced the in-place rewrite of site_api_common.py)
           #                                + CLAUDE.md/README.md/.claude/README.md/docs/*.md
           #                                (gate: lint "Doc-drift gate", test_sync_doc_metadata_check)
           #   generate_adr_index --apply → docs/DECISIONS.md index table (gate: lint "Wiki gates")
@@ -244,7 +246,7 @@ jobs:
           }
 
           # Generator-output whitelist. ANY other dirty path = fail loudly, no commit.
-          ALLOWED='^(CLAUDE\.md|README\.md|CHANGELOG\.md|\.claude/README\.md|docs/[A-Za-z0-9_./-]+\.md|lambdas/web/site_api_common\.py|site/assets/js/portrait_data\.js|site/data/data_sources\.json|site/[A-Za-z0-9_./-]*\.html|model/platform_model\.json)$'
+          ALLOWED='^(CLAUDE\.md|README\.md|CHANGELOG\.md|\.claude/README\.md|docs/[A-Za-z0-9_./-]+\.md|lambdas/web/platform_counts\.py|site/assets/js/portrait_data\.js|site/data/data_sources\.json|site/[A-Za-z0-9_./-]*\.html|model/platform_model\.json)$'
 
           BUILD_SHA="$GITHUB_SHA"
           for attempt in 1 2; do

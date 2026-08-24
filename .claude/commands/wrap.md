@@ -218,8 +218,9 @@ an outcome.**
   python3 scripts/check_doc_index.py && python3 scripts/generate_adr_index.py --check
   ```
   **`sync_doc_metadata.py --apply` is the doc-sync literal treadmill** (#3007): it
-  stamps ~8 unrelated docs (`test_count`/`alarm`/`lambda_count` and friends) and
-  concurrent PRs collide on those literals — the driver reconciles them at merge time
+  stamps ~8 unrelated docs (`alarm`/`lambda_count`/`tool_count` doc headers — the
+  counters themselves moved to the generated `lambdas/web/platform_counts.py` in #3101)
+  and concurrent PRs collide on those doc-header literals — the driver reconciles them at merge time
   via `/reconcile-branch`. Run it deliberately at the wrap, never mid-session from a
   worktree, and expect its diff to be the wrap commit's, not a feature branch's.
 - The new `handovers/HANDOVER_LATEST.md` must carry one line either way:

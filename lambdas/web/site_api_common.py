@@ -32,6 +32,8 @@ from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
 from common.pacific_time import PACIFIC
 from experiment.phase_filter import with_phase_filter
 
+from web.platform_counts import DISCOVERED_COUNTS
+
 # ── Config ─────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
@@ -193,19 +195,23 @@ CORS_HEADERS = {
 
 
 # ── Platform stats — single source of truth for all site pages ──
-# The discoverable fields (mcp_tools, lambdas, alarms, data_sources, adrs,
-# test_count) are REWRITTEN by `python3 deploy/sync_doc_metadata.py --apply` and
-# pinned by tests/test_platform_stats_truth.py — don't hand-edit them. lambdas =
-# CDK-defined count; test_count = `def test_` functions in tests/. Judgment /
-# live-AWS fields (monthly_cost, review_grade, active_secrets, site_pages…) stay
-# hand-maintained.
+# TWO KINDS OF NUMBER, TWO HOMES (#3101):
+#   • DISCOVERED — mcp_tools, lambdas, alarms, data_sources, adrs, test_count.
+#     Re-derived from the repo by `python3 deploy/sync_doc_metadata.py --apply`
+#     and pinned by tests/test_platform_stats_truth.py. They live in the
+#     generated single-writer module lambdas/web/platform_counts.py, NOT here,
+#     because a counter that moves on every sibling PR must not be a committed
+#     line inside a file branches edit for other reasons — that shape cost the
+#     2026-08-23/24 merge train ~3–4h of serial reconcile rounds. This module is
+#     hand-merged; platform_counts.py is not.
+#   • JUDGMENT / live-AWS — monthly_cost, review_grade, active_secrets,
+#     site_pages, cdk_stacks, board_*, the weight anchors. Hand-maintained here,
+#     never rewritten by the sync.
+# Splice order is deliberate: the discovered block cannot silently shadow a
+# judgment field, because a duplicate key would be caught by the guard test.
 PLATFORM_STATS = {
-    "data_sources": 20,
-    "mcp_tools": 76,
-    "lambdas": 104,
+    **DISCOVERED_COUNTS,
     "cdk_stacks": 8,
-    "alarms": 114,
-    "adrs": 153,
     "monthly_cost": "~$100",  # GROUND-TRUTH run-rate, pinned (#1232, re-grounded #2898).
     # Source = Cost Explorer UnblendedCost, read 2026-08-23: June 2026 $79.80 and July 2026
     # $98.35, both closed months. The LAST CLOSED MONTH is the honest trailing run-rate, so
@@ -225,7 +231,6 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 16941,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

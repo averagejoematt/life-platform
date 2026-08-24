@@ -1,6 +1,7 @@
 Merge a queue of concurrent PRs that each touch the doc-sync literals
-(`test_count`/`alarms`/`lambda_count`/`adrs` in `lambdas/web/site_api_common.py`'s
-`PLATFORM_STATS`, mirrored into `docs/ARCHITECTURE.md`/`docs/INFRASTRUCTURE.md`) without
+(`test_count`/`alarms`/`lambda_count`/`adrs` in `DISCOVERED_COUNTS` in
+`lambdas/web/platform_counts.py` — the generated single-writer module since #3101, spliced
+into `PLATFORM_STATS`; mirrored into `docs/ARCHITECTURE.md`/`docs/INFRASTRUCTURE.md`) without
 red-main windows or a rejected squash-merge. Canonical source: `docs/CONVENTIONS.md` §3
 (squash-merge drops unpushed commits) and the "Facts that drift" table (§ near the end)
 — **where this file and CONVENTIONS.md disagree, CONVENTIONS.md wins.**
@@ -9,7 +10,9 @@ red-main windows or a rejected squash-merge. Canonical source: `docs/CONVENTIONS
 
 The PR numbers or branch names to reconcile, in merge order (e.g. `#836 #837 #838`). If
 empty, ask which PRs are in scope, or find candidates with:
-`gh pr list --state open --search "site_api_common.py in:files"`.
+`gh pr list --state open --search "platform_counts.py in:files"` — and since #3101 that
+search should return **nothing**: no branch may carry the counter file at all. A hit means
+a PR bypassed `deploy/agent_commit.sh`; drop the file from it rather than reconciling it.
 
 ## Instructions
 
@@ -25,8 +28,9 @@ reconciling each.
 
 ```bash
 git checkout <branch>
-git merge origin/main            # conflicts land on the PLATFORM_STATS literal lines
-                                  # and the generated doc files
+git merge origin/main            # conflicts land on the generated doc files (doc headers).
+                                  # #3101: the counter literals themselves no longer live in a
+                                  # hand-merged file, so they should not appear here at all.
 ```
 
 - Resolve real content conflicts normally, keeping the **branch's actual changes** (its
@@ -34,8 +38,8 @@ git merge origin/main            # conflicts land on the PLATFORM_STATS literal 
 - For the **generated** literal/doc files specifically, take main's copy first, then let
   the discoverer recompute the truth over the merged tree:
   ```bash
-  git checkout --theirs docs/ARCHITECTURE.md docs/INFRASTRUCTURE.md lambdas/web/site_api_common.py
-  git add docs/ARCHITECTURE.md docs/INFRASTRUCTURE.md lambdas/web/site_api_common.py
+  git checkout --theirs docs/ARCHITECTURE.md docs/INFRASTRUCTURE.md lambdas/web/platform_counts.py
+  git add docs/ARCHITECTURE.md docs/INFRASTRUCTURE.md lambdas/web/platform_counts.py
   python3 deploy/sync_doc_metadata.py --apply     # authoritative — recomputes from the MERGED tree
   git add -A
   git commit --no-edit
