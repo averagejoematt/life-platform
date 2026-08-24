@@ -10,6 +10,7 @@ from common.pacific_time import PACIFIC as PT, parse_iso_utc  # #1964: THE one P
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
+from web.site_api_phase_frame import archival_frame  # #2957 — cross-phase framing
 
 _DEVICE_AGREEMENT_START = "2020-01-01"  # generous floor; predates any real device data
 
@@ -253,6 +254,7 @@ def device_agreement(*, _g) -> dict:
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     _query_source = _g["_query_source"]
+    EXPERIMENT_START = _g["EXPERIMENT_START"]
     today = datetime.now(PT).strftime("%Y-%m-%d")
     try:
         whoop_items = _query_source("whoop", _DEVICE_AGREEMENT_START, today, include_pilot=True)
@@ -381,6 +383,15 @@ def device_agreement(*, _g) -> dict:
             "flagged_disagreement_days": flagged_recent if flagged_recent else None,
             "garmin_last_date": garmin_last_date,
             "garmin_paused": bool(garmin_last_date and garmin_last_date < today),
+            # #2957: `garmin_paused` explains WHY the window stopped moving, but says
+            # nothing about whether it belongs to the live cycle — a 30-row "night by
+            # night" table read as current on a Day-8 cycle-14 page even with the pause
+            # note above it. Frame the window itself, off its own newest night (the
+            # most favorable date for still being in-cycle): if even that predates the
+            # genesis, none of the table does. Same primitive the lab-notes reactions
+            # and the wrong-page catches use — the reader-truth judge reads the same
+            # frame either way.
+            "archival": archival_frame(all_dates[-1], EXPERIMENT_START),
             "interpretation": (
                 "HRV delta is expected between devices (different sampling windows and algorithms); "
                 "10-15ms variance is normal. RHR should agree within 3-5bpm; larger gaps suggest sensor "

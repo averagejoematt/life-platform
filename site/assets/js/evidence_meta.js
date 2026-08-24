@@ -290,12 +290,21 @@ export function renderVerify(d) {
     const flagged = r.rhr_agreement === "flag" || r.hrv_agreement === "flag";
     return `<tr class="${flagged ? "rd-flag" : ""}"><td class="rd-name">${esc(r.date)}</td><td class="num">${r.whoop_rhr_bpm != null ? fmt(r.whoop_rhr_bpm) : "—"}</td><td class="num">${r.garmin_rhr_bpm != null ? fmt(r.garmin_rhr_bpm) : "—"}</td><td class="num">${r.rhr_abs_diff_bpm != null ? fmt(r.rhr_abs_diff_bpm) : "—"}</td><td>${esc(r.rhr_agreement || "—")}</td></tr>`;
   }).join("");
-  const table = rows ? sec("Whoop vs Garmin, night by night (resting heart rate, bpm)", `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Garmin</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  // #2957: the table's own caption now bounds the window it's actually showing —
+  // whatever the pause note says, a bare "night by night" table with no dates in
+  // its heading reads as live to a skimming reader. `archival` (the producer's own
+  // site_api_phase_frame.archival_frame call, off the window's newest night) adds
+  // the same "previous cycle" framing every other cross-phase surface uses.
+  const period = d.period ? ` — ${esc(d.period.start)} to ${esc(d.period.end)}` : "";
+  const table = rows ? sec(`Whoop vs Garmin, night by night (resting heart rate, bpm)${period}`, `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Garmin</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
   const pausedNote = d.garmin_paused ? `<p class="rd-meta label">Garmin ingestion has been paused since ${esc(d.garmin_last_date)} (vendor anti-automation, ADR-074) — the window above is real history through that date, not a live feed.</p>` : "";
+  const archivalNote = d.archival && d.archival.pre_cycle
+    ? `<p class="rd-meta label">${esc(d.archival.label)} — the comparison window itself, not only the Garmin pause.</p>`
+    : "";
   const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
   return sec("Cross-device agreement — the credibility signal", headFigs +
       `<p class="rd-prose">Whoop and Garmin are two independently-made sensors, worn the same nights, that were never designed to talk to each other. Across every overlapping night on record: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. That specific, correlated-but-imperfect pattern is what two real pieces of hardware produce — synthetic or copy-pasted numbers don't misbehave this particular way.</p>` +
-      pausedNote) +
+      pausedNote + archivalNote) +
     table + links + sample + methodLink +
     note(d.interpretation || "Cross-device HRV/RHR comparison, thresholded from real inter-device variance — not a claim either sensor is 'right.'");
 }

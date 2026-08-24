@@ -716,6 +716,19 @@ def survival(*, _g) -> dict:
         cur_strip = str(cur["strip"]) if cur else ""
         silent_now = len(cur_strip) - len(cur_strip.rstrip("·")) if cur else 0
 
+        # #2957/#2958: this same `cycles` list, filtered to closed cycles, is what
+        # /method/postmortems/ renders — correctly excluding the live cycle (a
+        # post-mortem needs a death) but on a page whose whole subject is "what
+        # each DEAD cycle taught," silent exclusion reads as absence, not "still
+        # alive." Compute the in-progress sentence once, here, off the same `cur`
+        # this endpoint's own "day N · live" row already uses, so postmortems can
+        # reuse the exact words instead of re-deriving them and risking drift.
+        in_progress_note = (
+            f"Cycle {cur['cycle']} is still running (day {cur['window_days']}) — its post-mortem is written once it closes, not before."
+            if cur
+            else None
+        )
+
         return _ok(
             {
                 "horizon_days": _SURVIVAL_HORIZON,
@@ -724,6 +737,7 @@ def survival(*, _g) -> dict:
                 "current_silent_days": silent_now,
                 "collapse_definition": f"{_COLLAPSE_GAP}+ consecutive days with no weigh-in, food log, or journal entry",
                 "cycles": cycles,
+                "in_progress_note": in_progress_note,
                 "confidence": "preliminary pattern · n=2 cycles",
                 "note": (
                     "The model handicapping its own human. Engagement counts only deliberate "
