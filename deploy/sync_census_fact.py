@@ -1,9 +1,15 @@
-"""deploy/sync_gate_census_fact.py — the gate_census_count doc-sync fact (#3000).
+"""deploy/sync_census_fact.py — the gate_census_count doc-sync fact (#3000).
 
 Split out of `deploy/sync_doc_metadata.py` (module-size ceiling —
 `tests/test_module_size_guard.py`): that script is at its recorded baseline, and the
 guard's rule is to pay for new lines out of an extracted sibling rather than raise the
 number — the same shape as #2649's `deploy/doc_alarm_inventory.py`.
+
+NAMED WITHOUT "gate" ON PURPOSE. An earlier name, `sync_gate_census_fact.py`, matched
+`scripts/gate_census.py`'s own `_GUARD_NAME` regex (any `_gate` substring before `.py`)
+purely as a filename coincidence — the census then classified this data-glue module as
+a guard script it can never prove `can-fail`, and its own row went stale by the width of
+that one spurious gate the next time anything ran `--apply`. Found live, fixed by renaming.
 
 Owns the auto-discovery of the total gate count from `scripts/gate_census.py`'s
 `build_census()`, AND the registration of the RULES entry that rewrites
