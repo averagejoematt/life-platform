@@ -11,6 +11,32 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 CF_DIST_ID = os.environ.get("CF_DIST_ID", "E3S424OXQZ8NBE")
 
+# ── DIL-027: the isolated backup of the irreplaceable zone ────────────────────
+# `raw/` is the ONLY unrecomputable data on the platform (original wearable/API
+# captures; every DDB metric, every derived artifact and the whole site can be
+# rebuilt from it). It lived single-region, in one account, with versioning as its
+# only protection — which survives an accidental overwrite but NOT a bucket
+# deletion or a us-west-2 outage (`docs/DISASTER_RECOVERY.md` scored both
+# "NOT RECOVERABLE").
+#
+# These four constants are the SINGLE source of truth for the replication build.
+# Three consumers derive from them and are parity-tested against this file
+# (`tests/test_raw_replication_dil027.py`), so a rename cannot half-land:
+#   1. cdk/stacks/backup_stack.py    — the destination bucket + the replication role
+#   2. deploy/s3_replication.json    — the source-side replication configuration
+#   3. deploy/sentinel_replication.py — the weekly live assertion
+#
+# The destination region is deliberately NOT us-east-1: the site's control plane
+# (ACM certs + CloudFront config, LifePlatformWeb) already lives there, so a
+# us-east-1 event would hit the platform AND its backup at once. us-east-2 is
+# independent of both us-west-2 and that dependency.
+RAW_BACKUP_BUCKET = os.environ.get("RAW_BACKUP_BUCKET", "matthew-life-platform-raw-backup")
+RAW_BACKUP_REGION = os.environ.get("RAW_BACKUP_REGION", "us-east-2")
+RAW_REPLICATION_ROLE_NAME = os.environ.get("RAW_REPLICATION_ROLE_NAME", "life-platform-raw-replication")
+# The ONLY prefix replicated. Widening this is a deliberate cost + privacy decision,
+# not a convenience edit — everything outside raw/ is recomputable by definition.
+RAW_REPLICATION_PREFIX = "raw/"
+
 # KMS key for DynamoDB encryption (SEC-06: env-overridable so staging can use a different key)
 KMS_KEY_ID = os.environ.get("KMS_KEY_ID", "444438d1-a5e0-43b8-9391-3cd2d70dde4d")
 # Phase 2.4 (2026-05-16): KMS CMK for S3 default encryption. Created in

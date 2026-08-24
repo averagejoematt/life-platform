@@ -255,7 +255,26 @@ jobs:
         #      wait a new test accidentally introduces). The #1966
         #      standing-warning triage gate (`scripts/check_ci_warnings.py`,
         #      /wrap step (e11)) still obligates a same-session decision the
-        #      next time this fires.
+        #      next time this fires. #3025 (2026-08-23) re-derived again from
+        #      CI's own --durations measurement, moving 1200 -> 1500.
+        #      #3106 (2026-08-24, ADR-105 measure-first): the 1500s budget bred
+        #      the exact same class a third time — the D2 session's ~230 new
+        #      tests breached it on green main (1507s, 7s over) within the
+        #      day. Sampled ALL 10 green-main "test / Unit Tests" runs since
+        #      #3025 landed 1500s (GitHub API, runs 32637512129..32762278235,
+        #      2026-08-23 11:50 -> 2026-08-24 18:29): 1175/1022/1179/1204/
+        #      1358/1580/1255/1305/1467/1507s (avg ~1305s, max 1580s) — TWO of
+        #      those 10 already breached 1500s outright, a 20% breach rate on
+        #      a budget that had JUST been raised. `--durations=25` on the
+        #      current run (21,146 tests) shows no single test over 51s and no
+        #      dominating outlier: the top 5 are all
+        #      tests/test_platform_model_drift.py (50.07/27.31/27.24/25.03/
+        #      24.89s ≈ 154s total) — the same known generation/drift family
+        #      #3025 already priced, asserting real generated artifacts, not a
+        #      slow-test mistake to trim. Honest broad growth again: applying
+        #      the same ~23% above-observed-max headroom #1966/#2152/#3025
+        #      each used (1580 * 1.23 ≈ 1943s), the budget moved 1500 -> 1950
+        #      (~49% above the 10-run average, ~23% above the observed max).
         #  (3) #1658: the MEASURED-coverage high-water ratchet — the only check
         #      here that can red the build. `--cov-fail-under` above is set a few
         #      points BELOW measured on purpose (anti-flap headroom), and until
@@ -274,7 +293,7 @@ jobs:
         run: |
           DURATION_SECONDS=$(( $(date +%s) - "${UNIT_TESTS_START_EPOCH:-$(date +%s)}" ))
           python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 74 --gap-threshold 10 \
-              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1500 \
+              --duration-seconds "$DURATION_SECONDS" --duration-budget-seconds 1950 \
               --high-water 81.60 --fail-on-regression
 
       - name: Upload coverage artifact

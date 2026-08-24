@@ -126,7 +126,19 @@ ARTIFACTS: dict[str, dict] = {
         writer="python3 deploy/sync_doc_metadata.py --apply",
         guard="deploy/sync_doc_metadata.py --check",
         guard_lane=LANE_DOCS_CI,
-        inputs=("docs/**", "lambdas/**", "mcp/**", "cdk/**"),
+        inputs=(
+            "docs/**",
+            "lambdas/**",
+            "mcp/**",
+            "cdk/**",
+            # #3000: the gate_census_count fact (docs/PROPORTIONALITY.md's row) is
+            # derived from scripts/gate_census.py's build_census(), which walks
+            # .github/workflows/** directly — a workflow-only change could stale the
+            # row with nothing in the OLD input list able to trigger a re-check.
+            ".github/workflows/**",
+            "scripts/gate_census.py",
+            "scripts/gate_census_precision.py",
+        ),
         reconciled=True,
         reason=(
             "The literal sweep — test/tool/lambda/ADR counts across the wiki. Its inputs are "
@@ -136,6 +148,15 @@ ARTIFACTS: dict[str, dict] = {
             "platform_counts.py, a file whose ENTIRE content is generator output — which is "
             "what a derived artifact is supposed to look like, and what makes the "
             "'never commit it on a branch' rule enforceable instead of advisory."
+            "The literal sweep — test/tool/lambda/ADR/gate-census counts across the wiki. Its "
+            "inputs are both halves of the doc↔source coupling (#1908), which is why docs-ci.yml "
+            "carries the code paths as well as docs/**. #3000 added the gate_census_count fact "
+            "(docs/PROPORTIONALITY.md's row, epic #2578) and the two workflow-side inputs that "
+            "can stale it — HONEST LIMIT: scripts/** and deploy/** stay narrow (named files, not "
+            "the full glob) so a brand-new guard script elsewhere under scripts/ or deploy/ does "
+            "not retrigger this lane until a later docs/lambdas/mcp/cdk/tests/.github-workflows "
+            "touch reconciles it — the same best-effort convention test_count already runs under "
+            "(#2982's own reasoning, restated for a different fact)."
         ),
     ),
     "scripts/generate_adr_index.py": _derived(

@@ -18,7 +18,16 @@ export async function renderPostmortems(d) {
   const byN = {};
   for (const c of (cc && cc.cycles) || []) byN[c.cycle] = c;
   const closed = (d.cycles || []).filter((c) => !c.is_current);
-  if (!closed.length) return empty("No closed cycles yet — post-mortems write themselves at each reset.");
+  // #2957: the live cycle is correctly excluded above — a post-mortem needs a death —
+  // but on a page whose whole subject is "what each DEAD cycle taught," silent
+  // exclusion reads as absence, not "still alive." The most recent card's own prose
+  // can say "Restarted 2026-08-17 as cycle 14" and a reader has no signal that cycle
+  // 14 is a live, ongoing thing rather than itself already closed like every card
+  // above it (the live-cycle-as-closed class, #2958). `survival()` computes the
+  // in-progress sentence for its own "day N · live" row off this SAME payload; reuse
+  // its words here instead of re-deriving them, so the two pages can't disagree.
+  const liveNote = d.in_progress_note ? `<p class="rd-archive">${esc(d.in_progress_note)}</p>` : "";
+  if (!closed.length) return liveNote + empty("No closed cycles yet — post-mortems write themselves at each reset.");
   const cards = closed.map((c) => {
     const m = byN[c.cycle] || {};
     const fate = c.collapse_day ? `Engagement collapsed on day ${fmt(c.collapse_day)} — ${esc(d.collapse_definition || "")}.`
@@ -33,7 +42,7 @@ export async function renderPostmortems(d) {
       ` ${changed}</p>` +
       `<p class="rd-meta label">strip: <span class="sv-strip">${esc(c.strip)}</span></p>`);
   }).join("");
-  return cards + `<p class="correlative">Derived live from the engagement and comparison records — nothing curated, nothing deleted. The restarts are part of the experiment, not failures of it.</p>`;
+  return cards + `<p class="correlative">Derived live from the engagement and comparison records — nothing curated, nothing deleted. The restarts are part of the experiment, not failures of it.</p>` + liveNote;
 }
 
 // The Survival Curve — engagement strips per cycle + loudly-caveated odds.
@@ -52,6 +61,39 @@ export function renderSurvival(d) {
     sec("Engagement, day by day (█ showed up · — silent)", `<table class="rd-tbl"><thead><tr><th>cycle</th><th>genesis</th><th>the strip</th><th>engaged</th><th>fate</th></tr></thead><tbody>${rows}</tbody></table>`) +
     `<p class="rd-archive">Collapse = ${esc(d.collapse_definition || "")}. Method: ${esc(d.method || "")}</p>` +
     `<p class="correlative">${esc(d.note || "")} <span class="confidence conf-low">${esc(d.confidence || "")}</span></p>`;
+}
+
+// Voice-fidelity scoreboard (#545) — a blind panel guessing which of 8 coaches wrote
+// a sample. #2957: `n` is `_load_cumulative_judgments` — every judgment ever scored,
+// never reset at a restart (VOICEFIDELITY# is PHASE_TAXONOMY's cross_phase class).
+// Unlabeled, "N=16" on Day 8 of a fresh cycle reads as this cycle's own count; it
+// never is one. The producer ships `scope` (site_api_phase_frame.lifetime_scope())
+// so the figure names its own window instead of leaving it to the reader to guess —
+// the same fix calibration used for its career card, reused rather than re-invented.
+export function renderVoiceFidelity(d) {
+  if (!d || !(d.n > 0)) {
+    return empty("No voice-fidelity panel has scored yet — the monthly blind judging fills in once the first sample completes.") +
+      note((d && d.disclosure) || "Self-measured: a blind panel guesses which coach wrote a sample of their own real output.");
+  }
+  const scopeLabel = d.scope ? ` · ${esc(d.scope)}` : "";
+  const head = figs([
+    fig(fmt(d.n), `judgments${scopeLabel}`),
+    d.correct != null && fig(fmt(d.correct), "correct"),
+    d.accuracy_pct != null && fig(fmt(d.accuracy_pct) + "%", "accuracy"),
+    d.chance_accuracy_pct != null && fig(fmt(d.chance_accuracy_pct) + "%", `chance accuracy · ${fmt(d.candidate_pool_size)}-coach roster`),
+  ]);
+  const rows = (d.coaches || []).map((c) =>
+    `<tr><td class="rd-name">${esc(c.coach_id || "")}</td><td class="num">${fmt(c.correct)}/${fmt(c.n)}${scopeLabel}</td><td class="num">${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${esc(c.distinguishability || "—")}</td></tr>`
+  ).join("");
+  const table = rows ? sec("Per coach", `<table class="rd-tbl"><thead><tr><th>coach</th><th>correct/n</th><th>accuracy</th><th>distinguishability</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  const confusedNote = d.worst_confused_pair
+    ? `<p class="rd-meta label">Most confused pair: ${esc((d.worst_confused_pair.coaches || []).join(" ↔ "))} (${fmt(d.worst_confused_pair.confusions)} mix-ups).</p>`
+    : "";
+  const runNote = d.run_month
+    ? `<p class="rd-archive">Latest panel run: ${esc(d.run_month)}${d.updated_at ? ` (scored ${esc(String(d.updated_at).slice(0, 10))})` : ""} — the tally above is everything scored since this scoreboard began, not just that run.</p>`
+    : "";
+  return head + table + confusedNote + runNote +
+    note(d.disclosure || "Self-measured: a blind panel guesses which coach wrote a sample of their own real output.");
 }
 
 // Scenario explorer (#550) — pick a kind of day, see the distribution of what
@@ -151,8 +193,14 @@ export function renderWrong(d) {
     ? sec("The obituaries — one card per graded failure", `<div class="wrong-feed">${obitCards}</div>`)
     : sec("The obituaries — one card per graded failure",
       `<p class="rd-archive">No graded failures on the board yet — an empty slate right after a reset is honest, not flattering. Each refuted call earns its own card here as the evaluator grades it.</p>`);
+  // #2957: the validator window runs 120 days back — well past the live genesis —
+  // so a catch dated months before this cycle began sits in the same flat table as
+  // one from yesterday. The producer decided per-row (site_api_foresight.wrong →
+  // site_api_phase_frame.archival_frame) and ships `archival`; the date cell just
+  // wears the same "· previous cycle" suffix the lab-notes list already uses for
+  // the identical fact, so the two surfaces can't drift about what counts as old.
   const cr = (v.recent || []).map((c) =>
-    `<tr class="${c.severity === "error" ? "rd-flag" : ""}"><td class="rd-name">${esc(String(c.date || "").slice(0, 10))}</td><td>${esc(c.coach || "")}</td><td>${esc(c.what)}</td></tr>`).join("");
+    `<tr class="${c.severity === "error" ? "rd-flag" : ""}"><td class="rd-name">${esc(String(c.date || "").slice(0, 10) + (c.archival && c.archival.pre_cycle ? " · previous cycle" : ""))}</td><td>${esc(c.coach || "")}</td><td>${esc(c.what)}</td></tr>`).join("");
   const undetailedNote = undetailed
     ? `<p class="rd-archive">+ ${fmt(undetailed)} earlier ${undetailed === 1 ? "catch was" : "catches were"} logged count-only (before per-catch detail was recorded) — included in the total above.</p>`
     : "";

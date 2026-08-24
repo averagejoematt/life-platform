@@ -196,6 +196,10 @@
       "routing": "digest",
       "stack": "mcp_stack"
     },
+    "telegram-coach-hold": {
+      "routing": "digest",
+      "stack": "monitoring_silence_alarms"
+    },
     "telegram-event-sweep-heartbeat": {
       "routing": "digest",
       "stack": "serve_stack"
@@ -458,6 +462,13 @@
       "lambda": null,
       "module": "lambdas/common/generation_cache.py",
       "partition": "coach_gen_cache",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/common/send_ledger.py",
+      "partition": "email_log",
       "via": "pk"
     },
     {
@@ -1445,13 +1456,6 @@
       "lambda": "daily-brief",
       "module": "lambdas/emails/daily_brief_lambda.py",
       "partition": "day_grade",
-      "via": "pk"
-    },
-    {
-      "direction": "write",
-      "lambda": "daily-brief",
-      "module": "lambdas/emails/daily_brief_lambda.py",
-      "partition": "email_log",
       "via": "pk"
     },
     {
@@ -6110,7 +6114,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 55,
+      "alarms": 56,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,

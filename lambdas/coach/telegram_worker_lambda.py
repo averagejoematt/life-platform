@@ -117,6 +117,41 @@ def _emit_metric(name: str, coach_id: str, value: float = 1) -> None:
         logger.warning("[telegram] metric %s emit failed: %s", name, e)
 
 
+# #2823: a held reply was a log line and nothing else — the 2026-08-10 P2 held
+# every reply containing a number for ~9h and left exactly one INFO line as its
+# only trace, and `slo-ai-coaching-success` cannot see it either (it watches
+# AnthropicAPIFailure; a gate hold rides a SUCCESSFUL Bedrock call). This is the
+# same fail-soft-silence shape as #2654/#2763/#2977 (a swallowing path logs a
+# literal token, a CloudWatch MetricFilter mints a metric, an alarm turns the
+# silence into news) — the token here is twin-pinned to the MetricFilter in
+# cdk/stacks/monitoring_silence_alarms.py by tests/test_telegram_coach_hold_2823.py.
+TELEGRAM_COACH_HOLD_TOKEN = "TELEGRAM-COACH-HOLD"  # noqa: S105 — a log token, not a credential
+
+# `kind` distinguishes a GENUINE reply hold (a question Matthew actually asked
+# went unanswered — the class the alarm exists for) from the three
+# structurally-routine unsolicited-outbound holds (referral/checkin/event),
+# which the shared daily ledger (coach_outbound.DAILY_OUTBOUND_CAP) already
+# bounds to at most 2/day platform-wide and which are silently discarded by
+# design (nobody was expecting the text). Both kinds share ONE metric filter —
+# see the threshold derivation in monitoring_silence_alarms.py for why a single
+# alarm set well above that structural ceiling still catches a reply-hold
+# regression within the hour without paging on routine unsolicited discards.
+HOLD_KIND_REPLY = "reply"
+HOLD_KIND_REFERRAL = "referral"
+HOLD_KIND_CHECKIN = "checkin"
+HOLD_KIND_EVENT = "event"
+
+
+def _emit_hold(coach_id: str, kind: str, status: str) -> None:
+    """Log the literal alarm token every hold path must emit (#2823).
+
+    No AWS call here — the CloudWatch MetricFilter reads this log line, matching
+    the #2763/#2977 shape rather than `_emit_metric`'s direct `put_metric_data`
+    (no new IAM grant needed either way).
+    """
+    logger.warning("[telegram] %s HOLD kind=%s status=%s %s", coach_id, kind, status, TELEGRAM_COACH_HOLD_TOKEN)
+
+
 def _persona_is_retired(persona_id: str) -> bool:
     """Whether `persona_id` names a retired seat. Fail-soft FALSE.
 
@@ -771,6 +806,7 @@ def _maybe_refer(*, marker: Optional[str], referring: dict, chat_id, thread: lis
     if not result.grounded:
         # An unsolicited "let me check that" is a buzz that says nothing. A reply
         # earns the honest deferral because he asked; this does not.
+        _emit_hold(target, HOLD_KIND_REFERRAL, result.status)
         logger.info("[telegram] referral to %s held (%s) — not sending unsolicited", target, result.status)
         return None
 
@@ -828,6 +864,7 @@ def _morning_checkin() -> dict:
     frame = coach_outbound.checkin_frame()
     result = _unsolicited_turn(a, frame, tier)
     if not result.grounded:
+        _emit_hold(persona_id, HOLD_KIND_CHECKIN, result.status)
         logger.info("[telegram] morning check-in held (%s) — not sending unsolicited", result.status)
         return {"ok": True, "reason": "held"}
 
@@ -865,6 +902,7 @@ def _speak_unsolicited(event: dict, token: str, chat_id) -> dict:
     # evidence it was handed, which is the whole point of an event-shaped ping.
     result = _unsolicited_turn(a, event["frame"], _current_tier(), event["evidence"])
     if not result.grounded:
+        _emit_hold(event["persona_id"], HOLD_KIND_EVENT, result.status)
         logger.info("[telegram] event ping held (%s) — not sending unsolicited", result.status)
         return {"ok": True, "reason": "held"}
     sent = _send_bubbles(token, chat_id, result.bubbles or [result.text], max_bubbles=1)
@@ -1045,6 +1083,11 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         last_reply_had_em_dash=_last_reply_had_em_dash(thread),
         colleagues_block=a["colleagues"],
     )
+    if not result.grounded:
+        # A genuine reply hold (#2823) — Matthew asked something and the honest
+        # deferral is going out instead. Metric only: the deferral still sends
+        # below (#2517), this branch never returns early.
+        _emit_hold(coach_id, HOLD_KIND_REPLY, result.status)
 
     # A burst goes out as separate bubbles ~1s apart with the typing indicator
     # between — the texture of a person, not a report renderer. Bounded: at most

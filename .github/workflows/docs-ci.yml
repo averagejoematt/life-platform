@@ -64,12 +64,18 @@ on:
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
       - 'scripts/operating_calendar.py'   # #2832 — the calendar doc derives from its registry
+      - 'scripts/gate_census.py'           # #3000 — docs/PROPORTIONALITY.md's gate_census_count fact
+      - 'scripts/gate_census_precision.py'  # #3000 — gate_census.py's error-bar sibling module
       # The code half — a source change can invalidate a doc (#1908).
       - 'lambdas/**'
       - 'mcp/**'
       - 'config/**'
       - 'cdk/**'
       - 'tests/**'
+      # #3000: gate_census_count derives from a build_census() sweep of .github/workflows/**
+      # itself — a workflow-only change (a new/removed CI step) can stale the row and
+      # nothing else in this list would catch it.
+      - '.github/workflows/**'
   # #2982 — the ONE deliberate asymmetry between these two lists, and the only one
   # allowed (test_the_only_push_vs_pr_asymmetry_is_the_tests_glob pins it).
   #
@@ -97,11 +103,16 @@ on:
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
       - 'scripts/operating_calendar.py'   # #2832 — the calendar doc derives from its registry
+      - 'scripts/gate_census.py'           # #3000 — docs/PROPORTIONALITY.md's gate_census_count fact
+      - 'scripts/gate_census_precision.py'  # #3000 — gate_census.py's error-bar sibling module
       # The code half — a source change can invalidate a doc (#1908).
       - 'lambdas/**'
       - 'mcp/**'
       - 'config/**'
       - 'cdk/**'
+      # #3000: same reasoning as the push list above — a workflow-only change can stale
+      # the gate_census_count fact.
+      - '.github/workflows/**'
       # NOT 'tests/**' — see the #2982 note above. These are the tests-side paths a doc
       # gate actually READS as a fact source, verified 2026-08-22 by scanning every gate
       # script for a reference under tests/:

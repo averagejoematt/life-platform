@@ -21,6 +21,17 @@ swallowed failure, so they have no twin constant to pin.
     expert-gate-infra-hold                   EXPERT-GATE-INFRA-HOLD                 (#2763)
     recall-index-failed-chronicle-approve    RECALL-INDEX-FAILED                    (#2977)
     recall-index-failed-wednesday-chronicle  RECALL-INDEX-FAILED                    (#2977)
+    telegram-coach-hold                      TELEGRAM-COACH-HOLD                    (#2823)
+
+#2823's ONE DELIBERATE DEVIATION — THRESHOLD, NOT SHAPE. Every alarm above is
+threshold=1 over 5 minutes: those tokens mean "this should never happen." A held
+coach reply is different — the same regenerate-or-hold gate that protects a real
+reply also runs on three speculative unsolicited-outbound turns (referral,
+morning check-in, event ping) that are *expected* to miss sometimes and are
+silently discarded by design when they do (coach_outbound.DAILY_OUTBOUND_CAP
+bounds those to at most 2/day, platform-wide, across all three). Alarming at
+threshold=1 would page on routine discards. See the threshold derivation in
+``add_silence_alarms`` below for the measured/structural reasoning (ADR-105).
 
 WHY THE EXTRACTION. ``monitoring_stack.py`` sat at 1357 of its recorded 1358-line ratchet
 baseline (#1665) — one line of headroom, and #2977 needed 33. The guard's own rule for a
@@ -197,3 +208,59 @@ def add_silence_alarms(scope, digest) -> None:
         treat_missing_data=NB,
     )
     ri_wed_alarm.add_alarm_action(cw_actions.SnsAction(digest))
+
+    # ══════════════════════════════════════════════════════════════
+    # #2823: a held Telegram coach reply was a log line and nothing else — the
+    # 2026-08-10 P2 held every reply containing a number for ~9h and left one
+    # INFO log line as its only trace. `slo-ai-coaching-success` cannot see a
+    # gate hold either (it watches AnthropicAPIFailure; a hold rides a
+    # SUCCESSFUL Bedrock call). `telegram_worker_lambda._emit_hold` logs this
+    # token on every hold path — the primary reply AND the three
+    # unsolicited-outbound paths (referral/checkin/event) — so a fourth hold
+    # site added later inherits the alarm automatically rather than needing a
+    # second filter. Token must equal telegram_worker_lambda.TELEGRAM_COACH_HOLD_TOKEN
+    # — pinned by tests/test_telegram_coach_hold_2823.py (the #2654 twin pattern).
+    #
+    # THRESHOLD DERIVATION (ADR-105 — recorded here, not just in the PR, so the
+    # number outlives the PR description):
+    #   * Measured 2026-08-24, CloudWatch Logs Insights over
+    #     /aws/lambda/telegram-coach-worker, 30-day window (2026-07-25 -
+    #     2026-08-24): 38 primary-reply turns total, 1 held (the 08-10
+    #     precedent itself) — an isolated single hold is normal model variance,
+    #     not a regression, and zero unsolicited-outbound holds were observed
+    #     in the same window (those paths are mostly dark pending BotFather
+    #     registration per the coach fleet's rollout state).
+    #   * Structural ceiling for the unsolicited class: coach_outbound's shared
+    #     daily ledger (DAILY_OUTBOUND_CAP=2, DAILY_REFERRAL_CAP=1) permits at
+    #     most 2 unsolicited-turn ATTEMPTS per day, platform-wide, across all
+    #     three paths combined — so at most 2 unsolicited holds are even
+    #     possible in any window, let alone one hour (the scheduled check-in
+    #     and event-sweep crons are >1h apart; only a coincident referral could
+    #     add a third, which the ledger's own cap forbids).
+    #   * threshold=3 over a 1-hour period sits strictly above both numbers
+    #     (the empirical single-hold baseline and the structural 2/day
+    #     unsolicited ceiling) while still catching a systemic regression
+    #     within the hour, per the acceptance bar: the 08-10 incident, sustained
+    #     over ~9h of an active chat, would have crossed 3 in its first hour.
+    # ══════════════════════════════════════════════════════════════
+    tg_hold_lg = logs.LogGroup.from_log_group_name(scope, "CoachHoldLgTelegram", "/aws/lambda/telegram-coach-worker")
+    tg_hold_mf = logs.MetricFilter(
+        scope,
+        "CoachHoldFilterTelegram",
+        log_group=tg_hold_lg,
+        filter_pattern=logs.FilterPattern.literal('"TELEGRAM-COACH-HOLD"'),
+        metric_name="TelegramCoachHold",
+        metric_namespace="LifePlatform/Telegram",
+        metric_value="1",
+    )
+    tg_hold_alarm = cloudwatch.Alarm(
+        scope,
+        "CoachHoldAlarmTelegram",
+        alarm_name="telegram-coach-hold",
+        metric=tg_hold_mf.metric(period=Duration.seconds(3600), statistic="Sum"),
+        evaluation_periods=1,
+        threshold=3,
+        comparison_operator=GTE,
+        treat_missing_data=NB,
+    )
+    tg_hold_alarm.add_alarm_action(cw_actions.SnsAction(digest))
