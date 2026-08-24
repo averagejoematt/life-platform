@@ -34,8 +34,8 @@ import sync_doc_metadata as sync  # noqa: E402
 def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
     """Point sync at a synthetic single-doc/single-rule world in tmp_path.
 
-    Keeps the test from touching real repo docs or lambdas/web/site_api_common.py
-    (both of which _sync_platform_stats / the real RULES would otherwise reach for).
+    Keeps the test from touching real repo docs or lambdas/web/platform_counts.py
+    (both of which _sync_platform_counts / the real RULES would otherwise reach for).
     """
     doc = tmp_path / "FAKE_DOC.md"
     doc.write_text(doc_text, encoding="utf-8")
@@ -43,7 +43,7 @@ def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
     monkeypatch.setattr(sync, "RULES", [("FAKE_DOC.md", r"\d+ Widgets", "{widget_count} Widgets")])
     monkeypatch.setattr(sync, "PLATFORM_FACTS", {**sync.PLATFORM_FACTS, "widget_count": widget_count})
     monkeypatch.setattr(sync, "_apply_auto_discovered", lambda facts: facts)  # no real AST/CDK discovery
-    monkeypatch.setattr(sync, "_sync_platform_stats", lambda facts, dry_run: [])  # no real site_api_common.py
+    monkeypatch.setattr(sync, "_sync_platform_counts", lambda facts, dry_run: [])  # no real platform_counts.py (#3101)
     monkeypatch.setattr(sync._alarm_inv, "sync", lambda dry_run, by_stack: [])  # no real docs/MONITORING.md or cdk/stacks
     return doc
 

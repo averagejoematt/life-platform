@@ -265,6 +265,15 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # red BEFORE the merge, not surface in production during the next PT
         # evening — the exact post-merge-only failure mode #2372 exists to stop.
         "test_pt_day_contract_sweep_2813.py",
+        # #3101: the doc-literal conflict surface. Its verdict is pure repo shape —
+        # whether a discovered counter has grown a SECOND committed home, and whether
+        # the single-writer plumbing (agent_commit refusal, hook stage pathspec,
+        # reconcile whitelist) is still wired. Post-merge is too late by construction:
+        # the whole point is that the surface must not reopen on the branch that
+        # reopens it, and a red arriving after the merge is a red the next concurrent
+        # PR pays for. Reads fixed files rather than sweeping, so premerge_derivation
+        # cannot discover it — hand-listed, same as test_qa_window_derivation_2818.
+        "test_doc_literal_conflict_surface_3101.py",
         # ── tree hygiene + safety sweeps ──────────────────────────────────────
         "test_lambdas_packaging_guard.py",  # ADR-146: no loose modules at the lambdas/ root
         "test_bundle_deploy_trigger_registry.py",  # #2920: every path build_bundle.py stages is a deploy trigger or a dated exemption

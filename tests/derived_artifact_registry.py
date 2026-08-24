@@ -122,7 +122,7 @@ def _excluded(generator, reason):
 ARTIFACTS: dict[str, dict] = {
     "deploy/sync_doc_metadata.py": _derived(
         generator="deploy/sync_doc_metadata.py",
-        outputs=("docs/*.md", "CLAUDE.md", "lambdas/web/site_api_common.py"),
+        outputs=("docs/*.md", "CLAUDE.md", "lambdas/web/platform_counts.py"),
         writer="python3 deploy/sync_doc_metadata.py --apply",
         guard="deploy/sync_doc_metadata.py --check",
         guard_lane=LANE_DOCS_CI,
@@ -131,7 +131,11 @@ ARTIFACTS: dict[str, dict] = {
         reason=(
             "The literal sweep — test/tool/lambda/ADR counts across the wiki. Its inputs are "
             "both halves of the doc↔source coupling (#1908), which is why docs-ci.yml carries "
-            "the code paths as well as docs/**."
+            "the code paths as well as docs/**. #3101 moved the counter literals out of "
+            "lambdas/web/site_api_common.py (a hand-merged module) into lambdas/web/"
+            "platform_counts.py, a file whose ENTIRE content is generator output — which is "
+            "what a derived artifact is supposed to look like, and what makes the "
+            "'never commit it on a branch' rule enforceable instead of advisory."
         ),
     ),
     "scripts/generate_adr_index.py": _derived(

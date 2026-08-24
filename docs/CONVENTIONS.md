@@ -126,6 +126,14 @@ output may already be live — leaving `main` both behind production and red.
   `git reset --hard origin/main && git checkout <localtip> -- . && git commit` (the net
   working-tree delta as one commit).
 
+- **Doc-sync literals are not part of this reconciliation.** `/reconcile-branch` cites this
+  section, but since #3101 the discovered counters live in ONE generated file
+  (`lambdas/web/platform_counts.py`) that no branch may carry — so a merge-order conflict on
+  a counter should no longer exist. If you hit one, the branch is carrying a file it should
+  not be: `git checkout origin/main -- lambdas/web/platform_counts.py`, then let the bot
+  regenerate on `main`. Policy lives in §4a1/§4c; the read-it command is in the "Facts that
+  drift" table.
+
 Source: #216, then the 2026-06-29 recurrence (`feedback_squash_merge_drops_unpushed_commits`).
 
 ## 4. CI gate ordering — one job, independently-reporting gates
@@ -328,7 +336,7 @@ test paths in a brief again, that is the defect this section exists to stop.
 **What a test-adding branch owes — nothing (#2982).** It used to owe a `test_count` stamp
 it was forbidden to make. `docs-ci.yml`'s `pull_request` filter carried a blanket
 `tests/**`, so *any* PR that added a test ran `Wiki drift gates`, which reds when
-`test_count` (in `docs/TESTING.md` + `lambdas/web/site_api_common.py`) is stale — while
+`test_count` (then in `docs/TESTING.md` + `lambdas/web/site_api_common.py`) is stale — while
 `deploy/agent_commit.sh` **deliberately refuses** to stamp that literal on a branch,
 because a global counter in a feature PR is a guaranteed conflict against every concurrent
 PR that also added a test (§4c; #2372 lost five PRs to it on 2026-08-08). The command
@@ -346,6 +354,28 @@ one permitted, and every `tests/<file>.py` a gate script reads must be on the PR
 
 Editing a doc still owes the stamp: a PR touching `docs/**` runs these gates on its own
 merits. Run `python3 deploy/sync_doc_metadata.py --apply` once, immediately before pushing.
+
+**And where the counter lives is the other half (#3101).** #2982 stopped the *trigger*
+from firing; the *collision* survived it, because the counter was still a committed line
+inside two files branches edit for real reasons — `PLATFORM_STATS` in
+`lambdas/web/site_api_common.py` (a hot shared module 134 endpoints import) and
+`docs/TESTING.md`. So a PR that legitimately touched either — and every substantive PR
+touches `docs/**`, which per the paragraph above *owes the stamp* — carried a global
+counter it could not separate from its own diff. Measured on the 2026-08-23/24 merge
+train: ~3–4h of serial reconcile rounds across 15 PRs, two of them needing 2–3 rounds
+each.
+
+The counter now has **exactly one committed home**: `DISCOVERED_COUNTS` in
+`lambdas/web/platform_counts.py`, a generated module that exists for no other purpose and
+is spliced into `PLATFORM_STATS` at import. `docs/TESTING.md` states the count as derived
+and names the command (`--print test_count`) instead of quoting a number. So running
+`sync --apply` before pushing a docs PR now produces a counter diff that is *separable* —
+in a file the branch has no reason to commit, and which `agent_commit.sh` refuses and
+restores. **A test-adding PR touches zero lines any sibling PR touches.** Everything
+downstream is unchanged: `--check` still reds on a wrong count, `test_platform_stats_truth`
+still pins the served dict, and the reconcile bot is still the single writer on `main`.
+`tests/test_doc_literal_conflict_surface_3101.py` holds the invariant — a counter growing
+a second committed home fails, rather than quietly reopening the surface.
 
 ### 4b. Visual-QA fires independently of the pipeline (#749)
 
@@ -394,7 +424,7 @@ add `--ai-qa-max-tier 1` to reproduce exactly what the deploy-time gates run).
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 
 Concurrent PRs each commit **generator output** (doc-sync literals in
-`lambdas/web/site_api_common.py` + doc headers, `site/method/game/index.html`,
+`lambdas/web/platform_counts.py` + doc headers, `site/method/game/index.html`,
 `site/assets/js/portrait_data.js`, `site/data/data_sources.json`, the ADR index in
 `docs/DECISIONS.md`, the shared chrome block). A PR branched before a sibling's merge
 regenerated one of those asserts staleness *after its own squash-merge* — that was the
@@ -1083,7 +1113,7 @@ These values change and must **never** be hand-written in docs or memory. Read t
 | Layer-retirement invariant (#781) | `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be `[]` (the layer is retired; there is no version to quote) |
 | Lambda count | `python3 deploy/sync_doc_metadata.py` (AST-discovers; syncs `PLATFORM_STATS` + doc headers) |
 | MCP tool count | `deploy/sync_doc_metadata.py::_auto_discover_tool_count` — the top-level keys in `TOOLS` in `mcp/registry.py`. **Do not** `grep -c '"name":'` — it over-counts nested schema fields |
-| Test count | `PLATFORM_STATS["test_count"]` in `lambdas/web/site_api_common.py`, auto-bumped by the sync + the pre-commit hook |
+| Test count | `python3 deploy/sync_doc_metadata.py --print test_count` (writes nothing). The one committed home is `DISCOVERED_COUNTS` in **`lambdas/web/platform_counts.py`** — generated, single-writer, never hand-edited and never carried on a branch (#3101). It is spliced into `PLATFORM_STATS` at import; `PLATFORM_STATS["test_count"]` is still the value served at `/api/platform_stats` |
 | Live site build | `curl -s https://averagejoematt.com/version.json` → compare `build` to `git rev-parse --short HEAD`; a mismatch means the viewer's device is stale |
 | Open CodeQL alerts | `gh api '/repos/{owner}/{repo}/code-scanning/alerts?state=open&per_page=100' --paginate --jq length` → steady state **0** since the #1902 triage (every alert is fixed or dismissed-with-reason; a just-merged fix stays open until CodeQL re-analyzes main). `drift_sentinel.check_codeql_alerts` alarms on regrowth — an open alert is un-triaged by definition, so triage it, never let the list re-accumulate |
 | `main` classic branch protection | `gh api repos/<owner>/<repo>/branches/main/protection` → must 404 "Branch not protected" (removed 2026-07-13, #1173; a 200 here means protection was re-added out of band — reconcile the doc, don't assume this table is wrong) |
@@ -1093,10 +1123,16 @@ These values change and must **never** be hand-written in docs or memory. Read t
 The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
 `deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it
 touches (`docs/`, `CLAUDE.md`, `.claude/README.md`,
-`lambdas/web/site_api_common.py`). If you run the script by hand outside a commit
+`lambdas/web/platform_counts.py`). If you run the script by hand outside a commit
 (or add a new doc to its `RULES` table that falls outside that stage glob), fold
 the changes into the commit yourself (`git add … && git commit --amend --no-edit
 --no-verify`) or `test_platform_stats_truth.py` reds CI.
+
+**On a branch, none of that applies — the counters are not yours to carry (#3101).**
+`deploy/agent_commit.sh` refuses `lambdas/web/platform_counts.py` outright (no
+`ALLOW_DOC_LITERALS` escape) and silently restores it if the hook already swept it,
+because the file is 100% regenerable and so has no authored content to lose. The
+reconcile bot on `main` is its only writer (§4c).
 
 ---
 

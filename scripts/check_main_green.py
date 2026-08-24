@@ -292,7 +292,8 @@ ZR_INDETERMINATE = "indeterminate"
 # #2826 follow-up (2026-08-20): a push made with GITHUB_TOKEN never dispatches
 # workflows — GitHub suppresses it by design to prevent recursion. The nightly
 # `chore(reconcile)` commit is exactly this shape AND touches lambdas/** (it
-# regenerates site_api_common.py's literals), so without this state it reads as
+# regenerates lambdas/web/platform_counts.py's literals — site_api_common.py's,
+# before #3101 moved them), so without this state it reads as
 # a PARTIAL SWALLOW and the 15-minute cron fires after every single merge.
 ZR_BOT_PUSH_NO_DISPATCH = "bot-push-no-dispatch"
 BOT_COMMITTERS = {"github-actions[bot]", "web-flow"}

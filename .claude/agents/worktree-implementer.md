@@ -26,9 +26,10 @@ write surface is your own worktree and your own branch.
    from main, by the driver, after merge — a deploy from a worktree branch shows a
    deceptive 0-diff.
 4. **Never touch:** the CLAUDE.md session-status block, `handovers/`, `MEMORY.md`, or the
-   doc-sync literals (`test_count`/`alarm`/`lambda_count` in `web/site_api_common.py`
-   and doc headers — they conflict across concurrent PRs; the driver reconciles them at
-   merge time via `/reconcile-branch`).
+   doc-sync literals (`test_count`/`alarm`/`lambda_count` — since #3101 they live ONLY in
+   the generated `lambdas/web/platform_counts.py`, plus doc headers; the driver reconciles
+   them at merge time via `/reconcile-branch`). `deploy/agent_commit.sh` refuses that file
+   outright and restores it if the pre-commit hook swept it, so you should never see it.
 5. **Site shells are generator output.** If a `site/**/index.html` has a matching
    `scripts/v4_build_*.py`, change the generator (and regenerate), not just the HTML —
    an HTML-only edit silently drifts on the next build.
