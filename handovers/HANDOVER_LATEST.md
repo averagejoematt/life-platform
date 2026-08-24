@@ -1,5 +1,38 @@
 # Handover — 2026-08-24 (Fable 5, autonomous, ~19h incl. overnight watchers): Phase D2 of the A-Grade Program + the deploy plane healed + the biggest single-session drain yet (28 PRs, 17 closures)
 
+## SESSION_STATE — Session A (shimmering-snacking-quokka), live block, replace at each phase boundary
+
+**Updated:** 2026-08-24 ~19:45Z · **Phase:** A2+A3 agents in flight · **Driver:** Fable 5.
+If resuming on Opus: *"Resume ~/.claude/plans/shimmering-snacking-quokka.md from SESSION_STATE"*.
+
+- **A0 DONE.** Main green at `5fa985dd8` (wrap commit's Docs CI red fixed by `ceffdb2e1` —
+  fact-scanner misread "#2989 alarm fix" as an alarm count + stale INCIDENT_LOG patterns;
+  citations commit `5fa985dd8`). Fleet deploy confirmed complete (qa-smoke LastModified
+  2026-08-24 18:51Z). No waiting leases. `gh secret list`: NO RECONCILE_PUSH_TOKEN, NO
+  DEPLOY_GATE_JANITOR_TOKEN → D0.6 + #3021 skipped silently per plan.
+- **Scheduled observations read:** first real nightly edge-429 = **GREEN** (PASS among 58;
+  registered qa_smoke_lambda.py:1015, deployed pre-run; the 3 PAUSE + 1 WARN + 1 FAIL all
+  enumerated and edge_429 not among them). Baselines: RegenDiscarded 0/24h ·
+  TruncatedResponses 15 (D2's own burn window) · CallerClass dimension live (prod-cron/ci)
+  · GenerationSkippedUnchanged no data yet (#3107 known). Recall corpus GREEN tonight.
+- **qa-smoke-failures still lit, NEW cause:** nightly FAIL = cross_surface:weight — Webb
+  (nutrition_coach) cites 321 lb (generated 08-23) vs cockpit 326 (weighed 08-24) because
+  today's regen was HELD twice by the ADR-108 quality gate (score 62 both attempts).
+  Evidence commented on #3083; alarm re-cited with expiry 2026-08-25T18:00Z. Also filed
+  #3108 (coach-state-updater float('early') bug, glucose_coach RELATIONSHIP#state stalls).
+  ai-tokens-daily + s3-bucket-size alarms decoded + cited (latter folded into DIL-026 lane).
+- **Agents in flight (11, all worktree-implementer, PRs never self-merged):** #3103
+  wait_pr_green (sonnet) · #3102 confirm-before-gate (sonnet) · #3101 literal-conflict
+  (opus) · #3049 source-completeness (opus) · DIL-025 idempotency census (opus) · DIL-028
+  raw-layout replay (sonnet) · DIL-026 lifecycle + bucket-size disposition (sonnet) ·
+  DIL-027 cross-account/region raw/ backup (opus) · #2997 qa-smoke-warnings reconcile
+  (sonnet) · #3000 census lane (sonnet) · #2578 CodeQL-sentinel can-it-fail (opus).
+- **Next:** merge trains for foundation trio first (use #3103's tool once landed), then D3
+  lanes + register flips; A4 drain wave (#2815, #2957 residuals, #3066, #2823, #3018,
+  #2888, #2847, #2883 residuals, #3108) launches as slots free; epic acceptance passes
+  #2986/#2798/#2799/#2801/#2578. Owner batch surfaced in-conversation (8 items, unanswered
+  → wrap). Merge discipline: verdicts read in their OWN command, check sets by name.
+
 **Session:** Fable 5. Drove: *"Boot Phase D2 of the A-Grade Program"*
 (`~/.claude/plans/ticklish-soaring-teapot.md`), then owner-directed scope expansion:
 *"clear as much of the open issues backlog as possible with sub-agents … non-fable
