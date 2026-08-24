@@ -193,6 +193,28 @@ SURFACES = {
     # as /api/coach_analysis's cross_coach_reference with no chokepoint in the
     # module. Now gated on the digest's own inputs, regenerate-once-then-HOLD (the
     # deterministic fallback digest persists instead of gated-out text).
+    # #2889: the module's THIRD surface — the ADR-126 reuse re-gate. It is the same
+    # check as `_apply_grounding_gate` over the same prose blob and the same allow-list
+    # derived from the same `user_message`, run at a DIFFERENT moment: before a stored
+    # digest is republished on a later cycle. That is precisely why it exists — the
+    # `dates` and `freshness` classes are functions of TODAY, so a digest that was
+    # honest when generated can be a fabricated-date / stale-Day-N violation when it is
+    # reused, and reusing the ORIGINAL verdict (which is what ADR-126's coach-brief path
+    # does) would ship it. Check-only, no corrective regen: a surviving finding means the
+    # caller regenerates from scratch, which runs `_apply_grounding_gate` in full.
+    "lambdas/coach/coach_ensemble_digest.py::_still_grounded": _entry(
+        ("numbers", "dates", "freshness"),
+        {
+            "behavioral": (
+                "identical reasoning to `_apply_grounding_gate` below — this grades the "
+                "same cross-coach synthesis prose, which cannot emit a second-person "
+                "same-day completed-action claim, and the pipeline still reads only the "
+                "COACH# partition, so arming would need a new read to grade a class this "
+                "surface cannot emit."
+            ),
+            "night": _NO_NIGHT_MAP,
+        },
+    ),
     "lambdas/coach/coach_ensemble_digest.py::_apply_grounding_gate": _entry(
         ("numbers", "dates", "freshness"),
         {

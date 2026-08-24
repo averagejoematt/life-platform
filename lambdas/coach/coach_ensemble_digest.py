@@ -649,6 +649,102 @@ def _apply_grounding_gate(digest, user_message):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #2889 — ADR-126 HASH-AND-REUSE, EXTENDED TO THIS SURFACE
+# ══════════════════════════════════════════════════════════════════════════════
+
+_CACHE_COACH = "ensemble"  # the generation_cache slot key for this cross-coach surface
+_CACHE_OUTPUT_TYPE = "ensemble_digest"
+
+
+def _still_grounded(digest, user_message):
+    """Does this digest pass the ADR-104 grounding classes against TODAY's inputs?
+
+    Check-only — no corrective regen, because on the reuse path a surviving finding
+    means "regenerate from scratch", which the caller already does. Fail-OPEN when the
+    shared module is unavailable, matching `_apply_grounding_gate` and the module's
+    own design.
+    """
+    if grounding_findings is None or allowed_numbers is None:
+        return True
+    _dates = allowed_dates(user_message) if allowed_dates is not None else None
+    findings = grounding_findings(
+        _digest_prose_blob(digest),
+        facts=None,
+        allowed=allowed_numbers(user_message),
+        allowed_dates=_dates,
+        **cycle_gate_params(),
+    )
+    return not findings
+
+
+def _reuse_digest(coach_data, coach_ids, user_message):
+    """Reuse the last gate-passed digest when not one coach's input moved (#2889).
+
+    The digest is a synthesis of the eight coaches' stored `OUTPUT#`/`COMPRESSED#latest`
+    records. When none of them changed since the last cycle, the cross-coach reading has
+    not changed either — and this is the platform's single most expensive daily Haiku
+    call (`max_tokens=6000`, and a grounding failure buys a second one).
+
+    The reuse is NOT a re-served verdict. `reuse_if_still_valid` re-runs the ADR-104
+    grounding check against today's `user_message` first, so the date-aware classes
+    (fabricated date #1242, cycle freshness #1691/#1897) get a fresh judgment on text
+    that is being republished on a later date. Fail-soft: any error → generate as before.
+
+    Returns `(fingerprint, reused_digest_or_None, unchanged_since)`.
+    """
+    try:
+        from common import generation_cache as gc
+
+        parts = gc.ensemble_parts(coach_data, sorted(coach_ids), _ensemble_system_prompt())
+        fingerprint, reused, unchanged_since = gc.reuse_if_still_valid(
+            table,
+            _CACHE_COACH,
+            _CACHE_OUTPUT_TYPE,
+            parts,
+            lambda blob: _still_grounded(json.loads(blob), user_message),
+        )
+        if not reused:
+            return fingerprint, None, None
+        digest = json.loads(reused)
+        # Bookkeeping, not content: today's row records when it was WRITTEN, and
+        # `_reused_since` keeps the reuse visible to anyone reading the stored digest.
+        digest["created_at"] = datetime.now(timezone.utc).isoformat()
+        digest["_reused_since"] = unchanged_since
+        gc.record_reuse(table, _CACHE_COACH, _CACHE_OUTPUT_TYPE, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        gc.emit_skip_metric(_cw, "LifePlatform/AI", _CACHE_COACH, surface=_CACHE_OUTPUT_TYPE)
+        logger.info("Ensemble digest inputs unchanged since %s — reusing the gated digest, skipping generation", unchanged_since)
+        return fingerprint, digest, unchanged_since
+    except Exception as e:
+        logger.warning("Ensemble generation cache unavailable (non-blocking): %s", e)
+        return None, None, None
+
+
+def _store_digest_for_reuse(fingerprint, coach_data, coach_ids, digest):
+    """Persist a freshly generated, gate-passed digest under its input fingerprint (#2889).
+
+    Only ever called with a MODEL digest that cleared the grounding gate — never a
+    fallback or a HOLD, which are cheap to rebuild deterministically and must not be
+    resurrected on a later cycle as if they were the real thing.
+    """
+    if not fingerprint:
+        return
+    try:
+        from common import generation_cache as gc
+
+        gc.store_entry(
+            table,
+            _CACHE_COACH,
+            _CACHE_OUTPUT_TYPE,
+            fingerprint,
+            json.dumps(_decimal_to_float(digest), default=str),
+            datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            parts=gc.ensemble_parts(coach_data, sorted(coach_ids), _ensemble_system_prompt()),
+        )
+    except Exception as e:
+        logger.warning("Ensemble generation cache store failed (non-blocking): %s", e)
+
+
 def _write_digest(digest, cycle_date):
     """Write the ensemble digest to DynamoDB at ENSEMBLE#digest / CYCLE#{date}."""
     item = {
@@ -853,6 +949,50 @@ def _update_coach_compressed_states(digest, coach_data, cycle_date):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _finish_digest(digest, coach_data, cycle_date):
+    """Steps 3-5: the persistence tail every digest takes, whatever produced it.
+
+    Extracted by #2889 so the reuse path and the generation path cannot drift: a
+    reused digest must land in DynamoDB, open its dockets and update the coaches'
+    compressed states exactly as a freshly generated one does — the ONLY difference
+    between the two paths is whether Bedrock was paid.
+    """
+    # Step 3: Write/update disagreement records
+    #
+    # This runs BEFORE the digest write on purpose. The docket pass below mutates
+    # `digest["docket"]`, and while it ran after _write_digest that field existed
+    # only in the Lambda's return value — an operator reading the stored digest
+    # could not tell whether the docket pass had run at all. Both writers are
+    # fail-soft, so nothing here can stop the digest from being stored.
+    disagreements = digest.get("active_disagreements", [])
+    if disagreements:
+        _write_disagreements(disagreements, cycle_date)
+
+        # Step 3b (#1386): open Dispute Docket entries for machine-checkable
+        # divergences. dispute_docket.validate_criterion is the deterministic
+        # gate; non-resolvable disagreements stay narrative. Fail-soft — a
+        # docket error must never sink the digest.
+        try:
+            from coach import dispute_docket
+
+            docket_stats = dispute_docket.open_from_disagreements(disagreements, cycle_date)
+            digest["docket"] = {
+                "opened": len(docket_stats.get("opened", [])),
+                "skipped": len(docket_stats.get("skipped", [])),
+            }
+        except Exception as e:
+            logger.warning("dispute-docket open pass failed (non-fatal): %s", e)
+
+    # Step 4: Write the digest — with the docket outcome, when there was one
+    _write_digest(digest, cycle_date)
+
+    # Step 5: Update each coach's compressed state with digest contribution
+    _update_coach_compressed_states(digest, coach_data, cycle_date)
+
+    logger.info("Ensemble digest complete for cycle %s", cycle_date)
+    return _decimal_to_float(digest)
+
+
 def lambda_handler(event, context):
     """Produce the cross-coach ensemble digest for a completed generation cycle.
 
@@ -914,6 +1054,16 @@ def lambda_handler(event, context):
     # Phase 3.7: pass expected coach_ids so the synthesizer knows who's absent.
     user_message = _build_user_message(coach_data, cycle_date, expected_coach_ids=coach_ids)
 
+    # Step 2a (#2889 / ADR-126 extended): if not one coach's record moved since the last
+    # cycle, reuse the stored gate-passed digest and skip the 6000-token Haiku call. The
+    # ADR-104 grounding gate is re-run against today's inputs inside `_reuse_digest` —
+    # skipped generation, never a skipped gate. `_cache_fp` is None when the cache is
+    # unavailable, which makes the store below a no-op and leaves this path unchanged.
+    _cache_fp, _reused_digest, _unchanged_since = _reuse_digest(coach_data, coach_ids, user_message)
+    if _reused_digest is not None:
+        digest = _reused_digest
+        return _finish_digest(digest, coach_data, cycle_date)
+
     try:
         # Budget guardrail: at Tier ≥ 1 skip the LLM and use the default digest.
         from ai.budget_guard import allow as _budget_allow
@@ -961,6 +1111,11 @@ def lambda_handler(event, context):
                 # Distinguish a grounding HOLD from a budget/LLM-failure fallback so
                 # an operator reading the stored digest can tell which path ran.
                 digest["_grounding_hold"] = True
+            else:
+                # #2889: only a gate-passed MODEL digest earns a cache slot. A HOLD or a
+                # fallback is deterministic and cheap to rebuild, and caching one would
+                # let a degraded cycle be replayed later as if it were the real thing.
+                _store_digest_for_reuse(_cache_fp, coach_data, coach_ids, digest)
         else:
             logger.warning("LLM returned non-dict response — using fallback digest")
             digest = _build_default_digest(coach_data, cycle_date)
@@ -969,37 +1124,4 @@ def lambda_handler(event, context):
         logger.error("LLM call failed: %s — using fallback digest", e)
         digest = _build_default_digest(coach_data, cycle_date)
 
-    # Step 3: Write/update disagreement records
-    #
-    # This runs BEFORE the digest write on purpose. The docket pass below mutates
-    # `digest["docket"]`, and while it ran after _write_digest that field existed
-    # only in the Lambda's return value — an operator reading the stored digest
-    # could not tell whether the docket pass had run at all. Both writers are
-    # fail-soft, so nothing here can stop the digest from being stored.
-    disagreements = digest.get("active_disagreements", [])
-    if disagreements:
-        _write_disagreements(disagreements, cycle_date)
-
-        # Step 3b (#1386): open Dispute Docket entries for machine-checkable
-        # divergences. dispute_docket.validate_criterion is the deterministic
-        # gate; non-resolvable disagreements stay narrative. Fail-soft — a
-        # docket error must never sink the digest.
-        try:
-            from coach import dispute_docket
-
-            docket_stats = dispute_docket.open_from_disagreements(disagreements, cycle_date)
-            digest["docket"] = {
-                "opened": len(docket_stats.get("opened", [])),
-                "skipped": len(docket_stats.get("skipped", [])),
-            }
-        except Exception as e:
-            logger.warning("dispute-docket open pass failed (non-fatal): %s", e)
-
-    # Step 4: Write the digest — with the docket outcome, when there was one
-    _write_digest(digest, cycle_date)
-
-    # Step 5: Update each coach's compressed state with digest contribution
-    _update_coach_compressed_states(digest, coach_data, cycle_date)
-
-    logger.info("Ensemble digest complete for cycle %s", cycle_date)
-    return _decimal_to_float(digest)
+    return _finish_digest(digest, coach_data, cycle_date)
