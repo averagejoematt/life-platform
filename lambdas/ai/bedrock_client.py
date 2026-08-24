@@ -171,6 +171,62 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
         )
 
 
+def first_text(resp: dict) -> str | None:
+    """The first text block of a Messages response, or None if there isn't one.
+
+    #2893: `resp["content"][0]["text"]` raises IndexError on an empty `content`
+    list — which is exactly the shape a `max_tokens` stop with no emitted text
+    returns. Both retry wrappers used to do that destructure INSIDE their retry
+    `try`, so a shape error on an already-billed response was caught by the
+    generic `except Exception` and re-invoked the model up to 4×. Callers use
+    this helper and handle None themselves, outside the retry loop.
+    """
+    if not isinstance(resp, dict):
+        return None
+    for block in resp.get("content") or []:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            return block["text"]
+    return None
+
+
+def _note_truncation(parsed: dict, bedrock_body: dict, model_id: str) -> None:
+    """Meter responses that stopped at `max_tokens` (#2893). Strictly fail-open.
+
+    A truncated response is billed in full and is then unparseable by every JSON
+    caller in the fleet — the #2668 class. Before this, `stop_reason` was read in
+    exactly zero places, so the only way to find the class was a hand audit of
+    CloudWatch logs. `TruncatedResponses` / `TruncatedCostUSD` make it a standing
+    measurement (per-LambdaFunction and platform-wide) instead.
+
+    Deliberately a metric plus a WARN, not an ERROR: a few call sites cap on
+    purpose (e.g. the podcast's 5-token yes/no classifier), so a truncation is
+    evidence to weigh, not an automatic failure.
+    """
+    try:
+        if (parsed.get("stop_reason") or "") != "max_tokens":
+            return
+        usage = parsed.get("usage") or {}
+        cap = int(bedrock_body.get("max_tokens") or 0)
+        out_tok = int(usage.get("output_tokens", 0) or 0)
+        cost = estimate_cost_usd(usage, model_id)
+        fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        _cw().put_metric_data(
+            Namespace=_CW_NAMESPACE,
+            MetricData=[
+                {"MetricName": "TruncatedResponses", "Dimensions": fn_dim, "Value": 1, "Unit": "Count"},
+                {"MetricName": "TruncatedResponses", "Value": 1, "Unit": "Count"},
+                {"MetricName": "TruncatedCostUSD", "Dimensions": fn_dim, "Value": cost, "Unit": "None"},
+                {"MetricName": "TruncatedCostUSD", "Value": cost, "Unit": "None"},
+            ],
+        )
+        print(
+            f"[WARN] bedrock response TRUNCATED at max_tokens={cap} (output_tokens={out_tok}, "
+            f"est ${cost:.6f}, model={model_id}) — billed in full; any JSON parse of it will fail (#2893)"
+        )
+    except Exception as e:  # never break an AI call on telemetry
+        print(f"[ERROR] bedrock truncation telemetry emit failed (non-fatal, datapoints DROPPED): {e}")
+
+
 def _client():
     """Lazy-init bedrock-runtime client. Read timeout generous for long
     Sonnet narrative passes; botocore adaptive retries on throttling."""
@@ -281,6 +337,8 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     parsed = json.loads(resp["body"].read())
     # G1: meter token usage + estimated spend at the single chokepoint. Fail-open.
     _emit_usage_metrics(parsed.get("usage") or {}, model_id)
+    # #2893: meter billed-but-unparseable output at the same chokepoint. Fail-open.
+    _note_truncation(parsed, bedrock_body, model_id)
     return parsed
 
 
