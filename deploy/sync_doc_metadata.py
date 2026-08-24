@@ -663,7 +663,7 @@ def _apply_auto_discovered(facts: dict) -> dict:
         f"{facts['secret_count']} active secrets × $0.40/secret/month "
         f"(live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md)"
     )
-    return facts
+    return __import__("sync_census_fact").apply(facts, RULES, ROOT) or facts  # #3000, module-size ceiling
 
 
 # ══════════════════════════════════════════════════════════════════════════════
