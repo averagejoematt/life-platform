@@ -222,7 +222,7 @@ live IAM gaps (golden-eval ran Bedrock OUTSIDE the ceiling) → 12 closed + appl
 #2893 waste audit ($1.66/mo cut; surfaced ADR-108 gate passing 84/484 unevaluated →
 #3083 owner call); #2837 EMF premise INVERTED (bill tracks ~102 dense series ≈ $19, not
 703); transport extraction ended the ai_calls ceiling + re-bill + budget-retry
-(#3082/#3084); #2989 alarm fix cleared live same-session. **Deploys:** 105-lambda fleet
+(#3082/#3084); the banding fix for issue #2989 cleared live same-session. **Deploys:** 105-lambda fleet
 pass 0-failed + 6 cdk stacks + 2 IAM applies, all postflight-verified. CodeQL at 0 open.
 **Retrospective filed as foundation:** #3101 literal-conflict surface, #3102
 truth-confirm, #3103 wait_pr_green, #3104 merge-train (~half the 12h was these).
