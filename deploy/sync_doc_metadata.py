@@ -499,36 +499,6 @@ def _count_test_functions() -> int | None:
         return None
 
 
-def _auto_discover_gate_census_count() -> int | None:
-    """Total gates found by scripts/gate_census.py's build_census() (#3000, epic #2578).
-
-    The ONE auto-discoverer here that costs real wall-clock (~7s measured 2026-08-24,
-    all 5 families over the full tree) rather than a regex/AST scan — the census walks
-    .github/workflows/**, the gate registries (lambdas/tests/scripts/deploy/mcp) and the
-    qa-smoke + structural-test families. Kept as a plain function call, not a subprocess,
-    so a failure here is an ImportError/exception this function swallows to None (the
-    same fallback contract as every other _auto_discover_*), never a silent wrong number.
-
-    Why this matters: docs/PROPORTIONALITY.md's gate-census row used to hand-state
-    "425 declared gates" and drifted 13% behind the live count when #2639 widened the
-    CI-step derivation without anyone re-typing the row. This makes the row DERIVED.
-    """
-    scripts_dir = ROOT / "scripts"
-    if not scripts_dir.exists():
-        return None
-    try:
-        scripts_path = str(scripts_dir)
-        if scripts_path not in sys.path:
-            sys.path.insert(0, scripts_path)
-        import gate_census  # local import: scripts/ is a lazy sys.path addition, not a package
-
-        census = gate_census.build_census(ROOT)
-        gates = census.get("gates")
-        return len(gates) if gates else None
-    except Exception:
-        return None
-
-
 # The credibility numbers served at /api/platform_stats (rendered on the /method/
 # pages — the surface a skeptic cross-checks against the public repo). Hand-editing
 # rotted: 2026-07-01 the dict claimed 303 tests vs ~1,290 actual, 138 tools vs 144,
@@ -629,15 +599,6 @@ def _apply_auto_discovered(facts: dict) -> dict:
             print(f"  [auto] test_count: {facts.get('test_count')} → {test_count} (def test_ across tests/*.py)")
         facts["test_count"] = test_count
 
-    gate_census_count = _auto_discover_gate_census_count()
-    if gate_census_count is not None:
-        if facts.get("gate_census_count") != gate_census_count:
-            print(
-                f"  [auto] gate_census_count: {facts.get('gate_census_count')} → {gate_census_count} "
-                "(scripts/gate_census.py build_census(), #3000)"
-            )
-        facts["gate_census_count"] = gate_census_count
-
     adr_count = _count_adrs()
     if adr_count is not None:
         if facts.get("adr_count") != adr_count:
@@ -702,7 +663,7 @@ def _apply_auto_discovered(facts: dict) -> dict:
         f"{facts['secret_count']} active secrets × $0.40/secret/month "
         f"(live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md)"
     )
-    return facts
+    return __import__("sync_gate_census_fact").apply(facts, RULES, ROOT) or facts  # #3000, module-size ceiling
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -719,7 +680,6 @@ PLATFORM_FACTS = {
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
     "tool_module_count": 25,  # fallback: mcp/tools_*.py domain modules only
     "adr_count": 120,  # fallback: ## ADR- headings in docs/DECISIONS.md (record count; max number may differ — see adr_max)
-    "gate_census_count": 523,  # fallback: len(build_census()['gates']) via scripts/gate_census.py (#3000, epic #2578). Was hand-typed at 425 and drifted 13% behind the #2639-widened live count before this row existed; measured 523 on 2026-08-24.
     "secret_count": 26,  # live-verified 2026-08-23 via `aws secretsmanager list-secrets` (not auto-discovered — update after secret add/delete)
     "account_concurrency_limit": 100,  # live-verified 2026-07-18 via `aws lambda get-account-settings` (#1328; raised from 10 by AWS case 177921309700709 — update after any quota change)
     "alarm_count": 113,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms); 69→71 on #1328 (serve-stack Throttles alarms); 71→77 refreshed to discovery on #1455 (drift >5; includes compute-outputs-missing + compute-outputs-heartbeat); 77→86 refreshed to discovery on #1960 (drift >5; includes the 5 per-source ingest-auth-unhealthy-* alarms); 86→92 refreshed to discovery on the 2026-08-03 merge wave (whoop auth alarm #2068, canary stored-state alarms #2065, kill-switch skip alarms #2067); 92→99 refreshed to discovery on the 2026-08-11 permanence merge (#1400/PR #2572 — the continuity-watch + public-archive alarms landed by the LifePlatformOperational cdk deploy); 99→107 refreshed to discovery on the 2026-08-20 us-east-1 reconcile (#2829/PR #2913 — dash-5xx-rate, dash-total-errors, cf-auth-errors declared in cdk/stacks/web_alarms.py; +3 crossed the ±5 fallback-hygiene tolerance and redded main, the class this test's docstring warns about); 107→113 refreshed to discovery on #3037 (the #2977 recall silence alarms + approve-path pair crossed the ±5 tolerance)
@@ -835,15 +795,6 @@ RULES = [
         "**Version:** {version} | **Last updated:** {date} | **Total tools:** {tool_count}",
     ),
     # DATA_DICTIONARY.md archived v3.7.32 — merged into SCHEMA.md
-    # ── PROPORTIONALITY.md ───────────────────────────────────────────────────
-    # #3000: the gate-census row hand-stated "425 declared gates" and drifted 13%
-    # behind the live count when #2639 widened the CI-step derivation. Derived now,
-    # like every other count on this page — see _auto_discover_gate_census_count().
-    (
-        "docs/PROPORTIONALITY.md",
-        r"\d+ declared gates with measured error bars",
-        "{gate_census_count} declared gates with measured error bars",
-    ),
     # ── SLOs.md ──────────────────────────────────────────────────────────────
     (
         "docs/SLOs.md",
