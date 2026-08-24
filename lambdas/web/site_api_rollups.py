@@ -631,6 +631,14 @@ def cycle_compare(*, _g) -> dict:
                     # inflated the count past the window (8 "days" in a 6-day cycle).
                     # Same [5:15] date-slice idiom as _engaged_dates above.
                     "days_with_data": len({str(r["sk"])[5:15] for r in wd} | {str(r["sk"])[5:15] for r in wh}),
+                    # #2957: the live cycle's window is still filling. Without saying so,
+                    # its column reads "Days with data: 7" beside "—" for start weight and
+                    # avg recovery, and the reader-truth judge (correctly) called that a
+                    # contradiction. It isn't one — "—" is PER-METRIC absence (no weigh-in
+                    # in the window), not "no data" — but the surface has to carry the
+                    # distinction rather than leave the reader to infer it.
+                    "in_progress": n == current,
+                    "days_elapsed": elapsed if n == current else window,
                 }
             )
 
@@ -642,7 +650,13 @@ def cycle_compare(*, _g) -> dict:
                 "note": (
                     # #948: "first 1 days" recurs on every genesis day of every cycle — pluralize.
                     f"Each cycle measured over its own first {window} day{'s' if window != 1 else ''} — matched windows, "
-                    "never a short run vs a long one. Correlative, N=1."
+                    "never a short run vs a long one. Correlative, N=1. "
+                    # #2957: name the two things a reader (and the reader-truth judge)
+                    # otherwise has to guess — that the newest column is a cycle still
+                    # running, and that a dash is one metric's absence, not the cycle's.
+                    f"Cycle {current} is still running (day {elapsed} of its own window), so its column is a "
+                    "partial read, not a closed result. A — means that metric has no reading inside the "
+                    "window; it never means the cycle has no data."
                 ),
             },
             cache_seconds=3600,

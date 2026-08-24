@@ -29,6 +29,7 @@ from web.site_api_common import (
     _ok,
     night_of_for,
 )
+from web.site_api_phase_frame import label_with_span, spans_cycle  # #2957 — cross-phase framing
 
 
 def pulse(*, _g) -> dict:
@@ -282,6 +283,17 @@ def pulse(*, _g) -> dict:
             return "green"
         return "amber" if mind_score >= 2 else "red"
 
+    # #2957 (ADR-104 / phase rubric): the two gap counters below are LIFETIME memory —
+    # they measure back from today to the last record of their kind, and neither the
+    # wipe nor the genesis resets them. On Day 5 of cycle 14 that produced the honest
+    # number 'No training logged — 57 days' inside a 5-day cycle, which the reader-truth
+    # judge correctly read as a temporal contradiction. The counter is right; it was
+    # missing the frame. `spans_cycle` decides (gap >= day number ⇒ it reaches past
+    # Day 1) and the label wears the parenthetical only then — an always-on badge would
+    # train the reader to skip it.
+    _lift_spans = spans_cycle(days_since_workout, _pulse_day)
+    _journal_spans = spans_cycle(journal_gap_days, _pulse_day)
+
     glyphs = {
         "scale": {
             "state": _scale_state(),
@@ -333,10 +345,15 @@ def pulse(*, _g) -> dict:
             "written_today": journal_today,
             "streak_days": journal_streak,
             "gap_days": journal_gap_days,
+            "spans_cycles": _journal_spans,  # #2957
             "label": (
                 "Journaled"
                 if journal_today
-                else (f"No entry in {journal_gap_days} days" if journal_gap_days is not None and journal_gap_days >= 2 else "No entry yet")
+                else (
+                    label_with_span(f"No entry in {journal_gap_days} days", journal_gap_days, _pulse_day, EXPERIMENT_START)
+                    if journal_gap_days is not None and journal_gap_days >= 2
+                    else "No entry yet"
+                )
             ),
         },
         "lift": {
@@ -344,6 +361,7 @@ def pulse(*, _g) -> dict:
             "trained_today": trained_today,
             "workout_type": workout_type,
             "days_since_last": days_since_workout,
+            "spans_cycles": _lift_spans,  # #2957
             # "Rest day" is only honest for a beat or two after a session; past that it's
             # a layoff and the glyph says how long. No hevy record at all reads unlogged.
             "label": workout_type
@@ -353,7 +371,16 @@ def pulse(*, _g) -> dict:
                 else (
                     "Rest day"
                     if days_since_workout is not None and days_since_workout <= 3
-                    else (f"No training logged — {days_since_workout} days" if days_since_workout is not None else "No training logged")
+                    else (
+                        label_with_span(
+                            f"No training logged — {days_since_workout} days",
+                            days_since_workout,
+                            _pulse_day,
+                            EXPERIMENT_START,
+                        )
+                        if days_since_workout is not None
+                        else "No training logged"
+                    )
                 )
             ),
         },
@@ -418,7 +445,11 @@ def pulse(*, _g) -> dict:
         narrative_parts.append("Journal logged.")
     elif journal_gap_days is not None and journal_gap_days >= 2:
         # "yet" implies today is the exception — past the threshold, the gap is the fact.
-        narrative_parts.append(f"No journal entry in {journal_gap_days} days.")
+        # #2957: and past Day 1 the gap is a LIFETIME fact — say so, or the sentence
+        # asserts a history the cycle it sits in cannot contain.
+        narrative_parts.append(
+            label_with_span(f"No journal entry in {journal_gap_days} days", journal_gap_days, _pulse_day, EXPERIMENT_START) + "."
+        )
     else:
         narrative_parts.append("No journal entry yet.")
     if nutrition_logged_7d > 0:
