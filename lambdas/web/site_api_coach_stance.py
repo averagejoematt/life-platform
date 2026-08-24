@@ -75,15 +75,29 @@ def _integrator_digest(*, _g):
         if not singleton_visible(item):
             return None
         item = _decimal_to_float(item)
-        # #2972: every consumer of this record is a PUBLIC endpoint (/api/coaching-dashboard,
-        # /api/weekly_priority, /api/coach_analysis, /api/coach_team), and the integrator's
-        # producer writes in the coaching register — TO Matthew. Until that producer emits a
-        # public-audience variant, an owner-directed weekly text is withheld (analysis -> None,
-        # checked on the FULL text) and every consumer renders its designed honest-empty state
-        # instead of a leaked private channel. Guarded at this one chokepoint, not per caller.
-        if audience_guard.is_owner_directed(item.get("analysis") or ""):
-            item = dict(item)
+        # #2972 (#3015 closed the read side): every consumer of this record is a PUBLIC
+        # endpoint (/api/coaching-dashboard, /api/weekly_priority, /api/coach_analysis,
+        # /api/coach_team) and `analysis` is the coaching register — TO Matthew.
+        # #3018 closed the producer side: ai-expert-analyzer now also writes
+        # `public_summary`, the reader-addressed register (third person for Matthew,
+        # write-side guarded by audience_guard.reader_safe). Prefer it here — the ONE
+        # chokepoint all four consumers share — over `analysis`, whose own
+        # is-it-clean check stays only as the fallback for rows written before this
+        # producer existed. Guard runs on the FULL stored text either way (#2972's
+        # truncation-launder lesson): never a truncated slice.
+        item = dict(item)
+        public_text = item.get("public_summary")
+        if isinstance(public_text, str) and public_text.strip() and not audience_guard.is_owner_directed(public_text):
+            item["analysis"] = public_text.strip()
+        elif audience_guard.is_owner_directed(item.get("analysis") or ""):
             item["analysis"] = None
+        # #3018 (the issue's named adjacent risk): cross_domain_notes are per-domain
+        # sentences from the SAME synthesis call — served on the SAME public endpoints
+        # as `analysis` but never guarded. Drop any note that addresses Matthew
+        # directly rather than withhold the whole digest over one domain's phrasing.
+        cdn = item.get("cross_domain_notes")
+        if isinstance(cdn, dict):
+            item["cross_domain_notes"] = {k: v for k, v in cdn.items() if not audience_guard.is_owner_directed(v or "")}
         return item
     except Exception:
         return None

@@ -22,6 +22,14 @@ Each is a PURE builder (strings in → prompt out) so the #1086 phase-context
 coverage suite can drive it offline, and each carries the mandatory
 experiment-phase grounding block via _phase_context_block() — a narrative
 prompt that doesn't know what day/phase it is cannot ship (ADR-104, #1138).
+
+#3018: `build_synthesis_prompt` now also asks for `public_summary` — the
+integrator's weekly call rewritten for site VISITORS (third person for
+Matthew, never addressed) — mirroring `coach_extraction_prompt`'s task 12.
+`weekly_priority` stays the owner-directed channel; `ai_expert_analyzer_lambda`
+grounds and writes both, guarded at write by `coach.audience_guard.reader_safe`
+and served at `site_api_coach_stance._integrator_digest`, the ONE public
+chokepoint (#2972's shape, pointed at the producer #2972 didn't reach).
 """
 
 import logging
@@ -84,6 +92,7 @@ HOW TO JUDGE THE WEEK (read this before you write):
 Produce EXACTLY this JSON structure (no markdown, no explanation):
 {{
   "weekly_priority": "One paragraph. Open by crediting what Matthew actually did well this week (be specific, drawn from the data). Then name the ONE thing that matters most NEXT — framed as the next step forward from where he is, not a scolding about the gap to the goal. One concrete action. If coaches disagree, make the call and say why. Decisive but encouraging — the voice of a coach who saw the real effort this week.",
+  "public_summary": "The same weekly call, rewritten for VISITORS to the public website — an audience reading ABOUT Matthew's experiment, not Matthew himself (2 short paragraphs, ~120-180 words). Speak AS {lead_surname} in first person ('I'm watching…'), but refer to Matthew strictly in the THIRD person — by his first name or 'he'/'his'. NEVER address him: no 'you'/'your', no name-as-salutation ('Matthew — …'), no imperatives aimed at him. Open with what he did well this week, then the one thing that matters most next — reported ('I've asked him to…'), never commanded. Keep the most important data point. This is the ONLY field served to site visitors; weekly_priority speaks to Matthew directly and is never shown to them.",
   "cross_domain_notes": {{
     "sleep": "1-2 sentences connecting sleep to the other domains this week",
     "nutrition": "1-2 sentences connecting nutrition to the other domains",
@@ -167,3 +176,49 @@ Produce EXACTLY this JSON (no markdown, no preamble):
 }}
 
 For chapters: one entry per week given, in order. The headline is the chapter title that week earns in the larger story."""
+
+
+def gate_json_record(label, parsed, key, partial, prompt, api_key, *, gate_prose, lenient_json):
+    """#2421: gate the reader-bound field(s) of a JSON-shaped generator (the weekly-
+    priority synthesis, the experiment arc, the month rollup). A rewrite comes back as
+    raw JSON, so the extractor re-parses it and keeps the WHOLE rewritten record —
+    publishing a corrected headline beside the uncorrected chapters/notes it was
+    generated with would be the post-gate-mutation bug in another costume. Returns the
+    grounded record, or None to hold (the caller's prior cached record keeps serving).
+
+    Extracted out of `ai_expert_analyzer_lambda.py` (#3018, the #1665 size ratchet —
+    the module sat at its baselined ceiling) — the same #2604/#2610 earned-headroom
+    shape as every other split in this tree. `gate_prose`/`lenient_json` are the
+    caller's own grounding transport (that module's `_gate_prose`/`_lenient_json`);
+    this module picks no model and owns no retry, the `coach_derived_prose.recondense`
+    posture pointed at a different caller's `call_model`.
+
+    `key` is normally one field name. #3018 lets it be a tuple — the weekly-priority
+    synthesis's `public_summary` is produced by the SAME model call as `weekly_priority`,
+    so the two are graded as one joined text: the `coach_derived_prose.DERIVED_PROSE_FIELDS`
+    "guard the SET, not the instance" idiom, mirrored at this producer. Only the FIRST key
+    is required for a regen to count as usable — the others are graded when present but
+    never block an otherwise-clean primary field, so a rewrite that drops a secondary key
+    still publishes (that key just comes back empty, the honest degradation)."""
+    keys = key if isinstance(key, tuple) else (key,)
+    fresh: dict = {}
+
+    def _extract(_raw):
+        _p = lenient_json(_raw, keys[0], partial)
+        if _p and _p.get(keys[0]):
+            fresh["parsed"] = _p
+            return "\n\n".join(str(_p.get(k) or "") for k in keys)
+        return ""
+
+    joined = "\n\n".join(str(parsed.get(k) or "") for k in keys)
+    text = gate_prose(label, joined, prompt, api_key, extract=_extract)
+    if not text:
+        logger.warning("%s HELD by the grounding gate (#2421/#2391) — prior cached record keeps serving", label)
+        return None
+    out = fresh.get("parsed", parsed)
+    if len(keys) == 1:
+        # #2421's original shape: for the single-key callers (experiment arc, month
+        # rollup) the grounded text IS the field — set directly (a no-op when `out`
+        # already carries it from `fresh["parsed"]`, load-bearing when it doesn't).
+        out[keys[0]] = text
+    return out
