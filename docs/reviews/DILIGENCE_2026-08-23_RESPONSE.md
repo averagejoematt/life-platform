@@ -107,10 +107,19 @@ repo-visibility change, or GitHub shipping ref-level purge tooling.
 
 ## Priced-acceptance register (dated; revisit triggers)
 
-_Populated as PROPORTIONALITY rows land. Standing entries: DIL-031 full clinical operating
-model · DIL-033/034/037/043/044/045/046 commercial control plane — all **revisit trigger = a
-commercialization decision**; DIL-004 self-approval residual — **structural to a solo
-operator**, priced under #2834 · DIL-047/048 key-person — priced after the owner-handoff drill._
+**Finalized 2026-08-25 (D5).** Every priced acceptance now has a dated row in
+`docs/PROPORTIONALITY.md` with a named revisit trigger. "PRICED" with nothing behind it is
+the same shape as the stale `MANAGED_WHERE_LEDGER` that manufactured three of this
+report's own false positives, and it is not a disposition this register is willing to ship.
+
+| Priced row (in `docs/PROPORTIONALITY.md`) | DIL | Revisit trigger |
+|---|---|---|
+| Absent commercial control plane | 033/034/037/043/044/045/046 | a commercialization decision — a second user, any paid tier, or a contractual/regulated obligation. **Not date-based:** waiting does not make a customer appear |
+| No clinician-reviewed hazard register (full model) | 031 | a second user · any public claim crossing from description into diagnosis/treatment · a real adverse event traced to platform output · commercialization. D4 builds the clinical-**lite** half regardless |
+| Key-person concentration / no segregation of duties | 047/048 | a second operator exists · the owner-handoff drill finds the written record insufficient · commercialization. The honest residual is recovery **time**, not recoverability — and it is explicitly NOT closed by the DIL-027 backup, which protects data, not decision continuity |
+| Self-approvable production gate | 004 residual (#2834) | a second operator exists. The gate is live and blocking (re-verified 2026-08-25 by `diligence_verify.py`); the residual is that its sole reviewer is its sole author — a deliberate *pause* with an audit record, which is real, and not an *independent check*, which would be a self-flattering claim |
+| No edge WAF | 014 | 2026-10-15 (owner-set), or immediately on observed abuse / a non-self-inflicted spike fire / commercialization |
+| Single-ACCOUNT recovery residual | 027 | a second AWS account · a failed restore drill · commercialization · `raw/` > ~50 GiB · otherwise 2027-02-24 (detail below) |
 
 ### DIL-027 — single-ACCOUNT recovery residual (dated 2026-08-24)
 
