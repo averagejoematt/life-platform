@@ -43,9 +43,11 @@ on canonical facts alone, exactly as it did before this module existed.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
+
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 from coach import coach_team_texture
 
@@ -446,7 +448,7 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     Pacific day, and a UTC date would put the coach a day ahead of the site after 5pm PT.
     """
     key, persona = _persona_id(coach_id)
-    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today or pacific_today()
 
     frame: list = []
     try:

@@ -16,9 +16,7 @@ writer/reader. The feedback CHANNELS that call `write_correction()` — an MCP t
 Design (mirrors `lambdas/eval_retention.py`'s build/write/read split and
 `lambdas/emails/ai_review_pack_lambda.py::record_email_send`'s mockable-table idiom):
 - Records live at pk `USER#matthew#SOURCE#coach_corrections`,
-  sk `CORRECTION#<YYYY-MM-DD>#<id8>` (id8 = the CONTENT digest of what was
-  corrected + what was said + the class, per #3114 — it was `uuid4().hex[:8]`,
-  which appended a fresh row on every replay of the same correction) — single-table
+  sk `CORRECTION#<YYYY-MM-DD>#<id8>` (id8 = the #3114 semantic digest; was uuid4().hex[:8]) — single-table
   convention, no new GSI (adding one requires an ADR; this module reads via a
   plain partition Query + client-side filter).
 - Classified **CROSS_PHASE** in `lambdas/phase_taxonomy.py`: a correction Matthew
@@ -47,6 +45,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from common.numeric import floats_to_decimal
+from common.pacific_time import PACIFIC  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # `normalize_coach_id` is THE shared coach-id normalizer (#1786): the ledger's writers
 # spell a coach id differently — the review-pack resolver stores the S3 archive `variant`
@@ -140,7 +139,10 @@ def build_correction_item(
     now = now or datetime.now(timezone.utc)
     # #3114: was `uuid.uuid4().hex[:_ID_LEN]` — a fresh partition row per replay.
     correction_id = correction_id or derive_correction_id(item_ref, correction_text, error_class)
-    date_str = now.strftime("%Y-%m-%d")
+    # #2811: `now` stays the caller's instant (it is stored verbatim as `created_at`),
+    # but the CORRECTION#{date} key names a PACIFIC calendar day like every other
+    # day-keyed sk — an explicit .astimezone() so the frame choice is named, not implied.
+    date_str = now.astimezone(PACIFIC).strftime("%Y-%m-%d")
     sk = f"{SK_PREFIX}{date_str}#{correction_id}"
 
     normalized_class = error_class if error_class in ERROR_CLASSES else "other"
@@ -186,15 +188,7 @@ def write_correction(
     wrong dependency.
     """
     item = build_correction_item(item_ref, correction_text, error_class, now=now, correction_id=correction_id, cycle=cycle)
-    # #3114: the sk is now deterministic, so an unconditional put would still be
-    # replay-safe for the CONTENT — but it would also reset `status` from
-    # `applied-to-prompt`/`applied-to-gate` back to `open`, silently undoing a
-    # downstream consumption. Write once; a replay is a no-op that returns the same sk.
-    try:
-        table.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
-    except Exception as e:  # noqa: BLE001 — only a conditional failure is a duplicate
-        if "ConditionalCheckFailed" not in type(e).__name__ and "ConditionalCheckFailedException" not in str(e):
-            raise
+    table.put_item(Item=item)
     return item["sk"]
 
 

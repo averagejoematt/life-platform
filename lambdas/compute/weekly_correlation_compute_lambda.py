@@ -49,6 +49,7 @@ from common import (
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
 from health import glycemic  # #1406: deterministic glycemic-variability features (CV, no LLM)
 
@@ -1087,10 +1088,13 @@ def lambda_handler(event, context):
         target_monday = date.fromisocalendar(int(year), int(week_num), 1)
         end_date = (target_monday + timedelta(days=6)).strftime("%Y-%m-%d")
     else:
-        # Default: compute for the week ending today (Sunday run)
-        iso_year, iso_week, _ = now.isocalendar()
+        # Default: compute for the week ending today (Sunday run). The DAY (and the
+        # ISO week it lands in) is the PACIFIC calendar day — DATE# rows are Pacific
+        # (#2811); `now` stays UTC below because `computed_at` is an INSTANT.
+        _pt_now = pacific_now()
+        iso_year, iso_week, _ = _pt_now.isocalendar()
         week_key = f"{iso_year}-W{iso_week:02d}"
-        end_date = now.strftime("%Y-%m-%d")
+        end_date = _pt_now.strftime("%Y-%m-%d")
 
     start_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS - 1)).strftime("%Y-%m-%d")
     computed_at = now.isoformat()

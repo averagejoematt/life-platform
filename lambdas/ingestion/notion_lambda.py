@@ -58,7 +58,7 @@ from urllib.request import Request
 
 import boto3
 from boto3.dynamodb.conditions import Key  # #476/E-6: deletion-reconcile query
-from common.pacific_time import pacific_date_of, pacific_now  # #1964: the one Pacific frame + ISO parse
+from common.pacific_time import pacific_date_of, pacific_now, pacific_today  # #1964: the one Pacific frame + ISO parse
 
 # #2569: the journal text attributes are named ONCE, here-adjacent, and read back through
 # the same constants by every consumer (the recall backfill among them). A reader that
@@ -787,7 +787,7 @@ def lambda_handler(event, context):
           {"full_sync": true}             → fetch ALL entries (initial load)
         """
         if hasattr(logger, "set_date"):
-            logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+            logger.set_date(pacific_today())  # OBS-1
         api_key, database_id = get_secrets()
 
         # Determine date range

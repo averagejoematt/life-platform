@@ -57,11 +57,14 @@ def _get_api_key():
 
 
 from common.numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 
 def get_iso_week(dt=None):
     if dt is None:
-        dt = datetime.now(timezone.utc)
+        # #2811: the ISO week of the PACIFIC calendar day — a UTC "now" after 4/5pm PT
+        # rolls the week label a day early (and on Sunday evenings, a WEEK early).
+        dt = pacific_now()
     year, week, _ = dt.isocalendar()
     return f"{year}-W{week:02d}"
 

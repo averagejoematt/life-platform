@@ -30,6 +30,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -64,8 +65,8 @@ table = dynamodb.Table(TABLE_NAME)
 def _check_data_gate():
     """Return (ok: bool, days_available: int) for the habit_scores partition."""
     try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        gate_start = (datetime.now(timezone.utc) - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
+        today = pacific_today()
+        gate_start = (pacific_now() - timedelta(days=MIN_DAYS_REQUIRED)).strftime("%Y-%m-%d")
         resp = table.query(
             **with_phase_filter(
                 {
@@ -400,7 +401,7 @@ def _write_pattern_memory(patterns, today):
 
 
 def lambda_handler(event, context):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     logger.info(f"[IC-4] failure-pattern-compute START date={today}")
 
     # ── Data gate check ────────────────────────────────────────────────────
@@ -414,7 +415,7 @@ def lambda_handler(event, context):
         return {"status": "data_gate_not_met", "days_available": days_available, "days_required": MIN_DAYS_REQUIRED, "message": msg}
 
     # ── Data collection ────────────────────────────────────────────────────
-    lookback_start = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    lookback_start = (pacific_now() - timedelta(days=90)).strftime("%Y-%m-%d")
 
     try:
         habit_resp = table.query(

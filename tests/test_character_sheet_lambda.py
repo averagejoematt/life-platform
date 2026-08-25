@@ -57,6 +57,7 @@ from health import (  # noqa: E402
     progression_receipts,
     sick_day_checker,
 )
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 PREFIX = "USER#matthew#SOURCE#"
 # A Wednesday. The whole fixture web below hardcodes dates around it; tests whose
@@ -78,6 +79,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(csl, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, csl, _FrozenDatetime)
     return _NOW
 
 

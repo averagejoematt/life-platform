@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
@@ -720,7 +721,7 @@ def lambda_handler(event, context):
         print("[INFO] Dashboard refresh starting")
 
         profile = load_profile()
-        today = datetime.now(timezone.utc).date()
+        today = pacific_now().date()
         yesterday = (today - timedelta(days=1)).isoformat()
 
         refresh_dashboard(profile, yesterday, today)

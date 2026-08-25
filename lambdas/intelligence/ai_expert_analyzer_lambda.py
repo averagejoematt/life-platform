@@ -217,6 +217,7 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
 from ai import grounded_generation as _gg
 from ai.behavior_logs import available_logs_from_recency as _avail_logs  # #2056 — the #1699 map
 from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 from intelligence import weight_recency
 
@@ -253,10 +254,10 @@ def _read_movement_ingest_health(sources=("strava", "garmin")):
 
 
 def gather_data_for_expert(expert_key):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     # Clamp lookback to experiment start — data before April 1 is pre-experiment
-    d30 = max((datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    days_in_experiment = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+    d30 = max((pacific_now() - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    days_in_experiment = max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
 
     if expert_key == "mind":
         # Journal analysis + mood + vice streaks
@@ -454,7 +455,7 @@ def gather_data_for_expert(expert_key):
             data["dexa_scan_date"] = str(dexa.get("scan_date") or "unknown")
             with contextlib.suppress(ValueError):
                 _scan_dt = datetime.strptime(data["dexa_scan_date"], "%Y-%m-%d").date()
-                data["days_since_dexa"] = (datetime.now(timezone.utc).date() - _scan_dt).days
+                data["days_since_dexa"] = (pacific_now().date() - _scan_dt).days
         if meas and meas.get("waist_height_ratio") is not None:
             data["waist_height_ratio"] = float(meas["waist_height_ratio"])
         return data
@@ -553,7 +554,7 @@ def gather_data_for_expert(expert_key):
 def build_prompt(expert_key, data, days_in_experiment=None, week_number=None):
     p = EXPERT_PERSONAS[expert_key]
     if days_in_experiment is None:
-        days_in_experiment = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+        days_in_experiment = max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
     week_num = week_number or max(1, days_in_experiment // 7 + 1)
 
     prior_summary = data.pop("_prior_analysis_summary", "")
@@ -1052,7 +1053,7 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
     """
     facts = _load_canonical_facts()
     allowed = _gg.allowed_numbers(prompt, shared_system, facts, *extra_sources)
-    gen_date_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    gen_date_iso = pacific_today()
     if available_logs is None:
         available_logs = _presence_logs(gen_date_iso)
 
@@ -1113,7 +1114,7 @@ def generate_and_cache(expert_key, shared_system=None):
     if prior_recommendation:
         data["_prior_recommendation"] = prior_recommendation
 
-    days_in = max(1, (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+    days_in = max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
     week_number = max(1, days_in // 7 + 1)
     prompt = build_prompt(expert_key, data, days_in, week_number)
     api_key = _get_api_key()
@@ -1237,7 +1238,7 @@ def generate_and_cache(expert_key, shared_system=None):
                 inventory=_inventory,
                 maturity=_maturity,
             )
-            today_str = now.strftime("%Y-%m-%d")
+            today_str = pacific_today()  # #2811: the day the quality result is KEYED by, not `now`'s instant
             errors = [f for f in _flags if f["severity"] == "error"]
 
             # Mode B: inline correction for error-severity flags (max 1 correction pass)
@@ -1421,7 +1422,7 @@ def generate_synthesis(all_coach_outputs):
     # it the labeled counts with a no-arithmetic rule so it cites, never re-derives.
     _count_bits = []
     try:
-        _now = datetime.now(timezone.utc)
+        _now = pacific_now()  # #2811: every derivation below is a DATE#-keyed day, not an instant
         _today_str = _now.strftime("%Y-%m-%d")
         _day_n = max(1, (_now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
         _count_bits.append(f"experiment day_n = {_day_n}")
@@ -1500,7 +1501,8 @@ def generate_synthesis(all_coach_outputs):
             "cross_domain_notes": synthesis.get("cross_domain_notes", {}),
             "disagreements": synthesis.get("disagreements", []),
             "generated_at": now.isoformat(),
-            "week_number": max(1, (now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days // 7 + 1),
+            # #2811: week_number counts PACIFIC days since genesis (`now` stays UTC — it is an instant)
+            "week_number": max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days // 7 + 1),
             "ttl": ttl,
         }
         table.put_item(Item=item)
@@ -1786,7 +1788,8 @@ def generate_month_rollup():
 
     try:
         now = datetime.now(timezone.utc)
-        day_n = max(1, (now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+        # #2811: day_n counts PACIFIC days since genesis (`now` stays UTC — it is an instant)
+        day_n = max(1, (pacific_now().date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
         item = {
             "pk": CACHE_PK,
             "sk": "EXPERT#integrator_month",

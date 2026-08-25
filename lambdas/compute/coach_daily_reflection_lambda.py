@@ -31,6 +31,7 @@ from ai import grounded_generation
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor (#1691 freshness class)
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -239,7 +240,7 @@ def lambda_handler(event, context):
     cw = boto3.client("cloudwatch", region_name=REGION)
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     reg = persona_registry.load_registry(s3, S3_BUCKET).get("personas", {})
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
 
     reflections, skipped = {}, []
     for coach_id in persona_registry.OPERATIONAL_COACH_IDS:

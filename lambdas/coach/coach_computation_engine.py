@@ -102,6 +102,8 @@ METRIC_DOMAIN = {
 # hand-typed copy that used to sit here claiming "must equal" it (#2334; guard:
 # tests/test_coach_roster_set_guard_2334.py). Historically used by the removed
 # duplicate prediction grader (#813); kept as the module's canonical coach list.
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 
 COACH_IDS = list(OPERATIONAL_COACH_IDS)
@@ -834,14 +836,18 @@ def lambda_handler(event, context):
 
     Returns structured computation_results_package.
     """
-    today_dt = datetime.now(timezone.utc)
+    # #2811: RESULTS#{date} and the lookback bounds below name DATE#-keyed Pacific
+    # days — a UTC "today" runs a day ahead of every other surface after 5pm PT.
+    today_dt = pacific_now()
     today_str = today_dt.strftime("%Y-%m-%d")
     current_month = today_dt.month
 
     logger.info("coach-computation-engine START date=%s", today_str)
 
     # Clamp lookback to experiment start
-    # V2 P0.4: normalize both to tz-aware (today_dt is UTC; strptime is naive → TypeError)
+    # V2 P0.4: normalize both to tz-aware (today_dt is Pacific-aware; strptime is
+    # naive → TypeError). The comparison is exact across offsets — both sides are
+    # aware instants — so the clamp is unchanged by the #2811 frame swap.
     lookback_dt = today_dt - timedelta(days=LOOKBACK_DAYS)
     experiment_start_dt = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     if lookback_dt < experiment_start_dt:

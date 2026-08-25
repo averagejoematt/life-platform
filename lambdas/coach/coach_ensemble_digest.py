@@ -104,6 +104,7 @@ def _slugify(text):
 
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
 
 # #2419: the digest writer joins ADR-104's grounded-generation gate. The LLM-written
@@ -711,7 +712,7 @@ def _reuse_digest(coach_data, coach_ids, user_message):
         # `_reused_since` keeps the reuse visible to anyone reading the stored digest.
         digest["created_at"] = datetime.now(timezone.utc).isoformat()
         digest["_reused_since"] = unchanged_since
-        gc.record_reuse(table, _CACHE_COACH, _CACHE_OUTPUT_TYPE, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        gc.record_reuse(table, _CACHE_COACH, _CACHE_OUTPUT_TYPE, pacific_today())
         gc.emit_skip_metric(_cw, "LifePlatform/AI", _CACHE_COACH, surface=_CACHE_OUTPUT_TYPE)
         logger.info("Ensemble digest inputs unchanged since %s — reusing the gated digest, skipping generation", unchanged_since)
         return fingerprint, digest, unchanged_since
@@ -738,7 +739,7 @@ def _store_digest_for_reuse(fingerprint, coach_data, coach_ids, digest):
             _CACHE_OUTPUT_TYPE,
             fingerprint,
             json.dumps(_decimal_to_float(digest), default=str),
-            datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            pacific_today(),
             parts=gc.ensemble_parts(coach_data, sorted(coach_ids), _ensemble_system_prompt()),
         )
     except Exception as e:
@@ -1002,7 +1003,7 @@ def lambda_handler(event, context):
 
     Returns the ensemble digest JSON.
     """
-    cycle_date = event.get("cycle_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cycle_date = event.get("cycle_date") or pacific_today()
     coach_ids = event.get("coach_ids") or ALL_COACH_IDS
 
     # Validate coach IDs

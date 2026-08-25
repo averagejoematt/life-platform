@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -86,6 +87,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(chg, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, chg, _FrozenDatetime)
     return FROZEN_NOW
 
 

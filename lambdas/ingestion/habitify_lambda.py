@@ -266,6 +266,11 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     # to today (UTC) to disambiguate Habitify's `in_progress` between "pending"
     # (today's deadline hasn't passed) and "failed" (past day, never resolved).
     # End-of-UTC-day is Habitify's source-of-truth flip point per the TD-11 audit.
+    # The VENDOR's day boundary, not the platform's: this value is never a DATE# key —
+    # it is compared against Habitify's own UTC-anchored deadline to classify
+    # `in_progress` as pending vs. failed. Converting it to Pacific would grade a habit
+    # against a deadline the vendor has not reached yet.
+    # utc-exempt(#2811): vendor-frame comparison, not a platform day key.
     today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     for entry in journal:

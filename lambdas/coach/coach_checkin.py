@@ -48,6 +48,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+
 logger = logging.getLogger(__name__)
 
 CHECKIN_SK_PREFIX = "CHECKIN#"
@@ -95,7 +97,7 @@ def checkin_pk(coach_id: str) -> str:
 
 
 def new_checkin_sk(date_str: Optional[str] = None, uid: Optional[str] = None) -> str:
-    d = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d = date_str or pacific_today()
     return f"{CHECKIN_SK_PREFIX}{d}#{uid or uuid.uuid4().hex[:8]}"
 
 
@@ -242,7 +244,7 @@ def recent_checkins(table, coach_ids, days: int = 45, limit_per_coach: int = 25)
     newest first. Fail-soft per coach (one bad partition never hides the rest)."""
     from boto3.dynamodb.conditions import Key
 
-    start = (datetime.now(timezone.utc) - timedelta(days=max(1, days))).strftime("%Y-%m-%d")
+    start = (pacific_now() - timedelta(days=max(1, days))).strftime("%Y-%m-%d")
     seen = set()
     items = []
     for cid in coach_ids:

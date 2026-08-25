@@ -45,6 +45,7 @@ from decimal import Decimal
 
 import boto3
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_taxonomy import experiment_stamp  # #2811: hoisted — it was imported locally in two functions
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
@@ -914,8 +915,6 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
             alpha, beta_val, item.get("conversation_alpha") if item else 0, item.get("conversation_beta") if item else 0
         )
 
-        from experiment.phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
-
         new_item = {
             **experiment_stamp(),
             "pk": pk,
@@ -977,8 +976,6 @@ def _write_learning_record(coach_id, today_str, evaluation):
     sk = f"LEARNING#{today_str}#{slug}"
 
     try:
-        from experiment.phase_taxonomy import experiment_stamp
-
         item = {
             **experiment_stamp(),
             "pk": pk,
@@ -1223,6 +1220,7 @@ STANCE_EVENT_REFRESH_DAILY_CAP = 2  # epic #526 Budget: "Capped Haiku calls (≤
 
 from ai.ai_context import _WEIGHT_MILESTONES  # noqa: E402 — the one canonical list (see ai_context._build_milestone_context)
 from ai.budget_guard import allow as _budget_allow  # noqa: E402
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from health.sick_day_checker import check_sick_day  # noqa: E402
 
 # physical_coach owns both sick-day onset and weight-milestone crossings (see
@@ -1546,7 +1544,7 @@ def lambda_handler(event: dict, context) -> dict:
     Returns a summary of all evaluations performed.
     """
     try:
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = pacific_today()
 
         logger.info("coach-prediction-evaluator START date=%s", today_str)
 

@@ -51,6 +51,7 @@ from decimal import Decimal
 
 import boto3
 from common import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 
@@ -180,7 +181,7 @@ def fetch_profile():
 
 def fetch_memory_records(category, days=30):
     """Load platform_memory records for a given category."""
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     start = (today - timedelta(days=days)).isoformat()
     pk = USER_PREFIX + "platform_memory"
     start_sk = f"MEMORY#{category}#{start}"
@@ -941,7 +942,7 @@ def _check_circadian_consistency(yesterday_str, window_days=21):
     surface it as a potential upstream cause.
     """
     try:
-        today = datetime.now(timezone.utc).date()
+        today = pacific_now().date()
         start = (today - timedelta(days=window_days + 1)).isoformat()
         recs = fetch_range("eightsleep", start, yesterday_str)
         bedtimes = []
@@ -995,7 +996,6 @@ def _compute_slow_drift(yesterday_str, profile):
       metric, source, recent_mean, baseline_mean, drift_sd (effect size),
       drift_z + p_value (significance), severity, baseline_n, note (optional context string)
     """
-    datetime.now(timezone.utc).date()
     yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
 
     # Recent window: days 1-14 before yesterday (inclusive) — TB7-22
@@ -1354,7 +1354,6 @@ def _build_experiment_context(yesterday_str, profile):
     if not active_exps:
         return ""
 
-    datetime.now(timezone.utc).date()
     yest_dt = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
     lines = ["ACTIVE EXPERIMENTS (descriptive only — evaluate with get_experiment_results):"]
 
@@ -1663,7 +1662,6 @@ def _compute_deficit_ceiling_alert(yesterday_str, habit_7d, computed_7d, profile
     Non-fatal throughout — returns (None, "") on any failure.
     """
     try:
-        datetime.now(timezone.utc).date()
         yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
         wt_start = (yest - timedelta(days=13)).isoformat()  # 14-day window
 
@@ -2070,7 +2068,7 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": "ok"}
     logger.info("Daily Insight Compute v1.2.0 starting...")
 
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     yesterday_str = event.get("date") or (today - timedelta(days=1)).isoformat()
 
     # Idempotency check (skip unless force=True)
