@@ -234,6 +234,23 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
+## 4b. Producer/Consumer Contracts (#2847)
+
+Pairs enrolled in the contract sweep: the real producer's output is round-tripped
+through the real consumer, then a disagreement is injected into BOTH sides
+(`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is one registry entry in
+`tests/pair_contract_registry.py`. This lists what IS contracted — see `meta.scope_cuts`
+for why it is not a census of every must-agree pair.
+
+| Pair | Producer | Consumer | Partition | Mutations |
+|------|----------|----------|-----------|-----------|
+| adaptive_mode -> /api/ask grounding reads | `compute.adaptive_mode_lambda::store_adaptive_mode` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `adaptive_mode` | 3 |
+| computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 |
+| engagement_state -> /api/presence | `content.engagement_core::compute_presence` | `web.site_api_freshness::presence` | `engagement_state` | 4 |
+| input_manifest -> character page projection | `common.input_manifest::build_input_manifest` | `web.site_api_character::_public_input_manifest` | `computed_metrics` | 4 |
+| public_stats.json -> fingerprint broadcast projection | `content.site_writer::write_public_stats` | `content.fingerprint_broadcast::project_public` | — | 4 |
+| send_ledger row -> replay guard + status page | `common.send_ledger::record_sent` | `common.send_ledger::already_sent` | — | 3 |
+
 ## 5. Alarms + Routing
 
 | Alarm | Stack | Routing |
