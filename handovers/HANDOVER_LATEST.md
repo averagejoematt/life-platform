@@ -2,65 +2,59 @@
 
 ---
 
-## SESSION B STATE (live — Opus 5 driver, overnight autonomous run; updated at phase boundaries, wrap deferred to owner wake ~6am PT)
+## SESSION B STATE (FINAL — Opus 5 driver, ~19h autonomous; QUEUE EMPTY, wrap pending with owner)
 
-**Owner directive (2026-08-24 ~19:10 PT, in-conversation):** run fully autonomously
-until ~6am PT, pull in more Now/Next issues, implementation on sonnet/opus agents
-(Fable at 12% weekly — reserved, untouched), wrap together at wake.
+**Owner directives honored:** (1) autonomous through the night, implementation on
+sonnet/opus agents, Fable untouched; (2) ~20:15 PT "clear ALL Now/Next" → full-drain
+wave; (3) ~23:55 PT "don't stop waiting — keep pulling backlog until 6am".
 
-**Done so far (all verified):**
-- Main was RED at boot despite the A-wrap's green claim — Docs CI failed on fc1186ae5
-  ~30s post-wrap. Clock-rollover class: sync stamps UTC dates, the generated MCP
-  catalog's two date lines diverged in the 17:00–00:00 PT window. Killed structurally
-  (sync stamps BOTH lines, mutation-proved both orders, regression test) → 4153c7590.
-- That fix then broke the module-size ratchet (sync_doc_metadata.py sat at EXACTLY its
-  1253 baseline) → extracted the --refresh-secrets leg to
-  deploy/sync_doc_secret_inventory.py (CLI contract unchanged) → 40851cd00. The
-  stranded 4153c wait­ing deploy lease was REJECTED with decode (superseded).
-- **D5 shipped (PR #3146, in flight):** scripts/diligence_verify.py — the report's §15
-  playbooks scripted against LIVE state, 12 playbooks / 4 families, three verdicts
-  (UNVERIFIED never folds into PASS), 36-test mutation proof; first run 12 PASS / 0
-  FAIL / 0 UNVERIFIED under --strict; bundle in docs/reviews/evidence/; priced register
-  finalized (4 new PROPORTIONALITY rows: commercial plane, clinical, key-person,
-  self-approvable gate); REGRADE_BRIEF_2026-08-25.md (the assessor handout, §3 "where
-  to attack us"); diligence line indexed in docs/README.md.
-- **D4 half shipped (PR #3147, in flight):** lambdas/ai/safety_contract.py — the
-  clinical-lite deterministic hazard gate (5 classes, fixed copy, $0, fail-closed),
-  wired at all three free-text AI doors. Found live: the board_ask OPENING turn had NO
-  input filter of any kind. 123 tests; AST set-guard + ordering guard; corpus loop
-  honest (5 misses fixed, then 4 real false positives fixed and kept as benign corpus).
-- Boot observations: s3-bucket-size CLEARED (lifecycle worked, early); #2888 cache
-  telemetry still zero-writes (fix not yet shipped — box open); backlog Now=4 all
-  P2/P3; 4 alarms all previously cited.
+**FINAL SCORE — severity-weighted per the 2026-08-24 amendment:**
+- **19 issues CLOSED with ADR-099 verdicts:** #3130 #3050(P2) #3119 #3154 #3129 #3104
+  #3113(P2) #3156(P2, filed+fixed same night) #3162 #3111 #3143 #3161(P2) #3118 #3114
+  #3115 #3170 #3128 #3107 #3117. Every verdict written at close time with evidence.
+- **Recurrence classes structurally killed: 5** — UTC/PT catalog-stamp divergence ·
+  CI census frozen-fallback (#3156) · check-name YAML truncation (#3117) · merge-train
+  counter tax (#3104's tool, dogfooded same night) · the naive-UTC-day class in 4
+  packages (#2811 ratchet, 108 sites, residue 0).
+- **Advanced honestly, stay open:** #2888/#2978/#2847/#2846/#2798 (Part-of merges with
+  named residuals) · #2883 (re-measured 1.371) · 5 epics (box-level acceptance audits
+  posted on each — all KEEP OPEN with evidence) · #3042 (awaits the owner re-grade).
+- **Discovery-source tags on all 6 filings:** #3154 review · #3156 incident · #3161
+  review · #3162 review · #3170 census · #3172 review.
 
-**Owner directive #2 (~20:20 PT, in-conversation): "why can't we clear ALL Now/Next" →
-scope expanded to the full-drain wave.** Blocked-with-reasons (stated to owner): #3042
-(closes on the owner's own re-grade) · #3083/#2961 (gate:owner, batch items 5/7) ·
-#2883/#2957/#2888-verify (measurement/time-gated) · #2849 (model:fable, preserved).
-#2846 relabeled → opus per plan decision #3 (dated comment on issue).
+**Merged: 16 PRs + the 14-lane integration train #3184** (the event-swallow recovery:
+GitHub dropped synchronize events repo-wide mid-night; per-PR recovery measured ~25min
+× 14 → ONE integration branch, each lane independently green-verified at its own head
+first, 3 real cross-lane frictions caught and fixed by the stacked validation, 3
+ceiling collisions paid by extraction/fold, one hand-composed semantic conflict).
+#3148→#3185 (check rename) merged LAST by design.
 
-**MERGED so far:** #3146 (D5 instrument) · #3149 (#3130 closed w/ verdict) · #3150
-(#2883 re-measure, stays open) · #3153 + #3147 (**#3050 CLOSED w/ verdict** — matrix +
-clinical-lite hazard gate). **site-api-ai DEPLOYED + wire-verified both directions**
-(chest-pain → fixed 911 copy, no model call; "shoulder is killing me" → real answer).
-**Incidents tonight:** two module-size-ceiling collisions fixed by extraction
-(sync_doc_metadata → sync_doc_secret_inventory.py; the agent's HAE bump REVERTED to
-extraction per #2610); #3156 filed P2 (census fact falls back to a CONSTANT in CI —
-found when the wiki gate redded 3147; the #1957/#3112 class inside a 24h-old gate).
+**Deployed + verified (ALL postflight, most wire-verified):** fleet **105/0/0** at the
+train sha · site-api + site-api-ai + hevy-routine-cron (deploy_and_verify PASS) · cdk
+Email+Operational (#3155 IAM) + Mcp+Web (#3166 alarms) + Ingestion ×2 (HAE #3152,
+#2846 exemplar) · **live wire-proofs:** the hazard gate (chest-pain → fixed 911 copy,
+zero model calls; "shoulder is killing me" → real answer) · /api/platform_stats
+cdk_stacks:10/alarms:116 · DIL-049 composite disclosures serving in /api/character.
 
-**In flight:** PRs cycling the counter-conflict tax (~20min/cycle, serial): #3152
-(cycle 3) · #3155 · #3151 · #3157 · #3148 (green, HELD for end-of-train — it renames
-the full-suite check and would strand other watchers' expectations). Second wave (12
-agents): #3156 #3154 #3111 #3129 (sonnet) · #3114+#3115 #3118 #3107+#2888 #3104 #2847
-#2846 #2978 (opus) · epic acceptance auditor over #2986 #2801 #2799 #2798 #2578
-(close-with-evidence or keep-with-residuals; #3156 is standing evidence AGAINST #2578).
+**Incidents (for the wrap's incident log):** the GitHub event-swallow (~04:30Z→,
+synchronize dropped; close/reopen mints, supersede-PR when head pointers stale —
+#3165→#3183, #3148→#3185) · TWO stranded production leases found at 17:1xZ (the #1901
+class): d657b973 16.4h REJECTED-superseded (its deploy would have regressed the fleet),
+the train-sha lease APPROVED (idempotent re-apply + independent smoke pass, run in
+flight at state-write) · two agents briefly shared a worktree (work replayed, pointers
+repaired, nothing lost) · 6 module-size ceiling events ALL paid by extraction/dedup,
+zero baselines raised (two agent attempts to raise were reverted per #2610).
 
-**Driver protocol:** serial merges via deploy/wait_pr_green.sh only; verdicts read in
-their own commands; platform_counts conflicts resolved by regeneration at merge time
-(driver-owned); deploys per PR-body notes with postflight (done: site-api-ai; pending
-per PR: HAE via cdk Ingestion, email fleet + cdk Email/Operational IAM for #3155,
-site-api for #3157, MCP lambda for #3114/#3115). Discovery-source tags on all filings
-(#3154 review · #3156 incident). No wrap tonight — owner wraps at wake.
+**Wrap TODO (with owner):** /wrap ritual — archive this handover, fresh SESSION_STATE,
+build beat (candidate: the safety layer + the acceptance instrument), PROPORTIONALITY
+ledger rows for tonight's standing machinery (merge_train.sh · safety_contract ·
+pair-contract framework · deploy_convergence · the enrollment kernel), memory notes
+(event-swallow recovery pattern; the integration-train pattern), Dependabot PRs
+3180-3182 dispose, owner batch re-surface (10 items, unchanged). Scheduled
+observations maturing today: #2888 cache-writes after the 17:00Z brief ·
+qa-smoke weight FAIL self-clear · #2957's last member after the ~10am PT cycle ·
+GradableShare first grades ~08-31.
+
 
 ---
 
