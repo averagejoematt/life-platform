@@ -8,6 +8,7 @@ incoherent surface. deploy/sync_doc_metadata.py --apply rewrites the discoverabl
 fields; this test reds CI whenever the served literal drifts from the discoverers.
 """
 
+import glob
 import os
 import sys
 
@@ -58,6 +59,28 @@ def test_alarm_count_matches_cdk():
     assert actual is not None, "discoverer bailed (unreadable/suspiciously-low stack parse) — investigate before trusting a fallback"
     assert isinstance(actual, int) and actual > 0
     assert PLATFORM_STATS["alarms"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+
+
+def test_cdk_stacks_matches_glob():
+    """#3143: cdk_stacks used to be a hand-maintained literal in PLATFORM_STATS and
+    it drifted (8 vs the real 10, missing the #793 serve split + DIL-027 backup
+    stack). Two independent checks, so a mutation survives even if the discoverer
+    itself were broken:
+      1. the served value matches sync's own discoverer (the wiring didn't rot);
+      2. the served value matches a FRESH glob computed right here, independent of
+         any sync_doc_metadata internals — proving PLATFORM_STATS["cdk_stacks"]
+         is not just a hardcoded int that happens to equal the discoverer's output.
+    """
+    actual = sync._auto_discover_cdk_stack_count()
+    assert actual is not None
+    assert PLATFORM_STATS["cdk_stacks"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+    stacks_dir = os.path.join(_REPO, "cdk", "stacks")
+    fresh_glob_count = len(glob.glob(os.path.join(stacks_dir, "*_stack.py")))
+    assert fresh_glob_count >= 5, "sanity: too few *_stack.py files found — check the glob path"
+    assert PLATFORM_STATS["cdk_stacks"] == fresh_glob_count, (
+        f"PLATFORM_STATS['cdk_stacks'] ({PLATFORM_STATS['cdk_stacks']}) does not match a live "
+        f"glob of cdk/stacks/*_stack.py ({fresh_glob_count}) — it may have regressed to a planted literal"
+    )
 
 
 def test_alarms_and_sources_share_the_maintained_fact():
