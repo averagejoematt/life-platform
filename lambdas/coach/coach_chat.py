@@ -52,6 +52,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+
 from coach import coach_style_gate
 
 logger = logging.getLogger(__name__)
@@ -145,7 +147,7 @@ def chat_pk(coach_id: str) -> str:
 
 
 def new_chat_sk(date_str: Optional[str] = None, uid: Optional[str] = None) -> str:
-    d = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d = date_str or pacific_today()
     return f"{CHAT_SK_PREFIX}{d}#{(uid or uuid.uuid4().hex)[:8]}"
 
 
@@ -644,7 +646,7 @@ def turn_records(coach_id: str, coach_name: str, inbound: str, result: TurnResul
     that reason.
     """
     pk = chat_pk(coach_id)
-    d = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d = date_str or pacific_today()
     stamp = now_iso()
     base: dict = {
         "pk": pk,

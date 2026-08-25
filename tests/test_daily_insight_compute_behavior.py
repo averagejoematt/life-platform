@@ -36,6 +36,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS = os.path.join(ROOT, "lambdas")
@@ -82,6 +83,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(di, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, di, _FrozenDatetime)
     return FROZEN_NOW
 
 

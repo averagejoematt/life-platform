@@ -322,10 +322,27 @@ def _drifted_resources(cfn, stack):
 # ── 2. Postflight reuse (layer / config / asset) ─────────────────────────────
 
 
+POSTFLIGHT_SUBCHECKS = ("layer_uniformity", "config_drift", "asset_completeness")
+
+
 def check_postflight():
     """Reuse the human-invoked-only checks from session_postflight (AC2)."""
     sys.path.insert(0, os.path.join(_ROOT, "deploy"))
-    import session_postflight as pf
+    try:
+        import session_postflight as pf
+    except Exception as e:  # noqa: BLE001
+        # #2578 can-it-fail proof (2026-08-25). This import was the ONE unguarded
+        # statement in the whole sweep: every other check is fail-soft per its own
+        # try, and `run_sweep()` has no try of its own — so an unimportable (or
+        # import-time-raising) session_postflight propagated straight out of
+        # run_sweep(), and under the remediation workflow's `continue-on-error: true`
+        # that darked ALL FIFTEEN checks with no drift-log record, no red step and no
+        # summary line. Exactly the shape #3112 found in check_codeql_alerts, one
+        # layer up. "Could not observe" must be a stated verdict, never an absence —
+        # so the three sub-checks report `error` and land in `_summary`'s
+        # "check(s) could not run" line instead of vanishing.
+        detail = f"import session_postflight: {str(e)[:250]}"
+        return {k: {"status": "error", "detail": detail} for k in POSTFLIGHT_SUBCHECKS}
 
     result = {}
     try:

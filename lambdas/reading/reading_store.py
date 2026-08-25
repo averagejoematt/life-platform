@@ -394,6 +394,20 @@ def get_reading_state(book_id: str) -> dict | None:
     return _strip(_get(rk.reading_state_key(book_id)))
 
 
+def get_note(book_id: str, note_id: str) -> dict | None:
+    """One NOTE# by id. Added for #3114: `debrief` must be able to ask "has this
+    book already been debriefed?" without pulling (and scanning) every note."""
+    return _strip(_get(rk.note_key(book_id, note_id)))
+
+
+def get_recall(book_id: str, prompt_id: str) -> dict | None:
+    """One RECALL# probe by id (PRIVATE). #3114's load-bearing read: `debrief`
+    checks this BEFORE `put_recall`, because re-putting an existing probe resets
+    `intervalIndex`/`nextDue` and thereby starts a SECOND spaced-repetition clock
+    on a book whose retention schedule was already running."""
+    return _strip(_get(rk.recall_key(book_id, prompt_id)))
+
+
 def _strip(item: dict | None) -> dict | None:
     if not item:
         return item
@@ -437,6 +451,17 @@ def notes(book_id: str) -> list:
     """§2.3 — all notes for a book via the main table (begins_with NOTE#)."""
     items = _query(
         KeyConditionExpression=Key("pk").eq(rk.READING_PK.format(book_id=book_id)) & Key("sk").begins_with(rk.SK_NOTE_PREFIX),
+    )
+    return [_strip(i) for i in items]
+
+
+def recalls(book_id: str) -> list:
+    """All RECALL# probes for a book (PRIVATE), via the main table. Added for #3114:
+    the debrief guard must find a legacy `probe-<timestamp>` row — those pre-date the
+    canonical id and are invisible to a keyed get, which is exactly how a second
+    retention clock would get started on a book that already had one."""
+    items = _query(
+        KeyConditionExpression=Key("pk").eq(rk.READING_PK.format(book_id=book_id)) & Key("sk").begins_with(rk.SK_RECALL_PREFIX),
     )
     return [_strip(i) for i in items]
 

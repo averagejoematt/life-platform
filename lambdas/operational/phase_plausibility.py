@@ -31,6 +31,15 @@ in 3/3 runs before a rubric clause, 3/3 after it, and 4/5 with an in-payload dis
 as well. Everything else stays with the LLM — HTML pages, the narrative /api/coaches
 payload, and every non-date temporal question on the strict payloads themselves.
 
+#3111 ADDS R8: a NEAR-REAL-TIME surface's `as_of_date` may not lag today by more
+than its own declared threshold. Observed live 2026-08-24 (reader_truth finding
+`e5eafd`): /api/glucose's `as_of_date` sat 2 days behind today — a genuine
+CGM/HAE-webhook catch-up gap that had already healed by the time it was
+investigated (#3111). The LLM rubric only sees this class on the nights its
+sample happens to land on the lagging day, which is exactly the #1920/#1927
+dark-window argument that moved R1-R7 off the LLM in the first place — so R8
+makes the same comparison deterministically, every run.
+
 Findings are emitted in reader_truth's canonical shape
 ({"page", "category", "severity", "note"}) so both passes route through one
 reporting path in qa_smoke's Reader Truth check (partition content_truth,
@@ -244,6 +253,68 @@ def _night_label_findings(page, payload):
     return findings
 
 
+# ── R8 (#3111): a near-real-time surface's as_of_date tracks today ───────────
+#
+# Reader Truth caught /api/glucose's `as_of_date` sitting 2 days behind today on
+# 2026-08-24 (finding `e5eafd`) — a real CGM/HAE-webhook catch-up gap, confirmed
+# healed by the time it was investigated (both 08-23 and 08-24 landed later that
+# same day). The gap itself was not the defect the issue asked to close (#3111):
+# it healed on its own, same day, with no historical precedent in the 08-18
+# through 08-24 window checked at filing time. What's missing is a HOME for a
+# recurrence — today this class is visible only when the nightly LLM sample
+# happens to land on the lagging day, exactly the #1920/#1927 "dark window"
+# shape. This rule is that home: the same "no more than 1 day behind" bar the
+# LLM already used, computed identically every run, zero tokens.
+#
+# Per-surface, not blanket: only sources with a genuine near-real-time contract
+# belong here (source_registry.py's `method` facet) — a source that legitimately
+# lags for days (labs, a weekly compute) would false-positive under this bar.
+# Threshold is DAYS behind, comparing calendar dates only (as_of_date is a bare
+# ISO date, never a timestamp) — a same-day gap of any clock size is never this
+# rule's concern, only a date that has rolled over without a fresher row landing.
+NEAR_REAL_TIME_ASOF_MAX_LAG_DAYS = {
+    "/api/glucose": 1,  # HAE CGM webhook (source_registry.py apple_health) — #3111
+}
+
+
+def _stale_as_of_findings(page, payload, today):
+    """R8 — `as_of_date` on a near-real-time surface is no more than its allowed lag behind today.
+
+    Scope: pages registered in NEAR_REAL_TIME_ASOF_MAX_LAG_DAYS only. Walks every
+    nested object for an `as_of_date` field shaped as a bare ISO date (the
+    reader_truth canonical shape — see site_api_biomarkers.glucose()) and flags
+    it once per distinct value found, so a payload republishing the same
+    as_of_date in more than one object is not double-reported.
+    """
+    max_lag = NEAR_REAL_TIME_ASOF_MAX_LAG_DAYS.get(page)
+    if max_lag is None:
+        return []
+    today_d = date.fromisoformat(today)
+    findings = []
+    seen = set()
+    for path, obj in _objects(payload):
+        if not isinstance(obj, dict):
+            continue
+        as_of = obj.get("as_of_date")
+        if not isinstance(as_of, str) or not _ISO_DATE_RE.match(as_of) or as_of in seen:
+            continue
+        seen.add(as_of)
+        lag = (today_d - date.fromisoformat(as_of)).days
+        if lag > max_lag:
+            findings.append(
+                {
+                    "page": page,
+                    "category": "temporal_contradiction",
+                    "severity": "high",
+                    "note": (
+                        f"{path or '<root>'}.as_of_date = {as_of} is {lag} day(s) behind today {today} — a "
+                        f"near-real-time source may lag at most {max_lag} day(s) (#3111 catch-up-gap recurrence check)"
+                    ),
+                }
+            )
+    return findings
+
+
 def _objects(obj, path=""):
     """Yield (json_path, dict) for the payload and every nested dict, depth-first."""
     if isinstance(obj, dict):
@@ -271,7 +342,7 @@ def _is_number(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
-def check_payload(page, payload, day_n, strict=False, start_date=None):
+def check_payload(page, payload, day_n, strict=False, start_date=None, today=None):
     """Deterministic phase-plausibility findings for one live JSON payload.
 
     Args:
@@ -282,12 +353,14 @@ def check_payload(page, payload, day_n, strict=False, start_date=None):
         start_date: the cycle start (phase_context's `start_date`), for R6/R7. Omitted
             => both are skipped: a rule with no genesis to compare against must not
             guess one (the same fail-soft posture as the rest of this module).
+        today: today's ISO date (phase_context's `today`), for R8 (#3111). Omitted
+            => R8 is skipped, same fail-soft posture as R6/R7 with no start_date.
 
     Returns a list of {"page", "category", "severity", "note"} findings.
-    Pre-start (day_n == 0) returns only R5 — the phase rules R1–R4 have nothing to
+    Pre-start (day_n == 0) returns only R5/R8 — the phase rules R1–R4 have nothing to
     compare against (the countdown state has its own honest copy and the LLM rubric
-    already knows the pre-start phase line), while R5's night-label question is
-    phase-independent (#1968).
+    already knows the pre-start phase line), while R5's night-label question and R8's
+    as_of-lag question are both phase-independent (#1968, #3111).
     """
     # R5 runs FIRST and outside the pre-start guard: it asks whether a figure names its
     # night, which is not a question about the experiment day (see the block above).
@@ -298,6 +371,11 @@ def check_payload(page, payload, day_n, strict=False, start_date=None):
     if strict and start_date:
         findings.extend(_pre_genesis_row_findings(page, payload, start_date))
         findings.extend(_pre_genesis_night_findings(page, payload, start_date))
+    # R8 (#3111): a served as_of_date lagging today is a date comparison, not a day
+    # count, so it too runs outside the pre-start guard and independent of `strict`
+    # (it targets a fixed, opted-in surface list, not every strict payload).
+    if today:
+        findings.extend(_stale_as_of_findings(page, payload, today))
     if not day_n or day_n < 1:
         return findings
     for path, key, value in _walk(payload):
@@ -385,6 +463,7 @@ def sweep_payloads(payloads, today_iso=None):
                 day_n,
                 strict=bool(p.get("strict")),
                 start_date=phase["start_date"],  # R6 (#2613)
+                today=phase["today"],  # R8 (#3111)
             )
         )
     return findings, warnings

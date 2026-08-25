@@ -54,8 +54,9 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
 from typing import Callable, Optional
+
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ def _gen_date(generation_date_iso: Optional[str]) -> str:
     grade a claim against the wrong day's logs, which is #2343's failure shape wearing
     #1699's clothes. One definition, two callers.
     """
-    return generation_date_iso or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return generation_date_iso or pacific_today()
 
 
 def chat_available_logs(table, generation_date_iso: Optional[str] = None):

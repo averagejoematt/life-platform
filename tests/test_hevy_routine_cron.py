@@ -68,7 +68,7 @@ def test_force_overrides_all_gates(cron_module, monkeypatch):
         "_ssm_get",
         side_effect=_ssm_returns({"/life-platform/pause-mode": "paused", "/life-platform/hevy/cron_enabled": "false"}),
     ):
-        with patch("training.routine_generator.generate_routines", return_value=[]), patch("training.routine_repo.put_versioned"):
+        with patch("training.routine_generator.generate_routines", return_value=[]), patch("training.routine_repo.draft_versioned"):
             result = cron_module.lambda_handler({"force": True, "target_date": "2026-06-01"}, None)
     assert result["status"] == "ok"
     assert result["routines"] == []
@@ -112,7 +112,11 @@ def test_cron_pushes_branch_model_not_ideal_floor_pair(cron_module):
         side_effect=_ssm_returns({"/life-platform/pause-mode": "active", "/life-platform/hevy/cron_enabled": "true"}),
     ):
         with patch("training.routine_generator.generate_routines", return_value=_ideal_floor_pair()):
-            with patch("training.routine_repo.put_versioned"), patch("training.routine_repo.upsert_id_map"):
+            with (
+                patch("training.routine_repo.draft_versioned"),
+                patch("training.routine_repo.put_versioned"),
+                patch("training.routine_repo.upsert_id_map"),
+            ):
                 with patch("training.hevy_template_cache.resolve_movement", return_value="TID"):
                     with patch("training.routine_title.build_title_context", return_value=None):
                         with patch("training.routine_title.format_why_note", return_value="Programmed."):

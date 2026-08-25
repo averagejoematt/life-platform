@@ -25,6 +25,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
@@ -1007,6 +1008,7 @@ class TestLambdaHandler:
 
     def _wire(self, monkeypatch, table, series):
         monkeypatch.setattr(wc, "datetime", _FrozenDatetime)
+        freeze_pacific(monkeypatch, wc, _FrozenDatetime)
         monkeypatch.setattr(wc, "table", table)
         monkeypatch.setattr(wc, "assemble_daily_series", lambda s, e: series)
         monkeypatch.setattr(wc, "fetch_range", _fetch_stub({}))
@@ -1083,6 +1085,7 @@ class TestLambdaHandler:
         fake_scheduled = FakeTable()
         self._wire(monkeypatch, fake_scheduled, self._rich_series())
         monkeypatch.setattr(wc, "datetime", _SundayOfWeek1)
+        freeze_pacific(monkeypatch, wc, _SundayOfWeek1)
         scheduled_out = wc.lambda_handler({"force": True}, None)
         assert scheduled_out["week"] == "2026-W01"
         assert scheduled_out["end_date"] == "2026-01-04"
@@ -1090,6 +1093,7 @@ class TestLambdaHandler:
         fake_manual = FakeTable()
         self._wire(monkeypatch, fake_manual, self._rich_series())
         monkeypatch.setattr(wc, "datetime", _SundayOfWeek1)
+        freeze_pacific(monkeypatch, wc, _SundayOfWeek1)
         manual_out = wc.lambda_handler({"week": "2026-W01", "force": True}, None)
         assert manual_out["week"] == "2026-W01"
         # The load-bearing assertion: a manual re-run of the SAME ISO week the

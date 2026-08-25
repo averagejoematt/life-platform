@@ -220,6 +220,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # and a guard placed in the wrong lane must red on the PR that placed it there.
         # Post-merge-only is the exact defect this registry was filed about.
         "test_derived_artifact_registry_2986.py",
+        # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
+        # constructed outside create_platform_lambda(), or landing with no deploy
+        # registration and no alarm story, must red BEFORE the merge. Post-merge is
+        # too late by construction: the next `cdk deploy` puts the unenrolled,
+        # unwatched function in production.
+        "test_enrollment_by_construction_2846.py",
         # #3042 (Phase D2): the public-claims registry. Verdict is repo shape + published
         # prose — a new page or generator restating a registered behavioural claim must be
         # registered BEFORE the merge. Post-merge is too late by construction: the site
@@ -265,6 +271,15 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # red BEFORE the merge, not surface in production during the next PT
         # evening — the exact post-merge-only failure mode #2372 exists to stop.
         "test_pt_day_contract_sweep_2813.py",
+        # #2847: the producer/consumer contract sweep — #2813's primitive generalised
+        # past the day-frame agreement. Half its verdict is pure repo shape (the enrolled
+        # floor, the enrollment ratchet, the PARTITION_WRITER_LEDGER against the #2845
+        # model's write edges, the registry↔model agreement), and a NEW writer joining a
+        # contracted shape must red on the PR that adds it — post-merge is how #2214's
+        # dual-writer and #2804's dead-zone read both reached production. Reads fixed
+        # files rather than sweeping the tree, so premerge_derivation cannot discover
+        # it — hand-listed, same as #2813 above.
+        "test_pair_contract_sweep_2847.py",
         # #3101: the doc-literal conflict surface. Its verdict is pure repo shape —
         # whether a discovered counter has grown a SECOND committed home, and whether
         # the single-writer plumbing (agent_commit refusal, hook stage pathspec,
@@ -350,6 +365,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_qa_smoke_fault_isolation_2307.py",
         "test_secret_references.py",
         "test_ses_send_guard_set_2222.py",
+        "test_utc_day_fleet_ratchet_2811.py",
         "test_site_chrome.py",
         "test_site_orphans.py",
         "test_site_partition_orphans.py",

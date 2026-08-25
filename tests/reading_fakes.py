@@ -44,13 +44,63 @@ def _eval(cond, item) -> bool:
     raise NotImplementedError(f"FakeTable: unsupported operator {op!r}")
 
 
+class ConditionalCheckFailedException(Exception):
+    """What boto3 raises when a conditional put is refused.
+
+    Named to match the real exception CLASS name, because that is what production
+    code inspects (`"ConditionalCheckFailed" in type(e).__name__`) — a fake that
+    raised a generically-named error would let a broken duplicate-detection branch
+    pass its own test. #3114/#3115.
+    """
+
+
+def _eval_condition(expr: str, item: dict | None, values: dict) -> bool:
+    """Evaluate the ConditionExpression subset this repo's conditional puts use.
+
+    Supported: `attribute_not_exists(x)`, `attribute_exists(x)`, `x = :v`, `x < :v`,
+    joined by AND/OR (OR binds loosest, matching the expressions in use — none of
+    them parenthesise). Anything else raises rather than silently passing: a fake
+    that answers True to an expression it did not understand is how a dedup guard
+    gets "tested" without ever being exercised.
+    """
+
+    def _atom(tok: str) -> bool:
+        tok = tok.strip()
+        if tok.startswith("attribute_not_exists(") and tok.endswith(")"):
+            return item is None or tok[len("attribute_not_exists(") : -1].strip() not in item
+        if tok.startswith("attribute_exists(") and tok.endswith(")"):
+            return item is not None and tok[len("attribute_exists(") : -1].strip() in item
+        for op in (" = ", " < ", " > ", " <= ", " >= "):
+            if op in tok:
+                name, placeholder = (p.strip() for p in tok.split(op, 1))
+                if item is None or name not in item:
+                    return False
+                actual, expected = item[name], values[placeholder]
+                return {
+                    " = ": lambda: actual == expected,
+                    " < ": lambda: actual < expected,
+                    " > ": lambda: actual > expected,
+                    " <= ": lambda: actual <= expected,
+                    " >= ": lambda: actual >= expected,
+                }[op]()
+        raise NotImplementedError(f"FakeTable: unsupported condition atom {tok!r}")
+
+    return any(all(_atom(a) for a in clause.split(" AND ")) for clause in expr.split(" OR "))
+
+
 class FakeTable:
     INDEXES = {"GSI1": ("GSI1PK", "GSI1SK"), "GSI2": ("GSI2PK", "GSI2SK")}
 
     def __init__(self):
         self.store: dict[tuple, dict] = {}
+        self.put_calls: list[dict] = []
 
-    def put_item(self, Item):
+    def put_item(self, Item, ConditionExpression=None, ExpressionAttributeValues=None, **_kw):
+        self.put_calls.append(dict(Item))
+        if ConditionExpression is not None:
+            current = self.store.get((Item["pk"], Item["sk"]))
+            if not _eval_condition(ConditionExpression, current, ExpressionAttributeValues or {}):
+                raise ConditionalCheckFailedException(f"condition {ConditionExpression!r} failed")
         self.store[(Item["pk"], Item["sk"])] = dict(Item)
 
     def get_item(self, Key):

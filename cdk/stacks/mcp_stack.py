@@ -205,6 +205,36 @@ class McpStack(Stack):
         # ADR-050: warmer failure means stale caches all day, but not user-blocking → digest.
         warmer_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # ── #3161: warmer ABSENCE alarm (heartbeat-completeness ledger) ────────
+        # slo-warmer-completeness above is an Errors alarm — treat_missing=NOT_BREACHING
+        # by construction, so it cannot fire on the "cron stopped firing entirely" case
+        # (errors require an invocation; a dead schedule invokes zero times and emits
+        # zero Errors datapoints). #3161's audit found life-platform-mcp-warmer was
+        # invisible to tests/test_heartbeat_completeness.py's enumerator ENTIRELY (its
+        # function_name is this file's WARMER_FUNCTION_NAME constant, not a string
+        # literal — the AST walk silently `continue`d past it). Mirrors
+        # daily-brief-no-invocations-24h / daily-debrief-no-invocations-24h
+        # (monitoring_stack.py): BREACHING on zero Invocations over 24h is the real
+        # absence signal; a quiet-but-healthy day still invokes (and still emits a
+        # datapoint), so this never false-fires on a normal warmer run.
+        warmer_no_invocations_alarm = cloudwatch.Alarm(
+            self,
+            "McpWarmerNoInvocations",
+            alarm_name="mcp-warmer-no-invocations-24h",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Invocations",
+                dimensions_map={"FunctionName": WARMER_FUNCTION_NAME},
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        warmer_no_invocations_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         # ── #809: recursive-invocation guard (adopted from the 2026-05-25 orphan batch) ──
         # AWS drops Lambda invocations it detects as recursive; a nonzero
         # RecursiveInvocationsDropped on the MCP server would indicate a serious

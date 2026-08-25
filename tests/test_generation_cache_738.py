@@ -259,16 +259,27 @@ def test_the_call_site_fingerprints_structure_not_the_rendered_message():
     """AST call-site pin (#2564's idiom). The unit tests above prove the helpers
     behave; only this proves PRODUCTION uses them that way. Without it the module
     could be perfect while the one caller keeps hashing prose — which is precisely
-    the state #2889 found, live, for two months behind a green suite."""
+    the state #2889 found, live, for two months behind a green suite.
+
+    #3107 moved the production call site from `ai_calls.py` into
+    `coach/coach_brief_input_gate.py` (the gate is now two gates, and `ai_calls` was
+    at its module-size ceiling). The scan follows the code and covers BOTH files —
+    a guard that keeps scanning the file the logic left is the vacuous-pass class
+    this assertion exists to prevent, so an empty result across both still fails."""
     import ast
     import pathlib
 
-    src = pathlib.Path(__file__).resolve().parents[1] / "lambdas" / "ai" / "ai_calls.py"
-    tree = ast.parse(src.read_text(encoding="utf-8"))
-    fingerprinting = {"brief_fingerprint", "check_reuse_or_explain", "brief_parts", "part_fingerprints"}
-    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in fingerprinting]
-    assert calls, "no generation-cache fingerprint call site found in ai_calls.py — the scan is vacuous, not clean"
-    assert any(c.func.attr == "check_reuse_or_explain" for c in calls), (
+    root = pathlib.Path(__file__).resolve().parents[1] / "lambdas"
+    sources = [root / "ai" / "ai_calls.py", root / "coach" / "coach_brief_input_gate.py"]
+    fingerprinting = {"brief_fingerprint", "check_reuse_or_explain", "brief_parts", "part_fingerprints", "upstream_parts"}
+    calls = []
+    for src in sources:
+        tree = ast.parse(src.read_text(encoding="utf-8"))
+        calls += [
+            n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "attr", getattr(n.func, "id", None)) in fingerprinting
+        ]
+    assert calls, "no generation-cache fingerprint call site found in the coach-brief path — the scan is vacuous, not clean"
+    assert any(getattr(c.func, "attr", getattr(c.func, "id", None)) == "check_reuse_or_explain" for c in calls), (
         "production must go through check_reuse_or_explain — it is the seam that keeps the parts named "
         "in generation_cache and logs the miss reason (#2889)"
     )

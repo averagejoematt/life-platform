@@ -39,6 +39,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
@@ -69,6 +70,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(engine, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, engine, _FrozenDatetime)
     return _FROZEN_NOW
 
 
@@ -903,6 +905,7 @@ class TestArcTransition:
 def _install_handler_doubles(monkeypatch, *, genesis, source_data):
     fake = FakeDdbTable()
     monkeypatch.setattr(engine, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, engine, _FrozenDatetime)
     monkeypatch.setattr(engine, "EXPERIMENT_START", genesis)
     monkeypatch.setattr(engine, "table", fake)
     monkeypatch.setattr(engine, "_s3_json", lambda key: None)  # exercise both config fallbacks

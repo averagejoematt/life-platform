@@ -1151,7 +1151,42 @@ class WebStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
 
+        # ══════════════════════════════════════════════════════════════
+        # #3161: life-platform-og-image error alarm.
+        # Live-verified 2026-08-25 (epic #2799 acceptance audit): this Lambda had ZERO
+        # CloudWatch alarms of any kind (`aws cloudwatch describe-alarms` returned only
+        # its DIFFERENTLY-NAMED sibling `ingestion-error-og-image-generator`, which
+        # covers a separate scheduled Lambda — operational_stack.py's og-image-generator,
+        # the daily PNG/WebP share-card cron — not this FunctionURL-triggered dynamic-SVG
+        # Lambda). Not a heartbeat-completeness ledger row: this Lambda has no
+        # `schedule=` (invoked only via its Function URL, same class as email-subscriber
+        # above), so tests/test_heartbeat_completeness.py's enumerator structurally
+        # cannot see it — closing the "zero alarms" gap is a plain error-alarm addition,
+        # not a ledger entry. Replicates the exact OBS-07 email-subscriber-errors pattern
+        # immediately above (same file, same us-east-1 region/action-wiring constraint).
+        # ══════════════════════════════════════════════════════════════
+        og_image_errors_alarm = cloudwatch.Alarm(
+            self,
+            "OgImageErrors",
+            alarm_name="life-platform-og-image-errors",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": "life-platform-og-image"},
+                period=Duration.minutes(5),
+                statistic="Sum",
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+
         # #2829: the rest of the us-east-1 alarm estate (adopted orphans + this alarm's
         # missing action) lives in the sibling module — see web_alarms.py's docstring
         # for the full per-alarm disposition.
-        add_web_alarms(self, subscriber_errors_alarm)
+        # #3161/test_web_alarms_2829.py: positional, not keyword — the delegation guard
+        # (_alarm_action_status in tests/test_web_alarms_2829.py) only recognizes a
+        # variable passed via `stmt.value.args` (positional) as "routed elsewhere"; a
+        # keyword arg reads as an unrouted bare alarm construct.
+        add_web_alarms(self, subscriber_errors_alarm, og_image_errors_alarm)

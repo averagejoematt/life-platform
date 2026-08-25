@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 try:
     from common.platform_logger import get_logger
@@ -422,7 +423,7 @@ def _read_all_history(source: str, start: str = "2010-01-01", end: str = None) -
     """Paginate a source's full DATE# range. NOTE: deliberately does NOT apply the
     ADR-058 phase filter — episode detection spans 14 years, so it MUST include
     pre-genesis (phase=pilot) records, unlike the nightly compute path."""
-    end = end or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    end = end or pacific_today()
     items = []
     kwargs = {
         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",

@@ -416,8 +416,13 @@ function fmtNight(iso) {
 const RD_BAND = { green: ["primed", "rd-band-high"], yellow: ["moderate", "rd-band-mid"], red: ["go easy", "rd-band-low"] };
 function renderReadinessScore(readiness) {
   const wrap = $("[data-bind=readiness-score-wrap]"), comp = $("[data-bind=readiness-components]");
+  const confEl = $("[data-bind=readiness-confidence]");
   if (!wrap || !comp) return;
-  if (!readiness || readiness.score == null) { wrap.hidden = true; comp.innerHTML = ""; return; }
+  if (!readiness || readiness.score == null) {
+    wrap.hidden = true; comp.innerHTML = "";
+    if (confEl) { confEl.hidden = true; confEl.textContent = ""; }
+    return;
+  }
   const [word, cls] = RD_BAND[String(readiness.band || "").toLowerCase()] || ["", ""];
   bind("readiness-score").textContent = Math.round(readiness.score);
   const bandEl = $("[data-bind=readiness-band]");
@@ -436,6 +441,16 @@ function renderReadinessScore(readiness) {
     ? `<li class="rd-comp-note label">a 0 is a real reading — counted, not hidden.</li>`
     : "");
   wrap.hidden = false;
+  // DIL-049 D4 (score-transparency, cheap half) — #3049's input_manifest rides
+  // along on computed_metrics; `note` is only ever non-empty when the compute run
+  // that produced THIS score was built on stale/missing/unverified input, so this
+  // stays silent on a fully-qualified morning and only speaks up when the score
+  // is less certain than it looks.
+  const note = readiness.input_manifest && readiness.input_manifest.note;
+  if (confEl) {
+    if (note) { confEl.textContent = note; confEl.hidden = false; }
+    else { confEl.textContent = ""; confEl.hidden = true; }
+  }
 }
 function renderReadiness(vitals) {
   const sec = $("[data-readiness]");

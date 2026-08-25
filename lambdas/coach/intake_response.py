@@ -20,10 +20,11 @@ tests/test_intake_privacy_contract.py enforces the boundary in both directions.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from common import stats_core
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 logger = logging.getLogger()
 
@@ -56,7 +57,7 @@ def fetch_intake_by_date(table, window_days=180, today=None):
     with the experiment (raw_timeseries class, ADR-077), so the window spans
     genesis boundaries.
     """
-    today = today or datetime.now(timezone.utc).date()
+    today = today or pacific_now().date()
     start = (today - timedelta(days=window_days)).isoformat()
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(PRIVATE_INTAKE_PK) & Key("sk").gte(f"DATE#{start}"),

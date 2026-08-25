@@ -174,7 +174,7 @@ def test_draft_custom_builds_ir_lb_to_kg_count_and_supersets():
             {"movement_key": "cable_tricep_pushdown", "superset_id": 1, "sets": [{"weight_lbs": 60, "reps": 12, "count": 3}]},
         ],
     }
-    with patch("training.routine_repo.put_versioned", side_effect=fake_put):
+    with patch("training.routine_repo.draft_versioned", side_effect=fake_put):  # #3115: drafting goes through draft_versioned
         out = t.tool_manage_hevy_routine(args)
 
     assert out["status"] == "drafted_custom"
@@ -218,7 +218,7 @@ def test_draft_custom_resolves_arbitrary_exercise_via_index():
     # Both movements are deliberately NOT in the curated catalog, so resolution
     # must fall through to the index (curated keys would short-circuit at step 2).
     fake_index = {"burpee": {"id": "BB792A36", "title": "Burpee"}, "mountain climber": {"id": "F49E31D6", "title": "Mountain Climber"}}
-    with patch("training.routine_repo.put_versioned", side_effect=fake_put), patch.object(t, "_template_index", return_value=fake_index):
+    with patch("training.routine_repo.draft_versioned", side_effect=fake_put), patch.object(t, "_template_index", return_value=fake_index):
         out = t.tool_manage_hevy_routine(
             {
                 "action": "draft_custom",
@@ -275,7 +275,7 @@ def test_draft_custom_auto_creates_missing_exercise():
 
     # live lookup MISSES during resolution, then HITS on the post-create reconcile
     with (
-        patch("training.routine_repo.put_versioned", side_effect=fake_put),
+        patch("training.routine_repo.draft_versioned", side_effect=fake_put),
         patch.object(t, "_template_index", return_value={}),
         patch("training.hevy_write_client.create_template", side_effect=fake_create),
         patch.object(t, "_live_template_id_by_title", side_effect=[None, "NEWID123"]),

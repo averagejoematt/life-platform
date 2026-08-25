@@ -96,6 +96,7 @@ BOARD_ROTATION = [
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days, pacific_today
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 
 
@@ -134,7 +135,7 @@ def _get_confirmed_subscribers():
 
 def _get_weekly_insight():
     """Get the most recent coaching/guidance insight from last 7 days."""
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     week_ago = (today - timedelta(days=7)).isoformat()
     try:
         resp = table.query(
@@ -310,7 +311,9 @@ def lambda_handler(event, context):
         # fan-out. Keyed on the ISO week the letter IS: `week_num` below is
         # `%W`, a Monday-based week number with a documented year-boundary
         # wobble, so the guard uses the ISO week rather than re-using it.
-        period_key = f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+        # #2811: the letter's week is a PACIFIC calendar fact (a Sunday-evening PT send
+        # must not key next week's ISO week just because UTC rolled) — pacific_today().
+        period_key = f"week:{send_ledger.iso_week_key(pacific_now().date())}"
         if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, user_id=USER_ID, logger=logger):
             logger.warning("[DIL-025] Weekly Signal for %s already sent — refusing to mail the list twice", period_key)
             return {"statusCode": 200, "body": f"Weekly Signal for {period_key} already sent — skipped (replay guard)", "sent": 0}

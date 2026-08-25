@@ -39,6 +39,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 (#2109/#2221)
 
 try:
@@ -149,9 +150,13 @@ def slug(name):
 
 def gather_context():
     """Gather all context needed for challenge generation."""
-    now = datetime.now(timezone.utc)
-    end_date = now.strftime("%Y-%m-%d")
-    start_date = (now - timedelta(days=LOOKBACK_DAYS - 1)).strftime("%Y-%m-%d")
+    # #2811: the lookback bounds are DATE# keys — Pacific days. Named `_pt_now`
+    # rather than `now` on purpose: the guard's taint tracking is file-wide and
+    # scope-blind, so reusing the name `store_challenge` binds to a UTC instant
+    # would report this clean-by-construction window as an offender.
+    _pt_now = pacific_now()
+    end_date = _pt_now.strftime("%Y-%m-%d")
+    start_date = (_pt_now - timedelta(days=LOOKBACK_DAYS - 1)).strftime("%Y-%m-%d")
 
     context = {}
 
@@ -417,7 +422,7 @@ def build_generation_prompt(context):
     #1138 phase-context coverage suite can drive it offline."""
     phase_block = _phase_context_block()
     return f"""Here is the current platform data for challenge generation.
-Today is {datetime.now(timezone.utc).strftime('%Y-%m-%d')} ({datetime.now(timezone.utc).strftime('%A')}).
+Today is {pacific_today()} ({datetime.now(timezone.utc).strftime('%A')}).
 {phase_block}
 JOURNAL ENTRIES (14 days, enriched fields):
 {json.dumps(context.get('journal_14d', []), indent=2, default=str)[:4000]}
@@ -525,7 +530,7 @@ def store_challenge(challenge: dict):
     # #2221: `.get("name", ...)` only defaults on an ABSENT key — a model returning
     # name="" kept the empty string and slugged to a keyless CHALLENGE#_<date>.
     name = (challenge.get("name") or "").strip() or "Unnamed Challenge"
-    date_str = now.strftime("%Y-%m-%d")
+    date_str = pacific_today()  # #2811: CHALLENGE#{slug}_{date} names a Pacific day
     duration_days = _coerce_duration(challenge)
     ch_slug = slug(name)  # the module's own guarded helper, not a second inline copy
     challenge_id = f"{ch_slug}_{date_str}"

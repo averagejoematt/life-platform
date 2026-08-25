@@ -1445,7 +1445,7 @@ def lambda_handler(event, context):
     """
     _request_start = datetime.now(timezone.utc)
     if hasattr(logger, "set_date"):
-        logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1
+        logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1 — utc-exempt(#2811): a log correlation id, not a DATE# key
     logger.info("Health Auto Export webhook received")
 
     # ── Auth ──

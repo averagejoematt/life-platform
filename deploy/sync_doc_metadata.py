@@ -110,6 +110,12 @@ def _auto_discover_lambda_count() -> int | None:
         return None
 
 
+def _auto_discover_cdk_stack_count() -> int | None:  # thin wrapper: sync_cdk_fact (#1665 extraction), #3151 test contract
+    from sync_cdk_fact import discover_cdk_stack_count
+
+    return discover_cdk_stack_count(ROOT)
+
+
 def _auto_discover_endpoint_count() -> int | None:
     """Count DISTINCT public API endpoint paths served by the site-api Lambda (#1437).
 
@@ -514,6 +520,7 @@ def _platform_counts_values(facts: dict) -> dict:
         "lambdas": facts.get("lambda_count"),
         "alarms": facts.get("alarm_count"),
         "data_sources": facts.get("data_sources"),
+        "cdk_stacks": facts.get("cdk_stacks"),
         "adrs": _count_adrs(),
         "test_count": _count_test_functions(),
     }
@@ -575,6 +582,12 @@ def _apply_auto_discovered(facts: dict) -> dict:
         if facts.get("alarm_count") != alarm_count:
             print(f"  [auto] alarm_count: {facts.get('alarm_count')} → {alarm_count} (from CDK stacks, #795)")
         facts["alarm_count"] = alarm_count
+
+    cdk_stack_count = _auto_discover_cdk_stack_count()
+    if cdk_stack_count is not None:
+        if facts.get("cdk_stacks") != cdk_stack_count:
+            print(f"  [auto] cdk_stacks: {facts.get('cdk_stacks')} → {cdk_stack_count} (from cdk/stacks/*_stack.py, #3143)")
+        facts["cdk_stacks"] = cdk_stack_count
 
     endpoint_count = _auto_discover_endpoint_count()
     if endpoint_count is not None:
@@ -685,7 +698,7 @@ PLATFORM_FACTS = {
     "alarm_count": 113,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms); 69→71 on #1328 (serve-stack Throttles alarms); 71→77 refreshed to discovery on #1455 (drift >5; includes compute-outputs-missing + compute-outputs-heartbeat); 77→86 refreshed to discovery on #1960 (drift >5; includes the 5 per-source ingest-auth-unhealthy-* alarms); 86→92 refreshed to discovery on the 2026-08-03 merge wave (whoop auth alarm #2068, canary stored-state alarms #2065, kill-switch skip alarms #2067); 92→99 refreshed to discovery on the 2026-08-11 permanence merge (#1400/PR #2572 — the continuity-watch + public-archive alarms landed by the LifePlatformOperational cdk deploy); 99→107 refreshed to discovery on the 2026-08-20 us-east-1 reconcile (#2829/PR #2913 — dash-5xx-rate, dash-total-errors, cf-auth-errors declared in cdk/stacks/web_alarms.py; +3 crossed the ±5 fallback-hygiene tolerance and redded main, the class this test's docstring warns about); 107→113 refreshed to discovery on #3037 (the #2977 recall silence alarms + approve-path pair crossed the ±5 tolerance)
     "endpoint_count": 115,  # fallback: AST-derived from site_api_lambda.py (#1437) — ROUTES + _SIMPLE_ROUTES + inline, deduped
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
-    "cdk_stacks": 10,  # 9→10 on #3042/DIL-027 (2026-08-24): LifePlatformBackup — the raw/ cross-region replica stack (cdk/stacks/backup_stack.py, us-east-2)
+    "cdk_stacks": 10,  # fallback: auto-discovered from cdk/stacks/*_stack.py (#3143, _auto_discover_cdk_stack_count); 9→10 on #3042/DIL-027 (2026-08-24) LifePlatformBackup, the raw/ cross-region replica stack
     "test_count": 3644,  # fallback: `def test_` count across tests/*.py (_count_test_functions)
     "iam_roles": 43,
     "adr_max": "132",  # fallback: auto-discovered from docs/DECISIONS.md (#817, _auto_discover_adr_max)
@@ -788,18 +801,9 @@ RULES = [
         r"\| \*\*Secrets Manager\*\* \| ~?\$[\d.]+ \| \d+ active secrets × \$0\.40",
         "| **Secrets Manager** | {secrets_cost} | {secret_count} active secrets × $0.40",
     ),
-    # ── MCP_TOOL_CATALOG.md ──────────────────────────────────────────────────
-    # BOTH date-bearing lines are stamped here, deliberately. The file is fully
-    # generated (`scripts/generate_mcp_tool_catalog.py`, pure AST parse of
-    # mcp/registry.py), and that generator COPIES the `Last updated` value into the
-    # `Verified:` header — so if this sync stamped only one of the two, every sync
-    # run landing on a new UTC date left the file self-inconsistent and the
-    # generator's `--check` redded Docs CI on main until someone re-ran the
-    # generator. That is exactly what happened at the 2026-08-24 wrap (synced at
-    # 00:57Z, i.e. the UTC date had already rolled while the PT date had not).
-    # Stamping both makes the two writers agree by construction, in either order.
-    # This is NOT manufactured freshness (#1957): the whole file is re-derived from
-    # source on every regeneration, so "Verified" here means exactly that.
+    # ── MCP_TOOL_CATALOG.md — BOTH date lines stamped: the generator copies `Last
+    # updated` into `Verified:`, so stamping one left the file self-inconsistent on
+    # every UTC rollover (the 08-24-wrap red). Fully re-derived each regen (#1957 ok).
     (
         "docs/MCP_TOOL_CATALOG.md",
         r"\*\*Version:\*\* [^\|]+ \| \*\*Last updated:\*\* [^\|]+ \| \*\*Total tools:\*\* \d+",

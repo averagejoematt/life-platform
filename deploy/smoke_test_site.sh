@@ -134,6 +134,39 @@ echo "$(date)"
 echo "============================================================"
 echo ""
 
+# ── Convergence gate (#2978) ──────────────────────────────────────────────────
+# THE class owner, one layer above the retries. smoke_confirm/cache_aware_fetch
+# handle residue AFTER a check has already read the wrong world; this refuses to
+# start reading until the world is the one this deploy shipped. The signal is the
+# viewer-path build fingerprint (/version.json == the deployed SHA — memory:
+# project_build_fingerprint + project_cloudfront_invalidation_path), plus the
+# declared api-before-frontend routes and the site-api's warm flag. The gate
+# WAITS on those signals with a bounded budget; it never sleeps a guessed number
+# (the 2026-07-19 05:40Z `sleep 60` is exactly the guess that lost).
+#
+# OPT-IN by construction: it gates only when the caller says which build it is
+# judging (SMOKE_EXPECT_BUILD, set from github.sha in site-deploy.yml). An
+# ad-hoc local `bash deploy/smoke_test_site.sh` has no expected build and is
+# unchanged — but it says so out loud rather than implying convergence was
+# checked (#2578: a silent skip is the failure mode, not the escape hatch).
+if [[ -n "${SMOKE_EXPECT_BUILD:-}" ]]; then
+  CURRENT_CHECK="convergence gate (#2978)"
+  if python3 "$(dirname "$0")/deploy_convergence.py" await --base "$BASE" --expect-build "$SMOKE_EXPECT_BUILD"; then
+    echo ""
+  else
+    CONV_RC=$?
+    echo ""
+    echo "❌ convergence gate FAILED (exit $CONV_RC) — the checks below would be measuring the"
+    echo "   pre-deploy world, so their verdict would be about the race, not the deploy."
+    echo "   exit 2 = a signal stayed PENDING past its budget; exit 3 = a signal was UNREADABLE."
+    exit 1
+  fi
+else
+  echo "ℹ️  convergence: NOT ASSERTED — no SMOKE_EXPECT_BUILD supplied, so this run cannot"
+  echo "   tell a deploy race from a real failure (#2978). CI supplies it; ad-hoc runs do not."
+  echo ""
+fi
+
 # ── v4 pages (HTTP status) — derived from THE page registry (#1426) ───────────
 # tests/qa_manifest.py is the ONE page list; this block sweeps every registered
 # page at its expected status. Adding a page = one manifest entry, never a new

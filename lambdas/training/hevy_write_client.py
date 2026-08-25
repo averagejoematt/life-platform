@@ -183,7 +183,65 @@ def _maybe_recover_orphan(title: str | None, http_error: urllib.error.HTTPError)
             )
 
 
+#: How far back a title lookup walks before giving up (pages × page_size routines).
+#: Bounded on purpose: this runs before every first push, and an unbounded walk of a
+#: growing routine list would turn one write into an open-ended read loop.
+FIND_MAX_PAGES = 10
+FIND_PAGE_SIZE = 10
+
+
+def find_routine_by_title(title: str | None) -> dict[str, Any] | None:
+    """The account's routine with this exact (case/whitespace-normalised) title, or None.
+
+    Hevy publishes no idempotency key, so this read IS the idempotency mechanism for
+    `create_routine` (#3115) — the same find-or-create shape `_ensure_folder` and the
+    template resolver already use, which the routine create was the one write missing.
+
+    Exact-title identity is sound here because the compiler renders titles through
+    `routine_title.format_title` (`Phase - Type - N - Y`), so a genuinely new session
+    gets a new counter and a re-push of the SAME session renders the same string. It is
+    the same identity `_maybe_recover_orphan` has always used to recognise a 4xx-but-
+    created routine. Fail-soft: any read error returns None and the POST proceeds —
+    a duplicate routine is recoverable, a blocked push is a session Matthew can't train.
+    """
+    if not title:
+        return None
+    target = " ".join(str(title).split()).lower()
+    for page in range(1, FIND_MAX_PAGES + 1):
+        try:
+            listing = list_routines(page=page, page_size=FIND_PAGE_SIZE)
+        except Exception as e:  # noqa: BLE001 — never block a push on a lookup
+            logger.warning(f"find_routine_by_title({title!r}) lookup failed on page {page}; POST proceeds: {e}")
+            return None
+        routines = listing.get("routines") or []
+        if not routines:
+            return None
+        for r in routines:
+            if " ".join(str(r.get("title") or "").split()).lower() == target:
+                return r
+        if len(routines) < FIND_PAGE_SIZE:
+            return None
+    return None
+
+
 def create_routine(body: dict[str, Any]) -> dict[str, Any]:
+    """POST a new routine — find-or-create, never blind-create (#3115).
+
+    A replayed commit (client timeout, cron re-run, retried MCP call) used to POST a
+    second routine, because Hevy mints a fresh id per call and offers no idempotency
+    header. The pre-flight title lookup makes the call converge instead: if the routine
+    is already there, its id is returned and NOTHING is written remotely.
+
+    Deliberately a link, not a PUT: an update here would have no `expected_updated_at`
+    to check against, so it could clobber an edit Matthew made in the Hevy app — the
+    exact thing `update_routine_with_guard` exists to refuse. The linked id means the
+    NEXT commit takes the guarded update branch, which is where a content change belongs.
+    """
+    title = (body.get("routine") or {}).get("title") if isinstance(body, dict) else None
+    existing = find_routine_by_title(title)
+    if existing:
+        logger.warning(f"routine {title!r} already exists in Hevy (id={existing.get('id')}) — linking, not creating a second one (#3115)")
+        return {"routine": existing, "linked_existing": True}
     try:
         return _request("POST", "/v1/routines", body=body)
     except urllib.error.HTTPError as e:

@@ -26,6 +26,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
@@ -160,6 +161,7 @@ def s3(monkeypatch):
 @pytest.fixture
 def frozen_now(monkeypatch):
     monkeypatch.setattr(drl, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, drl, _FrozenDatetime)
     return FROZEN_ISO
 
 

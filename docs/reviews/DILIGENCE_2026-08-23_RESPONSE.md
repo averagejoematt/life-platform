@@ -90,10 +90,41 @@ repo-visibility change, or GitHub shipping ref-level purge tooling.
 | 041 API contract baselines | **STALE (reverify)** | #1436 closed | D5 contract check |
 | 042 essay overstates autonomy | **CONFIRMED** | essay "daily self-merge before coffee" vs Mon/Wed/Fri shadow | Essay **corrected 2026-08-23** (D0.5 sweep — Mon/Wed/Fri cadence + shadow-mode demotion stated in the essay itself, framed as the org chart working) |
 | 047/048 org resilience / segregation | **CONFIRMED (arch)** | solo key-person | PRICED + owner-handoff drill (D3) |
-| 049 founder-calibrated scoring | **CONFIRMED** | single-subject validity | D4 score-transparency (cheap half) + PRICED |
+| 049 founder-calibrated scoring | **CONFIRMED (arch) → D4 cheap half LANDED 2026-08-24** | single-subject validity doesn't go away with a label (that half stays PRICED below); the labeling gap is real and now closed on the two surfaces the inventory found unlabeled | D4 score-transparency (cheap half) — see detail below; single-subject validity PRICED (commercialization / a second subject) |
 | 050 deletion propagation map | **PARTIALLY** | archives well-documented; propagation machinery absent | D3/D-later |
 | 051 accessibility coverage | **STALE (reverify)** | WCAG audit due | D-later |
 | 052 self-referential grading | **CONFIRMED** | REVIEW_METHODOLOGY concedes it; **this external review is the answer** | ongoing (external re-grade cadence) |
+
+### DIL-049 — score-transparency sweep (D4 cheap half, done 2026-08-24, part of #3042)
+
+The finding is real and split into two halves that don't share a fix. **Single-subject
+validity** — every score on the platform is calibrated against one person's own history,
+n=1 by design — is not something a label can close; it stays a dated PRICED acceptance
+(revisit trigger: a second subject, or commercialization). **The cheap half** is
+different: does every public score surface say what happens when its input data is
+missing, and does a score built from a thin/degraded window render identically to one
+built from a full one? That's a labeling sweep, not a research problem, and it was
+mostly already done by prior work (#3049/DIL-024, #1084/#1917, #1370, #747, #2388) —
+the sweep's job was to find what that prior work missed.
+
+**Inventory (every public score surface, 2026-08-24):**
+
+| Surface | Missing-data answer | Low-n/thin-window answer | What changed |
+|---|---|---|---|
+| `/api/character` pillar scores | Already excellent: per-pillar `data_coverage`, `coverage_hold`, `not_instrumented`/`not_instrumented_note`, `absent_behaviors`, #2388 `absence` state, document-level `input_manifest` (#3049/DIL-024) | Coverage-gated leveling (below the coverage floor a day carries no leveling signal, ADR-104) already stated on /method/game | Nothing — already labeled. **Found one real gap: the whole-life `composite_score` averages only the instrumented pillars but never said how many** — a 3-of-7 composite rendered identically to a 7-of-7 one. Added `composite_pillar_count`/`composite_pillar_total`/`composite_note` (labeling only, no computation change) |
+| `/api/snapshot` readiness score (the Cockpit hero) | **Gap found**: `computed_metrics` (the record backing it) already carries `input_manifest` from #3049 — daily-metrics-compute is one of the five stamped Lambdas — but `_latest_readiness()` never read it, so a readiness score built on stale/missing whoop input rendered identically to a clean one | `readiness_components` already serves the score's real inputs (#492/M-4); no separate n to disclose (single-day score, not a window average) | Added `input_manifest` to the `_latest_readiness()` payload (shared `_public_input_manifest` helper, moved to `web/site_api_common.py` so both `/api/character` and the readiness block use the same shape/wording) + a `.rd-confidence` caption on `/cockpit/` that only renders when the note is non-empty |
+| `/api/vitals` (weight/HRV/recovery/RHR/sleep) | Already excellent — the reference pattern this sweep followed: `window_disclosure`, `*_30d` fields null below `_MIN_AVG_N`/below a genuine 30-day window, `weight_as_of`/`recovery_as_of`/`sleep_as_of` divergence called out in prose | Same — `hrv_avg_n`/`hrv_avg_window_days` ride beside the average | Nothing — reference implementation, no gap |
+| `/api/calibration` (coach prediction Brier scores) | `label`/`score`/`calibration` verdict is n-gated (`n < 3` → "nascent"; `skilled` is `None`, never punished as False, when undefined); `not_yet_skillful` is a distinct dignified state from "well-calibrated" (#1370) | Same fields carry the n directly (`n`, `n_eff` where applicable) | Nothing — already labeled |
+| `/api/character_calibration` (felt-reality pillar calibration) | Confidence grammar already explicit: below `FELT_CALIBRATION_MIN_WEEKS` → `"uncalibrated (n=X)"` with no `r`; between MIN and CI_MIN weeks → point estimate with `ci95: null` (never a fabricated band) | Same — `n_weeks`/`gates` published per pillar | Nothing — already labeled |
+| `/method/game` (composition explainer) | "When the data goes dark" section already narrates the full rule set: absent behaviors score 0, sensors drop out of the weight sum, thin days blend toward neutral for *display only* (level gates read the unblended number), a never-instrumented pillar shows a placeholder not a reading, neglect atrophy, visible XP debt. The headline section already states the composite's renormalization rule | N/A — this page is the static rulebook, not a live score | Nothing — the rule was already documented; the live surface just never showed whether the rule was doing anything *today* (see the `/api/character` row above) |
+
+**Constraint honored:** every change above is additive labeling on top of an unchanged
+score computation — no `character_engine.py`, `daily_metrics_compute_lambda.py`, or
+`calibration_core.py` line changed. Tests:
+`tests/test_dil049_score_transparency.py` (7 tests, each surface's disclosure proved
+both ways — appears when thin/degraded, absent or silent when complete — the
+mutation-proof shape: deleting either branch of the new code fails one test in its
+pair).
 
 ## Findings our verification produced (not in the report)
 

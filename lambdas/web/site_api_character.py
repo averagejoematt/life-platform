@@ -23,10 +23,8 @@ import json
 import os
 import re as _re
 from datetime import date as _date, timedelta
-from typing import Optional
 
 from boto3.dynamodb.conditions import Key
-from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024
 from experiment.phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
@@ -37,51 +35,12 @@ from web.site_api_common import (
     _decimal_to_float,
     _error,
     _ok,
+    _public_input_manifest,  # noqa: F401 — re-export: DIL-049 moved the impl to site_api_common
+    # so /api/snapshot's readiness block (site_api_body.py) can share it; kept importable
+    # from here too since tests/test_input_manifest_contract_3049.py patches/imports it by
+    # this name (`from web.site_api_character import _public_input_manifest`).
     logger,
 )
-
-
-def _public_input_manifest(record) -> Optional[dict]:
-    """#3049 (DIL-024) — the compute run's own input-freshness manifest, for readers.
-
-    Sibling to the #2388 pillar-absence state, and deliberately NOT a re-derivation
-    of it: ``_attach_pillar_absence`` asks "is this pillar's behavior dark *right
-    now*, at serve time"; this reports what the compute Lambda actually observed
-    *when it ran*. They can honestly disagree — a connector that recovered between
-    9:30 AM and the page load leaves a stale-input sheet with a live pillar — and
-    collapsing them would hide exactly that.
-
-    Returns None for a record written before the contract shipped. That absence is
-    the honest answer ("this record predates the contract"); synthesizing a
-    ``complete`` for an unstamped record is the failure mode this whole issue is
-    about. Values arrive already ``_decimal_to_float``-ed by the caller.
-    """
-    manifest = record.get("input_manifest")
-    if not isinstance(manifest, dict):
-        return None
-    sources = manifest.get("sources")
-    if not isinstance(sources, dict):
-        sources = {}
-    return {
-        "status": manifest.get("status"),
-        "complete": bool(manifest.get("complete")),
-        "as_of_day": manifest.get("as_of_day"),
-        "degraded": [str(s) for s in (manifest.get("degraded") or [])],
-        "unobserved": [str(s) for s in (manifest.get("unobserved") or [])],
-        # One sentence, built by the shared helper so the brief and the site can
-        # never word the same manifest two different ways.
-        "note": _manifest_note(manifest),
-        "sources": {
-            str(k): {
-                "status": (v or {}).get("status"),
-                "latest_day": (v or {}).get("latest_day"),
-                "age_hours": (v or {}).get("age_hours"),
-                "stale_after_hours": (v or {}).get("stale_after_hours"),
-            }
-            for k, v in sources.items()
-            if isinstance(v, dict)
-        },
-    }
 
 
 def _attach_pillar_absence(pillars, *, table, now, window_start) -> None:
@@ -305,6 +264,25 @@ def character(date: str | None = None, *, _g) -> dict:
         if _composite_scores
         else sum(p["raw_score"] for p in pillars) / max(len(pillars), 1)
     )
+    # DIL-049 (D4 score-transparency, cheap half): the rule for what the composite
+    # averages over is already stated on /method/game ("renormalized over the
+    # pillars that have ever been instrumented") — but the LIVE number never said
+    # whether that renormalization was actually doing anything today. A composite
+    # built from 3 of 7 pillars renders identically to one built from all 7; the
+    # reader has no way to tell from `composite_score` alone (every pillar carries
+    # its own `not_instrumented`, so the fact is derivable, but making a reader
+    # cross-reference 7 objects to answer "how much of me is this number" is the
+    # same failure ADR-105's "the claim carries its context" rule exists to close).
+    # Never null-and-hidden — the pair is always real, `composite_note` is the only
+    # part that goes quiet once every pillar is instrumented.
+    _composite_pillar_count = len(_composite_scores)
+    _composite_pillar_total = len(pillars)
+    composite_note = (
+        f"composite_score is the mean of {_composite_pillar_count} of {_composite_pillar_total} pillars — "
+        f"{_composite_pillar_total - _composite_pillar_count} not yet instrumented pillar(s) are excluded, not averaged in at a neutral score."
+        if _composite_pillar_count < _composite_pillar_total
+        else None
+    )
     composite_delta_1d = None
     if prior_record:
         _yd_scores = [float(prior_record.get(f"pillar_{p}", {}).get("raw_score", 0)) for p in PILLAR_ORDER]
@@ -345,6 +323,11 @@ def character(date: str | None = None, *, _g) -> dict:
                 "as_of_date": date_str,
                 "composite_score": round(composite, 1),
                 "composite_delta_1d": composite_delta_1d,
+                # DIL-049 D4: how much of the composite is real signal right now —
+                # see the note above `composite_note` for why this exists.
+                "composite_pillar_count": _composite_pillar_count,
+                "composite_pillar_total": _composite_pillar_total,
+                "composite_note": composite_note,
                 "time_travel": bool(date),
                 # #590: the engine's designed cross-pillar couplings that are ACTIVE
                 # right now (rare gameplay thresholds — e.g. Sleep Drag). The home

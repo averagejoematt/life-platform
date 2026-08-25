@@ -63,6 +63,7 @@ from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # ── Deterministic vocabularies ────────────────────────────────────────────────
 
@@ -392,8 +393,8 @@ def fetch_habit_names():
 
 def lambda_handler(event, context):
     try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        start_date = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%d")
+        today = pacific_today()
+        start_date = (pacific_now() - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%d")
 
         # ADR-058: registry aggregation is cycle-honest — pilot rows stay hidden.
         from experiment.phase_filter import with_phase_filter

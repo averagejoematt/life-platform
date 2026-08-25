@@ -27,12 +27,13 @@ anyone reads the page.
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import boto3
 from common import stats_core
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 try:
     from common.platform_logger import get_logger
@@ -198,7 +199,7 @@ def lambda_handler(event: dict, context) -> dict:
             if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
                 import hypothesis_engine_lambda as eng
 
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = pacific_today()
         data = eng.gather_data(days=LOOKBACK_DAYS)
         rows = eng.build_data_narrative(data)
         rows_by_date = {r["date"]: r for r in rows if r.get("date")}

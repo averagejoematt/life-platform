@@ -902,14 +902,26 @@ class TestCallAnthropic:
 
         captured = {}
 
-        def _fake(prompt=None, max_tokens=None, system=None, temperature=None, timeout=None):
-            captured.update(prompt=prompt, max_tokens=max_tokens, system=system, temperature=temperature, timeout=timeout)
+        def _fake(prompt=None, max_tokens=None, system=None, temperature=None, timeout=None, cache_system=True):
+            captured.update(
+                prompt=prompt, max_tokens=max_tokens, system=system, temperature=temperature, timeout=timeout, cache_system=cache_system
+            )
             return "<div>compass</div>"
 
         monkeypatch.setattr(ru, "call_anthropic_api", _fake)
 
         assert mc.call_anthropic("SYS", "USER", max_tokens=1234) == "<div>compass</div>"
-        assert captured == {"prompt": "USER", "max_tokens": 1234, "system": "SYS", "temperature": 0.4, "timeout": 120}
+        # #2888: `cache_system=False` is part of the contract, not an incidental kwarg —
+        # monday-compass makes ONE Bedrock call per weekly run, so a cache_control block
+        # here is a pure write premium against a read that can never happen.
+        assert captured == {
+            "prompt": "USER",
+            "max_tokens": 1234,
+            "system": "SYS",
+            "temperature": 0.4,
+            "timeout": 120,
+            "cache_system": False,
+        }
 
 
 class TestPresenceBlock:

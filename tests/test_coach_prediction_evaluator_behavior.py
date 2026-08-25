@@ -37,6 +37,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS = os.path.join(ROOT, "lambdas")
@@ -209,6 +210,7 @@ def env(monkeypatch):
     """
     fake = SimpleNamespace(table=FakeTable(), cw=FakeCloudWatch(), lam=FakeLambdaClient())
     monkeypatch.setattr(ev, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, ev, _FrozenDatetime)
     monkeypatch.setattr(ev, "table", fake.table)
     monkeypatch.setattr(ev, "_cw", fake.cw)
     monkeypatch.setattr(ev, "_lambda_client", fake.lam)
