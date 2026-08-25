@@ -1056,6 +1056,30 @@ RULES = [
         r"\*\*Total tests:\*\* derived, never committed[^\n]*",
         "**Total tests:** derived, never committed — `test_count` in the generated `lambdas/web/platform_counts.py`, served at `/api/platform_stats` (#3101).",
     ),
+    # ── docs/content/ essays (#3162, Part of #2986, re-fixes #2838's class) ─────
+    # check_doc_facts.py's prose safety-net deliberately does NOT police lambda_count
+    # (too many legit subset counts — "14 ingestion Lambdas" etc — to regex safely across
+    # ALL of docs/). These two files quote the platform-wide TOTAL by name in a fixed,
+    # known phrasing, so a file-scoped RULES entry has none of that ambiguity and can
+    # both self-heal (--apply) and gate (--check) it, the same way README.md's count is
+    # kept honest. Found stale 2026-08-24: both files still said "99 Lambdas / 9 CDK
+    # stacks" months after the platform grew to 104/10 — the #2838 class recurring on a
+    # public-claims surface no RULES entry named.
+    (
+        "docs/content/ESSAY_ORG_CHART_OF_ONE.md",
+        r"\d+ Lambda functions, \d+ CDK stacks, ~\d+ MCP tools",
+        "{lambda_count} Lambda functions, {cdk_stacks} CDK stacks, ~{tool_count} MCP tools",
+    ),
+    (
+        "docs/content/CAREER_ARTIFACT_SUBMISSION_KIT.md",
+        r"\(\d+ Lambdas, \d+ CDK stacks,\n> a public website\)",
+        "({lambda_count} Lambdas, {cdk_stacks} CDK stacks,\n> a public website)",
+    ),
+    (
+        "docs/content/CAREER_ARTIFACT_SUBMISSION_KIT.md",
+        r"\(\d+ Lambdas, \d+ CDK stacks, ~\d+ MCP tools\)",
+        "({lambda_count} Lambdas, {cdk_stacks} CDK stacks, ~{tool_count} MCP tools)",
+    ),
 ]
 
 

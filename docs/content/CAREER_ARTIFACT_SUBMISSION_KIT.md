@@ -29,11 +29,11 @@ each submission so nothing needs re-drafting under time pressure.
 
 **One-line pitch (for the submission form's summary field):**
 
-> How a solo engineer keeps a production AWS platform (94 Lambdas, 9 CDK
-> stacks, a public website) running with AI agents as the entire engineering
-> team — not by trusting the model more, but by building the org chart a
-> model needs: shift handovers, deterministic merge gates, and a public
-> failure log as the credibility layer.
+> How a solo engineer keeps a production AWS platform (104 Lambdas, 10 CDK stacks,
+> a public website) running with AI agents as the entire engineering team —
+> not by trusting the model more, but by building the org chart a model
+> needs: shift handovers, deterministic merge gates, and a public failure
+> log as the credibility layer.
 
 **Angle framing (matches LeadDev's practitioner/engineering-leadership
 audience):** lead with "coach the workflow, not the worker" — the gates,
@@ -63,7 +63,7 @@ theme per the #740 shortlist):**
 > Most "AI agent org" talks are about capability — what the model can do.
 > This one is about org design — what it takes to make an org of mortal,
 > memory-wiped AI sessions *not fall over* in production. I run a live AWS
-> platform (99 Lambdas, 9 CDK stacks, ~76 MCP tools) with one human and N
+> platform (104 Lambdas, 10 CDK stacks, ~76 MCP tools) with one human and N
 > Claude sessions as the entire engineering team. The talk walks through the
 > five pieces that actually mattered: the handover ritual that survives
 > total session amnesia, a deterministic (not LLM) merge gate that holds the
