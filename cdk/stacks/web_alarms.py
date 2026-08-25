@@ -114,17 +114,24 @@ GT = cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD
 NOT_BREACHING = cloudwatch.TreatMissingData.NOT_BREACHING
 
 
-def add_web_alarms(scope: Construct, subscriber_alarm: cloudwatch.Alarm) -> None:
+def add_web_alarms(scope: Construct, subscriber_alarm: cloudwatch.Alarm, og_image_alarm: cloudwatch.Alarm = None) -> None:
     """Wire the us-east-1 alarm estate onto `scope` (WebStack, us-east-1).
 
     `subscriber_alarm` is the existing OBS-07 `email-subscriber-errors` Alarm construct
     (still defined in web_stack.py — it already existed there; this only supplies the
-    `.add_alarm_action()` call it was missing). Everything else is adopted fresh here.
+    `.add_alarm_action()` call it was missing). `og_image_alarm` (#3161) is the new
+    `life-platform-og-image-errors` Alarm construct — same missing-action shape, wired
+    the same way. Everything else is adopted fresh here.
     """
     topic = sns.Topic.from_topic_arn(scope, "AlertsTopicUsEast1", ALERTS_TOPIC_ARN_US_EAST_1)
 
     # OBS-07 fix: the literal "fires into the void" bug named in the issue title.
     subscriber_alarm.add_alarm_action(cw_actions.SnsAction(topic))
+
+    # #3161: life-platform-og-image had ZERO alarms of any kind (live-verified via
+    # describe-alarms) — route the new error alarm into the same us-east-1 topic.
+    if og_image_alarm is not None:
+        og_image_alarm.add_alarm_action(cw_actions.SnsAction(topic))
 
     # ADOPT — CloudFront 5xx rate on the dash distribution. Codified from live config.
     # ── The three orphan adoptions are DEFERRED (#2829, rescoped 2026-08-20) ──

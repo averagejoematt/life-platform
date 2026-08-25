@@ -267,9 +267,11 @@ readers under the `life-platform-mcp` lambda.
 | `life-platform-dlq-depth-warning` | operational_stack | digest |
 | `life-platform-freshness-checker-not-emitting` | operational_stack | digest |
 | `life-platform-insight-email-parser-parse-failure` | operational_stack | digest |
+| `life-platform-og-image-errors` | web_stack | unresolved |
 | `life-platform-recursive-loop` | mcp_stack | digest |
 | `mcp-server-duration-high` | mcp_stack | digest |
 | `mcp-warmer-error` | mcp_stack | digest |
+| `mcp-warmer-no-invocations-24h` | mcp_stack | digest |
 | `paging-budget-tier-3` | monitoring_stack | paging |
 | `paging-pipeline-dead` | monitoring_stack | paging |
 | `permanence-errors` | operational_stack | digest |
@@ -299,6 +301,6 @@ readers under the `life-platform-mcp` lambda.
 
 - Edge sites: 1138 total · 824 resolved · 314 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 56 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
+- Alarms: 58 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled

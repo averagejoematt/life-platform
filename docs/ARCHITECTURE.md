@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-08-25 (v8.6.0 — 76 tools, 38-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 114 alarms, 10 CDK stacks deployed).
+Last updated: 2026-08-25 (v8.6.0 — 76 tools, 38-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 116 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **153 ADRs** (ADR-001 → ADR-155 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -84,7 +84,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
-| CloudWatch | Alarms + logs | **~114 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
+| CloudWatch | Alarms + logs | **~116 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
 | CDK | Infrastructure as Code | `cdk/` — 10 stacks. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`, `backup_stack` (DIL-027/#3042 — the `raw/` cross-region replica bucket + replication role, **us-east-2**; the only stack outside us-west-2 other than `web_stack`'s us-east-1). |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | **$150/mo all-in cap** (ADR-063; base $75 -> $85 -> $150, surge-to-$176 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (every 8h) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features by AUDIENCE band (ADR-125; ground truth = `_FEATURE_CUTOFF`): 1=internal/dev AI (ensemble, chronicle editor, the coherence/reader-truth/visual QA passes), 2=reader narratives (coach commentary, State of Matthew, chronicle, nudges), 3=hard cutoff — the public ask endpoints and the daily brief's AI, the two surfaces that degrade LAST, enforced in `bedrock_client.invoke()`. |
@@ -203,7 +203,7 @@ Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, th
 
 DLQ coverage: all async Lambdas → `life-platform-ingestion-dlq`. Alarm actions route to SNS `life-platform-alerts`.
 
-CloudWatch carries **~114 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
+CloudWatch carries **~116 metric alarms** (CDK-declared; the count is auto-discovered by `deploy/sync_doc_metadata.py` and the inventory is regenerated into `docs/MONITORING.md`).
 
 Additional safeguards: DLQ Consumer Lambda, Canary Lambda (synthetic health check every 30 min), item size guard.
 

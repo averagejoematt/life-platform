@@ -428,6 +428,18 @@ class ServeStack(Stack):
         )
         _telegram_worker_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # TODO(#3161, owner paging-posture decision — NOT resolved here): live-verified
+        # 2026-08-25 that `telegram-webhook` (this Lambda; alerts_topic=None above, no
+        # `schedule=` so it's outside the heartbeat-completeness ledger's enumeration
+        # domain too) has ONLY this throttle alarm — no Errors/no-invocations alarm at
+        # all, so an unhandled exception in the webhook handler is currently silent.
+        # Deliberately NOT adding paging here: Telegram retries failed webhook deliveries
+        # itself, so an error alarm's urgency (page vs. digest vs. none) is a posture call
+        # for the owner, not a unilateral one (contrast life-platform-og-image in
+        # web_stack.py, #3161's same audit — cheap real coverage added there because no
+        # posture judgment was needed, just a missing alarm on an unambiguously-silent
+        # Lambda). Resolve by either wiring an Errors alarm here (pick urgent/digest) or
+        # recording an explicit accepted-risk decision.
         _telegram_webhook_throttles = cloudwatch.Alarm(
             self,
             "TelegramWebhookThrottles",
