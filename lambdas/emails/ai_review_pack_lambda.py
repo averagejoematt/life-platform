@@ -54,7 +54,10 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import boto3
-from common import qa_archive  # #1691 (epic #1687): re-run the baseline-freshness gate over each archived
+from common import (
+    qa_archive,  # #1691 (epic #1687): re-run the baseline-freshness gate over each archived
+    send_ledger,  # #3113 / DIL-025: the durable replay guard
+)
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # coach_brief's TEXT so a stale-baseline/stale-phase brief surfaces a visible flag
@@ -574,23 +577,30 @@ def _fmt_date(d):
         return d
 
 
-def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track the last send."""
-    import time as _time
+#: The `email_log#` partition this sender's completion rows live in. NOTE the
+#: hyphen: the status page has always read `email_log#ai-review-pack`, so the
+#: replay guard must read the SAME partition rather than a tidier spelling
+#: (#3113 — a guard that reads a partition nobody writes is silent).
+LEDGER_NAME = "ai-review-pack"
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.info(f"[ai-review-pack] status-tracking write failed (non-fatal): {e}")
+
+def _period_key():
+    """WHICH pack this is — `week:YYYY-Www` (#3113).
+
+    `week_dates()` is a rolling WINDOW_DAYS window ending *today*, so the window
+    is not itself a period; the PACK is weekly (Sunday 18:00 UTC) and that is
+    what must not be mailed twice. Every redrive inside that week resolves to
+    the same key; next Sunday's does not.
+    """
+    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+
+
+def record_email_send(table, lambda_name, period_key):
+    """The status page's completion row, plus DIL-025's `period_key` — WHICH
+    pack went out, not merely the UTC day it was sent. Delegated so the writer
+    and `already_sent`'s reader cannot drift apart; still non-fatal, since the
+    mail is already on the wire by the time this runs."""
+    send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
 def lambda_handler(event, context):
@@ -603,6 +613,17 @@ def lambda_handler(event, context):
 
 def _run(event, context):
     dry_run = is_dry_run(event)
+
+    # DIL-025 / #3113 replay guard — before the S3 sweep and the Haiku critic,
+    # not merely before the send. A redrive carries the original payload.
+    # (The table handle used to be built lazily further down, next to its first
+    # read; the guard needs it first, and one handle is cheaper than two.)
+    table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
+    period_key = _period_key()
+    if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
+        logger.warning(f"[DIL-025] AI review pack for {period_key} already sent — refusing to send it twice (force_send overrides)")
+        return {"statusCode": 200, "body": f"AI review pack for {period_key} already sent — skipped (replay guard)"}
+
     logger.info("Weekly AI Review Pack starting...")
     dates = week_dates()
     by_surface, screenshots_by_date, read_errors = gather_week(dates)
@@ -629,7 +650,6 @@ def _run(event, context):
     # #1698 (S6): gate-promotion proposals from the corrections ledger. Fail-soft —
     # a ledger read error degrades the section off, never a lost editorial email.
     # READ-ONLY: this path only queries; it never writes or flips anything.
-    table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     proposals = None
     try:
         proposals = compute_promotion_proposals(table)
@@ -655,9 +675,12 @@ def _run(event, context):
             }
         },
     )
+    # DIL-025: ONE line after the SES call (it already was — this only gives the
+    # row a `period_key` so a redrive can be recognised).
+    if not dry_run:
+        record_email_send(table, LEDGER_NAME, period_key)
     logger.info(f"Sent: {subject}")
 
-    record_email_send(table, "ai-review-pack")
     return {
         "statusCode": 200,
         "body": f"{total} generations across {sum(1 for s in by_surface if by_surface[s])} surfaces; {read_errors} read errors",

@@ -465,6 +465,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": null,
+      "module": "lambdas/common/send_ledger.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "unknown",
       "lambda": null,
       "module": "lambdas/common/send_ledger.py",
@@ -1088,6 +1095,20 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "weekly-signal",
+      "module": "lambdas/compute/weekly_signal_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "weekly-signal",
+      "module": "lambdas/compute/weekly_signal_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "unknown",
       "lambda": "weekly-signal",
       "module": "lambdas/compute/weekly_signal_lambda.py",
@@ -1144,11 +1165,18 @@
       "via": "local-seam"
     },
     {
+      "direction": "read",
+      "lambda": "ai-review-pack",
+      "module": "lambdas/emails/ai_review_pack_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "write",
       "lambda": "ai-review-pack",
       "module": "lambdas/emails/ai_review_pack_lambda.py",
       "partition": "email_log",
-      "via": "pk"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -1179,11 +1207,18 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "anomaly-detector",
+      "module": "lambdas/emails/anomaly_detector_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "write",
       "lambda": "anomaly-detector",
       "module": "lambdas/emails/anomaly_detector_lambda.py",
       "partition": "email_log",
-      "via": "pk"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -1219,6 +1254,20 @@
       "module": "lambdas/emails/between_chronicle_lambda.py",
       "partition": "email_digest",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
     },
     {
       "direction": "unknown",
@@ -1462,6 +1511,20 @@
       "direction": "read",
       "lambda": "daily-brief",
       "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "daily-brief",
+      "module": "lambdas/emails/daily_brief_lambda.py",
       "partition": "engagement_state",
       "via": "pk"
     },
@@ -1532,6 +1595,20 @@
       "direction": "read",
       "lambda": "evening-nudge",
       "module": "lambdas/emails/evening_nudge_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "evening-nudge",
+      "module": "lambdas/emails/evening_nudge_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "evening-nudge",
+      "module": "lambdas/emails/evening_nudge_lambda.py",
       "partition": "notion",
       "via": "pk"
     },
@@ -1585,6 +1662,20 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "insight-email-parser",
+      "module": "lambdas/emails/insight_email_parser_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "insight-email-parser",
+      "module": "lambdas/emails/insight_email_parser_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "unknown",
       "lambda": "insight-email-parser",
       "module": "lambdas/emails/insight_email_parser_lambda.py",
@@ -1597,6 +1688,20 @@
       "module": "lambdas/emails/insight_email_parser_lambda.py",
       "partition": "insights",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "milestone-digest",
+      "module": "lambdas/emails/milestone_digest_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "milestone-digest",
+      "module": "lambdas/emails/milestone_digest_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -1620,11 +1725,18 @@
       "via": "seam"
     },
     {
+      "direction": "read",
+      "lambda": "monday-compass",
+      "module": "lambdas/emails/monday_compass_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "write",
       "lambda": "monday-compass",
       "module": "lambdas/emails/monday_compass_lambda.py",
       "partition": "email_log",
-      "via": "pk"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -1690,11 +1802,18 @@
       "via": "local-seam"
     },
     {
+      "direction": "read",
+      "lambda": "nutrition-review",
+      "module": "lambdas/emails/nutrition_review_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "write",
       "lambda": "nutrition-review",
       "module": "lambdas/emails/nutrition_review_lambda.py",
       "partition": "email_log",
-      "via": "pk"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -1730,6 +1849,20 @@
       "module": "lambdas/emails/nutrition_review_lambda.py",
       "partition": "nutrition_review",
       "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "partner-weekly-email",
+      "module": "lambdas/emails/partner_email_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
+      "direction": "write",
+      "lambda": "partner-weekly-email",
+      "module": "lambdas/emails/partner_email_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
     },
     {
       "direction": "unknown",
@@ -1774,11 +1907,18 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "weekly-digest",
+      "module": "lambdas/emails/weekly_digest_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "write",
       "lambda": "weekly-digest",
       "module": "lambdas/emails/weekly_digest_lambda.py",
       "partition": "email_log",
-      "via": "pk"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -1816,11 +1956,18 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "weekly-plate",
+      "module": "lambdas/emails/weekly_plate_lambda.py",
+      "partition": "email_log",
+      "via": "fixed-seam"
+    },
+    {
       "direction": "write",
       "lambda": "weekly-plate",
       "module": "lambdas/emails/weekly_plate_lambda.py",
       "partition": "email_log",
-      "via": "pk"
+      "via": "fixed-seam"
     },
     {
       "direction": "read",
@@ -6115,7 +6262,7 @@
     },
     "counts": {
       "alarms": 56,
-      "edges": 644,
+      "edges": 665,
       "lambdas": 104,
       "mcp_tool_modules": 26,
       "mcp_tools": 76,
@@ -6125,8 +6272,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 314,
-        "sites_resolved": 802,
-        "sites_total": 1116
+        "sites_resolved": 824,
+        "sites_total": 1138
       },
       "schedule_resolution": {
         "dynamic": 0,

@@ -29,7 +29,6 @@ combined with the real clock.
 import json
 import os
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -903,20 +902,23 @@ class TestEmailHtml:
 
 class TestRecordEmailSend:
     def test_a_successful_send_is_recorded_for_the_status_page(self, table):
-        wp.record_email_send(table, "weekly_plate")
+        wp.record_email_send(table, "weekly_plate", "week:2026-W34")
         item = table.puts[0]
         assert item["pk"] == "USER#matthew#SOURCE#email_log#weekly_plate"
         assert item["sk"] == f"DATE#{TODAY}"
         assert item["status"] == "success"
 
     def test_the_record_expires_after_about_ninety_days(self, table):
-        wp.record_email_send(table, "weekly_plate")
-        ttl = table.puts[0]["ttl"]
-        assert 89 * 86400 < (ttl - time.time()) <= 90 * 86400
+        """90 days after the row's OWN `sent_at` — #3113 put the ttl and the
+        date on the same clock (the ttl used to read `time.time()` while the
+        date read `datetime.now()`, which a frozen-datetime fixture split)."""
+        wp.record_email_send(table, "weekly_plate", "week:2026-W34")
+        row = table.puts[0]
+        assert row["ttl"] == int(datetime.fromisoformat(row["sent_at"]).timestamp()) + 90 * 86400
 
     def test_a_failed_bookkeeping_write_is_non_fatal(self, table):
         table.put_error = RuntimeError("throttled")
-        wp.record_email_send(table, "weekly_plate")  # must not raise
+        wp.record_email_send(table, "weekly_plate", "week:2026-W34")  # must not raise
 
 
 # ══════════════════════════════════════════════════════════════════════════════

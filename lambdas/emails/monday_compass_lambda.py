@@ -37,6 +37,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -850,27 +851,39 @@ def build_email_html(ai_content, week_state, today_str):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track last send."""
-    import time as _time
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "monday_compass"
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+
+def _period_key():
+    """WHICH compass this is — `week:YYYY-Www` (#3113).
+
+    The compass is the letter for the week AHEAD, so unlike the look-back
+    senders its key is the ISO week of TODAY, not of yesterday. It runs Monday
+    15:00 UTC; every redrive for the rest of that week resolves to the same key,
+    while next Monday's legitimate send does not.
+    """
+    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+
+
+def record_email_send(table, lambda_name, period_key):
+    """The status page's completion row, plus DIL-025's `period_key` — WHICH
+    week's compass went out, not merely the UTC day it was sent. Delegated so
+    the writer and `already_sent`'s reader cannot drift apart; still non-fatal,
+    since the mail is already on the wire by the time this runs."""
+    send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
+
+    # DIL-025 / #3113 replay guard — before the Todoist fetch and the Bedrock
+    # call, not merely before the send. A redrive carries the original payload.
+    period_key = _period_key()
+    if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
+        logger.warning(f"[DIL-025] Monday Compass for {period_key} already sent — refusing to send it twice (force_send overrides)")
+        return {"statusCode": 200, "body": f"Monday Compass for {period_key} already sent — skipped (replay guard)"}
+
     logger.info("Monday Compass v1.0.0 starting...")
 
     # #2178: real Todoist token from Secrets Manager (life-platform/todoist),
@@ -951,6 +964,10 @@ def lambda_handler(event, context):
             }
         },
     )
+    # DIL-025: ONE line after the SES call. The IC-15 insight write below used
+    # to sit between the send and its only completion record.
+    if not dry_run:
+        record_email_send(table, LEDGER_NAME, period_key)
     logger.info(f"Sent: {subject}")
 
     if _HAS_INSIGHT_WRITER and ai_content and "unavailable" not in ai_content[:50]:
@@ -969,7 +986,6 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-15 failed (non-fatal): {e}")
 
-    record_email_send(table, "monday_compass")
     return {
         "statusCode": 200,
         "body": json.dumps(

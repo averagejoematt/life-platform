@@ -399,11 +399,16 @@ def email_evening_nudge() -> list[iam.PolicyStatement]:
 
     #769 (ADR-124): added GetSecretValue on the ritual-token secret — the nudge mints the
     signed one-tap links (connection/mood_valence) that site-api later verifies.
+
+    #3113 (DIL-025): + dynamodb:PutItem. The nudge now writes a `common.send_ledger`
+    completion row immediately after its SES call so a DLQ redrive cannot mail the
+    same nudge twice. The write fails SOFT, so without this grant the guard would
+    read an empty ledger forever and look armed while doing nothing.
     """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
-            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
@@ -545,11 +550,17 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
     No ai-keys — reads pre-computed data only.
     #2820: + cloudwatch:PutMetricData for the WeeklySignalSent delivery-heartbeat
     datapoint (PutMetricData only accepts "*" as a resource).
+
+    #3113 (DIL-025): + dynamodb:PutItem. The #2820 datapoint is a METRIC, not a
+    durable per-letter record — it cannot answer "did this week's letter already
+    go to the list?". The Signal now writes a `common.send_ledger` row after its
+    first successful send; the write fails soft, so without this grant the guard
+    would read an empty ledger forever and look armed while doing nothing.
     """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
-            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
@@ -572,7 +583,10 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="KMS",
-            actions=["kms:Decrypt"],
+            # GenerateDataKey joins Decrypt with the #3113 PutItem above: a write
+            # to the CMK-encrypted table needs it, and R2 in tests/test_role_policies.py
+            # enforces the pair so a write grant can never ship half-arrived.
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],
         ),
         iam.PolicyStatement(

@@ -34,7 +34,10 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from ai.grounded_generation import allowed_dates, allowed_numbers, correction_prompt, grounding_findings  # ADR-104 gate (#2423)
 from ai.grounding_gate_params import cycle_gate_params  # #1967 — cycle anchors (#1691/#1897)
-from common import digest_utils  # shared query_range implementations (#970)
+from common import (
+    digest_utils,  # shared query_range implementations (#970)
+    send_ledger,  # #3113 / DIL-025: the durable replay guard
+)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -831,6 +834,22 @@ def build_html(data, commentary_text):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "partner_weekly"
+
+
+def _period_key() -> str:
+    """WHICH week's letter this is — `week:YYYY-Www`.
+
+    `gather_all` derives its window from the wall clock (`w_end = today - 1d`),
+    so a date-shaped key would shift under a redrive that crossed a UTC
+    midnight and the guard would silently stop matching. This sender runs
+    Sunday 17:30 UTC, whose `w_end` is Saturday; the redrive six hours later
+    computes Sunday — the SAME ISO week, so the guard still fires.
+    """
+    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date() - timedelta(days=1))}"
+
+
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
     if hasattr(logger, "set_date"):
@@ -838,6 +857,15 @@ def lambda_handler(event, context):
     if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
         logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Partner send")
         return {"statusCode": 200, "body": "skipped: external emails disabled", "skipped": True}
+
+    # DIL-025 / #3113 replay guard — before gather_all and before the Sonnet
+    # call, not merely before the send. This letter goes to a THIRD PARTY
+    # (an SSM-resolved partner address), so a duplicate is disclosure-adjacent.
+    period_key = _period_key()
+    if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
+        logger.warning("[DIL-025] partner letter for %s already sent — refusing to send it twice (pass force_send to override)", period_key)
+        return {"statusCode": 200, "body": f"Partner email for {period_key} already sent — skipped (replay guard)"}
+
     logger.info("Partner Weekly Email v1.1.0 starting...")
     data = gather_all()
 
@@ -890,5 +918,9 @@ def lambda_handler(event, context):
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "partner_weekly"}],
     )
+    # DIL-025: ONE line after the SES call. Anything between the send and this
+    # write is a window in which a crash loses the only evidence the letter went.
+    if not dry_run:
+        send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
     print("[INFO] Sent to the partner address: " + subject)
     return {"statusCode": 200, "body": "Partner email v1.1.0 sent: " + subject}

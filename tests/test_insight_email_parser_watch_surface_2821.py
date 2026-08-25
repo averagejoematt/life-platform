@@ -223,7 +223,14 @@ def test_happy_path_emits_no_failure_signal(env):
     table, s3, cw, ses = env
     resp = iep.lambda_handler(_parser_event(), None)
     assert resp["statusCode"] == 200
-    assert len(table.puts) == 1
+    # Two writes since #3113: the insight itself, and the send-ledger completion
+    # row recorded one line after the confirmation reply (DIL-025). Asserted by
+    # partition rather than by count so a third unrelated write is still caught.
+    insight_puts = [p for p in table.puts if "SOURCE#insights" in p["Item"]["pk"]]
+    ledger_puts = [p for p in table.puts if "SOURCE#email_log#" in p["Item"]["pk"]]
+    assert len(insight_puts) == 1
+    assert len(ledger_puts) == 1
+    assert len(table.puts) == 2
     assert len(ses.sends) == 1
     assert cw.calls == [], "a successful save must not emit the failure metric"
     assert s3.puts == [], "a successful save must not archive a failure envelope"

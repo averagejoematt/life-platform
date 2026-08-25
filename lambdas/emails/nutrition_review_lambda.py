@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -861,35 +862,47 @@ def is_panel_edition(ai_content):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track last send."""
-    import time as _time
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "nutrition_review"
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                # #2221: derive the user from USER_ID like every other write in
-                # this lambda — a hardcoded "matthew" put the send record in the
-                # wrong partition under any non-default USER_ID.
-                "pk": f"USER#{USER_ID}#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+
+def _period_key():
+    """WHICH review this is — `week:YYYY-Www` (#3113).
+
+    The review runs Saturday 17:00 UTC over a this-week/last-week comparison
+    derived from the wall clock, so a date-shaped key would shift under a
+    redrive crossing UTC midnight. The ISO week does not: Saturday and the
+    following Sunday close the same one.
+    """
+    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+
+
+def record_email_send(table, lambda_name, period_key):
+    """The status page's completion row, plus DIL-025's `period_key` — WHICH
+    review went out, not merely the UTC day it was sent.
+
+    #2221: the user comes from USER_ID like every other write in this lambda —
+    a hardcoded "matthew" put the send record in the wrong partition under any
+    non-default USER_ID, and the replay guard reads the same partition, so the
+    two must be told the same thing. Still non-fatal: the mail is on the wire.
+    """
+    send_ledger.record_sent(table, lambda_name, period_key, user_id=USER_ID, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
 def lambda_handler(event, context):
-    logger.info("Nutrition Review v1.0 starting...")
-
     # #2216: {"dry_run": true} builds the whole review — data, prompt, panel call,
     # validation, HTML — and returns it without calling SES or writing any durable
     # row. A regeneration/verification invoke must never mail Matthew a review.
     dry_run = bool(event.get("dry_run")) if isinstance(event, dict) else False
+
+    # DIL-025 / #3113 replay guard — before the gather and the panel call, not
+    # merely before the send. A redrive carries the original scheduled payload.
+    period_key = _period_key()
+    if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, user_id=USER_ID, logger=logger):
+        logger.warning(f"[DIL-025] nutrition review for {period_key} already sent — refusing to send it twice (force_send overrides)")
+        return {"statusCode": 200, "body": f"Nutrition review for {period_key} already sent — skipped (replay guard)"}
+
+    logger.info("Nutrition Review v1.0 starting...")
 
     data = gather_nutrition_data()
     if not data:
@@ -1028,6 +1041,9 @@ def lambda_handler(event, context):
             }
         },
     )
+    # DIL-025: ONE line after the SES call. `store_weekly_summary` and the IC-15
+    # write below used to sit between the send and its only completion record.
+    record_email_send(table, LEDGER_NAME, period_key)
     logger.info(f"Sent: {subject}")
 
     store_weekly_summary(dates, summary)
@@ -1053,5 +1069,4 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-15 failed: {e}")
 
-    record_email_send(table, "nutrition_review")
     return {"statusCode": 200, "body": f"Nutrition review sent: {subject}"}

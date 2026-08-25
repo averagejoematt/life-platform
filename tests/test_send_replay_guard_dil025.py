@@ -47,10 +47,30 @@ Structure here:
      event does not reach SES;
   5. non-vacuity — the same invocation with no ledger row DOES proceed, so (4)
      is not passing for an unrelated reason;
-  6. structural pins on the two orderings the fix depends on.
+  6. structural pins on the two orderings the fix depends on;
+  7. **#3113 — the same acceptance case for the rest of the fleet.** DIL-025
+     shipped the primitive and wired it into one sender; #3113 extended it to
+     eleven more, starting with the two that mail THIRD PARTIES
+     (`milestone_digest` → the friends-and-family list, `partner_email` → an
+     SSM-resolved partner address). Section 7 drives each of those REAL handlers
+     with a seeded ledger row and asserts nothing reaches SES, then removes the
+     row and asserts the same invocation proceeds. `docs/IDEMPOTENCY.md` §2b
+     carries the nine senders that were assessed and deliberately left without
+     the ledger, with the reason each time.
+
+**Mutation proof (how to check these tests are not decoration).** Every §7 case
+is paired: `test_*_replay_is_refused` and `test_*_without_the_row_it_proceeds`.
+To prove the first is load-bearing, disable the guard in the sender's source —
+change its `if send_ledger.should_skip_replay(...)` to `if False:` (or delete the
+block) and re-run. Each `*_replay_is_refused` case must FAIL with "reached past the #3113 replay
+guard";
+the paired `*_without_the_row_it_proceeds` case must still pass, which is what
+separates "the guard is gone" from "the handler broke". Both halves were run
+this way when #3113 landed. The same trick on `send_ledger.record_sent` (make it
+a no-op) fails the `*_records_immediately_after_the_send` case instead.
 
 Safety: no real AWS anywhere. No Lambda is invoked, no mail is sent, no Bedrock
-call is made. `daily-brief` is never invoked live by this suite — per the repo's
+call is made. No email Lambda is ever invoked live by this suite — per the repo's
 standing rule, a regen-invoke of an email Lambda sends real mail.
 """
 
@@ -530,3 +550,521 @@ class TestOrdering:
             alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module == "common" for alias in node.names
         }
         assert "send_ledger" in imported, "daily-brief must use the shared ledger, not a local copy of it"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. #3113 — the same acceptance case, for the rest of the fleet
+#
+# One shape per sender, because the period semantics are per-sender and a swept
+# copy-paste is exactly what the issue said not to ship. Each block:
+#   (a) seeds the sender's own period key and proves NOTHING reaches SES;
+#   (b) removes the row and proves the SAME invocation gets past the guard
+#       (non-vacuity — without this, an always-return-early handler passes (a));
+#   (c) where it matters, proves the completion row lands right after the send.
+#
+# See the module docstring for the mutation-proof recipe.
+# ══════════════════════════════════════════════════════════════════════════════
+
+for _k, _v in [
+    ("S3_BUCKET", "matthew-life-platform"),
+    ("SITE_URL", "https://averagejoematt.invalid"),
+    ("DIGEST_SECRET", "life-platform/digest"),
+]:
+    os.environ.setdefault(_k, _v)
+
+sys.path.insert(0, str(REPO_ROOT / "lambdas" / "compute"))
+sys.path.insert(0, str(REPO_ROOT / "lambdas" / "web"))
+
+_fleet_import_err = None
+try:
+    from compute import weekly_signal_lambda as weekly_signal  # noqa: E402
+    from emails import (  # noqa: E402
+        ai_review_pack_lambda as review_pack,
+        anomaly_detector_lambda as anomaly,
+        between_chronicle_lambda as between,
+        evening_nudge_lambda as nudge,
+        insight_email_parser_lambda as parser,
+        milestone_digest_lambda as milestone,
+        monday_compass_lambda as compass,
+        nutrition_review_lambda as nutrition,
+        partner_email_lambda as partner,
+        weekly_digest_lambda as weekly,
+        weekly_plate_lambda as plate,
+    )
+except Exception as _e:  # pragma: no cover — only when the bundle layout changes
+    _fleet_import_err = _e
+
+fleet = pytest.mark.skipif(_fleet_import_err is not None, reason=f"fleet senders unavailable: {_fleet_import_err}")
+
+
+def _utc_today():
+    return datetime.now(timezone.utc).date()
+
+
+def _this_iso_week(offset_days: int = 0) -> str:
+    return f"week:{send_ledger.iso_week_key(_utc_today() - timedelta(days=offset_days))}"
+
+
+class _FleetTable(_FakeLedgerTable):
+    """The ledger fake, plus the two extra reads some fleet senders make on the
+    same handle before the guard can matter."""
+
+    def get_item(self, Key=None, **kw):
+        return {}
+
+    def update_item(self, **kw):
+        return {}
+
+
+def _seed(table, lambda_name, period_key, user_id="matthew", sent_on="2026-08-24"):
+    table.rows.append(
+        {
+            "pk": send_ledger.email_log_pk(lambda_name, user_id),
+            "sk": f"DATE#{sent_on}",
+            "status": "success",
+            "sent_at": f"{sent_on}T12:00:00+00:00",
+            send_ledger.PERIOD_KEY_ATTR: period_key,
+            "ttl": Decimal(9999999999),
+        }
+    )
+    return table
+
+
+def _explode(*a, **kw):
+    raise AssertionError("reached past the #3113 replay guard — this is the duplicate letter the guard exists to prevent")
+
+
+def _sentinel(*a, **kw):
+    raise _Sentinel()
+
+
+# ── 7a. milestone_digest — THIRD PARTY (friends-and-family list) ───────────────
+
+
+@fleet
+class TestMilestoneDigestReplay:
+    """The highest-consequence sender in the census: a duplicate here reaches
+    people who are not Matthew. Its period key is the MILESTONE ID, not a
+    calendar period — the digest is episodic, runs daily, and mails only when a
+    window-validated milestone lands."""
+
+    EVENT = {"detail-type": "Scheduled Event", "source": "aws.events", "detail": {}}
+
+    @pytest.fixture
+    def wired(self, monkeypatch):
+        t = _FleetTable()
+        monkeypatch.setattr(milestone, "table", t)
+        monkeypatch.setattr(
+            milestone, "_load_config", lambda: ([{"email": f"f{i}@example.invalid", "name": f"F{i}"} for i in range(5)], "m@x")
+        )
+        monkeypatch.setattr(milestone, "_celebration_allowed", lambda: True)
+        monkeypatch.setattr(
+            milestone.milestone_ledger,
+            "read_digest_state",
+            lambda *a, **kw: {"has_genesis": True, "sent_ids": set(), "last_sent_date": None},
+        )
+        monkeypatch.setattr(
+            milestone.milestone_ledger,
+            "read_announced_events",
+            lambda *a, **kw: [{"milestone_id": "M-2026-08-24-weight", "label": "Down 30 lb", "event_date": "2026-08-24"}],
+        )
+        monkeypatch.setattr(milestone.milestone_ledger, "mark_digest_sent", lambda *a, **kw: None)
+        return t
+
+    def test_the_period_key_is_the_milestone_not_the_day(self):
+        assert milestone._period_key("M-1") == "milestone:M-1"
+
+    def test_replay_is_refused(self, wired, monkeypatch):
+        _seed(wired, "milestone_digest", "milestone:M-2026-08-24-weight")
+        monkeypatch.setattr(milestone.ses, "send_email", _explode)
+        out = milestone.lambda_handler(dict(self.EVENT), None)
+        assert out["status"] == "already_sent"
+
+    def test_without_the_row_it_proceeds(self, wired, monkeypatch):
+        """Non-vacuity: identical fixture, no ledger row — the fan-out runs."""
+        sent = []
+        monkeypatch.setattr(milestone.ses, "send_email", lambda **kw: sent.append(kw["Destination"]["ToAddresses"][0]))
+        out = milestone.lambda_handler(dict(self.EVENT), None)
+        assert out["status"] == "sent" and len(sent) == 5
+
+    def test_the_row_is_written_after_the_FIRST_delivery_not_the_last(self, wired, monkeypatch):
+        """The fan-out window: `mark_digest_sent` lands after all five sends, so
+        'mailed two people, then crashed' left no record and a redrive re-mailed
+        everyone. The ledger row must exist by the time the SECOND send starts."""
+        rows_at_second_send = []
+
+        def _capture(**kw):
+            rows_at_second_send.append(len(wired.rows))
+
+        monkeypatch.setattr(milestone.ses, "send_email", _capture)
+        milestone.lambda_handler(dict(self.EVENT), None)
+        assert rows_at_second_send[0] == 0, "no row before the first letter is on the wire"
+        assert rows_at_second_send[1] == 1, "the row must exist before the SECOND recipient is mailed"
+
+    def test_an_operator_can_still_force_the_resend(self, wired, monkeypatch):
+        _seed(wired, "milestone_digest", "milestone:M-2026-08-24-weight")
+        sent = []
+        monkeypatch.setattr(milestone.ses, "send_email", lambda **kw: sent.append(1))
+        out = milestone.lambda_handler(dict(self.EVENT, force_send=True), None)
+        assert out["status"] == "sent" and len(sent) == 5
+
+    def test_a_different_milestone_is_not_blocked(self, wired, monkeypatch):
+        """The failure mode that would make this guard an outage: yesterday's
+        note must never suppress today's genuinely new milestone."""
+        _seed(wired, "milestone_digest", "milestone:SOMETHING-ELSE")
+        sent = []
+        monkeypatch.setattr(milestone.ses, "send_email", lambda **kw: sent.append(1))
+        assert milestone.lambda_handler(dict(self.EVENT), None)["status"] == "sent"
+
+
+# ── 7b. partner_email — THIRD PARTY (SSM-resolved partner address) ─────────────
+
+
+@fleet
+class TestPartnerEmailReplay:
+    EVENT = {"detail-type": "Scheduled Event", "source": "aws.events", "detail": {}}
+
+    def test_the_period_key_is_an_iso_week(self):
+        assert partner._period_key() == _this_iso_week(1)
+
+    def test_replay_is_refused_before_the_gather_and_the_sonnet_call(self, monkeypatch):
+        t = _seed(_FleetTable(), "partner_weekly", partner._period_key())
+        monkeypatch.setattr(partner, "table", t)
+        monkeypatch.setattr(partner, "gather_all", _explode)  # expensive work, also skipped
+        monkeypatch.setattr(partner.ses, "send_email", _explode)
+        out = partner.lambda_handler(dict(self.EVENT), None)
+        assert out["statusCode"] == 200 and "already sent" in out["body"]
+
+    def test_without_the_row_it_proceeds(self, monkeypatch):
+        monkeypatch.setattr(partner, "table", _FleetTable())
+        monkeypatch.setattr(partner, "gather_all", _sentinel)
+        with pytest.raises(_Sentinel):
+            partner.lambda_handler(dict(self.EVENT), None)
+
+    def test_last_weeks_letter_does_not_block_this_weeks(self, monkeypatch):
+        t = _seed(_FleetTable(), "partner_weekly", "week:1999-W01")
+        monkeypatch.setattr(partner, "table", t)
+        monkeypatch.setattr(partner, "gather_all", _sentinel)
+        with pytest.raises(_Sentinel):
+            partner.lambda_handler(dict(self.EVENT), None)
+
+    def test_a_dry_run_is_never_blocked(self, monkeypatch):
+        t = _seed(_FleetTable(), "partner_weekly", partner._period_key())
+        monkeypatch.setattr(partner, "table", t)
+        monkeypatch.setattr(partner, "gather_all", _sentinel)
+        with pytest.raises(_Sentinel):
+            partner.lambda_handler(dict(self.EVENT, dry_run=True), None)
+
+    def test_a_ledger_read_failure_still_lets_the_letter_go(self, monkeypatch):
+        """Fail-open end to end: a DDB hiccup must not be why the partner's
+        letter never arrives."""
+        t = _seed(_FleetTable(), "partner_weekly", partner._period_key())
+        t.query_error = RuntimeError("throttled")
+        monkeypatch.setattr(partner, "table", t)
+        monkeypatch.setattr(partner, "gather_all", _sentinel)
+        with pytest.raises(_Sentinel):
+            partner.lambda_handler(dict(self.EVENT), None)
+
+
+# ── 7c. the reader/owner-facing weekly letters ────────────────────────────────
+
+
+@fleet
+class TestWeeklyLettersReplay:
+    """Five weekly senders, one shape each. Parameterised on the SPEC, not on a
+    single assumed period rule: `monday_compass` keys on THIS week (it is the
+    letter for the week ahead) while the look-back senders key on yesterday's,
+    and getting that backwards is the "silently unsent letter" failure the issue
+    warned is worse than the duplicate."""
+
+    # (module, ledger name, expected period key, the first expensive call to sentinel)
+    SPECS = [
+        (lambda: weekly, "weekly_digest", lambda: _this_iso_week(1), "gather_all"),
+        (lambda: plate, "weekly_plate", lambda: _this_iso_week(1), "gather_data"),
+        (lambda: compass, "monday_compass", lambda: _this_iso_week(0), "_fetch_todoist_token"),
+        (lambda: nutrition, "nutrition_review", lambda: _this_iso_week(0), "gather_nutrition_data"),
+        (lambda: between, "between_chronicle", lambda: _this_iso_week(0), "gather_digest"),
+    ]
+    IDS = ["weekly_digest", "weekly_plate", "monday_compass", "nutrition_review", "between_chronicle"]
+    EVENT = {"detail-type": "Scheduled Event", "source": "aws.events", "detail": {}}
+
+    @pytest.mark.parametrize("spec", SPECS, ids=IDS)
+    def test_replay_is_refused_before_any_expensive_work(self, spec, monkeypatch):
+        mod, name, key, first_call = spec
+        mod = mod()
+        t = _seed(_FleetTable(), name, key())
+        monkeypatch.setattr(mod, "table", t)
+        monkeypatch.setattr(mod, first_call, _explode)
+        monkeypatch.setattr(mod.ses, "send_email", _explode)
+        out = mod.lambda_handler(dict(self.EVENT), None)
+        assert out["statusCode"] == 200
+
+    @pytest.mark.parametrize("spec", SPECS, ids=IDS)
+    def test_without_the_row_the_same_event_proceeds(self, spec, monkeypatch):
+        """Non-vacuity. Identical event, identical fixture, only the row gone."""
+        mod, name, key, first_call = spec
+        mod = mod()
+        monkeypatch.setattr(mod, "table", _FleetTable())
+        monkeypatch.setattr(mod, first_call, _sentinel)
+        with pytest.raises(_Sentinel):
+            mod.lambda_handler(dict(self.EVENT), None)
+
+    @pytest.mark.parametrize("spec", SPECS, ids=IDS)
+    def test_a_different_week_does_not_block(self, spec, monkeypatch):
+        """The outage-shaped failure mode: last week's row must never suppress
+        this week's letter."""
+        mod, name, key, first_call = spec
+        mod = mod()
+        monkeypatch.setattr(mod, "table", _seed(_FleetTable(), name, "week:1999-W01"))
+        monkeypatch.setattr(mod, first_call, _sentinel)
+        with pytest.raises(_Sentinel):
+            mod.lambda_handler(dict(self.EVENT), None)
+
+    @pytest.mark.parametrize("spec", SPECS, ids=IDS)
+    def test_an_operator_can_force_a_resend(self, spec, monkeypatch):
+        mod, name, key, first_call = spec
+        mod = mod()
+        monkeypatch.setattr(mod, "table", _seed(_FleetTable(), name, key()))
+        monkeypatch.setattr(mod, first_call, _sentinel)
+        with pytest.raises(_Sentinel):
+            mod.lambda_handler(dict(self.EVENT, force_send=True), None)
+
+    @pytest.mark.parametrize("spec", SPECS, ids=IDS)
+    def test_a_ledger_read_failure_fails_OPEN(self, spec, monkeypatch):
+        mod, name, key, first_call = spec
+        mod = mod()
+        t = _seed(_FleetTable(), name, key())
+        t.query_error = RuntimeError("throttled")
+        monkeypatch.setattr(mod, "table", t)
+        monkeypatch.setattr(mod, first_call, _sentinel)
+        with pytest.raises(_Sentinel):
+            mod.lambda_handler(dict(self.EVENT), None)
+
+    def test_the_compass_keys_on_the_week_AHEAD_not_the_one_behind(self):
+        """Pinned on its own because it is the one sender whose key differs, and
+        a copy-paste of the look-back rule would be invisible for six days of
+        every seven (they only disagree on a Monday)."""
+        assert compass._period_key() == f"week:{send_ledger.iso_week_key(_utc_today())}"
+        assert weekly is not compass
+
+
+# ── 7d. the senders whose period is NOT a week ────────────────────────────────
+
+
+@fleet
+class TestEveningNudgeReplay:
+    """Daily, and the one sender whose key is a PACIFIC date. It runs at 03:00
+    UTC (8 PM PT), where a UTC-dated key names *tomorrow* — the same trap
+    AUDIT BUG-02 already fixed for the rest of this handler's reads."""
+
+    EVENT = {"detail-type": "Scheduled Event", "source": "aws.events", "detail": {}}
+
+    def test_replay_is_refused(self, monkeypatch):
+        from common.pacific_time import pacific_today
+
+        t = _seed(_FleetTable(), "evening_nudge", f"date:{pacific_today()}")
+        monkeypatch.setattr(nudge, "table", t)
+        # Sentinel on the ritual check rather than on one of the three source
+        # checks: those are individually wrapped in try/except (a broken check
+        # degrades to "missing"), so an exception there proves nothing.
+        monkeypatch.setattr(nudge, "_check_evening_ritual", _explode)
+        monkeypatch.setattr(nudge.ses, "send_email", _explode)
+        out = nudge.lambda_handler(dict(self.EVENT), None)
+        assert "already sent" in out["body"]
+
+    def test_without_the_row_the_same_event_proceeds(self, monkeypatch):
+        monkeypatch.setattr(nudge, "table", _FleetTable())
+        monkeypatch.setattr(nudge, "_check_evening_ritual", _sentinel)
+        with pytest.raises(_Sentinel):
+            nudge.lambda_handler(dict(self.EVENT), None)
+
+    def test_the_key_is_the_pacific_day_not_the_utc_one(self):
+        """A UTC-dated key at 03:00 UTC names tomorrow in Pacific terms, and the
+        6-hourly redrive at 09:00 UTC would agree with it only by luck."""
+        src = (REPO_ROOT / "lambdas" / "emails" / "evening_nudge_lambda.py").read_text(encoding="utf-8")
+        guard_at = src.index('period_key = f"date:{today}"')
+        today_at = src.index("today = pacific_today()")
+        assert today_at < guard_at, "the guard must key on pacific_today(), not a UTC date"
+
+
+@fleet
+class TestWeeklySignalReplay:
+    """Mails the whole confirmed-subscriber list, so a duplicate is the loudest
+    one in the fleet. Its #2820 heartbeat is a CloudWatch METRIC and cannot
+    answer the replay question — this is the durable half."""
+
+    EVENT = {"detail-type": "Scheduled Event", "source": "aws.events", "detail": {}}
+
+    def test_replay_is_refused_before_the_s3_reads(self, monkeypatch):
+        t = _seed(_FleetTable(), "weekly_signal", _this_iso_week(0))
+        monkeypatch.setattr(weekly_signal, "table", t)
+        monkeypatch.setattr(weekly_signal, "_s3_json", _explode)
+        monkeypatch.setattr(weekly_signal.ses, "send_email", _explode)
+        out = weekly_signal.lambda_handler(dict(self.EVENT), None)
+        assert out["sent"] == 0 and "already sent" in out["body"]
+
+    def test_without_the_row_the_same_event_proceeds(self, monkeypatch):
+        monkeypatch.setattr(weekly_signal, "table", _FleetTable())
+        monkeypatch.setattr(weekly_signal, "_s3_json", _sentinel)
+        with pytest.raises(_Sentinel):
+            weekly_signal.lambda_handler(dict(self.EVENT), None)
+
+    def test_the_row_lands_after_the_FIRST_subscriber_not_the_last(self, monkeypatch):
+        """A 300-name fan-out is the widest 'sent then crashed' window in the
+        fleet; the record must exist before the second letter goes out."""
+        t = _FleetTable()
+        monkeypatch.setattr(weekly_signal, "table", t)
+        monkeypatch.setattr(weekly_signal, "_s3_json", lambda *a, **kw: {})
+        monkeypatch.setattr(weekly_signal, "_get_weekly_insight", lambda *a, **kw: "")
+        monkeypatch.setattr(
+            weekly_signal,
+            "_get_confirmed_subscribers",
+            lambda *a, **kw: [{"email": f"s{i}@example.invalid"} for i in range(3)],
+        )
+        monkeypatch.setattr(weekly_signal, "_emit_sent_metric", lambda *a, **kw: None)
+        monkeypatch.setattr(weekly_signal.time, "sleep", lambda *a, **kw: None)
+        rows_seen = []
+        monkeypatch.setattr(weekly_signal.ses, "send_email", lambda **kw: rows_seen.append(len(t.rows)))
+        weekly_signal.lambda_handler(dict(self.EVENT), None)
+        assert rows_seen == [0, 1, 1], f"expected the ledger row after the first send, saw {rows_seen}"
+
+
+@fleet
+class TestAnomalyDetectorReplay:
+    """The one sender that must NOT short-circuit. It can mail two different
+    letters about the same analysed date, and it also writes a durable anomaly
+    record the site reads — so a replay re-runs the analysis and suppresses only
+    the mail."""
+
+    EVENT = {"detail-type": "Scheduled Event", "source": "aws.events", "detail": {}}
+
+    @pytest.fixture
+    def wired(self, monkeypatch):
+        t = _FleetTable()
+        monkeypatch.setattr(anomaly, "table", t)
+        monkeypatch.setattr(anomaly, "_check_travel", lambda *a, **kw: None)
+        monkeypatch.setattr(
+            anomaly,
+            "check_anomalies",
+            lambda *a, **kw: [
+                {"source": "whoop", "label": "HRV", "yesterday_val": 30, "z_score": -3.1, "direction": "down"},
+                {"source": "withings", "label": "Weight", "yesterday_val": 220, "z_score": 3.0, "direction": "up"},
+            ],
+        )
+        monkeypatch.setattr(anomaly, "_check_sustained_streaks", lambda *a, **kw: [])
+        monkeypatch.setattr(anomaly, "build_context", lambda *a, **kw: {})
+        monkeypatch.setattr(anomaly, "call_haiku_hypothesis", lambda *a, **kw: "h")
+        written = {}
+        monkeypatch.setattr(anomaly, "write_anomaly_record", lambda *a, **kw: written.update({"called": True, "alert_sent": a[2]}))
+        return t, written
+
+    def _yesterday(self):
+        return (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+
+    def test_replay_suppresses_the_mail_but_still_writes_the_record(self, wired, monkeypatch):
+        t, written = wired
+        _seed(t, "anomaly_detector", f"date:{self._yesterday()}")
+        monkeypatch.setattr(anomaly, "send_alert_email", _explode)
+        anomaly.lambda_handler(dict(self.EVENT), None)
+        assert written["called"] is True, "a replay must still rewrite the anomaly record"
+        assert written["alert_sent"] is True, "the alert DID go out — on the run this replays"
+
+    def test_without_the_row_the_alert_is_sent(self, wired, monkeypatch):
+        t, written = wired
+        sends = []
+        monkeypatch.setattr(anomaly, "send_alert_email", lambda *a, **kw: sends.append(1))
+        anomaly.lambda_handler(dict(self.EVENT), None)
+        assert sends == [1]
+
+    def test_a_quiet_run_writes_a_key_that_can_never_suppress_a_later_alert(self, wired, monkeypatch):
+        """A run that mails nothing still writes the status row. If that row
+        carried the guard's key, an operator re-invoking after fixing an ingest
+        gap would be refused the alert they just made possible."""
+        t, _ = wired
+        monkeypatch.setattr(anomaly, "check_anomalies", lambda *a, **kw: [])
+        anomaly.lambda_handler(dict(self.EVENT), None)
+        assert t.rows[-1][send_ledger.PERIOD_KEY_ATTR] == f"run:{self._yesterday()}"
+        assert send_ledger.already_sent(t, "anomaly_detector", f"date:{self._yesterday()}") is False
+
+
+@fleet
+class TestInsightEmailParserReplay:
+    """Event-driven, so there is no calendar period at all: the letter's identity
+    is the INBOUND MESSAGE it answers, and the S3 object key is that id."""
+
+    def _event(self, key="raw/inbound_email/msg-42"):
+        return {"Records": [{"s3": {"bucket": {"name": "matthew-life-platform"}, "object": {"key": key}}}]}
+
+    def test_replay_is_refused_before_the_email_is_even_read(self, monkeypatch):
+        """Asserted as "the read never happened", NOT as "an exception escaped":
+        every per-record failure in this handler is caught and `continue`d, so a
+        raising stub would be swallowed and the test would pass with the guard
+        deleted. (It did, until this was rewritten.)"""
+        t = _seed(_FleetTable(), "insight_email_parser", "msg:raw/inbound_email/msg-42")
+        monkeypatch.setattr(parser, "table", t)
+        reads, sends = [], []
+        monkeypatch.setattr(parser.s3, "get_object", lambda **kw: reads.append(kw.get("Key")) or _explode())
+        monkeypatch.setattr(parser.ses, "send_email", lambda **kw: sends.append(1))
+        out = parser.lambda_handler(self._event(), None)
+        assert out["statusCode"] == 200
+        assert reads == [], "the guard must short-circuit before the inbound email is even read"
+        assert sends == [], "no confirmation reply may go out on a replay"
+
+    def test_a_different_inbound_message_is_not_blocked(self, monkeypatch):
+        """Non-vacuity. The handler catches an S3 read failure per record and
+        continues, so this asserts the READ WAS ATTEMPTED rather than expecting
+        an exception to escape — an exception-shaped probe here would pass just
+        as well against a handler that skipped the record entirely."""
+        t = _seed(_FleetTable(), "insight_email_parser", "msg:raw/inbound_email/SOME-OTHER")
+        monkeypatch.setattr(parser, "table", t)
+        reads = []
+        monkeypatch.setattr(parser.s3, "get_object", lambda **kw: reads.append(kw["Key"]) or _sentinel())
+        monkeypatch.setattr(parser, "_persist_failure_envelope", lambda *a, **kw: "")
+        parser.lambda_handler(self._event(), None)
+        assert reads == ["raw/inbound_email/msg-42"]
+
+
+@fleet
+class TestAiReviewPackReplay:
+    """Guarded like the weekly letters, but pinned separately for one reason:
+    its `email_log#` partition keeps the historical HYPHEN (`ai-review-pack`).
+    A tidier spelling would make the guard read a partition nobody writes —
+    silent, and passing every test that only checks one side."""
+
+    EVENT = {"detail-type": "Scheduled Event", "source": "aws.events", "detail": {}}
+
+    def test_the_ledger_name_still_matches_the_status_pages_partition(self):
+        assert review_pack.LEDGER_NAME == "ai-review-pack"
+        src = (REPO_ROOT / "lambdas" / "emails" / "ai_review_pack_lambda.py").read_text(encoding="utf-8")
+        assert "record_email_send(table, LEDGER_NAME, period_key)" in src
+
+    def _wire(self, monkeypatch, table):
+        class _Res:
+            def Table(self, _name):
+                return table
+
+        class _Boto:
+            def resource(self, *a, **kw):
+                return _Res()
+
+            def client(self, *a, **kw):
+                class _C:
+                    def send_email(self, **kw):
+                        raise AssertionError("reached past the #3113 replay guard")
+
+                return _C()
+
+        monkeypatch.setattr(review_pack, "boto3", _Boto())
+
+    def test_replay_is_refused(self, monkeypatch):
+        t = _seed(_FleetTable(), "ai-review-pack", _this_iso_week(0))
+        self._wire(monkeypatch, t)
+        monkeypatch.setattr(review_pack, "gather_week", _explode)
+        out = review_pack.lambda_handler(dict(self.EVENT), None)
+        assert out["statusCode"] == 200 and "already sent" in out["body"]
+
+    def test_without_the_row_the_same_event_proceeds(self, monkeypatch):
+        self._wire(monkeypatch, _FleetTable())
+        monkeypatch.setattr(review_pack, "gather_week", _sentinel)
+        with pytest.raises(_Sentinel):
+            review_pack.lambda_handler(dict(self.EVENT), None)

@@ -925,7 +925,7 @@ class TestPresenceBlock:
 class TestRecordEmailSend:
     def test_writes_a_dated_success_row_with_ttl(self, monkeypatch, frozen_clock):
         fake = FakeDdbTable()
-        mc.record_email_send(fake, "monday_compass")
+        mc.record_email_send(fake, "monday_compass", "week:2026-W34")
 
         assert len(fake.puts) == 1
         item = fake.puts[0]
@@ -939,7 +939,7 @@ class TestRecordEmailSend:
             def put_item(self, **kwargs):
                 raise RuntimeError("throttled")
 
-        mc.record_email_send(_Boom(), "monday_compass")  # must not raise
+        mc.record_email_send(_Boom(), "monday_compass", "week:2026-W34")  # must not raise
 
 
 # ═══════════════════════════════════════════════════════════════════════════

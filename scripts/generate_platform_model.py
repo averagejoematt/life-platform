@@ -311,6 +311,20 @@ def extract_partitions() -> dict[str, dict]:
 # Seam functions whose literal first argument IS the partition name (bare source
 # id, no "SOURCE#") — the #2805 resolution mechanism for the query layer.
 _SEAM_READ_FUNCS = {"query_source", "_query_source", "query_metrics"}
+
+# Shared helpers whose partition is FIXED by the helper, not named by an
+# argument — the caller passes a LAMBDA name, never a partition. DIL-025/#3113
+# forced this: twelve senders replaced an in-module
+# `USER#…#SOURCE#email_log#…` literal with a `send_ledger` call, and a
+# literal-only walk then reported that they had stopped writing `email_log`
+# altogether. The model got LESS true because the code got better, which is the
+# one failure mode a generated model must not have. (daily-brief lost the same
+# edge when DIL-025 shipped and nobody noticed for a month.)
+_FIXED_PARTITION_FUNCS = {
+    "already_sent": ("email_log", "read"),
+    "should_skip_replay": ("email_log", "read"),
+    "record_sent": ("email_log", "write"),
+}
 _READ_ATTRS = {"query", "get_item", "batch_get_item"}
 _WRITE_ATTRS = {"put_item", "update_item", "delete_item"}
 
@@ -528,6 +542,12 @@ def extract_edges(lambdas: dict[str, dict]) -> tuple[list[dict], dict]:
                         direction = "read"
                     elif func.attr in _WRITE_ATTRS:
                         direction = "write"
+                if direction is None and func_name in _FIXED_PARTITION_FUNCS:
+                    fixed_part, fixed_dir = _FIXED_PARTITION_FUNCS[func_name]
+                    stats["sites_total"] += 1
+                    stats["sites_resolved"] += 1
+                    edges.add((rel, lam, fixed_part, fixed_dir, "fixed-seam"))
+                    continue
                 if direction is None and func_name in _SEAM_READ_FUNCS:
                     direction, seam = "read", True
                 if direction is None and func_name in local_seams:

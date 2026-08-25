@@ -69,6 +69,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 _logger_std = logging.getLogger()
@@ -933,23 +934,20 @@ def send_alert_email(flagged, hypothesis, date_str, dry_run: bool = False):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track last send."""
-    import time as _time
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "anomaly_detector"
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+
+def record_email_send(table, lambda_name, period_key):
+    """The status page's completion row, plus DIL-025's `period_key`.
+
+    ONE key covers both letters this handler can mail (the multi-source alert
+    and the sustained-streak alert) because both are alerts ABOUT the same
+    analysed date, and the row shape is one row per sender per send-day — two
+    period keys would collide on the sort key and the second would silently
+    erase the first. Deliberately the analysed date, not the send date.
+    """
+    send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
 def lambda_handler(event, context):
@@ -961,6 +959,16 @@ def lambda_handler(event, context):
     today = datetime.now(timezone.utc).date()
     yesterday = (today - timedelta(days=1)).isoformat()
     logger.info(f"Checking anomalies for: {yesterday}")
+
+    # DIL-025 / #3113. Deliberately NOT an early return: a replay must still
+    # re-run the analysis and rewrite the anomaly record (idempotent, keyed on
+    # the date), because the original may have crashed between the alert mail
+    # and `write_anomaly_record`. Only the MAIL is suppressed — and `alert_sent`
+    # still records True, because an alert for this date genuinely did go out.
+    period_key = f"date:{yesterday}"
+    replayed = send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger)
+    if replayed:
+        logger.warning(f"[DIL-025] anomaly alerts for {yesterday} already mailed — analysis re-runs, mail does not")
 
     # ── Travel check (v2.1.0) ──
     travel = _check_travel(yesterday)
@@ -1027,11 +1035,16 @@ def lambda_handler(event, context):
             logger.warning(f"Haiku hypothesis failed: {e}")
             hypothesis = "Multiple metrics flagged -- check your daily brief for details."
 
-        try:
-            send_alert_email(flagged, hypothesis, yesterday, dry_run=dry_run)
-            alert_sent = True
-        except Exception as e:
-            logger.error(f"Alert email failed: {e}")
+        if replayed:
+            alert_sent = True  # it DID go out — on the invocation this replays
+        else:
+            try:
+                send_alert_email(flagged, hypothesis, yesterday, dry_run=dry_run)
+                alert_sent = True
+                if not dry_run:
+                    record_email_send(table, LEDGER_NAME, period_key)  # DIL-025: one line after the send
+            except Exception as e:
+                logger.error(f"Alert email failed: {e}")
 
     elif multi and travel_mode:
         source_count = len(set(f["source"] for f in flagged))
@@ -1058,11 +1071,16 @@ def lambda_handler(event, context):
 
     # ── Send sustained alert if streaks detected (separate from primary alert) ──
     if sustained_metrics and not travel_mode and not sick_mode:
-        try:
-            send_sustained_alert_email(sustained_metrics, yesterday, dry_run=dry_run)
-            sustained_alert_sent = True
-        except Exception as e:
-            logger.error(f"Sustained alert email failed (non-fatal): {e}")
+        if replayed:
+            sustained_alert_sent = True  # DIL-025: already mailed for this date
+        else:
+            try:
+                send_sustained_alert_email(sustained_metrics, yesterday, dry_run=dry_run)
+                sustained_alert_sent = True
+                if not dry_run:
+                    record_email_send(table, LEDGER_NAME, period_key)  # DIL-025: one line after the send
+            except Exception as e:
+                logger.error(f"Sustained alert email failed (non-fatal): {e}")
 
     write_anomaly_record(
         yesterday,
@@ -1078,7 +1096,17 @@ def lambda_handler(event, context):
         sustained_alert_sent=sustained_alert_sent,
     )
 
-    record_email_send(table, "anomaly_detector")
+    # The completion row the status page reads. It shares pk+sk with the
+    # per-send write above, so it necessarily OVERWRITES it — which is why its
+    # period key is chosen, not copied. On an alerting day it repeats the send's
+    # key (identical content, guard intact). On a quiet day — this handler
+    # completes most days without mailing anything — it writes a `run:` key that
+    # can never match the guard's `date:` key, so a completed-but-silent run
+    # cannot suppress a later alert an operator's re-invoke would legitimately
+    # raise. A dry run writes nothing at all (#2255).
+    if not dry_run:
+        mailed = alert_sent or sustained_alert_sent
+        record_email_send(table, LEDGER_NAME, period_key if mailed else f"run:{yesterday}")
     return {
         "statusCode": 200,
         "body": json.dumps(
