@@ -34,9 +34,9 @@ _SCRIPT = os.path.join(_REPO, "deploy", "wait_pr_green.sh")
 
 _BASELINE = [
     "Collect + deploy-critical + format",
-    # The real reported name — see the script's own BASELINE_CHECKS comment for why
-    # "#3025)" is missing (a YAML `#`-comment gotcha in pr-checks.yml, verified live).
-    "Full unit suite (pre-merge,",
+    # #3117: renamed off the `#`-comment-truncated wire name (`Full unit suite
+    # (pre-merge,` — see the script's own BASELINE_CHECKS comment for the incident).
+    "Full unit suite (pre-merge, issue 3025)",
     "API-before-frontend sequencing check (#2831)",
     "gitleaks (PR commit range only, not full history)",
     "CodeQL analysis (python)",
