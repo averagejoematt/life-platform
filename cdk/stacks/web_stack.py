@@ -1185,4 +1185,8 @@ class WebStack(Stack):
         # #2829: the rest of the us-east-1 alarm estate (adopted orphans + this alarm's
         # missing action) lives in the sibling module — see web_alarms.py's docstring
         # for the full per-alarm disposition.
-        add_web_alarms(self, subscriber_errors_alarm, og_image_alarm=og_image_errors_alarm)
+        # #3161/test_web_alarms_2829.py: positional, not keyword — the delegation guard
+        # (_alarm_action_status in tests/test_web_alarms_2829.py) only recognizes a
+        # variable passed via `stmt.value.args` (positional) as "routed elsewhere"; a
+        # keyword arg reads as an unrouted bare alarm construct.
+        add_web_alarms(self, subscriber_errors_alarm, og_image_errors_alarm)
