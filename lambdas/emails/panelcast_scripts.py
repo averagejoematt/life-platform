@@ -31,6 +31,7 @@ except ImportError:
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
         from panelcast_qa import _QA_MAX_WORDS_PER_TURN
 
+from ai import prompt_cache  # #2888: the per-model minimum-cacheable-prefix registry + breakpoint helper
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 
 from emails.chronicle_prompt import _vice_terms_clause  # #2370: channel-derived never-name enumeration
@@ -141,7 +142,18 @@ def build_intro_script(bible: dict, zeitgeist: list | None, deps: dict) -> list:
         + (f"{zg}\n\n" if zg else "")
         + "Write Episode 0 now."
     )
-    body = {"model": deps["intro_model"], "max_tokens": 4000, "system": system, "messages": [{"role": "user", "content": user}]}
+    # #2888: this system block is ~2,080 tok against Sonnet 4.6's 1,024-token floor,
+    # and `coach_panel_podcast_lambda` rebuilds it byte-identically on each of the up
+    # to `_QA_MAX_ATTEMPTS` (3) generations inside ONE invocation — so a read is
+    # genuinely reachable here, unlike the once-per-run weekly writer below.
+    # `bedrock_client.invoke` does NOT auto-wrap the way `call_anthropic` does (that
+    # is ADR-049's wrapper, one layer up), so a plain string here has never cached.
+    body = {
+        "model": deps["intro_model"],
+        "max_tokens": 4000,
+        "system": [prompt_cache.cached_block(system)],
+        "messages": [{"role": "user", "content": user}],
+    }
     resp = invoke(body, model_name=deps["intro_model"])
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
     text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
@@ -219,6 +231,11 @@ def build_weekly_script(beats: dict, bible: dict, deps: dict) -> dict:
         + (f"{_zg}\n\n" if _zg else "")
         + "Write the JSON now."
     )
+    # #2888: deliberately NOT cached. The prefix would clear Sonnet's floor (~1,000-1,300
+    # tok), but `_build_weekly_script` runs ONCE per weekly invocation (there is no
+    # attempt loop around it, unlike the intro above), so a breakpoint here would buy a
+    # 1.25x write premium against a read that can never happen — the same measured
+    # inverse the D-01 note in ai_calls.py and state_of_matthew's `cache=False` record.
     body = {"model": deps["writer_model"], "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = invoke(body, model_name=deps["writer_model"])
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()

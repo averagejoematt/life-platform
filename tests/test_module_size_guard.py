@@ -182,7 +182,7 @@ BASELINE = {
     # unchanged. 132 lines came out; 26 of them (a fifth — the #2610 earned-headroom rule)
     # are banked so the re-bill fix and the #3084 budget-stop clause have room, and 106 are
     # handed back. Measured 2264. Terminal cure is still under 1200 and pruning this line.
-    "lambdas/ai/ai_calls.py": 2290,
+    "lambdas/ai/ai_calls.py": 2245,
     # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
     # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
     # honest-numbers fixes could land without raising this number. The ratchet tightening.
@@ -277,7 +277,7 @@ BASELINE = {
     # the OLDEST reading in a 14-day window). The single line buys one shared definition —
     # the ratchet's first real bump, and the shape it is meant to allow.
     "lambdas/compute/daily_metrics_compute_lambda.py": 1370,
-    "lambdas/coach/coach_narrative_orchestrator.py": 1315,
+    "lambdas/coach/coach_narrative_orchestrator.py": 1292,
     # 1268 -> 1233 (#2418): the ADR-104 grounding gate on the derived reader prose is
     # ~85 lines of new substance, and this file was AT its recorded number. Paid for the
     # #2221 way rather than by raising it — the 143-line extraction-prompt literal moved

@@ -208,3 +208,68 @@ def test_corrections_stay_outside_the_cached_prefix():
     for dynamic in ("_corr", "_note", "correction_prompt("):
         assert f"system=system_prompt + {dynamic}" not in src
         assert f'system=system_prompt + "\\n\\n" + {dynamic}' not in src
+
+
+# ── 6. the 2026-08-24 call-site sweep (#2888's second wave) ─────────────────
+#
+# The first wave fixed the coach-v2 concat bug. Re-running the census over every
+# production Bedrock call site turned up three more decisions, each of which is a
+# fact about a MEASURED prefix size and a MEASURED call frequency — so each gets a
+# test rather than a comment, because both facts are the kind that drift silently.
+
+_EMAILS = Path(__file__).resolve().parents[1] / "lambdas" / "emails"
+
+
+def test_the_panelcast_intro_carries_a_real_breakpoint():
+    """WIRED. ~2,080 tok of show-bible prompt on Sonnet 4.6 (floor 1,024), rebuilt
+    byte-identically on each of up to 3 `_QA_MAX_ATTEMPTS` generations inside ONE
+    invocation — so unlike a once-a-week call, a cache READ is actually reachable.
+
+    It goes straight to `bedrock_client.invoke`, which (unlike `call_anthropic`)
+    does NOT auto-wrap: a plain-string `system` there has never cached, and never
+    would have, without anything anywhere reporting it.
+    """
+    src = (_EMAILS / "panelcast_scripts.py").read_text()
+    assert '"system": [prompt_cache.cached_block(system)]' in src, "the Episode-0 writer must carry an explicit cache breakpoint (#2888)"
+
+
+def test_the_panelcast_weekly_writer_is_deliberately_not_cached():
+    """NOT WIRED, on purpose. Its prefix would clear Sonnet's floor, but
+    `_build_weekly_script` is called ONCE per weekly invocation (no attempt loop),
+    so a breakpoint buys a 1.25x write premium against a read that cannot happen.
+    Caching it would be a third instance of the D-01 inverse, not a saving."""
+    src = (_EMAILS / "panelcast_scripts.py").read_text()
+    assert '"model": deps["writer_model"], "max_tokens": 3500, "system": system' in src
+    assert "#2888: deliberately NOT cached" in src, "the decision must stay explained where the next reader will look"
+
+
+@pytest.mark.parametrize("module", ["monday_compass_lambda.py", "weekly_plate_lambda.py"])
+def test_the_weekly_single_call_emails_turn_caching_off(module):
+    """UN-WIRED. Both clear Sonnet's floor, so the ADR-049 auto-wrap engaged and
+    paid the write premium — and both make exactly ONE Bedrock call per weekly run,
+    seven days apart, past even a 1h TTL. Same measured inverse as D-01 (0 reads /
+    10K writes per 14d) and state-of-matthew (24,159 writes / 0 reads)."""
+    src = (_EMAILS / module).read_text()
+    assert "cache_system=False" in src, f"{module} pays a cache write it can never read (#2888)"
+
+
+def test_the_coach_v2_system_prompt_clears_the_sonnet_floor():
+    """The precondition for the telemetry half of #2888: `AnthropicCacheWriteTokens`
+    is emitted by `bedrock_client` only when the wire actually reports a nonzero
+    count, so `LambdaFunction=daily-brief` can only appear once a coach-v2 prefix is
+    big enough to engage. The static skeleton alone (before the facts, recall,
+    memory and few-shot blocks are interpolated) is ~4.7K chars.
+
+    NOTE, stated rather than overclaimed: this makes the WRITE reachable. Cross-DAY
+    reads are not — `_facts_block` and friends sit inside the system slot and change
+    daily. The read side is repaid only by an in-invocation gate regen.
+    """
+    src = _AI_CALLS.read_text()
+    start = src.index('system_prompt = f"""You are {voice_spec[')
+    end = src.index('"""', src.index("Write 2-4 paragraphs", start))
+    skeleton = re.sub(r"\{[^{}]*\}", "", src[start:end])
+    assert prompt_cache.clears_floor(skeleton, "us.anthropic.claude-sonnet-4-6"), (
+        f"the coach-v2 system prompt skeleton is ~{prompt_cache.estimate_tokens(skeleton)} tok against a "
+        f"{prompt_cache.cache_floor('us.anthropic.claude-sonnet-4-6')} floor — below it, daily-brief can never "
+        "appear in the LifePlatform/AI cache-token series at all"
+    )

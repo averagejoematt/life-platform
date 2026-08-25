@@ -40,6 +40,8 @@ import boto3
 from common.constants import EXPERIMENT_START_DATE, day_n  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
+from coach import coach_brief_input_gate as _input_gate  # #3107 — system prompt + the upstream change-gate
+
 # Structured logger
 try:
     from common.platform_logger import get_logger
@@ -865,43 +867,12 @@ def _engagement_for_brief(signal):
 # SYSTEM PROMPT
 # ══════════════════════════════════════════════════════════════════════════════
 
-SYSTEM_PROMPT = (
-    "You are the Narrative Orchestrator — the 'showrunner' for a team of "
-    "AI health coaches. Your job is to produce a structured generation brief "
-    "that will guide one specific coach's next output.\n\n"
-    "You are NOT the coach. You do not write the coaching content. You plan "
-    "what the coach should write about, which threads to reference, what "
-    "cross-coach context to incorporate, and what voice/structural guidance "
-    "to follow.\n\n"
-    "## Your Responsibilities\n\n"
-    "1. **Thread management**: Identify which open threads the coach should "
-    "address, which to leave dormant, and whether new threads should be "
-    "opened based on computation results.\n\n"
-    "2. **Cross-coach context**: Determine which other coaches' concerns, "
-    "recommendations, or disagreements are relevant to this coach's domain. "
-    "Weight by influence graph.\n\n"
-    "3. **Prediction accountability**: Flag predictions that need addressing "
-    "— confirmed, refuted, or approaching their evaluation window.\n\n"
-    "4. **Narrative beat**: Set the narrative tone for this output based on "
-    "the journey phase, recent arc history, and current data state.\n\n"
-    "5. **Voice guidance**: Based on the coach's voice state, recommend "
-    "opening types (avoiding overused patterns), structural approaches, and "
-    "any anti-patterns to watch for.\n\n"
-    "6. **Decision class ceiling**: Based on available evidence and data "
-    "maturity, set the maximum decision class "
-    "(observational/directional/interventional) the coach should use.\n\n"
-    "7. **Computation context**: Package relevant trend data, statistical "
-    "flags, and regression-to-mean warnings for the coach.\n\n"
-    "## Statistical Guardrails (ENFORCE THESE)\n\n"
-    '- <7 days of data: "Observational only — no directional claims"\n'
-    '- <14 days of data: "Use preliminary framing"\n'
-    '- Regression-to-mean warnings: "Do not claim intervention effect"\n'
-    '- Autocorrelation flags: "Likely autocorrelation, not independent signal"\n'
-    '- N=1 constraint: Always. "Unusual for you" only, never "unusual."\n\n'
-    "## Output Format\n\n"
-    "Return ONLY valid JSON matching the generation_brief schema. "
-    "No markdown, no explanation, no preamble."
-)
+# #3107: the literal moved to coach/coach_brief_input_gate.py — the upstream
+# change-gate hashes it as part of the prompt-template digest, and extracting it
+# is what paid (under the #2610 earned-headroom rule) for the fingerprint-only
+# dispatch below. Re-exported so `orch.SYSTEM_PROMPT` is unchanged for every
+# caller and test.
+SYSTEM_PROMPT = _input_gate.ORCHESTRATOR_SYSTEM_PROMPT
 
 
 def _build_user_message(state, coach_id, today):
@@ -1211,6 +1182,13 @@ def lambda_handler(event, context):
 
     # Gather all state
     state = _gather_all_state(coach_id)
+
+    # #3107: fingerprint-only mode — hash what this leg READS and return, with no
+    # model call. The caller's upstream change-gate needs the orchestrator's own
+    # inputs (this state is a large DDB/S3 read the caller cannot see); without
+    # them a skip would be blind to a real change. See coach_brief_input_gate.
+    if event.get("mode") == _input_gate.FINGERPRINT_MODE:
+        return {"coach_id": coach_id, _input_gate.FINGERPRINT_MODE: _input_gate.orchestrator_input_digest(state)}
 
     # Build the orchestrator prompt
     user_message = _build_user_message(state, coach_id, today)
