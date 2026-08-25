@@ -188,7 +188,15 @@ def write_correction(
     wrong dependency.
     """
     item = build_correction_item(item_ref, correction_text, error_class, now=now, correction_id=correction_id, cycle=cycle)
-    table.put_item(Item=item)
+    # #3114: the sk is now deterministic, so an unconditional put would still be
+    # replay-safe for the CONTENT — but it would also reset `status` from
+    # `applied-to-prompt`/`applied-to-gate` back to `open`, silently undoing a
+    # downstream consumption. Write once; a replay is a no-op that returns the same sk.
+    try:
+        table.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+    except Exception as e:  # noqa: BLE001 — only a conditional failure is a duplicate
+        if "ConditionalCheckFailed" not in type(e).__name__ and "ConditionalCheckFailedException" not in str(e):
+            raise
     return item["sk"]
 
 

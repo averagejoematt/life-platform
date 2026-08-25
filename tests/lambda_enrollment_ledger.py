@@ -163,11 +163,9 @@ ALARM_STORY: dict[str, tuple[str, str]] = {
         "invocation to error. The row retires when the source is revived and its schedule restored, which is "
         "exactly when it needs a liveness row instead.",
     ),
-    "life-platform-og-image": (
-        "2026-08-24",
-        "The us-east-1 alarm estate is enumerated against live in web_alarms.py (describe-alarms, "
-        "2026-08-20: exactly 6 alarms) and none watches this function. It is also the raw construction above, "
-        "so it never took the constructor's error-alarm path in the first place — the two rows retire "
-        "together when the constructor learns to express a non-Python Lambda.",
-    ),
+    # 2026-08-25: the og-image ALARM_STORY row retired — #3161 (same integration
+    # train) added life-platform-og-image-errors in web_stack.py, digest-routed, so
+    # the function now HAS an alarm story and the G4 ratchet tightened on the spot.
+    # (Its RAW_CONSTRUCTIONS row above still stands — the alarm arrived without the
+    # constructor learning non-Python Lambdas.)
 }
