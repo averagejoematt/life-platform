@@ -1,5 +1,49 @@
 # Handover — 2026-08-24/25 (Fable 5, autonomous, ~6h): Session A — D3 complete, the foundation trio live, 25 PRs, and the treadmill question answered with a metric change
 
+---
+
+## SESSION B STATE (live — Opus 5 driver, overnight autonomous run; updated at phase boundaries, wrap deferred to owner wake ~6am PT)
+
+**Owner directive (2026-08-24 ~19:10 PT, in-conversation):** run fully autonomously
+until ~6am PT, pull in more Now/Next issues, implementation on sonnet/opus agents
+(Fable at 12% weekly — reserved, untouched), wrap together at wake.
+
+**Done so far (all verified):**
+- Main was RED at boot despite the A-wrap's green claim — Docs CI failed on fc1186ae5
+  ~30s post-wrap. Clock-rollover class: sync stamps UTC dates, the generated MCP
+  catalog's two date lines diverged in the 17:00–00:00 PT window. Killed structurally
+  (sync stamps BOTH lines, mutation-proved both orders, regression test) → 4153c7590.
+- That fix then broke the module-size ratchet (sync_doc_metadata.py sat at EXACTLY its
+  1253 baseline) → extracted the --refresh-secrets leg to
+  deploy/sync_doc_secret_inventory.py (CLI contract unchanged) → 40851cd00. The
+  stranded 4153c wait­ing deploy lease was REJECTED with decode (superseded).
+- **D5 shipped (PR #3146, in flight):** scripts/diligence_verify.py — the report's §15
+  playbooks scripted against LIVE state, 12 playbooks / 4 families, three verdicts
+  (UNVERIFIED never folds into PASS), 36-test mutation proof; first run 12 PASS / 0
+  FAIL / 0 UNVERIFIED under --strict; bundle in docs/reviews/evidence/; priced register
+  finalized (4 new PROPORTIONALITY rows: commercial plane, clinical, key-person,
+  self-approvable gate); REGRADE_BRIEF_2026-08-25.md (the assessor handout, §3 "where
+  to attack us"); diligence line indexed in docs/README.md.
+- **D4 half shipped (PR #3147, in flight):** lambdas/ai/safety_contract.py — the
+  clinical-lite deterministic hazard gate (5 classes, fixed copy, $0, fail-closed),
+  wired at all three free-text AI doors. Found live: the board_ask OPENING turn had NO
+  input filter of any kind. 123 tests; AST set-guard + ordering guard; corpus loop
+  honest (5 misses fixed, then 4 real false positives fixed and kept as benign corpus).
+- Boot observations: s3-bucket-size CLEARED (lifecycle worked, early); #2888 cache
+  telemetry still zero-writes (fix not yet shipped — box open); backlog Now=4 all
+  P2/P3; 4 alarms all previously cited.
+
+**In flight (7 worktree agents + 2 PR watchers):** #3117 #3130 #3143 #2883 (sonnet) ·
+#3113 #3050-remainder (opus) · #3119 (sonnet). Queued behind #3113 to avoid census-doc
+conflicts: #3114 #3115 #3118 (opus).
+
+**Driver protocol:** serial merges via deploy/wait_pr_green.sh only; verdicts read in
+their own commands; deploys per PR-body notes with postflight (site-api-ai needed after
+#3147; email/ingestion lambdas per DIL-025 PRs; cdk Monitoring if #3130/#2883 add
+alarms). Discovery-source tags on any new filings. No wrap tonight — owner wraps at wake.
+
+---
+
 **Session:** Fable 5. Drove: *"Boot Session A of the self-sustaining push"*
 (`~/.claude/plans/shimmering-snacking-quokka.md`, phases A0–A6) — D3 reliability lanes +
 the #3101/#3102/#3103 foundation + the drain wave, AUTONOMOUS with merge+deploy
