@@ -16,6 +16,22 @@ a PR bypassed `deploy/agent_commit.sh`; drop the file from it rather than reconc
 
 ## Instructions
 
+### 0a. More than 2–3 PRs? Run the train instead of the hand ritual
+
+`bash deploy/merge_train.sh [--dry-run] <pr> <pr> ...` is this whole ritual in
+script form for a QUEUE (#3104). It verifies every PR green by name (delegating to
+`deploy/wait_pr_green.sh` — never reimplementing it), rebases each onto an
+accumulating train tip, resolves conflicts **only** on
+`lambdas/web/platform_counts.py` by regeneration and **refuses loudly on any other
+conflicted file** (that PR drops out, named), validates `main + all N` ONCE offline,
+then squash-merges in order with the verdict-read and the merge as separate commands.
+It never force-pushes a branch it did not have to change, never pushes to a fork,
+never touches your working tree (it uses its own scratch worktree), and aborts the
+whole train on the first merge failure. `--dry-run` is a complete rehearsal that
+stops before every mutation — **start there.** Its report names every PR's
+disposition. The hand ritual below stays canonical for 1–2 PRs and for anything the
+train drops.
+
 ### 0. Confirm the drift is real
 
 Doc-sync literals only conflict when two PRs branched off *different* points on `main`
