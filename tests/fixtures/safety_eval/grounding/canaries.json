@@ -1,0 +1,33 @@
+[
+  {
+    "id": "grounding_canary_invented_vital",
+    "family": "grounding",
+    "mutation": "SEEDED FAULT (synthetic): invents a recovery figure (91.2%) and an HRV (58 ms) that appear nowhere in the allow-list — the fabricated-vital class the ADR-104 gate exists for.",
+    "inputs": {
+      "allowed": [73.6, 300.8]
+    },
+    "mutated_output": "Recovery climbed to 91.2% overnight and HRV reached 58 ms, the best reading of the cycle.",
+    "expect_checks": ["invented_value"]
+  },
+  {
+    "id": "grounding_canary_invented_value_evasive_format",
+    "family": "grounding",
+    "mutation": "SEEDED FAULT (synthetic): the invented value is written with a thousands separator (18,400 steps) while the allow-list holds 12,400 — the adversarial half of the formatting golden above. A gate that normalises only bare digits would miss it.",
+    "inputs": {
+      "allowed": [12400.0, 1847.0]
+    },
+    "mutated_output": "He walked 18,400 steps yesterday on 1,847 kcal.",
+    "expect_checks": ["invented_value"]
+  },
+  {
+    "id": "grounding_canary_invented_date",
+    "family": "grounding",
+    "mutation": "SEEDED FAULT (synthetic): cites a calendar date (2026-07-19) that is in no supplied record date — the #1242 fabricated-date class, armed here by passing allowed_dates.",
+    "inputs": {
+      "allowed": [300.8],
+      "allowed_dates": ["2026-07-05", "2026-07-06"]
+    },
+    "mutated_output": "The 300.8 lb weigh-in on 2026-07-19 was the turn of the week.",
+    "expect_checks": ["invented_date"]
+  }
+]
