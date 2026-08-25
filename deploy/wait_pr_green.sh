@@ -52,9 +52,9 @@
 #   --expect NAME      an additional check name to require (repeatable). Names are
 #                       matched EXACTLY against what GitHub reports — copy the real
 #                       string from `gh pr checks <a-recent-pr> --json name`, don't
-#                       guess (a workflow job `name:` field can itself get silently
-#                       truncated by a YAML `#`-comment gotcha — see the
-#                       BASELINE_CHECKS comment below for a live example).
+#                       guess (a workflow job `name:` field can silently truncate at
+#                       an unquoted `#` — see the BASELINE_CHECKS comment below for
+#                       the #3117 incident that motivated this warning).
 #   --timeout SECONDS  overall wait budget (default 1800 = 30 min).
 #   --interval SECONDS poll interval (default 30).
 #   --no-derive        skip path-based derivation; expect ONLY the baseline set
@@ -95,18 +95,18 @@ REPO="${WAIT_PR_GREEN_REPO:-averagejoematt/life-platform}"
 #   - codeql.yml's `pull_request:` trigger ALSO carries no `paths:` filter (only
 #     its `push:` trigger is path-scoped) — both CodeQL matrix legs fire on every PR.
 #
-# "Full unit suite (pre-merge," — yes, missing "#3025)" — is the REAL reported name,
-# verified live via `gh api repos/.../commits/<full-sha>/check-runs`, not a typo in
-# this file. The job's `name:` in pr-checks.yml literally is `Full unit suite
-# (pre-merge, #3025)`, but YAML treats an unquoted `#` preceded by whitespace as a
-# COMMENT START — so everything from " #3025)" onward is stripped before GitHub ever
-# sees the string. `(#2831)` in the api-before-frontend job survives intact because
-# its `#` is preceded by `(`, not whitespace, so it's not a comment. This script
-# matches the name GitHub actually reports; it is not this script's job to fix the
-# workflow file's YAML gotcha (flagged separately, out of scope for #3103).
+# FIXED by #3117 (was open when #3103 landed this script): the job's `name:` in
+# pr-checks.yml used to be `Full unit suite (pre-merge, #3025)` — YAML treats an
+# unquoted `#` preceded by whitespace as a COMMENT START, so everything from
+# " #3025)" onward was stripped before GitHub ever saw the string, and the WIRE
+# name silently truncated to `Full unit suite (pre-merge,` (trailing comma).
+# `(#2831)` in the api-before-frontend job below never had this problem — its `#`
+# is preceded by `(`, not whitespace, so it was never a comment start. #3117
+# renamed the job to `Full unit suite (pre-merge, issue 3025)` (no `#` at all) —
+# the baseline below is that CURRENT wire name, not the old truncated one.
 BASELINE_CHECKS=(
   "Collect + deploy-critical + format"
-  "Full unit suite (pre-merge,"
+  "Full unit suite (pre-merge, issue 3025)"
   "API-before-frontend sequencing check (#2831)"
   "gitleaks (PR commit range only, not full history)"
   "CodeQL analysis (python)"
