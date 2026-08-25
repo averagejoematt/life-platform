@@ -62,6 +62,7 @@ import ast
 import copy
 import fnmatch
 import glob
+import json
 import os
 import re
 import sys
@@ -384,6 +385,40 @@ def test_every_ci_role_has_a_checked_in_permissions_doc():
         - {os.path.basename(p).split(".")[0] for p in glob.glob(os.path.join(ge.IAM_DIR, "*.permissions.json"))}
     )
     assert not missing, "Workflow jobs assume these roles, but no infra/iam/<role>.permissions.json exists:\n  " + "\n  ".join(missing)
+
+
+def test_deploy_role_grants_artifact_tagging_for_fleet_bookkeeping():
+    """#3186 pin — a bash-shaped consumer the call-graph sweep cannot see.
+
+    `deploy/deploy_fleet.sh` maintains the TB7-25 rollback artifact with an
+    s3-to-s3 `aws s3 cp` of the (multipart-sized) MCP bundle; on the multipart
+    path the CLI reads the source object's tags (`s3:GetObjectTagging`) and
+    re-applies them at the destination, so both tagging actions must ride on the
+    CI deploy role or the fleet deploy reds AFTER all function updates succeed
+    and leaves `previous.zip` stale — found live 2026-08-25 (#3186). Section B
+    derives consumers from python entrypoints only, so this grant is pinned by
+    name. The first assert keeps the pin from outliving the code it guards:
+    if the bookkeeping copy ever leaves deploy_fleet.sh, delete this test.
+    """
+    fleet = open(os.path.join(REPO, "deploy", "deploy_fleet.sh")).read()
+    assert "previous.zip" in fleet, "deploy_fleet.sh no longer maintains rollback artifacts — delete this pin (#3186)"
+
+    with open(os.path.join(ge.IAM_DIR, "github-actions-deploy-role.permissions.json")) as fh:
+        doc = json.load(fh)
+
+    def _as_list(v):
+        return v if isinstance(v, list) else [v]
+
+    tagging = [
+        s
+        for s in doc["Statement"]
+        if s.get("Effect") == "Allow" and {"s3:GetObjectTagging", "s3:PutObjectTagging"} <= set(_as_list(s.get("Action")))
+    ]
+    resources = {r for s in tagging for r in _as_list(s["Resource"])}
+    assert any(r.endswith("/deploys/*") or r.endswith(":matthew-life-platform/*") for r in resources), (
+        "the CI deploy role no longer grants s3:Get/PutObjectTagging on deploys/* — the fleet "
+        "deploy's rollback-artifact copies AccessDenied after every function updates (#3186)"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
