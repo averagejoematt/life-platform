@@ -265,49 +265,45 @@ diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
 > credentialed run) reds until the three `_PENDING_LIVE_APPLY` entries are deleted —
 > they were deleted in #3099, the confirmation the apply landed and the ratchet shrink.
 
-## Golden-eval-role AI cost telemetry — STAGED (#2883), NOT yet applied
+## Golden-eval-role AI cost telemetry — APPLIED 2026-08-24 (#2883)
 
-> **Status: the checked-in JSON is AHEAD of live** (confirmed live 2026-08-24, the same
-> day the two grants above were applied). This statement adds `AiCostTelemetry` to
-> `infra/iam/github-actions-golden-eval-role.permissions.json`: `cloudwatch:PutMetricData`
-> namespace-conditioned to `LifePlatform/AI`, the identical least-privilege shape as the
-> diagnosis-role (#2974) and remediation-role (#2883/#3070) grants above.
+> **Status: APPLIED live 2026-08-24** (`put-role-policy`). This statement adds
+> `AiCostTelemetry` to `infra/iam/github-actions-golden-eval-role.permissions.json`:
+> `cloudwatch:PutMetricData` namespace-conditioned to `LifePlatform/AI`, the identical
+> least-privilege shape as the diagnosis-role (#2974) and remediation-role
+> (#2883/#3070) grants above.
 >
-> **Confirmed live and still failing today.** The 2026-08-24T15:54 UTC `golden-brief-eval.yml`
-> run — the first since `HaikuJudge`/`BudgetTierRead` started actually letting the judge
-> call Bedrock — logged 8x `[ERROR] bedrock cost telemetry emit failed …
-> namespace=LifePlatform/AI … AccessDenied … github-actions-golden-eval-role … is
-> not authorized to perform: cloudwatch:PutMetricData`. The role's only `PutMetricData`
-> grant is `GoldenBriefMetrics`, scoped to the `LifePlatform/GoldenBrief` namespace —
-> it does not cover `bedrock_client.invoke()`'s own telemetry emit, which targets
-> `LifePlatform/AI`.
->
-> This is the third instance of the #2974 class (a Bedrock-calling CI identity billing
-> `AWS/Bedrock` natively while silently dropping every `LifePlatform/AI` self-report), and
-> it is **not caught by any existing gate**: the #2824 grant-enumeration sweep
-> (`tests/grant_enumeration.py`) only derives `ssm`/`secret`/`s3config`/`ses` fail-closed
-> channels by design (see its module docstring); the narrower #1196
-> `test_put_metric_data_grant_lockstep.py` only walks `create_platform_lambda`-wired
-> Lambda source files, never GitHub Actions OIDC roles. Both diagnosis-role and
-> remediation-role needed a hand-found fix for the same reason — this is a recurring
-> blind spot in the grant-derivation tooling, not just a one-off gap. Filed against
-> #2883's box-4 residual finding.
->
-> Apply (attended):
->
+> **Re-verified live 2026-08-24/25** (re-measurement pass, read-only, no cost incurred):
 > ```bash
-> aws iam put-role-policy \
->   --role-name github-actions-golden-eval-role \
->   --policy-name golden-eval-permissions \
->   --policy-document file://infra/iam/github-actions-golden-eval-role.permissions.json
-> python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN (for this role)
+> aws iam get-role-policy --role-name github-actions-golden-eval-role \
+>   --policy-name golden-eval-permissions --query 'PolicyDocument.Statement[].Sid'
+> # → [..., 'AiCostTelemetry']  -- statement present live
+> aws iam simulate-principal-policy \
+>   --policy-source-arn arn:aws:iam::205930651321:role/github-actions-golden-eval-role \
+>   --action-names cloudwatch:PutMetricData \
+>   --context-entries ContextKeyName=cloudwatch:namespace,ContextKeyValues=LifePlatform/AI,ContextKeyType=string
+> # → EvalDecision: allowed
+> python3 deploy/verify_oidc_iam.py   # no drift reported for this role — repo JSON == live
 > ```
+> Both checks confirm the grant is live and functional. It does **not yet show up** in
+> `LifePlatform/AI::EstimatedCostUSD` — the 2026-08-24T15:54 UTC `golden-brief-eval.yml`
+> run (`32747686536`, 8x AccessDenied on `PutMetricData`) **predates** the apply, and
+> `golden-brief-eval.yml` only runs weekly (Mondays 15:17 UTC — next: 2026-08-31). The
+> first run to actually prove the fix end-to-end (zero `bedrock cost telemetry emit
+> failed` lines, a `CallerClass=ci` datapoint landing during the run) will be that one,
+> or an attended `workflow_dispatch` with `run_judge: true` sooner — neither happened as
+> part of this pass (`gh workflow run` would itself spend Bedrock $ and write
+> CloudWatch metrics, outside this worktree's read-only-AWS mandate).
 >
-> Post-apply proof: the next scheduled `golden-brief-eval.yml` run's log shows zero
-> `bedrock cost telemetry emit failed` lines, and `LifePlatform/AI EstimatedCostUSD` gains
-> a `CallerClass=ci` datapoint timestamped during the run. Dollar size is small (weekly
-> cadence, ~8 Haiku judge calls/run) — this closes an attribution gap, not a material
-> share of #2883's residual.
+> This was the third instance of the #2974 class (a Bedrock-calling CI identity billing
+> `AWS/Bedrock` natively while silently dropping every `LifePlatform/AI` self-report);
+> diagnosis-role and remediation-role needed the same hand-found fix — a recurring blind
+> spot in the grant-derivation tooling (#2824's sweep only derives
+> `ssm`/`secret`/`s3config`/`ses` channels by design; #1196's lockstep test only walks
+> CDK-wired Lambda source, never GitHub Actions OIDC roles). Dollar size is small
+> (weekly cadence, ~8 Haiku judge calls/run) — closes an attribution gap, not a material
+> share of #2883's box-4 residual (see the CE reconciliation re-measurement in
+> `docs/audits/AI_COST_DRIFT_ATTRIBUTION_2026-08-18.md`'s addendum).
 
 ### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
 
