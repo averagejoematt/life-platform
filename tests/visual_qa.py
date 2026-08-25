@@ -157,6 +157,43 @@ def confirm_before_fail(first, reprobe, sleeper=None, attempts=None, delay=None)
     return second
 
 
+def await_convergence_or_die(base=None, expect_build=None, printer=print, exiter=sys.exit):
+    """#2978: refuse to sweep until the deploy has CONVERGED at the viewer path.
+
+    confirm_before_fail above is the second net — it re-probes a page that
+    already read the wrong world. This is the first: the sweep does not start
+    until the edge serves the build under test, the declared api-before-frontend
+    routes answer, and the site-api is warm. Opt-in on VISUAL_QA_EXPECT_BUILD
+    (site-deploy.yml passes github.sha), so every existing caller — the weekly
+    run, the WebKit run, local debugging — behaves exactly as it does today.
+
+    Non-convergence and an unreadable signal both exit non-zero and LOUD: a
+    sweep that cannot tell a race from a real defect must not report either.
+    """
+    expect_build = expect_build or os.environ.get("VISUAL_QA_EXPECT_BUILD", "")
+    if not expect_build:
+        printer("ℹ️  convergence: NOT ASSERTED — no VISUAL_QA_EXPECT_BUILD (#2978); ad-hoc run, verdicts are un-raced-checked")
+        return None
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "deploy"))
+    import deploy_convergence  # noqa: PLC0415 — deliberately lazy: only the deploy-time path needs it
+
+    report = deploy_convergence.await_convergence(base or SITE_URL, expect_build)
+    for wid, w in report["windows"].items():
+        printer(f"  convergence · {wid}: {w['state']} — {w['detail']}")
+    if report["overall"] != deploy_convergence.CONVERGED:
+        stuck = [w for w, s in report["windows"].items() if s["state"] == report["overall"]]
+        deploy_convergence.emit(
+            deploy_convergence.UNVERIFIED if report["overall"] == deploy_convergence.UNAVAILABLE else deploy_convergence.RACED,
+            deploy_convergence.EDGE_CONTENT,
+            window_id=stuck[0] if stuck else None,
+            detail=f"visual sweep blocked: overall={report['overall']}; "
+            + "; ".join(f"{w}={report['windows'][w]['detail']}" for w in stuck),
+        )
+        printer(f"::error::visual QA did not start — convergence {report['overall'].upper()} (#2978). Re-run after the signal converges.")
+        exiter(1)
+    return report
+
+
 def _pending_deploy_routes() -> set:
     """#2831: the routes deferred via deploy/api_deploy_sequencing.json's
     `pending_deploy_routes` — the generalized, dated replacement for the old
@@ -1212,6 +1249,11 @@ def run_sweep(
     agnostic and runs identically either way — only the axe-core pass and its
     baseline differ by theme.
     """
+    # #2978: before a single page is captured — a sweep of the pre-deploy world
+    # produces verdicts about the pre-deploy world. No-op unless the caller
+    # supplied the build under test (VISUAL_QA_EXPECT_BUILD).
+    await_convergence_or_die()
+
     from playwright.sync_api import sync_playwright
 
     if screenshot_dir is None:

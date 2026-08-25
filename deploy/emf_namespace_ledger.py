@@ -335,17 +335,23 @@ LEDGER: dict[str, dict] = {
     ),
     # ── rare-event counters: zero live series is the HEALTHY state ───────────
     "LifePlatform/QA": _row(
-        owner="lambdas/operational/reader_truth_qa.py",
+        owner="lambdas/operational/reader_truth_qa.py + deploy/deploy_convergence.py (#2978)",
         verdict=KEEP,
         cardinality=FIXED,
         driver=None,
         live_series=0,
-        series_budget=5,
+        series_budget=8,
         note=(
             "Zero live series and that is correct: QAPausedByBudget only fires when the tier-3 "
             "cutoff pauses the AI QA gates. `qa-paused-by-budget` alarms on it (notBreaching) and "
             "the traffic digest reads it. Whether the emitter WOULD fire is #2999's scope, not a "
-            "sprawl question — an absent series is not an unowned series."
+            "sprawl question — an absent series is not an unowned series. #2978 adds three flat "
+            "disposition counters here rather than minting a namespace (DeployRaceRaced / "
+            "DeployRaceReal / DeployRaceUnverified — a deploy-gate verdict IS a QA fact, and this "
+            "issue's own finding is that ad-hoc namespaces are how the estate grew 9x unwatched). "
+            "They are EMF-only for now: the site-deploy smoke job holds no AWS credentials by "
+            "design, so the durable record is the EMF line in the run log until a caller with "
+            "credentials arms DEPLOY_RACE_PUT_METRIC=1. Budget 5 -> 8 covers the three."
         ),
     ),
     "LifePlatform/Privacy": _row(

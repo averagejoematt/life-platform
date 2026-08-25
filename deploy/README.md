@@ -95,6 +95,7 @@ claim had drifted to a fraction of reality. These are the ones you'll actually r
 | `deploy_site_api.sh [path]` | site-api full bundle + invoke-verify a real route |
 | `sync_site_to_s3.sh` | Attended site sync (content-hashed, self-invalidating) |
 | `smoke_test_site.sh` | HTTP/content smoke of the public site |
+| `deploy_convergence.py` | **The deploy-race class's owner (#2978)** — the race-window taxonomy (`--table`) + the convergence gate (`await --expect-build <sha>`) the smoke and visual-QA jobs run before their first check. Waits on SIGNALS (viewer-path `/version.json` fingerprint, declared `pending_deploy_routes`, `/api/healthz`), never on a guessed sleep, and classifies a failure `raced` / `real` / `unverified` |
 | `post_cdk_smoke.sh` | Full smoke after a CDK deploy |
 | `restart_pipeline.py` | THE orchestrator for experiment re-anchoring (ADR-059/077) |
 | `sync_doc_metadata.py` | Sync doc resource counts from CDK/registry sources of truth |
