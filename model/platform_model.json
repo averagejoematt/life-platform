@@ -5288,13 +5288,13 @@
       "timeout_seconds": 180
     },
     "health-auto-export-webhook": {
-      "declared_alarm": null,
+      "declared_alarm": "hae-webhook-errors",
       "handler": "ingestion.health_auto_export_lambda.lambda_handler",
-      "memory_mb": null,
+      "memory_mb": 256,
       "module": "lambdas/ingestion/health_auto_export_lambda.py",
       "schedules": [],
       "stack": "ingestion_stack",
-      "timeout_seconds": null
+      "timeout_seconds": 300
     },
     "hevy-backfill": {
       "declared_alarm": "ingestion-error-hevy-backfill",
