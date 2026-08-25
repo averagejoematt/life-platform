@@ -2,13 +2,13 @@
   {
     "id": "temporal_canary_pre_reset_baseline",
     "family": "temporal",
-    "mutation": "SEEDED FAULT (synthetic): cites a PRE-RESET baseline (306.2 lb) as the starting weight while this cycle's baseline is 300.8 — the stale-cycle carry-over the restart pipeline exists to prevent, and the class #1691 armed. NB the phrasing is \"starting weight\" deliberately: the gate's _BASELINE_FRAMING_RE covers \"started the experiment at\" but not \"started THIS experiment at\", a determiner-width gap this matrix found and the PR body reports rather than silently papering over.",
+    "mutation": "SEEDED FAULT (synthetic): cites a PRE-RESET baseline (306.2 lb) as the starting weight while this cycle's baseline is 300.8 — the stale-cycle carry-over the restart pipeline exists to prevent, and the class #1691 armed. The phrasing is deliberately \"started THIS experiment at\" (not \"starting weight\"): this matrix's adversarial-canary construction found that _BASELINE_FRAMING_RE covered \"started the experiment at\" but not the determiner variant, so this exact canary MISSED when PR #3153 staged it (documented there as a KNOWN MISS). #3154 widened the pattern to the|this|my|our and this canary now CAUGHT it — see the regex's #3154 comment for the mutation-proof (revert the fix and this canary reds).",
     "inputs": {
       "generation_date_iso": "2026-08-24",
       "start_date_iso": "2026-08-17",
       "baseline_lbs": 300.8
     },
-    "mutated_output": "His starting weight for this cycle was 306.2 lb, so the loss so far is real.",
+    "mutated_output": "He started this experiment at 306.2 lb, so the loss so far is real.",
     "expect_checks": ["stale_baseline"]
   },
   {
