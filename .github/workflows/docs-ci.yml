@@ -59,6 +59,7 @@ on:
       - 'CLAUDE.md'
       - '.claude/commands/**'
       - 'deploy/sync_doc_metadata.py'
+      - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
@@ -98,6 +99,7 @@ on:
       - 'CLAUDE.md'
       - '.claude/commands/**'
       - 'deploy/sync_doc_metadata.py'
+      - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
@@ -153,6 +155,21 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+
+      # #3156 — this job installed NO packages until now, and `sync_doc_metadata --check`
+      # below calls into `scripts/gate_census.py`'s `discover_ci_gates()`, which needs
+      # PyYAML to parse `.github/workflows/**` for docs/PROPORTIONALITY.md's
+      # gate_census_count fact. Every run here hit `ModuleNotFoundError: No module named
+      # 'yaml'` (confirmed via a bare venv), swallowed to None by
+      # `deploy/sync_census_fact.py`, which then compared docs against a frozen fallback
+      # instead of a real measurement — the check and any branch with the dep installed
+      # locally fought forever (#1957 class). Version from requirements-dev.txt via
+      # ci_pins.py (CQ-01, #2760) — the same pin `apply_branch_protection.py`'s identical
+      # `.github/workflows/**` YAML parsing already needs, never a second copy here.
+      - name: Install census dependency (PyYAML)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pyyaml)
+          pip install --quiet $PINS
 
       # Each gate reports independently (#749 pattern) so one red doesn't mask the rest.
       - name: Literal-drift gate (sync_doc_metadata --check)
