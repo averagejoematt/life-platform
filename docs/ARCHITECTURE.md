@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-08-25 (v8.6.0 — 76 tools, 38-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 114 alarms, 10 CDK stacks deployed).
+Last updated: 2026-08-25 (v8.6.0 — 76 tools, 39-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 114 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **153 ADRs** (ADR-001 → ADR-155 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -228,7 +228,7 @@ SK: DATE#YYYY-MM-DD
 
 ### MCP Server
 
-**Lambda:** `life-platform-mcp` | **Tools:** 76 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 38 (`mcp/tools_*.py` + helpers)
+**Lambda:** `life-platform-mcp` | **Tools:** 76 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 39 (`mcp/tools_*.py` + helpers)
 **Remote MCP:** `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>`
 **Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (see CLAUDE.md — `grep '"name":'` over-counts nested schema fields).
 
