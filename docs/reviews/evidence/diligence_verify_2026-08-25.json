@@ -1,0 +1,144 @@
+{
+  "playbooks": [
+    {
+      "dil": "DIL-004",
+      "evidence": [
+        "protection_rules types = ['branch_policy', 'required_reviewers']",
+        "reviewer count = 1"
+      ],
+      "family": "control",
+      "id": "production_approval_gate",
+      "status": "PASS",
+      "summary": "production deploys require approval (1 reviewer(s))"
+    },
+    {
+      "dil": "DIL-005",
+      "evidence": [
+        "active rulesets = ['main-block-force-push-and-deletion']",
+        "rule types present = ['deletion', 'non_fast_forward']"
+      ],
+      "family": "control",
+      "id": "main_ruleset_active",
+      "status": "PASS",
+      "summary": "main blocks force-push and deletion via an active ruleset"
+    },
+    {
+      "dil": "DIL-006",
+      "evidence": [
+        "GET vulnerability-alerts \u2192 204"
+      ],
+      "family": "control",
+      "id": "vulnerability_alerts_enabled",
+      "status": "PASS",
+      "summary": "vulnerability alerts are enabled"
+    },
+    {
+      "dil": "DIL-018",
+      "evidence": [
+        "GET code-scanning/alerts?state=open \u2192 []"
+      ],
+      "family": "control",
+      "id": "codeql_alerts_triaged",
+      "status": "PASS",
+      "summary": "0 open CodeQL alerts"
+    },
+    {
+      "dil": "DIL-001",
+      "evidence": [
+        "scanned 3025 tracked text file(s) with the canonical predicate"
+      ],
+      "family": "privacy",
+      "id": "no_private_markers_in_tree",
+      "status": "PASS",
+      "summary": "no tracked file declares itself PRIVATE"
+    },
+    {
+      "dil": "DIL-001",
+      "evidence": [
+        "COACH_STANCE.md \u2192 HTTP 404",
+        "COACH_DOSSIERS.md \u2192 HTTP 404",
+        "COACH_CALIBRATION.md \u2192 HTTP 404",
+        "COACH_RELATIONSHIP_MODEL.md \u2192 HTTP 404",
+        "COACH_INTAKE.md \u2192 HTTP 404"
+      ],
+      "family": "privacy",
+      "id": "relocated_docs_are_404",
+      "status": "PASS",
+      "summary": "all 5 relocated coaching docs return 404 on the raw endpoint"
+    },
+    {
+      "dil": "DIL-008/011",
+      "evidence": [
+        "owner-only vocabulary = 33 field(s)",
+        "/api/vitals \u2192 0 owner-only field(s) present",
+        "/api/labs \u2192 0 owner-only field(s) present",
+        "/api/character \u2192 0 owner-only field(s) present",
+        "/api/platform_stats \u2192 0 owner-only field(s) present"
+      ],
+      "family": "privacy",
+      "id": "public_api_serves_no_owner_only_field",
+      "status": "PASS",
+      "summary": "no owner-only field appears on 4 public endpoints"
+    },
+    {
+      "dil": "DIL-007/032",
+      "evidence": [
+        "n=40",
+        "brier_skill=-0.0476",
+        "skilled=False",
+        "label=not_yet_skillful"
+      ],
+      "family": "prediction",
+      "id": "calibration_reported_honestly",
+      "status": "PASS",
+      "summary": "calibration reports n=40, brier_skill=-0.0476, skilled=False \u2014 self-consistent"
+    },
+    {
+      "dil": "DIL-007",
+      "evidence": [
+        "alarm state = OK",
+        "threshold = 0.5",
+        "updated = 2026-08-23 10:25:03.355000-07:00"
+      ],
+      "family": "prediction",
+      "id": "gradable_share_healthy",
+      "status": "PASS",
+      "summary": "gradable share is above the floor and the alarm that watches it exists and is OK"
+    },
+    {
+      "dil": "DIL-015",
+      "evidence": [
+        "script-src = \"'self'\"",
+        "directives = ['base-uri', 'connect-src', 'default-src', 'font-src', 'form-action', 'frame-ancestors', 'img-src', 'script-src', 'style-src']"
+      ],
+      "family": "edge",
+      "id": "csp_is_hardened",
+      "status": "PASS",
+      "summary": "script-src is exactly 'self' \u2014 no inline, no eval, no CDN"
+    },
+    {
+      "dil": "DIL-002/014",
+      "evidence": [
+        "qa_check_edge_429.py present",
+        "referenced by qa_smoke_lambda.py (the nightly handler)",
+        "SCOPE: proves the observation is installed and executable, NOT that last night's run observed a 429 \u2014 that verdict lives in the qa-smoke output (#3058's RED / could-not-observe vocabulary), not in an aggregate alarm"
+      ],
+      "family": "edge",
+      "id": "rate_limit_enforced",
+      "status": "PASS",
+      "summary": "the real-edge 429 observation exists, is wired into the nightly run, and can fail"
+    },
+    {
+      "dil": "DIL-023/024",
+      "evidence": [
+        "as_of_date = 2026-08-24",
+        "window_disclosure present = True",
+        "age = 0 day(s)"
+      ],
+      "family": "edge",
+      "id": "public_data_is_fresh",
+      "status": "PASS",
+      "summary": "public data is 0 day(s) old and dates itself honestly"
+    }
+  ]
+}
