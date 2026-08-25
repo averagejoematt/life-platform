@@ -18,6 +18,30 @@ Owns the auto-discovery of the total gate count from `scripts/gate_census.py`'s
 appends it to the caller's live `RULES` list rather than sync_doc_metadata.py carrying a
 second line for it, purely to fit under the module-size ceiling; idempotent, so a second
 call in the same process (a test exercising `main()` twice) does not double-register it.
+
+#3156 — LOUD-FAILURE REWRITE. The Docs CI job (`docs-ci.yml`) installs no packages, so
+every `--check` run there hit `discover_ci_gates()`'s local `import yaml` (needed to
+parse `.github/workflows/**`), raised `ModuleNotFoundError`, and this module swallowed it
+to `None` the way the docstring above always documented — but the caller then substituted
+`_FALLBACK_COUNT = 531` (frozen 2026-08-24) as if it were a measurement. `--check` compared
+docs/PROPORTIONALITY.md against that frozen constant forever, while a branch whose local
+pre-commit hook DOES have PyYAML installed keeps deriving the true live count (538 by
+2026-08-25) and re-stamping it — the #1957 "credentialed --apply vs. credential-free
+--check fight forever" class, verbatim. Confirmed live via a bare venv with no packages
+installed: `ModuleNotFoundError: No module named 'yaml'` at `gate_census.py`'s
+`discover_ci_gates()`, `import yaml` line — not guessed.
+
+Fixed two ways: (1) `docs-ci.yml` now installs PyYAML (already pinned in
+requirements-dev.txt for `apply_branch_protection.py`'s identical need) before running the
+gates, so the Docs CI job can actually measure; (2) defense in depth for every OTHER
+environment that still lacks the dep — `discover_gate_census_count()` now returns the
+FAILURE REASON alongside `None` instead of throwing it away, and `apply()` uses it: under
+`--check` (detected the same way `sync_doc_metadata.main()` itself does, via `sys.argv` —
+apply() stays a two-argument function so no caller-side plumbing is needed) an underivable
+census fails the build LOUDLY (`sys.exit(1)`, message names the reason); outside `--check`
+the rule is explicitly SKIPPED with a printed reason and the doc is left untouched — never
+a silent fallback comparison against a frozen number either way. `_FALLBACK_COUNT` is gone;
+nothing compares against it anymore.
 """
 
 from __future__ import annotations
@@ -33,20 +57,24 @@ ROOT = Path(__file__).resolve().parent.parent
 _RULE = ("docs/PROPORTIONALITY.md", r"\d+ declared gates", "{gate_census_count} declared gates")
 
 
-def discover_gate_census_count(root: Path | None = None) -> int | None:
+def discover_gate_census_count(root: Path | None = None) -> tuple[int | None, str | None]:
     """Total gates found by scripts/gate_census.py's build_census() (#3000, epic #2578).
 
     The ONE auto-discoverer that costs real wall-clock (~7s measured 2026-08-24, all 5
     families over the full tree) rather than a regex/AST scan — the census walks
     .github/workflows/**, the gate registries (lambdas/tests/scripts/deploy/mcp) and the
-    qa-smoke + structural-test families. A failure here is an ImportError/exception this
-    function swallows to None (the same fallback contract as every sync_doc_metadata.py
-    `_auto_discover_*`), never a silent wrong number.
+    qa-smoke + structural-test families.
+
+    Returns ``(count, error)``: on success ``(int, None)``; on failure ``(None, reason)``
+    where `reason` is a short human-readable string (#3156 — the exception used to be
+    swallowed with no trace at all, which is how a frozen fallback could pass for a
+    measurement one layer up in `apply()`). `error` is None-only-on-success, so a caller
+    can tell "underivable" from "zero gates found" without inspecting both fields blindly.
     """
     root = root or ROOT
     scripts_dir = root / "scripts"
     if not scripts_dir.exists():
-        return None
+        return None, f"{scripts_dir} does not exist"
     try:
         scripts_path = str(scripts_dir)
         if scripts_path not in sys.path:
@@ -55,27 +83,34 @@ def discover_gate_census_count(root: Path | None = None) -> int | None:
 
         census = gate_census.build_census(root)
         gates = census.get("gates")
-        return len(gates) if gates else None
-    except Exception:
-        return None
-
-
-# The fallback default lives here, not in sync_doc_metadata.py's PLATFORM_FACTS (module-
-# size ceiling) — `apply()` seeds it before discovery can override it, so the dict always
-# ends up with a value either way, matching every other fact's fallback contract.
-_FALLBACK_COUNT = 531  # measured 2026-08-24 (post-merge); was hand-typed "425" and drifted 13% (#2639)
+        if not gates:
+            return None, "build_census() returned zero gates"
+        return len(gates), None
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
 
 
 def apply(facts: dict, rules: list, root: Path | None = None) -> None:
     """Sync_doc_metadata.py's `_apply_auto_discovered` call site — one line at the
     parent, all the print-on-change + rules-registration logic here (module-size
-    ceiling): registers `_RULE` into the live `rules` list and sets the fact."""
+    ceiling): registers `_RULE` into the live `rules` list and sets the fact.
+
+    #3156: an underivable count is NEVER silently compared against a frozen number.
+    `is_check` is read from `sys.argv` (the same technique `sync_doc_metadata.main()`
+    itself already uses for the identical question) rather than threaded through as a
+    parameter, so this call site never has to change and every existing caller/monkeypatch
+    of `_apply_auto_discovered` stays untouched.
+    """
+    count, error = discover_gate_census_count(root)
+    if count is None:
+        if "--check" in sys.argv:
+            print(f"  ❌ CHECK FAILED — census underivable: {error}")
+            print("     (scripts/gate_census.py could not run — install its deps or fix the import)")
+            sys.exit(1)
+        print(f"  [skip] gate_census_count underivable ({error}) — docs/PROPORTIONALITY.md's gate-census row left unchanged (#3156)")
+        return
     if _RULE not in rules:
         rules.append(_RULE)
-    facts.setdefault("gate_census_count", _FALLBACK_COUNT)
-    count = discover_gate_census_count(root)
-    if count is None:
-        return
     if facts.get("gate_census_count") != count:
         print(f"  [auto] gate_census_count: {facts.get('gate_census_count')} → {count} (#3000)")
     facts["gate_census_count"] = count
