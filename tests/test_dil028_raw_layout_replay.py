@@ -36,13 +36,26 @@ facet and the reason a hard cutover DATE was deliberately rejected (garmin's
 CURRENT format despite naming pre-migration dates — the generation depends on
 when an object was written, not what date it names).
 
-**Residual, explicitly NOT fixed here (scope discipline):** `raw/matthew/whoop/{cycle,sleep,recovery,workout}/` — a structurally distinct per-metric-type
-archive predating the current combined date-tree, going back to 2022, that the
-current `whoop` facet does not model at all. It sits under a different sub-path
-than the documented prefix (no filename-only variance to resolve), the current
-combined date-tree facet is accurate for everything under it, and modeling a
-fifth generation is real scope beyond a single reverify PR. Left for a
-follow-up story if replay ever needs pre-2026-05-17 whoop data.
+**Residual from this file's original reverify — MODELED by #3128:**
+`raw/matthew/whoop/{cycle,sleep,recovery,workout}/`, the per-metric-type
+archive predating the current combined date-tree, is now a `sub_layouts` facet
+on `whoop` (`lambdas/ingestion/source_registry.py`) — cycle/sleep/recovery are
+plain `DD.json` date trees (live-confirmed 2026-03-09..2026-05-17, 70 objects
+each); `workout` nests one folder per day holding 0-N per-workout UUID files
+(26 objects, 2026-03-13..2026-04-14) and deliberately has no per-day key
+(`raw_date_key` raises, the `macrofactor` idiom). See `TestWhoopLegacyFamily`
+below.
+
+**New residual found WHILE fixing #3128 (honestly out of scope, not silently
+dropped):** one generation further back, `raw/whoop/{cycle,sleep,recovery,
+workout}/` — the SAME per-metric split with NO `matthew` user segment
+(the X-9 legacy-prefix family), live-confirmed 2020-03-01..2026-03-08 (2199
+objects each for cycle/sleep/recovery, 2546 for workout, every object's mtime
+2026-02-21 — a one-time bulk historical import). Modeling a fifth generation
+(on top of workout's already-nested UUID scheme) is real scope beyond #3128's
+Small estimate, so it carries a dated `unmodeled_legacy` facet instead of
+silence — see `test_whoop_no_segment_legacy_is_a_dated_documented_exclusion`.
+Left for a follow-up story if replay ever needs pre-2026-03 whoop data.
 """
 
 import os
@@ -226,6 +239,62 @@ class TestHaeFamily:
         the filename for a non-date-tree scheme."""
         with pytest.raises(ValueError, match="not a date tree"):
             reg.raw_date_key("apple_health", "2026-08-01")
+
+
+class TestWhoopLegacyFamily:
+    """#3128: whoop's pre-2026-05-17 per-metric-type split — a temporal
+    PREDECESSOR generation living under a wholly different prefix per stream
+    (not just a different leaf filename, so `filename_legacy` doesn't fit;
+    modeled as `sub_layouts` instead, same idiom as apple_health's HAE fan-out)."""
+
+    def test_cycle_matches_the_real_object(self):
+        # aws s3 ls raw/matthew/whoop/cycle/2026/03/ → 09.json (956 bytes)
+        assert reg.raw_date_key("whoop", "2026-03-09", sub="cycle") == "raw/matthew/whoop/cycle/2026/03/09.json"
+
+    def test_sleep_matches_the_real_object(self):
+        # aws s3 ls raw/matthew/whoop/sleep/2026/03/ → 10.json (1264 bytes)
+        assert reg.raw_date_key("whoop", "2026-03-10", sub="sleep") == "raw/matthew/whoop/sleep/2026/03/10.json"
+
+    def test_recovery_matches_the_real_object(self):
+        # aws s3 ls raw/matthew/whoop/recovery/2026/03/ → 11.json (534 bytes)
+        assert reg.raw_date_key("whoop", "2026-03-11", sub="recovery") == "raw/matthew/whoop/recovery/2026/03/11.json"
+
+    def test_cycle_year_prefix_matches_the_real_listing_root(self):
+        assert reg.raw_year_prefix("whoop", 2026, sub="cycle") == "raw/matthew/whoop/cycle/2026/"
+
+    def test_generation_boundary_overlaps_the_combined_tree_first_day(self):
+        """Both generations wrote 2026-05-17: the per-metric split's LAST day
+        and the combined tree's FIRST day are the same calendar date (the same
+        day-of-migration overlap already documented for garmin/todoist/etc's
+        `filename_legacy` pairs) — live-confirmed via
+        `aws s3 ls raw/matthew/whoop/cycle/2026/05/` (17.json present) AND
+        `aws s3 ls raw/matthew/whoop/2026/05/` (2026-05-17.json present)."""
+        assert reg.raw_date_key("whoop", "2026-05-17", sub="cycle") == "raw/matthew/whoop/cycle/2026/05/17.json"
+        assert reg.raw_date_key("whoop", "2026-05-17") == "raw/matthew/whoop/2026/05/2026-05-17.json"
+
+    def test_workout_sub_layout_is_declared_but_has_no_per_day_key(self):
+        """workout nests one folder PER DAY holding 0-N per-workout UUID files
+        (e.g. `raw/matthew/whoop/workout/2026/03/13/b8d9b2db-....json`) — there
+        is no single per-day leaf to construct, so (the `macrofactor` idiom)
+        `raw_date_key` raises rather than guessing one."""
+        layout = reg.raw_layout_for("whoop", sub="workout")
+        assert layout["scheme"] == "date-tree"
+        assert layout["prefix"] == "raw/matthew/whoop/workout"
+        with pytest.raises(ValueError, match="unhandled leaf filename"):
+            reg.raw_date_key("whoop", "2026-03-13", sub="workout")
+
+    def test_whoop_no_segment_legacy_is_a_dated_documented_exclusion(self):
+        """The generation found ONE PREFIX further back while fixing #3128 —
+        `raw/whoop/{cycle,sleep,recovery,workout}/` (no `matthew` user segment,
+        live-confirmed 2020-03-01..2026-03-08) — is deliberately NOT modeled
+        as a `sub_layouts` entry (real scope beyond this issue's estimate).
+        This pins that the exclusion is at least MACHINE-READABLE and dated,
+        per #3128's own acceptance criteria, rather than silently absent."""
+        legacy = reg.SOURCE_REGISTRY["whoop"]["raw_layout"]["unmodeled_legacy"]
+        assert legacy["dated"] == "2026-08-25"
+        assert legacy["prefix"] == "raw/whoop/{cycle,sleep,recovery,workout}"
+        assert legacy["scheme"] == "date-tree"
+        assert "2020-03-01" in legacy["note"] and "2026-03-08" in legacy["note"]
 
 
 class TestLegacyNoUserSegmentFamily:
