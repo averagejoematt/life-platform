@@ -218,6 +218,7 @@ from ai import grounded_generation as _gg
 from ai.behavior_logs import available_logs_from_recency as _avail_logs  # #2056 — the #1699 map
 from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from experiment.phase_filter import singleton_visible  # hoisted from two function-local sites (size ceiling)
 
 from intelligence import weight_recency
 
@@ -796,8 +797,6 @@ def _load_engagement_signal():
     keep injecting the OLD cycle's presence severity into every expert prompt
     until adaptive_mode's next daily run rewrites it."""
     try:
-        from experiment.phase_filter import singleton_visible
-
         resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"})
         item = resp.get("Item")
         if not singleton_visible(item):
@@ -958,8 +957,6 @@ def _load_prior_analysis(expert_key):
     on Day 1 this read fed the wiped cycle-10 text into the live prompt. A
     tombstoned/wrong-phase prior reads as ABSENT (honest absence, ADR-104)."""
     try:
-        from experiment.phase_filter import singleton_visible
-
         prior = table.get_item(Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"}).get("Item")
         if not singleton_visible(prior):
             return "", ""

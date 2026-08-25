@@ -110,24 +110,6 @@ def _auto_discover_lambda_count() -> int | None:
         return None
 
 
-def _auto_discover_cdk_stack_count() -> int | None:
-    """Count deployed CDK stack modules: cdk/stacks/*_stack.py (#3143).
-
-    Every real stack follows the suffix (core_stack.py, ingestion_stack.py, ...);
-    helper modules sharing the directory (role_policies*, constants.py, csp.py,
-    monitoring_dashboards.py, ...) don't match it, so the glob doesn't need an
-    app.py cross-check to stay accurate. Matches cdk/app.py's stack count (10).
-    """
-    stacks_dir = ROOT / "cdk" / "stacks"
-    if not stacks_dir.exists():
-        return None
-    try:
-        count = len(list(stacks_dir.glob("*_stack.py")))
-        return count if count >= 5 else None
-    except Exception:
-        return None
-
-
 def _auto_discover_endpoint_count() -> int | None:
     """Count DISTINCT public API endpoint paths served by the site-api Lambda (#1437).
 
@@ -595,7 +577,9 @@ def _apply_auto_discovered(facts: dict) -> dict:
             print(f"  [auto] alarm_count: {facts.get('alarm_count')} → {alarm_count} (from CDK stacks, #795)")
         facts["alarm_count"] = alarm_count
 
-    cdk_stack_count = _auto_discover_cdk_stack_count()
+    from sync_cdk_fact import discover_cdk_stack_count
+
+    cdk_stack_count = discover_cdk_stack_count(ROOT)
     if cdk_stack_count is not None:
         if facts.get("cdk_stacks") != cdk_stack_count:
             print(f"  [auto] cdk_stacks: {facts.get('cdk_stacks')} → {cdk_stack_count} (from cdk/stacks/*_stack.py, #3143)")
@@ -814,17 +798,10 @@ RULES = [
         "| **Secrets Manager** | {secrets_cost} | {secret_count} active secrets × $0.40",
     ),
     # ── MCP_TOOL_CATALOG.md ──────────────────────────────────────────────────
-    # BOTH date-bearing lines are stamped here, deliberately. The file is fully
-    # generated (`scripts/generate_mcp_tool_catalog.py`, pure AST parse of
-    # mcp/registry.py), and that generator COPIES the `Last updated` value into the
-    # `Verified:` header — so if this sync stamped only one of the two, every sync
-    # run landing on a new UTC date left the file self-inconsistent and the
-    # generator's `--check` redded Docs CI on main until someone re-ran the
-    # generator. That is exactly what happened at the 2026-08-24 wrap (synced at
-    # 00:57Z, i.e. the UTC date had already rolled while the PT date had not).
-    # Stamping both makes the two writers agree by construction, in either order.
-    # This is NOT manufactured freshness (#1957): the whole file is re-derived from
-    # source on every regeneration, so "Verified" here means exactly that.
+    # BOTH date-bearing lines stamped, deliberately: the generator COPIES `Last
+    # updated` into `Verified:`, so stamping only one left the file self-inconsistent
+    # on every UTC-date rollover (the 2026-08-24-wrap Docs CI red). Not manufactured
+    # freshness (#1957): the file is fully re-derived from source each regeneration.
     (
         "docs/MCP_TOOL_CATALOG.md",
         r"\*\*Version:\*\* [^\|]+ \| \*\*Last updated:\*\* [^\|]+ \| \*\*Total tools:\*\* \d+",

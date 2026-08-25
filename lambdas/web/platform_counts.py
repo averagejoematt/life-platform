@@ -48,6 +48,7 @@ DISCOVERED_COUNTS = {
     "mcp_tools": 76,
     "lambdas": 104,
     "alarms": 116,
+    "cdk_stacks": 10,
     "adrs": 153,
     "test_count": 17329,
 }

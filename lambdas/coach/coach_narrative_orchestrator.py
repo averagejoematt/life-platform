@@ -147,10 +147,7 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from common.numeric import (
-    decimals_to_float as _decimal_to_float,  # noqa: E402,F401
-    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
-)
+from common.numeric import decimals_to_float as _decimal_to_float, floats_to_decimal  # noqa: E402,F401  # canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
