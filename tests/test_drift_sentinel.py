@@ -5,6 +5,7 @@ monkeypatched or fed fake clients."""
 import json
 import os
 import sys
+from datetime import datetime, timezone
 
 import pytest
 
@@ -15,6 +16,7 @@ for p in (os.path.join(_ROOT, "deploy"), os.path.join(_ROOT, "remediation")):
 
 import drift_report  # noqa: E402
 import drift_sentinel as ds  # noqa: E402
+import sentinel_cadence as scad  # noqa: E402  — the cadence dead-man lives here (#3130 split)
 import sentinel_github as sg  # noqa: E402  — the GitHub legs live here (#1665 split); a re-export is NOT a patch point
 import sentinel_quota as sq  # noqa: E402  — quota internals live here (#1665 split)
 
@@ -253,10 +255,18 @@ def _patch_all(
     hae=None,
     raw_replication=None,
     s3_lifecycle=None,
+    cadence=None,
 ):
     # DIL-027 (#3042): the raw/ cross-region backup check. Patched here like every
     # other AWS-touching check so the sweep-shape tests stay offline.
     monkeypatch.setattr(ds, "check_raw_replication", lambda *a, **k: raw_replication or {"status": "clean", "objects_confirmed": 2})
+    # #3130: the sentinel-cadence dead-man. Patched here too — otherwise every sweep
+    # test in this section would fall through to the real check's live S3 client.
+    monkeypatch.setattr(
+        ds,
+        "check_sentinel_cadence",
+        lambda *a, **k: cadence or {"status": "clean", "missing_dates": [], "latest_date": "2026-08-22", "days_stale": 2},
+    )
     monkeypatch.setattr(ds, "check_codeql_alerts", lambda: codeql or {"status": "clean", "open_count": 0, "sample": []})
     monkeypatch.setattr(
         ds, "check_hae_webhook_ingress", lambda: hae or {"status": "clean", "cdk_api_id": "p6clybdkkc", "invoke_statements": []}
@@ -1752,3 +1762,159 @@ def test_sweep_surfaces_hae_webhook_ingress_drift_in_summary(monkeypatch):
     rec = ds.run_sweep()
     assert rec["status"] == "drift"
     assert "HAE webhook ingress grant drift" in rec["summary"]
+
+
+# ── sentinel cadence dead-man (#3130) ────────────────────────────────────────
+#
+# Mirrors #2578's discipline: a genuine gap and an unreadable log must BOTH be
+# `status: "drift"` (never a silent clean, never a soft `error` that
+# drift_report.as_signal ignores), and a clean cadence must not false-positive.
+
+
+class _FakeCadenceS3:
+    """Fake S3 client for check_sentinel_cadence — list_objects_v2 only, paginated."""
+
+    def __init__(self, dates=None, pages=None, boom=None):
+        # `dates`: list of "YYYY-MM-DD" strings present as drift-log/{date}.json.
+        # `pages`: optional pre-built list of raw list_objects_v2 responses, for the
+        # pagination test. `boom`: an exception to raise instead of listing.
+        self._boom = boom
+        if pages is not None:
+            self._pages = pages
+        else:
+            dates = dates or []
+            contents = [{"Key": f"drift-log/{d}.json"} for d in dates] + [{"Key": "drift-log/latest.json"}]
+            self._pages = [{"Contents": contents, "IsTruncated": False}]
+        self._calls = 0
+
+    def list_objects_v2(self, **kwargs):
+        if self._boom is not None:
+            raise self._boom
+        page = self._pages[min(self._calls, len(self._pages) - 1)]
+        self._calls += 1
+        return page
+
+
+def _cadence_factory(fake):
+    return lambda service, region=None: fake
+
+
+def test_sentinel_cadence_clean_on_fully_populated_fresh_cadence():
+    # Anchor "now" on a Thursday (weekday 3) so yesterday (Wed) is the most recent
+    # expected date, and populate every Mon/Wed/Fri in the lookback window.
+    now = datetime(2026, 8, 27, 15, 0, tzinfo=timezone.utc)  # Thursday
+    assert now.weekday() == 3
+    expected = scad._expected_dates(now)
+    assert expected, "fixture bug: expected at least one Mon/Wed/Fri in the lookback window"
+    fake = _FakeCadenceS3(dates=[d.isoformat() for d in expected])
+    res = scad.check_sentinel_cadence(client_factory=_cadence_factory(fake), now=now)
+    assert res["status"] == "clean"
+    assert res["missing_dates"] == []
+    assert res["days_stale"] <= scad.STALE_AFTER_DAYS
+
+
+def test_sentinel_cadence_drift_on_a_planted_gap():
+    # Same fresh Thursday anchor, but drop ONE expected date (a Monday) from the
+    # populated set — the classic #3112 shape: everything else ran, one didn't.
+    now = datetime(2026, 8, 27, 15, 0, tzinfo=timezone.utc)
+    expected = scad._expected_dates(now)
+    gap_date = expected[0]  # the oldest expected date in the window, not the freshness edge
+    present = [d.isoformat() for d in expected if d != gap_date]
+    fake = _FakeCadenceS3(dates=present)
+    res = scad.check_sentinel_cadence(client_factory=_cadence_factory(fake), now=now)
+    assert res["status"] == "drift"
+    assert gap_date.isoformat() in res["missing_dates"]
+    assert gap_date.isoformat() in res["detail"]
+
+
+def test_sentinel_cadence_drift_on_staleness_even_with_no_named_gap():
+    # No missing dates in the (short) window, but the newest record is stale beyond
+    # the 4-day cadence allowance — the "half-wrote and stalled" shape the missing-
+    # dates diff alone wouldn't catch on its own.
+    now = datetime(2026, 8, 27, 15, 0, tzinfo=timezone.utc)
+    stale_date = "2026-08-10"  # far beyond STALE_AFTER_DAYS from 2026-08-27
+    fake = _FakeCadenceS3(dates=[stale_date])
+    res = scad.check_sentinel_cadence(client_factory=_cadence_factory(fake), now=now)
+    assert res["status"] == "drift"
+    assert res["days_stale"] > scad.STALE_AFTER_DAYS
+    assert "stale" in res["detail"]
+
+
+def test_sentinel_cadence_fails_closed_when_the_log_is_unreadable():
+    # #2578/#3112 mutation proof: an S3 error must be drift, NEVER a silent clean and
+    # NEVER a soft "error" (as_signal only escalates on status == "drift").
+    fake = _FakeCadenceS3(boom=RuntimeError("AccessDenied"))
+    res = scad.check_sentinel_cadence(client_factory=_cadence_factory(fake), now=datetime(2026, 8, 27, tzinfo=timezone.utc))
+    assert res["status"] == "drift"
+    assert res["status"] != "error"
+    assert "UNREADABLE" in res["detail"]
+    assert "AccessDenied" in res["detail"]
+
+
+def test_sentinel_cadence_drift_on_a_truly_empty_log():
+    # A successfully-queried but entirely empty drift-log/ is itself a finding (the
+    # sentinel has run since #394), distinct from — but still — drift, not clean.
+    fake = _FakeCadenceS3(dates=[])
+    res = scad.check_sentinel_cadence(client_factory=_cadence_factory(fake), now=datetime(2026, 8, 27, tzinfo=timezone.utc))
+    assert res["status"] == "drift"
+    assert res["reason"] == "empty"
+
+
+def test_sentinel_cadence_paginates_list_objects_v2():
+    now = datetime(2026, 8, 27, 15, 0, tzinfo=timezone.utc)
+    expected = scad._expected_dates(now)
+    page1 = {"Contents": [{"Key": f"drift-log/{expected[0].isoformat()}.json"}], "IsTruncated": True, "NextContinuationToken": "tok"}
+    page2 = {"Contents": [{"Key": f"drift-log/{d.isoformat()}.json"} for d in expected[1:]], "IsTruncated": False}
+    fake = _FakeCadenceS3(pages=[page1, page2])
+    res = scad.check_sentinel_cadence(client_factory=_cadence_factory(fake), now=now)
+    assert res["status"] == "clean"
+    assert fake._calls == 2
+
+
+def test_sentinel_cadence_expected_weekdays_matches_the_workflow_cron():
+    # .github/workflows/remediation-agent.yml: cron "45 14 * * 1,3,5" (Mon,Wed,Fri in
+    # cron's 0=Sun numbering). Python's datetime.weekday() is 0=Mon..6=Sun, so the
+    # equivalent set is {0, 2, 4}. This test is the tripwire if either encoding drifts.
+    workflow_path = os.path.join(_ROOT, ".github", "workflows", "remediation-agent.yml")
+    with open(workflow_path, encoding="utf-8") as f:
+        workflow_text = f.read()
+    assert 'cron: "45 14 * * 1,3,5"' in workflow_text
+    assert scad.EXPECTED_WEEKDAYS == frozenset({0, 2, 4})
+
+
+def test_sweep_surfaces_sentinel_cadence_drift_in_summary(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean", "missing_prefixes": []},
+        cadence={
+            "status": "drift",
+            "reason": "gap",
+            "missing_dates": ["2026-08-17"],
+            "latest_date": "2026-08-24",
+            "days_stale": 0,
+            "detail": "sentinel cadence gap — missing expected run date(s): 2026-08-17",
+        },
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "sentinel cadence gap" in rec["summary"]
+    sig = drift_report.as_signal(rec)
+    assert sig is not None
+    assert "sentinel_cadence" in sig["flagging"]
+    assert sig["flagging"]["sentinel_cadence"]["status"] == "drift"
+
+
+def test_sweep_stays_clean_when_cadence_is_clean(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean", "missing_prefixes": []},
+        cadence={"status": "clean", "missing_dates": [], "latest_date": "2026-08-24", "days_stale": 0},
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "clean"
