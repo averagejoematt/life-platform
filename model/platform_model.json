@@ -116,6 +116,10 @@
       "routing": "digest",
       "stack": "operational_stack"
     },
+    "life-platform-og-image-errors": {
+      "routing": "unresolved",
+      "stack": "web_stack"
+    },
     "life-platform-recursive-loop": {
       "routing": "digest",
       "stack": "mcp_stack"
@@ -125,6 +129,10 @@
       "stack": "mcp_stack"
     },
     "mcp-warmer-error": {
+      "routing": "digest",
+      "stack": "mcp_stack"
+    },
+    "mcp-warmer-no-invocations-24h": {
       "routing": "digest",
       "stack": "mcp_stack"
     },
@@ -6114,7 +6122,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 56,
+      "alarms": 58,
       "edges": 644,
       "lambdas": 104,
       "mcp_tool_modules": 26,
