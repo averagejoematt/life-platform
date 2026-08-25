@@ -17,8 +17,11 @@ Lambda invocation failure — for a malformed request.
 """
 
 import json
+import logging
 import re
 from typing import Any, Dict, Optional, Tuple
+
+logger = logging.getLogger()
 
 
 def json_object_body(raw_body: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
@@ -47,3 +50,45 @@ def text_field(body: Dict[str, Any], key: str, cap: int = 500) -> str:
     if not isinstance(raw, (str, int, float)) or isinstance(raw, bool):
         return ""
     return re.sub(r"<[^>]+>", "", str(raw)).strip()[:cap]
+
+
+def hazard_gate(
+    question: str,
+    endpoint: str,
+    response_key: str,
+    cors_headers: Dict[str, str],
+    extra: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """#3050 (DIL-031-lite): the clinical-lite hazard check, shared by every free-text
+    AI door. Returns None when the question is safe; otherwise the COMPLETE HTTP
+    response to serve — and the caller MUST return it without calling any model.
+    That short-circuit is the safety property: the platform cannot hallucinate advice
+    it never generated.
+
+    Lives here (not in the lambda module) for the same reason this file exists at
+    all — site_api_ai_lambda.py sits at its module-size ceiling, and the guard's rule
+    is to pay for new lines out of a sibling. ONE deliberate ordering rule for
+    callers, pinned by tests/test_safety_contract_3050.py: this gate runs BEFORE the
+    WR-40 privacy filter (a question can be both a hazard and a privacy hit — the
+    hazard response must win) and BEFORE the rate limit (a person describing an
+    emergency must not be rate-limited into silence; this path is $0 and makes no
+    model call).
+
+    ``response_key`` matches each door's existing payload shape ("answer" for
+    /api/ask, "response" for the board doors); ``extra`` carries door-specific
+    fields (e.g. the follow-up's persona echo).
+    """
+    from ai import safety_contract
+
+    safe, copy, hazard = safety_contract.check(question)
+    if safe:
+        return None
+    logger.warning(f"[{endpoint}] safety contract fired — class={hazard} (no model call made)")
+    payload: Dict[str, Any] = {response_key: copy, "filtered": True, "safety": hazard}
+    if extra:
+        payload.update(extra)
+    return {
+        "statusCode": 200,
+        "headers": {**cors_headers, "Cache-Control": "no-store"},
+        "body": json.dumps(payload),
+    }
