@@ -107,10 +107,19 @@ repo-visibility change, or GitHub shipping ref-level purge tooling.
 
 ## Priced-acceptance register (dated; revisit triggers)
 
-_Populated as PROPORTIONALITY rows land. Standing entries: DIL-031 full clinical operating
-model · DIL-033/034/037/043/044/045/046 commercial control plane — all **revisit trigger = a
-commercialization decision**; DIL-004 self-approval residual — **structural to a solo
-operator**, priced under #2834 · DIL-047/048 key-person — priced after the owner-handoff drill._
+**Finalized 2026-08-25 (D5).** Every priced acceptance now has a dated row in
+`docs/PROPORTIONALITY.md` with a named revisit trigger. "PRICED" with nothing behind it is
+the same shape as the stale `MANAGED_WHERE_LEDGER` that manufactured three of this
+report's own false positives, and it is not a disposition this register is willing to ship.
+
+| Priced row (in `docs/PROPORTIONALITY.md`) | DIL | Revisit trigger |
+|---|---|---|
+| Absent commercial control plane | 033/034/037/043/044/045/046 | a commercialization decision — a second user, any paid tier, or a contractual/regulated obligation. **Not date-based:** waiting does not make a customer appear |
+| No clinician-reviewed hazard register (full model) | 031 | a second user · any public claim crossing from description into diagnosis/treatment · a real adverse event traced to platform output · commercialization. D4 builds the clinical-**lite** half regardless |
+| Key-person concentration / no segregation of duties | 047/048 | a second operator exists · the owner-handoff drill finds the written record insufficient · commercialization. The honest residual is recovery **time**, not recoverability — and it is explicitly NOT closed by the DIL-027 backup, which protects data, not decision continuity |
+| Self-approvable production gate | 004 residual (#2834) | a second operator exists. The gate is live and blocking (re-verified 2026-08-25 by `diligence_verify.py`); the residual is that its sole reviewer is its sole author — a deliberate *pause* with an audit record, which is real, and not an *independent check*, which would be a self-flattering claim |
+| No edge WAF | 014 | 2026-10-15 (owner-set), or immediately on observed abuse / a non-self-inflicted spike fire / commercialization |
+| Single-ACCOUNT recovery residual | 027 | a second AWS account · a failed restore drill · commercialization · `raw/` > ~50 GiB · otherwise 2027-02-24 (detail below) |
 
 ### DIL-027 — single-ACCOUNT recovery residual (dated 2026-08-24)
 
@@ -168,6 +177,84 @@ blast radius**: one account's compromise still reaches everything.
 5. Otherwise: **2027-02-24** (six months), re-read with the quarterly PROPORTIONALITY pass.
 
 ---
-*Register opened 2026-08-23 (A-Grade Program, Phase S2-close). Updated per phase; D5 runs
-`scripts/diligence_verify.py` (the report's §15 playbooks, scripted) to regenerate the
-live-evidence column before the external re-grade.*
+
+## D5 — the acceptance instrument (2026-08-25)
+
+`scripts/diligence_verify.py` is the report's §15 verification playbooks, scripted. It
+exists so the dispositions above stop being prose an assessor has to trust and become
+checks an assessor can run. It answers one question per playbook, against **live** state:
+*if an external reviewer re-ran this check today, what would they see?*
+
+That framing is why almost nothing in it reads the repo. A grep proving `field_tiers.py`
+declares a field Tier-2 is not evidence — the evidence is that the live public API does
+not serve it. Four families, mirroring §15's grouping:
+
+| Family | Playbooks | What it asserts |
+|---|---|---|
+| `control` | 4 | production approval gate live · main ruleset active (deletion + non-fast-forward) · vulnerability alerts enabled · 0 open CodeQL alerts |
+| `privacy` | 3 | no tracked file declares itself PRIVATE · the 5 relocated coaching docs 404 on the raw endpoint · no owner-only field appears on 4 public API payloads |
+| `prediction` | 2 | calibration is internally coherent (a `skilled` claim must follow from `brier_skill`, both directions) · the gradable-share alarm exists and is OK |
+| `edge` | 3 | live `script-src` is exactly `'self'` · the nightly real-edge 429 observation is installed and wired · public data is fresh **and dates itself** (ADR-104 window disclosure) |
+
+**First full run, 2026-08-25 01:5xZ — `12 PASS · 0 FAIL · 0 UNVERIFIED`, exit 0 under
+`--strict`.** Bundle: `docs/reviews/evidence/diligence_verify_2026-08-25.json`.
+
+### Three verdicts, not two — and why that is the whole design
+
+`UNVERIFIED` is a first-class outcome alongside `PASS`/`FAIL`, and is never folded into
+either. The failure mode this guards is the one the program has now found three times in
+its own machinery: `drift_sentinel.check_codeql_alerts` had declared itself armed for
+weeks while **never once successfully reading the code-scanning API** (#3112 — a
+billing-scoped token, a missing `security-events: read` scope, and an error-treated-as-
+no-drift fail-soft, each independently sufficient), and every one of those defects
+produced a clean-looking result. So here: an auth failure, a transport error, a changed
+API shape, an emptied registry vocabulary, or an unexpected exception all yield
+`UNVERIFIED` with a stated reason. `--strict` — the mode the evidence pack is generated
+in — exits non-zero on it. **An evidence bundle with an unobserved row is not an evidence
+bundle.**
+
+### The instrument is mutation-proved, because an unfalsifiable instrument is worthless
+
+`tests/test_diligence_verify_d5.py` (36 tests) plants a defect at the seam each playbook
+reads and asserts the verdict flips: a demoted approval gate, a dropped `non_fast_forward`
+rule, a re-disabled Dependabot, an open CodeQL alert, a planted PRIVATE marker, a
+re-served coaching doc, a leaked owner-only field, a calibration surface claiming skill it
+has not earned (**and** one understating skill it has), a returned `'unsafe-inline'`, a
+re-allowlisted CDN, an unwired 429 observation, stale data, a dropped window disclosure.
+A second group asserts the `UNVERIFIED` paths. The suite was itself checked for vacuity:
+neutering three playbooks turns four tests red.
+
+### Honest scope — what this instrument does NOT prove
+
+- **Coverage is 14 of 52 findings** (`DIL-001/002/004/005/006/007/008/011/014/015/018/023/
+  024/032`), and that fraction is **derived from the playbook registry at runtime**, never
+  hand-typed — a hand-maintained copy of it is exactly the literal-drift class #3101 killed.
+  The remainder are priced acceptances, commercial gaps, and product findings that no
+  script can verify; they are answered by the dated rows above, not by this run.
+- **`privacy_relocated_docs_are_404` proves the current surface is gone, nothing more.**
+  Historical copies remain reachable by direct sha — the dated risk acceptance under
+  DIL-001 — and no HTTP check can or should claim otherwise.
+- **`edge_rate_limit_enforced` proves the nightly observation is installed, wired and
+  able to fail — not that last night's run observed a 429.** That verdict lives in the
+  qa-smoke output's own RED / could-not-observe vocabulary (#3058). The first draft of
+  this playbook cited the aggregate `qa-smoke-failures` alarm as evidence and so printed
+  `PASS` directly above `alarm = ALARM`; the citation was removed rather than explained.
+- **One first-draft false positive is recorded here deliberately.** The initial
+  no-PRIVATE-markers playbook used a naive substring test and flagged *this register*,
+  which quotes the marker inside a table cell as DIL-001's evidence. The fix was not a
+  special case but the single-source one: the playbook now imports the canonical
+  predicate from `tests/test_no_private_markers_3043.py`, which already documented that
+  quote as benign. Two guards with two definitions of the same word is the twin-sources
+  drift class closed elsewhere in this same register (DIL-011/#3045).
+
+### Standing use
+
+Run before any external re-grade, and after any change to the control plane, privacy
+surface, or CSP. The bundle is deterministic — two runs over unchanged state produce
+byte-identical JSON (pinned by test), so a diff between dated bundles is a real change in
+the platform's posture rather than noise.
+
+---
+*Register opened 2026-08-23 (A-Grade Program, Phase S2-close). Updated per phase. D5's
+`scripts/diligence_verify.py` is the acceptance instrument; its dated bundles under
+`docs/reviews/evidence/` are the live-evidence column.*
