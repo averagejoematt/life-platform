@@ -39,6 +39,7 @@ registry addition in lambdas/phase_taxonomy.py is a deliberate follow-up
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -96,6 +97,19 @@ def checkin_pk(coach_id: str) -> str:
 def new_checkin_sk(date_str: Optional[str] = None, uid: Optional[str] = None) -> str:
     d = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return f"{CHECKIN_SK_PREFIX}{d}#{uid or uuid.uuid4().hex[:8]}"
+
+
+def checkin_uid(*parts: object) -> str:
+    """A deterministic 8-hex check-in uid derived from what makes the question the
+    SAME question (#3114).
+
+    The uuid4 default above is right for a coach's freshly generated question — two
+    generations genuinely are two questions. It is wrong for a check-in that is a
+    projection of another record: `curate_horizon`'s prescription follow-up is one
+    question per (week, coach, type, text), and a replayed curate minted a second
+    copy of it in the coach's queue for Matthew to answer twice."""
+    canonical = "\x1f".join(" ".join(str("" if p is None else p).split()) for p in parts)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:8]
 
 
 def now_iso() -> str:
@@ -164,7 +178,10 @@ def build_prescription_followup_item(
     stamp = now or now_iso()
     item = {
         "pk": checkin_pk(surface_coach),
-        "sk": new_checkin_sk(),
+        # #3114: was `new_checkin_sk()` — a uuid4 suffix, so a replayed curate_horizon
+        # queued the same follow-up twice. The DATE part stays wall-clock (the queue is
+        # read by day); the uid is now the follow-up's own identity.
+        "sk": new_checkin_sk(uid=checkin_uid(week, surface_coach, ftype, text)),
         "record_type": "coach_checkin",
         "coach_id": surface_coach,
         "coach_name": resolve_name(surface_coach),

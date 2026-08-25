@@ -1,6 +1,4 @@
-"""
-Lifestyle tools: insights, supplements, weather, social, meditation, travel, BP, experiments, gait, energy, movement, state_of_mind.
-"""
+"""Lifestyle tools: insights, supplements, weather, social, meditation, travel, BP, experiments, gait, energy, movement, state_of_mind."""
 
 import json
 import math
@@ -13,6 +11,7 @@ from boto3.dynamodb.conditions import Key
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from ingestion.source_registry import raw_date_key  # bundled shared module: the X-9 raw/ layout facts (#2278)
 
+from mcp import idempotency as _idem
 from mcp.config import EXPERIMENTS_PK, INSIGHTS_PK, S3_BUCKET, TRAVEL_PK, USER_ID, USER_PREFIX, logger, s3_client, table
 from mcp.core import decimal_to_float, parallel_query_sources, query_source
 from mcp.helpers import normalize_whoop_sleep
@@ -265,14 +264,11 @@ def tool_save_insight(args):
     source = args.get("source") or "chat"
 
     now = datetime.now(timezone.utc)
-    ts = now.strftime("%Y-%m-%dT%H:%M:%S")
-    insight_id = ts  # human-readable, doubles as sort key suffix
-    sk = f"INSIGHT#{ts}"
-
+    ts = now.strftime("%Y-%m-%dT%H:%M:%S")  # human-readable; doubles as insight_id AND the INSIGHT# sort-key suffix
     item = {
         "pk": INSIGHTS_PK,
-        "sk": sk,
-        "insight_id": insight_id,
+        "sk": f"INSIGHT#{ts}",
+        "insight_id": ts,
         "text": text,
         "date_saved": now.strftime("%Y-%m-%d"),
         "source": source,
@@ -280,11 +276,15 @@ def tool_save_insight(args):
         "outcome_notes": "",
         "tags": tags,
     }
+    # #3114: a 1-SECOND-granularity sk meant every replay appended a second insight.
+    dup = _idem.guard(table, "save_insight", _idem.content_key(item["date_saved"], text, source, tags), payload={"insight_id": ts})
+    if dup:
+        return {**dup, "saved": False}
     table.put_item(Item=item)
-    logger.info(f"save_insight: saved insight_id={insight_id}")
+    logger.info(f"save_insight: saved insight_id={ts}")
     return {
         "saved": True,
-        "insight_id": insight_id,
+        "insight_id": ts,
         "date_saved": item["date_saved"],
         "text_preview": text[:120] + ("…" if len(text) > 120 else ""),
         "tags": tags,

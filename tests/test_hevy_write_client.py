@@ -123,7 +123,13 @@ def test_create_routine_recovers_orphan():
             }
         )
 
-    with _mock_secret(), patch.object(wc, "urlopen_with_retry", side_effect=fake_urlopen):
+    # #3115 added a pre-flight find-or-create lookup to create_routine; this test is about
+    # the ORPHAN path, so stub the lookup to "not found" and keep the POST->GET assertion exact.
+    with (
+        _mock_secret(),
+        patch.object(wc, "urlopen_with_retry", side_effect=fake_urlopen),
+        patch.object(wc, "find_routine_by_title", return_value=None),
+    ):
         with pytest.raises(wc.HevyOrphanCreated) as exc:
             wc.create_routine({"routine": {"title": "Upper — 2026-06-01", "exercises": []}})
     assert exc.value.hevy_routine_id == "orphan-id"
@@ -211,7 +217,13 @@ def test_post_does_not_retry_on_5xx_at_transport_level(monkeypatch):
         calls["n"] += 1
         raise urllib.error.HTTPError(req.full_url, 503, "Service Unavailable", {}, io.BytesIO(b""))
 
-    with _mock_secret(), patch("urllib.request.urlopen", side_effect=fake_transport):
+    # #3115: the pre-flight title lookup is a GET and WOULD be retried; stub it out so this
+    # test still measures exactly what it claims to — retries on the mutating POST.
+    with (
+        _mock_secret(),
+        patch("urllib.request.urlopen", side_effect=fake_transport),
+        patch.object(wc, "find_routine_by_title", return_value=None),
+    ):
         with pytest.raises(HevyRetryable):
             wc.create_routine({"routine": {"title": "X", "exercises": []}})
     assert calls["n"] == 1  # no retry for a mutating call

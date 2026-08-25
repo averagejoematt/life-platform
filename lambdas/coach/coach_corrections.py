@@ -16,7 +16,9 @@ writer/reader. The feedback CHANNELS that call `write_correction()` — an MCP t
 Design (mirrors `lambdas/eval_retention.py`'s build/write/read split and
 `lambdas/emails/ai_review_pack_lambda.py::record_email_send`'s mockable-table idiom):
 - Records live at pk `USER#matthew#SOURCE#coach_corrections`,
-  sk `CORRECTION#<YYYY-MM-DD>#<id8>` (id8 = uuid4().hex[:8]) — single-table
+  sk `CORRECTION#<YYYY-MM-DD>#<id8>` (id8 = the CONTENT digest of what was
+  corrected + what was said + the class, per #3114 — it was `uuid4().hex[:8]`,
+  which appended a fresh row on every replay of the same correction) — single-table
   convention, no new GSI (adding one requires an ADR; this module reads via a
   plain partition Query + client-side filter).
 - Classified **CROSS_PHASE** in `lambdas/phase_taxonomy.py`: a correction Matthew
@@ -39,7 +41,8 @@ v1.0.0 — 2026-07-22 (#1689)
 
 from __future__ import annotations
 
-import uuid
+import hashlib
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -82,6 +85,26 @@ STATUSES = ("open", "applied-to-prompt", "applied-to-gate")
 _ID_LEN = 8
 
 
+def derive_correction_id(item_ref: Optional[dict], correction_text: str, error_class: str) -> str:
+    """The correction's SEMANTIC identity, as 8 hex — replacing `uuid4().hex[:8]` (#3114).
+
+    A uuid4 suffix meant a replayed `log_coach_correction` / `audit_coach_dossier
+    retract` minted a SECOND ledger row for the same correction: same subject, same
+    words, same class, indistinguishable from Matthew having said it twice. Since the
+    correction ledger is read by the prompt-memory injection (S5) and the promotion
+    clustering (S6), a duplicate double-weights one piece of feedback.
+
+    Derived from what makes a correction the same correction — WHAT was corrected
+    (`item_ref`, canonicalised so key order cannot change the digest), WHAT was said
+    (whitespace-normalised), and the class. Deliberately NOT the date: `write_correction`
+    puts on `CORRECTION#{date}#{id}`, so the date is already in the key and including it
+    twice would only re-open the duplicate on the stroke of UTC midnight.
+    """
+    canonical = json.dumps(item_ref or {}, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
+    text = " ".join((correction_text or "").split())
+    return hashlib.sha256(f"{canonical}\x1f{text}\x1f{error_class or ''}".encode("utf-8")).hexdigest()[:_ID_LEN]
+
+
 def build_correction_item(
     item_ref: Optional[dict],
     correction_text: str,
@@ -115,7 +138,8 @@ def build_correction_item(
     reach SSM, is never guessed at.
     """
     now = now or datetime.now(timezone.utc)
-    correction_id = correction_id or uuid.uuid4().hex[:_ID_LEN]
+    # #3114: was `uuid.uuid4().hex[:_ID_LEN]` — a fresh partition row per replay.
+    correction_id = correction_id or derive_correction_id(item_ref, correction_text, error_class)
     date_str = now.strftime("%Y-%m-%d")
     sk = f"{SK_PREFIX}{date_str}#{correction_id}"
 
@@ -162,7 +186,15 @@ def write_correction(
     wrong dependency.
     """
     item = build_correction_item(item_ref, correction_text, error_class, now=now, correction_id=correction_id, cycle=cycle)
-    table.put_item(Item=item)
+    # #3114: the sk is now deterministic, so an unconditional put would still be
+    # replay-safe for the CONTENT — but it would also reset `status` from
+    # `applied-to-prompt`/`applied-to-gate` back to `open`, silently undoing a
+    # downstream consumption. Write once; a replay is a no-op that returns the same sk.
+    try:
+        table.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+    except Exception as e:  # noqa: BLE001 — only a conditional failure is a duplicate
+        if "ConditionalCheckFailed" not in type(e).__name__ and "ConditionalCheckFailedException" not in str(e):
+            raise
     return item["sk"]
 
 

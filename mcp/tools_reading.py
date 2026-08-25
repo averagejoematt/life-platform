@@ -32,9 +32,22 @@ from reading import (
     reading_store,
 )
 
+from mcp import idempotency as _idem
 from mcp.config import logger, table
 from mcp.tools_coach_intelligence import COACH_IDS, COACH_NAMES
 from mcp.utils import mcp_error
+
+#: #3114 — how long a `log_session` claim on (book, date, minutes, pages) stands.
+#: A reading session's own fields are NOT unique over a day (two 30-minute sits are
+#: a plausible evening), so this is a replay window, not a permanent key: long enough
+#: to swallow a client retry or a double-submit, short enough that a genuine second
+#: session an hour later still records.
+SESSION_REPLAY_WINDOW_SECONDS = 15 * 60
+
+#: The canonical debrief note id. Was `"debrief-" + now.strftime("%Y%m%dT%H%M%S")`,
+#: which made a replay write a second takeaway AND start a second recall clock.
+#: A book has ONE post-book debrief, so the id is the book's, not the clock's.
+DEBRIEF_NOTE_ID = "debrief"
 
 
 def _coach_checkin_module():
@@ -465,6 +478,14 @@ def tool_curate_horizon(args=None):
             coach_name_of=lambda cid: COACH_NAMES.get(cid) or COACH_NAMES.get(f"{cid}_coach") or cid,
         )
         if checkin_item:
+            # #3114: the cross-reference this comment always promised ("a re-curate can
+            # see a follow-up already fired") was WRITTEN and never READ, so a replayed
+            # curate queued the same question again. The uid is content-derived now, so
+            # a same-day replay collides; the stored sk covers the cross-midnight case,
+            # where the CHECKIN# date part would otherwise differ.
+            prior_sk = ((reading_store.get_horizon_pick(week) or {}).get("follow_up") or {}).get("surfaced_checkin_sk")
+            if prior_sk and prior_sk.split("#")[-1] == checkin_item["sk"].split("#")[-1]:
+                checkin_item["sk"] = prior_sk
             # Thread the surfaced check-in back onto the pick so the two records
             # cross-reference (and a re-curate can see a follow-up already fired).
             plan["follow_up"] = {
@@ -475,7 +496,13 @@ def tool_curate_horizon(args=None):
 
     item = reading_store.put_horizon_pick(plan)
     if checkin_item:
-        table.put_item(Item=checkin_item)
+        # Write-once: a replay must not reset an ANSWERED follow-up back to `open`.
+        try:
+            table.put_item(Item=checkin_item, ConditionExpression="attribute_not_exists(sk)")
+        except Exception as e:  # noqa: BLE001 — only a conditional failure is a duplicate
+            if "ConditionalCheckFailed" not in type(e).__name__ and "ConditionalCheckFailedException" not in str(e):
+                raise
+            logger.info("[horizons] follow-up check-in %s already queued — not re-opened", checkin_item["sk"])
     return {
         "status": "committed",
         "action": "curate_horizon",
@@ -638,6 +665,12 @@ def _action_log_session(args, dry_run):
     plan = {"bookId": bid, "minutes": args.get("minutes"), "pages": args.get("pages"), "date": args.get("date")}
     if dry_run:
         return _preview("log_session", plan)
+    # #3114: the sk is `SESSION#{iso-ts}`, so a replay appended a phantom session and
+    # inflated the reading totals. Claim the session's identity for a short window.
+    key = _idem.content_key(bid, args.get("date") or "", args.get("minutes"), args.get("pages"))
+    dup = _idem.guard(table, "manage_reading.log_session", key, payload=plan, window_seconds=SESSION_REPLAY_WINDOW_SECONDS)
+    if dup:
+        return {"status": "duplicate", "action": "log_session", **dup}
     item = reading_store.log_session(
         bid,
         minutes=float(args["minutes"]),
@@ -653,7 +686,12 @@ def _action_add_note(args, dry_run):
     bid, text = args.get("bookId"), args.get("text")
     if not bid or not text:
         return mcp_error("add_note requires bookId + text", error_code="MISSING_ARG")
-    note_id = args.get("note_id") or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    # #3114: the default note id was a wall-clock stamp, so a replay wrote a second
+    # copy of the same note. Content-derived (the `mark_journal_quote` precedent):
+    # the same text on the same book IS the same note and overwrites in place; a
+    # genuinely different note hashes differently and still writes. An explicitly
+    # supplied note_id (e.g. "coach-why") still wins.
+    note_id = args.get("note_id") or "n-" + _idem.content_key(bid, text, args.get("type", "reflection"))
     plan = {"bookId": bid, "noteId": note_id, "type": args.get("type", "reflection"), "public": bool(args.get("public", False))}
     if dry_run:
         return _preview("add_note", {**plan, "text": text})
@@ -713,9 +751,12 @@ def _action_debrief(args, dry_run):
     bid, takeaway = args.get("bookId"), args.get("takeaway")
     if not bid or not takeaway:
         return mcp_error("debrief requires bookId + takeaway", error_code="MISSING_ARG")
-    now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    note_id = "debrief-" + now
-    probe_id = "probe-" + now
+    # #3114: both ids were `"...-" + now.strftime("%Y%m%dT%H%M%S")`. A replay therefore
+    # wrote a SECOND takeaway note and — the part that actually corrupts data — a second
+    # RECALL# probe, so the book's spaced-repetition schedule silently doubled and its
+    # retention score was computed over two interleaved clocks. A book has one debrief.
+    note_id = DEBRIEF_NOTE_ID
+    probe_id = "probe-" + DEBRIEF_NOTE_ID
     book = reading_store.get_book(bid) or {}
     prompt = f"A few weeks back you read {book.get('title', 'this book')} — what's stayed with you? Reconstruct the heart of it."
     if dry_run:
@@ -723,7 +764,20 @@ def _action_debrief(args, dry_run):
             "debrief",
             {"bookId": bid, "noteId": note_id, "first_probe": probe_id, "probe_prompt": prompt, "public": bool(args.get("public", True))},
         )
+    # Read the clock BEFORE writing it. put_recall resets intervalIndex/nextDue, so a
+    # second debrief on an already-debriefed book would rewind a running schedule —
+    # including the legacy `probe-<timestamp>` rows written before this change.
+    existing = _existing_debrief_probe(bid, probe_id)
     item = reading_store.add_note(bid, note_id=note_id, type="synthesis", text=takeaway, public=bool(args.get("public", True)))
+    if existing:
+        return {
+            "status": "committed",
+            "action": "debrief",
+            "note": item,
+            "first_probe_due": existing.get("nextDue"),
+            "recall_clock": "already running — NOT restarted (#3114)",
+            "note2": "The takeaway was updated in place. The retention clock started at the first debrief and keeps its schedule.",
+        }
     # start the retention clock — the first probe, due in INTERVALS[0] days (sparse GSI1)
     fp = reading_recall.first_probe()
     reading_store.put_recall(bid, prompt_id=probe_id, prompt=prompt, interval_index=0, next_due=fp["nextDue"])
@@ -732,8 +786,29 @@ def _action_debrief(args, dry_run):
         "action": "debrief",
         "note": item,
         "first_probe_due": fp["nextDue"],
+        "recall_clock": "started",
         "note2": "Retention clock started — the first memory check is weeks out, kept separate from this reaction.",
     }
+
+
+def _existing_debrief_probe(book_id: str, probe_id: str) -> dict | None:
+    """The debrief's recall probe if this book already has one (#3114).
+
+    Checks the canonical id first, then falls back to scanning the book's RECALL#
+    rows for a legacy `probe-<timestamp>` id — books debriefed before this change
+    carry one, and missing it would restart exactly the clock this guard exists to
+    protect. Fail-soft: a read error returns None and the caller starts a clock,
+    which is the pre-#3114 behaviour rather than a lost debrief."""
+    try:
+        found = reading_store.get_recall(book_id, probe_id)
+        if found:
+            return found
+        for r in reading_store.recalls(book_id):
+            if str(r.get("promptId") or "").startswith("probe-"):
+                return r
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[reading] debrief probe lookup failed for %s (%s) — clock not asserted", book_id, e)
+    return None
 
 
 def _action_map_ideas(args, dry_run):
