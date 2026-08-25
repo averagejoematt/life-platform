@@ -27,7 +27,10 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from common import digest_utils  # shared query_range implementations (#970)
+from common import (
+    digest_utils,  # shared query_range implementations (#970)
+    send_ledger,  # #3113 / DIL-025: the durable replay guard
+)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -577,27 +580,40 @@ def build_email_html(ai_content, dates, weight_info):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track last send."""
-    import time as _time
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "weekly_plate"
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+
+def _period_key():
+    """WHICH edition this is — `week:YYYY-Www` (#3113).
+
+    The plate runs Saturday 02:00 UTC over a rolling 14-day food window, so the
+    window itself is not a period; the EDITION is weekly and that is what must
+    not be mailed twice. `gather_data`'s `end_date` is yesterday (Friday); a
+    redrive up to Monday 02:00 UTC still lands inside the same ISO week, which
+    a date-shaped key would not.
+    """
+    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date() - timedelta(days=1))}"
+
+
+def record_email_send(table, lambda_name, period_key):
+    """The status page's completion row, plus DIL-025's `period_key` — WHICH
+    edition went out, not merely the UTC day it was sent. Delegated so the
+    writer and `already_sent`'s reader cannot drift apart; still non-fatal,
+    since the mail is already on the wire by the time this runs."""
+    send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
+
+    # DIL-025 / #3113 replay guard — before the gather and before the Bedrock
+    # call, not merely before the send. A redrive carries the original payload.
+    period_key = _period_key()
+    if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
+        logger.warning(f"[DIL-025] weekly plate for {period_key} already sent — refusing to send it twice (force_send overrides)")
+        return {"statusCode": 200, "body": f"The Weekly Plate for {period_key} already sent — skipped (replay guard)"}
+
     logger.info("The Weekly Plate v1.0.0 starting...")
 
     data = gather_data()
@@ -704,6 +720,10 @@ def lambda_handler(event, context):
             }
         },
     )
+    # DIL-025: ONE line after the SES call. The IC-15 insight write below used
+    # to sit between the send and its only completion record.
+    if not dry_run:
+        record_email_send(table, LEDGER_NAME, period_key)
     logger.info(f"Sent: {subject}")
 
     # IC-15: Persist plate insight (only when the edition is genuine AI writing, #2221)
@@ -724,5 +744,4 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-15 failed: {e}")
 
-    record_email_send(table, "weekly_plate")
     return {"statusCode": 200, "body": f"The Weekly Plate sent: {subject}"}

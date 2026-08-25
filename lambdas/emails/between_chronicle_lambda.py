@@ -69,6 +69,7 @@ table = dynamodb.Table(TABLE_NAME)
 ses = boto3.client("sesv2", region_name=REGION)
 
 
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
@@ -268,8 +269,38 @@ def _get_confirmed_subscribers() -> list:
     return confirmed
 
 
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+#: This sender had NO email_log row at all before #3113 — the content-hash
+#: marker below is a "has this content changed" check, not a send record.
+LEDGER_NAME = "between_chronicle"
+
+
+def _period_key() -> str:
+    """WHICH note this is — `week:YYYY-Www` (#3113).
+
+    Deliberately NOT the content hash, even though one is already computed
+    here: the digest is assembled from live records (freshly graded
+    predictions, stance shifts), so a redrive hours later can hash *differently*
+    for the same letter and the existing marker check sails straight through.
+    The note is weekly (Sunday 17:00 UTC); one per ISO week is the invariant
+    that survives that drift.
+    """
+    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+
+
 def lambda_handler(event: dict, context) -> dict:
     event = event or {}
+
+    # DIL-025 / #3113 replay guard. The marker write below lands AFTER the whole
+    # subscriber fan-out, so "mailed 300 people, then crashed" left no record at
+    # all and a redrive re-mailed the list. Dry runs put nothing on the wire.
+    period_key = _period_key()
+    if send_ledger.should_skip_replay(
+        table, LEDGER_NAME, period_key, dry_run=bool(event.get("dry_run")), event=event, user_id=USER_ID, logger=logger
+    ):
+        logger.warning("[DIL-025] between-chronicle note for %s already sent — refusing to send it twice", period_key)
+        return {"statusCode": 200, "sent": 0, "skipped": "replay_guard", "period_key": period_key}
+
     digest = gather_digest()
     h = digest_hash(digest)
 
@@ -314,6 +345,10 @@ def lambda_handler(event: dict, context) -> dict:
                 },
             )
             sent += 1
+            if sent == 1:
+                # DIL-025: mail is on the wire NOW. Record before the remaining
+                # ~N sends and before the marker write at the end of the fan-out.
+                send_ledger.record_sent(table, LEDGER_NAME, period_key, user_id=USER_ID, logger=logger)
         except Exception as exc:
             failed += 1
             logger.error("send failed to %s…: %s", email[:6], exc)

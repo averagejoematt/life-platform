@@ -40,7 +40,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from common import digest_utils  # shared query_range implementations (#970)
+from common import digest_utils, send_ledger  # shared query_range impls (#970); the DIL-025 replay guard (#3113)
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
@@ -1693,23 +1693,13 @@ def get_food_delivery_digest_line():
         return None
 
 
-def record_email_send(table, lambda_name):
-    """Write a completion record so the status page can track last send."""
-    import time as _time
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "weekly_digest"
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        table.put_item(
-            Item={
-                "pk": f"USER#matthew#SOURCE#email_log#{lambda_name}",
-                "sk": f"DATE#{today}",
-                "sent_at": datetime.now(timezone.utc).isoformat(),
-                "status": "success",
-                "ttl": int(_time.time()) + 86400 * 90,
-            }
-        )
-    except Exception as e:
-        logger.info(f"[status-tracking] Non-fatal write failure: {e}")
+
+def record_email_send(table, lambda_name, period_key):
+    """Status-page completion row + DIL-025's `period_key` (WHICH letter went)."""
+    send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
 def _gate_telemetry(data, profile, real_subscribers, attribution=None):
@@ -1729,6 +1719,14 @@ def _gate_telemetry(data, profile, real_subscribers, attribution=None):
 
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
+    # DIL-025/#3113 replay guard, before the gather AND the Haiku call. Keyed on
+    # the ISO WEEK, not a date: `gather_all` derives its window from the wall
+    # clock, so a redrive crossing UTC midnight computes a shifted `this_end`
+    # (Sunday 16:00 UTC covers through Saturday) — the same ISO week either way.
+    period_key = f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date() - timedelta(days=1))}"
+    if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
+        logger.warning("[DIL-025] weekly digest for %s already sent — refusing to send it twice (force_send overrides)", period_key)
+        return {"statusCode": 200, "body": f"Weekly digest for {period_key} already sent — skipped (replay guard)"}
     logger.info("Weekly Digest v4.0 starting...")
     result = gather_all()
     if result is None or result[0] is None:
@@ -1793,6 +1791,8 @@ def lambda_handler(event, context):
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "weekly_digest"}],
     )
+    if not dry_run:  # DIL-025: record HERE — the ~40 lines of insight-writing
+        record_email_send(table, LEDGER_NAME, period_key)  # below used to sit between the send and its only record
     logger.info("Sent.")
 
     # IC-15: Persist insights from this digest — genuine Board output only (#2221).
@@ -1821,5 +1821,4 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-15 insight write failed (non-fatal): {e}")
 
-    record_email_send(table, "weekly_digest")
     return {"statusCode": 200, "body": "Digest v4.0 sent."}

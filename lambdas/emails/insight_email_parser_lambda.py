@@ -54,6 +54,7 @@ from email import policy
 from html import escape as html_escape
 
 import boto3
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.send_guard import guarded_send_email, is_dry_run
 
 # #2291: DECLARED trigger-type exemption from the DEFAULT SES dry-run suppression.
@@ -95,6 +96,9 @@ table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
 cloudwatch = boto3.client("cloudwatch", region_name=REGION)
+
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "insight_email_parser"
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 
@@ -462,6 +466,17 @@ def lambda_handler(event, context):
 
             print(f"[INFO] Processing: s3://{bucket}/{key}")
 
+            # DIL-025 / #3113 replay guard. This sender is event-driven, so it
+            # has no calendar period at all — the identity of the letter is the
+            # INBOUND MESSAGE it answers, and the S3 object key is that message's
+            # id. A redrive of the S3/SES record replays the same key, so the
+            # confirmation reply goes out once per inbound email, not once per
+            # delivery of it.
+            period_key = f"msg:{key}"
+            if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
+                print(f"[DIL-025] already replied to {key} — not answering it twice")
+                continue
+
             # Read raw email from S3
             try:
                 obj = s3.get_object(Bucket=bucket, Key=key)
@@ -526,6 +541,8 @@ def lambda_handler(event, context):
             if _is_review_pack_reply(subject):
                 print(f"[INFO] review-pack reply detected (subject: {subject[:80]!r}) — routing to corrections ledger")
                 handle_review_pack_reply(reply_text, subject, sender, dry_run=dry_run)
+                if not dry_run:  # DIL-025: one line after the send it just made
+                    send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
                 continue
 
             if not reply_text or len(reply_text) < 5:
@@ -550,6 +567,8 @@ def lambda_handler(event, context):
             # Send confirmation back to sender
             try:
                 send_confirmation(reply_text, insight_id, recipient_email=sender, dry_run=dry_run)
+                if not dry_run:  # DIL-025: one line after the SES call
+                    send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
                 print(f"[INFO] Confirmation email sent to {sender}")
             except Exception as e:
                 print(f"[WARN] Confirmation email failed: {e}")

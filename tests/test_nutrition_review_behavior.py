@@ -32,7 +32,6 @@ import json
 import os
 import re
 import sys
-import time
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -1378,7 +1377,7 @@ def test_a_storage_failure_never_takes_down_the_email(monkeypatch, frozen_clock)
 
 def test_a_successful_send_is_recorded_for_the_status_page(monkeypatch, frozen_clock):
     table = FakeTable()
-    m.record_email_send(table, "nutrition_review")
+    m.record_email_send(table, "nutrition_review", "week:2026-W34")
     item = table.puts[0]
     assert item["sk"] == f"DATE#{FROZEN_NOW.date().isoformat()}"
     assert item["status"] == "success"
@@ -1386,22 +1385,25 @@ def test_a_successful_send_is_recorded_for_the_status_page(monkeypatch, frozen_c
 
 
 def test_the_send_record_expires_after_about_ninety_days(monkeypatch, frozen_clock):
+    """90 days after the row's OWN `sent_at` — #3113 put the ttl and the date on
+    the same clock (the ttl used to read `time.time()` while the date read the
+    module's frozen `datetime.now()`, so the two disagreed by ~10 weeks here)."""
     table = FakeTable()
-    m.record_email_send(table, "nutrition_review")
-    ttl_days = (table.puts[0]["ttl"] - time.time()) / 86400
-    assert 89 < ttl_days <= 90
+    m.record_email_send(table, "nutrition_review", "week:2026-W34")
+    row = table.puts[0]
+    assert row["ttl"] == int(datetime.fromisoformat(row["sent_at"]).timestamp()) + 90 * 86400
 
 
 def test_a_failed_status_write_never_takes_down_the_email(frozen_clock):
     table = FakeTable()
     table.put_error = RuntimeError("no")
-    m.record_email_send(table, "nutrition_review")  # must not raise
+    m.record_email_send(table, "nutrition_review", "week:2026-W34")  # must not raise
 
 
 def test_the_send_record_is_keyed_to_the_configured_user(monkeypatch, frozen_clock):
     monkeypatch.setattr(m, "USER_ID", "someone_else")
     table = FakeTable()
-    m.record_email_send(table, "nutrition_review")
+    m.record_email_send(table, "nutrition_review", "week:2026-W34")
     assert table.puts[0]["pk"].startswith("USER#someone_else#")
 
 

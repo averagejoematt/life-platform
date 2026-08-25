@@ -58,7 +58,7 @@ It arms itself on the first send after deploy. Nothing to backfill.
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import date as _date, datetime, timezone
 from typing import Any, Mapping, Optional
 
 from common import dry_run as _dry_run
@@ -104,6 +104,26 @@ def force_resend_requested(event: Optional[Mapping[str, Any]]) -> bool:
     if event is None:
         return False
     return _dry_run.force_requested(event)
+
+
+def iso_week_key(day: _date) -> str:
+    """The ISO week `day` belongs to, as `YYYY-Www` — the period key for a
+    WEEKLY letter (#3113).
+
+    Weekly senders derive their coverage window from the wall clock at
+    invocation (`yesterday`, `today - 7d`, …), so a redrive that crosses a UTC
+    midnight computes a *shifted* window and a date-shaped period key silently
+    stops matching — the exact class of miss `period_key` exists to prevent, one
+    level up. An ISO week absorbs that shift: the Sunday senders' `yesterday` is
+    Saturday, and Saturday and Sunday are the same ISO week, so the replay still
+    lands on the letter it is replaying.
+
+    The unit is chosen per sender, not swept: this helper is only correct for a
+    sender whose letter genuinely covers one week. A daily sender uses its
+    content date; an episodic one uses the id of the thing it announced.
+    """
+    iso_year, iso_week, _ = day.isocalendar()
+    return f"{iso_year}-W{iso_week:02d}"
 
 
 def already_sent(
@@ -181,3 +201,36 @@ def record_sent(
             logger.error(
                 f"[DIL-025] send-ledger write failed for {lambda_name}/{period_key} ({e}) — a redrive of this send would NOT be caught"
             )
+
+
+def should_skip_replay(
+    table: Any,
+    lambda_name: str,
+    period_key: str,
+    *,
+    dry_run: bool = False,
+    event: Optional[Mapping[str, Any]] = None,
+    user_id: str = "matthew",
+    logger: Optional[Any] = None,
+) -> bool:
+    """The whole pre-send decision, in one call (#3113).
+
+    True means "this letter already went out — do not send it again". The three
+    carve-outs are resolved here rather than at 17 call sites, because each one
+    of them is a way for a sender to fail CLOSED (a silently unsent letter),
+    which is strictly worse than the duplicate this guard prevents:
+
+      * a **dry run** puts nothing on the wire, so it has nothing to replay —
+        and must stay usable for diagnosing the very send the ledger recorded;
+      * an operator's explicit **`force_send`** already means "really send" for
+        the dry-run gate, and must not acquire a new way to be refused;
+      * a **read failure** fails open inside `already_sent`.
+
+    `daily_brief_lambda` predates this helper and spells the same three checks
+    inline; it is left alone deliberately, since its ordering is pinned by test.
+    """
+    if dry_run:
+        return False
+    if force_resend_requested(event):
+        return False
+    return already_sent(table, lambda_name, period_key, user_id=user_id, logger=logger)

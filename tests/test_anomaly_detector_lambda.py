@@ -985,7 +985,7 @@ def test_write_anomaly_record_carries_suppression_and_sustained_fields(monkeypat
 
 def test_record_email_send_writes_status_row(monkeypatch):
     table = FakeTable()
-    anomaly.record_email_send(table, "anomaly_detector")
+    anomaly.record_email_send(table, "anomaly_detector", "date:2026-08-23")
     item = table.puts[0]
     assert item["pk"] == "USER#matthew#SOURCE#email_log#anomaly_detector"
     assert item["sk"].startswith("DATE#")
@@ -994,7 +994,7 @@ def test_record_email_send_writes_status_row(monkeypatch):
 
 
 def test_record_email_send_failure_is_non_fatal():
-    anomaly.record_email_send(FakeTable(fail_put=True), "anomaly_detector")  # must not raise
+    anomaly.record_email_send(FakeTable(fail_put=True), "anomaly_detector", "date:2026-08-23")  # must not raise
 
 
 # ══════════════════════════════════════════════════════════════════════════════

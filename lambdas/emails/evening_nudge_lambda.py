@@ -26,6 +26,7 @@ import os
 from datetime import datetime
 
 import boto3
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.pacific_time import pacific_today
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from content.ritual_link import sign_ritual_token
@@ -440,6 +441,10 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritua
 </html>"""
 
 
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "evening_nudge"
+
+
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
     try:
@@ -447,6 +452,17 @@ def lambda_handler(event, context):
         # a UTC "today" is tomorrow in PT — so every manual source reads "not logged".
         # See AUDIT BUG-02.
         today = pacific_today()
+
+        # DIL-025 / #3113 replay guard. The period key is the PACIFIC day the
+        # nudge is about — the same reason BUG-02 made the rest of this handler
+        # read Pacific: at 03:00 UTC a UTC-dated key names tomorrow, and the
+        # 6-hourly redrive at 09:00 UTC would name the same tomorrow only by
+        # luck. `pacific_today()` is stable across that whole evening.
+        period_key = f"date:{today}"
+        if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, user_id=USER_ID, logger=logger):
+            logger.warning(f"[DIL-025] evening nudge for {today} already sent — refusing to send it twice (force_send overrides)")
+            return {"statusCode": 200, "body": f"Nudge for {today} already sent — skipped (replay guard)"}
+
         logger.info(f"[nudge] Checking data completeness for {today}")
 
         checks = [
@@ -534,6 +550,10 @@ def lambda_handler(event, context):
                 }
             },
         )
+        # DIL-025: ONE line after the SES call. This sender had no completion
+        # record of any kind before #3113.
+        if not dry_run:
+            send_ledger.record_sent(table, LEDGER_NAME, period_key, user_id=USER_ID, logger=logger)
         logger.info(f"[nudge] Sent: {subject}")
         return {"statusCode": 200, "body": f"Nudge sent: {subject}"}
     except Exception as e:

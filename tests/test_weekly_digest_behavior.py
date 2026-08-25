@@ -2487,13 +2487,18 @@ class TestLambdaHandler:
 
 class TestRecordEmailSend:
     def test_the_completion_record_is_keyed_to_the_configured_user(self, table):
-        wd.record_email_send(table, "weekly_digest")
+        wd.record_email_send(table, "weekly_digest", "week:2026-W34")
         assert table.puts[0]["pk"].startswith(f"USER#{wd.USER_ID}#SOURCE#email_log#")
 
     def test_the_record_carries_a_ninety_day_ttl(self, table):
-        import time as _time
+        """90 days after the row's OWN `sent_at`.
 
-        wd.record_email_send(table, "weekly_digest")
-        ttl = table.puts[0]["ttl"]
-        # 90 days = 86400 × 90 = 7,776,000 seconds from now
-        assert 7_776_000 - 120 <= ttl - int(_time.time()) <= 7_776_000 + 120
+        Asserted against the row rather than against `time.time()` because
+        #3113 put the ttl and the date on the SAME clock — this row used to
+        read `time.time()` for the ttl while reading `datetime.now()` for the
+        date, so under a frozen-datetime fixture the two disagreed by however
+        long ago the fixture's day was.
+        """
+        wd.record_email_send(table, "weekly_digest", "week:2026-W34")
+        row = table.puts[0]
+        assert row["ttl"] == int(datetime.fromisoformat(row["sent_at"]).timestamp()) + 90 * 86400

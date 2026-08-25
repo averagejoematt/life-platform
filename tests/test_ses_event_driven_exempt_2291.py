@@ -160,7 +160,12 @@ def test_parser_real_event_still_sends(parser_env):
     parser_mod.lambda_handler(_parser_event(dry_run=False), None)
     assert len(ses.sends) == 1, "a real event must still send the confirmation"
     assert ses.sends[0]["Destination"]["ToAddresses"] == [_SENDER_ADDR]
-    assert len(table.puts) == 1, "a real event must still save the insight"
+    # Asserted by PARTITION, not by count: since #3113 a real event writes two
+    # rows — the insight, and the DIL-025 send-ledger row recorded one line
+    # after the confirmation reply. A bare count would have to be re-bumped by
+    # every future writer and says nothing about which write happened.
+    saved = [p for p in table.puts if "SOURCE#insights" in p["Item"]["pk"]]
+    assert len(saved) == 1, "a real event must still save the insight"
 
 
 def test_parser_bare_operator_invoke_mails_nobody(parser_env):

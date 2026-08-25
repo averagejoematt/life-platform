@@ -22,6 +22,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -292,6 +293,12 @@ def _build_email(stats, posts_data, insight_text, week_num, unsub_url):
 # ── Handler ───────────────────────────────────────────────────────────────────
 
 
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+#: This sender had no completion row of any kind — only the #2820 CloudWatch
+#: delivery datapoint, which is a metric, not a durable per-letter record.
+LEDGER_NAME = "weekly_signal"
+
+
 def lambda_handler(event, context):
     event = event or {}
     # #2111: {"dry_run": true} runs the full pipeline (data load, subscriber load,
@@ -299,6 +306,15 @@ def lambda_handler(event, context):
     # gate below, so a diagnostic invoke is safe to run regardless of switch state.
     dry_run = bool(event.get("dry_run"))
     try:
+        # DIL-025 / #3113 replay guard, ahead of every S3 read and the whole
+        # fan-out. Keyed on the ISO week the letter IS: `week_num` below is
+        # `%W`, a Monday-based week number with a documented year-boundary
+        # wobble, so the guard uses the ISO week rather than re-using it.
+        period_key = f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+        if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, user_id=USER_ID, logger=logger):
+            logger.warning("[DIL-025] Weekly Signal for %s already sent — refusing to mail the list twice", period_key)
+            return {"statusCode": 200, "body": f"Weekly Signal for {period_key} already sent — skipped (replay guard)", "sent": 0}
+
         if not dry_run and os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
             logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Weekly Signal subscriber send")
             # #2820: an unfulfilled promise emits 0 — the #1951 kill-switch alarm
@@ -370,6 +386,10 @@ def lambda_handler(event, context):
                     },
                 )
                 sent += 1
+                if sent == 1:
+                    # DIL-025: mail is on the wire NOW — record before the rest
+                    # of the fan-out, not after it.
+                    send_ledger.record_sent(table, LEDGER_NAME, period_key, user_id=USER_ID, logger=logger)
                 logger.info("Sent %d/%d (%s...)", i + 1, len(subscribers), email[:6])
             except Exception as exc:
                 failed += 1

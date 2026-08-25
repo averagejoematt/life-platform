@@ -33,6 +33,7 @@ import os
 
 import boto3
 from coach import spiral_breaker  # noqa: F401 — registered celebratory emitter (#1627); used via check_celebration_allowed
+from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.pacific_time import pacific_today
 from common.secret_cache import get_secret_json
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
@@ -134,9 +135,24 @@ def _celebration_allowed() -> bool:
         return False
 
 
+#: The `email_log#` partition this sender's completion rows live in (#3113).
+LEDGER_NAME = "milestone_digest"
+
+
+def _period_key(milestone_id: str) -> str:
+    """WHICH note this is — the milestone announced, not the day it was mailed.
+
+    This sender is episodic, not periodic: it runs daily and mails only when a
+    window-validated milestone lands, so there is no calendar period to key on.
+    The milestone id IS the identity of the letter, and it is the same id on a
+    replay however many days later the redrive arrives.
+    """
+    return f"milestone:{milestone_id}"
+
+
 def lambda_handler(event: dict, context) -> dict:  # noqa: ARG001
     try:
-        return _run(dry_run=is_dry_run(event))
+        return _run(dry_run=is_dry_run(event), event=event)
     except Exception:
         # I4: fail loudly into the DLQ/digest-alarm path — a swallowed error here
         # would silently kill the platform's best downturn-signal channel.
@@ -144,7 +160,7 @@ def lambda_handler(event: dict, context) -> dict:  # noqa: ARG001
         raise
 
 
-def _run(dry_run: bool = False) -> dict:
+def _run(dry_run: bool = False, event: dict | None = None) -> dict:
     today = pacific_today()
     stamp = experiment_stamp()
 
@@ -182,11 +198,29 @@ def _run(dry_run: bool = False) -> dict:
         return {"status": "suppressed", "pending": len(pending)}
 
     ev = pending[0]  # oldest first (read_announced_events sorts by event_date)
+    period_key = _period_key(str(ev["milestone_id"]))
+
+    # DIL-025 / #3113 replay guard — FIRST, because this sender mails third
+    # parties. `mark_digest_sent` below is a cursor, not a replay guard: it is
+    # written after the whole fan-out, so every "mailed some of the list, then
+    # crashed" invocation leaves the cursor untouched and a redrive re-mails
+    # everyone. The ledger row is written after the FIRST delivery instead.
+    if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
+        logger.warning(
+            f"[DIL-025] milestone note for {period_key} already went out — refusing to mail it twice (pass force_send to override)"
+        )
+        return {"status": "already_sent", "milestone_id": ev.get("milestone_id")}
+
     delivered = 0
     for recipient in recipients:
         subject, body = _note(ev, recipient["name"])
         if _send(recipient, reply_to, subject, body, dry_run=dry_run):
             delivered += 1
+            if delivered == 1 and not dry_run:
+                # Mail is on the wire NOW. Record before the rest of the fan-out,
+                # not after it — everything between here and the cursor write is
+                # window in which a crash loses the only evidence of the send.
+                send_ledger.record_sent(table, LEDGER_NAME, period_key, logger=logger)
     if delivered == 0:
         # Nothing went out: leave the cursor untouched so tomorrow retries, and
         # let the invocation fail into the DLQ/digest alarm path.

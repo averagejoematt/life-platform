@@ -1,6 +1,6 @@
 # IDEMPOTENCY.md — the external-side-effect replay census
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-24
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-25
 
 **What this is:** every code path in this platform that causes an effect the
 platform cannot take back — mail on the wire, a row in a ledger, an object in a
@@ -66,10 +66,16 @@ disagree about who is in the set.
 All 28 honour a send suppressor (#2222/#2291) — that is a solved problem and is
 not restated per row. The column that matters here is **replay-safe**.
 
+**#3113 closed the gap DIL-025 opened.** 6 senders were replay-safe when this
+file was written; 19 are now, and the remaining **9** carry a written verdict
+rather than silence. The honest `N` rows in §2b are as much the deliverable as
+the `Y` rows — three of them are `N` because the Lambda's IAM role is read-only
+by design and the duplicate it would prevent is an ops digest nobody records.
+
 **Legend.** Replay-safe `Y` = a second invocation with the same payload will not
 send a second letter. `N` = it will.
 
-### 2a. Replay-safe today (6)
+### 2a. Replay-safe today (19)
 
 | Module | Trigger | Mechanism | Evidence |
 |---|---|---|---|
@@ -79,42 +85,45 @@ send a second letter. `N` = it will.
 | `emails/wednesday_chronicle_lambda.py` | `cron` Wednesday | #2254 generation-time gate, **before** the Sonnet call and the approval mail: refuses a week already in a protected status, so a replay cannot mint a second `approval_token` over the one in Matthew's inbox. `{"force": true}` is the escape hatch. | `wednesday_chronicle_lambda.py:509+`; `chronicle_store.py:63-72` |
 | `emails/coach_nudge_lambda.py` | schedule | `_reserve_day()` — a conditional put claiming the day's nudge slot (`attribute_not_exists(pk)`, no TTL). Fails **closed**: any error stands the nudge down. | `coach_nudge_lambda.py:325-345` |
 | `emails/coach_panel_podcast_lambda.py` | manual / unscheduled | Week-artifact presence check — an existing week in `episodes.json` is skipped unless `{"force": true}`. Gates the whole run, including the mail. | `coach_panel_podcast_lambda.py:8`, `:947` |
+| `emails/milestone_digest_lambda.py` | `cron(15 17 * * ? *)` | **#3113.** `period_key = milestone:{milestone_id}` — episodic, so the key is the announced milestone, not a calendar period, and it is the same id however many days later a redrive lands. Recorded after the **first** delivery, so a crash mid-fan-out cannot re-mail the whole list. | `milestone_digest_lambda.py::_period_key`; `tests/test_send_replay_guard_dil025.py` |
+| `emails/partner_email_lambda.py` | `cron(30 17 ? * 1 *)` | **#3113.** `period_key = week:{ISO week}`, guarded before `gather_all` and the Sonnet call. ISO week rather than a date because `w_end` is derived from the wall clock and shifts under a redrive crossing UTC midnight; Saturday and the following Sunday close the same ISO week. | `partner_email_lambda.py::_period_key`; `tests/test_send_replay_guard_dil025.py` |
+| `emails/weekly_digest_lambda.py` | `cron(0 16 ? * SUN *)` | **#3113.** `period_key = week:{ISO week}`; the completion row moved from the end of the handler (~40 lines of insight-writing later) to one line after the SES call. | `weekly_digest_lambda.py` guard + `record_email_send` |
+| `emails/weekly_plate_lambda.py` | `cron(0 2 ? * SAT *)` | **#3113.** `period_key = week:{ISO week}` — the food window is a rolling 14 days, but the EDITION is weekly and that is what must not be mailed twice. | `weekly_plate_lambda.py::_period_key` |
+| `emails/monday_compass_lambda.py` | `cron(0 15 ? * MON *)` | **#3113.** `period_key = week:{ISO week of TODAY}` — the compass is the letter for the week AHEAD, so unlike the look-back senders it keys on today, not yesterday. | `monday_compass_lambda.py::_period_key` |
+| `emails/nutrition_review_lambda.py` | `cron(0 17 ? * SAT *)` | **#3113.** `period_key = week:{ISO week}`, and the ledger is read/written under `USER_ID` (not a hardcoded `matthew`) so the guard reads the partition #2221 fixed. | `nutrition_review_lambda.py::_period_key` |
+| `emails/anomaly_detector_lambda.py` | `cron(5 15 * * ? *)` | **#3113.** `period_key = date:{analysed date}`, covering **both** letters this handler can mail (multi-source alert + sustained-streak alert) — two keys would collide on the shared sort key and the second would erase the first. Deliberately **not** an early return: a replay re-runs the analysis and rewrites the anomaly record, and only the mail is suppressed. A completed run that mailed nothing writes a `run:` key that can never match, so a quiet run cannot suppress a later genuine alert. | `anomaly_detector_lambda.py` `replayed` branches |
+| `emails/ai_review_pack_lambda.py` | `cron(0 18 ? * SUN *)` | **#3113.** `period_key = week:{ISO week}`. Note the ledger name keeps the historical hyphen (`email_log#ai-review-pack`) so the guard reads the partition the status page writes. | `ai_review_pack_lambda.py::LEDGER_NAME` |
+| `emails/between_chronicle_lambda.py` | `cron(0 17 ? * SUN *)` | **#3113.** `period_key = week:{ISO week}`, recorded after the **first** subscriber send. Deliberately not the content hash this module already computes: the digest is assembled from live records, so a redrive hours later can hash differently for the same letter and the existing marker check sails through. | `between_chronicle_lambda.py::_period_key` |
+| `emails/evening_nudge_lambda.py` | `cron(0 3 * * ? *)` | **#3113.** `period_key = date:{pacific_today()}` — the same reason AUDIT BUG-02 made the rest of this handler read Pacific: at 03:00 UTC a UTC-dated key names tomorrow. Needed a new `dynamodb:PutItem` grant (`role_policies_email.email_evening_nudge`). | `evening_nudge_lambda.py` guard |
+| `emails/insight_email_parser_lambda.py` | **SES receipt rule → S3** (event-driven, #2291) | **#3113.** No calendar period exists — the letter's identity is the inbound message it answers, so `period_key = msg:{S3 object key}`. Needed a new `dynamodb:Query` grant (`role_policies_operational.operational_insight_email_parser`). | `insight_email_parser_lambda.py` per-record guard |
+| `compute/weekly_signal_lambda.py` | `cron(30 16 ? * SUN *)` | **#3113.** `period_key = week:{ISO week}`, recorded after the **first** subscriber send. The #2820 delivery datapoint is a CloudWatch METRIC, not a durable record, and cannot answer "did this week's letter already go to the list?". Needed new `dynamodb:PutItem` + `kms:GenerateDataKey` grants. | `weekly_signal_lambda.py` guard |
+| `web/subscriber_onboarding_lambda.py` | `cron(5 17 * * ? *)` | The guard is **per-recipient**, which a per-lambda `period_key` cannot express: there is no one letter, there are N, each on its own clock relative to that subscriber's `confirmed_at`. The `onboarding_sent` flag IS a durable per-letter record, read before the send by the query's `FilterExpression` and written **one line** after it. Re-classified from "partial" on re-reading (#3113): the residual window (send OK, `update_item` raises) is the same fail-open window `send_ledger.record_sent` has. | `subscriber_onboarding_lambda.py:174`, `:225-232` |
 
-### 2b. No replay guard (22) — `filed #3113`
+### 2b. Residual — no ledger, by verdict (9)
 
-None of these has a durable record of *what* it last sent, so a "sent, then
-crashed" invocation followed by an async retry or a 6-hourly redrive mails the
-same letter again. Ordered by consequence.
+Each of these was assessed under #3113 and **deliberately not** given the shared
+primitive. The reasons are specific, not a shrug — and two of them are the same
+reason twice: the role is read-only *by design*, so adopting the ledger would
+mean granting `dynamodb:PutItem` to a Lambda whose whole posture is that it
+cannot write, in order to close a "duplicate ops digest is noise" gap. That is
+the disproportion ADR-103/144 exists to refuse.
 
-| Module | Trigger | Side effect | Why it is not merely cosmetic |
+| Module | Trigger | Replay-safe | Why no ledger |
 |---|---|---|---|
-| `emails/milestone_digest_lambda.py` | schedule | Mails the **friends-and-family list** | A duplicate reaches third parties. Has a ledger *cooldown* spacing announcements, which is not a replay guard. |
-| `emails/partner_email_lambda.py` | schedule | Mails a **partner address** resolved from SSM | Same: third-party recipient. |
-| `emails/weekly_digest_lambda.py` | schedule | Reader-facing weekly letter | Writes an `email_log` row it never reads. |
-| `emails/weekly_plate_lambda.py` | schedule | Reader-facing | Writes `email_log`, never reads it. |
-| `emails/monday_compass_lambda.py` | schedule | Reader-facing | Writes `email_log`, never reads it. |
-| `emails/nutrition_review_lambda.py` | schedule | Owner-facing review | Writes `email_log`, never reads it. |
-| `emails/anomaly_detector_lambda.py` | schedule | Owner alerts | Writes `email_log`, never reads it. Its internal "dedup" is sleep-metric selection, not send dedup. |
-| `emails/ai_review_pack_lambda.py` | schedule | Owner-facing | Writes `email_log`, never reads it. |
-| `emails/between_chronicle_lambda.py` | schedule | Reader-facing | No `email_log` row at all. |
-| `emails/evening_nudge_lambda.py` | schedule | Owner nudge | No completion record. |
-| `emails/insight_email_parser_lambda.py` | **SES receipt rule → S3** (event-driven, #2291) | Reply mail | Event-driven, so the async-retry vector still applies. |
-| `web/email_subscriber_lambda.py` | **reader HTTP** (FunctionURL) | Confirmation / welcome mail | See §4 — the row is natural-keyed, but a resubmit mints a new token and re-sends. |
-| `web/subscriber_onboarding_lambda.py` | `cron(5 17 * * ? *)` | Onboarding mail | Flag-gated (`onboarding_sent`) — a *partial* guard, but the flag write is unconditional and follows the send. |
-| `compute/weekly_signal_lambda.py` | schedule | Owner-facing | Hand-rolled dry-run gate only. |
-| `operational/alert_digest_lambda.py` | schedule | Ops digest | Content is a fresh alarm observation; a duplicate is noise, not a false record. |
-| `operational/canary_lambda.py` | schedule | Ops alert | As above. |
-| `operational/data_reconciliation_lambda.py` | schedule | Ops report | As above. |
-| `operational/dlq_consumer_lambda.py` | `rate(6 hours)` | Ops digest | **It is itself the redrive engine** — a duplicate digest is harmless, but note the recursion. |
-| `operational/permanence_lambda.py` | schedule | Ops report | As above. |
-| `operational/pip_audit_lambda.py` | schedule | Ops report | As above. |
-| `operational/qa_smoke_lambda.py` | schedule | Ops report | As above. |
-| `operational/traffic_digest_lambda.py` | schedule | Ops digest | As above. |
+| `operational/canary_lambda.py` | `rate(4 hours)` | **N — accepted** | A liveness alert is a *fresh observation*, and a repeated alert during a real outage is the point. Suppressing the second one is a way to hide an outage, which is a worse failure than a duplicate mail. |
+| `operational/dlq_consumer_lambda.py` | `rate(6 hours)` | **N — accepted** | **It is itself the redrive engine.** Its digest is queue state at read time; a duplicate is a repeated reading of a moving number. |
+| `operational/qa_smoke_lambda.py` | `cron(30 18 ? * * *)` | **N — accepted** | Nightly observation, not a reproducible artifact. (Also at 1,198 of the 1,200-line module ceiling — `tests/test_module_size_guard.py` — so a guard cannot land without an unrelated extraction.) |
+| `operational/alert_digest_lambda.py` | `cron(0 15 * * ? *)` | **N — accepted** | Content is the alarm state at read time. Its role (`operational_alert_digest`) holds **no DynamoDB grant at all** — SQS drain + `DescribeAlarms` + SES. |
+| `operational/pip_audit_lambda.py` | `cron(0 17 ? * MON *)` | **N — accepted** | Its role holds **no AWS resource access at all** ("just runs pip-audit and reports"). |
+| `operational/traffic_digest_lambda.py` | `cron(0 16 ? * MON *)` | **N — accepted** | `dynamodb:Query` only — "Query only, never write — the digest is read-only by contract" (`role_policies_operational.py`). |
+| `operational/permanence_lambda.py` | `cron(0 6 * * ? *)` | **N — accepted** | `dynamodb:Query` only, and #1400 says why out loud: "the contract's own state lives in the published continuity document rather than in a private partition." |
+| `operational/data_reconciliation_lambda.py` | `cron(30 7 ? * MON *)` | **N — accepted** | Read-only DDB grant (`GetItem`/`Query`/`Scan`, no write). Report content is a fresh reconciliation reading. |
+| `web/email_subscriber_lambda.py` | **reader HTTP** (FunctionURL) | **Partial — accepted** | The remaining exposure is a *reader resubmitting the form*, which is not a replay: re-sending the confirmation is the intended behaviour when someone lost the first mail. The `confirm` leg is already replay-safe — the token is `REMOVE`d on use, so a replayed confirm cannot re-send the welcome (see §4). |
 
-> The last eight are the weakest case for a guard and the strongest case for an
-> explicit written verdict: their content is a *fresh observation at send time*,
-> so a duplicate is a repeated reading, not a falsified record. #3113 requires
-> each to either adopt the ledger or record that reasoning as a row here.
+> The eight ops rows are the honest `N` this census was built to make sayable.
+> Their content is a *fresh observation at send time*, so a duplicate is a
+> repeated reading, not a falsified record — and closing that gap would cost a
+> write grant on five roles that are read-only on purpose.
 
 ---
 
@@ -193,7 +202,7 @@ counter `ADD` is structurally unreachable a second time.
 | `/api/experiment_suggest` | Content hash **+** `ConditionExpression="attribute_not_exists(sk)"` → true no-op, `duplicate: true` | **Y** — the strongest door on the surface |
 | `/api/challenge_checkin` | Read-modify-write dedup on `date` | **Y** for replay; races on truly simultaneous delivery |
 | `/api/cohort_submit`, `/api/ritual_log` | Natural-key overwrite (`SUBMIT#{ip_hash}`, `DATE#{date}`) | **Y** |
-| `/api/subscribe` | Natural key `EMAIL#{sha256}` — no duplicate row, but a resubmit mints a **new token** and re-sends the confirmation | **Partial** — `filed #3113` |
+| `/api/subscribe` | Natural key `EMAIL#{sha256}` — no duplicate row, but a resubmit mints a **new token** and re-sends the confirmation | **Partial** — accepted (#3113 §2b: a resubmit is a reader action, not a replay) |
 | `/api/subscribe?action=confirm` / `unsubscribe` | Token is `REMOVE`d on confirm (self-invalidating); unsubscribe guarded by a status read | **Y** |
 | `/api/submit_finding`, `/api/board_question` | Content-addressed — but under a `{date}` / `{YYYY-MM}` prefix, and an unconditional `put_object` | **N** — a boundary-crossing retry duplicates AND resets `status` over a moderation decision. `filed #3118` |
 | `site_api_ai` follow-up turn | `ADD followup_count` + `list_append`; the condition enforces the **cap and IP**, never turn identity | **N** — a duplicate appends the same turn twice and burns two of three reader follow-ups. `filed #3118` |

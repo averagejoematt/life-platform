@@ -893,9 +893,14 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
     shared dlq-consumer's dead-letter-archive/ root) and CloudWatchMetrics so it
     can emit LifePlatform/Email::InsightParseFailure — required in lockstep with
     that emit by tests/test_put_metric_data_grant_lockstep.py (#1196).
+
+    #3113 (DIL-025): + dynamodb:Query. The confirmation reply is now gated on a
+    `common.send_ledger` row keyed on the inbound message's S3 key, and
+    `send_ledger.already_sent` reads it with a bounded Query. The read fails
+    OPEN, so without this grant the guard would silently never fire.
     """
     return _operational_base(
-        ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"],
+        ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
         needs_s3_read=["inbound-email/*", "generated/qa_archive/text/*"],
         needs_s3_write=["dead-letter-archive/insight-email-parser/*"],
         needs_dlq=True,
