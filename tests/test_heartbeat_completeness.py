@@ -56,9 +56,23 @@ pytestmark = pytest.mark.deploy_critical
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CDK_STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
+DEPLOY_DIR = os.path.join(ROOT, "deploy")
 
 if LAMBDAS_DIR not in sys.path:
     sys.path.insert(0, LAMBDAS_DIR)
+if DEPLOY_DIR not in sys.path:
+    sys.path.insert(0, DEPLOY_DIR)
+
+# #3161: the CDK-derived alarm-name inventory is NOT hand-rolled here — it delegates to
+# deploy/alarm_discovery.py's _auto_discover_alarm_names(), the SAME AST discoverer
+# sync_doc_metadata.py uses for the alarm_count doc-sync literal (#795/#934). Reusing it
+# matters: it correctly excludes "ghost" alarm_name= kwargs that are never actually
+# created (create_platform_lambda's `error_alarm=False` fleet-wide spread on
+# ingestion/compute/email Lambdas suppresses the alarm even when alarm_name= is passed).
+# This test file used to hand-roll a second, blunter scanner (cdk_alarm_names(), removed
+# below) that matched those ghost names as if real — exactly how six exemption rows in
+# COVERAGE got away with citing controls that don't exist (#3161).
+from alarm_discovery import _auto_discover_alarm_names  # noqa: E402
 
 # lambda_helpers.py holds the GENERIC schedule/Rule machinery (its events.Rule is
 # the helper every stack call flows through) — scanning it would double-count.
@@ -93,13 +107,39 @@ def scheduled_lambdas() -> dict:
         var_to_fn = {}  # local variable name → function_name
         rule_enabled = {}  # rule variable name → enabled flag
 
+        # #3161: module-level `NAME = "literal-string"` constants, resolved so a
+        # `function_name=SOME_CONSTANT` kwarg (mcp_stack.py's WARMER_FUNCTION_NAME) is
+        # NOT indistinguishable from a genuinely unresolvable expression. This is the
+        # ONE additional shape taught here — anything else non-Constant still hits the
+        # loud-failure branch below, per this function's own docstring ("a new wiring
+        # pattern? teach scheduled_lambdas() about it — do NOT let it be silently
+        # skipped").
+        const_map = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                for t in node.targets:
+                    if isinstance(t, ast.Name):
+                        const_map[t.id] = node.value.value
+
         # Pass 1: create_platform_lambda calls (scheduled?) + assignments.
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and _is_call_to(node, "create_platform_lambda"):
                 fn_kw = _kw(node, "function_name")
-                if not isinstance(fn_kw, ast.Constant):
+                if isinstance(fn_kw, ast.Constant) and isinstance(fn_kw.value, str):
+                    fn_name = fn_kw.value
+                elif isinstance(fn_kw, ast.Name) and fn_kw.id in const_map:
+                    fn_name = const_map[fn_kw.id]
+                else:
+                    # #3161: this used to be a silent `continue` — exactly how
+                    # life-platform-mcp-warmer (mcp_stack.py's WARMER_FUNCTION_NAME,
+                    # a Name node the old branch couldn't resolve) went missing from
+                    # every COVERAGE row, every EXEMPT row, and every test failure
+                    # message: structurally invisible, not even flagged as a gap.
+                    unresolved.append(
+                        f"{fname}:{node.lineno} → create_platform_lambda(function_name=<unresolvable: "
+                        f"{ast.dump(fn_kw) if fn_kw is not None else 'missing'}>)"
+                    )
                     continue
-                fn_name = fn_kw.value
                 node._fn_name = fn_name  # stash for the Assign pass
                 sched = _kw(node, "schedule")
                 if sched is not None and not (isinstance(sched, ast.Constant) and sched.value is None):
@@ -170,12 +210,23 @@ def ses_triggered_lambdas() -> dict:
         with open(os.path.join(CDK_STACKS_DIR, fname), encoding="utf-8") as f:
             tree = ast.parse(f.read())
 
+        # #3161: same module-level-constant resolution as scheduled_lambdas() above —
+        # kept in sync so a Name-based function_name can't go invisible here either.
+        const_map = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                for t in node.targets:
+                    if isinstance(t, ast.Name):
+                        const_map[t.id] = node.value.value
+
         var_to_fn = {}
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and _is_call_to(node, "create_platform_lambda"):
                 fn_kw = _kw(node, "function_name")
-                if isinstance(fn_kw, ast.Constant):
+                if isinstance(fn_kw, ast.Constant) and isinstance(fn_kw.value, str):
                     node._fn_name = fn_kw.value
+                elif isinstance(fn_kw, ast.Name) and fn_kw.id in const_map:
+                    node._fn_name = const_map[fn_kw.id]
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
                 call = node.value
@@ -208,34 +259,52 @@ def ses_triggered_lambdas() -> dict:
 
 
 def cdk_alarm_names() -> set:
-    """Every alarm_name string defined in cdk/stacks/*.py (alarm_name= kwargs plus
-    the positional alarm-name argument of monitoring_stack's _alarm/_heartbeat_alarm
-    helpers)."""
-    names = set()
-    for fname in sorted(os.listdir(CDK_STACKS_DIR)):
-        if not fname.endswith(".py") or fname.startswith("__"):
-            continue
-        with open(os.path.join(CDK_STACKS_DIR, fname), encoding="utf-8") as f:
-            tree = ast.parse(f.read())
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            an = _kw(node, "alarm_name")
-            if isinstance(an, ast.Constant) and isinstance(an.value, str):
-                names.add(an.value)
-            if _is_call_to(node, "_alarm") or _is_call_to(node, "_heartbeat_alarm"):
-                if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
-                    names.add(node.args[1].value)
+    """The set of CloudWatch alarm names ACTUALLY created by cdk/stacks/*.py.
+
+    #3161: delegates to deploy/alarm_discovery.py's `_auto_discover_alarm_names()` — the
+    same AST discoverer sync_doc_metadata.py uses for the alarm_count doc-sync literal
+    (#795/#934) — instead of hand-rolling a second alarm-listing method here. That is not
+    a style preference: this test used to have its own blunter scanner that matched ANY
+    `alarm_name=` kwarg regardless of whether `create_platform_lambda`'s
+    `if _selected_topic and error_alarm:` gate actually creates the alarm. The ingestion/
+    compute/email fleets pass a shared `error_alarm=False` spread (COST-01, #790) that
+    SUPPRESSES per-Lambda alarms even when an `alarm_name=` literal sits right there in
+    source — e.g. `ingestion-error-enrichment` (activity-enrichment) reads as a real
+    alarm name to a naive AST scan and is not one; it is never created. Six exemption
+    rows below cited compensating controls resolved only against that naive scanner (or
+    not resolved against anything at all) — a mix of ghost alarm-name lookalikes and one
+    control, "ingestion error aggregate", that greps to zero hits anywhere in cdk/ or
+    deploy/. The canonical discoverer's `_create_platform_lambda_makes_alarm` gate closes
+    that hole structurally.
+    """
+    names = _auto_discover_alarm_names()
+    assert names, (
+        "alarm_discovery._auto_discover_alarm_names() returned nothing (or None) — "
+        "cdk/stacks/ is unreadable or the discoverer rotted. Every alarm-citation check "
+        "below is hollow until this returns a real set."
+    )
     return names
 
 
 # ── The coverage ledger ───────────────────────────────────────────────────────
 # Entry kinds:
-#   ("alarm", "<alarm-name>")          — an alarm that fires when the Lambda (or the
-#                                        output only it produces) goes ABSENT/stale.
-#   ("ingest-liveness", "<source>")    — covered by the ER-01 daily sweep over
-#                                        source_registry active_api sources.
-#   ("exempt", "YYYY-MM-DD", "reason") — dated, honest acceptance of silent absence.
+#   ("alarm", "<alarm-name>")                        — an alarm that fires when the
+#                                                       Lambda (or the output only it
+#                                                       produces) goes ABSENT/stale.
+#   ("ingest-liveness", "<source>")                  — covered by the ER-01 daily sweep
+#                                                       over source_registry active_api
+#                                                       sources.
+#   ("exempt", "YYYY-MM-DD", "reason")               — dated, honest acceptance of
+#                                                       silent absence.
+#   ("exempt", "YYYY-MM-DD", "reason", "cited_control")
+#       — same, PLUS a 4th element (#3161) naming a specific real alarm the reason
+#         leans on (e.g. as error-mode compensation for the accepted absence).
+#         test_exemption_cited_controls_reference_real_alarms() asserts this string is
+#         an alarm_name cdk/stacks/*.py actually creates (via cdk_alarm_names(), which
+#         itself excludes alarm_name= literals that error_alarm=False suppresses — see
+#         cdk_alarm_names()'s docstring). Omit the 4th element when the reason cites a
+#         human/process control instead of an alarm (e.g. "noticed by its reader") —
+#         there is nothing there to structurally verify.
 
 ALARM = "alarm"
 LIVENESS = "ingest-liveness"
@@ -275,6 +344,15 @@ COVERAGE = {
     # promise. Emits LifePlatform/Permanence::ArchiveBuilt on every completed run.
     "life-platform-permanence": (ALARM, "permanence-heartbeat"),
     "life-platform-freshness-checker": (ALARM, "freshness-interior-gap-heartbeat"),
+    # #3161: this Lambda was invisible to the enumerator entirely until this PR — its
+    # function_name is mcp_stack.py's WARMER_FUNCTION_NAME constant, not a string
+    # literal, so scheduled_lambdas()'s old `if not isinstance(fn_kw, ast.Constant):
+    # continue` silently dropped it (no COVERAGE row, no gap in test output, nothing).
+    # mcp-warmer already had an Errors alarm (slo-warmer-completeness) but that does
+    # NOT satisfy this ledger — errors require an invocation, so it cannot detect "the
+    # cron stopped firing." mcp-warmer-no-invocations-24h (new, mcp_stack.py) is the
+    # real absence signal, mirroring daily-brief-no-invocations-24h.
+    "life-platform-mcp-warmer": (ALARM, "mcp-warmer-no-invocations-24h"),
     # ── Compute cascade feeding the 17:00 UTC brief (#1455 added the alarm leg:
     #    pipeline-health-check's 16:58 UTC {check_compute_outputs} run has emitted
     #    LifePlatform/Pipeline::ComputeOutputsMissing since Phase 3.2 — now alarmed;
@@ -295,40 +373,68 @@ COVERAGE = {
     #     surfaces render honest dated staleness (ADR-104).
     #   * "derived layer": deterministic recompute over already-liveness-checked
     #     ingested data; a missed run means consumers read the previous value with
-    #     its date. Failure-mode (thrown errors) is covered by the per-Lambda
-    #     digest error alarm + DLQ digest — it is ABSENCE that is accepted here.
+    #     its date. #3161 CORRECTED this line — it used to claim failure-mode was
+    #     "covered by the per-Lambda digest error alarm", which is false for the
+    #     compute-stack Lambdas in this class: compute_stack.py's shared kwargs
+    #     spread sets `error_alarm=False` (COST-01, #790) — there IS no per-Lambda
+    #     alarm to be that backstop. What actually exists is the SHARED
+    #     `life-platform-ingestion-dlq-messages` alarm (every compute Lambda still
+    #     routes terminal async failures to the one ingestion DLQ) — a coarser,
+    #     fleet-wide signal, not a per-Lambda one. It is ABSENCE that is accepted
+    #     here regardless; this note only fixes what was said about error-mode.
     #   * "operator email": the output IS an email to Matthew on a human rhythm;
     #     a missing issue is noticed by its reader, and error-mode is alarmed.
+    #
+    # cited_control (4th tuple element, #3161): where a row's prose names a SPECIFIC
+    # compensating alarm, that alarm name is repeated here as a 4th, machine-checked
+    # element — test_exemption_cited_controls_reference_real_alarms() asserts it is a
+    # real alarm_name cdk/stacks/*.py actually creates (not just an alarm_name= literal
+    # that error_alarm=False suppresses, and not a phrase like "ingestion error
+    # aggregate" that never existed anywhere in cdk/ or deploy/ — grepped zero hits,
+    # #3161's audit finding). Rows whose reason cites a human/process control (not an
+    # alarm) correctly have no 4th element — there is nothing there to structurally
+    # verify.
     "life-platform-delete-user-data": (
         EXEMPT,
         "2026-07-25",
         "#1350: the weekly subscriber-retention sweep is a slow-moving compliance job — a missed run purges eligible "
         "unsubscribed emails one week later (no freshness/correctness impact), and a week with no eligible rows "
         "legitimately writes nothing, so ABSENCE of output is a sanctioned state an absence alarm would false-fire on. "
-        "The lambda's primary role is on-demand user-data deletion; error-mode is covered by its digest error alarm.",
+        "The lambda's primary role is on-demand user-data deletion; error-mode is covered by its dedicated per-Lambda "
+        "error alarm (operational_stack.py — NOT the ingestion/compute/email fleet's suppressed error_alarm=False; "
+        "this Lambda keeps a real one).",
+        "life-platform-delete-user-data-errors",
     ),
     "activity-enrichment": (
         EXEMPT,
         "2026-07-19",
         "Additive enrichment of already-stored Strava records; a dead cron degrades detail, never freshness/correctness "
-        "(the strava source itself is ER-01 liveness-checked). Failures → DLQ digest + ingestion error aggregate.",
+        "(the strava source itself is ER-01 liveness-checked). #3161: corrected — 'ingestion error aggregate' never "
+        "existed (zero hits in cdk/ or deploy/; monitoring_stack.py's own COST-01 comment says outright 'No aggregate "
+        "replaces them'). Failures route to the shared ingestion DLQ (dlq=local_dlq, error_alarm=False), alarmed by "
+        "life-platform-ingestion-dlq-messages — a fleet-wide signal, not per-Lambda.",
+        "life-platform-ingestion-dlq-messages",
     ),
     "journal-enrichment": (
         EXEMPT,
         "2026-07-26",
         "Additive enrichment of already-ingested Notion journal records (notion source is ER-01 liveness-checked); "
-        "absence degrades detail only. Failures → DLQ digest + ingestion error aggregate. #1756 added the #1574 "
+        "absence degrades detail only. #3161: corrected — 'ingestion error aggregate' never existed; failures route to "
+        "the shared ingestion DLQ, alarmed by life-platform-ingestion-dlq-messages. #1756 added the #1574 "
         "diary-reaction trigger to this pass — still additive and still absence-safe: a reaction is produced only "
         "for an entry Matthew explicitly consented (rare by construction, so an absence alarm would false-fire on "
         "every ordinary day), it is fail-open (never fails the enrichment run), and an absent reaction renders "
         "nothing on lab-notes by design (#1574 AC3).",
+        "life-platform-ingestion-dlq-messages",
     ),
     "social-enrichment": (
         EXEMPT,
         "2026-07-22",
         "#1671 (epic #1668): additive enrichment of already-ingested inbound-social posts (writes enriched_* back in place, no "
         "new source partition). A dead cron degrades coach-signal detail only, never data freshness/correctness; the youtube "
-        "source it reads is itself dormant until the owner provisions a channel id. Failures → DLQ digest + ingestion error aggregate.",
+        "source it reads is itself dormant until the owner provisions a channel id. #3161: corrected — 'ingestion error "
+        "aggregate' never existed; failures route to the shared ingestion DLQ, alarmed by life-platform-ingestion-dlq-messages.",
+        "life-platform-ingestion-dlq-messages",
     ),
     "acwr-compute": (EXEMPT, "2026-07-19", "Derived layer: ACWR training-load ratios recomputed daily from liveness-checked sources."),
     "anomaly-detector": (
@@ -421,8 +527,11 @@ COVERAGE = {
         EXEMPT,
         "2026-07-26",
         "#1623: sends are rare by design (>=10-14 day ledger cooldown) and most daily runs are honest no-ops (quiet/disarmed), "
-        "so an absence alarm cannot distinguish 'dead cron' from 'nothing to celebrate'. Error-mode is covered by the digest "
-        "error alarm + DLQ. Revisit when the recipient secret is provisioned and the first real send lands.",
+        "so an absence alarm cannot distinguish 'dead cron' from 'nothing to celebrate'. #3161: corrected — this Lambda uses "
+        "email_stack.py's shared kwargs spread (error_alarm=False, COST-01), so there is no dedicated per-Lambda 'digest error "
+        "alarm'; error-mode is covered by the shared ingestion DLQ, alarmed by life-platform-ingestion-dlq-messages. Revisit "
+        "when the recipient secret is provisioned and the first real send lands.",
+        "life-platform-ingestion-dlq-messages",
     ),
     "nutrition-review": (EXEMPT, "2026-07-19", "Operator email (Saturday nutrition review); a missing issue is noticed by its reader."),
     "monday-compass": (EXEMPT, "2026-07-19", "Operator email (Monday week-plan); a missing issue is noticed by its reader same-morning."),
@@ -450,6 +559,17 @@ COVERAGE = {
     # telegram-event-sweep-heartbeat fires when that datapoint stops arriving. The
     # sanctioned no-op states all still emit; only a dead cron is silent.
     "telegram-coach-worker": (ALARM, "telegram-event-sweep-heartbeat"),
+    # #3161 evidence note — NOT a ledger row (out of this file's enumeration domain):
+    # `telegram-webhook` (serve_stack.py, the DIFFERENT Lambda that receives Telegram's
+    # inbound POSTs — telegram-coach-worker above is the scheduled event-sweep, a
+    # separate function) has no `schedule=` kwarg, so scheduled_lambdas() cannot and
+    # should not enumerate it; it is FunctionURL-triggered only. Live-verified
+    # 2026-08-25 (epic #2799 audit): it carries ONLY `telegram-webhook-throttles` — no
+    # Errors/absence alarm at all (alerts_topic=None in its create_platform_lambda call).
+    # Deliberately left unresolved here — see the TODO in serve_stack.py right above that
+    # alarm's construction: whether an unhandled webhook exception should page, go to
+    # digest, or stay silent (Telegram retries failed deliveries itself) is an owner
+    # paging-posture call, not one this PR makes unilaterally.
     "weekly-plate": (EXEMPT, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
     # #2820: the stale "Operator email" rationale predated #1951 lifting this to a
     # real subscriber send (2026-08-03). Same one-metric delivery dead-man as the
@@ -529,10 +649,25 @@ COVERAGE = {
         "4x-daily intraday vitals top-up of generated/public_stats.json; the daily anchor refresh rides the alarmed daily-brief "
         "pipeline, so absence = intraday staleness only on public vitals.",
     ),
+    # #3161 evidence note: this row IS this Lambda (operational_stack.py's scheduled
+    # og-image-generator, the daily PNG/WebP share-card cron) and its citation below was
+    # already accurate — it has a real terminal-failure alarm, ingestion-error-og-image-
+    # generator (default error_alarm=True here, unlike the ingestion/compute/email
+    # fleets). #2799's live-verify finding about "og-image having zero alarms" was about
+    # a DIFFERENT, identically-prefixed Lambda: `life-platform-og-image` (web_stack.py,
+    # the FunctionURL-triggered dynamic-SVG generator) — confirmed via
+    # `aws cloudwatch describe-alarms` 2026-08-25 to have genuinely zero alarms. That
+    # Lambda has no `schedule=`, so it is outside this file's enumeration domain and
+    # cannot be (and should not be forced to be) a COVERAGE row; real coverage was added
+    # instead — `life-platform-og-image-errors` in web_stack.py, wired via
+    # web_alarms.add_web_alarms(), replicating this exact per-Lambda-error-alarm pattern.
     "og-image-generator": (
         EXEMPT,
         "2026-07-19",
-        "Cosmetic share-card regeneration; stale PNGs degrade sharing polish only. Terminal failures → DLQ digest (#809/ADR-116).",
+        "Cosmetic share-card regeneration; stale PNGs degrade sharing polish only. Terminal failures → DLQ digest (#809/ADR-116) "
+        "+ its own per-Lambda error alarm, ingestion-error-og-image-generator (error_alarm defaults True here — this Lambda is "
+        "NOT part of the ingestion/compute/email error_alarm=False consolidation).",
+        "ingestion-error-og-image-generator",
     ),
     "hevy-restamp": (
         EXEMPT,
@@ -666,10 +801,10 @@ def test_exemptions_are_dated_and_reasoned():
             if len(entry) != 2:
                 problems.append(f"  {fn}: liveness entry must be ('ingest-liveness', source)")
         elif entry[0] == EXEMPT:
-            if len(entry) != 3:
-                problems.append(f"  {fn}: exemption must be ('exempt', 'YYYY-MM-DD', reason)")
+            if len(entry) not in (3, 4):
+                problems.append(f"  {fn}: exemption must be ('exempt', 'YYYY-MM-DD', reason) or (..., cited_control)")
                 continue
-            _, d, reason = entry
+            _, d, reason = entry[0], entry[1], entry[2]
             try:
                 when = datetime.strptime(d, "%Y-%m-%d").date()
                 if when > date.today():
@@ -678,9 +813,37 @@ def test_exemptions_are_dated_and_reasoned():
                 problems.append(f"  {fn}: exemption date {d!r} is not YYYY-MM-DD")
             if not isinstance(reason, str) or len(reason.strip()) < 40:
                 problems.append(f"  {fn}: exemption reason too thin — state WHY silent absence is acceptable (≥ 40 chars)")
+            if len(entry) == 4:
+                cited_control = entry[3]
+                if not isinstance(cited_control, str) or not cited_control.strip():
+                    problems.append(f"  {fn}: 4th tuple element (cited_control) must be a non-empty alarm-name string")
         else:
             problems.append(f"  {fn}: unknown entry kind {entry[0]!r}")
     assert not problems, "Malformed COVERAGE entries:\n" + "\n".join(problems)
+
+
+def test_exemption_cited_controls_reference_real_alarms():
+    """#3161: an exemption's 4th tuple element (cited_control) names a SPECIFIC
+    compensating alarm the reason leans on for error-mode coverage. This asserts that
+    name is a real alarm cdk/stacks/*.py actually creates — the same discipline
+    test_alarm_claims_reference_real_alarms() applies to ALARM-kind rows, extended to
+    the compensating controls EXEMPT rows cite.
+
+    Mutation-proved (see PR body for the pasted failing output): temporarily changing a
+    real cited_control to a fabricated name reds this test with the exact bad row named.
+    """
+    names = cdk_alarm_names()
+    bad = []
+    for fn, entry in sorted(COVERAGE.items()):
+        if entry[0] == EXEMPT and len(entry) == 4:
+            control = entry[3]
+            if control not in names:
+                bad.append(f"  {fn} → cites compensating control {control!r} which is not a real alarm cdk/stacks/*.py creates")
+    assert not bad, (
+        "EXEMPT rows below cite a compensating control that does not exist (renamed, deleted, or never real — e.g. an "
+        "alarm_name= literal that error_alarm=False suppresses, or a phrase that was never wired to an actual alarm). "
+        "An exemption whose compensating control doesn't exist is not an exemption (#3161):\n" + "\n".join(bad)
+    )
 
 
 if __name__ == "__main__":
