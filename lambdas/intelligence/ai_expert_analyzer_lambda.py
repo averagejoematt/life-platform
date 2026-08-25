@@ -969,12 +969,17 @@ def _load_prior_analysis(expert_key):
         return "", ""
 
 
-def _anthropic_req(prompt, api_key, max_tokens=2048):
-    """The one shaped messages-API POST this module's non-cached calls share (#2421)."""
+def _anthropic_req(prompt, api_key, max_tokens=2048, system=None):
+    """The one shaped messages-API POST this module's non-cached calls share; `system` lets a regen (#3170) reuse it verbatim."""
+    body = {"model": AI_MODEL, "max_tokens": max_tokens, "messages": [{"role": "user", "content": prompt}]}
+    headers = {"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"}
+    if system:
+        body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+        headers["anthropic-beta"] = "prompt-caching-2024-07-31"
     return urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
-        data=json.dumps({"model": AI_MODEL, "max_tokens": max_tokens, "messages": [{"role": "user", "content": prompt}]}).encode(),
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        data=json.dumps(body).encode(),
+        headers=headers,
     )
 
 
@@ -1066,7 +1071,8 @@ def _gate_prose(label, text, prompt, api_key, *, shared_system=None, extra_sourc
     def _regen(_correction):
         from common.retry_utils import call_anthropic_raw
 
-        _req = _anthropic_req(prompt + "\n\n" + _correction, api_key)
+        # #3170: same shared_system as the primary call — a regen is not a weaker contract.
+        _req = _anthropic_req(prompt + "\n\n" + _correction, api_key, system=shared_system)
         _raw = "".join(b["text"] for b in call_anthropic_raw(_req, timeout=60).get("content", []) if b.get("type") == "text")
         if extract is not None:
             return extract(_raw)
