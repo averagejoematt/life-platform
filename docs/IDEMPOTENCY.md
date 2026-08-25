@@ -132,21 +132,21 @@ persistent write, only a worker invoke.
 delivery of the same HAE payload does **not** double-count water or caffeine.
 Two independent reasons, and the load-bearing one is the second:
 
-1. every DDB write is `SET field = <absolute>`, never `ADD` (`:1025-1026`) — so
+1. every DDB write is `SET field = <absolute>`, never `ADD` (`:1020-1022`) — so
    even with zero dedup logic a replay overwrites rather than accumulates;
 2. the `_rd_{field}` reading map merges by the raw HAE timestamp and
-   **recomputes the total from the merged map** (`:949-965`), so `if ts not in
+   **recomputes the total from the merged map** (`:966-1005`), so `if ts not in
    merged` makes a replay a no-op. This is also what makes *incremental* syncs
    correct, since HAE sends only-new-readings bundles.
 
 | Source | Dedup mechanism today | Replay-safe | Evidence |
 |---|---|---|---|
-| water, caffeine | Reading-level `_rd_` map keyed on the HAE timestamp string, total recomputed from the merge; a failed dedup-read withholds the `_rd_` write rather than overwriting the stored map (#3119) | **Y** | `:681`, `:982-1030` |
-| steps, distance, active/basal calories, flights | GREATEST-on-write monotonic guard + cross-source `max_sum` | **Y** (also protected against undercount) | `:451-462`, `:962-980` |
-| blood_glucose_readings_count, blood_pressure_readings_count, som_check_in_count | GREATEST-on-write monotonic guard (#3119 — joined the mechanism above via `_READING_COUNT_GUARD_FIELDS`, kept as its own set since these are single-source per-payload counts, not a cross-device max-of-sums) | **Y** (also protected against undercount) | `:465-482`, `:962-980` |
-| cgm, blood_pressure, state_of_mind (DDB, non-count fields) | Stateless recompute from the payload → last-write-wins | **Y** for an identical replay | `:1647`, `:1733` |
-| cgm, blood_pressure, state_of_mind, workouts (S3) | Read-merge-dedup on the reading's own `time` / `id`; `put_object` skipped when nothing is new | **Y** | `:1096-1123`, `:1126-1151`, `:1154`, `:1510` |
-| raw payload archive | Key leaf is `{DD}_{sha256(payload)[:16]}.json` (#3119, was pure wall-clock `DD_HHMMSS.json`) — a redelivery of identical bytes the same UTC day resolves to the SAME key, an idempotent overwrite | **Y** for a same-day replay of identical bytes | `:1540-1566` |
+| water, caffeine | Reading-level `_rd_` map keyed on the HAE timestamp string, total recomputed from the merge; a failed dedup-read withholds the `_rd_` write rather than overwriting the stored map (#3119) | **Y** | `:677`, `:966-1005` |
+| steps, distance, active/basal calories, flights | GREATEST-on-write monotonic guard + cross-source `max_sum` | **Y** (also protected against undercount) | `:455-462`, `:946-964` |
+| blood_glucose_readings_count, blood_pressure_readings_count, som_check_in_count | GREATEST-on-write monotonic guard (#3119 — joined the mechanism above via `_READING_COUNT_GUARD_FIELDS`, kept as its own set since these are single-source per-payload counts, not a cross-device max-of-sums) | **Y** (also protected against undercount) | `:473-480`, `:946-964` |
+| cgm, blood_pressure, state_of_mind (DDB, non-count fields) | Stateless recompute from the payload → last-write-wins | **Y** for an identical replay | `:1511`, `:1540` |
+| cgm, blood_pressure, state_of_mind, workouts (S3) | Read-merge-dedup on the reading's own `time` / `id`; `put_object` skipped when nothing is new. Bodies extracted to the sibling `health_auto_export_archive.py` (#3119, the module-size ratchet split); `health_auto_export_lambda.py` keeps thin same-signature wrappers | **Y** | `ingestion/health_auto_export_archive.py:48-183`, wrappers at `health_auto_export_lambda.py:1080-1097,1422-1429` |
+| raw payload archive | Key leaf is `{DD}_{sha256(payload)[:16]}.json` (#3119, was pure wall-clock `DD_HHMMSS.json`) — a redelivery of identical bytes the same UTC day resolves to the SAME key, an idempotent overwrite. Also a DIL-028 generation flip: `filename`/`filename_legacy` facets added to `apple_health`'s `raw_layout` in `source_registry.py` | **Y** for a same-day replay of identical bytes | `ingestion/health_auto_export_archive.py:165-186` |
 
 Fixed by #3119: the raw archive no longer mints a fresh object per delivery of
 the same bytes; `*_readings_count` / `check_in_count` now share the
