@@ -33,14 +33,34 @@ until ~6am PT, pull in more Now/Next issues, implementation on sonnet/opus agent
   telemetry still zero-writes (fix not yet shipped — box open); backlog Now=4 all
   P2/P3; 4 alarms all previously cited.
 
-**In flight (7 worktree agents + 2 PR watchers):** #3117 #3130 #3143 #2883 (sonnet) ·
-#3113 #3050-remainder (opus) · #3119 (sonnet). Queued behind #3113 to avoid census-doc
-conflicts: #3114 #3115 #3118 (opus).
+**Owner directive #2 (~20:20 PT, in-conversation): "why can't we clear ALL Now/Next" →
+scope expanded to the full-drain wave.** Blocked-with-reasons (stated to owner): #3042
+(closes on the owner's own re-grade) · #3083/#2961 (gate:owner, batch items 5/7) ·
+#2883/#2957/#2888-verify (measurement/time-gated) · #2849 (model:fable, preserved).
+#2846 relabeled → opus per plan decision #3 (dated comment on issue).
+
+**MERGED so far:** #3146 (D5 instrument) · #3149 (#3130 closed w/ verdict) · #3150
+(#2883 re-measure, stays open) · #3153 + #3147 (**#3050 CLOSED w/ verdict** — matrix +
+clinical-lite hazard gate). **site-api-ai DEPLOYED + wire-verified both directions**
+(chest-pain → fixed 911 copy, no model call; "shoulder is killing me" → real answer).
+**Incidents tonight:** two module-size-ceiling collisions fixed by extraction
+(sync_doc_metadata → sync_doc_secret_inventory.py; the agent's HAE bump REVERTED to
+extraction per #2610); #3156 filed P2 (census fact falls back to a CONSTANT in CI —
+found when the wiki gate redded 3147; the #1957/#3112 class inside a 24h-old gate).
+
+**In flight:** PRs cycling the counter-conflict tax (~20min/cycle, serial): #3152
+(cycle 3) · #3155 · #3151 · #3157 · #3148 (green, HELD for end-of-train — it renames
+the full-suite check and would strand other watchers' expectations). Second wave (12
+agents): #3156 #3154 #3111 #3129 (sonnet) · #3114+#3115 #3118 #3107+#2888 #3104 #2847
+#2846 #2978 (opus) · epic acceptance auditor over #2986 #2801 #2799 #2798 #2578
+(close-with-evidence or keep-with-residuals; #3156 is standing evidence AGAINST #2578).
 
 **Driver protocol:** serial merges via deploy/wait_pr_green.sh only; verdicts read in
-their own commands; deploys per PR-body notes with postflight (site-api-ai needed after
-#3147; email/ingestion lambdas per DIL-025 PRs; cdk Monitoring if #3130/#2883 add
-alarms). Discovery-source tags on any new filings. No wrap tonight — owner wraps at wake.
+their own commands; platform_counts conflicts resolved by regeneration at merge time
+(driver-owned); deploys per PR-body notes with postflight (done: site-api-ai; pending
+per PR: HAE via cdk Ingestion, email fleet + cdk Email/Operational IAM for #3155,
+site-api for #3157, MCP lambda for #3114/#3115). Discovery-source tags on all filings
+(#3154 review · #3156 incident). No wrap tonight — owner wraps at wake.
 
 ---
 
