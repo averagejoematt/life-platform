@@ -152,7 +152,10 @@ def lambda_handler(event, context):
         summary: list[dict[str, Any]] = []
         pushed_one = False
         for ir in routines:
-            repo.put_versioned(ir)
+            # #3115: a re-run for the same target_date now lands on the same
+            # routine_id, so persist as the next VERSION of it (carrying the Hevy
+            # link forward) rather than raising RoutineConflict or forking a routine.
+            repo.draft_versioned(ir)
             # Push only the primary (branch-carrying) routine. Siblings are
             # persisted above for the record but folded into the primary's
             # branch menu — they are not pushed as separate routines anymore.
@@ -175,7 +178,15 @@ def lambda_handler(event, context):
                 ir.parent_version = ir.version - 1
                 repo.put_versioned(ir)
                 if ir.hevy_routine_id:
-                    repo.upsert_id_map(ir.routine_id, ir.hevy_routine_id)
+                    # #3115: routine_id is deterministic now, so a cron re-run for the
+                    # same day reaches this with the mapping ALREADY present. The
+                    # conditional id-map put then raises — which the MCP commit path has
+                    # always swallowed here and this one did not, so an idempotent re-run
+                    # would have gone to the DLQ for having nothing to do.
+                    try:
+                        repo.upsert_id_map(ir.routine_id, ir.hevy_routine_id)
+                    except repo.RoutineConflict:
+                        logger.info(f"id-map already present for routine {ir.routine_id}")
                 pushed_one = True
                 _emit_metric("RoutinePushed")
                 summary.append(
