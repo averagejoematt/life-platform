@@ -957,7 +957,11 @@ def _handle_ask(event: dict) -> dict:
             if q and a and _ask_question_safe(q)[0] and _ask_question_safe(a)[0]:
                 history.append((q, _scrub_blocked_terms(a)))
 
-        # WR-40: Safety filter
+        hazard_hit = _req.hazard_gate(question, "ask", "answer", CORS_HEADERS, extra={"remaining": 999})
+        if hazard_hit:
+            return hazard_hit
+
+        # WR-40: Safety filter (privacy categories — a different question from the above)
         is_safe, safety_reason = _ask_question_safe(question)
         if not is_safe:
             return {
@@ -1293,6 +1297,19 @@ def _handle_board_ask(event: dict) -> dict:
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
+    # #3050: this OPENING turn had NO input filter pre-gate (WR-40 skipped it) — the
+    # widest door: up to 12 Bedrock calls. History + why: _req.hazard_gate docstring.
+    hazard_hit = _req.hazard_gate(question, "board_ask", "response", CORS_HEADERS)
+    if hazard_hit:
+        return hazard_hit
+    is_safe, safety_reason = _ask_question_safe(question)
+    if not is_safe:
+        return {
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+            "body": json.dumps({"response": safety_reason, "filtered": True}),
+        }
+
     # #373: convene the REAL roster. Legacy cached ids map to their nearest
     # coach; a genuinely unknown id is a 400 BEFORE any paid model call.
     requested = body.get("personas") or ["training_coach", "nutrition_coach", "sleep_coach"]
@@ -1536,6 +1553,10 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     question = _req.text_field(body, "question")
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
+
+    hazard_hit = _req.hazard_gate(question, "board_followup", "response", CORS_HEADERS, extra={"persona": persona})
+    if hazard_hit:
+        return hazard_hit
 
     # WR-40 safety filter on the follow-up (the new untrusted input surface).
     is_safe, safety_reason = _ask_question_safe(question)
