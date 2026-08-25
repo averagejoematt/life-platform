@@ -195,6 +195,12 @@ def make_session_update_hook(enforce_cap: bool = True) -> Callable[..., dict]:
     ConditionalCheckFailedException. With `enforce_cap=False`
     (test_untrusted_reader_delimiter.py's behavior): only a missing session
     raises; the cap/IP aren't checked.
+
+    #3118 — the turn-identity arm of the real ConditionExpression
+    (``attribute_not_exists(turn_ids) OR NOT contains(turn_ids, :tid)``) is
+    emulated here unconditionally, in BOTH flavors, because it is a correctness
+    guard rather than a budget one: a replayed turn id raises and the
+    ``turn_ids`` set grows on every accepted append. Fixture must be the wire.
     """
 
     def _hook(table: FakeDdbTable, Key, ExpressionAttributeValues, ExpressionAttributeNames=None, **_kwargs) -> dict:
@@ -206,6 +212,12 @@ def make_session_update_hook(enforce_cap: bool = True) -> Callable[..., dict]:
             ip = ExpressionAttributeValues[":ip"]
             if float(item.get("followup_count", 0)) >= cap or item.get("ip_hash") != ip:
                 raise Exception("ConditionalCheckFailedException")
+        tid = ExpressionAttributeValues.get(":tid")
+        if tid is not None:
+            seen = item.setdefault("turn_ids", set())
+            if tid in seen:
+                raise Exception("ConditionalCheckFailedException")
+            seen.add(tid)
         item["followup_count"] = float(item.get("followup_count", 0)) + 1
         pid = (ExpressionAttributeNames or {}).get("#pid")
         if pid:

@@ -34,6 +34,14 @@ def _ai():
     return ai
 
 
+def _sess():
+    # #3118: the session store moved to this cohesive sibling (the size ceiling paid
+    # for the turn-identity guard); the shape/TTL constants live with it now.
+    from web import site_api_ai_session as sess
+
+    return sess
+
+
 def _FakeTable():
     """Minimal single-table stand-in: enough of put/get/update/query for the
     session + episodic-write paths the follow-up handler exercises. Enforces
@@ -98,7 +106,7 @@ def test_create_session_returns_opaque_token_no_pii():
     finally:
         ai.table = ai_table_backup
     # opaque + unguessable shape (url-safe, not sequential, no PII embedded)
-    assert token and ai._SESSION_TOKEN_RE.match(token)
+    assert token and _sess()._SESSION_TOKEN_RE.match(token)
     assert re.match(r"^[A-Za-z0-9_-]{16,64}$", token)
     item = table.store[(f"BOARDSESS#{token}", "SESSION")]
     # NO PII: only an ip hash, the transcript, a counter, and a TTL
@@ -118,8 +126,8 @@ def test_ttl_is_set_within_one_hour():
         ai.table = ai_table_backup
     item = table.store[(f"BOARDSESS#{token}", "SESSION")]
     ttl = int(float(item["ttl"]))
-    assert before < ttl <= before + ai.SESSION_TTL_SECONDS + 2
-    assert ai.SESSION_TTL_SECONDS <= 3600  # acceptance ceiling
+    assert before < ttl <= before + _sess().SESSION_TTL_SECONDS + 2
+    assert _sess().SESSION_TTL_SECONDS <= 3600  # acceptance ceiling
 
 
 def test_board_ask_response_carries_a_session_token(monkeypatch):
@@ -131,7 +139,7 @@ def test_board_ask_response_carries_a_session_token(monkeypatch):
     body = json.loads(resp["body"])
     assert "responses" in body and body["responses"].get("sleep_coach")
     token = body.get("session_token")
-    assert token and ai._SESSION_TOKEN_RE.match(token)
+    assert token and _sess()._SESSION_TOKEN_RE.match(token)
     assert body["followups_remaining"] == ai.MAX_FOLLOWUPS
     # the session was persisted with the opening turn for that coach
     item = table.store[(f"BOARDSESS#{token}", "SESSION")]
