@@ -34,7 +34,9 @@ S3 raw storage (user-segmented — the prefixes below are what this module ACTUA
 writes; #2278 found a reader following the old, un-segmented form documented here
 and reading a prefix nothing has ever written. Readers must resolve these from
 `source_registry.raw_date_key("apple_health", date, sub=...)`, not retype them):
-  raw/matthew/health_auto_export/YYYY/MM/DD_HHmmss.json  (full payload)
+  raw/matthew/health_auto_export/YYYY/MM/DD_{contenthash}.json  (full payload,
+    #3119: content-hashed leaf so a redelivery of identical bytes overwrites
+    rather than minting a new object — see save_raw_payload())
   raw/matthew/cgm_readings/YYYY/MM/DD.json                (individual glucose readings)
   raw/matthew/blood_pressure/YYYY/MM/DD.json              (individual cuff readings)
   raw/matthew/state_of_mind/YYYY/MM/DD.json               (individual check-ins)
@@ -102,6 +104,7 @@ v1.1.0 — Three-tier source filtering + expanded metrics
 v1.0.0 — Initial release
 """
 
+import hashlib
 import hmac
 import json
 import logging
@@ -456,6 +459,25 @@ _ACTIVITY_MAX_FIELDS = {
     "distance_cycling_miles",
     "distance_swimming_miles",
     "distance_snow_miles",
+}
+
+
+# #3119 (DIL-025 census residual #2): reading-count fields — recomputed each
+# delivery as `len(readings-in-this-payload)`, an unconditional SET with no
+# guard — while steps/distance/etc. above DO get GREATEST-on-write. A PARTIAL
+# re-export of a day (fewer readings resent than a prior full delivery
+# carried) therefore silently LOWERS blood_glucose_readings_count,
+# blood_pressure_readings_count and som_check_in_count (and the TIR percentages
+# derived from the glucose count). This is an undercount risk, the mirror
+# image of the raw-archive-duplication finding, and kept as its OWN set rather
+# than folded into _ACTIVITY_MAX_FIELDS above: these are single-source
+# per-payload counts, never a cross-device max-of-sums, so they don't belong
+# in that set's semantics — merge_day_to_dynamo's monotonic guard checks the
+# UNION of both sets, which is the only place they need to meet.
+_READING_COUNT_GUARD_FIELDS = {
+    "blood_glucose_readings_count",
+    "blood_pressure_readings_count",
+    "som_check_in_count",
 }
 
 
@@ -904,9 +926,29 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
       for dedup-able fields (water, caffeine). Each reading's timestamp is tracked
       in a DynamoDB String Set so re-sends of the same readings are not double-counted.
     monotonic_guard: when True (live path), additive activity totals (steps/distance/
-      energy/flights) are written with GREATEST(stored, new) — a day's count only
-      increases, so a later PARTIAL export must never LOWER a fuller stored value. The
-      backfill passes False to SET the recomputed-from-raw value authoritatively.
+      energy/flights) AND the reading-count fields (#3119: blood_glucose_readings_count,
+      blood_pressure_readings_count, som_check_in_count) are written with
+      GREATEST(stored, new) — a day's count only increases, so a later PARTIAL
+      export must never LOWER a fuller stored value. The backfill passes False
+      to SET the recomputed-from-raw value authoritatively.
+
+    Concurrency (#3119, DIL-025 census residual #3 — accepted in writing rather
+    than made conditional/versioned): this is a plain read-modify-write with no
+    ConditionExpression, so two DIFFERENT bundles landing in the SAME
+    invocation window for the SAME (date, dedup-field) pair could last-writer-
+    win and lose one bundle's readings. An exact-duplicate redelivery is safe
+    regardless (identical merge, identical result). The accepted risk is
+    narrow: HAE fires one automation trigger per data type on its own
+    schedule, so true millisecond-scale concurrency requires two DIFFERENT
+    automations (e.g. water and CGM) racing on the SAME field, which they
+    never share, or the same automation double-firing, which is the
+    already-safe duplicate case. A lost reading in this narrow window is also
+    self-healing: the next sync for that field (incremental or full re-export)
+    carries the same timestamp again and it merges in normally. Adding a
+    version/ConditionExpression here would need to span every call site
+    (CGM/BP/SoM/generic-metrics) and a retry-on-conflict loop for a race this
+    narrow was judged not worth the added complexity — revisit if HAE ever
+    ships true multi-automation-per-second delivery.
     """
     if not fields:
         return
@@ -917,9 +959,10 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     if not _merge_is_valid(fields, date_str):
         return
 
-    # ── GREATEST-on-write for monotonic activity totals ──
+    # ── GREATEST-on-write for monotonic activity totals + reading counts ──
     if monotonic_guard:
-        _guard = [f for f in _ACTIVITY_MAX_FIELDS if f in fields and fields[f] is not None]
+        _guarded_fields = _ACTIVITY_MAX_FIELDS | _READING_COUNT_GUARD_FIELDS
+        _guard = [f for f in _guarded_fields if f in fields and fields[f] is not None]
         if _guard:
             try:
                 _gn = {f"#g{i}": f for i, f in enumerate(_guard)}
@@ -942,6 +985,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     # The field total is always recomputed from the full deduplicated map.
     # This handles both incremental syncs (1 glass) and full-day re-sends correctly.
     if reading_timestamps:
+        _dedup_ok_fields = set()
         try:
             ts_fields = list(reading_timestamps.keys())
             proj_names = {f"#rd{i}": f"_rd_{k}" for i, k in enumerate(ts_fields)}
@@ -963,8 +1007,27 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
                 fields[field_name] = round(sum(merged.values()), 2)
                 # Store merged map back (handled in write section below)
                 reading_timestamps[field_name] = merged
+                _dedup_ok_fields.add(field_name)
         except Exception as e:
-            logger.info(f"[DEDUP] Read failed (proceeding with full write): {e}")
+            # #3119 (DIL-025 census residual #4): `_rd_{field}` is the durable
+            # dedup ledger. The OLD behavior here just logged and fell through,
+            # which meant the write section below persisted `reading_timestamps`
+            # exactly as the CALLER passed it in — THIS payload's readings only,
+            # with no prior history merged in — silently overwriting (not
+            # merging) the stored map and dropping every reading a previous
+            # successful sync had accumulated. Fail toward preserving history
+            # instead: keep whatever fields finished merging before the failure
+            # (both their totals and their _rd_ write are safe), and for the
+            # rest, withhold the _rd_ write entirely so a later successful read
+            # finds its accumulated map intact rather than clobbered. Each
+            # withheld field's numeric total still writes — it's the caller's
+            # own payload-only sum, unaffected by this failure — matching the
+            # historical fail-soft contract ("proceed with the full write").
+            logger.warning(
+                f"[DEDUP] Read failed after {len(_dedup_ok_fields)}/{len(reading_timestamps)} field(s) merged — "
+                f"withholding _rd_ map write for the unmerged rest to avoid clobbering stored history: {e}"
+            )
+            reading_timestamps = {k: v for k, v in reading_timestamps.items() if k in _dedup_ok_fields}
 
     # Derive oz from deduped ml (oz not tracked independently)
     if "water_intake_ml" in fields:
@@ -1475,13 +1538,29 @@ def save_workouts_to_s3(date_str, workouts_list):
 
 
 def save_raw_payload(payload):
-    """Archive the raw webhook payload to S3."""
+    """Archive the raw webhook payload to S3.
+
+    #3119 (DIL-025 census residual #1): the key used to be pure wall-clock
+    (`.../DD_HHMMSS.json`) with an unconditional put — every redelivery of the
+    SAME bytes (a client retry, an API Gateway retry, a duplicated HAE send)
+    minted a brand-new object. raw/* is delete-protected, so that was unbounded
+    growth we could never prune, and it made this the one non-idempotent key on
+    an otherwise replay-safe path. The HHMMSS component is now replaced with a
+    content hash of the canonicalized payload: a redelivery of identical bytes
+    on the same UTC day resolves to the SAME key (an idempotent overwrite of
+    identical content, not a new object) while genuinely different payloads
+    delivered the same day still get distinct keys. Day-level (not full
+    wall-clock) granularity is deliberate — it keeps the archive listable by
+    date for ops/audit the way every other date-tree source is.
+    """
     now = datetime.now(timezone.utc)
-    s3_key = f"raw/{USER_ID}/health_auto_export/" f"{now.strftime('%Y/%m/%d_%H%M%S')}.json"
+    body = json.dumps(payload, default=str, sort_keys=True)
+    content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+    s3_key = f"raw/{USER_ID}/health_auto_export/" f"{now.strftime('%Y/%m/%d')}_{content_hash}.json"
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
-        Body=json.dumps(payload, default=str),
+        Body=body,
         ContentType="application/json",
     )
     return s3_key
