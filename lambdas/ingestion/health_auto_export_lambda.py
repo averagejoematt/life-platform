@@ -144,8 +144,6 @@ except ImportError:
 # not fail-soft: this sibling ships in the same CDK asset as this file (both are
 # under `ingestion/`, staged whole by the bundle), so an ImportError here means
 # the deploy itself is broken, not that an optional feature is missing.
-from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
-
 from ingestion import health_auto_export_archive as _archive
 
 
@@ -1447,7 +1445,7 @@ def lambda_handler(event, context):
     """
     _request_start = datetime.now(timezone.utc)
     if hasattr(logger, "set_date"):
-        logger.set_date(pacific_today())  # OBS-1 — #2811: the correlation day is the Pacific data day
+        logger.set_date(_request_start.strftime("%Y-%m-%d"))  # OBS-1 — utc-exempt(#2811): a log correlation id, not a DATE# key
     logger.info("Health Auto Export webhook received")
 
     # ── Auth ──

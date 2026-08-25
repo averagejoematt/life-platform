@@ -52,6 +52,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.compute_metadata import tag_record  # #2811: hoisted — it was imported locally in three functions
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
@@ -746,12 +747,7 @@ def store_computed_metrics(
     except Exception as ve:
         logger.warning("[DATA-2] validate_item failed (proceeding with write): %s", ve)
     # Phase 3.3 (2026-05-16): tag with run_id + computed_at.
-    try:
-        from common.compute_metadata import tag_record
-
-        item = tag_record(item, source_id="computed_metrics")
-    except ImportError:
-        pass
+    item = tag_record(item, source_id="computed_metrics")
     try:
         table.put_item(Item=item)
     except Exception as ddb_err:
@@ -788,8 +784,6 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
         # default-deny read filter as CURRENT, so a row written between the reset's
         # tagger pass and genesis silently counted as an experiment day.
-        from common.compute_metadata import tag_record
-
         item = tag_record(item, source_id="day_grade")
         # DATA-2: validate_item directly (no S3 client for compute partitions)
         try:
@@ -880,8 +874,6 @@ def store_habit_scores(date_str, component_details, component_scores, vice_strea
             item["synergy_groups"] = _deep_dec(sg_pcts)
         item = {k: v for k, v in item.items() if v is not None}
         # ADR-058 (#1814): phase-stamp — see store_day_grade above.
-        from common.compute_metadata import tag_record
-
         item = tag_record(item, source_id="habit_scores")
         # DATA-2: validate_item for habit_scores (Item 3, R12)
         try:

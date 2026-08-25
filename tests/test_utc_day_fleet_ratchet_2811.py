@@ -68,9 +68,11 @@ so the ratchet cannot silently license a regrowth back up to the old number.
 **The map is empty, and that is a measurement, not an oversight.** The 2026-08-25 epic
 audit measured 96 naive-UTC-day sites in `lambdas/` outside `web/`; of those, 111
 day-semantics sites fell in these four packages, and #2811's sweep converted all of them
-(3 vendor-frame sites took inline `utc-exempt(#2811)` markers instead — Habitify's
-UTC deadline comparison, and the Strava/Whoop reconcile windows, which bound UTC-epoch
-API requests rather than DDB keys). `test_residue_is_empty_by_measurement` pins that
+(4 took inline `utc-exempt(#2811)` markers instead — Habitify's UTC deadline comparison,
+the Strava/Whoop reconcile windows, which bound UTC-epoch API requests rather than DDB
+keys, and health_auto_export's `logger.set_date` correlation id, which is a CloudWatch
+log dimension on a webhook that keys its records off the payload's own dates, never off
+"today"). `test_residue_is_empty_by_measurement` pins that
 claim so it becomes false loudly if anyone re-adds an entry instead of fixing a site.
 The map's machinery stays because `lambdas/emails/` (18 sites, #2817) and `mcp/`
 (51 sites) enter this surface next and will arrive WITH entries.
@@ -282,6 +284,7 @@ def test_the_exempt_valve_is_actually_in_use_and_reasoned():
         ("lambdas/ingestion/habitify_lambda.py", "vendor-frame comparison"),
         ("lambdas/ingestion/strava_lambda.py", "vendor-frame API window bound"),
         ("lambdas/ingestion/whoop_lambda.py", "utc-exempt(#2811)"),
+        ("lambdas/ingestion/health_auto_export_lambda.py", "a log correlation id, not a DATE# key"),
     ):
         src = (ROOT / rel).read_text(encoding="utf-8")
         assert "utc-exempt(#2811)" in src, f"{rel} lost its #2811 exemption marker"

@@ -45,6 +45,7 @@ from decimal import Decimal
 
 import boto3
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_taxonomy import experiment_stamp  # #2811: hoisted — it was imported locally in two functions
 
 # ── Structured logger ────────────────────────────────────────────────────────
 try:
@@ -914,8 +915,6 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
             alpha, beta_val, item.get("conversation_alpha") if item else 0, item.get("conversation_beta") if item else 0
         )
 
-        from experiment.phase_taxonomy import experiment_stamp  # fail-soft provenance (#1233)
-
         new_item = {
             **experiment_stamp(),
             "pk": pk,
@@ -977,8 +976,6 @@ def _write_learning_record(coach_id, today_str, evaluation):
     sk = f"LEARNING#{today_str}#{slug}"
 
     try:
-        from experiment.phase_taxonomy import experiment_stamp
-
         item = {
             **experiment_stamp(),
             "pk": pk,

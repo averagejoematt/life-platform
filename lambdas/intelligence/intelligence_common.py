@@ -23,6 +23,7 @@ import boto3
 from boto3.dynamodb.conditions import Attr, Key
 from coach.reading_date_fidelity import guard_derived_summary  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
@@ -676,8 +677,6 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory:
 
     Returns list of flag dicts: {check, severity, detail, source_text}.
     """
-    import re
-
     flags = []
     text_lower = narrative.lower()
 
@@ -1688,7 +1687,6 @@ Rules:
 
 # #2334: the registry's own short-id projection, never re-typed (see the set guard).
 from coach.persona_registry import OPERATIONAL_SHORT_IDS
-from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 COACH_IDS_ALL = list(OPERATIONAL_SHORT_IDS)
 
