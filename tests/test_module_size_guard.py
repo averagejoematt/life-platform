@@ -223,7 +223,19 @@ BASELINE = {
     # experiment/canonical_facts.py. Net zero — no headroom taken, none banked.
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1898,
     "deploy/archive/onetime/daily_brief_lambda.py": 1881,
-    "lambdas/ingestion/health_auto_export_lambda.py": 1779,
+    # 2026-08-24 (#3119): 1779 → 1820. The +41 is four DIL-025 replay-safety
+    # fixes: a content-hashed raw-archive key (was pure wall-clock, unbounded
+    # growth on delete-protected raw/*), a monotonic guard on the
+    # *_readings_count fields (undercount on a partial re-export), a
+    # fail-toward-history fix for a dedup-map read failure that used to
+    # overwrite the stored map, and the accepted-in-writing concurrency
+    # reasoning for merge_day_to_dynamo. Kept IN-module deliberately — these
+    # touch the same merge/archive functions the #483/X-3 validator gate and
+    # the monotonic guard already live in; extracting mid-fix would scatter
+    # one code path's idempotency logic across two files. A considered raise,
+    # not a reflexive one; comments were already compressed once before this
+    # bump. The NEXT growth here should extract.
+    "lambdas/ingestion/health_auto_export_lambda.py": 1820,
     "deploy/sync_doc_metadata.py": 1253,  # 2026-08-23: shrank again — alarm discovery (#795/#934) extracted to deploy/alarm_discovery.py
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
