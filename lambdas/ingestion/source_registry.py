@@ -344,6 +344,28 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # sub-streams health_auto_export_lambda.py fans out to; each is its
             # own date tree with a DD.json leaf (NOT the YYYY-MM-DD.json form the
             # SIMP-2 framework sources flipped to). Resolve via raw_date_key().
+            #
+            # #3119 (DIL-028 generation flip, same shape as the date-tree
+            # `filename_legacy` rows below — garmin/todoist/eightsleep/withings/
+            # strava — applied to the one 'timestamped' source): the TOP-LEVEL
+            # payload archive's leaf flipped from wall-clock-only to a content
+            # hash so a redelivery overwrites instead of minting a new object
+            # (`save_raw_payload`, `health_auto_export_archive.py`). `filename`
+            # is the current generation, `filename_legacy` the pre-#3119 one —
+            # every object written before 2026-08-25 is `filename_legacy`
+            # shaped, live-confirmed (e.g. `2026/02/25_002710.json`, cited in
+            # docs/reviews/REVIEW_BUNDLE_2026-03-*.md), and stays exactly as
+            # written (`raw/*` delete-protected — no rewrite, no migration).
+            # UNLIKE the date-tree rows, `raw_date_key`/`raw_date_key_candidates`
+            # still raise for this scheme (deliberately — a 'timestamped'
+            # archive holds MANY objects per day, so there is no single
+            # per-day key to guess either generation of). These two fields are
+            # documentary here: a backfill tool resolves every object via a
+            # LIST on `prefix` (which sees both generations with no filename
+            # knowledge at all) and uses `filename`/`filename_legacy` only to
+            # classify what it finds, not to construct a key.
+            "filename": "DD_{contenthash16}.json",
+            "filename_legacy": "DD_HHMMSS.json",
             "sub_layouts": {
                 "cgm_readings": {"prefix": "raw/matthew/cgm_readings", "scheme": "date-tree", "filename": "DD.json"},
                 "blood_pressure": {"prefix": "raw/matthew/blood_pressure", "scheme": "date-tree", "filename": "DD.json"},

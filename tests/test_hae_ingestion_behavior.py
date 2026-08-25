@@ -644,6 +644,43 @@ class TestMergeDayToDynamo:
         hae.merge_day_to_dynamo("2026-05-02", {"vo2max": 50}, monotonic_guard=True)
         assert table.get_item_calls == []
 
+    # ── monotonic guard on reading-count fields (#3119) ──
+    #
+    # DIL-025 census residual #2: *_readings_count / check_in_count had no
+    # monotonic protection while steps/distance/etc. did, so a PARTIAL
+    # re-export of a day silently LOWERED them. These join the SAME
+    # GREATEST-on-write mechanism as the activity fields above (via
+    # _READING_COUNT_GUARD_FIELDS), not _ACTIVITY_MAX_FIELDS itself — they are
+    # single-source per-payload counts, never a cross-device max-of-sums.
+
+    @pytest.mark.parametrize("field", ["blood_glucose_readings_count", "blood_pressure_readings_count", "som_check_in_count"])
+    def test_reading_count_fields_keep_the_larger_stored_value(self, wired, field):
+        """A later PARTIAL re-export must never lower a fuller stored count —
+        disabling _READING_COUNT_GUARD_FIELDS' membership for this field makes
+        this fail (the write would silently drop to 2)."""
+        _, table = wired
+        table.stored = {field: Decimal("12")}
+        hae.merge_day_to_dynamo("2026-05-02", {field: 2}, monotonic_guard=True)
+        assert only_update(table)[field] == Decimal("12")
+
+    @pytest.mark.parametrize("field", ["blood_glucose_readings_count", "blood_pressure_readings_count", "som_check_in_count"])
+    def test_reading_count_fields_accept_a_larger_new_value(self, wired, field):
+        _, table = wired
+        table.stored = {field: Decimal("2")}
+        hae.merge_day_to_dynamo("2026-05-02", {field: 12}, monotonic_guard=True)
+        assert only_update(table)[field] == Decimal("12")
+
+    def test_reading_count_guard_and_activity_guard_compose_in_one_write(self, wired):
+        """A CGM day writes both an activity field (none here) and a count
+        field in the same merge — the union set must protect the count field
+        without the caller having to know the two sets exist separately."""
+        _, table = wired
+        table.stored = {"blood_glucose_readings_count": Decimal("288"), "steps": Decimal("9000")}
+        hae.merge_day_to_dynamo("2026-05-02", {"blood_glucose_readings_count": 40, "steps": 402}, monotonic_guard=True)
+        written = only_update(table)
+        assert written["blood_glucose_readings_count"] == Decimal("288")
+        assert written["steps"] == Decimal("9000")
+
     # ── reading-timestamp dedup ──
 
     def test_resent_readings_are_not_double_counted(self, wired):
@@ -688,6 +725,38 @@ class TestMergeDayToDynamo:
         ts = {"water_intake_ml": {"08:00": 240}}
         hae.merge_day_to_dynamo("2026-05-02", {"water_intake_ml": 240}, reading_timestamps=ts, monotonic_guard=False)
         assert only_update(table)["water_intake_ml"] == Decimal("240")
+
+    def test_a_failed_dedup_read_does_not_overwrite_the_stored_reading_map(self, wired):
+        """#3119 (DIL-025 census residual #4): the OLD behavior here fell
+        through to the write section with `reading_timestamps` unchanged —
+        i.e. still holding ONLY this payload's readings, never merged with
+        whatever `_rd_water_intake_ml` already held. The write section then
+        persisted that payload-only map as the WHOLE stored map, silently
+        dropping every reading a prior successful sync had accumulated. A
+        failed read must withhold the `_rd_` write entirely instead — this
+        assertion fails against the old code (it wrote the key)."""
+        _, table = wired
+        table.get_item_error = RuntimeError("throttled")
+        ts = {"water_intake_ml": {"08:00": 240}}
+        hae.merge_day_to_dynamo("2026-05-02", {"water_intake_ml": 240}, reading_timestamps=ts, monotonic_guard=False)
+        assert "_rd_water_intake_ml" not in only_update(table)
+
+    def test_a_partial_dedup_read_failure_withholds_only_the_unmerged_fields(self, wired):
+        """Two dedup-able fields land in one merge (rare but possible — e.g. a
+        payload carrying both water and caffeine readings). A read failure is
+        all-or-nothing per get_item call (both fields share one projection),
+        so BOTH must be withheld together — proving the withhold logic keys
+        off what actually finished, not a blanket 'first field only'."""
+        _, table = wired
+        table.get_item_error = RuntimeError("throttled")
+        ts = {"water_intake_ml": {"08:00": 240}, "caffeine_mg": {"08:00": 95}}
+        hae.merge_day_to_dynamo("2026-05-02", {"water_intake_ml": 240, "caffeine_mg": 95}, reading_timestamps=ts, monotonic_guard=False)
+        written = only_update(table)
+        assert "_rd_water_intake_ml" not in written
+        assert "_rd_caffeine_mg" not in written
+        # the payload-only totals still write — fail-soft, not fail-closed
+        assert written["water_intake_ml"] == Decimal("240")
+        assert written["caffeine_mg"] == Decimal("95")
 
     # ── the validator gate (#483/X-3) ──
 
@@ -779,6 +848,49 @@ class TestS3ArchiveWriters:
         payload = {"data": {"metrics": [{"name": "step_count"}]}}
         key = hae.save_raw_payload(payload)
         assert s3.objects[key] == payload
+
+    # ── content-derived key (#3119 residual #1) ──
+    #
+    # The key used to be pure wall-clock (`DD_HHMMSS.json`) with an
+    # unconditional put, so every redelivery of the SAME bytes minted a new
+    # object under raw/* — which is delete-protected, so that growth could
+    # never be pruned. The HHMMSS component is now a content hash.
+
+    def test_an_identical_redelivery_resolves_to_the_same_key(self, wired):
+        """The mutation-prove case for residual #1: revert the hash suffix
+        back to wall-clock time and this fails, because two calls in the same
+        test (even microseconds apart) would then mint two different keys."""
+        s3, _ = wired
+        payload = {"data": {"metrics": [{"name": "step_count", "data": [{"date": "2026-05-02", "qty": 1}]}]}}
+        key_first = hae.save_raw_payload(payload)
+        key_second = hae.save_raw_payload(payload)
+        assert key_first == key_second
+        assert len(s3.objects) == 1, "a redelivery of identical bytes must not add a second object"
+
+    def test_an_identical_redelivery_overwrites_rather_than_appends(self, wired):
+        s3, _ = wired
+        payload = {"data": {"metrics": [{"name": "step_count", "data": [{"date": "2026-05-02", "qty": 1}]}]}}
+        hae.save_raw_payload(payload)
+        hae.save_raw_payload(payload)
+        assert len(s3.puts) == 2, "S3 still sees two PUTs (both deliveries actually ran)"
+        assert s3.puts[0]["Key"] == s3.puts[1]["Key"], "…but they land on the SAME key, an idempotent overwrite"
+
+    def test_a_genuinely_different_payload_the_same_day_gets_a_distinct_key(self, wired):
+        """Content-derived does not mean day-only — two REAL different
+        deliveries on the same UTC day must still archive separately."""
+        s3, _ = wired
+        key1 = hae.save_raw_payload({"data": {"metrics": [{"name": "step_count", "data": [{"date": "2026-05-02", "qty": 1}]}]}})
+        key2 = hae.save_raw_payload({"data": {"metrics": [{"name": "step_count", "data": [{"date": "2026-05-02", "qty": 2}]}]}})
+        assert key1 != key2
+        assert len(s3.objects) == 2
+
+    def test_the_key_leaf_is_not_wall_clock_time(self, wired):
+        """Locks in the shape change itself, not just its effect: the leaf
+        after the day component must be a hex digest, never HHMMSS."""
+        _, _ = wired
+        key = hae.save_raw_payload({"data": {"metrics": []}})
+        leaf = key.rsplit("/", 1)[-1]
+        assert re.match(r"^\d{2}_[0-9a-f]{16}\.json$", leaf), f"unexpected raw-archive leaf shape: {leaf!r}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1259,3 +1371,107 @@ class TestHandlerRouting:
         body = json.loads(hae.lambda_handler(_event(payload), _Ctx())["body"])
         assert body["other_metric_days"] == 1
         assert written_fields(table.updates[0])["steps"] == 1000
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# End-to-end replay — #3119 mutation-prove (DIL-025 census, real POST /ingest)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _sync_stored(table):
+    """Replay every logged update_item onto `table.stored`, simulating what a
+    real DynamoDB table would hold after those writes land.
+
+    FakeTable.get_item normally hands back a STATIC snapshot no matter how
+    many update_item calls preceded it — fine for the single-call unit tests
+    elsewhere in this file, but an end-to-end replay test spans TWO real
+    `lambda_handler` invocations, and the second one's guard/dedup reads must
+    see what the first one actually wrote or every idempotency mechanism
+    under test would look correct by accident (an empty `stored` never
+    triggers a guard override or a dedup merge in the first place)."""
+    for u in table.updates:
+        table.stored.update(written_fields(u))
+
+
+class TestReplayEndToEnd:
+    """Drives the REAL handler (auth -> parse -> process -> S3 archive ->
+    DynamoDB merge) with the SAME webhook delivery more than once, against a
+    backing store that persists between calls (see `_sync_stored`). This is
+    the acceptance test #3119 asks for: a redelivery of an identical HAE
+    bundle through the real API-Gateway-v2 `POST /ingest` path must leave raw
+    S3 state byte-identical and water/caffeine/reading-count totals unchanged
+    the second time. Reverting any ONE of the three fixes (content-hashed raw
+    key, reading-count monotonic guard, dedup-read-failure handling) makes one
+    of these assertions fail.
+    """
+
+    def _bundle(self, glucose_readings=5):
+        return {
+            "data": {
+                "metrics": [
+                    {
+                        "name": "dietary_water",
+                        "units": "mL",
+                        "data": [
+                            {"date": "2026-05-02 08:00:00 +0000", "qty": 240, "source": "My Water"},
+                            {"date": "2026-05-02 12:00:00 +0000", "qty": 240, "source": "My Water"},
+                        ],
+                    },
+                    {
+                        "name": "blood_glucose",
+                        "units": "mg/dL",
+                        "data": [{"date": f"2026-05-02 08:{m:02d}:00 +0000", "qty": 100 + m} for m in range(0, glucose_readings * 5, 5)],
+                    },
+                ],
+                "workouts": [],
+            }
+        }
+
+    def test_an_identical_replay_leaves_raw_state_and_counts_unchanged(self, handler_env):
+        s3, table = handler_env
+        payload = self._bundle()
+
+        first_resp = json.loads(hae.lambda_handler(_event(payload), _Ctx())["body"])
+        assert first_resp["status"] == "ok"
+        _sync_stored(table)
+
+        raw_prefix = f"raw/{hae.USER_ID}/health_auto_export/"
+        raw_keys_after_first = {p["Key"] for p in s3.puts if p["Key"].startswith(raw_prefix)}
+        assert len(raw_keys_after_first) == 1
+        water_after_first = table.stored["water_intake_ml"]
+        glucose_count_after_first = table.stored["blood_glucose_readings_count"]
+        assert water_after_first == Decimal("480")  # 240 + 240, not double-counted even within one delivery
+        assert glucose_count_after_first == 5
+
+        # ── The SAME bundle, delivered again (client retry / duplicate webhook) ──
+        second_resp = json.loads(hae.lambda_handler(_event(payload), _Ctx())["body"])
+        assert second_resp["status"] == "ok"
+        _sync_stored(table)
+
+        raw_keys_after_second = {p["Key"] for p in s3.puts if p["Key"].startswith(raw_prefix)}
+        assert raw_keys_after_second == raw_keys_after_first, "replay must not mint a second raw-archive object (#3119 residual #1)"
+        (surviving_key,) = raw_keys_after_second
+        assert s3.objects[surviving_key] == payload, "the surviving raw object is byte-identical to the payload"
+
+        assert table.stored["water_intake_ml"] == water_after_first, "water total must not double-count on replay"
+        assert (
+            table.stored["blood_glucose_readings_count"] == glucose_count_after_first
+        ), "reading count must not change on an identical replay"
+
+    def test_a_partial_re_export_does_not_lower_the_stored_reading_count(self, handler_env):
+        """The undercount half of the finding, driven through the real
+        handler: a full delivery followed by a SMALLER delivery for the same
+        day (a partial re-export — HAE resending a truncated batch) must not
+        silently lower the stored count. This is what joining
+        _READING_COUNT_GUARD_FIELDS (#3119 residual #2) exists to prevent —
+        disable that guard and this assertion fails (the count would drop to 2)."""
+        _, table = handler_env
+        full = self._bundle(glucose_readings=5)
+        hae.lambda_handler(_event(full), _Ctx())
+        _sync_stored(table)
+        assert table.stored["blood_glucose_readings_count"] == 5
+
+        partial = self._bundle(glucose_readings=2)
+        hae.lambda_handler(_event(partial), _Ctx())
+        _sync_stored(table)
+        assert table.stored["blood_glucose_readings_count"] == 5, "a partial re-export must not lower a fuller stored count"

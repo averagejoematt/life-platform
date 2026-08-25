@@ -134,9 +134,31 @@ def test_filename_legacy_only_on_sources_with_live_confirmed_drift():
     second generation under the SAME prefix. A source gaining `filename_legacy`
     without a corresponding registry-comment citing live evidence (or without
     updating this set) should be a deliberate, reviewed change — this pins the
-    set so that happens with eyes open, not by silent copy-paste."""
+    set so that happens with eyes open, not by silent copy-paste.
+
+    `apple_health` joined 2026-08-25 (#3119): the top-level payload archive's
+    leaf flipped from wall-clock-only (`DD_HHMMSS.json`) to a content hash
+    (`DD_{contenthash16}.json`) so a redelivery overwrites instead of minting
+    a new object. Unlike the other five (all `date-tree`), this one is
+    `timestamped` — `filename`/`filename_legacy` are documentary there (see
+    the registry comment); `raw_date_key`/`raw_date_key_candidates` still
+    raise for it, proven below."""
     have_legacy = {k for k, v in reg.SOURCE_REGISTRY.items() if (v.get("raw_layout") or {}).get("filename_legacy")}
-    assert have_legacy == {"todoist", "garmin", "eightsleep", "withings", "strava"}
+    assert have_legacy == {"todoist", "garmin", "eightsleep", "withings", "strava", "apple_health"}
+
+
+def test_apple_health_top_level_generation_flip_is_machine_readable():
+    """#3119: the DIL-028 generation-flip class (a source's raw-archive leaf
+    format changing over time) modeled five `date-tree` sources with
+    `filename_legacy`; this is the same class applied to the one
+    `timestamped` source. Both generations must be resolvable from the facet
+    alone — a future backfill/scanner walking `raw/matthew/health_auto_export/`
+    needs to recognise objects written before AND after the 2026-08-25 flip,
+    and `raw/*` is delete-protected so the pre-flip objects are permanent."""
+    layout = reg.raw_layout_for("apple_health")
+    assert layout["scheme"] == "timestamped"
+    assert layout["filename"] == "DD_{contenthash16}.json"
+    assert layout["filename_legacy"] == "DD_HHMMSS.json"
 
 
 def test_habitify_and_weather_confirmed_single_generation():
@@ -194,10 +216,14 @@ class TestHaeFamily:
         assert reg.raw_date_key("apple_health", "2026-06-01", sub="workouts") == "raw/matthew/workouts/2026/06/01.json"
 
     def test_top_level_timestamped_scheme_has_no_per_day_key(self):
-        """The un-migrated top-level apple_health archive is `timestamped`
-        (`DD_HHMMSS.json`, e.g. `01_002710.json` — confirmed live), not a
-        `date-tree`; a per-day key is deliberately unresolvable, matching the
-        facet's own scheme declaration rather than the resolvable sub-streams."""
+        """The top-level apple_health payload archive is `timestamped`, not a
+        `date-tree` — a per-day key is deliberately unresolvable, matching the
+        facet's own scheme declaration rather than the resolvable sub-streams.
+        Live-confirmed pre-#3119 objects are `DD_HHMMSS.json` (e.g.
+        `01_002710.json`); #3119 flipped new writes to `DD_{contenthash16}.json`
+        (`filename_legacy`, added below) — the raise is unaffected by which
+        generation a given object is in, since neither function ever looks at
+        the filename for a non-date-tree scheme."""
         with pytest.raises(ValueError, match="not a date tree"):
             reg.raw_date_key("apple_health", "2026-08-01")
 

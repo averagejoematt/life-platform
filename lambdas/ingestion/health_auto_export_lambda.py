@@ -34,7 +34,7 @@ S3 raw storage (user-segmented — the prefixes below are what this module ACTUA
 writes; #2278 found a reader following the old, un-segmented form documented here
 and reading a prefix nothing has ever written. Readers must resolve these from
 `source_registry.raw_date_key("apple_health", date, sub=...)`, not retype them):
-  raw/matthew/health_auto_export/YYYY/MM/DD_HHmmss.json  (full payload)
+  raw/matthew/health_auto_export/YYYY/MM/DD_{contenthash}.json  (full payload — #3119)
   raw/matthew/cgm_readings/YYYY/MM/DD.json                (individual glucose readings)
   raw/matthew/blood_pressure/YYYY/MM/DD.json              (individual cuff readings)
   raw/matthew/state_of_mind/YYYY/MM/DD.json               (individual check-ins)
@@ -138,6 +138,13 @@ try:
     from ingestion.ingestion_validator import validate_fields
 except ImportError:
     validate_fields = None
+
+# #3119: the raw-S3 archive writers (facade + cohesive-sibling split, #1400/#1654/
+# #2604 shape — see health_auto_export_archive.py's module docstring). Required,
+# not fail-soft: this sibling ships in the same CDK asset as this file (both are
+# under `ingestion/`, staged whole by the bundle), so an ImportError here means
+# the deploy itself is broken, not that an optional feature is missing.
+from ingestion import health_auto_export_archive as _archive
 
 
 def _merge_is_valid(fields, date_str):
@@ -456,6 +463,17 @@ _ACTIVITY_MAX_FIELDS = {
     "distance_cycling_miles",
     "distance_swimming_miles",
     "distance_snow_miles",
+}
+
+
+# #3119: per-payload reading counts had no monotonic guard (undercount risk on
+# a partial re-export). Own set, not folded into _ACTIVITY_MAX_FIELDS (these
+# are single-source counts, not a cross-device max-of-sums) — the guard below
+# checks the UNION. Full writeup: docs/IDEMPOTENCY.md §3.
+_READING_COUNT_GUARD_FIELDS = {
+    "blood_glucose_readings_count",
+    "blood_pressure_readings_count",
+    "som_check_in_count",
 }
 
 
@@ -903,10 +921,18 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     reading_timestamps: optional dict of {field_name: set_of_timestamp_strings}
       for dedup-able fields (water, caffeine). Each reading's timestamp is tracked
       in a DynamoDB String Set so re-sends of the same readings are not double-counted.
-    monotonic_guard: when True (live path), additive activity totals (steps/distance/
-      energy/flights) are written with GREATEST(stored, new) — a day's count only
-      increases, so a later PARTIAL export must never LOWER a fuller stored value. The
-      backfill passes False to SET the recomputed-from-raw value authoritatively.
+    monotonic_guard: when True (live path), additive activity totals AND the
+      reading-count fields (#3119: see _READING_COUNT_GUARD_FIELDS) are written
+      with GREATEST(stored, new) — a day's count only increases, so a later
+      PARTIAL export must never LOWER a fuller stored value. The backfill
+      passes False to SET the recomputed-from-raw value authoritatively.
+
+    Concurrency (#3119 residual #3 — accepted in writing, not made
+    conditional/versioned): still a plain read-modify-write, so two DIFFERENT
+    bundles racing on the SAME (date, dedup-field) pair could last-writer-win.
+    Narrow (HAE fires one automation per data type) and self-healing (a
+    dropped reading reappears on that field's next sync). Reasoning + the
+    rejected optimistic-locking alternative: docs/IDEMPOTENCY.md §3.
     """
     if not fields:
         return
@@ -917,9 +943,10 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     if not _merge_is_valid(fields, date_str):
         return
 
-    # ── GREATEST-on-write for monotonic activity totals ──
+    # ── GREATEST-on-write for monotonic activity totals + reading counts ──
     if monotonic_guard:
-        _guard = [f for f in _ACTIVITY_MAX_FIELDS if f in fields and fields[f] is not None]
+        _guarded_fields = _ACTIVITY_MAX_FIELDS | _READING_COUNT_GUARD_FIELDS
+        _guard = [f for f in _guarded_fields if f in fields and fields[f] is not None]
         if _guard:
             try:
                 _gn = {f"#g{i}": f for i, f in enumerate(_guard)}
@@ -942,6 +969,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     # The field total is always recomputed from the full deduplicated map.
     # This handles both incremental syncs (1 glass) and full-day re-sends correctly.
     if reading_timestamps:
+        _dedup_ok_fields = set()
         try:
             ts_fields = list(reading_timestamps.keys())
             proj_names = {f"#rd{i}": f"_rd_{k}" for i, k in enumerate(ts_fields)}
@@ -963,8 +991,19 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
                 fields[field_name] = round(sum(merged.values()), 2)
                 # Store merged map back (handled in write section below)
                 reading_timestamps[field_name] = merged
+                _dedup_ok_fields.add(field_name)
         except Exception as e:
-            logger.info(f"[DEDUP] Read failed (proceeding with full write): {e}")
+            # #3119: the OLD code fell through with `reading_timestamps`
+            # unmerged (this payload only), then persisted THAT as the whole
+            # stored `_rd_{field}` map — dropping prior history. Withhold the
+            # _rd_ write for whatever didn't finish merging; each field's
+            # payload-only total still writes (the historical fail-soft
+            # contract).
+            logger.warning(
+                f"[DEDUP] Read failed after {len(_dedup_ok_fields)}/{len(reading_timestamps)} field(s) merged — "
+                f"withholding _rd_ map write for the unmerged rest to avoid clobbering stored history: {e}"
+            )
+            reading_timestamps = {k: v for k, v in reading_timestamps.items() if k in _dedup_ok_fields}
 
     # Derive oz from deduped ml (oz not tracked independently)
     if "water_intake_ml" in fields:
@@ -1030,91 +1069,27 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     )
 
 
+# ── Raw S3 archive writers ──
+# #3119: bodies live in health_auto_export_archive.py (facade + cohesive-sibling
+# split — see its module docstring). These wrappers keep the ORIGINAL names and
+# signatures, forwarding this module's OWN s3_client/S3_BUCKET/USER_ID at call
+# time — so every existing caller and every `monkeypatch.setattr(hae, "s3_client",
+# ...)` test is unchanged.
+
+
 def save_cgm_readings_to_s3(date_str, readings):
     """Save individual CGM readings to S3 for detailed analysis."""
-    s3_key = f"raw/{USER_ID}/cgm_readings/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    # Merge with existing readings for this day (idempotent)
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_cgm_readings %s: %s", s3_key, e)
-
-    # Deduplicate by timestamp
-    existing_times = {r["time"] for r in existing}
-    new_readings = [r for r in readings if r["time"] not in existing_times]
-
-    if new_readings:
-        merged = sorted(existing + new_readings, key=lambda r: r["time"] or "")
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_readings)
-    return 0
+    return _archive.save_cgm_readings_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, readings)
 
 
 def save_bp_readings_to_s3(date_str, readings):
     """Save individual BP readings to S3 for detailed analysis (v1.4.0)."""
-    s3_key = f"raw/{USER_ID}/blood_pressure/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_bp_readings %s: %s", s3_key, e)
-
-    existing_times = {r["time"] for r in existing}
-    new_readings = [r for r in readings if r["time"] not in existing_times]
-
-    if new_readings:
-        merged = sorted(existing + new_readings, key=lambda r: r["time"] or "")
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_readings)
-    return 0
+    return _archive.save_bp_readings_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, readings)
 
 
 def save_state_of_mind_to_s3(date_str, entries):
     """Save individual State of Mind check-ins to S3 (v1.5.0)."""
-    s3_key = f"raw/{USER_ID}/state_of_mind/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_state_of_mind %s: %s", s3_key, e)
-
-    # Deduplicate by timestamp
-    existing_times = {e.get("time") for e in existing}
-    new_entries = [e for e in entries if e.get("time") not in existing_times]
-
-    if new_entries:
-        merged = sorted(existing + new_entries, key=lambda e: e.get("time") or "")
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_entries)
-    return 0
+    return _archive.save_state_of_mind_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, entries)
 
 
 def process_state_of_mind(payload):
@@ -1446,45 +1421,13 @@ def process_workouts(workouts):
 
 def save_workouts_to_s3(date_str, workouts_list):
     """Save individual workout records to S3, merging with existing (v1.6.0)."""
-    s3_key = f"raw/{USER_ID}/workouts/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_workouts %s: %s", s3_key, e)
-
-    # Deduplicate by workout id
-    existing_ids = {w.get("id") for w in existing if w.get("id")}
-    new_workouts = [w for w in workouts_list if w.get("id") and w["id"] not in existing_ids]
-
-    if new_workouts:
-        merged = existing + new_workouts
-        merged.sort(key=lambda w: w.get("start", ""))
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_workouts)
-    return 0
+    return _archive.save_workouts_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, workouts_list)
 
 
 def save_raw_payload(payload):
-    """Archive the raw webhook payload to S3."""
-    now = datetime.now(timezone.utc)
-    s3_key = f"raw/{USER_ID}/health_auto_export/" f"{now.strftime('%Y/%m/%d_%H%M%S')}.json"
-    s3_client.put_object(
-        Bucket=S3_BUCKET,
-        Key=s3_key,
-        Body=json.dumps(payload, default=str),
-        ContentType="application/json",
-    )
-    return s3_key
+    """Archive the raw webhook payload to S3 (#3119: content-hashed leaf — see
+    health_auto_export_archive.py)."""
+    return _archive.save_raw_payload(s3_client, S3_BUCKET, USER_ID, payload)
 
 
 # ── Lambda Handler ─────────────────────────────────────────────────────────────
