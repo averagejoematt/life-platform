@@ -102,7 +102,6 @@ v1.1.0 — Three-tier source filtering + expanded metrics
 v1.0.0 — Initial release
 """
 
-import hashlib
 import hmac
 import json
 import logging
@@ -139,6 +138,13 @@ try:
     from ingestion.ingestion_validator import validate_fields
 except ImportError:
     validate_fields = None
+
+# #3119: the raw-S3 archive writers (facade + cohesive-sibling split, #1400/#1654/
+# #2604 shape — see health_auto_export_archive.py's module docstring). Required,
+# not fail-soft: this sibling ships in the same CDK asset as this file (both are
+# under `ingestion/`, staged whole by the bundle), so an ImportError here means
+# the deploy itself is broken, not that an optional feature is missing.
+from ingestion import health_auto_export_archive as _archive
 
 
 def _merge_is_valid(fields, date_str):
@@ -1063,91 +1069,27 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     )
 
 
+# ── Raw S3 archive writers ──
+# #3119: bodies live in health_auto_export_archive.py (facade + cohesive-sibling
+# split — see its module docstring). These wrappers keep the ORIGINAL names and
+# signatures, forwarding this module's OWN s3_client/S3_BUCKET/USER_ID at call
+# time — so every existing caller and every `monkeypatch.setattr(hae, "s3_client",
+# ...)` test is unchanged.
+
+
 def save_cgm_readings_to_s3(date_str, readings):
     """Save individual CGM readings to S3 for detailed analysis."""
-    s3_key = f"raw/{USER_ID}/cgm_readings/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    # Merge with existing readings for this day (idempotent)
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_cgm_readings %s: %s", s3_key, e)
-
-    # Deduplicate by timestamp
-    existing_times = {r["time"] for r in existing}
-    new_readings = [r for r in readings if r["time"] not in existing_times]
-
-    if new_readings:
-        merged = sorted(existing + new_readings, key=lambda r: r["time"] or "")
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_readings)
-    return 0
+    return _archive.save_cgm_readings_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, readings)
 
 
 def save_bp_readings_to_s3(date_str, readings):
     """Save individual BP readings to S3 for detailed analysis (v1.4.0)."""
-    s3_key = f"raw/{USER_ID}/blood_pressure/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_bp_readings %s: %s", s3_key, e)
-
-    existing_times = {r["time"] for r in existing}
-    new_readings = [r for r in readings if r["time"] not in existing_times]
-
-    if new_readings:
-        merged = sorted(existing + new_readings, key=lambda r: r["time"] or "")
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_readings)
-    return 0
+    return _archive.save_bp_readings_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, readings)
 
 
 def save_state_of_mind_to_s3(date_str, entries):
     """Save individual State of Mind check-ins to S3 (v1.5.0)."""
-    s3_key = f"raw/{USER_ID}/state_of_mind/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_state_of_mind %s: %s", s3_key, e)
-
-    # Deduplicate by timestamp
-    existing_times = {e.get("time") for e in existing}
-    new_entries = [e for e in entries if e.get("time") not in existing_times]
-
-    if new_entries:
-        merged = sorted(existing + new_entries, key=lambda e: e.get("time") or "")
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_entries)
-    return 0
+    return _archive.save_state_of_mind_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, entries)
 
 
 def process_state_of_mind(payload):
@@ -1479,54 +1421,13 @@ def process_workouts(workouts):
 
 def save_workouts_to_s3(date_str, workouts_list):
     """Save individual workout records to S3, merging with existing (v1.6.0)."""
-    s3_key = f"raw/{USER_ID}/workouts/{date_str[:4]}/{date_str[5:7]}/{date_str[8:10]}.json"
-
-    existing = []
-    try:
-        resp = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-        existing = json.loads(resp["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
-        pass
-    except Exception as e:
-        logger.warning("s3_read_workouts %s: %s", s3_key, e)
-
-    # Deduplicate by workout id
-    existing_ids = {w.get("id") for w in existing if w.get("id")}
-    new_workouts = [w for w in workouts_list if w.get("id") and w["id"] not in existing_ids]
-
-    if new_workouts:
-        merged = existing + new_workouts
-        merged.sort(key=lambda w: w.get("start", ""))
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(merged, default=str),
-            ContentType="application/json",
-        )
-        return len(new_workouts)
-    return 0
+    return _archive.save_workouts_to_s3(s3_client, S3_BUCKET, USER_ID, date_str, workouts_list)
 
 
 def save_raw_payload(payload):
-    """Archive the raw webhook payload to S3.
-
-    #3119: the leaf used to be pure wall-clock (unbounded growth on
-    delete-protected raw/* — every redelivery minted a new object). It's now a
-    content hash of the day's payload: identical bytes the same UTC day
-    overwrite the same key; genuinely different payloads still get distinct
-    keys.
-    """
-    now = datetime.now(timezone.utc)
-    body = json.dumps(payload, default=str, sort_keys=True)
-    content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
-    s3_key = f"raw/{USER_ID}/health_auto_export/" f"{now.strftime('%Y/%m/%d')}_{content_hash}.json"
-    s3_client.put_object(
-        Bucket=S3_BUCKET,
-        Key=s3_key,
-        Body=body,
-        ContentType="application/json",
-    )
-    return s3_key
+    """Archive the raw webhook payload to S3 (#3119: content-hashed leaf — see
+    health_auto_export_archive.py)."""
+    return _archive.save_raw_payload(s3_client, S3_BUCKET, USER_ID, payload)
 
 
 # ── Lambda Handler ─────────────────────────────────────────────────────────────

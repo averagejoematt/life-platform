@@ -223,19 +223,20 @@ BASELINE = {
     # experiment/canonical_facts.py. Net zero — no headroom taken, none banked.
     "lambdas/intelligence/ai_expert_analyzer_lambda.py": 1898,
     "deploy/archive/onetime/daily_brief_lambda.py": 1881,
-    # 2026-08-24 (#3119): 1779 → 1820. The +41 is four DIL-025 replay-safety
-    # fixes: a content-hashed raw-archive key (was pure wall-clock, unbounded
-    # growth on delete-protected raw/*), a monotonic guard on the
-    # *_readings_count fields (undercount on a partial re-export), a
-    # fail-toward-history fix for a dedup-map read failure that used to
-    # overwrite the stored map, and the accepted-in-writing concurrency
-    # reasoning for merge_day_to_dynamo. Kept IN-module deliberately — these
-    # touch the same merge/archive functions the #483/X-3 validator gate and
-    # the monotonic guard already live in; extracting mid-fix would scatter
-    # one code path's idempotency logic across two files. A considered raise,
-    # not a reflexive one; comments were already compressed once before this
-    # bump. The NEXT growth here should extract.
-    "lambdas/ingestion/health_auto_export_lambda.py": 1820,
+    # 2026-08-24/25 (#3119): 1779 -> 1721. Four DIL-025 replay-safety fixes
+    # (content-hashed raw-archive key, a monotonic guard on the
+    # *_readings_count fields, a fail-toward-history dedup-map fix, and the
+    # written-up concurrency acceptance) needed real lines and this file was
+    # at zero headroom. Per the #2610 policy, extraction came FIRST: the five
+    # raw-S3 archive writers (save_cgm/bp/state_of_mind/workouts_to_s3,
+    # save_raw_payload — a cohesive "archive a reading/payload to raw S3" seam,
+    # same read-merge-dedup-put shape throughout) moved to the new sibling
+    # `lambdas/ingestion/health_auto_export_archive.py` (187 lines, well under
+    # the ceiling), the #1400/#1654/#2604 facade shape. ~192 lines came out;
+    # ALL of them handed back (no headroom banked) — the file lands 58 lines
+    # BELOW its old baseline even after the fixes landed. The pure-subset
+    # ratchet allows tightening a shrunk entry.
+    "lambdas/ingestion/health_auto_export_lambda.py": 1721,
     "deploy/sync_doc_metadata.py": 1253,  # 2026-08-23: shrank again — alarm discovery (#795/#934) extracted to deploy/alarm_discovery.py
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
