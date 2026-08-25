@@ -184,7 +184,14 @@ jobs:
   # required check earns required-ness by not flaking first.
   # ════════════════════════════════════════════════════════════════
   full-suite:
-    name: Full unit suite (pre-merge, #3025)
+    # #3117: an unquoted `#` preceded by whitespace is a YAML COMMENT START, so
+    # `name: Full unit suite (pre-merge, #3025)` silently reported to GitHub as
+    # `Full unit suite (pre-merge,` (truncated, trailing comma) — deploy/
+    # wait_pr_green.sh had to hardcode that truncated string to match reality.
+    # Never put a bare `#` in a job/step `name:` — quote the string if one is
+    # unavoidable. tests/test_workflow_names_3117.py sweeps every workflow file
+    # for this class.
+    name: Full unit suite (pre-merge, issue 3025)
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
