@@ -236,13 +236,26 @@ BASELINE = {
     # ALL of them handed back (no headroom banked) — the file lands 58 lines
     # BELOW its old baseline even after the fixes landed. The pure-subset
     # ratchet allows tightening a shrunk entry.
-    "lambdas/ingestion/health_auto_export_lambda.py": 1721,
+    # 2026-08-25 (#2811): +2 — ONE `from common.pacific_time import ...` line plus the
+    # blank line ruff's isort inserts to separate the first-party block from it. The
+    # minimum cost of taking a naive-UTC-day defect out of a file already at its cap.
+    # Not a growth budget: no logic was added, and the frame fix is not deferrable to a
+    # sibling-extraction PR without leaving the wrong day live in the meantime.
+    "lambdas/ingestion/health_auto_export_lambda.py": 1723,
     "deploy/sync_doc_metadata.py": 1253,  # 2026-08-23: shrank again — alarm discovery (#795/#934) extracted to deploy/alarm_discovery.py
     # 2026-08-09 (#2334): +3 — a hand-typed roster literal became the registry import
     # + derived assignment; the growth IS the fix (guard-the-SET conversion).
-    "lambdas/intelligence/intelligence_common.py": 1744,
+    # 2026-08-25 (#2811): +1 — ONE `from common.pacific_time import ...` line, the
+    # minimum cost of taking a naive-UTC-day defect out of a file already at its cap.
+    # Not a growth budget: no logic was added, and the frame fix is not deferrable to a
+    # sibling-extraction PR without leaving the wrong day live in the meantime.
+    "lambdas/intelligence/intelligence_common.py": 1745,
     "lambdas/coach/coach_history_summarizer.py": 1731,
-    "lambdas/coach/coach_prediction_evaluator.py": 1633,
+    # 2026-08-25 (#2811): +1 — ONE `from common.pacific_time import ...` line, the
+    # minimum cost of taking a naive-UTC-day defect out of a file already at its cap.
+    # Not a growth budget: no logic was added, and the frame fix is not deferrable to a
+    # sibling-extraction PR without leaving the wrong day live in the meantime.
+    "lambdas/coach/coach_prediction_evaluator.py": 1634,
     # 2026-08-13 (#2610): 1623 → 1382. This file was at 1623/1623 — zero headroom — and
     # adding an alarm is the most routine change it ever takes, so it was the next
     # role_policies.py. Both CloudWatch DASHBOARDS (311 lines, pure composition, not one
@@ -276,7 +289,11 @@ BASELINE = {
     # different definitions of "last week's weight" and the compute one was wrong (it took
     # the OLDEST reading in a 14-day window). The single line buys one shared definition —
     # the ratchet's first real bump, and the shape it is meant to allow.
-    "lambdas/compute/daily_metrics_compute_lambda.py": 1370,
+    # 2026-08-25 (#2811): +1 — ONE `from common.pacific_time import ...` line, the
+    # minimum cost of taking a naive-UTC-day defect out of a file already at its cap.
+    # Not a growth budget: no logic was added, and the frame fix is not deferrable to a
+    # sibling-extraction PR without leaving the wrong day live in the meantime.
+    "lambdas/compute/daily_metrics_compute_lambda.py": 1371,
     "lambdas/coach/coach_narrative_orchestrator.py": 1315,
     # 1268 -> 1233 (#2418): the ADR-104 grounding gate on the derived reader prose is
     # ~85 lines of new substance, and this file was AT its recorded number. Paid for the

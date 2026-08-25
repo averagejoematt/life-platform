@@ -48,6 +48,7 @@ from intelligence import (  # noqa: E402
     ai_expert_analyzer_lambda as ana,
     weight_recency as wr,
 )
+from pacific_clock import freeze_pacific, pacific_instant  # noqa: E402 — #2811: the PT clock the module actually calls
 
 # A fixed instant, unrelated to whatever day this suite actually runs on. Every
 # fixture date in this file derives from it, and _physical() pins the analyzer's
@@ -67,11 +68,21 @@ def _freeze(monkeypatch, module, instant):
             return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
 
     monkeypatch.setattr(module, "datetime", _Frozen)
+    # #2811: the analyzer now derives its "today" from `pacific_today()`/`pacific_now()`,
+    # which read `common.pacific_time`'s OWN datetime — a name this patch cannot reach.
+    # Pin those too, from the same instant, or the fixture stops being the wire.
+    freeze_pacific(monkeypatch, module, _Frozen)
 
 
 def _ago(anchor: datetime, days: int) -> str:
-    """A date N days before `anchor` — never before the real wall clock."""
-    return (anchor.date() - timedelta(days=days)).isoformat()
+    """A date N days before `anchor`, in the PACIFIC frame.
+
+    #2811: `DATE#` keys name Pacific calendar days and the analyzer's own "today" is
+    now `pacific_today()`, so a fixture date built off `anchor.date()` (the UTC day)
+    would be a day ahead of the code for every anchor between 00:00Z and 07:00/08:00Z.
+    Same rule as before — one anchor, one frame, both sides.
+    """
+    return (pacific_instant(anchor).date() - timedelta(days=days)).isoformat()
 
 
 TODAY = _ago(ANCHOR, 0)  # derived from the fixed ANCHOR, not from real time — stable at any import moment
@@ -155,13 +166,22 @@ def test_no_readings_is_honest_absence(monkeypatch):
 
 def test_stale_weight_detection_is_stable_across_a_midnight_boundary(monkeypatch):
     """#2093 itself: prove the class is impossible now, not just fixed by luck.
-    Pin the fake clock to two instants straddling UTC midnight and rebuild the
-    fixture dates from EACH pinned instant in turn — since both the fixtures and
+    Pin the fake clock to two instants straddling midnight and rebuild the fixture
+    dates from EACH pinned instant in turn — since both the fixtures and
     gather_data_for_expert's own "now" derive from the same single `anchor`
-    argument, the assertions hold identically on both sides of the boundary."""
-    before_midnight = datetime(2026, 9, 15, 23, 59, tzinfo=timezone.utc)
-    after_midnight = datetime(2026, 9, 16, 0, 1, tzinfo=timezone.utc)
-    for anchor in (before_midnight, after_midnight):
+    argument, the assertions hold identically on both sides of the boundary.
+
+    #2811 moved the boundary that matters: the analyzer names PACIFIC days now, so
+    UTC midnight is no longer a day boundary here at all (23:59Z and 00:01Z are the
+    same Pacific afternoon). The pair below straddles PACIFIC midnight — 06:59Z /
+    07:01Z during PDT — which is the seam this test exists to hold, plus the old UTC
+    pair kept as a regression witness that it is now a non-event.
+    """
+    before_pt_midnight = datetime(2026, 9, 15, 6, 59, tzinfo=timezone.utc)  # 23:59 PT on 09-14
+    after_pt_midnight = datetime(2026, 9, 15, 7, 1, tzinfo=timezone.utc)  # 00:01 PT on 09-15
+    before_utc_midnight = datetime(2026, 9, 15, 23, 59, tzinfo=timezone.utc)
+    after_utc_midnight = datetime(2026, 9, 16, 0, 1, tzinfo=timezone.utc)
+    for anchor in (before_pt_midnight, after_pt_midnight, before_utc_midnight, after_utc_midnight):
         rows = _rows((_ago(anchor, 7), 320.0), (_ago(anchor, 5), 317.61))
         d = _physical(monkeypatch, rows, anchor=anchor)
         assert d["current_weight_is_stale"] is True

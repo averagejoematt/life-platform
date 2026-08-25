@@ -39,7 +39,9 @@ and the day-scoped rollup is the right producer for them. Only figures that answ
 "what is the latest reading" move.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
+
+from common.pacific_time import PACIFIC, pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # The #1369 Truth Spine — the cockpit's resolution, imported rather than re-derived.
 # A second implementation here would be the very defect this module closes.
@@ -103,7 +105,9 @@ def resolve_latest_readings(table, user_prefix, withings_latest=None, now=None):
             out["latest_weight"] = float(w_lbs)
             out["weight_as_of"] = w_date
             out["last_weighin_date"] = w_date
-            today = (now or datetime.now(timezone.utc)).date()
+            # #2811: `days_since_weighin` counts PACIFIC calendar days — `w_date` is a
+            # DATE# key (Pacific), so a UTC "today" adds a phantom day every PT evening.
+            today = (now.astimezone(PACIFIC) if now is not None and now.tzinfo else pacific_now()).date()
             out["days_since_weighin"] = max(0, (today - datetime.strptime(w_date, "%Y-%m-%d").date()).days)
     except (TypeError, ValueError):  # unparseable date / non-numeric weight — publish neither
         for k in ("latest_weight", "weight_as_of", "last_weighin_date", "days_since_weighin"):

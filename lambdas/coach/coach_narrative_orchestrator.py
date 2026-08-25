@@ -149,6 +149,7 @@ from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
@@ -189,7 +190,7 @@ def _track_record_block(coach_id: str) -> str:
 
         from boto3.dynamodb.conditions import Key as _Key
 
-        cutoff = (datetime.now(timezone.utc) - _td(days=60)).strftime("%Y-%m-%d")
+        cutoff = (pacific_now() - _td(days=60)).strftime("%Y-%m-%d")
         r = table.query(
             KeyConditionExpression=_Key("pk").eq(f"COACH#{coach_id}") & _Key("sk").gt(f"LEARNING#{cutoff}"),
         )
@@ -512,7 +513,7 @@ def _gather_all_state(coach_id):
     # 9b. Commitments (#532) — the concrete actions this coach pushed. Due/overdue
     # pending ones get injected so the coach MUST revisit its own advice; recently
     # resolved kept/broken ones frame follow-through. Bounded read (most recent 50).
-    _today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    _today_str = pacific_today()
     all_commitments = _query_begins_with(coach_pk, "COMMITMENT#", scan_forward=False, limit=50)
     due_commitments = [c for c in all_commitments if c.get("status") == "pending" and str(c.get("due_date") or "9999") <= _today_str]
     resolved_commitments = [c for c in all_commitments if c.get("status") in ("kept", "broken")][:5]
@@ -649,8 +650,8 @@ def _gather_journal_mood_signal():
     try:
         from boto3.dynamodb.conditions import Key as _Key
 
-        end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        start = (datetime.now(timezone.utc) - timedelta(days=JOURNAL_MOOD_WINDOW_DAYS)).strftime("%Y-%m-%d")
+        end = pacific_today()
+        start = (pacific_now() - timedelta(days=JOURNAL_MOOD_WINDOW_DAYS)).strftime("%Y-%m-%d")
         pk = f"USER#{USER_ID}#SOURCE#notion"
         kwargs = with_phase_filter(
             {
@@ -1205,7 +1206,7 @@ def lambda_handler(event, context):
     Returns the generation brief JSON.
     """
     coach_id = event.get("coach_id", TARGET_COACH)
-    today = event.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    today = event.get("date", pacific_today())
 
     logger.info("Starting narrative orchestrator for %s on %s", coach_id, today)
 

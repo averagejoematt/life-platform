@@ -59,7 +59,7 @@ from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import pacific_now  # #1964: the one Pacific frame (DST-aware)
+from common.pacific_time import pacific_now, pacific_today  # #1964: the one Pacific frame (DST-aware)
 from content import social_signals  # #1671: the deterministic coach router
 from privacy import social_provenance as prov  # #1670: the membrane (origin gate)
 
@@ -393,7 +393,7 @@ def lambda_handler(event: dict, context) -> dict:
         return {"statusCode": 200, "body": "ok"}
     try:
         if hasattr(logger, "set_date"):
-            logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+            logger.set_date(pacific_today())
         event = event or {}
         force = bool(event.get("force"))
         channels = tuple(event.get("channels") or DEFAULT_CHANNELS)

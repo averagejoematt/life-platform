@@ -48,6 +48,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from health import personal_baselines
 
 try:
@@ -255,7 +256,7 @@ def _impl(event, context):
     t0 = time.time()
     logger.info("Personal Baselines Compute v%s starting", METHOD_VERSION)
 
-    end = (event or {}).get("date") or datetime.now(timezone.utc).date().isoformat()
+    end = (event or {}).get("date") or pacific_now().date().isoformat()
     start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
 
     records = _fetch_computed_metrics(start, end)

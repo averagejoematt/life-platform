@@ -22,6 +22,7 @@ from decimal import Decimal, InvalidOperation
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 try:
     from common.platform_logger import get_logger
@@ -181,7 +182,7 @@ def _phase_for(date_str: str) -> str:
 
 def lambda_handler(event, context):
     if hasattr(logger, "set_date"):
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        logger.set_date(pacific_today())
 
     # Parse S3 event
     if "Records" in event:

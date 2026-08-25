@@ -44,6 +44,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from common.numeric import floats_to_decimal
+from common.pacific_time import PACIFIC  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # `normalize_coach_id` is THE shared coach-id normalizer (#1786): the ledger's writers
 # spell a coach id differently — the review-pack resolver stores the S3 archive `variant`
@@ -116,7 +117,10 @@ def build_correction_item(
     """
     now = now or datetime.now(timezone.utc)
     correction_id = correction_id or uuid.uuid4().hex[:_ID_LEN]
-    date_str = now.strftime("%Y-%m-%d")
+    # #2811: `now` stays the caller's instant (it is stored verbatim as `created_at`),
+    # but the CORRECTION#{date} key names a PACIFIC calendar day like every other
+    # day-keyed sk — an explicit .astimezone() so the frame choice is named, not implied.
+    date_str = now.astimezone(PACIFIC).strftime("%Y-%m-%d")
     sk = f"{SK_PREFIX}{date_str}#{correction_id}"
 
     normalized_class = error_class if error_class in ERROR_CLASSES else "other"

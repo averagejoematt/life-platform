@@ -350,6 +350,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_qa_smoke_fault_isolation_2307.py",
         "test_secret_references.py",
         "test_ses_send_guard_set_2222.py",
+        "test_utc_day_fleet_ratchet_2811.py",
         "test_site_chrome.py",
         "test_site_orphans.py",
         "test_site_partition_orphans.py",

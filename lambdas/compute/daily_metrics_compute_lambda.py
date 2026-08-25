@@ -53,6 +53,7 @@ from decimal import Decimal
 
 import boto3
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import phase_taxonomy  # ADR-077/#1233: write-time provenance stamp for the first-earn ledger
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 from health import (
@@ -194,8 +195,8 @@ def sweep_achievement_first_earns(profile: dict) -> int:
     Fail-soft: a badge ledger is not worth failing the daily metrics run over.
     """
     try:
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        window_start = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
+        today_str = pacific_today()
+        window_start = (pacific_now() - timedelta(days=365)).strftime("%Y-%m-%d")
         start_weight = float(profile.get("journey_start_weight_lbs") or profile.get("start_weight_lbs") or 0) or None
         if start_weight is None:
             from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
@@ -248,7 +249,7 @@ def sweep_milestone_ledger() -> int:
     Fail-soft: a milestone ledger is not worth failing the daily metrics run over.
     """
     try:
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = pacific_today()
         stamp = phase_taxonomy.experiment_stamp(include_phase=False)  # cycle-only provenance
         result = milestone_ledger.sweep(table, USER_PREFIX, with_phase_filter, today_str, stamp=stamp)
         if result["genesis"]:
@@ -992,7 +993,7 @@ def assemble_data(yesterday_str, profile):
     directly without re-deriving from the data dict.
     """
     t0_timer = time.time()
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
 
     # Single-day records
     whoop = fetch_date("whoop", yesterday_str)
@@ -1161,7 +1162,7 @@ def lambda_handler(event, context):
         yesterday_str = event["date"]
         logger.info(f"Override date: {yesterday_str}")
     else:
-        today = datetime.now(timezone.utc).date()
+        today = pacific_now().date()
         yesterday_str = (today - timedelta(days=1)).isoformat()
 
     # Idempotency — data-aware: recompute if any source has updated since last run

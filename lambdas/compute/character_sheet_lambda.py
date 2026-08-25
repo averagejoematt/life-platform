@@ -35,6 +35,7 @@ from decimal import Decimal
 
 import boto3
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 from health import (
     character_engine,
@@ -350,7 +351,7 @@ def assemble_data(yesterday_str):
     # historical rebuild never smears today's presence onto past days.
     data["engagement_state"] = fetch_date("engagement_state", yesterday_str)
     if data["engagement_state"] is None:
-        days_old = (datetime.now(timezone.utc).date() - dt.date()).days
+        days_old = (pacific_now().date() - dt.date()).days
         if days_old <= 2:
             try:
                 resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
@@ -730,7 +731,7 @@ def lambda_handler(event, context):
         yesterday_str = event["date"]
         logger.info(f"[character] Override date: {yesterday_str}")
     else:
-        today = datetime.now(timezone.utc).date()
+        today = pacific_now().date()
         yesterday_str = (today - timedelta(days=1)).isoformat()
 
     # ── Check if already computed (idempotency) ──

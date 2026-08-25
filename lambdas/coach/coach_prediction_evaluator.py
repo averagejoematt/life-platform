@@ -1223,6 +1223,7 @@ STANCE_EVENT_REFRESH_DAILY_CAP = 2  # epic #526 Budget: "Capped Haiku calls (≤
 
 from ai.ai_context import _WEIGHT_MILESTONES  # noqa: E402 — the one canonical list (see ai_context._build_milestone_context)
 from ai.budget_guard import allow as _budget_allow  # noqa: E402
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from health.sick_day_checker import check_sick_day  # noqa: E402
 
 # physical_coach owns both sick-day onset and weight-milestone crossings (see
@@ -1546,7 +1547,7 @@ def lambda_handler(event: dict, context) -> dict:
     Returns a summary of all evaluations performed.
     """
     try:
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = pacific_today()
 
         logger.info("coach-prediction-evaluator START date=%s", today_str)
 

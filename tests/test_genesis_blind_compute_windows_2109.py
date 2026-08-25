@@ -71,6 +71,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -227,6 +228,8 @@ def frozen_inventory_clock(monkeypatch):
             return datetime(_TODAY.year, _TODAY.month, _TODAY.day, 12, 0, tzinfo=tz or timezone.utc)
 
     monkeypatch.setattr(ic, "datetime", _FrozenDatetime)
+
+    freeze_pacific(monkeypatch, ic, _FrozenDatetime)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

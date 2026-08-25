@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -434,10 +435,10 @@ def enrich_date_range(start_date: str, end_date: str):
 
 def lambda_handler(event, context):
     try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = pacific_today()
         if hasattr(logger, "set_date"):
             logger.set_date(today)  # OBS-1
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        yesterday = (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
         if event.get("backfill"):
             # ARCHIVE_START, not 2020-01-01: the percentile context already reads

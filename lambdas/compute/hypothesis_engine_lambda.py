@@ -76,6 +76,7 @@ from common import (
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates  # #1371: the ONE registry of arming thresholds
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -228,8 +229,8 @@ def fetch_profile():
 def gather_data(days=LOOKBACK_DAYS):
     """Fetch multi-source data. #530: 30 days — deterministic checks evaluate the
     hypothesis's full monitoring window; generation only sees the last GENERATION_DAYS."""
-    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date = (datetime.now(timezone.utc) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    end_date = pacific_today()
+    start_date = (pacific_now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
     # #3049: the ingest set is DECLARED ONCE in the compute-input census
     # (common.input_manifest.COMPUTE_INPUTS). This list was a second copy of it,
@@ -535,7 +536,7 @@ def enforce_hard_expiry(all_hypotheses):
     Returns list of (sk, new_status, reason) tuples for hypotheses to archive.
     """
     updates = []
-    now = datetime.now(timezone.utc).date()
+    now = pacific_now().date()
 
     for hyp in all_hypotheses:
         if hyp.get("status") in ("archived", "confirmed", "refuted"):
@@ -1146,7 +1147,7 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows):
         return []
 
     updates = []
-    now = datetime.now(timezone.utc).date()
+    now = pacific_now().date()
 
     for hyp in pending_hypotheses:
         sk = hyp.get("sk", "")
@@ -1256,7 +1257,7 @@ def write_hypothesis_context_to_memory(active_hypotheses):
         now = datetime.now(timezone.utc)
         item = {
             "pk": f"USER#{USER_ID}#SOURCE#platform_memory",
-            "sk": f"MEMORY#hypothesis_monitoring#{now.date().isoformat()}",
+            "sk": f"MEMORY#hypothesis_monitoring#{pacific_today()}",
             "category": "hypothesis_monitoring",
             "stored_at": now.isoformat(),
             "context_block": "\n".join(lines),
@@ -1288,7 +1289,7 @@ def _fetch_character_history(window_days):
     as the CROSS_PHASE calibration ledger."""
     from boto3.dynamodb.conditions import Key
 
-    start = (datetime.now(timezone.utc) - timedelta(days=window_days)).strftime("%Y-%m-%d")
+    start = (pacific_now() - timedelta(days=window_days)).strftime("%Y-%m-%d")
     pk = f"USER#{USER_ID}#SOURCE#character_sheet"
     items, kwargs = [], {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start}", "DATE#~"),
@@ -1348,7 +1349,7 @@ def run_time_affluence_weekly(force=False):
     from health import time_affluence as ta
 
     try:
-        end = datetime.now(timezone.utc).date()
+        end = pacific_now().date()
         start = (end - timedelta(weeks=ta.PROXY_WINDOW_WEEKS + 1)).isoformat()
         end_s = end.isoformat()
         computed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")

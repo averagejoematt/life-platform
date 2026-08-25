@@ -42,7 +42,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import boto3
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
@@ -83,6 +83,7 @@ MAX_TOKENS = 420
 # the coach-intelligence tools + calibration scoreboard resolve, so a rename or
 # retirement propagates from config/personas.json instead of drifting here.
 from coach.persona_registry import short_id_names as _short_id_names
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 COACH_NAMES = _short_id_names()
 COACH_IDS = tuple(COACH_NAMES)
@@ -679,7 +680,7 @@ def fetch_calibration_summary() -> dict:
 
 
 def lambda_handler(event: dict, context) -> dict:
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     today_str = today.isoformat()
     cutoff_str = (today - timedelta(days=RESOLVED_WINDOW_DAYS)).isoformat()
 

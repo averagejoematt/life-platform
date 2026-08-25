@@ -535,6 +535,12 @@ def _reconcile(event: dict, context) -> dict:
             except Exception as e:
                 logger.warning("reconcile secret writeback failed (non-fatal): %s", e)
 
+        # This day pair bounds a UTC-EPOCH window handed to the Strava API
+        # (`after_ts`/`before_ts` below), not a DATE# key. The stored-side fetch it feeds
+        # is already bracketed ±1 day precisely because DDB is Pacific-keyed and this
+        # window is not (see the #472/C-1 note below) — converting it would shift the API
+        # window rather than fix a frame mismatch that is already handled.
+        # utc-exempt(#2811): vendor-frame API window bound, not a platform day key.
         today = datetime.now(timezone.utc).date()
         start = today - timedelta(days=RECONCILE_WINDOW_DAYS)
         after_ts = datetime(start.year, start.month, start.day, tzinfo=timezone.utc).timestamp()

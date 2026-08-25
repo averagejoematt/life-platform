@@ -162,6 +162,7 @@ from common.numeric import (
     decimals_to_float as _decimal_to_float,  # noqa: E402,F401
     floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
 )
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
@@ -1420,7 +1421,7 @@ def _generate_stance(coach_id, compressed, track, prior_stance, event_context=No
     """
     meta = _coach_meta(coach_id)
     now_iso = datetime.now(timezone.utc).isoformat()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
 
     user_message = _build_stance_message(coach_id, compressed, track, prior_stance)
     if event_context:
