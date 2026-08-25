@@ -220,6 +220,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # and a guard placed in the wrong lane must red on the PR that placed it there.
         # Post-merge-only is the exact defect this registry was filed about.
         "test_derived_artifact_registry_2986.py",
+        # #2846: enrollment by construction. Verdict is pure repo shape — a Lambda
+        # constructed outside create_platform_lambda(), or landing with no deploy
+        # registration and no alarm story, must red BEFORE the merge. Post-merge is
+        # too late by construction: the next `cdk deploy` puts the unenrolled,
+        # unwatched function in production.
+        "test_enrollment_by_construction_2846.py",
         # #3042 (Phase D2): the public-claims registry. Verdict is repo shape + published
         # prose — a new page or generator restating a registered behavioural claim must be
         # registered BEFORE the merge. Post-merge is too late by construction: the site

@@ -65,6 +65,12 @@ if _DEPLOY_DIR not in sys.path:
     sys.path.insert(0, _DEPLOY_DIR)
 import build_bundle  # noqa: E402
 
+# ── Enrollment by construction (#2846) ────────────────────────────────────────
+# Importing by module path rather than package-relative: cdk/app.py puts
+# cdk/ on sys.path and imports `stacks.<name>`, and this module is also read
+# directly by the CI guard, which has no CDK install.
+from stacks.lambda_enrollment import record, validate_enrollment  # noqa: E402
+
 _TREE_STAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "_bundle_staging"))
 _staged = {"tree": False}
 
@@ -135,6 +141,17 @@ def create_platform_lambda(
 
     Returns the Lambda Function construct.
     """
+
+    # ── Enrollment gate (#2846) ──
+    # Runs BEFORE anything is constructed: a stack that violates E1–E3 does not
+    # synthesize, so it cannot deploy, so the drift cannot reach production.
+    validate_enrollment(
+        function_name=function_name,
+        source_file=source_file,
+        handler=handler,
+        schedule=schedule,
+        where=f"{getattr(scope.node, 'id', type(scope).__name__)}/{id}",
+    )
 
     # ── Environment variables ──
     env = {
@@ -314,10 +331,12 @@ def create_platform_lambda(
     # NOTE: alerts_topic=None still disables alarms entirely — preserves the
     # existing opt-out pattern used by sources where no alarm is desired.
     _selected_topic = None
+    _enrolled_alarm_name = None
     if alerts_topic is not None:
         _selected_topic = digest_topic if (digest and digest_topic is not None) else alerts_topic
     if _selected_topic and error_alarm:
         _alarm_name = alarm_name if alarm_name else f"ingestion-error-{function_name}"
+        _enrolled_alarm_name = _alarm_name
         # 2026-05-03 v6.9.2: period reduced 24h → 1h. Old window kept alarms in
         # ALARM state for 24h on a single transient error, and re-emailed if
         # set-alarm-state was overridden during evaluation. 1h window means a
@@ -337,5 +356,19 @@ def create_platform_lambda(
         )
         alarm.add_alarm_action(cw_actions.SnsAction(_selected_topic))
         # OK actions intentionally omitted — inbox should only receive actionable alerts
+
+    # ── Enrollment census (#2846) ──
+    # The construction is now a registry row: after `cdk synth` walks cdk/app.py,
+    # lambda_enrollment.ENROLLED IS the platform's Lambda set, with the alarm
+    # posture this call actually produced (not the one the call site asked for).
+    record(
+        function_name=function_name,
+        source_file=source_file,
+        handler=handler,
+        stack=getattr(scope.node, "id", type(scope).__name__),
+        logical_id=id,
+        schedule=schedule,
+        alarm_name=_enrolled_alarm_name,
+    )
 
     return fn
