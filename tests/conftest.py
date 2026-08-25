@@ -265,6 +265,15 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # red BEFORE the merge, not surface in production during the next PT
         # evening — the exact post-merge-only failure mode #2372 exists to stop.
         "test_pt_day_contract_sweep_2813.py",
+        # #2847: the producer/consumer contract sweep — #2813's primitive generalised
+        # past the day-frame agreement. Half its verdict is pure repo shape (the enrolled
+        # floor, the enrollment ratchet, the PARTITION_WRITER_LEDGER against the #2845
+        # model's write edges, the registry↔model agreement), and a NEW writer joining a
+        # contracted shape must red on the PR that adds it — post-merge is how #2214's
+        # dual-writer and #2804's dead-zone read both reached production. Reads fixed
+        # files rather than sweeping the tree, so premerge_derivation cannot discover
+        # it — hand-listed, same as #2813 above.
+        "test_pair_contract_sweep_2847.py",
         # #3101: the doc-literal conflict surface. Its verdict is pure repo shape —
         # whether a discovered counter has grown a SECOND committed home, and whether
         # the single-writer plumbing (agent_commit refusal, hook stage pathspec,

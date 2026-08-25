@@ -624,11 +624,49 @@ def _mcp_tool_counts() -> tuple[int, int]:
     return count, modules
 
 
+CONTRACT_REGISTRY_PATH = ROOT / "tests" / "pair_contract_registry.py"
+
+
+def extract_contracts() -> list[dict]:
+    """The #2847 producer/consumer contract plane — the pairs that must agree.
+
+    AST over ``tests/pair_contract_registry.py``, never an import: the generator's
+    stated method is static extraction (``_mcp_tool_counts`` parses ``mcp/registry.py``
+    by AST for the same reason), and the registry's entries carry live test closures
+    that must never be constructed here.
+
+    The registry lives under ``tests/`` because a contract entry is inherently
+    test-side wiring — it names a producer, a consumer, and the mutations that must
+    red on both — but WHICH pairs are contracted is a platform fact, so it belongs
+    in the model. Only the literal string kwargs are lifted.
+    """
+    if not CONTRACT_REGISTRY_PATH.is_file():
+        return []
+    tree = ast.parse(CONTRACT_REGISTRY_PATH.read_text(encoding="utf-8"), filename=str(CONTRACT_REGISTRY_PATH))
+    out: list[dict] = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "PairContract"):
+            continue
+        fields: dict = {}
+        for kw in node.keywords:
+            if kw.arg in ("name", "producer", "consumer", "partition", "note") and isinstance(kw.value, ast.Constant):
+                fields[kw.arg] = kw.value.value
+        if not fields.get("name") or not fields.get("producer") or not fields.get("consumer"):
+            continue  # a synthetic/self-test pair built inline, not an enrolled one
+        fields.setdefault("partition", None)
+        fields["mutations"] = sum(
+            1 for kw in node.keywords if kw.arg == "mutations" and isinstance(kw.value, (ast.Tuple, ast.List)) for _ in kw.value.elts
+        )
+        out.append({k: fields.get(k) for k in ("name", "producer", "consumer", "partition", "mutations", "note")})
+    return sorted(out, key=lambda c: c["name"])
+
+
 def build_model() -> dict:
     lambdas = extract_lambdas()
     alarms = extract_alarms()
     partitions = extract_partitions()
     edges, edge_stats = extract_edges(lambdas)
+    contracts = extract_contracts()
     tool_count, tool_modules = _mcp_tool_counts()
 
     scheduled = {n: r for n, r in lambdas.items() if r["schedules"]}
@@ -643,6 +681,7 @@ def build_model() -> dict:
                 "alarms": "cdk/stacks/*.py alarm_name= declarations (AST) + variable-traced SNS routing",
                 "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) × lambdas/ingestion/source_registry facets",
                 "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
+                "contracts": "tests/pair_contract_registry.py PairContract(...) declarations (AST) — the #2847 enrolled producer/consumer pairs",
             },
             "counts": {
                 "lambdas": len(lambdas),
@@ -650,6 +689,7 @@ def build_model() -> dict:
                 "alarms": len(alarms),
                 "partitions": len(partitions),
                 "edges": len(edges),
+                "contracts": len(contracts),
                 "mcp_tools": tool_count,
                 "mcp_tool_modules": tool_modules,
             },
@@ -663,12 +703,14 @@ def build_model() -> dict:
                 "privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled",
                 "helper-default error alarms (ingestion-error-<fn>) are not enumerated — the alarms plane matches the #2844 vocabulary (explicit alarm_name declarations)",
                 "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)",
+                "the contracts plane lists ENROLLED pairs (#2847), not every must-agree pair — without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is a floor + ratchet in tests/test_pair_contract_sweep_2847.py",
             ],
         },
         "lambdas": lambdas,
         "alarms": alarms,
         "partitions": partitions,
         "edges": edges,
+        "contracts": contracts,
     }
 
 
@@ -752,6 +794,20 @@ def render_doc(model: dict) -> str:
     add(f"**{counts['mcp_tools']} tools across {counts['mcp_tool_modules']} modules** (AST-counted from `mcp/registry.py`;")
     add("the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as")
     add("readers under the `life-platform-mcp` lambda.")
+    add("")
+    add("## 4b. Producer/Consumer Contracts (#2847)")
+    add("")
+    add("Pairs enrolled in the contract sweep: the real producer's output is round-tripped")
+    add("through the real consumer, then a disagreement is injected into BOTH sides")
+    add("(`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is one registry entry in")
+    add("`tests/pair_contract_registry.py`. This lists what IS contracted — see `meta.scope_cuts`")
+    add("for why it is not a census of every must-agree pair.")
+    add("")
+    add("| Pair | Producer | Consumer | Partition | Mutations |")
+    add("|------|----------|----------|-----------|-----------|")
+    for rec in model.get("contracts", []):
+        part = f"`{rec['partition']}`" if rec.get("partition") else "—"
+        add(f"| {rec['name']} | `{rec['producer']}` | `{rec['consumer']}` | {part} | {rec['mutations']} |")
     add("")
     add("## 5. Alarms + Routing")
     add("")
