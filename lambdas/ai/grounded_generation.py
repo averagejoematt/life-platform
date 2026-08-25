@@ -588,10 +588,17 @@ _WEIGHT_LB_RE = re.compile(r"(?<![\d.])(\d{2,3}(?:\.\d+)?)\s*(?:lbs?|pounds?)\b"
 # these is a candidate — a current-weight mention ("you now weigh 315 lb") never
 # flags because it carries none of this framing. Mirrors band_adjective_findings'
 # proximity approach.
+#
+# 2026-08-25 (#3154): "start(?:ed|ing)? the experiment at" / "began the experiment
+# at" hardcoded the determiner to "the" — "started THIS experiment at" (or my/our)
+# sailed straight through. #3050's eval-matrix build caught it by adversarial
+# canary construction (staged as a KNOWN MISS in PR #3153, flipped to CAUGHT here).
+# Scoped to the same four determiners _SPAN_RE already covers below, so the fix
+# closes the class without widening past it.
 _BASELINE_FRAMING_RE = re.compile(
     r"\b("
     r"starting weight|start weight|baseline weight|baseline|"
-    r"started at|began at|start(?:ed|ing)? the experiment at|began the experiment at|"
+    r"started at|began at|start(?:ed|ing)? (?:the|this|my|our) experiment at|began (?:the|this|my|our) experiment at|"
     r"day 1 weight|day one weight|starting point|initial weight|started out at|started from"
     r")\b",
     re.IGNORECASE,
@@ -663,6 +670,10 @@ _WORD_NUMBERS = {
 # "N days of the experiment" / "three weeks into this experiment" / "seven days in".
 # Requires the experiment framing — a bare "six days" may be about anything
 # (a training block, a sleep streak), and flagging those would make the gate noise.
+#
+# 2026-08-25 (#3154 sibling sweep): this one already spans the/this/my/our (plus
+# his/her) before the noun — no determiner-width gap here, unlike the
+# _BASELINE_FRAMING_RE class this pattern sits alongside.
 _SPAN_RE = re.compile(
     r"\b(?P<n>\d{1,4}|" + "|".join(sorted(_WORD_NUMBERS, key=len, reverse=True)) + r")\s+"
     r"(?P<unit>days?|weeks?|months?)\s+"
