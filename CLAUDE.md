@@ -208,29 +208,26 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-24 (Fable 5, autonomous — *"Boot Phase D2"* + owner-directed drain).
-**Phase D2 (truth manifest) DONE + the biggest single-session drain yet: 28 PRs merged,
-deployed, live-verified; 17 issues closed with ADR-099 verdicts.** #2898 CLOSED (ceiling
-family → ONE governor source; found the live page telling readers $150 vs the real $200
-window); public-claims registry live (4 wire-real comparators both directions);
-DIL-010/035 flipped (#3097). **Deploy plane healed:** the D1 rollback's causes all fixed
-at producers — #3057 AA clamp, #3067 judge tiling (bound = the model's 1568px resize,
-not Bedrock's 8000), #2957 six members drained via shared `site_api_phase_frame`, a real
-UTC-week front-end bug (#3095, #2506 class), the page_data.js JS-lane landmine (#3077);
-#3064 auto-closed green. **The drain:** 18 non-Fable agents — #2824 grant sweep found 12
-live IAM gaps (golden-eval ran Bedrock OUTSIDE the ceiling) → 12 closed + applies CLEAN;
-#2893 waste audit ($1.66/mo cut; surfaced ADR-108 gate passing 84/484 unevaluated →
-#3083 owner call); #2837 EMF premise INVERTED (bill tracks ~102 dense series ≈ $19, not
-703); transport extraction ended the ai_calls ceiling + re-bill + budget-retry
-(#3082/#3084); the banding fix for issue #2989 cleared live same-session. **Deploys:** 105-lambda fleet
-pass 0-failed + 6 cdk stacks + 2 IAM applies, all postflight-verified. CodeQL at 0 open.
-**Retrospective filed as foundation:** #3101 literal-conflict surface, #3102
-truth-confirm, #3103 wait_pr_green, #3104 merge-train (~half the 12h was these).
-**Honest misses:** absent-check class recurred ×2 (compound-command merges — read
-verdicts in their own command); two leases stranded 15.5h mid-train (rejected with
-decode); PyYAML collection class recurred (#3100/#3105). Main **green (9331995b)**.
-**Next: Session A of `~/.claude/plans/shimmering-snacking-quokka.md`** (owner-approved:
-D3 + foundation #3101-3103 now on Now + drain to ~zero; Fable drives A, Opus drives B;
-owner batch front-loaded — PAT · janitor token · consent · notion · #2961/#2834 · #3083
-· restore-drill appointment). Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-25 (Fable 5, autonomous — *"Boot Session A"* of
+`~/.claude/plans/shimmering-snacking-quokka.md`). **Session A DONE: D3 complete + the
+foundation trio live + 25 PRs merged, all deploys postflight-verified; 13 issues closed
+with verdicts.** Foundation: #3103 `wait_pr_green.sh` (the blessed watcher), #3102
+judge confirm-before-gate, #3101 the literal-conflict class KILLED (six counters →
+generated `platform_counts.py`; the night paid the seam ~10 more times first). All five
+DIL lanes: 024 input manifests at `tag_record` · 025 idempotency census (senders 7→28,
+live DLQ replay vector, brief send-ledger) · 026 lifecycle+65GiB · 027 us-east-2 raw/
+backup ($0.015/mo; backfill = owner click) · 028 replay proof (filename_legacy facets).
+**The CodeQL sentinel had never once read the API** (3 independent defects; fixed
+fail-closed, live-verified clean). #3108: all 8 coaches' relationship-state writes had
+crashed silently since 08-13 — migrated. #2888 measured: the cache had ZERO writes ever
+(no `system=` + Haiku's 4096 floor); $1–3/mo honest, not $8–15. Incidents: the 20:43Z
+site auto-rollback (mixed-state during the train; rerun green) + the Collect-lane 10m
+timeout rendering as `cancelled` (#3141). **Owner-ratified strategy change (plan
+amendment): severity-weighted wrap metrics, discovery-source tagging, discovery/drain
+session split; D5 re-grade prioritized.** Honest misses: 20 filing-contract violations
+were this session's own filings (11 missing prio labels); the literal seam cost ~5
+resolution rounds before its killer merged; a U+2192 in an IAM description redded the
+first Backup deploy. Main green at wrap. **Next: Session B on OPUS** — the plan file
+§Session B + its 2026-08-24 amendment; owner batch riding in the handover (10 items).
+Full narrative: `handovers/HANDOVER_LATEST.md`.
 

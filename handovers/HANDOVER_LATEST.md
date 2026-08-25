@@ -1,167 +1,134 @@
-# Handover — 2026-08-24 (Fable 5, autonomous, ~19h incl. overnight watchers): Phase D2 of the A-Grade Program + the deploy plane healed + the biggest single-session drain yet (28 PRs, 17 closures)
+# Handover — 2026-08-24/25 (Fable 5, autonomous, ~6h): Session A — D3 complete, the foundation trio live, 25 PRs, and the treadmill question answered with a metric change
 
-## SESSION_STATE — Session A (shimmering-snacking-quokka), live block, replace at each phase boundary
+**Session:** Fable 5. Drove: *"Boot Session A of the self-sustaining push"*
+(`~/.claude/plans/shimmering-snacking-quokka.md`, phases A0–A6) — D3 reliability lanes +
+the #3101/#3102/#3103 foundation + the drain wave, AUTONOMOUS with merge+deploy
+authority, ALL implementation via 20 sonnet/opus worktree agents (Fable = judgment
+only). Previous handover archived as `HANDOVER_2026-08-24_d2-truth-manifest-drain.md`
+on `session-archive`. **Next session: Session B on OPUS** — driver prompt =
+`~/.claude/plans/shimmering-snacking-quokka.md` §Session B **+ its 2026-08-24
+amendment** (owner-ratified: severity-weighted wrap metrics, discovery-source tagging,
+discovery/drain session split, D5 re-grade prioritized over D4 breadth).
 
-**Updated:** 2026-08-24 ~23:30Z · **Phase:** A5 deploys DONE, wrap pending · **Driver:** Fable 5.
-If resuming on Opus: *"Resume ~/.claude/plans/shimmering-snacking-quokka.md from SESSION_STATE"*.
+## What shipped (25 PRs merged; every deploy postflight-verified)
 
-**MERGED: 23 PRs** (#3109 #3110 #3121 #3116 #3112 #3123 #3124 #3127 #3133 #3134 #3125
-#3132 #3140 #3122 #3138 #3137 #3136 #3126 #3120 #3135 #3131 #3141 + pending #3142).
-**Issues closed: 15** (#3102 #3103 #2997 #3066 #3108 #2815 #2958 #3106 #3018 #2823
-#3000 #3049 #3101 + earlier #2889-class) — all with ADR-099 verdicts. **A2 foundation
-COMPLETE** (wait_pr_green + confirm-before-gate + literal-removal — the conflict class is
-dead; tonight paid it ~10 more times first). **ALL five D3 lanes MERGED** + alarm/gate
-truth (#2997 #3000 CodeQL-sentinel-never-read-the-API fixed+live-verified clean).
-**DEPLOYED + postflight-verified:** fleet 105/0 at 1e21a9fc · site-api (403-OK probe) ·
-cdk Monitoring (65GiB + telegram-hold alarm) · cdk Backup us-east-2 (bootstrap + stack;
-first attempt redded on a U+2192 in an IAM description — fixed) · S3 lifecycle 15 rules
-(imports/ covered) · raw/* replication config applied · golden-eval IAM applied,
-verify_oidc_iam --strict CLEAN.
-**OPEN/PENDING:** site-deploy full RERUN in flight (first run failed visual-QA at 20:43Z
-BEFORE site-api deployed — the API-before-frontend race; rolled back correctly) → then
-post-deploy truth sweep retires /method/wrong/ + /method/verify/ baselines → close #2957.
-PR #3142 (cdk_stacks 8→10 literal) pending checks → merge → one more site-api deploy.
-Two CI/CD runs in progress will Plan-fail on R8-ST6 (IAM diffs — expected; deploys were
-manual) or mint leases → REJECT with decode (7 rejected so far; decode ledger in run
-comments). **S3 Batch Replication backfill = owner step** (console: Replicate existing
-objects; ≈$0.49; sentinel_replication reports drift BY DESIGN until then).
-**Filed tonight:** #3111 #3113 #3114 #3115 #3117 #3118 #3119 #3128 #3129 #3130 #3139
-#3143 (+#3108 filed+closed same session). **CodeQL 0 open** (#161 dismissed used-in-tests).
-**Epic statuses:** #2798 open (#2811 #2817 remain) · #2578 open (#2999 #3129) · #2986
-open (re-stamp rule; evidence logged) · #2801/#2799/#2883/#2888/#2957/#3104 open with
-dated status comments. **Wrap remains:** #2957 close-out post-sweep · epic acceptance
-comments · register D3 flip comment on #3042 · scorecard · build beat · #365 wrap.
-## What shipped (28 PRs merged AND deployed AND live-verified)
+**A2 foundation (all three live — the session's own friction classes killed):**
+- **#3103 → PR #3110**: `deploy/wait_pr_green.sh` — the blessed named-check-set
+  watcher; full shas, absent-check = failure, never merges. Dogfooded same night.
+- **#3102 → PR #3109**: reader-truth confirm-before-gate — a NEW high re-judges once
+  over the same prose, gates only on 2-of-2 (fail-closed on re-judge errors). In the
+  lane that evening; the green site-deploy rerun ran with it.
+- **#3101 → PR #3131** (merged LAST, deliberately): the six conflict-shaped counters
+  moved to generated single-writer `lambdas/web/platform_counts.py`. Tonight's train
+  paid the literal seam ~10 more times first (3120 ×3, 3122 ×4, 3135 ×2 resolution
+  rounds) — the class is now structurally dead. #3104 deprioritized with a dated note.
 
-**D2 — the truth manifest (all three lanes done; DIL-010/035 flipped, #3097):**
-- **Lane 1 (#2898 CLOSED, PR #3080)** — the ceiling family collapsed to ONE source
-  (`cost_governor_lambda` constants): `site_api_budget` imports it, `core_stack`
-  derives at synth (template proven byte-identical), `renderCost` reads live
-  `/api/receipts` with ADR-104 omit-when-stale, derivation guard in the premerge lane
-  (`scripts/budget_ceilings.py` = the one parser; a second parser is itself forbidden by
-  test). Mutation-proved 5 ways. **Found live: /method/cost/ told readers $150 while the
-  August window base is $200**, plus a "$~80" string-concat display bug — both dead.
-  Live: receipts serves 200/235 + window flag; auto-reverts 09-01 with no deploy.
-- **Lane 2 (PR #3072)** — public-claims registry: 4 behavioral claims (remediation mode,
-  deploy lanes, deletion promise, auto-merge caps) with wire-real comparators both
-  directions (comparator reds on drift; discovery reds an unregistered claim-bearing
-  generator). Runtime-state claims use the permanence-terms recorded-value pattern.
-  PROPORTIONALITY row. Scope-disciplined to exactly four.
-- **Lane 3** — verified already-closed by intervening work (catalog current + `--check`
-  in docs-ci; platform-model `--check` pre-merge in docs-ci); epic #2986 commented with
-  per-box acceptance, ONE honest residual keeps it open (the generic re-stamp rule).
+**D3 — all five DIL lanes (register rows flipped in-PR; full detail in #3042's
+2026-08-24 comment):** DIL-024 input manifests at the `tag_record` chokepoint (#3049
+closed; a real same-tzinfo DST bug caught in its own first draft; conformance ledger
+ratcheted DOWN 35→33) · DIL-025 idempotency census (sender surface corrected 7→**28**,
+a LIVE replay vector found — default-TRANSIENT DLQ redrive vs a 1200s lease — brief
+send-ledger shipped; 22 unsafe senders filed across #3113/#3114/#3115/#3118/#3119) ·
+DIL-026 lifecycle (imports/ covered, declared-vs-live sentinel assertion, 50→65GiB
+re-derived from prefix sizing) · DIL-027 cross-REGION us-east-2 raw/ backup (the org
+has ONE account; backup-not-mirror enforced twice; measured $0.015/mo) · DIL-028
+replay proof (filename-flip found undocumented on eightsleep/withings/strava — now
+machine-readable `filename_legacy` facets).
 
-**The deploy plane, broken at boot, fully healed:** D1's wrap site-deploy had rolled
-back; #3064's rerun failed with three NEW causes. All diagnosed and fixed at producers:
-#3057 AA clamp on data-supplied coach colors (PR #3071, closes it); #3067 vision-judge
-tall-page tiling — bound derived from the model's 1568px resize tier, NOT Bedrock's 8000
-reject limit (PR #3078); #2957 got two new members (chronicle archival framing, the
-verify-table), then **PR #3074 fixed six members at the producer** via the shared
-`site_api_phase_frame` vocabulary and drained 6 baseline entries; #3066 hero as-of
-framing (PR #3075); a REAL #2506-class front-end bug on /story/agents/ (UTC week seed —
-PR #3095); and a main-level landmine from the CSP extraction (page_data.js broke the JS
-unit lane for every site PR — PR #3077). Site-deploys green end-to-end since; #3064
-auto-closed on a green standalone run.
+**Alarm/gate truth:** #2997 closed — the qa-smoke-warnings alarm was HONEST all along
+(336-line reconciliation; the issue's all-chronic premise was a sampling artifact).
+#3000 closed — gate census runs in the unconditional pre-merge lane with an up-only
+ratchet; PROPORTIONALITY count derived (425→523). **The CodeQL sentinel had NEVER once
+read the code-scanning API** (#3112: billing-scoped token + missing `security-events:
+read` + error≠drift fail-soft — three independent sufficient defects); fixed at
+producers, fail-closed, live-verified same night (`codeql_alerts: clean/triaged`).
 
-**The drain (owner-directed):** every Now story + a Next wave, all via sonnet/opus
-worktree agents (18 agents; ~0 Fable tokens in implementation): #2989 alarm banding
-(cleared live same-session), #2893 waste audit ($1.66/mo eliminated; surfaced the
-ADR-108 gate green-lighting 84/484 unevaluated drafts → #3083 owner call), #2889
-gen-cache extension (measured skip-rate was ZERO; causes fixed/filed #3107), #2813
-PT-day contract sweep, #2883 remediation-spend attribution (PR #3070 + IAM applied),
-#2892 caller-class dimension at the bedrock chokepoint, #3082+#3084 transport extraction
-(ai_calls 2396→2264, re-bill + budget-retry dead), #3086 regen-discard telemetry, #2824
-grant-enumeration call-graph sweep (**found 12 live IAM gaps** incl. golden-eval running
-Bedrock outside the budget ceiling — PR #3094 closed 12/13 + both out-of-band applies,
-`verify_oidc_iam --strict` CLEAN), #2837 EMF ledger (**premise inverted: the bill tracks
-~102 dense series ≈ $19/mo, not the 703-series inventory**), #3037 unparked (recall
-publish-path grants + self-heal + silence-alarm extraction, monitoring ratchet TIGHTENED
-1358→1331), plus both dependabot PRs and the CodeQL pair (#160 fixed + rescan-confirmed,
-#159 dismissed with reason — **code scanning at 0 open**).
+**Drain:** #2815 (OUTPUT# frame → PT atomically), #2823 (telegram hold alarm, 3/hr
+from 30d measurement), #2958 (live-cycle framing), #3018 (integrator public register),
+#3106 (suite budget 1500→1950s from 10-run measurement), #3108 (ALL 8 coaches'
+relationship-state writes had crashed silently since 08-13 — found in boot-triage
+logs, root-caused to pre-#536 seed rows, migrated), #2888 measured-partial (cache had
+**zero writes ever** — daily-brief passed no `system=`; Haiku's 4096-token floor makes
+most of that fleet structurally uncacheable; honest projection $1–3/mo not $8–15).
 
-**Deploys (all postflight-verified):** fleet pass **105 lambdas / 0 failed** at HEAD
-9331995b · 6 cdk stacks (Monitoring ×2, Email, Ingestion, Operational, Serve, Compute) ·
-site-api ×2 + site auto-deploys ×4 (final green) · qa-smoke + chronicle-approve +
-coach-quality-gate + coach-state-updater · IAM put-role-policy ×2 (remediation
-AiCostTelemetry, golden-eval BudgetTierRead/EvalConfigRead) with strict parity CLEAN.
+**Deploys (all postflight):** fleet 105/0 · site-api ×2 · cdk Monitoring · cdk Backup
+(us-east-2 bootstrap + stack; first attempt redded on a U+2192 in an IAM role
+description) · S3 lifecycle (15 rules) · raw/* replication config · golden-eval
+PutMetricData IAM applied, `verify_oidc_iam --strict` CLEAN · site statics green
+end-to-end on the full rerun.
 
-## Retrospective (owner-requested) + the foundation it produced
+## The owner's treadmill question (answered in-conversation, ratified "ok cool")
 
-~Half the 12h+ wall-clock was process friction, now filed: **#3101** literal-conflict
-surface removal (the serial merge tax — 15 PRs × 12–18 min check cycles + reconcile-bot
-races), **#3102** confirm-before-gate for truth verdicts (3 rollbacks on single-run
-judge flips), **#3103** `wait_pr_green.sh` (the blessed named-check-set watcher),
-**#3104** merge-train mode. Fifth lesson to memory: combine finding→fix in ONE agent
-brief (the #3092→#3094 and #3081→#3091 stacks each paid a doubled check cycle).
+Closed-13/filed-14 prompted: are the reviews wrong if instances keep surfacing?
+Assessment: what closes is P0–P2 debt, what files is census-made-visible inventory;
+severity trajectory is steeply down; 3 recurrence classes died structurally tonight.
+Conceded real: the raw count is the wrong headline metric, and discovery+drain in one
+session guarantees net-zero optics. **Three standing changes recorded in the plan
+amendment** (see the Session B pointer above). D5's external re-grade is the designed
+answer — prioritize reaching it.
 
 ## Gate lines
 
-**Build beat:** 2026-08-24-d2-truth-manifest
-**Docs:** DILIGENCE register (DIL-010/035 flipped, #3097) · PROPORTIONALITY (+3 rows via
-PRs: claims registry #3072, grant sweep #3092/#3094 with the 13-gap correction, EMF
-ledger #3093) · INCIDENT_LOG (+3 rows + header) · alarm_citations (+4 entries) ·
-SECRETS_MAP-adjacent: infra/iam README (both staged grants stamped APPLIED) ·
-MONITORING (regenerated: derived ledger pointer, #3093) · COACH_STANCE (fail-open
-posture documented, #3081) · engines/ADR-126 amendment (#3073) · sync_doc_metadata
---apply run at the wrap commit
-**Decisions:** none needed — no governance-class choice beyond dispositions already
-recorded in the register/PROPORTIONALITY rows (the fail-open gate call is deliberately
-DEFERRED to the owner as #3083)
-**Main:** green (9331995b)
-**Incidents:** 3 rows added — two merge-train site auto-rollbacks (one #2957 member
-baselined, one real UTC-week bug fixed #3095; single-run-verdict exposure filed #3102);
-the deploy-critical PyYAML collection red ~1.5h (#3100/#3105); the ~15.5h
-production-lease chain (2 leases rejected with decode; janitor token = owner batch)
-**Stash/hooks:** clean
-**Closures:** #3057, #3064, #3067, #2989, #2977, #2898, #2893, #2892, #2889, #2837,
-#2824, #2813, #3082, #3084, #3086, #3096, #3098 all commented (ADR-099 two-line
-verdicts; #2889/#2892/#2824/#3084 honestly `partial` with residuals named — #3107 filed
-for the coach-brief cache gap, the chronicle-sender grant rides the _OPEN_GAPS ratchet)
-**Backlog:** Now live at 3 actionable (promoted #3101, #3102, #3103 by stored rank —
-also Session A's first work); Later sweep — no stale Later issues; hygiene OK across 67
-open (14 violations found at the gate all fixed: 4 epics' Stories coverage, outcome
-audiences, #3083 label, #3098 wedge tracker closed, score-line milestones)
-**Alarms:** 0 red >72h uncited; 10 flap episodes in the 72h window all decoded in
-alarm_citations (ai-daily-spend ×2 + site-api-invocation-spike ×7 + coherence ×1 — all
-the session's own agent burn/QA traffic, each with an expiry clause);
-qa-smoke-failures re-cited as a dated self-clearing window (stale corpus evidence;
-expires 2026-08-25T19:00Z — if still lit after the first post-#3037 nightly, file fresh)
-**CI warnings:** 1 — unit-suite 1507s vs 1500s budget (7s over; this session added ~230
-tests); filed #3106 for the measure-first budget re-decision (--decoded)
-**Ledger:** 3 rows added (public-claims registry · grant-enumeration sweep · EMF
-namespace ledger — each in its shipping PR, ADR-103/144 shape)
+**Build beat:** 2026-08-25-session-a-watchdogs
+**Docs:** via shipping PRs — `docs/IDEMPOTENCY.md` (new, indexed) · DISASTER_RECOVERY
+Scenario 6b (un-drilled banner) · DILIGENCE register rows 024–028 + priced DIL-027 ·
+PROPORTIONALITY +5 rows · MANAGED_WHERE (lifecycle ownership) · DATA_GOVERNANCE
+(retention row) · CONVENTIONS §3/§4a1/§4c (#3131 shape) · engine re-verifies:
+COACH_STANCE (PR #3140 merged) + HYPOTHESIS/READINESS/SCORING (PR #3145, merged at
+wrap) · alarm_citations (boot decodes + re-points) · sync run at the wrap commit
+**Decisions:** none needed — dispositions live in register/PROPORTIONALITY rows; the
+session-process changes (metrics, discovery/drain split) are conventions recorded in
+the Session B plan amendment + this handover, not architecture/data/deploy posture
+**Main:** green (55f939c8 at the last deploy; wrap commit's own run pending at close)
+**Incidents:** 2 rows added — the 20:43Z site auto-rollback (real mixed old-API/
+new-statics state during the merge train; rolled back correctly, full rerun green at
+23:22Z once site-api deployed) and the Collect-lane 10m-timeout episode (~1.5h of
+reruns misdiagnosed because GitHub renders a job timeout as `cancelled`; fixed #3141)
+**Stash/hooks:** clean — the installed hook went stale when #3131 changed
+install_hooks.sh; reinstalled and re-verified 🟢
+**Closures:** #3102 #3103 #2997 #3066 #3108 #2815 #2958 #3106 #3018 #2823 #3000 #3049
+#3101 all commented (ADR-099 verdicts written at close time, not backfilled; #2997
+verdict = "realized with the premise inverted"; #2888 stays open `partial`)
+**Backlog:** Now live at 3 actionable (promoted #3130, #3143 by stored rank); Later
+sweep — no stale Later issues (e7 clean at wrap); 69 open satisfy the filing contract
+after fixing 20 violations on this session's own filings (11 missing prio labels — my
+filings and agents' both; lesson noted in memory)
+**Alarms:** all red >72h cited; qa-smoke-failures re-cited to the ADR-108
+hold-staleness cause (expires 2026-08-25T18:00Z, evidence on #3083); ai-tokens +
+s3-bucket-size decoded at boot (the latter's structural fix DEPLOYED tonight —
+lifecycle + 65GiB threshold; expect clear within ~48h, re-verify before pruning)
+**CI warnings:** none — latest green main run carries no annotations (the #3106 fix
+re-derived the budget this session)
+**Ledger:** 5 rows added via shipping PRs — input-manifest contract (#3135) ·
+idempotency census + send-ledger (#3132) · lifecycle drift check (#3120) · raw
+replication check (#3122) · telegram hold alarm (#3136)
 
-## Owner batch (ONE ask — everything needing Matthew; front-loaded next session per plan A1)
+## Owner batch (unanswered items re-batched from session start + 2 new)
 
-1. **RECONCILE_PUSH_TOKEN PAT** (unblocks D0.6 required checks — also the structural fix
-   for tonight's reconcile-bot races).
-2. **DEPLOY_GATE_JANITOR_TOKEN** (#3021 — would have caught tonight's 15.5h lease chain).
-3. **respiratory_rate + disturbance_count consent** (#3045 residual).
-4. **notion secret deletion pre-check** (#2890 — LastAccessed 2026-07-25 reader).
-5. **#2961 cdk-import approval** (D3 alarm lane) · **#2834 IAM posture**.
-6. **NEW: #3083** — the ADR-108 quality gate fail-opens on its own fallback report
-   (84/484 drafts green-lit unevaluated): pass-for-availability stays, or hold?
-7. **NEW: schedule the DIL-027 timed restore drill** (a ~30–60 min owner appointment;
-   Session A ships the cross-account raw/ backup + priced row without it).
+1. RECONCILE_PUSH_TOKEN PAT (D0.6) · 2. DEPLOY_GATE_JANITOR_TOKEN (#3021) ·
+3. respiratory_rate/disturbance_count consent (#3045) · 4. notion secret deletion
+(#2890) · 5. #2961 cdk-import approval · 6. #2834 IAM posture · 7. #3083 quality-gate
+fail-open vs hold (now with live evidence both directions — see #3083's 2026-08-24
+comment) · 8. DIL-027 restore-drill appointment · **9. NEW: the S3 Batch Replication
+backfill click** (S3 console → Management → Replication rules → "Replicate existing
+objects"; ≈$0.49; `sentinel_replication` reports drift BY DESIGN until run) ·
+**10. NEW:** the Session B plan amendment is owner-ratified — Session B runs on Opus
+with the re-grade prioritized.
 
 ## Residuals / next picks
 
-- **Session A** = `~/.claude/plans/shimmering-snacking-quokka.md` (owner-approved):
-  D3 lanes + foundation (#3101/#3102/#3103 now on Now) + drain toward zero. Boot prompt
-  delivered in-conversation 2026-08-24.
-- **Scheduled observations (not-work — dated):** first REAL nightly edge-429 2026-08-24
-  18:30Z (RED is real) · qa-smoke-failures self-clear window expires 2026-08-25T19:00Z ·
-  new metric baselines accruing (RegenDiscarded / CallerClass / TruncatedResponses /
-  GenerationSkippedUnchanged — read at Session A boot, no alarms until baselined) ·
-  first prod-class governor share after one 8h cycle · first real prediction grades
-  ~2026-08-31 · WAF revisit 2026-10-15 · legacy unsubscribe sunset 2026-09-22.
-- **#2883 stays open** (boxes 2/4: ratio re-measure post-telemetry + CE reconciliation)
-  — Session A drain list.
-- **#2824's last gap** (chronicle-sender personas.json) is now unblocked (#3037 merged)
-  — rides the `_OPEN_GAPS` ratchet, which reds the day it's fixed and not deleted.
-- **Honest lessons worth carrying:** (1) the absent-check class recurred TWICE as a
-  compound-command slip (watcher output + merge in one command) — #3103 makes the fix
-  structural; separate-command merges from now. (2) Two stranded leases accumulated
-  because mid-train gate arrivals had no watcher — janitor token + #3103. (3) The
-  yaml-less-lane collection break is the 2026-08-08 class recurring — module-scope work
-  in test files must be import-guarded.
+- **#2957** — one member left (`/method/wrong/`): tomorrow's daily cycle regenerates
+  its rows → sweep observes clean → retire the last baseline entry → close (#2957's
+  2026-08-24 comment has the exact path).
+- **Scheduled observations (not-work — dated):** first post-fix nightly qa-smoke
+  2026-08-25 (weight FAIL self-clears if the coach gate passes; alarm citation expires
+  18:00Z) · AnthropicCacheWriteTokens for daily-brief 0→nonzero after the next 17:00Z
+  brief (#2888 box) · GradableShare first real grades ~2026-08-31 · s3-bucket-size
+  clear within ~48h · integrator public register renders after Monday 6am PT (#3018
+  verify) · glucose_coach RELATIONSHIP#state numeric after the next coach cycle
+  (#3108 verify) · WAF revisit 2026-10-15 · legacy unsubscribe sunset 2026-09-22.
+- **#2883** stays open (ratio 1.384 vs 1.15; golden-eval self-report grant applied
+  tonight — re-measure after its next scheduled run) — Session B drain list.
+- **Session B first hour** (not-work — a driver-prompt instruction, owner-ratified in
+  the plan amendment, not a backlog item): read the amendment; adopt the
+  severity-weighted metrics + discovery-source tags in its wrap from the start.

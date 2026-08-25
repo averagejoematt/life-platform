@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-08-24
 
-**Version:** v8.6.0 | **Last updated:** 2026-08-24 | **Total tools:** 76
+**Version:** v8.6.0 | **Last updated:** 2026-08-25 | **Total tools:** 76
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;

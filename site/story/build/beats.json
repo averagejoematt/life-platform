@@ -3127,6 +3127,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3078"
         }
       ]
+    },
+    {
+      "id": "2026-08-25-session-a-watchdogs",
+      "date": "2026-08-25",
+      "title": "Two watchdogs that never barked once",
+      "shipped": "A 25-PR night closed the platform's reliability phase: every compute run now stamps which inputs it could actually see, an idempotency census mapped all 28 email senders (the external review thought there were 7) and gave the daily brief a replay guard, S3 lifecycle and a cross-region backup now cover the irreplaceable raw data, and three pieces of merge-discipline tooling killed the session's own worst friction — including moving the test-count literal out of every PR's conflict path.",
+      "why_it_mattered": "Two watchers turned out to have never worked at all. The CodeQL security sentinel had never once successfully read the alerts API — wrong credential, a missing workflow permission, and an error state that routed around triage, three independent defects each sufficient alone. And every coach's relationship-state write had been silently crashing for eleven days behind a swallowed exception. Both are the same lesson: a monitor you have never seen fail is indistinguishable from one that cannot fire, so both fixes ship with a planted-failure proof that the alarm path actually pages.",
+      "gotcha": "A CI job killed by its own timeout reports itself as 'cancelled', not 'timed out' — which reads as a flaky runner and invites rerunning it into the same wall. Three pull requests burned about ninety minutes that way before the annotation gave it away; the lane's ceiling was re-derived from ten measured runs instead.",
+      "honest_miss": "The session closed 13 issues and filed 14. Most of the filings are census output — debt that already existed, now named and priced — but the raw count reading flat prompted a real strategy change: wrap metrics move to severity-weighted debt and classes-structurally-killed, and future discovery work gets separated from drain work so a census can't make a paydown session read as a treadmill.",
+      "prs": [
+        {
+          "label": "PR #3131",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3131"
+        },
+        {
+          "label": "PR #3112",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3112"
+        },
+        {
+          "label": "PR #3135",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3135"
+        },
+        {
+          "label": "PR #3132",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3132"
+        },
+        {
+          "label": "PR #3122",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3122"
+        }
+      ]
     }
   ]
 }
