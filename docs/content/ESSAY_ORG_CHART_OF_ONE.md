@@ -23,9 +23,10 @@ file:
 > every decision here is deterministic and auditable." (`remediation/automerge.py:7`)
 
 That sentence is the whole org chart, compressed. I run a production AWS platform —
-99 Lambda functions, 9 CDK stacks, ~76 MCP tools, a public website, a hard $85-a-month
-budget — with no team. The engineering headcount is one human who has a day job and a
-family, plus N instances of Claude, where N is however many sessions ran this week.
+104 Lambda functions, 10 CDK stacks, ~76 MCP tools, a public website, a hard monthly
+budget ceiling enforced in code — with no team. The engineering headcount is one human
+who has a day job and a family, plus N instances of Claude, where N is however many
+sessions ran this week.
 The humans-to-agents ratio isn't the novel part anymore; half the industry is doing
 some version of that. The novel part is what it took to make it *not fall over*: it
 took an org chart. Roles, shift handovers, performance reviews, an audit trail, and a

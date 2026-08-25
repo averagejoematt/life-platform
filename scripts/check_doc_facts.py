@@ -211,6 +211,32 @@ HISTORICAL = re.compile(
 APPROX = ("~", "≈", "+", "about ", "around ", "roughly ")
 
 
+def _match_is_approx(line: str, mo: "re.Match") -> bool:
+    """True if an APPROX marker sits directly against THIS match's number.
+
+    #3162: the caller used to compute `approx` once per LINE (`any(a in line for a in
+    APPROX)`) and apply that single flag to every FACT_SPECS match on the line. That let
+    an approximate figure ANYWHERE on a line loosen the tolerance for an unrelated EXACT
+    figure (tol=0.0) elsewhere on the SAME line — measured live: "9 CDK stacks" (stale,
+    truth 10) sat on a line that also said "~76 MCP tools", and the `~`'s 15% approx
+    tolerance leaked onto the exact cdk_stacks check, hiding a genuine 1-off drift behind
+    a green gate for weeks (docs/content/ESSAY_ORG_CHART_OF_ONE.md).
+
+    Markers are directional: `~`/`≈`/"about "/"around "/"roughly " are PREFIXES that must
+    directly abut the digit run ("~76"); `+` is a POSTFIX that must directly follow it
+    ("115+"). A marker anywhere else on the line no longer counts.
+    """
+    start, end = mo.span(1)
+    prefix, suffix = line[:start], line[end:]
+    for marker in APPROX:
+        if marker == "+":
+            if suffix.startswith("+"):
+                return True
+        elif prefix.endswith(marker):
+            return True
+    return False
+
+
 def line_is_exempt(line: str) -> bool:
     """The ONE exemption predicate — historical framing or an inline `drift-ok` marker.
 
@@ -991,14 +1017,14 @@ def main():
                 )
             if HISTORICAL.search(line):
                 continue
-            approx = any(a in line for a in APPROX)
             for key, patterns, tol in FACT_SPECS:
                 for pat in patterns:
                     for mo in re.finditer(pat, line):
                         claim = _to_int(mo.group(1))
                         if claim is None:
                             continue
-                        if _off(claim, truth[key], tol, approx):
+                        # #3162: approx is per-MATCH, not per-line — see _match_is_approx.
+                        if _off(claim, truth[key], tol, _match_is_approx(line, mo)):
                             hits.append(
                                 f"{rel}:{lineno}: {key} claims {claim}, truth is {truth[key]}"
                                 f"{' (±%d%%)' % round(tol*100) if tol else ''}\n"
