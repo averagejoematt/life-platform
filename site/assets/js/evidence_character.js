@@ -110,6 +110,13 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
         <p class="ch-class label">${tt}${esc(tier)} · Level ${level} of 100${ch.as_of_date ? ` · as of ${esc(String(ch.as_of_date))}` : ""}</p>
         ${moodLine}
         <p class="ch-idnote">One character, seven pillars — scored nightly from the same data every other page reads. The silhouette is the real weight; the ring is today's pillar scores; the emblem evolves with the tier.</p>
+        ${
+          // DIL-049 D4 (score-transparency, cheap half): composite_score renders
+          // identically whether it averaged 7 pillars or 3 — /method/game states the
+          // renormalization RULE, this states whether it's doing anything TODAY.
+          // Silent once every pillar is instrumented (the API sends null then).
+          ch.composite_note ? `<p class="ch-idnote">${esc(ch.composite_note)}</p>` : ""
+        }
         ${figs([
           Number.isFinite(composite) && fig(fmt(composite), "composite", ch.composite_delta_1d != null ? `${Number(ch.composite_delta_1d) >= 0 ? "+" : ""}${fmt(ch.composite_delta_1d)} d/d` : ""),
           ch.xp_total != null && fig(fmt(ch.xp_total), "xp"),
