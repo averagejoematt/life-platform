@@ -28,6 +28,7 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for downstream use
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
+from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024 / DIL-049
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
 from common.pacific_time import PACIFIC
 from experiment.phase_filter import with_phase_filter
@@ -260,6 +261,54 @@ def _decimal_to_float(obj):
     if isinstance(obj, list):
         return [_decimal_to_float(i) for i in obj]
     return obj
+
+
+def _public_input_manifest(record) -> "dict | None":
+    """#3049 (DIL-024) / DIL-049 — the compute run's own input-freshness manifest,
+    for readers. Shared across every compute-output-backed surface (originally
+    ``/api/character`` only; ``/api/snapshot``'s readiness block reads it too, #DIL-049
+    D4) so a "was this qualified?" question is answered the same way everywhere
+    instead of drifting into two hand-written phrasings.
+
+    Sibling to the #2388 pillar-absence state, and deliberately NOT a re-derivation
+    of it: ``_attach_pillar_absence`` (site_api_character.py) asks "is this pillar's
+    behavior dark *right now*, at serve time"; this reports what the compute Lambda
+    actually observed *when it ran*. They can honestly disagree — a connector that
+    recovered between 9:30 AM and the page load leaves a stale-input sheet with a
+    live pillar — and collapsing them would hide exactly that.
+
+    Returns None for a record written before the contract shipped (or one whose
+    output partition #3049 never wired in). That absence is the honest answer
+    ("this record predates the contract" / "not in scope"), never synthesized into
+    a fabricated ``complete``. Values arrive already ``_decimal_to_float``-ed by
+    the caller.
+    """
+    manifest = record.get("input_manifest") if isinstance(record, dict) else None
+    if not isinstance(manifest, dict):
+        return None
+    sources = manifest.get("sources")
+    if not isinstance(sources, dict):
+        sources = {}
+    return {
+        "status": manifest.get("status"),
+        "complete": bool(manifest.get("complete")),
+        "as_of_day": manifest.get("as_of_day"),
+        "degraded": [str(s) for s in (manifest.get("degraded") or [])],
+        "unobserved": [str(s) for s in (manifest.get("unobserved") or [])],
+        # One sentence, built by the shared helper so the brief and the site can
+        # never word the same manifest two different ways.
+        "note": _manifest_note(manifest),
+        "sources": {
+            str(k): {
+                "status": (v or {}).get("status"),
+                "latest_day": (v or {}).get("latest_day"),
+                "age_hours": (v or {}).get("age_hours"),
+                "stale_after_hours": (v or {}).get("stale_after_hours"),
+            }
+            for k, v in sources.items()
+            if isinstance(v, dict)
+        },
+    }
 
 
 def _clamp_today(date_str: str, _now_date: str | None = None) -> str:

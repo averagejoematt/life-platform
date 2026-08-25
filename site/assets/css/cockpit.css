@@ -483,6 +483,11 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .rd-comp-zero .rd-comp-track { height: 2px; opacity: 0.6; }
 .rd-comp-zero .rd-comp-v { color: var(--ink-faint); }
 .rd-comp-note { margin-top: 2px; color: var(--ink-faint); opacity: 0.85; }
+/* DIL-049 D4 — the readiness score's own input-completeness disclosure (only
+   rendered when the compute run was actually built on stale/missing input;
+   silent on a fully-qualified score, same "claim carries its context" idiom
+   as .rd-comp-note above and /api/vitals's window_disclosure). */
+.rd-confidence { margin-top: var(--sp-2); color: var(--ink-faint); font-size: var(--fs-small); line-height: var(--lh-relaxed); }
 
 /* "today — where you stand" band header, above the pillar domains. */
 .cap-today { margin-top: var(--sp-5); margin-bottom: 0; }
