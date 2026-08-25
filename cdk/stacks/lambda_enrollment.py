@@ -66,7 +66,9 @@ __all__ = [
     "EnrollmentError",
     "ENROLLED",
     "LAMBDA_CONSTRUCTS",
+    "alarm_coverage",
     "declared_alarm_names",
+    "resolve_alarm_shape",
     "derive_constructions",
     "module_path_for",
     "record",
@@ -535,6 +537,160 @@ def alarm_coverage(stacks_dir: str) -> dict[str, set[str]]:
             for target in _referenced_functions(node, lambda_vars, metric_vars, consts):
                 coverage.setdefault(target, set()).add(label)
     return coverage
+
+
+def _param_names(fn: ast.FunctionDef) -> set[str]:
+    args = fn.args
+    return {a.arg for a in (list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs))} | {
+        a.arg for a in (args.vararg, args.kwarg) if a is not None
+    }
+
+
+def _derives_from(name: str, fn: ast.FunctionDef, roots: set[str], _depth: int = 0) -> bool:
+    """True when local `name` is assigned from something reaching `roots` in `fn`."""
+    if name in roots:
+        return True
+    if _depth > 4:
+        return False
+    for node in ast.walk(fn):
+        if not (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)):
+            continue
+        if node.targets[0].id != name:
+            continue
+        for sub in ast.walk(node.value):
+            if isinstance(sub, ast.Name) and _derives_from(sub.id, fn, roots, _depth + 1):
+                return True
+    return False
+
+
+def resolve_alarm_shape(stacks_dir: str, alarm_name: str) -> dict | None:
+    """Find where `alarm_name`'s CloudWatch alarm is really shaped, following the wire.
+
+    An alarm on this platform is defined one of two ways, and a source-shape guard
+    that only knows the first silently stops guarding the moment a Lambda moves onto
+    the paved road:
+
+      "direct"       — `fn.metric_errors(...).create_alarm(alarm_name="x", ...)`
+                       written out in the stack itself.
+      "constructor"  — the stack passes `alarm_name="x"` to `create_platform_lambda`,
+                       and the constructor creates the alarm.
+
+    The constructor case is resolved in TWO hops, both asserted, because a
+    constructor that stopped creating the alarm would otherwise leave the call site
+    looking perfectly "wired" to a no-op:
+
+      hop 1  the `create_platform_lambda(...)` call carrying this `alarm_name`, and
+             the posture that decides whether an alarm is created at all
+             (`alerts_topic`, `error_alarm`, `digest`, `digest_topic`).
+      hop 2  inside `create_platform_lambda`'s own body, the `.create_alarm(...)`
+             whose `alarm_name=` provably derives from the `alarm_name` PARAMETER —
+             so the literal from hop 1 is demonstrably the name that lands.
+
+    Returns None when the alarm is defined nowhere. The returned `shape_call` is the
+    node whose kwargs are the alarm's REAL shape (period, threshold, treat-missing,
+    …) — assert against that, never against a value the caller had to supply itself.
+
+    Note on the shape parameters: the constructor holds them as literals rather than
+    threading them per call site, deliberately. A per-call-site `alarm_period_hours=`
+    would make the fleet's error-alarm shape configurable at 105 call sites, which is
+    the opposite of what the convention exists for. They are one hop away, not absent
+    — so the honest fix is to follow the hop, which is what this does.
+    """
+    files = [f for f in sorted(os.listdir(stacks_dir)) if f.endswith(".py") and not f.startswith("__")]
+    trees: dict[str, ast.Module] = {}
+    for fname in files:
+        with open(os.path.join(stacks_dir, fname), encoding="utf-8") as fh:
+            trees[fname] = ast.parse(fh.read(), filename=fname)
+
+    # ── The direct idiom ──────────────────────────────────────────────────────
+    for fname, tree in trees.items():
+        if fname == CONSTRUCTOR_FILE:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+            if called not in _ALARM_CONSTRUCTS:
+                continue
+            for kw in node.keywords:
+                if kw.arg == "alarm_name" and isinstance(kw.value, ast.Constant) and kw.value.value == alarm_name:
+                    metric = node.func.value if isinstance(node.func, ast.Attribute) and called == "create_alarm" else None
+                    if metric is None:
+                        metric = next((k.value for k in node.keywords if k.arg == "metric"), None)
+                    return {
+                        "provenance": "direct",
+                        "shape_file": fname,
+                        "shape_call": node,
+                        "metric_call": metric,
+                        "call_site": None,
+                        "constructor_fn": None,
+                    }
+
+    # ── Hop 1: the constructor call site carrying this alarm_name ─────────────
+    site = None
+    for fname, tree in trees.items():
+        if fname == CONSTRUCTOR_FILE:
+            continue
+        consts = _module_constants(tree)
+        dict_vars = _dict_literals(tree)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+            if called != CONSTRUCTOR:
+                continue
+            kwargs, _ = _effective_kwargs(node, dict_vars)
+            _, name = _kwarg(kwargs, "alarm_name", consts)
+            if name != alarm_name:
+                continue
+            topic_present, topic = _kwarg(kwargs, "alerts_topic", consts)
+            _, err = _kwarg(kwargs, "error_alarm", consts)
+            _, digest = _kwarg(kwargs, "digest", consts)
+            digest_topic_present, digest_topic = _kwarg(kwargs, "digest_topic", consts)
+            _, fn_name = _kwarg(kwargs, "function_name", consts)
+            site = {
+                "file": fname,
+                "line": node.lineno,
+                "function_name": fn_name,
+                "alerts_topic_present": topic_present and topic is not None,
+                "error_alarm_disabled": err is False,
+                "digest": digest,
+                "digest_topic_present": digest_topic_present and digest_topic is not None,
+            }
+            break
+        if site:
+            break
+    if site is None:
+        return None
+
+    # ── Hop 2: the constructor really does create it, under that same name ────
+    helpers = trees.get(CONSTRUCTOR_FILE)
+    if helpers is None:
+        return None
+    ctor = next((n for n in ast.walk(helpers) if isinstance(n, ast.FunctionDef) and n.name == CONSTRUCTOR), None)
+    if ctor is None:
+        return None
+    params = _param_names(ctor)
+    for node in ast.walk(ctor):
+        if not isinstance(node, ast.Call):
+            continue
+        called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+        if called not in _ALARM_CONSTRUCTS:
+            continue
+        bound = next((k.value for k in node.keywords if k.arg == "alarm_name"), None)
+        # The name that lands must come from the alarm_name PARAMETER, not a
+        # literal the constructor invented — otherwise hop 1's literal is decorative.
+        if not (isinstance(bound, ast.Name) and "alarm_name" in params and _derives_from(bound.id, ctor, {"alarm_name"})):
+            continue
+        return {
+            "provenance": "constructor",
+            "shape_file": CONSTRUCTOR_FILE,
+            "shape_call": node,
+            "metric_call": node.func.value if isinstance(node.func, ast.Attribute) and called == "create_alarm" else None,
+            "call_site": site,
+            "constructor_fn": ctor,
+        }
+    return None
 
 
 def declared_alarm_names(stacks_dir: str) -> set[str]:
