@@ -1125,55 +1125,11 @@ def process_doc(rel_path: str, dry_run: bool, is_check: bool = False) -> list[st
     return changes
 
 
-def _refresh_secret_count() -> int:
-    """`--refresh-secrets`: read the LIVE Secrets Manager inventory and rewrite the
-    `secret_count` literal (number + `live-verified` date) in this file. Read-only in AWS.
-
-    Why a flag and not another `_auto_discover_*` (#1957): the secret inventory exists
-    only in AWS — nothing in the repo can derive it. Discovering it inline would make the
-    sync's OUTPUT depend on whether the caller happened to hold credentials, so a
-    credentialed `--apply` and a credential-free `--check` would stamp different numbers
-    and fight each other forever. Instead discovery is an explicit, deterministic-output
-    command: it updates the literal + its verification date, and
-    `scripts/doc_facts_ops.py` reds CI when that date goes stale (>90d). That closes the
-    "manufactured freshness" hole — the doc-sync re-stamping "Last updated" over a count
-    nobody had verified since 2026-07-10 — without introducing environment-dependent docs.
-    """
-    import boto3
-
-    client = boto3.client("secretsmanager", region_name="us-west-2")
-    names = []
-    kwargs: dict = {"MaxResults": 100}
-    while True:
-        page = client.list_secrets(**kwargs)
-        names += [s["Name"] for s in page.get("SecretList", [])]
-        token = page.get("NextToken")
-        if not token:
-            break
-        kwargs["NextToken"] = token
-    live = sorted(n for n in names if n.startswith("life-platform/"))
-    src = Path(__file__).read_text(encoding="utf-8")
-    today = datetime.now(timezone.utc).date().isoformat()
-    new_src, n = re.subn(
-        r'"secret_count": \d+,  # live-verified \d{4}-\d{2}-\d{2}',
-        f'"secret_count": {len(live)},  # live-verified {today}',
-        src,
-        count=1,
-    )
-    if n != 1:
-        print("error: could not locate the secret_count literal to rewrite", file=sys.stderr)
-        sys.exit(2)
-    Path(__file__).write_text(new_src, encoding="utf-8")
-    print(f"  secret_count → {len(live)} (live-verified {today}, region us-west-2)")
-    for name in live:
-        print(f"    {name}")
-    print("\n  Next: python3 deploy/sync_doc_metadata.py --apply   (propagate to the docs)")
-    return len(live)
-
-
 def main():
     if "--refresh-secrets" in sys.argv:
-        _refresh_secret_count()
+        from sync_doc_secret_inventory import refresh_secret_count  # extracted (#1665 ratchet, 2026-08-25)
+
+        refresh_secret_count()
         return
     is_check = "--check" in sys.argv
     is_apply = "--apply" in sys.argv
