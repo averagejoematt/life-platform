@@ -1,0 +1,59 @@
+[
+  {
+    "id": "temporal_canary_pre_reset_baseline",
+    "family": "temporal",
+    "mutation": "SEEDED FAULT (synthetic): cites a PRE-RESET baseline (306.2 lb) as the starting weight while this cycle's baseline is 300.8 — the stale-cycle carry-over the restart pipeline exists to prevent, and the class #1691 armed. NB the phrasing is \"starting weight\" deliberately: the gate's _BASELINE_FRAMING_RE covers \"started the experiment at\" but not \"started THIS experiment at\", a determiner-width gap this matrix found and the PR body reports rather than silently papering over.",
+    "inputs": {
+      "generation_date_iso": "2026-08-24",
+      "start_date_iso": "2026-08-17",
+      "baseline_lbs": 300.8
+    },
+    "mutated_output": "His starting weight for this cycle was 306.2 lb, so the loss so far is real.",
+    "expect_checks": ["stale_baseline"]
+  },
+  {
+    "id": "temporal_canary_stale_cycle_day_number",
+    "family": "temporal",
+    "mutation": "SEEDED FAULT (synthetic): frames the narrative as Day 47 — a day number from the PREVIOUS cycle — while the generation date is Day 8 of this one.",
+    "inputs": {
+      "generation_date_iso": "2026-08-24",
+      "start_date_iso": "2026-08-17"
+    },
+    "mutated_output": "Day 47 and the pattern is finally holding.",
+    "expect_checks": ["stale_phase"]
+  },
+  {
+    "id": "temporal_canary_pre_genesis_day_claim",
+    "family": "temporal",
+    "mutation": "SEEDED FAULT (synthetic): claims Day 1 while the generation date is three days BEFORE genesis — the pre-start surface narrating results that cannot exist yet.",
+    "inputs": {
+      "generation_date_iso": "2026-08-14",
+      "start_date_iso": "2026-08-17"
+    },
+    "mutated_output": "Day 1 is in the books and the streak has started.",
+    "expect_checks": ["stale_phase"]
+  },
+  {
+    "id": "temporal_canary_invented_experiment_age",
+    "family": "temporal",
+    "mutation": "SEEDED FAULT (synthetic): claims eleven weeks of experiment history when 8 days have elapsed since genesis — the #1897 span class.",
+    "inputs": {
+      "generation_date_iso": "2026-08-24",
+      "start_date_iso": "2026-08-17"
+    },
+    "mutated_output": "Eleven weeks into the experiment, the sleep curve has settled.",
+    "expect_checks": ["experiment_span"]
+  },
+  {
+    "id": "temporal_canary_understated_absence",
+    "family": "temporal",
+    "mutation": "SEEDED FAULT (synthetic): reproduces the #2756 live defect exactly — the narrative says the food log has been blank for four days while the measured span handed to the gate is 52.",
+    "inputs": {
+      "generation_date_iso": "2026-08-24",
+      "start_date_iso": "2026-08-17",
+      "known_absence_days": { "food": 52 }
+    },
+    "mutated_output": "MacroFactor has been blank for four days, which is a short lapse and easy to recover from.",
+    "expect_checks": ["absence_span"]
+  }
+]

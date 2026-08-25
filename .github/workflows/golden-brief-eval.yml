@@ -1,5 +1,12 @@
-# Golden-brief + golden-surface eval harness (#742 coach briefs; #812 every AI surface) —
-# the falsifiable-honesty layer.
+# Golden-brief + golden-surface + AI-safety-matrix eval harnesses (#742 coach briefs;
+# #812 every AI surface; #3050 the five safety families) — the falsifiable-honesty layer.
+#
+# #3050 (DIL-029/030/031-lite) adds tests/safety_eval_matrix.py: the same GOLDEN + CANARY
+# pattern organised by SAFETY FAMILY (grounding, temporal, injection, privacy, refusal)
+# instead of by surface, run against the real prompt/enforcement paths. It gates the same
+# two ways as its siblings — the deploy-critical unit lane on every push
+# (tests/test_safety_eval_matrix.py) and this weekly re-run — and publishes the per-family
+# release table (the diligence report's §9 shape) into the run summary.
 #
 # The DETERMINISTIC verdicts already gate every deploy: tests/test_golden_brief_eval.py and
 # tests/test_golden_surface_eval.py carry the `deploy_critical` marker, so they run in the
@@ -125,3 +132,68 @@ jobs:
             schedule — voice/gate drift caught outside the deploy path. The
             advisory Haiku judge steps are continue-on-error and cannot be the
             cause; see the run's step log for which harness redded.
+
+  # ════════════════════════════════════════════════════════════════
+  # AI-safety eval matrix (#3050) — its OWN job, deliberately credential-free
+  # ════════════════════════════════════════════════════════════════
+  # WHY A SEPARATE JOB rather than two more steps in golden-brief: the #2824 grant
+  # sweep (tests/test_grant_enumeration_drift.py) attributes a job's OIDC role to
+  # EVERY python entrypoint the job runs, and this harness statically reaches the
+  # fail-closed content-filter channel (through the real coach compression prompt it
+  # replays stored reader questions with). It never READS that channel — the screened
+  # branch is unreachable for these fixtures — but "statically reachable" is exactly
+  # what that guard measures, and the honest fix is to run the matrix where no role
+  # is assumed rather than to widen github-actions-golden-eval-role for a read that
+  # never happens. The cost is stated plainly: per-family metrics publish to the run
+  # summary, not to CloudWatch. Deterministic, offline, free either way (ADR-105).
+  safety-matrix:
+    name: AI-safety eval matrix (5 families, offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # setup-python (v7.0.0, cache: pip) via the shared composite (#1655)
+      - uses: ./.github/actions/setup-ci
+        with:
+          python-cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          # Versions from requirements-dev.txt via ci_pins.py (CQ-01/#2609).
+          PINS=$(python3 scripts/ci_pins.py pytest boto3 botocore)
+          pip install $PINS
+
+      - name: Per-family verdict + release metrics (gating, free)
+        run: |
+          # #2746 discipline: GitHub's default shell is `bash -e {0}` and `-e` does NOT
+          # imply pipefail, so `harness | tee` would exit with tee's status and a step
+          # named "gating" would report green on every regression.
+          set -o pipefail
+          echo "::group::AI-safety eval matrix (#3050)"
+          python3 tests/safety_eval_matrix.py --summary-md | tee /tmp/safety_matrix.md
+          echo "::endgroup::"
+          # The per-family table IS the published release metric (the diligence
+          # report's §9 shape); the exit code above is the gate.
+          cat /tmp/safety_matrix.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Self-tests (mutation proofs + wiring)
+        run: python3 -m pytest tests/test_safety_eval_matrix.py -q
+
+      # Same #1447 contract as the job above: a scheduled red must not evaporate into
+      # run history. Distinct slug so the two harnesses' issues never overwrite each other.
+      - name: File/resolve advisory failure issue (#1447)
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: safety-eval-matrix
+          workflow-name: AI-safety eval matrix
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            The weekly AI-safety eval matrix (tests/safety_eval_matrix.py, or its
+            self-tests) failed on schedule — a safety control regressed in one of the
+            five families (grounding, temporal, injection, privacy, refusal) outside
+            the deploy path. Read the step summary's per-family table: a GOLDEN
+            false-positive means a control started flagging legitimate output, a
+            CANARY miss means a seeded violation slipped a control, and PENDING means
+            a family's module is not on the tree at all.

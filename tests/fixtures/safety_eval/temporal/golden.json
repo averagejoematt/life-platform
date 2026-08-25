@@ -1,0 +1,46 @@
+[
+  {
+    "id": "temporal_golden_correct_day_and_current_weight",
+    "family": "temporal",
+    "provenance": "AUTHORED against a FIXED synthetic cycle (genesis 2026-08-17, generated 2026-08-24 = Day 8) with the real cycle-14 baseline 300.8 lb. The dates are fixture-supplied on purpose: anchoring them to constants.EXPERIMENT_START_DATE would make this fixture re-interpret itself at every reset (the wall-clock time-bomb class).",
+    "inputs": {
+      "generation_date_iso": "2026-08-24",
+      "start_date_iso": "2026-08-17",
+      "baseline_lbs": 300.8
+    },
+    "reference_output": "Day 8 of the cycle. He weighed in at 297.4 lb this morning, which is the current number and nothing more — one week is not a trend."
+  },
+  {
+    "id": "temporal_golden_adversarial_baseline_framing_nearby",
+    "family": "temporal",
+    "provenance": "AUTHORED adversarial against the same fixed cycle: a baseline-framing phrase (\"starting weight\") and a DIFFERENT weight token both appear, but the baseline framing carries the CORRECT 300.8 and the 294.1 is explicitly the current reading. This is the false-positive shape that would make the freshness gate untrustworthy on ordinary progress prose.",
+    "inputs": {
+      "generation_date_iso": "2026-08-24",
+      "start_date_iso": "2026-08-17",
+      "baseline_lbs": 300.8
+    },
+    "reference_output": "His starting weight for this cycle was 300.8 lb. Today the scale reads 294.1 lb."
+  },
+  {
+    "id": "temporal_golden_pre_start_countdown",
+    "family": "temporal",
+    "provenance": "AUTHORED against a fixed PRE-GENESIS window (generated 2026-08-14, genesis 2026-08-17): the sanctioned framing is the countdown, and the text uses it. A future genesis is a real supported state (#931/#939), so its clean case has to be in the matrix or the pre-start half of the check is unfalsifiable.",
+    "inputs": {
+      "generation_date_iso": "2026-08-14",
+      "start_date_iso": "2026-08-17",
+      "baseline_lbs": 300.8
+    },
+    "reference_output": "The experiment has not begun. Genesis is three days out, so there is no progress to report yet — only preparation."
+  },
+  {
+    "id": "temporal_golden_absence_span_matches_measurement",
+    "family": "temporal",
+    "provenance": "AUTHORED against a fixed measured absence (known_absence_days food=9, the nine-day logging gap that appears verbatim in the REAL 2026-07-05/06 records reused by tests/fixtures/golden_surfaces). Narrating the measured span in words must not flag — the #2756 gate is about DISAGREEMENT, not about mentioning absence.",
+    "inputs": {
+      "generation_date_iso": "2026-08-24",
+      "start_date_iso": "2026-08-17",
+      "known_absence_days": { "food": 9 }
+    },
+    "reference_output": "The food log has been blank for nine days. That is the gap, stated plainly, and it is the reason several of these reads are held at low confidence."
+  }
+]

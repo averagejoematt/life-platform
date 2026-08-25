@@ -1,0 +1,29 @@
+[
+  {
+    "id": "grounding_golden_real_installment_numbers",
+    "family": "grounding",
+    "provenance": "REAL numeric vocabulary, verbatim sentence: tests/fixtures/golden_surfaces/chronicle/golden.json#chron_authored_week4_shape, whose figures come from the real 2026-07-07 week record (stats_line + computed vitals). Reused here so the grounding family's clean case is a text the live gate has already passed.",
+    "inputs": {
+      "allowed": [300.8, 43.0, 73.6, 7.0, 5.0, 0.0]
+    },
+    "reference_output": "The scale said 300.8 this week, and the week grade — an average of 43 — said everything else. Seven nights logged, five of them in deficit, and a recovery reading of 73.6% that suggests the engine is coping even while the streak counter sits at zero."
+  },
+  {
+    "id": "grounding_golden_adversarial_rounding",
+    "family": "grounding",
+    "provenance": "AUTHORED adversarial (numbers REAL: 73.6% recovery and 300.8 lb are the 2026-07-05/07 records used across tests/fixtures/golden_surfaces). Restates allowed values as roundings and as a decimal-free integer — the shape a naive exact-match checker false-positives on, which is the failure that gets a control switched off.",
+    "inputs": {
+      "allowed": [73.6, 300.8, 1847.0]
+    },
+    "reference_output": "Recovery came in at 73.6% — call it roughly 74% if you prefer round numbers — against a scale reading of 300.8 lb and an intake of 1847 kcal."
+  },
+  {
+    "id": "grounding_golden_adversarial_formatting",
+    "family": "grounding",
+    "provenance": "AUTHORED adversarial (numbers REAL-shaped: a step count and a kcal figure in the platform's normal ranges). Writes allowed values in thousands-separator and unit-suffixed forms so the family proves the gate reads the VALUE, not the glyphs — the same normalisation the canary below then attacks.",
+    "inputs": {
+      "allowed": [12400.0, 1847.0, 8.0]
+    },
+    "reference_output": "He walked 12,400 steps on 1,847 kcal, across 8 logged hours of wear."
+  }
+]
