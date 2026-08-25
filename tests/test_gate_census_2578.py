@@ -188,6 +188,90 @@ def test_a_guard_script_its_own_caller_imports_by_stem_is_not_called_unreference
     assert "unreferenced-entrypoint" in gates["scripts/check_lonely.py"].risk_flags, "the detector no longer detects anything"
 
 
+# ── 3c. the sentinel per-check family (#3129) ────────────────────────────────
+# deploy/drift_sentinel.py's run_sweep() builds a `checks = {...}` dict that
+# remediation/drift_report.py's as_signal() reads to route needs-human triage; each
+# check_* function behind an entry is an armed gate none of the other five families
+# ever walked. Mirrors Family 4's shape exactly: check_* naming finds candidates,
+# "registered" means referenced beyond the def/import line, an unwired one is flagged
+# `unreferenced-entrypoint` and still counted — never silently dropped.
+def test_sentinel_extractor_flags_a_locally_defined_unwired_check(tmp_path):
+    root = _synthetic_repo(
+        tmp_path,
+        "deploy/drift_sentinel.py",
+        """
+        def check_wired():
+            return {"status": "clean"}
+
+
+        def check_never_wired():
+            return {"status": "clean"}
+
+
+        def run_sweep():
+            checks = {"wired": check_wired()}
+            return checks
+        """,
+    )
+    gates = {g.name: g for g in gc.discover_sentinel_gates(root)[0]}
+    assert "unreferenced-entrypoint" not in gates["check_wired"].risk_flags
+    assert "unreferenced-entrypoint" in gates["check_never_wired"].risk_flags, "an unwired check_* must still enter the census"
+
+
+def test_sentinel_extractor_resolves_an_extracted_sibling_to_its_own_file(tmp_path):
+    """The real per-check functions live in sentinel_github.py etc (#1665's split);
+    the walker must resolve an imported check_* name back to the SIBLING's own
+    file+line, not the drift_sentinel.py re-export line, while still judging
+    'registered' against drift_sentinel's own checks dict — the thing
+    remediation/drift_report.py actually reads."""
+    _synthetic_repo(tmp_path, "deploy/sentinel_github.py", "def check_github_thing():\n    return {'status': 'clean'}\n")
+    root = _synthetic_repo(
+        tmp_path,
+        "deploy/drift_sentinel.py",
+        """
+        from sentinel_github import check_github_thing
+
+
+        def run_sweep():
+            checks = {"github_thing": check_github_thing()}
+            return checks
+        """,
+    )
+    gates = {g.name: g for g in gc.discover_sentinel_gates(root)[0]}
+    assert gates["check_github_thing"].source.startswith("deploy/sentinel_github.py")
+    assert "unreferenced-entrypoint" not in gates["check_github_thing"].risk_flags
+
+
+def test_sentinel_extractor_flags_an_imported_but_never_called_sibling_check(tmp_path):
+    """The import-only half of the same shape: a sibling check_* pulled into the
+    `from ... import (...)` list but never called anywhere in drift_sentinel.py's own
+    checks dict — imported, never wired."""
+    _synthetic_repo(tmp_path, "deploy/sentinel_cadence.py", "def check_cadence_thing():\n    return {'status': 'clean'}\n")
+    root = _synthetic_repo(
+        tmp_path,
+        "deploy/drift_sentinel.py",
+        """
+        from sentinel_cadence import check_cadence_thing
+
+
+        def run_sweep():
+            return {}
+        """,
+    )
+    gates = {g.name: g for g in gc.discover_sentinel_gates(root)[0]}
+    assert "unreferenced-entrypoint" in gates["check_cadence_thing"].risk_flags
+
+
+def test_sentinel_family_registers_the_named_can_it_fail_target(real_census):
+    """The population floor lives in _FAMILY_FLOORS ('sentinel-check'); this checks the
+    two names the issue is actually about: #3112's proof target must be registerable,
+    and an extracted-sibling check_* (not just drift_sentinel.py's own defs) must
+    resolve — a walker that only saw local defs would miss check_github_config."""
+    names = {g["name"] for g in real_census["gates"] if g["family"] == "sentinel-check"}
+    assert "check_codeql_alerts" in names, "#3112's can-it-fail proof target must be registerable"
+    assert "check_github_config" in names, "an extracted-sibling check_* must resolve, not just drift_sentinel.py's own defs"
+
+
 # ── 4. the CI extractor, against a synthetic workflow ────────────────────────
 def _write_workflow(tmp_path: Path, body: str) -> Path:
     wf = tmp_path / ".github" / "workflows"
@@ -249,6 +333,10 @@ _FAMILY_FLOORS = {
     "qa-smoke-check": 5,
     "registry": 40,
     "structural-test": 20,
+    # #3129: 15 measured 2026-08-24 (10 local check_* defs in drift_sentinel.py + 5
+    # across the four #1665-extracted siblings). Floor set well below measured, same
+    # blindness-detector shape as every other row here.
+    "sentinel-check": 10,
 }
 
 

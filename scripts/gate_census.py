@@ -844,31 +844,14 @@ def discover_qa_smoke_gates(root: Path) -> tuple[list[Gate], dict[str, int]]:
     return gates, counters
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Family 5 — structural pytest gates (repo-shape ratchets).
-# ─────────────────────────────────────────────────────────────────────────────
+# Family 5 — structural pytest gates (repo-shape ratchets). Split to
+# gate_census_structural.py alongside Family 6 (#3129, headroom on the module-size
+# ratchet); wrapper below keeps the call site identical.
+from gate_census_structural import discover_structural_test_gates as _discover_structural_gates_impl  # noqa: E402
+
+
 def discover_structural_test_gates(root: Path) -> tuple[list[Gate], dict[str, int]]:
-    sys.path.insert(0, str(root / "tests"))
-    try:
-        from premerge_derivation import discover_tree_sweeping_test_files  # type: ignore
-    except ImportError:  # pragma: no cover
-        log("tests/premerge_derivation.py not importable — structural-test family SKIPPED (n unknown)")
-        return [], {"importable": 0}
-    names = sorted(discover_tree_sweeping_test_files(root / "tests"))
-    gates: list[Gate] = []
-    for name in names:
-        text = _read(root / "tests" / name)
-        gates.append(
-            Gate(
-                id=f"structural::{name}",
-                family="structural-test",
-                name=name,
-                source=f"tests/{name}",
-                screened=True,
-                risk_flags=sorted(set(_static_source_flags(text))),
-            )
-        )
-    return gates, {"importable": 1, "found": len(names)}
+    return _discover_structural_gates_impl(root, Gate, _read, _static_source_flags, log)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -899,10 +882,20 @@ def _static_source_flags(text: str) -> list[str]:
     return sorted(set(flags))
 
 
+# Family 6 (#3129), split to gate_census_sentinel.py (module-size ratchet #1665/#2610:
+# extraction, never a baseline). See that module's docstring for the derivation + why
+# the wrapper passes Gate/_read/_static_source_flags/log as params (avoids a cycle).
+from gate_census_sentinel import discover_sentinel_gates as _discover_sentinel_gates_impl  # noqa: E402
+
+
+def discover_sentinel_gates(root: Path) -> tuple[list[Gate], dict[str, int]]:
+    return _discover_sentinel_gates_impl(root, Gate, _read, _static_source_flags, log)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Assembly + report
 # ─────────────────────────────────────────────────────────────────────────────
-FAMILIES = ("ci", "guard", "registry", "qa", "structural")
+FAMILIES = ("ci", "guard", "registry", "qa", "structural", "sentinel")
 
 
 def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -> dict[str, Any]:
@@ -936,6 +929,10 @@ def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -
         g, c = discover_structural_test_gates(root)
         gates += g
         counters["structural"] = c
+    if "sentinel" in families:
+        g, c = discover_sentinel_gates(root)
+        gates += g
+        counters["sentinel"] = c
 
     # A verdict attaches by id, and a CI-step id is positional (`::<job>::<index>`), so
     # inserting one step into a workflow silently slides every later id onto a DIFFERENT
