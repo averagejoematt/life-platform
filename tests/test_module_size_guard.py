@@ -201,7 +201,12 @@ BASELINE = {
     # cohesive lambdas/web/site_api_ai_context.py (459 lines, under the ceiling) so
     # the per-metric as-of work had room. Extracted ~312 net; banked 62 (a fifth,
     # the #2610 earned-headroom rule), handed the rest back.
-    "lambdas/web/site_api_ai_lambda.py": 1753,
+    # 1753 -> 1700 by #3118 (2026-08-24): the #546 board-session store (mint / load /
+    # conditional append + its security-posture block) moved to cohesive
+    # lambdas/web/site_api_ai_session.py (168 lines, under the ceiling), which paid for
+    # the #3118 turn-identity replay guard that stayed behind. Extracted 98, spent 38,
+    # measured 1693; banked 7 of the ~19 the earned-headroom rule allows. Lowering.
+    "lambdas/web/site_api_ai_lambda.py": 1700,
     # 1989 -> 1829 by #2221: tool_get_social_connection_trend was lifted into cohesive
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)

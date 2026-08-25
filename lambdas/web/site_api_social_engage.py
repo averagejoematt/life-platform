@@ -269,18 +269,20 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
         "status": "pending",
     }
 
-    # Write to S3
+    # Write to S3.
+    # #3118: the key is the content hash ALONE. It used to carry a `{YYYY-MM-DD}_`
+    # prefix, so a retry that crossed the UTC midnight boundary landed on a SECOND
+    # key and duplicated the pending finding; and the put was unconditional, so a
+    # replay of an item Matthew had already moderated reset `status` to "pending".
+    # The conditional write (and its fail-open fallback) lives in web/site_api_capture_store.py.
+    from web.site_api_capture_store import put_capture_record
+
     S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    s3_key = f"generated/findings/{timestamp[:10]}_{finding_id}.json"  # same instant as submitted_at (UTC key prefix, not reader-facing)
+    s3_key = f"generated/findings/{finding_id}.json"
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            Body=json.dumps(record, indent=2),
-            ContentType="application/json",
-        )
-        logger.info(f"[submit_finding] Stored: {s3_key} metric_a={metric_a} metric_b={metric_b}")
+        stored = put_capture_record(s3_client, S3_BUCKET, s3_key, record, json.dumps(record, indent=2), door="submit_finding")
+        logger.info(f"[submit_finding] {'Stored' if stored else 'Replay'}: {s3_key} metric_a={metric_a} metric_b={metric_b}")
     except Exception as e:
         logger.error(f"[submit_finding] S3 write failed: {e}")
         return _error(503, "Unable to store finding. Try again later.")
@@ -290,6 +292,7 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
         {
             "success": True,
             "finding_id": finding_id,
+            "duplicate": not stored,
             "message": "Finding submitted! Matthew will review it and may promote it to a Discovery or seed an Experiment.",
             "remaining": remaining,
         },
@@ -657,13 +660,17 @@ def _handle_board_question(event: dict, *, _g) -> dict:
         "status": "pending",
     }
 
+    # #3118: content hash alone (the `{YYYY-MM}_` prefix made a month-boundary retry
+    # a duplicate) + a conditional put, so a replay can never overwrite a question
+    # Matthew has already answered back to "pending". See _handle_submit_finding.
+    from web.site_api_capture_store import put_capture_record
+
     S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
-    s3_key = f"generated/board_questions/{month}_{qid}.json"
+    s3_key = f"generated/board_questions/{qid}.json"
     try:
         s3_client = boto3.client("s3", region_name=S3_REGION)
-        s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=json.dumps(record, indent=2), ContentType="application/json")
-        logger.info(f"[board_question] Stored: {s3_key}")
+        stored = put_capture_record(s3_client, S3_BUCKET, s3_key, record, json.dumps(record, indent=2), door="board_question")
+        logger.info(f"[board_question] {'Stored' if stored else 'Replay'}: {s3_key}")
     except Exception as e:
         logger.error(f"[board_question] S3 write failed: {e}")
         return _error(503, "Unable to store question. Try again later.")
@@ -673,6 +680,7 @@ def _handle_board_question(event: dict, *, _g) -> dict:
         {
             "success": True,
             "id": qid,
+            "duplicate": not stored,
             "message": "Question received — Matthew reviews these and the board answers a selection.",
             "remaining": remaining,
         },

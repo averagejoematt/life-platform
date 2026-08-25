@@ -54,6 +54,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from botocore.exceptions import ClientError  # #3118: the fake S3 must be able to refuse a conditional put
 
 # ── Frozen clock ──────────────────────────────────────────────────────────────
 # One instant for the whole harness: mid-week, mid-hour, mid-5-minute-bucket, so
@@ -289,7 +290,20 @@ class FakeS3Client:
             raise Exception(f"NoSuchKey: {Key}")
         return {"Body": io.BytesIO(self.objects[Key])}
 
+    def head_object(self, Bucket=None, Key=None, **_kw):
+        if Key not in self.objects:
+            raise Exception(f"NoSuchKey: {Key}")
+        return {"ContentLength": len(self.objects[Key])}
+
     def put_object(self, Bucket=None, Key=None, Body=None, **_kw):
+        # #3118: honor S3's conditional put. Without this the fake would answer
+        # "written" to a write the real bucket refuses, and the capture doors'
+        # replay guard would be tested against a wire that cannot say no.
+        if _kw.get("IfNoneMatch") == "*" and Key in self.objects:
+            raise ClientError(
+                {"Error": {"Code": "PreconditionFailed", "Message": "At least one of the pre-conditions you specified did not hold"}},
+                "PutObject",
+            )
         self.objects[Key] = Body.encode() if isinstance(Body, str) else Body
         self.put_keys.append(Key)
         return {}

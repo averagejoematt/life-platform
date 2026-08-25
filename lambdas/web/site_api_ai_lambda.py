@@ -26,7 +26,6 @@ import json
 import logging
 import os
 import re
-import secrets
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -44,6 +43,7 @@ from ingestion.source_registry import public_board_sources, public_paused_source
 from privacy import privacy_guard  # deterministic real-name + vice scrub (layer module)
 
 import web.site_api_ai_request as _req  # #2688: body parsing lives in the extracted sibling
+import web.site_api_ai_session as _sess  # #546/#3118: the follow-up session store lives in the extracted sibling
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.ask_retrieval import retrieve_block as _ask_retrieve  # #2348: the question selects published-archive passages (fail-soft)
 
@@ -176,16 +176,9 @@ BOARD_RATE_LIMIT = 5  # 5 Bedrock calls/IP/hr. #1221 box 5: this is now a FAN-OU
 # A board_ask response mints an opaque session token; a follow-up carrying that
 # token continues the thread with the SAME coach, replaying the server-stored
 # prior turns so the coach can genuinely reference what it already said. The
-# session record holds NO PII — only an IP hash (already collected for rate
-# limiting), the coach transcript, and a DDB TTL. Bounds: TTL ≤ 1h and ≤3
-# follow-ups per session; the per-IP board_ask rate limit still applies to every
-# follow-up (each costs a Bedrock call), so the worst-case bill is capped.
-SESSION_PK_PREFIX = "BOARDSESS#"
-SESSION_TTL_SECONDS = 3600  # ≤ 1 hour — the acceptance ceiling (#546)
-MAX_FOLLOWUPS = 3  # ≤ 3 follow-ups per session (cost + focus bound)
-# token_urlsafe(24) → 32 url-safe chars; the shape gate rejects anything else
-# BEFORE a DDB read (no guessable/sequential ids, no PII in the token itself).
-_SESSION_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+# store, its bounds (TTL ≤ 1h, ≤3 follow-ups), the security posture and the
+# #3118 turn-identity guard all live in `web/site_api_ai_session.py`.
+MAX_FOLLOWUPS = _sess.MAX_FOLLOWUPS
 
 try:
     from common.rate_limiter import check_rate_limit as _ddb_rate_check
@@ -749,100 +742,27 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
 
 
 # ── #546: board follow-up sessions ─────────────────────────
-# Security posture (this is a PUBLIC, unauthenticated endpoint):
-#   • token is opaque + unguessable (secrets.token_urlsafe) — never sequential
-#     or derived from any request field; the token itself carries NO PII.
-#   • the record stores only an IP hash (already collected for rate limiting),
-#     the coach transcript, a turn counter, and a DDB TTL — no PII.
-#   • the session is bound to the originating IP hash, so a leaked token cannot
-#     be replayed from another network.
-#   • TTL ≤ 1h (DDB TTL attribute) AND a defensive in-code expiry check, since
-#     DynamoDB TTL deletion is lazy (an expired item can linger briefly).
-#   • the follow-up cap is enforced atomically (a conditional UpdateItem), and
-#     every follow-up still consumes a per-IP board_ask rate-limit token.
+# Thin delegators over `web/site_api_ai_session.py` (the store, its security
+# posture, and the #3118 turn-identity guard live there). They stay here because
+# the behavior suite drives `ai._create_board_session` / patches `ai.table`, and
+# reading the module global at call time is what keeps that monkeypatch live.
 
 
 def _valid_session_token(token: str) -> bool:
-    """True only for the opaque url-safe token shape we mint. Cheap gate run
-    BEFORE any DDB read so malformed/probe tokens never touch the table."""
-    return bool(token) and bool(_SESSION_TOKEN_RE.match(token))
+    return _sess.valid_session_token(token)
 
 
 def _create_board_session(ip_hash: str, threads: dict) -> str | None:
-    """Mint an opaque session token and persist the opening transcript.
-
-    `threads` maps coach_id → [{"q", "a"}] (one opening turn per coach that
-    actually answered). Returns the token, or None on any write failure (the
-    reader still gets their answers — the session is a best-effort add-on).
-    Decimal for the numeric attributes (boto3 rejects float). No PII is written.
-    """
-    if not threads:
-        return None
-    token = secrets.token_urlsafe(24)
-    now = int(time.time())
-    try:
-        table.put_item(
-            Item={
-                "pk": f"{SESSION_PK_PREFIX}{token}",
-                "sk": "SESSION",
-                "record_type": "board_session",
-                "ip_hash": ip_hash,  # NOT PII — the same 16-char hash used for rate limiting
-                "followup_count": Decimal(0),
-                "threads": {
-                    pid: [{"q": str(t.get("q", ""))[:500], "a": str(t.get("a", ""))[:1200]} for t in (turns or [])]
-                    for pid, turns in threads.items()
-                },
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "ttl": Decimal(now + SESSION_TTL_SECONDS),  # ≤ 1h — DDB TTL auto-purges
-            }
-        )
-        return token
-    except Exception as e:
-        logger.warning(f"[board_ask] session create failed (non-fatal): {e}")
-        return None
+    return _sess.create_board_session(table, ip_hash, threads)
 
 
 def _load_board_session(token: str) -> dict | None:
-    """Fetch a session by opaque token. Returns None if absent OR expired —
-    a defensive in-code expiry check backstops DDB's lazy TTL deletion so an
-    expired thread can never be resumed."""
-    try:
-        item = table.get_item(Key={"pk": f"{SESSION_PK_PREFIX}{token}", "sk": "SESSION"}).get("Item")
-        if not item:
-            return None
-        if int(item.get("ttl") or 0) < int(time.time()):
-            return None  # expired but not yet reaped by DDB
-        return _decimal_to_float(item)
-    except Exception as e:
-        logger.warning(f"[board_ask] session load failed: {e}")
-        return None
+    item = _sess.load_board_session(table, token)
+    return _decimal_to_float(item) if item else None
 
 
 def _append_board_turn(token: str, ip_hash: str, persona: str, question: str, answer: str) -> bool:
-    """Atomically append a follow-up turn and bump the counter, gated on the
-    ≤3 cap AND the originating IP. The ConditionExpression makes the cap a
-    hard, race-safe ceiling (a burst can't double-spend past it). Returns True
-    on write, False if the condition failed (cap reached / IP mismatch) or on
-    error. Does NOT extend the TTL — total session life stays ≤ 1h from mint."""
-    try:
-        table.update_item(
-            Key={"pk": f"{SESSION_PK_PREFIX}{token}", "sk": "SESSION"},
-            UpdateExpression=("ADD followup_count :one " "SET threads.#pid = list_append(if_not_exists(threads.#pid, :empty), :turn)"),
-            ConditionExpression=("attribute_exists(pk) AND followup_count < :cap AND ip_hash = :ip"),
-            ExpressionAttributeNames={"#pid": persona},
-            ExpressionAttributeValues={
-                ":one": Decimal(1),
-                ":cap": Decimal(MAX_FOLLOWUPS),
-                ":empty": [],
-                ":turn": [{"q": str(question)[:500], "a": str(answer)[:1200]}],
-                ":ip": ip_hash,
-            },
-        )
-        return True
-    except Exception as e:
-        # ConditionalCheckFailedException lands here too — cap reached or IP moved.
-        logger.warning(f"[board_ask] follow-up persist skipped for {persona} (non-fatal): {e}")
-        return False
+    return _sess.append_board_turn(table, token, ip_hash, persona, question, answer)
 
 
 # ── Lambda Handler ─────────────────────────────────────────
@@ -1590,6 +1510,26 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     prior_turns = (sess.get("threads") or {}).get(persona)
     if not prior_turns:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "That coach isn't part of this thread"})}
+
+    # #3118: a REDELIVERY of a follow-up already in this thread serves the stored
+    # answer — no model call, no second append, no second turn burned. The reader
+    # loses nothing to a retry; only the (fail-closed) hourly token is spent.
+    _replay = _sess.replayed_turn(sess, persona, question)
+    if _replay:
+        logger.info(f"[board_ask] follow-up replay for {persona} — served from the thread, no turn consumed")
+        return {
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+            "body": json.dumps(
+                {
+                    "persona": persona,
+                    "response": str(_replay.get("a") or ""),
+                    "session_token": token,
+                    "followups_remaining": max(0, MAX_FOLLOWUPS - used),
+                    "replay": True,
+                }
+            ),
+        }
 
     api_key = _get_anthropic_key()
     if not api_key:
