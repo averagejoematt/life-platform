@@ -110,6 +110,12 @@ def _auto_discover_lambda_count() -> int | None:
         return None
 
 
+def _auto_discover_cdk_stack_count() -> int | None:  # thin wrapper: sync_cdk_fact (#1665 extraction), #3151 test contract
+    from sync_cdk_fact import discover_cdk_stack_count
+
+    return discover_cdk_stack_count(ROOT)
+
+
 def _auto_discover_endpoint_count() -> int | None:
     """Count DISTINCT public API endpoint paths served by the site-api Lambda (#1437).
 
@@ -577,9 +583,7 @@ def _apply_auto_discovered(facts: dict) -> dict:
             print(f"  [auto] alarm_count: {facts.get('alarm_count')} → {alarm_count} (from CDK stacks, #795)")
         facts["alarm_count"] = alarm_count
 
-    from sync_cdk_fact import discover_cdk_stack_count
-
-    cdk_stack_count = discover_cdk_stack_count(ROOT)
+    cdk_stack_count = _auto_discover_cdk_stack_count()
     if cdk_stack_count is not None:
         if facts.get("cdk_stacks") != cdk_stack_count:
             print(f"  [auto] cdk_stacks: {facts.get('cdk_stacks')} → {cdk_stack_count} (from cdk/stacks/*_stack.py, #3143)")
@@ -797,11 +801,9 @@ RULES = [
         r"\| \*\*Secrets Manager\*\* \| ~?\$[\d.]+ \| \d+ active secrets × \$0\.40",
         "| **Secrets Manager** | {secrets_cost} | {secret_count} active secrets × $0.40",
     ),
-    # ── MCP_TOOL_CATALOG.md ──────────────────────────────────────────────────
-    # BOTH date-bearing lines stamped, deliberately: the generator COPIES `Last
-    # updated` into `Verified:`, so stamping only one left the file self-inconsistent
-    # on every UTC-date rollover (the 2026-08-24-wrap Docs CI red). Not manufactured
-    # freshness (#1957): the file is fully re-derived from source each regeneration.
+    # ── MCP_TOOL_CATALOG.md — BOTH date lines stamped: the generator copies `Last
+    # updated` into `Verified:`, so stamping one left the file self-inconsistent on
+    # every UTC rollover (the 08-24-wrap red). Fully re-derived each regen (#1957 ok).
     (
         "docs/MCP_TOOL_CATALOG.md",
         r"\*\*Version:\*\* [^\|]+ \| \*\*Last updated:\*\* [^\|]+ \| \*\*Total tools:\*\* \d+",
