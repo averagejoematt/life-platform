@@ -205,13 +205,14 @@ CORS_HEADERS = {
 #     2026-08-23/24 merge train ~3–4h of serial reconcile rounds. This module is
 #     hand-merged; platform_counts.py is not.
 #   • JUDGMENT / live-AWS — monthly_cost, review_grade, active_secrets,
-#     site_pages, cdk_stacks, board_*, the weight anchors. Hand-maintained here,
-#     never rewritten by the sync.
+#     site_pages, board_*, the weight anchors. Hand-maintained here, never
+#     rewritten by the sync. (cdk_stacks moved into the discovered set at #3143
+#     — the hand-maintained copy here was stale 8 vs 10, missing the #793 serve
+#     split and the DIL-027 backup stack; see platform_counts.py's docstring.)
 # Splice order is deliberate: the discovered block cannot silently shadow a
 # judgment field, because a duplicate key would be caught by the guard test.
 PLATFORM_STATS = {
     **DISCOVERED_COUNTS,
-    "cdk_stacks": 10,  # 8 was stale by TWO stack additions (serve split #793, backup DIL-027) — evidence this belongs in platform_counts.py (#3143)
     "monthly_cost": "~$100",  # GROUND-TRUTH run-rate, pinned (#1232, re-grounded #2898).
     # Source = Cost Explorer UnblendedCost, read 2026-08-23: June 2026 $79.80 and July 2026
     # $98.35, both closed months. The LAST CLOSED MONTH is the honest trailing run-rate, so
