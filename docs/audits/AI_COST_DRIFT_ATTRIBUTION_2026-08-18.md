@@ -305,3 +305,83 @@ infrastructure's own usage logs, out of scope for a repo-side PR.
 (1.36 → 1.42 over four days), not toward it — the 7-day-sustained box remains open and, on current
 trend, is not close. The alarm (box 3) is live and correctly in ALARM on this true condition. Box 4
 (per-caller reconciliation) is untouched.
+
+## Addendum — 2026-08-24/25: box 3 confirmed already complete, golden-eval grant confirmed live, box 2/4 re-measured
+
+**Box 3 (alarm) re-audited, not re-built.** `cost-metric-drift-sustained`
+(`cdk/stacks/operational_stack.py`) shipped in #2948, deployed and verified live
+2026-08-24 per this issue's own status comment: `StateValue=ALARM`,
+`threshold=1.15`, `ComparisonOperator=GreaterThanOrEqualToThreshold`,
+`EvaluationPeriods=21`/`DatapointsToAlarm=21` at an 8h period (= 7 days),
+`Statistic=Minimum`, `treat_missing_data=NOT_BREACHING`, routed to the digest SNS
+topic — exactly mirroring `budget-tier-sustained-7d`'s shape, and locked to
+`cost_governor_lambda.DRIFT_RATIO_BAR` by an AST cross-check
+(`tests/test_cost_drift_alarm_2883.py`, 6/6 passing). This pass re-verified all of
+that in source and re-ran the test file rather than adding a second alarm on the
+same metric — a duplicate would not add coverage, only alarm-count noise. **No
+alarm work remained to do for #2883**; the issue's original "nothing alarms on it"
+premise, true when filed 2026-08-18, has been false since #2948.
+
+**Golden-eval `AiCostTelemetry` grant: confirmed APPLIED live** (was "staged, not
+applied" as of the 2026-08-24T15:54 UTC status comment). Read-only, no-cost checks:
+`aws iam get-role-policy` shows the `AiCostTelemetry` Sid present on
+`github-actions-golden-eval-role`; `aws iam simulate-principal-policy` for
+`cloudwatch:PutMetricData` under `cloudwatch:namespace=LifePlatform/AI` returns
+`allowed`; `deploy/verify_oidc_iam.py` shows no drift for the role (the checked-in
+JSON already matched). `infra/iam/README.md` updated to reflect APPLIED rather than
+STAGED. **This has not yet moved the ratio** — `golden-brief-eval.yml` runs weekly
+(next: 2026-08-31T15:17 UTC) and the one run since the grant would have applied
+predates it, so no `CallerClass=ci` datapoints have landed from that source yet.
+Triggering an out-of-schedule `workflow_dispatch` to force a datapoint was
+considered and declined for this pass — it would spend real Bedrock $ and write
+real CloudWatch metrics, outside a read-only-AWS worktree's mandate.
+
+**Box 2 (ratio < 1.15 sustained 7d) re-measured, live CloudWatch, 2026-08-24T23:59Z
+(most recent governor cycle):**
+
+```
+2026-08-19T09:00-07:00  1.3719
+2026-08-19T17:00-07:00  1.3673
+2026-08-20T01:00-07:00  1.3673
+2026-08-20T09:00-07:00  1.3663
+2026-08-20T17:00-07:00  1.3613
+2026-08-21T01:00-07:00  1.3647
+2026-08-21T09:00-07:00  1.3778
+2026-08-21T17:00-07:00  1.3800
+2026-08-22T01:00-07:00  1.4114
+2026-08-22T09:00-07:00  1.4140
+2026-08-22T17:00-07:00  1.4177  <- prior peak
+2026-08-23T01:00-07:00  1.4159
+2026-08-23T09:00-07:00  1.4107
+2026-08-23T17:00-07:00  1.3906
+2026-08-24T01:00-07:00  1.3851
+2026-08-24T09:00-07:00  1.3840
+2026-08-24T17:00-07:00  1.3710  <- most recent
+```
+
+19 consecutive 8h datapoints since box 2 landed (08-19), all above 1.15 — not one
+sub-bar reading in 6 days, let alone 7 sustained. The most recent point (1.3710) is
+the lowest since 08-21, continuing the slow pullback from the 08-22 peak (1.4177),
+but still ~19% above the bar. **Box 2 stays open.**
+
+**Box 4 (CE reconciliation) re-measured, live, 2026-08-25T02:xx UTC:**
+
+| source | MTD (Aug 1 → now) |
+|---|---:|
+| Cost Explorer, Bedrock (Haiku $49.97 + Sonnet $33.34 + Opus/Titan $0.02) | **$83.32** |
+| `LifePlatform/AI::EstimatedCostUSD`, dimensionless sum | **$61.36** |
+| Gap | **$21.96 (26.4% of CE spend)** |
+
+Versus the 2026-08-24T16:00 UTC governor cycle cited in the last status comment
+($82.96 / $60.25 / $22.71 / 27.4%), the gap narrowed by $0.75 (about a day's worth
+of remediation-agent + minor drift) — real but small, consistent with "two of three
+named residual sources are landing small amounts, the third (golden-eval) hasn't
+emitted yet, and the dominant residual (interactive dev-session Bedrock usage) is
+still out-of-repo and unsized." **Box 4 stays open** — the per-caller table does not
+yet reconcile to CE within the acceptance tolerance.
+
+**Disposition:** no code or alarm-config change was warranted this pass — box 3 was
+already complete, and boxes 2/4 are measurement, not implementation, until the
+out-of-repo dev-session/remediation-scale residual gets a fix candidate. This PR is
+docs/audit-only: the IAM status correction (real drift between docs and live state)
+and a fresh, cited re-measurement for whoever picks this up next. Issue stays open.
