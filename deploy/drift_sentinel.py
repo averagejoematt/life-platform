@@ -668,7 +668,7 @@ def check_doc_literals():
 # sentinel_quota.py below). Imported here so run_sweep and existing callers/tests
 # keep the ds.check_github_config / ds.check_github_push_runs names; GitHub-internal
 # fakes must patch sentinel_github directly (a re-export is not a patch point).
-from sentinel_github import (  # noqa: E402,F401
+from sentinel_github import (  # noqa: E402,F401,I001
     DEFAULT_REPO,
     GITHUB_POSTURE_FILE,
     PAT_FIX,
@@ -736,6 +736,16 @@ from sentinel_quota import (  # noqa: E402,F401
 # configuration is exactly the control that gets verified once and believed
 # forever. Read that module's docstring for what it can and cannot fail on.
 from sentinel_replication import check_raw_replication  # noqa: E402,F401
+
+# ── 11. sentinel cadence dead-man (#3130) ─────────────────────────────────────
+# Own module (same split shape as sentinel_github/sentinel_quota/sentinel_replication):
+# a self-report at the START of each run asserting the PREVIOUS run(s) left a
+# drift-log record, so a sentinel run that dies before persist() is caught by the
+# NEXT run rather than vanishing silently (the #3112 autopsy: the 2026-08-17 run
+# failed outright and nothing noticed the 08-10 → 08-24 gap). Read that module's
+# docstring for the mechanism choice (self-report over a new CloudWatch alarm) and
+# the #2578 fail-closed precedent it mirrors.
+from sentinel_cadence import check_sentinel_cadence  # noqa: E402,F401
 
 CODEQL_ALERT_BUDGET = 0
 
@@ -925,6 +935,7 @@ def run_sweep():
         "codeql_alerts": check_codeql_alerts(),
         "hae_webhook_ingress": check_hae_webhook_ingress(),
         "raw_replication": check_raw_replication(),
+        "sentinel_cadence": check_sentinel_cadence(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -965,6 +976,7 @@ def _summary(status, checks):
         ("github_push_runs", "main-push workflow runs not queuing"),
         ("hae_webhook_ingress", "HAE webhook ingress grant drift"),
         ("raw_replication", "raw/ cross-region backup not verified"),
+        ("sentinel_cadence", "sentinel cadence gap — a missed/stale weekly drift-log record"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -1034,6 +1046,8 @@ def print_summary(record):
                 # #2578: a drift line with no detail is a finding nobody can act on.
                 detail = f" — {c.get('detail', '')}"
             elif name == "raw_replication":
+                detail = f" — {c.get('detail', '')}"
+            elif name == "sentinel_cadence":
                 detail = f" — {c.get('detail', '')}"
         elif st == "degraded":
             # DIL-027: "could not observe" is a distinct verdict from clean and must
