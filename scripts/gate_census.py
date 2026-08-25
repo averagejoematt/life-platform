@@ -380,6 +380,15 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
     ),
 }
 
+# Family 6 (#3129/#3160) — the fifteen drift-sentinel per-check verdicts, kept in their
+# own module purely for the #1665 line ceiling (this file is at ~1,190 of 1,200 and was
+# never baselined; #2610's policy is extraction). `gate_census_proofs` exports plain
+# dicts and has NO dependency on this module, so there is no cycle even when this file
+# is executed directly as `__main__` (the trap gate_census_sentinel.py documents).
+from gate_census_proofs import SENTINEL_PROOFS  # noqa: E402
+
+PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in SENTINEL_PROOFS.items()})
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Gates ATTEMPTED and NOT proved. A first-class result, not an omission: the whole
