@@ -1,6 +1,6 @@
 # Hypothesis Engine
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-09 (#2221 xfail-burn re-verify — the SPEC_METRICS **vocabulary** changed and nothing else did. Four entries were reader/writer name splits the doc never cited individually: `stress` and `steps_garmin` now read the writer's real names (`avg_stress` / `steps`, not `average_stress_level` / `total_steps`, which garmin_lambda has never emitted); `zone2_min` converts from the stored `total_zone2_seconds` rather than reading a `zone2_minutes` no writer stores, with absence preserved as absence rather than 0.0; and **`bed_temp_f` was REMOVED** — Eight Sleep temperature ingestion is retired (ADR-118/#489), so a spec on it could only expire undecided. Two robustness fixes: the model's fields now splat FIRST so engine-owned lifecycle keys win (an LLM-emitted `status` could previously pre-declare a hypothesis confirmed — an ADR-062 boundary breach), and IndexError/TypeError from an empty or null model payload are caught rather than killing the weekly run. **Arming thresholds, the scoring algorithm, the pre-registration framework and the cross-pillar re-fit are ALL unchanged**, which is why this is a re-verify and not a rewrite. Prior verify 2026-07-28: #1653 packaging re-verify — `stats_core.py` moved to `lambdas/common/`, `experiment_gates.py` to `lambdas/experiment/`, and `hypothesis_engine_lambda.py` had its imports rewritten. Arming thresholds, the scoring algorithm and the cross-pillar re-fit are unchanged; this doc carries no line citations into the moved files. Prior verify 2026-07-27: #1590 re-verify — line refs re-derived against live source; the arming thresholds (10 days / 5 metrics-per-day / 7-day check floor / 5-per-arm) now live in `lambdas/experiment/experiment_gates.py` (#1371, moved so the site's zero-state serves the same values — no drift possible) rather than as bare module constants, values unchanged; the quarterly cross-pillar effect re-fit (#1411, `refit_cross_pillar_effects`) piggybacks on this same weekly cron and is new since the prior verification — added below. 2026-07-26 re-verify: #1408 added a Time-Affluence hypothesis edge (a new input signal the documented framework already accommodates); the engine's arming/scoring algorithm is unchanged. 2026-07-27 re-verify: #1843 added `diary_day` + `habit_pct` to the SPEC_METRICS deterministic-test vocabulary, `computed_metrics` as a gather source, and one idempotent code-registered hypothesis (diary-days vs habit adherence, seeded step 3.5) — new input signals the documented framework already accommodates; arming thresholds and the scoring algorithm are unchanged)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-24 (#3135 DIL-024 re-verify — one change to `hypothesis_engine_lambda.py` since 08-09: `gather_data`'s hand-typed `sources` list (whoop/garmin/macrofactor/apple_health/withings/strava/notion/habitify/eightsleep + computed_metrics) collapsed to `list(COMPUTE_INPUTS["hypothesis-engine"]) + ["computed_metrics"]`, deriving from the new `common.input_manifest.COMPUTE_INPUTS` registry instead of carrying a second hand-typed copy (#2844 ledger paydown). **Checked, not assumed: the derived set is byte-identical** to the old literal list, just alphabetized in the registry — the documented Inputs below are unchanged. **Not material**: this is a source-list DEDUP, not a data or algorithm change. `common.compute_metadata.tag_record` — #3135's actual input-manifest stamping chokepoint — is untouched here: `hypotheses`/`calibration` are not on DIL-024's `MANIFEST_OUTPUTS` allowlist, so this engine gained no `input_status`/`input_manifest` fields and none are documented below. **Arming thresholds, the scoring algorithm, the pre-registration framework and the cross-pillar re-fit are ALL unchanged.** **Every line citation in this doc was re-derived by AST against current source** (most had already drifted from accumulated commits since the 2026-07-27 baseline, independent of #3135 — the one-line import plus the net −5-line `gather_data` edit only account for a uniform −4 below it): `build_data_narrative` :326-414 → **:361-463**, `validate_test_spec` :514-563 → **:565-612**, SPEC_METRICS :133-165 → **:154-192**, `validate_hypothesis` :426-480 → **:477-529**, `evaluate_test_spec` :564-669 → **:615-718**, `check_pending_hypotheses` :994-1076 → **:1128-1200**, `enforce_hard_expiry` :481-513 → **:532-556**, `update_hypothesis_status` :271-325 → **:322-358**, `narrate_resolution` :744-832 → **:795-856**, `build_calibration_item` :698-725 → **:749-774**, `refit_cross_pillar_effects` :1171-1200 → **:1305-1337**, module constants :104-170 → **:115-196**. Prior verify 2026-08-09: #2221 xfail-burn re-verify — the SPEC_METRICS **vocabulary** changed and nothing else did. Four entries were reader/writer name splits the doc never cited individually: `stress` and `steps_garmin` now read the writer's real names (`avg_stress` / `steps`, not `average_stress_level` / `total_steps`, which garmin_lambda has never emitted); `zone2_min` converts from the stored `total_zone2_seconds` rather than reading a `zone2_minutes` no writer stores, with absence preserved as absence rather than 0.0; and **`bed_temp_f` was REMOVED** — Eight Sleep temperature ingestion is retired (ADR-118/#489), so a spec on it could only expire undecided. Two robustness fixes: the model's fields now splat FIRST so engine-owned lifecycle keys win (an LLM-emitted `status` could previously pre-declare a hypothesis confirmed — an ADR-062 boundary breach), and IndexError/TypeError from an empty or null model payload are caught rather than killing the weekly run. **Arming thresholds, the scoring algorithm, the pre-registration framework and the cross-pillar re-fit are ALL unchanged**, which is why this is a re-verify and not a rewrite. Prior verify 2026-07-28: #1653 packaging re-verify — `stats_core.py` moved to `lambdas/common/`, `experiment_gates.py` to `lambdas/experiment/`, and `hypothesis_engine_lambda.py` had its imports rewritten. Arming thresholds, the scoring algorithm and the cross-pillar re-fit are unchanged; this doc carries no line citations into the moved files. Prior verify 2026-07-27: #1590 re-verify — line refs re-derived against live source; the arming thresholds (10 days / 5 metrics-per-day / 7-day check floor / 5-per-arm) now live in `lambdas/experiment/experiment_gates.py` (#1371, moved so the site's zero-state serves the same values — no drift possible) rather than as bare module constants, values unchanged; the quarterly cross-pillar effect re-fit (#1411, `refit_cross_pillar_effects`) piggybacks on this same weekly cron and is new since the prior verification — added below. 2026-07-26 re-verify: #1408 added a Time-Affluence hypothesis edge (a new input signal the documented framework already accommodates); the engine's arming/scoring algorithm is unchanged. 2026-07-27 re-verify: #1843 added `diary_day` + `habit_pct` to the SPEC_METRICS deterministic-test vocabulary, `computed_metrics` as a gather source, and one idempotent code-registered hypothesis (diary-days vs habit adherence, seeded step 3.5) — new input signals the documented framework already accommodates; arming thresholds and the scoring algorithm are unchanged)
 > **Sources of truth:** `lambdas/compute/hypothesis_engine_lambda.py` (v2, #530/ADR-105), `lambdas/common/stats_core.py`, `lambdas/experiment/experiment_gates.py` (arming thresholds, #1371)
 
 ## Purpose
@@ -13,27 +13,27 @@ every resolution writes a calibration-ledger row. ADR-105 rule 3: deterministic 
 ## Inputs
 
 30 days of multi-source data (`whoop, garmin, macrofactor, apple_health, withings, strava,
-notion, habitify, eightsleep`) flattened to day-rows by `build_data_narrative` (:326-414).
+notion, habitify, eightsleep`) flattened to day-rows by `build_data_narrative` (:361-463).
 Checks see the full 30 days (`LOOKBACK_DAYS`); generation sees the last 14 (`GENERATION_DAYS`).
 Generation requires ≥10 days with ≥5 non-null metrics (`MIN_DATA_DAYS`, `MIN_METRICS_PER_DAY`).
 
 ## The pre-registered test spec (#530)
 
 At creation the LLM must emit a `test_spec`, validated deterministically and **frozen** —
-hypotheses without a parseable spec are rejected (`validate_test_spec`, :514-563):
+hypotheses without a parseable spec are rejected (`validate_test_spec`, :565-612):
 
 - `condition_metric`, `outcome_metric` — both from the fixed `SPEC_METRICS` vocabulary
-  (:133-165, exactly what `build_data_narrative` emits — a spec can only reference values the
+  (:154-192, exactly what `build_data_narrative` emits — a spec can only reference values the
   check path can compute), and must differ.
 - `condition_op` ∈ {`>=`, `<=`, `median_split`} (+ numeric `condition_threshold` for the first two)
 - `direction` ∈ {higher, lower}; `min_effect ≥ 0` (outcome units); `lag_days` 0–3.
 
-Other creation gates (`validate_hypothesis`, :426-480): required fields incl. confidence ∈
+Other creation gates (`validate_hypothesis`, :477-529): required fields incl. confidence ∈
 {low, medium, high}; ≥2 domains; a numeric threshold with units in `confirmation_criteria`;
 `monitoring_window_days` 7–30; >50% word-overlap duplicate rejection. Caps: ≤5 new per run
 (`MAX_NEW_HYPOTHESES`), ≤20 pending (`MAX_PENDING_HYPOTHESES`).
 
-## The deterministic check (`evaluate_test_spec`, :564-669)
+## The deterministic check (`evaluate_test_spec`, :615-718)
 
 Pure Python, weekly, per pending/confirming hypothesis that is ≥7 days old
 (`MIN_SAMPLE_DAYS_FOR_CHECK`):
@@ -50,33 +50,33 @@ contradicted  — CI excludes 0 in the OPPOSITE direction
 inconclusive  — arms too thin or CI straddles 0
 ```
 
-## Lifecycle (status machine, in `check_pending_hypotheses`, :994-1076)
+## Lifecycle (status machine, in `check_pending_hypotheses`, :1128-1200)
 
 ```
 pending ── supported (window open) ──▶ confirming
 pending/confirming ── supported AND days_old ≥ monitoring_window ──▶ confirmed   (resolution)
 pending/confirming ── contradicted ──▶ refuted                                   (resolution)
 pending/confirming ── window expired, no verdict ──▶ archived / expired_undecided (resolution)
-anything non-terminal older than 30 days ──▶ archived (hard expiry, `enforce_hard_expiry`, :481-513)
+anything non-terminal older than 30 days ──▶ archived (hard expiry, `enforce_hard_expiry`, :532-556)
 ```
 
 v1 legacy hypotheses (no `test_spec`) are never checked — they age out via hard expiry.
 On resolution, Haiku **narrates** the already-decided verdict (one sentence, only numbers from
 the deterministic evidence string; fail-soft to the deterministic sentence — `narrate_resolution`,
-:744-832).
+:795-856).
 
 ## Outputs
 
 - `USER#matthew#SOURCE#hypotheses / HYPOTHESIS#<ISO-ts>` — the hypothesis + frozen spec +
   per-check stats (`_CHECK_STAT_FIELDS`: `effect_size`, `ci95_low/high`, `cohens_d`, arm counts,
-  `deterministic_verdict`; written by `update_hypothesis_status`, :271-325). EXPERIMENT_SCOPED
+  `deterministic_verdict`; written by `update_hypothesis_status`, :322-358). EXPERIMENT_SCOPED
   (wiped at reset).
 - `USER#matthew#SOURCE#calibration / CALIB#<date>#<hypothesis_id>` — one row per resolution with
-  stated confidence, outcome, effect + CI (`build_calibration_item`, :698-725). **CROSS_PHASE**:
+  stated confidence, outcome, effect + CI (`build_calibration_item`, :749-774). **CROSS_PHASE**:
   the long-run "do high-confidence bets confirm more often?" scoreboard survives resets.
 - A compact monitoring block into `platform_memory` for the digest lambdas (IC-16).
 - Consumers: MCP `get_hypotheses` / `update_hypothesis_outcome`, `/api/hypotheses`.
-- **#1411 (quarterly, piggybacked on this cron):** `refit_cross_pillar_effects` (:1171-1200)
+- **#1411 (quarterly, piggybacked on this cron):** `refit_cross_pillar_effects` (:1305-1337)
   re-fits the character engine's cross-pillar effect priors from the last `effect_fitter.
   FIT_WINDOW_DAYS` of character history — deterministic end to end (fixed bootstrap seed, no
   LLM), writes a fit-status record read by `character_engine.compute_cross_pillar_effects` and
@@ -85,8 +85,8 @@ the deterministic evidence string; fail-soft to the deterministic sentence — `
 ## Config surface
 
 Env: `AI_MODEL`, `AI_MODEL_HAIKU` (default `claude-haiku-4-5-20251001`), `TABLE_NAME`, `USER_ID`,
-`S3_BUCKET`. Generation/check thresholds are module constants (:104-170), most sourced from the
+`S3_BUCKET`. Generation/check thresholds are module constants (:115-196), most sourced from the
 shared `experiment_gates` registry (#1371) rather than hardcoded here — not config files either
 way. Cost ≈ $0.05/week — one generation call; the check path is free except resolution narration.
 
-> **Verified against `lambdas/compute/hypothesis_engine_lambda.py` @ git `fab48cbd` on 2026-07-20 (#1590).**
+> **Verified against `lambdas/compute/hypothesis_engine_lambda.py` @ git `55f939c86` on 2026-08-24 (#3135). Every line span above was re-derived from the AST of the file at that sha, not carried forward from the prior stamp.**
