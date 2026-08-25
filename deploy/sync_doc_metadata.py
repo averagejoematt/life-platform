@@ -789,10 +789,26 @@ RULES = [
         "| **Secrets Manager** | {secrets_cost} | {secret_count} active secrets × $0.40",
     ),
     # ── MCP_TOOL_CATALOG.md ──────────────────────────────────────────────────
+    # BOTH date-bearing lines are stamped here, deliberately. The file is fully
+    # generated (`scripts/generate_mcp_tool_catalog.py`, pure AST parse of
+    # mcp/registry.py), and that generator COPIES the `Last updated` value into the
+    # `Verified:` header — so if this sync stamped only one of the two, every sync
+    # run landing on a new UTC date left the file self-inconsistent and the
+    # generator's `--check` redded Docs CI on main until someone re-ran the
+    # generator. That is exactly what happened at the 2026-08-24 wrap (synced at
+    # 00:57Z, i.e. the UTC date had already rolled while the PT date had not).
+    # Stamping both makes the two writers agree by construction, in either order.
+    # This is NOT manufactured freshness (#1957): the whole file is re-derived from
+    # source on every regeneration, so "Verified" here means exactly that.
     (
         "docs/MCP_TOOL_CATALOG.md",
         r"\*\*Version:\*\* [^\|]+ \| \*\*Last updated:\*\* [^\|]+ \| \*\*Total tools:\*\* \d+",
         "**Version:** {version} | **Last updated:** {date} | **Total tools:** {tool_count}",
+    ),
+    (
+        "docs/MCP_TOOL_CATALOG.md",
+        r"> \*\*Status:\*\* generated · \*\*Owner:\*\* Matthew · \*\*Verified:\*\* \d{4}-\d{2}-\d{2}",
+        "> **Status:** generated · **Owner:** Matthew · **Verified:** {date}",
     ),
     # DATA_DICTIONARY.md archived v3.7.32 — merged into SCHEMA.md
     # ── SLOs.md ──────────────────────────────────────────────────────────────
