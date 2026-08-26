@@ -752,8 +752,12 @@ from sentinel_github import (  # noqa: E402,F401,I001
     _is_bot_commit,
     _judge_required_checks,
     _load_github_posture,
+    _github_drift_detail,
+    _github_extra_lines,
     _matches_push_trigger,
     _parse_gh_date,
+    _pending_detail,
+    _pending_note,
     check_github_config,
     check_github_push_runs,
 )
@@ -769,6 +773,7 @@ from sentinel_quota import (  # noqa: E402,F401
     _gh_run_list_trailing,
     _run_duration_seconds,
     check_github_quota,
+    quota_summary_lines,
 )
 
 # ── 9. CodeQL open-alert regrowth (#1902) ────────────────────────────────────
@@ -1028,21 +1033,6 @@ def run_sweep():
     }
 
 
-def _pending_note(checks):
-    """#3207 — one clause naming every declared-but-not-yet-applied posture surface.
-
-    Rendered on EVERY summary, clean or not. `pending` deliberately does not red the
-    sweep, and a state that neither alarms nor prints is exactly how a stale marker
-    rots into a false green — so it always says which surfaces are waiting."""
-    waiting = []
-    for check in checks.values():
-        for surface, blocker in (check.get("pending") or {}).items():
-            waiting.append(f"{surface} (blocked on: {str(blocker).split(' — ')[0]})")
-    if not waiting:
-        return ""
-    return f"{len(waiting)} declared-but-not-yet-applied posture surface(s) PENDING, not drift: {'; '.join(waiting)}"
-
-
 def _summary(status, checks):
     pending_note = _pending_note(checks)
     if status == "clean":
@@ -1127,11 +1117,8 @@ def print_summary(record):
                 detail = f" — {[(m['fact'], m['documented'], 'live', m['live']) for m in c.get('mismatches', [])]}"
             elif name == "site_sha_ancestry":
                 detail = f" — {c.get('detail', '')}"
-            elif name == "github_config":
-                bad = {k: v.get("detail", "") for k, v in c.get("surfaces", {}).items() if v.get("status") == "drift"}
-                detail = f" — {bad}"
-            elif name == "github_push_runs":
-                detail = f" — {c.get('detail', '')}"
+            elif name in ("github_config", "github_push_runs"):
+                detail = _github_drift_detail(name, c)
             elif name == "github_quota":
                 detail = f" — {c.get('warn', '')}"
             elif name == "codeql_alerts":
@@ -1142,10 +1129,7 @@ def print_summary(record):
             elif name == "sentinel_cadence":
                 detail = f" — {c.get('detail', '')}"
         elif st == "pending":
-            # #3207: a declared-but-not-yet-applied posture surface. Distinct from drift
-            # and never an alarm, but it must NEVER print as a silent pass — the whole
-            # point of the state is that the sweep says what is waiting, and on what.
-            detail = f" — {c.get('pending') or c.get('detail', '')}"
+            detail = _pending_detail(c)
         elif st == "degraded":
             # DIL-027: "could not observe" is a distinct verdict from clean and must
             # print its reason — a check that sampled nothing has not passed.
@@ -1161,24 +1145,11 @@ def print_summary(record):
             noisy = {s: len(v.get("filtered_noise", [])) for s, v in c.get("stacks", {}).items() if v.get("filtered_noise")}
             if noisy:
                 print(f"      [filtered known-noise, #1781] {noisy}")
-        # #1320 fail-soft honesty: a scope-gapped GitHub surface surfaces its
-        # needs-owner line (the exact PAT permission to add) — visible, never red.
-        if name in ("github_config", "github_push_runs") and c.get("needs_owner"):
-            print(f"      [needs-owner] {c['needs_owner']}")
-        # GitHub quota/billing facts always print, regardless of status (#1334/#1453 —
-        # this is a monthly-glance line, not just an alert): the real usage pct when
-        # the billing API is available, the fail-soft reason when it isn't, and the
-        # top-consuming workflows either way so run-rate regressions are attributable.
+        for line in _github_extra_lines(name, c):
+            print(line)
         if name == "github_quota":
-            b = c.get("billing_api", {})
-            if b.get("available"):
-                print(f"      Actions minutes used: {b.get('total_minutes_used')}/{b.get('included_minutes')} ({b.get('pct_used')}%)")
-            else:
-                print(f"      {b.get('detail', 'billing API unavailable')}")
-            for w in c.get("top_workflows_7d", [])[:5]:
-                print(f"      · {w['workflow']}: {w['wall_clock_minutes']} min (7d wall-clock proxy)")
-            if c.get("top_workflows_error"):
-                print(f"      [warn] top-workflows proxy: {c['top_workflows_error']}")
+            for line in quota_summary_lines(c):
+                print(line)
 
 
 def main() -> int:

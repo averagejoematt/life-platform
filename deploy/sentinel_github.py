@@ -308,6 +308,56 @@ def _classify_declared_but_unapplied(want, applied_live, drift_result):
     return merged
 
 
+def _github_drift_detail(name, check):
+    """The drift-line suffix for either GitHub leg, in drift_sentinel.print_summary.
+
+    `check_github_config` reports PER-SURFACE, so its drift line has to name which
+    surfaces drifted and why — a bare "github_config: drift" is a finding nobody can
+    act on (the #2578 rule). `check_github_push_runs` carries one detail string."""
+    if name == "github_config":
+        bad = {k: v.get("detail", "") for k, v in check.get("surfaces", {}).items() if v.get("status") == "drift"}
+        return f" — {bad}"
+    return f" — {check.get('detail', '')}"
+
+
+def _github_extra_lines(name, check):
+    """Extra indented lines printed under either GitHub leg, whatever its status.
+
+    #1320 fail-soft honesty: a scope-gapped GitHub surface surfaces its needs-owner
+    line (the exact PAT permission to add) — visible, never red."""
+    if name in ("github_config", "github_push_runs") and check.get("needs_owner"):
+        return [f"      [needs-owner] {check['needs_owner']}"]
+    return []
+
+
+def _pending_note(checks):
+    """#3207 — one summary clause naming every declared-but-not-yet-applied surface.
+
+    Lives beside the classifier that produces the state (and travels with it if the
+    GitHub legs move again), because how `pending` READS is part of what `pending`
+    means: it deliberately does not red the sweep, and a state that neither alarms nor
+    prints is exactly how a stale marker rots into a false green. So it is rendered on
+    EVERY summary — clean or not — and always says which surfaces are waiting, on what.
+
+    Takes the whole `checks` map (not one check) so any future sentinel leg that adopts
+    the marker is picked up without touching the summary."""
+    waiting = []
+    for check in checks.values():
+        for surface, blocker in (check.get("pending") or {}).items():
+            waiting.append(f"{surface} (blocked on: {str(blocker).split(' — ')[0]})")
+    if not waiting:
+        return ""
+    return f"{len(waiting)} declared-but-not-yet-applied posture surface(s) PENDING, not drift: {'; '.join(waiting)}"
+
+
+def _pending_detail(check):
+    """#3207 — the per-check `pending` line for drift_sentinel.print_summary.
+
+    Same contract as `_pending_note` at the other altitude: never a silent pass. Prefers
+    the surface→blocker map, falls back to the check's own detail text."""
+    return f" — {check.get('pending') or check.get('detail', '')}"
+
+
 def check_github_config():
     """#1320 — GET-only asserts of documented GitHub config vs. live state.
 

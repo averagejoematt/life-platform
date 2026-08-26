@@ -185,3 +185,26 @@ def check_github_quota():
 
     result["status"] = "drift" if result.get("warn") else ("unavailable" if not result["billing_api"]["available"] else "clean")
     return result
+
+
+def quota_summary_lines(check):
+    """The indented block drift_sentinel.print_summary prints under `github_quota`.
+
+    Lives with the check that produces the record (the same cohesion rule that put the
+    GitHub-leg renderers in sentinel_github.py): these facts always print, regardless of
+    status (#1334/#1453 — this is a monthly-glance line, not just an alert). The real
+    usage pct when the billing API is available, the fail-soft REASON when it isn't
+    (never a silent omission), and the top-consuming workflows either way so run-rate
+    regressions are attributable."""
+    billing = check.get("billing_api", {})
+    if billing.get("available"):
+        lines = [
+            f"      Actions minutes used: {billing.get('total_minutes_used')}/{billing.get('included_minutes')} ({billing.get('pct_used')}%)"
+        ]
+    else:
+        lines = [f"      {billing.get('detail', 'billing API unavailable')}"]
+    for w in check.get("top_workflows_7d", [])[:5]:
+        lines.append(f"      · {w['workflow']}: {w['wall_clock_minutes']} min (7d wall-clock proxy)")
+    if check.get("top_workflows_error"):
+        lines.append(f"      [warn] top-workflows proxy: {check['top_workflows_error']}")
+    return lines
