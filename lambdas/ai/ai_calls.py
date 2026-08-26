@@ -1249,11 +1249,11 @@ def _quality_gate_correction_note(report):
     return "\n".join(lines)
 
 
-# #3202: the body moved to ai/coach_gate_retention.py (the #1665 ratchet's "cohesive
+# #3202: the body moved to ai/coach_brief_retention.py (the #1665 ratchet's "cohesive
 # helper module beside it", not a baseline raise). Re-exported under its original name so
 # every caller and the #390 tests that monkeypatch `ai_calls._retain_coach_brief_flag`
 # keep working unchanged — `_enforce_quality_gate` resolves it from this module's globals.
-from ai.coach_gate_retention import retain_coach_brief_flag as _retain_coach_brief_flag  # noqa: E402
+from ai.coach_brief_retention import retain_coach_brief_flag as _retain_coach_brief_flag  # noqa: E402
 
 
 def _enforce_quality_gate(
