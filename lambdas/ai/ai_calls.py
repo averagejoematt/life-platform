@@ -1249,42 +1249,11 @@ def _quality_gate_correction_note(report):
     return "\n".join(lines)
 
 
-def _retain_coach_brief_flag(coach_id, verdict, draft, final, report):
-    """#744: persist a fired coach-quality-gate verdict (draft + findings +
-    disposition) as eval data via the SAME `eval_retention.py` mechanism #812
-    wired for the other 5 surfaces. `ai_calls._enforce_quality_gate` is the
-    ORIGINAL surface #744 named — the highest-fire-rate ADR-104-adjacent gate
-    in the platform (10.2% of 206 logged verdicts over 30 days, ADR-108) — and
-    #812 did not reach it (it wired the 5 newer golden_surface_eval surfaces
-    only). Fail-soft: never affects the coach pipeline.
-    """
-    try:
-        from experiment import eval_retention
-
-        findings = []
-        for v in report.get("anti_pattern_violations") or []:
-            phrase = v.get("phrase") if isinstance(v, dict) else v
-            if phrase:
-                findings.append({"type": "anti_pattern", "detail": phrase})
-        for v in report.get("decision_class_violations") or []:
-            if isinstance(v, dict):
-                findings.append({"type": "decision_class", "detail": v.get("excerpt", "")})
-        for flag in report.get("cross_coach_similarity_flags") or []:
-            if isinstance(flag, dict):
-                findings.append({"type": "cross_coach_similarity", "detail": flag.get("reason", "")})
-        for v in report.get("cycle_boundary_violations") or []:  # #1973
-            if isinstance(v, dict):
-                findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
-        eval_retention.retain(
-            "coach_brief",
-            verdict,
-            draft=draft or "",
-            final=final or "",
-            findings=findings,
-            extra={"coach_id": coach_id, "score": report.get("score")},
-        )
-    except Exception:  # noqa: BLE001 — retention is never load-bearing
-        pass
+# #3202: the body moved to ai/coach_brief_retention.py (the #1665 ratchet's "cohesive
+# helper module beside it", not a baseline raise). Re-exported under its original name so
+# every caller and the #390 tests that monkeypatch `ai_calls._retain_coach_brief_flag`
+# keep working unchanged — `_enforce_quality_gate` resolves it from this module's globals.
+from ai.coach_brief_retention import retain_coach_brief_flag as _retain_coach_brief_flag  # noqa: E402
 
 
 def _enforce_quality_gate(
@@ -1347,11 +1316,12 @@ def _enforce_quality_gate(
         except Exception as e:
             print(f"[COACH-QUALITY-GATE:{coach_id}] CloudWatch held-metric emit failed (non-fatal): {e}")
         if fired:
-            _retain_coach_brief_flag(coach_id, "flagged_dropped", original_draft, output_text, report)
+            _retain_coach_brief_flag(coach_id, "flagged_dropped", original_draft, output_text, report, generation_brief)
         return None, report
 
     if fired:
-        _retain_coach_brief_flag(coach_id, "flagged_corrected" if attempts else "flagged_kept_best", original_draft, output_text, report)
+        _v = "flagged_corrected" if attempts else "flagged_kept_best"
+        _retain_coach_brief_flag(coach_id, _v, original_draft, output_text, report, generation_brief)
     return output_text, report
 
 
@@ -1928,8 +1898,19 @@ Write your {domain_label} coaching section now."""
                 except Exception:  # noqa: BLE001
                     _sr_mod = None
 
+                # #3202: arm the cycle-freshness classes HERE too. Only the BLOCKING quality
+                # gate spread **cycle_gate_params, so a stale_phase/experiment_span finding
+                # met the hard gate having never been offered a rewrite — the asymmetry that
+                # held nutrition_coach and mind_coach dark every cycle.
+                try:
+                    from ai.grounding_gate_params import cycle_gate_params as _cgp
+
+                    _fresh_kwargs = _cgp()
+                except Exception:  # noqa: BLE001 — the gate-params module's own fail-soft contract
+                    _fresh_kwargs = {}
+
                 def _findings_fn(_t):
-                    _f = _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed)
+                    _f = _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed, **_fresh_kwargs)
                     if _sr_mod is not None:
                         _f = _f + _sr_mod.precedent_citation_findings(_t, _recall_precedents)
                     return _f
