@@ -1126,6 +1126,24 @@ def test_sparsity_objection_fires_on_the_observed_results_note():
     assert rtq.is_sparsity_objection(f) is True
 
 
+# The oracle's non-stationary population (#2959) reproduced the SAME finding on a
+# live re-run of this exact page with none of the baseline note's wording — no
+# "impossible", no "across N days". A keyword-matched suppressor would have missed
+# it; the numeric comparison (count <= day number) does not (fixture must be the
+# wire — captured live during this fix's own verification, #3199).
+_NOTE_3199_RESULTS_REPHRASED = (
+    "Page states 'LATEST 326.2 LB · 1 READING SO FAR' and 'LATEST · AUG 24', but today is 2026-08-26 (Day 10). "
+    "A single reading on Aug 24 with no subsequent readings contradicts the current date being two days later. "
+    "The phrase '1 READING SO FAR' in the context of Day 10 (10 days of possible data) is implausibly sparse and "
+    "suggests either staleness or a data collection failure not acknowledged as such."
+)
+
+
+def test_sparsity_objection_fires_on_a_live_rephrasing_with_no_shared_keywords():
+    f = {"page": "/method/results/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3199_RESULTS_REPHRASED}
+    assert rtq.is_sparsity_objection(f) is True
+
+
 def test_sparsity_objection_spares_a_real_wrong_day_claim():
     # The #2941 wrong-Day-number shape (a prior TRUE positive, synthesized): a
     # genuinely wrong banner day, no honest-count phrasing, no sparsity language.

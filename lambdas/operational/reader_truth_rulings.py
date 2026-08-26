@@ -578,34 +578,46 @@ def is_self_refuted(finding):
 # same span is not a temporal impossibility — it is the data model (ADR-154's
 # per-source cadence facets) doing its job. A finding is this class only when it
 # (a) quotes the page's own honest "<N> reading(s) so far" disclosure, AND (b)
-# manufactures its objection purely from that count being small against the
-# elapsed-day span ("across N days … impossible"), with no OTHER evidence that the
-# count itself is wrong (a genuinely corrupted count — e.g. MORE readings than
-# days could exist — is a real defect and does not match this shape). DEMOTED to
-# low, not dropped — this module's constant discipline (#2959/#3003): the
-# observation stays visible as advisory, never gates. Printed, never silently
-# swallowed.
-_HONEST_READING_COUNT_RE = re.compile(r"\b\d+\s+readings?\s+so\s+far\b", re.I)
-_SPARSITY_SPAN_IMPOSSIBLE_RE = re.compile(r"\bacross\s+\d+\s+days?\b[^.?!]{0,120}?\bimposs", re.I)
+# ALSO cites the current day number, with N no greater than that day number —
+# i.e. the count is a deficiency (at most one reading per elapsed day), not an
+# excess. A genuinely corrupted count — MORE readings than days could hold — is a
+# real defect and does not match this shape; that residue keeps gating.
+#
+# WHY A NUMERIC COMPARISON, NOT A KEYWORD MATCH. A live re-run of this exact page
+# during the fix's own verification (#3199) reproduced the SAME finding worded
+# differently — "implausibly sparse", "a data collection failure not acknowledged
+# as such" — with no "impossible" and no "across N days" anywhere in the note.
+# That is #2613's and #2741's measured lesson again: a suppressor keyed to one
+# phrasing does not survive the oracle's non-stationary rephrasing (#2959). The
+# invariant that DOES survive rephrasing is the arithmetic itself: whatever words
+# it uses, the objection is unsound exactly when the honestly-disclosed count is
+# ≤ the day number it is being compared against. DEMOTED to low, not dropped —
+# this module's constant discipline (#2959/#3003): the observation stays visible
+# as advisory, never gates. Printed, never silently swallowed.
+_HONEST_READING_COUNT_RE = re.compile(r"\b(\d{1,4})\s+readings?\s+so\s+far\b", re.I)
 
 
 def is_sparsity_objection(finding):
     """True when a temporal_contradiction's objection is that an honestly-labeled
-    reading count is small relative to the elapsed-day span (#3199).
+    reading count is small relative to the current day number (#3199).
 
     Structural conditions, both required: temporal_contradiction; and the note
     quotes the page's own "<N> reading(s) so far" honest-count disclosure while
-    separately manufacturing an "across N days … impossible" objection from the
-    elapsed span. A note that never quotes the honest-count phrasing, or one whose
-    impossibility rests on something other than the day span (a count exceeding
-    what the day span could hold — a real corrupted-count defect), survives.
+    also citing a day number ("Day M") that is >= N. A note that never quotes the
+    honest-count phrasing, never cites a day number, or cites a count that
+    EXCEEDS every cited day number (a genuinely corrupted count — a real defect)
+    survives at full severity.
     """
     if finding.get("category") != "temporal_contradiction":
         return False
     note = finding.get("note") or ""
-    if not _HONEST_READING_COUNT_RE.search(note):
+    m = _HONEST_READING_COUNT_RE.search(note)
+    if not m:
         return False
-    return bool(_SPARSITY_SPAN_IMPOSSIBLE_RE.search(note))
+    day_ns = {int(d) for d in _DAY_N_RE.findall(note)}
+    if not day_ns:
+        return False
+    return int(m.group(1)) <= max(day_ns)
 
 
 # ── #3199 (2026-08-26): a claim scoped to ACTIVE logging is not disproved by day arithmetic ─
