@@ -280,6 +280,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # files rather than sweeping the tree, so premerge_derivation cannot discover
         # it — hand-listed, same as #2813 above.
         "test_pair_contract_sweep_2847.py",
+        # #2847 box 4: the must-agree SEAM guard — charter standing rule 3's fleet-wide
+        # enforcement, the peer of #2844's rule-1 guard. Its whole premise is that the
+        # birth of a must-agree pair is a decision made ON the PR that creates it; a red
+        # arriving post-merge is the seam already shipped, which is exactly how #2804's
+        # dead-zone read and #2214's dual writer both reached production. Builds the
+        # #2845 model from source rather than sweeping the tree (~7s), so
+        # premerge_derivation cannot discover it — hand-listed, same as the sweep above.
+        "test_pair_seam_conformance_2847.py",
         # #3101: the doc-literal conflict surface. Its verdict is pure repo shape —
         # whether a discovered counter has grown a SECOND committed home, and whether
         # the single-writer plumbing (agent_commit refusal, hook stage pathspec,
