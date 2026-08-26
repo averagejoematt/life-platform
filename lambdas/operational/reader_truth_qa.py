@@ -104,6 +104,7 @@ from operational.reader_truth_rulings import (  # noqa: F401
     _normalize_copy,
     _note_dates,
     _pacific_renderings,
+    is_active_vs_passive_objection,
     is_coach_surface_audience,
     is_code_owned_temporal,
     is_day_counter_bound_inference,
@@ -111,6 +112,7 @@ from operational.reader_truth_rulings import (  # noqa: F401
     is_position_banner_misread,
     is_prior_cycle_archive,
     is_self_refuted,
+    is_sparsity_objection,
     is_utc_offset_misread,
     is_vagueness_objection,
     is_wake_frame_correct,
@@ -672,6 +674,28 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     print(
                         f"  ↩ reader-truth: demoted a vagueness-objection finding on {f['page']} "
                         f"{f['severity']}→low ('vague' is not a temporal_contradiction, #3003): {f['note'][:120]}"
+                    )
+                    f = dict(f, severity="low")
+                # #3199: the objection is that an honestly-labeled reading count
+                # ("N readings so far") is small relative to the elapsed-day span
+                # — a cross-signal cadence gap (Withings owner-initiated vs HRV
+                # passive-daily), not an impossibility. DEMOTED to low, never
+                # gating. Printed, never silently swallowed.
+                if f["severity"] != "low" and is_sparsity_objection(f):
+                    print(
+                        f"  ↩ reader-truth: demoted a sparsity-objection finding on {f['page']} "
+                        f"{f['severity']}→low (a cadence gap is not a temporal_contradiction, #3199): {f['note'][:120]}"
+                    )
+                    f = dict(f, severity="low")
+                # #3199: a claim scoped to ACTIVE logging ("went silent … since
+                # August 17th") objected to with nothing but a Day-1/today
+                # restatement — the auto-rollback flake that reverted its own fix
+                # (ground-truthed TRUE against DDB the same night). DEMOTED to
+                # low, never gating. Printed, never silently swallowed.
+                if f["severity"] != "low" and is_active_vs_passive_objection(f):
+                    print(
+                        f"  ↩ reader-truth: demoted an active-vs-passive objection on {f['page']} "
+                        f"{f['severity']}→low (day arithmetic alone does not disprove it, #3199): {f['note'][:120]}"
                     )
                     f = dict(f, severity="low")
                 findings.append(f)

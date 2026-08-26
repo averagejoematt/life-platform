@@ -1104,3 +1104,133 @@ def test_assess_prose_demotes_a_position_banner_misread_high_to_low(capsys):
     assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"
     assert findings[0]["severity"] == "low"
     assert "demoted a position-banner misread" in capsys.readouterr().out
+
+
+# ── #3199: a cross-signal cadence gap is not a temporal_contradiction ──────────
+# The #3186 evidence run's visual-qa red decoded to /method/results/: the page
+# honestly reads "LATEST 326.2 LB · 1 READING SO FAR" (ADR-104 copy the DO-NOT-FLAG
+# list already names exempt) next to a 9-day HRV series — Withings weigh-ins are
+# owner-initiated, HRV is passive-daily, so the counts legitimately differ. The
+# note below is the WIRE — verbatim from tests/truth_baseline.json's note_sample
+# for (/method/results/, temporal_contradiction), truncated at 200 chars exactly
+# as the baseline audit stores it (fixture must be the wire).
+
+_NOTE_3199_RESULTS = (
+    "Page states 'LATEST 326.2 LB · 1 READING SO FAR' and 'LATEST · AUG 24', but the experiment phase is Day 9 "
+    "(2026-08-25). A single weight reading across 9 days of an active tracking experiment is imposs"
+)
+
+
+def test_sparsity_objection_fires_on_the_observed_results_note():
+    f = {"page": "/method/results/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3199_RESULTS}
+    assert rtq.is_sparsity_objection(f) is True
+
+
+def test_sparsity_objection_spares_a_real_wrong_day_claim():
+    # The #2941 wrong-Day-number shape (a prior TRUE positive, synthesized): a
+    # genuinely wrong banner day, no honest-count phrasing, no sparsity language.
+    note = (
+        "The page header states 'DAY 9 · WEEK 2, SINCE AUGUST 17 2026', but today is August 23, 2026. "
+        "August 23 is Day 7, not Day 9 — the banner overstates the cycle position."
+    )
+    f = {"page": "/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_sparsity_objection(f) is False
+
+
+def test_sparsity_objection_spares_a_count_that_genuinely_exceeds_the_span():
+    # A corrupted count (MORE readings than the day span could hold) is a real
+    # defect, not a cadence gap — the honest-count phrase alone is not enough.
+    note = "Page states '12 readings so far' on Day 3 (Day 1 = 2026-08-17); 12 readings in 3 days cannot exist."
+    f = {"page": "/method/results/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_sparsity_objection(f) is False
+
+
+def test_sparsity_objection_never_touches_other_categories():
+    for cat in ("duplicated_narrative", "audience_violation", "other"):
+        f = {"page": "/method/results/", "category": cat, "severity": "high", "note": _NOTE_3199_RESULTS}
+        assert rtq.is_sparsity_objection(f) is False, cat
+
+
+def test_assess_prose_demotes_a_sparsity_objection_high_to_low(capsys):
+    """The predicate is wired: the /method/results/ high reaches the gate as low."""
+    verdict = {
+        "findings": [
+            {"page": "/method/results/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3199_RESULTS},
+        ],
+        "severity": "high",
+        "summary": "x",
+    }
+    pages = [{"name": "Results", "path": "/method/results/", "prose": "LATEST 326.2 LB · 1 READING SO FAR"}]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_7)
+    assert errors == []
+    assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"
+    assert findings[0]["severity"] == "low"
+    assert findings[0]["note"] == _NOTE_3199_RESULTS, "demotion must not lose the evidence"
+    assert "demoted a sparsity-objection finding" in capsys.readouterr().out
+
+
+# ── #3199: a claim scoped to ACTIVE logging is not disproved by day arithmetic ─
+# The redeploy that CARRIED #3198's fix was itself auto-rolled-back by this flake:
+# Dr. Eli Marsh's /method/board/ copy — "active logging went silent across food,
+# training, habits, and journal since August 17th" — ground-truthed TRUE against
+# DDB the same night (zero macrofactor/hevy/journal rows, zero habitify check-ins
+# since genesis). The note below is the WIRE — verbatim from
+# tests/truth_baseline.json's note_sample for (/method/board/,
+# temporal_contradiction), truncated at 200 chars exactly as the baseline audit
+# stores it (fixture must be the wire).
+
+_NOTE_3199_BOARD = (
+    "Dr. Eli Marsh states 'active logging went silent across food, training, habits, and journal since August 17th' "
+    "— but August 17 is Day 1 of the current cycle, and today is Day 9 (2026-08-25). The phras"
+)
+
+
+def test_active_vs_passive_objection_fires_on_the_observed_board_note():
+    f = {"page": "/method/board/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3199_BOARD}
+    assert rtq.is_active_vs_passive_objection(f) is True
+
+
+def test_active_vs_passive_objection_spares_a_real_wrong_day_claim():
+    # The #2941 wrong-Day-number shape (a prior TRUE positive, synthesized): a
+    # genuinely wrong banner day, no active-logging claim at all.
+    note = (
+        "The page header states 'DAY 9 · WEEK 2, SINCE AUGUST 17 2026', but today is August 23, 2026. "
+        "August 23 is Day 7, not Day 9 — the banner overstates the cycle position."
+    )
+    f = {"page": "/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_active_vs_passive_objection(f) is False
+
+
+def test_active_vs_passive_objection_spares_a_since_date_that_is_actually_wrong():
+    # The banner-itself-wrong residue: the claimed since-date is NOT Day 1 — a
+    # live defect (the #2941 shape applied to this claim), and must keep gating.
+    note = (
+        "States 'active logging went silent since August 16th' — but August 16 is a day before Day 1 "
+        "of the current cycle (2026-08-17), and today is Day 9. The cited since-date predates genesis."
+    )
+    f = {"page": "/method/board/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_active_vs_passive_objection(f) is False
+
+
+def test_active_vs_passive_objection_never_touches_other_categories():
+    for cat in ("duplicated_narrative", "audience_violation", "other"):
+        f = {"page": "/method/board/", "category": cat, "severity": "high", "note": _NOTE_3199_BOARD}
+        assert rtq.is_active_vs_passive_objection(f) is False, cat
+
+
+def test_assess_prose_demotes_an_active_vs_passive_objection_high_to_low(capsys):
+    """The predicate is wired: the /method/board/ Marsh high reaches the gate as low."""
+    verdict = {
+        "findings": [
+            {"page": "/method/board/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3199_BOARD},
+        ],
+        "severity": "high",
+        "summary": "x",
+    }
+    pages = [{"name": "Board", "path": "/method/board/", "prose": "Dr. Eli Marsh: active logging went silent."}]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_7)
+    assert errors == []
+    assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"
+    assert findings[0]["severity"] == "low"
+    assert findings[0]["note"] == _NOTE_3199_BOARD, "demotion must not lose the evidence"
+    assert "demoted an active-vs-passive objection" in capsys.readouterr().out

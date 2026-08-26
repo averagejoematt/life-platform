@@ -558,3 +558,104 @@ def is_self_refuted(finding):
         return False
     sentences = [s.strip() for s in re.split(r"[.?!]", note) if s.strip()]
     return bool(sentences) and bool(_WITHDRAWAL_RE.search(sentences[-1]))
+
+
+# ── #3199 (2026-08-26): a cross-signal cadence gap is not a temporal_contradiction ─
+#
+# THE OBSERVED FAILURE. The #3186 evidence run's visual-qa red decoded to
+# /method/results/: the page correctly reads "LATEST 326.2 LB · 1 READING SO FAR"
+# (ADR-104 honest-absence copy — the DO-NOT-FLAG list has named "N readings so far"
+# exempt since before this class existed) next to an HRV series with 9 daily
+# readings, because Withings weigh-ins are owner-initiated and HRV is passive-daily
+# — different cadences, not a contradiction. The oracle graded it `high`
+# temporal_contradiction anyway: "A single weight reading across 9 days of an
+# active tracking experiment is impossible." Its own arithmetic never disputes the
+# COUNT (one reading did happen); it disputes that the count is SMALL relative to
+# the elapsed days — i.e. it is re-litigating the exact honest-sparsity disclosure
+# the rubric already tells it to leave alone.
+#
+# THE RULING. Two signals legitimately carrying different reading counts over the
+# same span is not a temporal impossibility — it is the data model (ADR-154's
+# per-source cadence facets) doing its job. A finding is this class only when it
+# (a) quotes the page's own honest "<N> reading(s) so far" disclosure, AND (b)
+# manufactures its objection purely from that count being small against the
+# elapsed-day span ("across N days … impossible"), with no OTHER evidence that the
+# count itself is wrong (a genuinely corrupted count — e.g. MORE readings than
+# days could exist — is a real defect and does not match this shape). DEMOTED to
+# low, not dropped — this module's constant discipline (#2959/#3003): the
+# observation stays visible as advisory, never gates. Printed, never silently
+# swallowed.
+_HONEST_READING_COUNT_RE = re.compile(r"\b\d+\s+readings?\s+so\s+far\b", re.I)
+_SPARSITY_SPAN_IMPOSSIBLE_RE = re.compile(r"\bacross\s+\d+\s+days?\b[^.?!]{0,120}?\bimposs", re.I)
+
+
+def is_sparsity_objection(finding):
+    """True when a temporal_contradiction's objection is that an honestly-labeled
+    reading count is small relative to the elapsed-day span (#3199).
+
+    Structural conditions, both required: temporal_contradiction; and the note
+    quotes the page's own "<N> reading(s) so far" honest-count disclosure while
+    separately manufacturing an "across N days … impossible" objection from the
+    elapsed span. A note that never quotes the honest-count phrasing, or one whose
+    impossibility rests on something other than the day span (a count exceeding
+    what the day span could hold — a real corrupted-count defect), survives.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    note = finding.get("note") or ""
+    if not _HONEST_READING_COUNT_RE.search(note):
+        return False
+    return bool(_SPARSITY_SPAN_IMPOSSIBLE_RE.search(note))
+
+
+# ── #3199 (2026-08-26): a claim scoped to ACTIVE logging is not disproved by day arithmetic ─
+#
+# THE OBSERVED FAILURE. The very redeploy that carried #3198's fix was itself
+# auto-rolled-back by a second flake on /method/board/: coach Dr. Eli Marsh's copy
+# states "active logging went silent across food, training, habits, and journal
+# since August 17th" — a claim scoped explicitly to the deliberately-logged,
+# opt-in categories (food/nutrition, training, habits, journal), as distinct from
+# the passive-daily signals (HRV, sleep, RHR) that keep recording regardless of
+# whether Matthew acts. Ground-truthed against DDB the same night: TRUE (zero
+# macrofactor/hevy/journal rows and zero habitify check-ins since genesis). The
+# oracle graded it `high` temporal_contradiction anyway, its entire cited evidence
+# being "August 17 is Day 1 of the current cycle, and today is Day 9" — date
+# arithmetic that never disputes the claim (nothing logs before Day 1 by
+# construction; the claim is that nothing logged AFTER it either). The same
+# finding had already been non-reproduced on an earlier pass (#3102) and demoted
+# by #3003 on a third — a coin-flip judge treating a true, honestly-scoped absence
+# claim as a defect and costing a healthy deploy its own rollback.
+#
+# THE RULING. A claim naming the active-logging categories as silent SINCE the
+# cycle's own start date, objected to with nothing but a restatement of that same
+# start date and the current day number, is not a temporal impossibility — the
+# window it describes is exactly as old as the cycle itself, and passive signals
+# continuing elsewhere corroborates nothing about whether the ACTIVE categories
+# were touched. DEMOTED to low, never dropped — advisory, printed, never silently
+# swallowed.
+_ACTIVE_LOGGING_SILENT_RE = re.compile(
+    r"\bactive\s+(?:logging|tracking)\s+(?:went\s+silent|has\s+been\s+silent|stopped|paused|gone\s+quiet)\b", re.I
+)
+_SINCE_DAY_ONE_RE = re.compile(r"\bis\s+Day\s+1\s+of\s+the\s+current\s+cycle\b", re.I)
+_TODAY_IS_DAY_N_RE = re.compile(r"\btoday\s+is\s+Day\s+\d{1,3}\b", re.I)
+
+
+def is_active_vs_passive_objection(finding):
+    """True when a temporal_contradiction objects to an active-logging-silence
+    claim with nothing but a Day-1/today restatement (#3199).
+
+    Structural conditions, all required: temporal_contradiction; the note quotes
+    an "active logging/tracking went silent" claim; the note states that the
+    claimed since-date is Day 1 of the current cycle; and the note states today's
+    day number. A note offering any OTHER evidence against the claim (a cited
+    active-category entry after the since-date, a since-date that is NOT Day 1 —
+    the banner-itself-wrong shape, #2941) is a live objection and survives.
+    """
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    note = finding.get("note") or ""
+    if not _ACTIVE_LOGGING_SILENT_RE.search(note):
+        return False
+    if not _SINCE_DAY_ONE_RE.search(note):
+        return False
+    return bool(_TODAY_IS_DAY_N_RE.search(note))
