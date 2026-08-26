@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
 import partner_email_lambda as partner  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 # ── A pinned "today" so nothing in this file does fixture-date + now() math ───
 FIXED_TODAY = datetime(2026, 8, 6, 12, 0, 0, tzinfo=timezone.utc)
@@ -337,6 +338,7 @@ def _wire_gather(monkeypatch, raw=None, journal=None, profile=None):
         return raw.get(source, {})
 
     monkeypatch.setattr(partner, "datetime", _FixedDatetime)
+    freeze_pacific(monkeypatch, partner, _FixedDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(partner, "query_range", _query_range)
     monkeypatch.setattr(partner, "query_journal_range", lambda s, e: journal)
     monkeypatch.setattr(partner, "fetch_profile", lambda: profile)

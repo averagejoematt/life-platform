@@ -7,7 +7,9 @@ Social, behavioral, and protocol tools:
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import INTERACTIONS_PK, table
 from mcp.core import decimal_to_float
@@ -43,8 +45,8 @@ _DEPTH_LEVELS = ["surface", "meaningful", "deep"]
 
 def tool_get_social_dashboard(args):
     """Social connection dashboard: frequency, diversity, depth, trends."""
-    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end = args.get("end_date", pacific_today())
+    start = args.get("start_date", (pacific_now() - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     from mcp.core import _apply_phase_filter  # ADR-058
 

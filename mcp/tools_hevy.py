@@ -18,7 +18,9 @@ records are hidden unless include_pilot=True is set on the tool call.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
+
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.core import query_source_range
 
@@ -168,7 +170,7 @@ def tool_get_workouts(args: dict) -> dict:
                      see his full training history when asking via MCP. Set to
                      False to mirror the public-site default-deny behavior.
     """
-    today = date.today()
+    today = pacific_now().date()
     end_date = args.get("end_date") or today.isoformat()
     start_date = args.get("start_date") or (today - timedelta(days=30)).isoformat()
     source_filter = (args.get("source") or "").strip().lower() or None
@@ -233,7 +235,7 @@ def tool_get_workout_detail(args: dict) -> dict:
 
     # Bounded lookback for both lookup paths. Workouts are rare, this is fine
     # for an MCP tool's latency budget. Look back 5 years.
-    today = date.today()
+    today = pacific_now().date()
     start_date = (today - timedelta(days=5 * 365)).isoformat()
     end_date = today.isoformat()
 

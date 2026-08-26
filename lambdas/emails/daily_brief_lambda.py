@@ -71,6 +71,8 @@ if _MISSING:
 # BUG-10: Validate email format for recipient and sender
 import re as _re
 
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+
 _EMAIL_RE = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 for _var, _addr in [("EMAIL_RECIPIENT", RECIPIENT), ("EMAIL_SENDER", SENDER)]:
     if not _EMAIL_RE.match(_addr):
@@ -598,7 +600,7 @@ def _emit_source_fetch_metrics(sources: dict) -> None:
 
 
 def gather_daily_data(profile, yesterday):
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
 
     whoop = fetch_date("whoop", yesterday)
     sleep = _normalize_whoop_sleep(whoop)  # Whoop is now SOT for sleep duration/staging
@@ -1115,7 +1117,7 @@ def get_food_delivery_brief_signal():
             return None
         streak_days = int(streak.get("streak_days", 0))
         last_order = streak.get("last_order_date", "")
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = pacific_today()
         if last_order == today_str:
             return "Food delivery ordered today — nutrition score modifier applied (0.85x)."
         if streak_days >= 30:
@@ -1286,7 +1288,7 @@ def _run_ai_coach_pipeline(
             _lc.invoke(
                 FunctionName="coach-ensemble-digest",
                 InvocationType="Event",
-                Payload=json.dumps({"cycle_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}).encode(),
+                Payload=json.dumps({"cycle_date": pacific_today()}).encode(),
             )
             logger.info("Ensemble digest invoked (async)")
         except Exception as e:
@@ -1440,7 +1442,7 @@ def lambda_handler(event, context):
     _persist = dry_run.persistence_enabled(event, demo_mode)
     logger.info("Daily Brief v2.82.0 starting..." + (" [DEMO MODE]" if demo_mode else ""))
 
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     yesterday = (today - timedelta(days=1)).isoformat()
 
     # #2860 in-flight guard (daily_brief_lock.py) — claims a lease BEFORE
@@ -1980,12 +1982,12 @@ def lambda_handler(event, context):
     _weekly_habit_review = None
     try:
 
-        _is_sunday = datetime.now(timezone.utc).weekday() == 6  # 6 = Sunday
+        _is_sunday = pacific_now().weekday() == 6  # 6 = Sunday; #2817 — the PACIFIC weekday, like the window two lines down
         if _is_sunday:
             # Fetch 7-day habit_scores for the review
             _whr_habit_7d = fetch_range(
                 "habit_scores",
-                (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat(),
+                (pacific_now().date() - timedelta(days=7)).isoformat(),
                 yesterday,
             )
             if _whr_habit_7d:
@@ -2103,7 +2105,7 @@ def lambda_handler(event, context):
     # this email and nothing else. Quiet sources are re-homed out of the amber
     # list so a logging lapse is never dressed up as breakage (ADR-104).
     try:
-        _scan_today = datetime.now(timezone.utc).date()
+        _scan_today = pacific_now().date()
         _stale = scan_stale_sources(_scan_today)
         _quiet = scan_quiet_behavioral_sources(table, _scan_today)
         # #3049 (DIL-024): the compute runs' OWN verdicts on what they could see,
@@ -2266,7 +2268,7 @@ def lambda_handler(event, context):
                 from datetime import date as _date
 
                 _started = profile.get("journey_start_date", EXPERIMENT_START_DATE)
-                _days_in = max(1, (_date.today() - _date.fromisoformat(_started)).days + 1)
+                _days_in = max(1, (pacific_now().date() - _date.fromisoformat(_started)).days + 1)
             except Exception:
                 _days_in = 0
 

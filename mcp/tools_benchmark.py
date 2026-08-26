@@ -18,7 +18,9 @@ BENCH-1.3 — dispatcher + pace view (this commit).
 BENCH-1.4 — episodes + maintenance views (next commit).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.core import get_profile, query_source
 
@@ -47,7 +49,7 @@ _BENCHMARK_DISCLAIMER = (
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return pacific_today()
 
 
 def _read_reference() -> dict:

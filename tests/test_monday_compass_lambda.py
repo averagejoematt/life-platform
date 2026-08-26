@@ -46,6 +46,7 @@ import monday_compass_lambda as mc  # noqa: E402
 import pytest  # noqa: E402
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 # Monday 2026-06-08 15:30 UTC — the cron's own firing slot (Mon 15:00 UTC).
 _NOW = datetime(2026, 6, 8, 15, 30, tzinfo=timezone.utc)
@@ -63,6 +64,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(mc, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, mc, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     return _NOW
 
 

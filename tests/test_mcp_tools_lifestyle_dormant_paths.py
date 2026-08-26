@@ -30,6 +30,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 
 import pytest  # noqa: E402
+from common.pacific_time import pacific_today  # #2817: the frame the module reads
 from fakes import FakeDdbTable  # noqa: E402
 
 from mcp import tools_lifestyle as tl  # noqa: E402
@@ -100,7 +101,10 @@ def test_an_open_ended_trip_is_still_running_today(monkeypatch):
 
 
 def test_travel_defaults_to_today_when_no_date_is_given(monkeypatch):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #2817: `_is_traveling()`'s default is the PACIFIC day. Deriving the fixture
+    # from the UTC clock made this test red for the seven evening hours a day when
+    # the two calendars disagree — the fixture has to name the same day the wire does.
+    today = pacific_today()
     monkeypatch.setattr(tl, "table", FakeDdbTable(rows=[_trip(today, today)]))
     assert tl._is_traveling() is not None
 

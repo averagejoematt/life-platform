@@ -241,7 +241,7 @@ def test_freshness_still_wins_over_the_paused_label(sources, monkeypatch):
     fresh = FakeTable(
         {
             **PARTITIONS,
-            "garmin": [("DATE#2022-04-25", True), ("DATE#" + tools_data.datetime.now(tools_data.timezone.utc).date().isoformat(), True)],
+            "garmin": [("DATE#2022-04-25", True), ("DATE#" + tools_data.pacific_now().date().isoformat(), True)],
         }
     )
     monkeypatch.setattr(tools_data, "table", fresh)

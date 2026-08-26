@@ -33,6 +33,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS = os.path.join(ROOT, "lambdas")
@@ -64,15 +65,22 @@ if _import_err is not None:  # pragma: no cover
 # Frozen clock
 # ──────────────────────────────────────────────────────────────────────────────
 
-# The Lambda fires Friday 18:00 PT == Saturday 02:00 UTC.
+# The Lambda fires Friday 18:00 PT == Saturday 02:00 UTC. THIS INSTANT IS THE POINT:
+# it sits inside the PT-evening window where the two calendars disagree, so every
+# constant below is a witness to #2817. Before it, `gather_data` derived "today" from
+# the UTC clock and named SATURDAY — a day whose food log does not exist yet — while
+# the `DATE#` rows it queries are keyed by the Pacific day. The expectations are now
+# the Pacific ones (Friday 2026-06-05), which is the day this Friday-evening edition
+# is actually about. Moving the frozen instant to a time where the frames agree would
+# have made the suite green by deleting the evidence.
 FROZEN_NOW = datetime(2026, 6, 6, 2, 0, 0, tzinfo=timezone.utc)
 
-TODAY = "2026-06-06"  # now().date()
-END = "2026-06-05"  # today - 1  → the last complete day
-START_14D = "2026-05-23"  # today - 14
-WEIGHT_START = "2026-05-07"  # today - 30
-WEEK_CUTOFF = "2026-05-30"  # today - 7  (the 7-day weight window's inclusive floor)
-HISTORY_START = "2026-03-28"  # today - 70 (plate-history lower bound)
+TODAY = "2026-06-05"  # pacific_now().date() — Friday evening PT, NOT the UTC Saturday
+END = "2026-06-04"  # today - 1  → the last complete day
+START_14D = "2026-05-22"  # today - 14
+WEIGHT_START = "2026-05-06"  # today - 30
+WEEK_CUTOFF = "2026-05-29"  # today - 7  (the 7-day weight window's inclusive floor)
+HISTORY_START = "2026-03-27"  # today - 70 (plate-history lower bound)
 
 
 class _FrozenDatetime(datetime):
@@ -94,6 +102,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(wp, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, wp, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     return FROZEN_NOW
 
 
@@ -863,7 +872,7 @@ class TestEmailHtml:
 
     def test_the_edition_date_is_rendered_in_long_human_form(self):
         html = wp.build_email_html(AI_HTML, {"end": END}, None)
-        assert "June 5, 2026" in html
+        assert "June 4, 2026" in html
 
     def test_an_unparseable_window_end_falls_back_to_the_raw_string(self):
         html = wp.build_email_html(AI_HTML, {"end": "unknown"}, None)
@@ -932,8 +941,11 @@ def wired(monkeypatch, table, ses):
     canned AI response, and a fake insight writer. No real client remains."""
     rows = [
         profile_row(calorie_target=1800, protein_target_g=190, goal_weight_lbs=185, journey_start_weight_lbs=Decimal("321.6")),
-        mf_row("2026-06-03", [food("Eggs", cal=180, protein=Decimal("12"))], total_calories_kcal=Decimal("1790")),
-        mf_row("2026-06-04", [food("Ground Turkey 93/7", cal=320, protein=44)], total_calories_kcal=Decimal("1810")),
+        # Three DISTINCT days ending at END. #2817 moved END back one day (the frozen
+        # instant is Friday evening PT), so these moved with it rather than two rows
+        # collapsing onto the same key and silently dropping a food.
+        mf_row("2026-06-02", [food("Eggs", cal=180, protein=Decimal("12"))], total_calories_kcal=Decimal("1790")),
+        mf_row("2026-06-03", [food("Ground Turkey 93/7", cal=320, protein=44)], total_calories_kcal=Decimal("1810")),
         mf_row(END, [food("Salmon", cal=300, protein=34)], total_calories_kcal=Decimal("1750")),
         wi_row("2026-05-08", weight_lbs=Decimal("310.0")),
         wi_row("2026-06-01", weight_lbs=Decimal("306.0")),
@@ -1006,7 +1018,7 @@ class TestHandlerHappyPath:
         wp.lambda_handler({}, None)
         subject = wired["ses"].sent[0]["Content"]["Simple"]["Subject"]["Data"]
         assert "The Weekly Plate" in subject
-        assert "Jun 5" in subject
+        assert "Jun 4" in subject
 
     def test_the_body_carries_the_ai_writing_the_reader_is_here_for(self, wired):
         wp.lambda_handler({}, None)

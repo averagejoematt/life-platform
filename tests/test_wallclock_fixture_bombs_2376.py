@@ -96,6 +96,16 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
         "`today = date(2026, 3, 14)` builds the records AND is passed in as the "
         "as-of day, so both sides move together and the wall clock is never read."
     ),
+    # Both entries below became VISIBLE to this gate at #2817, when _HANDLER_CLOCK_RE
+    # learned the `pacific_now()`/`pacific_today()` idiom. Neither is new risk; both
+    # were always in the class and the dotted-call regex simply could not see a
+    # bare-function clock read.
+    "test_as_of_agreement_qa.py": (
+        "assess_as_of(payload, PT_TODAY) / assess_as_of_data_correspondence take the "
+        "as-of day as an argument and PT_TODAY is a fixture literal; the module's one "
+        "pacific_today() read lives in the fetch/wrap half these tests never drive "
+        "(its own docstring: 'Pure-assessor tests with FIXTURE dates only')."
+    ),
     "test_daily_insight_changepoints.py": (
         "_compute_changepoints(yesterday.isoformat(), ...) receives its day "
         "explicitly; the same local `yesterday` builds the fetched series, and "
@@ -117,6 +127,12 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
         "argument; NOW.date() arithmetic builds the fixture sk dates from the same "
         "injected instant."
     ),
+    "test_spiral_breaker.py": (
+        "every call is is_suppressed(...,now=NOW)/evaluate(...,now=NOW) against the "
+        "pinned NOW = date(2026, 7, 20) that also generates every fixture date; the "
+        "module's only clock read is gather_signals's `now=None` default, and "
+        "gather_signals is not driven here."
+    ),
     "test_prediction_metadata_stamp_725.py": (
         "stamp_thread_predictions(..., today=TODAY) — the handler's signature is "
         "`today: str = None` with `today = today or datetime.now(...)`, so the "
@@ -134,7 +150,12 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
 }
 
 _ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
-_HANDLER_CLOCK_RE = re.compile(r"\.(now|today|utcnow)\s*\(")
+# #2817: `pacific_now()` / `pacific_today()` are wall-clock reads with NO leading
+# dot, so the original `\.(now|today|utcnow)\(` pattern stopped seeing a module the
+# moment #2811/#2817 converted it to the Pacific frame — silently retiring this gate
+# over the whole converted fleet (three live exemptions went 'dead' in one sweep).
+# The guard has to know the frame it asked the fleet to adopt.
+_HANDLER_CLOCK_RE = re.compile(r"\.(now|today|utcnow)\s*\(|\bpacific_(now|today)\s*\(")
 
 # Any of these anywhere in a test file counts as clock CONTROL: the author has
 # reached for the handler's clock, so the file is out of the "unfrozen" class.

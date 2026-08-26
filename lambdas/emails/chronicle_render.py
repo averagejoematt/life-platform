@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timezone
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.text_utils import truncate_at_word
 
 # BS-05 confidence helpers (bundled digest_utils) — same optional-import shape as the facade.
@@ -480,7 +481,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     "@type": "BlogPosting",
     "headline": "{title}",
     "description": "{cur_label} of The Measured Life by Elena Voss",
-    "datePublished": "{datetime.now(timezone.utc).date().isoformat()}",
+    "datePublished": "{pacific_now().date().isoformat()}",
     "author": {{"@type": "Person", "name": "Elena Voss"}},
     "image": "{og_image}",
     "publisher": {{
@@ -775,8 +776,11 @@ def build_weekly_signal_data(data, week_num):
     # Journey days
     journey_start = profile.get("journey_start_date", EXPERIMENT_START_DATE)
     try:
-        start_dt = datetime.strptime(journey_start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        journey_days = max(0, (datetime.now(timezone.utc) - start_dt).days)
+        # #2817: a CALENDAR-day count, so subtract two dates rather than an instant
+        # from a UTC-midnight-anchored one — `journey_start` is a Pacific day string
+        # and mixing it with a UTC now shifted "Day N" by one every PT evening.
+        start_day = datetime.strptime(journey_start, "%Y-%m-%d").date()
+        journey_days = max(0, (pacific_now().date() - start_day).days)
     except Exception:
         journey_days = 0
 

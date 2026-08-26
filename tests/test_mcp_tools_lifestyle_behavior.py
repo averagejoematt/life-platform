@@ -66,6 +66,7 @@ os.environ.setdefault("USER_ID", "matthew")
 
 import pytest  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import (
     tools_lifestyle as tl,  # noqa: E402
@@ -191,7 +192,9 @@ class _Body:
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(tl, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tl, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(tsc, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tsc, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
 
 
 @pytest.fixture
@@ -1415,9 +1418,18 @@ def test_log_evening_intake_rejects_junk_dates(table):
 def test_log_evening_intake_defaults_to_the_pacific_day_not_utc(monkeypatch, table):
     """#1484: the evening flow runs 18:00-24:00 PT, which is already tomorrow in
     UTC. The default MUST come from pacific_today(), or one evening splits across
-    two DATE# rows and double-counts in the dose-response ledger."""
+    two DATE# rows and double-counts in the dose-response ledger.
+
+    #2817 hoisted the import from a function-local to module scope (paying for its
+    own line, #2610), which moved the patch point: the name this code path reads is
+    `tl.pacific_today`, bound at import, so patching `common.pacific_time` no longer
+    reaches it. Patching the module attribute is the repo's freeze idiom and is what
+    `tests/pacific_clock.freeze_pacific` does; the "no second Pacific frame" half of
+    the claim is held structurally by `test_time_invariant_helpers_1964.py`, which
+    bans any module from constructing its own PT.
+    """
     table(update_item_hook=lambda _t, **kw: {})
-    monkeypatch.setattr("common.pacific_time.pacific_today", lambda: "2026-08-07")
+    monkeypatch.setattr(tl, "pacific_today", lambda: "2026-08-07")
     out = call("log_evening_intake", {"count": 3})
     assert out["date"] == "2026-08-07"  # PT day, not the frozen UTC 2026-08-08
 

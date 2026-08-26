@@ -51,11 +51,12 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from common.pacific_time import pacific_now  # #2817: the frame the brief names
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -278,7 +279,7 @@ class TestLambdaHandlerInFlightShortCircuit:
         """The acceptance criterion in its own words: a simulated concurrent
         second invoke returns early with ZERO AI-section execution."""
         event = {"dry_run": True}
-        yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+        yesterday = (pacific_now().date() - timedelta(days=1)).isoformat()  # #2817: the day the handler names
 
         t = _FakeConditionalTable()
         # Pre-seed an UNEXPIRED lease, as if a first invocation for the same
@@ -321,7 +322,7 @@ class TestLambdaHandlerInFlightShortCircuit:
         """The lease key is (date, dry_run) — a REAL scheduled run must not be
         blocked by a stale dry-run test lease for the same date, or vice
         versa."""
-        yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+        yesterday = (pacific_now().date() - timedelta(days=1)).isoformat()  # #2817: the day the handler names
         now = int(time.time())
         # A lease held for the DRY-RUN key only.
         lock_sk = f"LOCK#{yesterday}#True"

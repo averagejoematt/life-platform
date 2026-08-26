@@ -74,6 +74,7 @@ os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
 import monthly_digest_lambda as m  # noqa: E402
 from experiment.phase_filter import with_phase_filter  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Frozen clocks
@@ -130,6 +131,7 @@ def _frozen_date_class(pinned):
 @pytest.fixture
 def frozen_monday(monkeypatch):
     monkeypatch.setattr(m, "datetime", _frozen_datetime_class(GUARD_MONDAY))
+    freeze_pacific(monkeypatch, m, GUARD_MONDAY)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(_datetime_mod, "date", _frozen_date_class(GUARD_MONDAY))
     return GUARD_MONDAY
 
@@ -137,6 +139,7 @@ def frozen_monday(monkeypatch):
 @pytest.fixture
 def frozen_cron_sunday(monkeypatch):
     monkeypatch.setattr(m, "datetime", _frozen_datetime_class(CRON_SUNDAY))
+    freeze_pacific(monkeypatch, m, CRON_SUNDAY)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(_datetime_mod, "date", _frozen_date_class(CRON_SUNDAY))
     return CRON_SUNDAY
 
@@ -866,6 +869,9 @@ def test_the_year_elapsed_percentage_uses_the_real_length_of_the_year(monkeypatc
     # 2028 is a leap year (366 days). 2028-01-01 -> 2028-02-12 is 42 days elapsed:
     #   correct: round(42 / 366 * 100) = 11        module: round(42 / 365 * 100) = 12
     monkeypatch.setattr(m, "datetime", _frozen_datetime_class(datetime(2028, 2, 12, 16, 0, tzinfo=timezone.utc)))
+    freeze_pacific(
+        monkeypatch, m, datetime(2028, 2, 12, 16, 0, tzinfo=timezone.utc)
+    )  # #2817: pin the PACIFIC helpers this module now calls
     assert m.compute_annual_goals({}, WINDOWS, {})["year_pct_elapsed"] == round(42 / 366 * 100)
 
 
@@ -1795,6 +1801,9 @@ def test_the_send_decision_does_not_depend_on_the_weekday(monkeypatch, day):
     """
     ses = FakeSES()
     monkeypatch.setattr(m, "datetime", _frozen_datetime_class(datetime(2026, 8, day, 16, 0, tzinfo=timezone.utc)))
+    freeze_pacific(
+        monkeypatch, m, datetime(2026, 8, day, 16, 0, tzinfo=timezone.utc)
+    )  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(m, "ses", ses)
     monkeypatch.setattr(m, "table", _seeded_table())
     monkeypatch.setattr(m, "call_haiku_monthly", lambda data, goals: COMMENTARY)
@@ -1827,6 +1836,7 @@ def test_the_weekday_guard_reads_the_clock_in_utc(monkeypatch):
     """Freeze only the module's UTC clock and leave date.today() alone: a
     UTC-derived guard follows the frozen clock, a local one does not."""
     monkeypatch.setattr(m, "datetime", _frozen_datetime_class(GUARD_MONDAY))
+    freeze_pacific(monkeypatch, m, GUARD_MONDAY)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(m, "ses", FakeSES())
     monkeypatch.setattr(m, "table", _seeded_table())
     monkeypatch.setattr(m, "call_haiku_monthly", lambda data, goals: COMMENTARY)

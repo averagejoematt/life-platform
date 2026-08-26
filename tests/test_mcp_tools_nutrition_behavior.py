@@ -54,6 +54,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config reads 
 os.environ.setdefault("USER_ID", "matthew")
 
 import pytest  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import core as mcore, tools_nutrition as tn  # noqa: E402
 from mcp.registry import TOOLS  # noqa: E402
@@ -247,6 +248,7 @@ def _frozen_and_isolated(monkeypatch):
     _FROZEN[0] = NOW
     _PT[0] = PT_TODAY
     monkeypatch.setattr(tn, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tn, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(tn, "pacific_today", lambda: _PT[0])
     monkeypatch.setattr(mcore, "_PROFILE_CACHE", None, raising=False)
     yield
@@ -1031,6 +1033,7 @@ def test_the_macro_target_and_the_energy_view_agree_on_todays_calorie_target(mon
     from mcp import tools_health as th
 
     monkeypatch.setattr(th, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, th, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     rows = MACRO_ROWS + [withings(PT_TODAY, weight_lbs=220.0), strava(PT_TODAY, total_moving_time_seconds=3600)]
     install(monkeypatch, rows, profile=PROFILE_WITH_HEIGHT)
     macros = tn.tool_get_nutrition({"view": "macros", "start_date": "2026-05-01", "end_date": PT_TODAY})

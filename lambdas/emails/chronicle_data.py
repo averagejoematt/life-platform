@@ -4,11 +4,12 @@ facade's live (monkeypatchable) module state via the `_g` hand-off; does NOT
 import the facade (no import cycle)."""
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
 from common.digest_utils import d2f, safe_float
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from experiment.phase_filter import singleton_visible
 from privacy import diary_consent  # #1483 (ADR-142 tier 2): the conversation-allude projection + prompt block
 
@@ -54,7 +55,7 @@ def gather_chronicle_data(*, _g):
     USER_ID = _g["USER_ID"]
     EXPERIMENT_START_DATE = _g["EXPERIMENT_START_DATE"]
     logger = _g["logger"]
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     end = (today - timedelta(days=1)).isoformat()  # yesterday
     start = (today - timedelta(days=7)).isoformat()  # 7 days back
     weight_start = (today - timedelta(days=30)).isoformat()

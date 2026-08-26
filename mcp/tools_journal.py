@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import USER_PREFIX, table
 from mcp.core import decimal_to_float
@@ -67,8 +68,8 @@ def _query_journal(start_date, end_date, template=None):
 
 def _get_mood_trend(args):
     """Mood/energy/stress scores over time with enriched signals."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
+    today = pacific_today()
+    start = args.get("start_date", (pacific_now() - timedelta(days=30)).strftime("%Y-%m-%d"))
     end = args.get("end_date", today)
     metric = args.get("metric", "all")  # mood|energy|stress|all
 
@@ -232,7 +233,7 @@ def tool_get_flourishing_trend(args):
 
     days = max(7, min(365, int(args.get("days") or 90)))
     span = max(3, min(60, int(args.get("ema_span") or 14)))
-    start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    start = (pacific_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}flourishing") & Key("sk").gte(f"DATE#{start}"),
         ScanIndexForward=True,
@@ -528,7 +529,7 @@ def tool_manage_diary_claims(args):
     from privacy import diary_claims as dc  # bundled shared module (#781) — the pure gate
 
     action = (args.get("action") or "due").strip().lower()
-    today = (args.get("today") or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()
+    today = (args.get("today") or pacific_today()).strip()
     if not _DATE_RE.match(today):
         return {"error": "today must be YYYY-MM-DD."}
 

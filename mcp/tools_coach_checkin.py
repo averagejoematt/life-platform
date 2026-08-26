@@ -24,10 +24,11 @@ but persists the questions it generates — a deliberate trade-off documented in
 PR #915 (the write is system-generated question text, never user data).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import S3_BUCKET, USER_PREFIX, logger, s3_client, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
@@ -142,7 +143,7 @@ def _manual_source_signal():
     each source's own staleness threshold and owning coach. Partition-level —
     the cheap, honest 'how dark is this channel' signal."""
     out = []
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     for src, meta in manual_capture_sources().items():
         days_since = None
         try:
@@ -240,7 +241,7 @@ def tool_get_coach_checkin_queue(args):
 
     manual_signal = _manual_source_signal()
     snapshot = {
-        "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "as_of": pacific_today(),
         "presence": _presence_snapshot(),
         "adaptive_mode": _adaptive_mode_snapshot(),
         "manual_sources_days_since": manual_signal,

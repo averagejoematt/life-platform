@@ -187,6 +187,7 @@ SLEEP_DEDUP_FIELDS = {"sleep_efficiency_percentage", "sleep_quality_score"}
 
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 # ── Travel awareness (v2.1.0) ─────────────────────────────────────────────────
 TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
@@ -956,7 +957,7 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": "ok"}
     logger.info("Anomaly Detector v2.3.0 starting (adaptive thresholds + travel + sustained tracking)...")
 
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     yesterday = (today - timedelta(days=1)).isoformat()
     logger.info(f"Checking anomalies for: {yesterday}")
 

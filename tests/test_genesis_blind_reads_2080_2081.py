@@ -439,8 +439,9 @@ def test_the_scan_is_still_wired_into_the_brief():
     it, and nothing rebuilt an inline copy alongside."""
     src = (REPO_ROOT / "lambdas" / "emails" / "daily_brief_lambda.py").read_text()
     # #2326 moved the call onto a shared pinned date so the quiet-behavioral scan
-    # reads the same "today" as the staleness scan.
-    assert "_scan_today = datetime.now(timezone.utc).date()" in src
+    # reads the same "today" as the staleness scan; #2817 moved that shared date onto
+    # the PACIFIC frame, which is the day the DATE# rows both scans read are keyed by.
+    assert "_scan_today = pacific_now().date()" in src
     assert "scan_stale_sources(_scan_today)" in src
     assert "scan_quiet_behavioral_sources(table, _scan_today)" in src
     assert src.count("def scan_stale_sources") == 1

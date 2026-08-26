@@ -5,6 +5,8 @@ wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 import json
 from datetime import datetime, timezone
 
+from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+
 # #2254: the statuses a stored installment can be in that a regenerating run must
 # NOT clobber. `draft` = awaiting Matthew's approval (its approval_token is live and
 # already in his inbox); `published` = already on the site and mailed. `changes_requested`
@@ -378,7 +380,7 @@ def record_email_send(table, lambda_name, *, _g):
 
     USER_ID = _g["USER_ID"]
     logger = _g["logger"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     try:
         table.put_item(
             Item={

@@ -276,7 +276,12 @@ def _probe_found(sent_at_iso: str, probe: dict) -> bool:
 def run_grading_pass(now_utc: datetime) -> int:
     """Grade every sent-but-ungraded nudge whose outcome window has elapsed.
     Returns the number graded. Fail-soft per row."""
-    start = (now_utc.date() - timedelta(days=3)).isoformat()
+    # #2817: the ledger sk carries `date_pt` (the handler's PACIFIC day — see
+    # `now_pt`/`date_pt` below), so the window's low bound has to be a Pacific
+    # day too. `.astimezone(PACIFIC)` keeps the caller's single instant while
+    # naming the frame the key is written in; `now_utc.date()` named the UTC one
+    # and dropped the oldest ledger day for any run between 17:00 PT and midnight.
+    start = (now_utc.astimezone(PACIFIC).date() - timedelta(days=3)).isoformat()
     try:
         resp = _table().query(
             KeyConditionExpression=Key("pk").eq(engine.LEDGER_PK)

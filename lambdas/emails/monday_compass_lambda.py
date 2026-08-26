@@ -151,6 +151,7 @@ _PILLAR_WEIGHTS = {
 
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 
 def fetch_profile():
@@ -326,7 +327,7 @@ def gather_todoist_data(token):
 
 def gather_health_data():
     """Pull Monday readiness, last week grades, and Character Sheet from DDB."""
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     last_7_start = (today - timedelta(days=7)).isoformat()
     today_str = today.isoformat()
 
@@ -401,7 +402,7 @@ def _due_label(due):
     date_str = due.get("date", "") if isinstance(due, dict) else str(due)
     try:
         due_date = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
-        today = datetime.now(timezone.utc).date()
+        today = pacific_now().date()
         delta = (due_date - today).days
         if delta == 0:
             return "· due today"
@@ -468,7 +469,7 @@ def build_week_state_summary(health_data, profile):
 def _compute_week_num(profile):
     try:
         start = datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()
-        today = datetime.now(timezone.utc).date()
+        today = pacific_now().date()
         return max(1, ((today - start).days + 6) // 7)
     except Exception:
         return 1
@@ -677,7 +678,7 @@ Format it as a clear call-to-action. Bold the actual action. End with why this o
 
 def build_user_message(week_state, todoist_data, health_data, profile, pillar_map, board_context):
     """Assemble the full data payload for the AI."""
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
 
     week_num = week_state.get("week_num", 1)
     start_w = week_state.get("start_weight", EXPERIMENT_BASELINE_WEIGHT_LBS)
@@ -871,7 +872,7 @@ def _period_key():
     15:00 UTC; every redrive for the rest of that week resolves to the same key,
     while next Monday's legitimate send does not.
     """
-    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+    return f"week:{send_ledger.iso_week_key(pacific_now().date())}"
 
 
 def record_email_send(table, lambda_name, period_key):
@@ -949,7 +950,7 @@ def lambda_handler(event, context):
         elif _val.warnings:
             logger.warning(f"[AI-3] Monday Compass warnings: {_val.warnings}")
 
-    today_str = health_data.get("today_str", datetime.now(timezone.utc).date().isoformat())
+    today_str = health_data.get("today_str", pacific_now().date().isoformat())
     html = build_email_html(ai_content, week_state, today_str)
 
     try:

@@ -57,6 +57,7 @@ os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 
 import pytest  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import tools_memory  # noqa: E402
 from mcp.handler import _validate_tool_args  # noqa: E402
@@ -136,6 +137,7 @@ def _rows(corpus=CORPUS, drop_date_attr=()):
 def _frozen_clock(monkeypatch):
     """Pin the tool's clock to the same instant TODAY was built from (#2223)."""
     monkeypatch.setattr(tools_memory, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tools_memory, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
 
 
 @pytest.fixture

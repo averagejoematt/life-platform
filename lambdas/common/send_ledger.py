@@ -62,6 +62,7 @@ from datetime import date as _date, datetime, timezone
 from typing import Any, Mapping, Optional
 
 from common import dry_run as _dry_run
+from common.pacific_time import PACIFIC  # #2817: the ONE Pacific frame (#1964)
 
 #: The `SOURCE#` segment every email-completion row has always used.
 EMAIL_LOG_SOURCE = "email_log"
@@ -185,11 +186,19 @@ def record_sent(
     """
     _now = int(time.time()) if now is None else now
     sent_at = datetime.fromtimestamp(_now, tz=timezone.utc)
+    # #2817: the INSTANT stays UTC (`sent_at` below is frame-free and comparable);
+    # the DAY in the sort key is PACIFIC, because that is the frame the only reader
+    # of this partition uses — `lambdas/web/site_api_status.py` builds its 90-day
+    # uptime bars off `datetime.now(PT).date()`. A UTC sk put every letter sent
+    # after 17:00 PT on tomorrow's bar, and the senders that hand-roll their own
+    # completion row (chronicle, chronicle_email_sender, partner) now write the
+    # Pacific day too — one partition, one frame. Invisible to the #2811 matcher,
+    # which does not treat `datetime.fromtimestamp(...)` as a clock.
     try:
         table.put_item(
             Item={
                 "pk": email_log_pk(lambda_name, user_id),
-                "sk": f"DATE#{sent_at.date().isoformat()}",
+                "sk": f"DATE#{sent_at.astimezone(PACIFIC).date().isoformat()}",
                 "sent_at": sent_at.isoformat(),
                 "status": "success",
                 PERIOD_KEY_ATTR: period_key,

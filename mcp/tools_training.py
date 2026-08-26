@@ -3,7 +3,9 @@ Training tools: load, PRs, correlation, seasonal, periodization, recommendation,
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.core import get_profile, get_sot, query_source
 from mcp.helpers import classify_hr_zone, compute_daily_load_score, compute_ewa, warm_start_seed
@@ -23,7 +25,7 @@ def _demote_tier(tier, floor):
 
 
 def _get_training_load(args):
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
     start_dt = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=180)
     start_date = args.get("start_date", start_dt.strftime("%Y-%m-%d"))
     warmup_dt = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=84)
@@ -174,7 +176,7 @@ def _get_training_periodization(args):
     Attia: Training is the most potent longevity drug — but only with periodization.
     Seiler: 80/20 polarized model — 80% easy, 20% hard for optimal adaptation.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
     weeks_back = int(args.get("weeks", 12))
     start_date = args.get("start_date", (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks_back)).strftime("%Y-%m-%d"))
 
@@ -547,7 +549,7 @@ def _get_training_recommendation(args):
     Based on Galpin (training periodization), Huberman (recovery science),
     Attia (longevity training framework), Seiler (polarized training).
     """
-    target_date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    target_date = args.get("date", pacific_today())
     d7_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
     d14_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=14)).strftime("%Y-%m-%d")
     d3_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=3)).strftime("%Y-%m-%d")
@@ -1007,7 +1009,7 @@ def tool_get_acwr_status(args):
     Reads pre-computed acwr fields from the computed_metrics partition.
     Falls back to live computation from Whoop strain if pre-computed record is missing.
     """
-    end_date = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
+    end_date = args.get("date", (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d"))
     days_back = int(args.get("days_back", 14))  # how many days of history to return
 
     def _sf(v):

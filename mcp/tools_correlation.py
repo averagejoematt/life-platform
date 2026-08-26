@@ -3,7 +3,9 @@ Correlation tools: caffeine, exercise, zone2, alcohol vs sleep.
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.core import get_profile, query_source
 from mcp.helpers import HR_ZONE_BOUNDS, classify_hr_zone, pearson_r
@@ -20,8 +22,8 @@ def tool_get_zone2_breakdown(args):
     density, fat oxidation capacity, and cardiovascular base. Most people drastically
     undertrain Zone 2 relative to higher intensities.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
+    start_date = args.get("start_date", (pacific_now() - timedelta(days=89)).strftime("%Y-%m-%d"))
     weekly_target_min = int(args.get("weekly_target_minutes", 150))
     min_duration_min = int(args.get("min_duration_minutes", 10))
 

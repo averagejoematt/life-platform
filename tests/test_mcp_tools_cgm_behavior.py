@@ -60,6 +60,7 @@ from decimal import Decimal  # noqa: E402
 
 import pytest  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import core as mcore, tools_cgm as tc  # noqa: E402
 from mcp.registry import TOOLS  # noqa: E402
@@ -92,6 +93,7 @@ class _FrozenDatetime(datetime):
 def frozen_clock(monkeypatch):
     _FROZEN[0] = NOW
     monkeypatch.setattr(tc, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tc, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     yield
 
 

@@ -58,6 +58,7 @@ from common import (
     qa_archive,  # #1691 (epic #1687): re-run the baseline-freshness gate over each archived
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # coach_brief's TEXT so a stale-baseline/stale-phase brief surfaces a visible flag
@@ -125,7 +126,7 @@ _SNIPPET_CHARS = 360
 
 def week_dates(end=None):
     """The WINDOW_DAYS calendar dates (YYYY-MM-DD), oldest-first, ending today (UTC)."""
-    end = end or datetime.now(timezone.utc).date()
+    end = end or pacific_now().date()
     return [(end - timedelta(days=i)).isoformat() for i in range(WINDOW_DAYS - 1, -1, -1)]
 
 
@@ -592,7 +593,7 @@ def _period_key():
     what must not be mailed twice. Every redrive inside that week resolves to
     the same key; next Sunday's does not.
     """
-    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+    return f"week:{send_ledger.iso_week_key(pacific_now().date())}"
 
 
 def record_email_send(table, lambda_name, period_key):

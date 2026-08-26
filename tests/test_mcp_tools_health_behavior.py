@@ -55,6 +55,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config reads 
 os.environ.setdefault("USER_ID", "matthew")
 
 import pytest  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import core as mcore, tools_health as th  # noqa: E402
 from mcp.registry import TOOLS  # noqa: E402
@@ -285,6 +286,7 @@ def _frozen_and_isolated(monkeypatch):
     """
     freeze(NOW)
     monkeypatch.setattr(th, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, th, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(mcore, "_PROFILE_CACHE", None, raising=False)
     yield
     mcore._PROFILE_CACHE = None

@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
@@ -60,8 +61,8 @@ def _causality_sk(date_str, name):
 
 def _recent_habitify(days):
     """Latest-per-day Habitify records for the trailing `days` window (inclusive today)."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start = (datetime.now(timezone.utc) - timedelta(days=max(1, days) - 1)).strftime("%Y-%m-%d")
+    today = pacific_today()
+    start = (pacific_now() - timedelta(days=max(1, days) - 1)).strftime("%Y-%m-%d")
     resp = _table_ref.query(
         KeyConditionExpression=Key("pk").eq(_pk(HABITIFY_SOURCE)) & Key("sk").between(f"DATE#{start}", f"DATE#{today}"),
         ScanIndexForward=True,
@@ -71,8 +72,8 @@ def _recent_habitify(days):
 
 def _captured_reflections(days):
     """Existing claude_reflection records in the window, indexed by (date, slug)."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start = (datetime.now(timezone.utc) - timedelta(days=max(1, days) - 1)).strftime("%Y-%m-%d")
+    today = pacific_today()
+    start = (pacific_now() - timedelta(days=max(1, days) - 1)).strftime("%Y-%m-%d")
     resp = _table_ref.query(
         KeyConditionExpression=Key("pk").eq(_pk(CAUSALITY_SOURCE)) & Key("sk").between(f"HABITDAY#{start}", f"HABITDAY#{today}~"),
         ScanIndexForward=True,
@@ -129,7 +130,7 @@ def tool_get_habit_reflection_queue(args):
     return _d2f(
         {
             "window_days": days,
-            "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "as_of": pacific_today(),
             "missed_needs_why": missed_needs_why[:15],
             "completed_needs_driver": done_needs_driver[:15],
             "missed_needs_why_total": len(missed_needs_why),
@@ -155,7 +156,7 @@ def tool_log_habit_reflection(args):
     name = (args.get("habit") or "").strip()
     if not name:
         return {"error": "habit is required (the habit name as it appears in the tracker)"}
-    date = (args.get("date") or "").strip() or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = (args.get("date") or "").strip() or pacific_today()
 
     trigger = clip_note(args.get("trigger"))
     reward = clip_note(args.get("reward"))

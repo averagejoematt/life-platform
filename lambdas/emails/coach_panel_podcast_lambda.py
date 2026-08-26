@@ -29,6 +29,7 @@ from ai.ai_context import build_experiment_phase_context, format_experiment_phas
 from boto3.dynamodb.conditions import Key
 from coach import coach_derived_prose, persona_registry  # #2418: served_summary falls back to gated `content`
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
@@ -640,7 +641,7 @@ def _seed_series_state(bible: dict, ep: dict) -> None:
         },
         "running_threads": bible.get("through_lines", []),
         "recurring_bits": bible.get("recurring_bits", []),
-        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "updated": pacific_today(),
     }
     s3.put_object(
         Bucket=S3_BUCKET,
@@ -950,7 +951,7 @@ def _run_intro(dry_run: bool = False) -> dict:
     ep = {
         "week": 0,
         "title": "Episode 0 — Welcome to The Measured Life",
-        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "date": pacific_today(),
         **published,  # url/bytes/duration_sec from the compressed publish (#1018)
         "byline": "Elena + Dr. Eli Marsh",
         "excerpt": "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
@@ -1023,7 +1024,7 @@ def _state_write(state: dict) -> None:
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return pacific_today()
 
 
 def _extract_json(text: str):
@@ -1540,11 +1541,9 @@ def _select_week_post() -> dict:
     weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
     if weekly:
         return max(weekly, key=lambda x: x["date"])
-    from datetime import date as _date
-
-    genesis = _date.fromisoformat(EXPERIMENT_START_DATE)
-    wk = max(1, ((_date.today() - genesis).days // 7) + 1)
-    return {"week": wk, "date": _date.today().isoformat(), "title": f"Week {wk}"}
+    genesis = datetime.fromisoformat(EXPERIMENT_START_DATE).date()
+    wk = max(1, ((pacific_now().date() - genesis).days // 7) + 1)
+    return {"week": wk, "date": pacific_now().date().isoformat(), "title": f"Week {wk}"}
 
 
 def _run_weekly(force: bool, dry_run: bool = False) -> dict:

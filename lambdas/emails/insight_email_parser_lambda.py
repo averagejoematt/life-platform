@@ -55,6 +55,7 @@ from html import escape as html_escape
 
 import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run
 
 # #2291: DECLARED trigger-type exemption from the DEFAULT SES dry-run suppression.
@@ -222,7 +223,10 @@ def save_insight(text, source_email_subject="", dry_run=False):
     leave no record claiming the real run happened."""
     now = datetime.now(timezone.utc)
     insight_id = now.isoformat()
-    date_saved = now.strftime("%Y-%m-%d")
+    # #2817: the id stays a UTC INSTANT (it is the record's identity and sorts
+    # monotonically); the DAY it is filed under is Pacific, like every other
+    # `date`-shaped field the site reads.
+    date_saved = pacific_today()
 
     # Auto-detect tags from subject line
     tags = []

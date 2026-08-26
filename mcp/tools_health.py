@@ -4,6 +4,7 @@ Health & body composition tools.
 
 from datetime import datetime, timedelta, timezone
 
+from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from health import tdee as tdee_core  # ADR-152 / #2310: THE one TDEE definition
 
 from mcp.config import logger
@@ -42,7 +43,7 @@ def tool_get_readiness_score(args):
     # Bad input returns an error DICT, never a stack trace out of the tool: an
     # unparseable string used to raise ValueError and an explicit {"date": None}
     # raised TypeError, both of which reach the MCP caller as a crash.
-    end_date = args.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("date", pacific_today())
     if not isinstance(end_date, str) or not end_date.strip():
         return {"error": f"Invalid 'date' argument ({end_date!r}) — expected a YYYY-MM-DD string, or omit it for today."}
     try:
@@ -477,7 +478,7 @@ def tool_get_readiness_score(args):
 
 
 def tool_get_weight_loss_progress(args):
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
     explicit_start = args.get("start_date")  # None when caller didn't pass one
     profile = get_profile()
 
@@ -707,7 +708,7 @@ def tool_get_weight_loss_progress(args):
 
 
 def _get_energy_expenditure(args):
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
     try:
         _end_dt = datetime.strptime(end_date, "%Y-%m-%d")
     except (ValueError, TypeError):
@@ -861,7 +862,7 @@ def _get_hydration_score(args):
     Source: apple_health (water_intake_ml). Bodyweight target: 35ml/kg (Webb).
     Fallback guidance: Habitify manual log if Apple Health sync is incomplete.
     """
-    end = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end = args.get("end_date", pacific_today())
     try:
         _end_dt = datetime.strptime(end, "%Y-%m-%d")
     except (ValueError, TypeError):

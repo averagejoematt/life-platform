@@ -56,6 +56,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -131,6 +132,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(brief, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, brief, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     return FROZEN_NOW
 
 
@@ -2169,6 +2171,7 @@ class TestWeeklyHabitReview:
                 return base if tz else base.replace(tzinfo=None)
 
         monkeypatch.setattr(brief, "datetime", _Sunday)
+        freeze_pacific(monkeypatch, brief, _Sunday)  # #2817: pin the PACIFIC helpers this module now calls
         brief.lambda_handler({}, None)
         assert len(handler_env["ses"].sent) == 1
         assert handler_env["html"].calls[0][1]["weekly_habit_review"] is None

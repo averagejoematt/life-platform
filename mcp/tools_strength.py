@@ -2,7 +2,9 @@
 Strength training tools: exercise history, PRs, volume, progress, frequency, standards.
 """
 
-from datetime import date, datetime
+from datetime import datetime
+
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import logger, table
 from mcp.core import query_source_range
@@ -12,7 +14,7 @@ from mcp.strength_helpers import _VOLUME_LANDMARKS, assess_volume_completeness, 
 def tool_get_muscle_volume(args):
     """Weekly sets per muscle group vs MEV/MAV/MRV volume landmarks."""
     start_date = args.get("start_date", "2000-01-01")
-    end_date = args.get("end_date", date.today().isoformat())
+    end_date = args.get("end_date", pacific_now().date().isoformat())
     period = args.get("period", "week")  # "week" or "month"
 
     items = query_source_range("hevy", start_date, end_date)

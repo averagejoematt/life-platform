@@ -50,7 +50,7 @@ _GENOME_SCAN_MAX_DEPTH = 12
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from common.pacific_time import PACIFIC
+from common.pacific_time import PACIFIC, pacific_now  # #2817: the Pacific frame
 
 from mcp.config import logger, table
 from mcp.helpers import _linear_regression
@@ -767,7 +767,7 @@ def tool_get_freshness_status(args):
             )
     keys = list(requested) if requested else list(SOURCES.keys())
 
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     per_source = []
     stale_count = 0
     unreadable_count = 0
