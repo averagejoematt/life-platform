@@ -192,9 +192,14 @@ def nutrition_absence_facts(latest_row, days_in_experiment: int, experiment_star
     `latest_row` is the newest macrofactor item anywhere in the record (or None);
     pure, zero I/O — the caller owns the lookup, same contract as pillar_absence().
     """
-    from datetime import date, datetime
+    from datetime import datetime
 
-    today = today or date.today()
+    from common.pacific_time import pacific_now
+
+    # #2811 — `days_dark` subtracts a `DATE#` day (Pacific) from this one, so a naive
+    # `date.today()` (UTC in Lambda) reported one extra dark day every PT evening —
+    # straight into an absence FACT the grounding class then polices as truth.
+    today = today or pacific_now().date()
     sk = str((latest_row or {}).get("sk", ""))
     last_date = sk[len("DATE#") :][:10] if sk.startswith("DATE#") else None
     days_dark = None

@@ -43,6 +43,7 @@ from typing import Any, Optional
 
 from boto3.dynamodb.conditions import Key
 from common.numeric import floats_to_decimal  # bundled shared module (#1207)
+from common.pacific_time import pacific_today  # #2811: the fit's `as_of` DAY is a Pacific day
 from common.stats_core import (
     bh_fdr,
     effective_sample_size,
@@ -200,7 +201,9 @@ def _lagged_pairs(records: list[dict], drivers: dict, target: str, lag_days: int
 # ══════════════════════════════════════════════════════════════════════════════
 def fit_effects(records: list[dict], config: dict[str, Any], as_of_date: Optional[str] = None) -> dict[str, Any]:
     """Fit every configured effect against the daily history. Pure + deterministic."""
-    as_of = as_of_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #2811 — `as_of` is published as the fit's reference DAY alongside `records` whose
+    # own days are `DATE#` (Pacific) keys. Two frames in one artifact is the defect.
+    as_of = as_of_date or pacific_today()
     specs = derive_fit_specs(config)
 
     rows = []

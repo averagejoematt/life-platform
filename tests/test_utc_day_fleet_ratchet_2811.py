@@ -101,6 +101,31 @@ adherence check's `start_time[:10]`, a vendor instant). The AGREEMENT half of th
 lives in `tests/test_pt_day_pair_contracts_2798.py`, which drives both sides of both pairs
 at one PT-evening instant. Both files are load-bearing; neither subsumes the other.
 
+**#2811 CLOSED ITS OWN BOX, AND FIRST HAD TO FIX THE INSTRUMENT MEASURING IT.**
+The last five packages joined here — `lambdas/health/` (8 day-semantics sites),
+`lambdas/common/` (6), `lambdas/experiment/` (5), `lambdas/ai/` (3) and `lambdas/privacy/`
+(11 files, already at ZERO) — which makes the scanned surface the whole deployed bundle
+minus the two packages that owe #2414's stricter zero. Exactly ONE site was ruled
+genuinely-UTC: `ai/grounding_gate_params.py`'s fail-soft degrade, which is not a calendar
+choice at all but the handler for `common.pacific_time` being unimportable.
+
+But the 22-site figure that scoped this slice was a FLOOR, not a ceiling. `_is_day_slice`
+and every other predicate bottomed out in `_subtree_dirty`, which asked only "a literal
+clock, or a tainted NAME?" — so a day derived from a CALL (`_now_iso()[:10]`, or
+`now = now or _now_iso()` then `now[:10]`) was structurally unreachable, and all three
+pre-existing planted-site proofs plant the SAME `datetime.now(timezone.utc).strftime(...)`
+shape, so none of them could ever have caught it. #2798's own PR body named that blindness
+in prose and shipped without closing it. Closing it (`_clock_returning_functions` /
+`_is_clock_fn_call` in the #2414 module, per-scope in `_taint_index`) immediately found a
+23rd site: `reading/reading_store.py`'s `or now[:10]` FALLBACK — live, in a package two
+consecutive slices had certified at zero, on the very line whose comment describes the
+frame it was violating. The instrument was the last thing anyone had audited.
+
+The vendor-instant face (`w["start_time"][:10]`) is deliberately still OUT of reach, and
+that is a measurement rather than an omission — see
+`test_a_blanket_ten_char_slice_ban_would_be_unlivable_and_is_deliberately_not_the_rule`.
+It belongs to the pair guard, not the shape guard.
+
 Run:  python3 -m pytest tests/test_utc_day_fleet_ratchet_2811.py -v
 """
 
@@ -117,7 +142,7 @@ from test_pacific_today_guard_2414 import (
     _is_naive_clock,
     _owner_name,
     _subtree_dirty,
-    _tainted_names,
+    _taint_index,
 )
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -147,6 +172,18 @@ SURFACE_PACKAGES = (
     "lambdas/reading",
     "lambdas/training",
     "lambdas/operational",
+    # #2811's own closing slice — the LAST five packages of the deployed tree
+    # outside #2414's stricter zero surface. `lambdas/health/` (8 sites),
+    # `lambdas/common/` (6), `lambdas/experiment/` (5), `lambdas/ai/` (3) and
+    # `lambdas/privacy/` (11 files, ALREADY at zero — it joins clean, which is
+    # worth having under the ratchet precisely so it stays that way).
+    # With these, `lambdas/` ex-`web/`+`content/` is fully scanned: the surface is
+    # now the whole deployed bundle minus the two packages that owe a stricter zero.
+    "lambdas/health",
+    "lambdas/common",
+    "lambdas/experiment",
+    "lambdas/ai",
+    "lambdas/privacy",
 )
 
 # ── THE RATCHET. Repo-relative file -> maximum day-semantics sites allowed. ──
@@ -173,12 +210,16 @@ def _surface_files() -> list[pathlib.Path]:
     return sorted(files)
 
 
-def _is_day_slice(node, tainted: set, aliases: dict) -> bool:
-    """`<utc/naive now>.isoformat()[:10]` / `str(<utc/naive now>)[:10]`.
+def _is_day_slice(node, tainted: set, aliases: dict, clock_fns: frozenset = frozenset()) -> bool:
+    """`<utc/naive now>.isoformat()[:10]` / `str(<utc/naive now>)[:10]` / `_now_iso()[:10]`.
 
     A ten-character prefix of an ISO-8601 rendering IS the calendar day — the same
     value `strftime("%Y-%m-%d")` produces, reached by a route #2414's matcher does
     not walk. Matched on the slice bound so `[:19]` (a timestamp) stays clean.
+
+    The `clock_fns` arm is #2811's second pass: `_now_iso()[:10]` and
+    `now = now or _now_iso()` → `now[:10]` are the shapes #2798 had to find BY HAND
+    because a slice of a CALL is never tainted by a name-based matcher.
     """
     if not isinstance(node, ast.Subscript):
         return False
@@ -187,7 +228,7 @@ def _is_day_slice(node, tainted: set, aliases: dict) -> bool:
         return False
     if not (isinstance(sl.upper, ast.Constant) and sl.upper.value == 10):
         return False
-    return _subtree_dirty(node.value, tainted, aliases)
+    return _subtree_dirty(node.value, tainted, aliases, clock_fns)
 
 
 def utc_day_semantics_sites(source: str, filename: str = "<source>") -> list[str]:
@@ -200,7 +241,7 @@ def utc_day_semantics_sites(source: str, filename: str = "<source>") -> list[str
     tree = ast.parse(source, filename=filename)
     lines = source.splitlines()
     aliases = _import_aliases(tree)
-    tainted = _tainted_names(tree, aliases)
+    clock_fns, tainted_at = _taint_index(tree, aliases)
     findings: list[str] = []
 
     def _exempt(lineno: int) -> bool:
@@ -217,6 +258,7 @@ def utc_day_semantics_sites(source: str, filename: str = "<source>") -> list[str
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             attr = node.func.attr
             owner = _owner_name(node.func.value, aliases)
+            tainted = tainted_at(node)
             # `date.today()` / `datetime.today()` — the naive clock that RETURNS a day.
             # `datetime.utcnow()` / a no-arg `datetime.now()` are naive clocks too, but
             # their value is an instant; they are findings only via a derivation below.
@@ -224,17 +266,17 @@ def utc_day_semantics_sites(source: str, filename: str = "<source>") -> list[str
                 _flag(node, "naive clock whose value IS a day")
                 continue
             if attr == "strftime" and node.args and _is_day_only_fmt(getattr(node.args[0], "value", None)):
-                if _subtree_dirty(node.func.value, tainted, aliases):
+                if _subtree_dirty(node.func.value, tainted, aliases, clock_fns):
                     _flag(node, "date-only strftime on a UTC/naive now")
-            elif attr == "date" and not node.args and _subtree_dirty(node.func.value, tainted, aliases):
+            elif attr == "date" and not node.args and _subtree_dirty(node.func.value, tainted, aliases, clock_fns):
                 _flag(node, ".date() on a UTC/naive now")
-            elif attr == "isocalendar" and _subtree_dirty(node.func.value, tainted, aliases):
+            elif attr == "isocalendar" and _subtree_dirty(node.func.value, tainted, aliases, clock_fns):
                 _flag(node, ".isocalendar() on a UTC/naive now")
         elif isinstance(node, ast.FormattedValue) and node.format_spec is not None:
             spec = "".join(str(v.value) for v in ast.walk(node.format_spec) if isinstance(v, ast.Constant))
-            if _is_day_only_fmt(spec) and _subtree_dirty(node.value, tainted, aliases):
+            if _is_day_only_fmt(spec) and _subtree_dirty(node.value, tainted_at(node), aliases, clock_fns):
                 _flag(node, "date-only f-string format on a UTC/naive now")
-        elif isinstance(node, ast.Subscript) and _is_day_slice(node, tainted, aliases):
+        elif isinstance(node, ast.Subscript) and _is_day_slice(node, tainted_at(node), aliases, clock_fns):
             _flag(node, "[:10] day slice of a UTC/naive now")
     return findings
 
@@ -272,6 +314,11 @@ def test_surface_is_derived_and_covers_every_scoped_package():
         "lambdas/reading/reading_store.py",  # #2798 — the session-`date` writer of pair 1
         "lambdas/training/exercise_history.py",  # #2798 — bounds its window off the routine day
         "lambdas/operational/hevy_routine_cron_lambda.py",  # #2798 — the other author of `target_date`
+        "lambdas/health/character_engine.py",  # #2811 close — 3 sites, the heaviest of the five
+        "lambdas/common/qa_archive.py",  # #2811 close — the archive DAY partition
+        "lambdas/experiment/eyeball_calibration.py",  # #2811 close — 4 sites, an ESTIMATE#/GRADE# write key
+        "lambdas/ai/grounding_gate_params.py",  # #2811 close — the one ruled exemption
+        "lambdas/privacy/diary_publish.py",  # #2811 close — the package that joined already clean
     ):
         assert expected in rels, f"derived surface lost {expected}"
 
@@ -334,10 +381,10 @@ def test_residue_is_exactly_the_measured_coordination_debt():
     number with no partner named is a baseline, and this test exists to say so out loud.
     """
     assert _UTC_DAY_RESIDUE == {}, (
-        "The #2811/#2817/#2798 surface is SEVEN packages at ZERO: compute, ingestion, "
-        "coach, intelligence, emails, mcp, reading, training and operational (the mcp/ "
-        "residue was paid off in #2798 by converting each pair's writer at the same "
-        "time).\n"
+        "The #2811/#2817/#2798 surface is FOURTEEN packages at ZERO: compute, ingestion, "
+        "coach, intelligence, emails, mcp, reading, training, operational, health, "
+        "common, experiment, ai and privacy — i.e. the whole deployed bundle except "
+        "lambdas/web/ + lambdas/content/, which owe #2414's stricter zero.\n"
         "A non-empty map means either a new two-sided coordination debt (name the writer, "
         "the package it lives in, and why it cannot move in this change) or a site that "
         "was baselined instead of fixed. Fix it, or mark it "
@@ -422,6 +469,65 @@ def test_the_billing_calendar_exemption_is_the_only_2798_one_and_is_reasoned():
         "#2798's exemption ruling was: exactly one genuinely-UTC file (the billing "
         "calendar). A new `# utc-exempt(#2798)` site is a NEW ruling — give it its own "
         "issue number so the reason is attributable. Currently marked:\n" + "\n".join(marked)
+    )
+
+
+def test_no_utc_day_site_survives_in_the_2811_closing_packages():
+    """#2811's own acceptance, said in one sentence for the next reader.
+
+    `lambdas/health/` (8 sites), `lambdas/common/` (6), `lambdas/experiment/` (5),
+    `lambdas/ai/` (3) and `lambdas/privacy/` (0 — it joined clean) are the LAST
+    packages of the deployed tree outside #2414's stricter zero. With them the
+    scanned surface is `lambdas/` ex-`web/`+`content/`, plus `mcp/`: every module
+    that ships in the bundle is now under one of the two guards.
+
+    The heavy ones are all defaults rather than direct reads, which is why they
+    outlived four earlier slices: `data.get("date", <utc today>)`,
+    `ref_dt or <utc now>`, `now or <utc now>`. A default argument is still a clock.
+    """
+    counts = _measure()
+    closing = ("lambdas/health/", "lambdas/common/", "lambdas/experiment/", "lambdas/ai/", "lambdas/privacy/")
+    offenders = sorted(rel for rel in counts if rel.startswith(closing) and rel not in _UTC_DAY_RESIDUE)
+    assert not offenders, (
+        "The #2811 closing packages were swept to the Pacific frame (8 + 6 + 5 + 3 + 0 "
+        "sites), with the grounding gate's fail-soft degrade the only ruled exemption. "
+        "These files regrew a UTC day:\n" + "\n".join(offenders)
+    )
+
+
+def test_the_grounding_gate_degrade_path_is_the_only_2811_closing_exemption():
+    """#2811's closing slice ruled exactly ONE site genuinely-UTC, and it is not a
+    frame choice at all — it is the handler for the frame module being unavailable.
+
+    `ai/grounding_gate_params.py` tries `common.pacific_time.pacific_today()` first
+    and falls back to the naive clock only when that import raises. "Use
+    pacific_time" is therefore not a remedy on this branch: it is the branch that
+    runs when that call is what failed. The gate must never take a narrative
+    surface down (#1691), so it degrades rather than raising.
+
+    The test pins three things a future edit could quietly break: the marker, its
+    stated reason, that the PACIFIC path is still attempted FIRST — and that this
+    is still the only `#2811` exemption in the five closing packages, so a second
+    ruling has to arrive in a diff with its own argument.
+    """
+    rel = "lambdas/ai/grounding_gate_params.py"
+    src = (ROOT / rel).read_text(encoding="utf-8")
+    assert "utc-exempt(#2811)" in src, f"{rel} lost its #2811 fail-soft exemption marker"
+    assert "fail-soft degrade" in src, f"{rel}'s #2811 exemption lost its stated reason"
+    assert "pacific_today" in src, f"{rel} must still TRY the Pacific frame before degrading — that is the reason"
+    assert src.index("pacific_today") < src.index("utc-exempt(#2811)"), "the Pacific attempt must come BEFORE the degrade"
+
+    closing = ("lambdas/health/", "lambdas/common/", "lambdas/experiment/", "lambdas/ai/", "lambdas/privacy/")
+    marked = sorted(
+        str(p.relative_to(ROOT))
+        for p in _surface_files()
+        if str(p.relative_to(ROOT)).startswith(closing) and "utc-exempt(#2811)" in p.read_text(encoding="utf-8")
+    )
+    assert marked == [rel], (
+        "#2811's closing ruling was: exactly one genuinely-UTC site in the five "
+        "packages, and it is a fail-soft degrade rather than a calendar. A new "
+        "`# utc-exempt(#2811)` site here is a NEW ruling — give it its own issue "
+        "number so the reason is attributable. Currently marked:\n" + "\n".join(marked)
     )
 
 
@@ -524,6 +630,140 @@ def test_a_planted_site_reds_the_guard_in_the_2798_packages_too():
         assert utc_day_semantics_sites(src, filename=rel) == [], f"precondition: {rel} is clean today"
         planted = src + '\n\n_PLANTED = datetime.now(timezone.utc).strftime("%Y-%m-%d")\n'
         assert len(utc_day_semantics_sites(planted, filename=rel)) == 1, f"the guard would not fire on {rel}"
+
+
+def test_a_day_slice_of_a_CALL_fires_the_matcher_blindness_proof():
+    """THE PROOF THE CLOSING SLICE TURNS ON. Read this before trusting a green run.
+
+    Session D's audit of this file found that `_is_day_slice` bottoms out in
+    `_subtree_dirty`, which only ever asked "does this subtree contain a literal
+    clock, or a tainted NAME?". A `[:10]` slice of a CALL satisfies neither, so it
+    was structurally unreachable — and all three planted-site proofs below plant the
+    same `datetime.now(timezone.utc).strftime(...)` shape, so none of them could
+    have caught it. The 22 sites this slice was scoped against were a FLOOR.
+
+    Every case here returns 0 findings against the pre-#2811 matcher and 1 after it,
+    which is the difference between a guard and a decoration. The middle case is not
+    hypothetical: it is `reading/reading_store.log_session`, which survived #2817 AND
+    #2798 with both slices reporting `lambdas/reading/` at zero.
+    """
+    for src, why in (
+        ("def _now_iso():\n    return datetime.now(timezone.utc).isoformat()\nday = _now_iso()[:10]\n", "inline call slice"),
+        (
+            "def _now_iso():\n"
+            "    return datetime.now(timezone.utc).isoformat()\n\n\n"
+            "def log(now=None):\n"
+            "    now = now or _now_iso()\n"
+            "    return now[:10]\n",
+            "the reading_store shape: bound, then sliced",
+        ),
+        (
+            "class C:\n"
+            "    def _stamp(self):\n"
+            "        return datetime.now(timezone.utc).isoformat()\n\n"
+            "    def day(self):\n"
+            "        return self._stamp()[:10]\n",
+            "self.<helper>() slice",
+        ),
+    ):
+        assert len(utc_day_semantics_sites(src)) == 1, f"matcher still blind to the {why} face"
+
+
+def test_the_call_taint_does_not_flag_a_stored_DATE_key_in_another_scope():
+    """The blindness fix's own judgment test, drawn from the live tree.
+
+    `lambdas/compute/episode_detect_lambda.py` has `build_episode_record` binding
+    `item = {..., "computed_at": _now_iso()}` and a separate `_sk_date(item)` that
+    slices the stored `DATE#` sort key off its own PARAMETER. A file-wide taint
+    (the first implementation tried here) flags that second function — correct code,
+    on a DATE# key that is ALREADY a Pacific day. Measured, it also flagged
+    `datetime.strptime(...)` parses and plain list truncations across the fleet.
+
+    So the helper-call taint is scoped to the function that bound it. This test is
+    what stops a future "simplification" back to the file-wide form, and it runs
+    against the real module rather than a sketch of it.
+    """
+    rel = "lambdas/compute/episode_detect_lambda.py"
+    src = (ROOT / rel).read_text(encoding="utf-8")
+    assert "_now_iso()" in src and "_sk_date" in src, f"{rel} no longer carries the shape this test is about"
+    assert utc_day_semantics_sites(src, filename=rel) == [], (
+        "helper-call taint leaked across function scopes — a `DATE#` key normalisation "
+        "in one function is being read as a clock because ANOTHER function stamps a "
+        "record with one. An over-firing guard gets muted; keep the taint scoped."
+    )
+
+
+def test_a_blanket_ten_char_slice_ban_would_be_unlivable_and_is_deliberately_not_the_rule():
+    """WHY THE SLICE FACE STILL NEEDS A CLOCK, stated as a measurement.
+
+    The obvious "fix" for the vendor-instant blind spot (`w["start_time"][:10]`) is
+    to flag EVERY `[:10]` slice and let the exemption valve absorb the rest. It is
+    not viable, and the number is the argument: the scanned surface carries well
+    over a hundred `[:10]` slices, and the overwhelming majority are
+    `sk.replace("DATE#", "")[:10]` normalisations of a key that is ALREADY a Pacific
+    day, or plain list truncations (`failed_ids[:10]`). A rule needing a hundred
+    exemptions is a rule nobody reads.
+
+    So the slice face keeps requiring a provable clock, and the vendor-instant class
+    stays OUT of this shape guard's reach ON PURPOSE. That class is caught by
+    `tests/test_pt_day_pair_contracts_2798.py`, which drives a writer and its reader
+    at one PT-evening instant — a shape guard is not a pair guard (#2798), and this
+    test exists so the next author does not "fix" the shape guard into uselessness
+    trying to make it into one.
+    """
+    import ast as _ast
+
+    total, list_like = 0, 0
+    for path in _surface_files():
+        try:
+            tree = _ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:  # pragma: no cover — the tree parses today
+            continue
+        for node in _ast.walk(tree):
+            if not (isinstance(node, _ast.Subscript) and isinstance(node.slice, _ast.Slice)):
+                continue
+            sl = node.slice
+            if sl.lower is None and sl.step is None and isinstance(sl.upper, _ast.Constant) and sl.upper.value == 10:
+                total += 1
+                if "DATE#" in _ast.unparse(node):
+                    list_like += 1
+    assert total >= 100, f"only {total} `[:10]` slices found — re-check the claim before trusting the rule below"
+    assert list_like >= 20, f"only {list_like} of {total} slices are DATE#-key normalisations — the ratio argument needs re-measuring"
+    assert len(_measure()) == 0, "and with the clock requirement in place the whole surface is still at zero"
+
+
+def test_a_planted_site_reds_the_guard_in_the_2811_closing_packages_too():
+    """The closing slice's half of the mutation proof — one REAL file per new package.
+
+    Widening `SURFACE_PACKAGES` is the whole change on the guard side, and a widened
+    glob that quietly matches nothing reports green forever. Per-package means
+    dropping ONE of the five from the tuple cannot pass — including
+    `lambdas/privacy/`, which joined at zero and would otherwise be the easiest
+    package in the repo to lose without anyone noticing.
+
+    Two shapes are planted, not one: the classic `strftime` face (which every
+    earlier proof used) and the `[:10]`-slice-of-a-CALL face this slice added. A
+    proof that only plants shapes the matcher already caught is how the blindness
+    survived four slices in the first place.
+    """
+    surface = {str(p.relative_to(ROOT)) for p in _surface_files()}
+    for rel in (
+        "lambdas/health/weight_trend.py",
+        "lambdas/common/quarter_utils.py",
+        "lambdas/experiment/effect_fitter.py",
+        "lambdas/ai/platform_memory.py",
+        "lambdas/privacy/diary_publish.py",
+    ):
+        assert rel not in _UTC_DAY_RESIDUE
+        assert rel in surface, f"{rel} is not on the scanned surface"
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        assert utc_day_semantics_sites(src, filename=rel) == [], f"precondition: {rel} is clean today"
+        strftime_planted = src + '\n\n_PLANTED = datetime.now(timezone.utc).strftime("%Y-%m-%d")\n'
+        assert len(utc_day_semantics_sites(strftime_planted, filename=rel)) == 1, f"the guard would not fire on {rel}"
+        call_planted = (
+            src + "\n\ndef _planted_now():\n    return datetime.now(timezone.utc).isoformat()\n\n\n_PLANTED = _planted_now()[:10]\n"
+        )
+        assert len(utc_day_semantics_sites(call_planted, filename=rel)) == 1, f"the CALL-slice face would not fire on {rel}"
 
 
 def test_the_residue_files_are_frozen_not_forgotten():

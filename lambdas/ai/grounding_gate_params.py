@@ -60,6 +60,15 @@ def cycle_gate_params(generation_date_iso: Optional[str] = None) -> Dict[str, An
 
             generation_date_iso = pacific_today()
         except Exception:  # noqa: BLE001 — same fail-soft contract: degrade to UTC, never take the surface down
+            # THE ONE #2811 EXEMPTION IN `lambdas/ai/`, and the reason it cannot be a
+            # fix: every other site in this sweep converts by CALLING
+            # `common.pacific_time`. This branch is the handler for that module being
+            # unimportable, so "call it instead" is not a remedy available here — it is
+            # the code that runs when exactly that call is what failed. A grounding gate
+            # must never be the thing that takes a narrative surface down (#1691), so it
+            # degrades to the naive clock rather than raising. Unreachable while the
+            # bundle is intact.
+            # utc-exempt(#2811): fail-soft degrade — pacific_time is unimportable on this path
             generation_date_iso = _date.today().isoformat()
     return {
         "generation_date_iso": generation_date_iso,

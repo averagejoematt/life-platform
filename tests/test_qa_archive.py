@@ -31,19 +31,46 @@ from experiment import eval_retention  # noqa: E402
 
 NOW = datetime(2026, 7, 20, 14, 30, 5, tzinfo=timezone.utc)
 
+# #2811 — the archive's DAY (and the time segment beside it) is the PACIFIC rendering
+# of the instant. Expectations are computed through the module's OWN frame rather than
+# hand-typed, so a fixture can never quietly encode the frame the code is being fixed
+# out of. `_PT_DAY`/`_PT_HMS` are what `build_key` must produce for `NOW`.
+_PT = NOW.astimezone(qa_archive.PACIFIC)
+_PT_DAY = _PT.strftime("%Y-%m-%d")
+_PT_HMS = _PT.strftime("%H%M%S")
+
 
 # ── build_key ─────────────────────────────────────────────────────────────────
 
 
 def test_build_key_is_date_first_under_text_prefix():
     key = qa_archive.build_key("chronicle", now=NOW)
-    assert key.startswith("generated/qa_archive/text/2026-07-20/chronicle--143005--")
+    assert key.startswith(f"generated/qa_archive/text/{_PT_DAY}/chronicle--{_PT_HMS}--")
     assert key.endswith(".json")
 
 
 def test_build_key_includes_variant_segment():
     key = qa_archive.build_key("coach_brief", variant="sleep", now=NOW)
-    assert "/2026-07-20/coach_brief--sleep--143005--" in key
+    assert f"/{_PT_DAY}/coach_brief--sleep--{_PT_HMS}--" in key
+
+
+def test_build_key_and_body_agree_on_the_pacific_day_after_17_00_pt():
+    """#2811 — the whole reason this module moved frames, at an instant where the two
+    calendars DISAGREE (so the test cannot go vacuously green like the 14:30Z one).
+
+    2026-07-21T02:30Z is 2026-07-20 19:30 PT. A generation published on the PT evening
+    of the 20th belongs in the 20th's review-pack day, and its body must say the same
+    day its own key partitions on. `archived_at` stays the raw instant — frame-free.
+    """
+    evening = datetime(2026, 7, 21, 2, 30, 0, tzinfo=timezone.utc)
+    assert evening.astimezone(qa_archive.PACIFIC).strftime("%Y-%m-%d") == "2026-07-20"
+    assert evening.strftime("%Y-%m-%d") == "2026-07-21", "precondition: the calendars must disagree here"
+
+    key = qa_archive.build_key("chronicle", now=evening)
+    body = qa_archive.build_body("chronicle", "text", now=evening)
+    assert key.startswith("generated/qa_archive/text/2026-07-20/")
+    assert body["date"] == "2026-07-20"
+    assert body["archived_at"] == evening.isoformat()
 
 
 def test_build_key_sanitizes_hostile_segments():

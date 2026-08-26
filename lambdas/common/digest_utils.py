@@ -28,6 +28,8 @@ from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny p
 from ingestion.source_registry import stale_hours_overrides  # #2235: one staleness threshold, not three copies
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
+from common.pacific_time import pacific_now  # #2811: the Banister decay walks PACIFIC days
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE SCALAR HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -475,7 +477,10 @@ def compute_banister_from_dict(strava_60d_dict):
     Dict keys must be YYYY-MM-DD date strings. Activities are deduped, then
     scored on the shared TSS-like scale (training_load, #490).
     """
-    today = datetime.now(timezone.utc).date()
+    # #2811 — the dict's keys ARE `DATE#` days (Pacific), and `_banister_core` walks
+    # backwards from `today` over them. A UTC "today" after 17:00 PT started the decay
+    # loop on a day with no row, silently reporting a zero-load day into CTL/ATL/TSB.
+    today = pacific_now().date()
     load = {}
     for date_str, r in strava_60d_dict.items():
         day_acts = dedup_activities(r.get("activities", []))

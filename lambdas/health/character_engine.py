@@ -26,12 +26,14 @@ v1.3.0 — 2026-07-10  (#913 neglect honesty: up-gate compares raw to the TARGET
 import json
 import logging
 import math
+import statistics  # #2811 fold: was imported function-locally twice, paying for this slice's lines
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.pacific_time import pacific_today  # #2811: the character sheet's DAY is the Pacific day
 
 logger = logging.getLogger(__name__)
 
@@ -397,8 +399,6 @@ def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[flo
                 pass
 
     if len(onset_minutes) >= 3:
-        import statistics
-
         std = statistics.stdev(onset_minutes)
         scores["onset_consistency"] = _deviation_score(std, ideal=0, worst=120)
     else:
@@ -614,7 +614,8 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
 
     # Lab biomarkers (with decay)
     labs_latest = data.get("labs_latest") or {}
-    compute_date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    # #2811 — the DEFAULT is the defect: it decided the lab-DECAY reference day, in UTC.
+    compute_date = data.get("date", pacific_today())
     scores["lab_biomarkers"] = _compute_lab_score(labs_latest, compute_date, components.get("lab_biomarkers", {}))
 
     # Blood pressure
@@ -982,8 +983,6 @@ def compute_consistency_raw(
     # Cross-pillar variance
     other_scores = [v for k, v in other_pillar_raw_scores.items() if k != "consistency" and v is not None]
     if len(other_scores) >= 3:
-        import statistics
-
         std = statistics.stdev(other_scores)
         scores["cross_pillar_variance"] = _deviation_score(std, ideal=0, worst=30)
     else:
@@ -1701,7 +1700,8 @@ def compute_character_sheet(
     data: dict[str, Any], previous_day_state: Optional[dict[str, Any]], raw_score_histories: dict[str, list[float]], config: dict[str, Any]
 ) -> dict[str, Any]:
     """Compute the full character sheet for a single day."""
-    compute_date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    # #2811 — same default; this one feeds `_day_number` off the Pacific genesis anchor.
+    compute_date = data.get("date", pacific_today())
     experiment_start = config.get("experiment_start", EXPERIMENT_START_DATE)
     try:
         _day_number = max(1, (datetime.strptime(compute_date, "%Y-%m-%d") - datetime.strptime(experiment_start, "%Y-%m-%d")).days + 1)

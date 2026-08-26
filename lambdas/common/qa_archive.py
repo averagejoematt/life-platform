@@ -56,6 +56,8 @@ import re
 import uuid
 from datetime import datetime, timezone
 
+from common.pacific_time import PACIFIC  # #2811: the archive's DAY partition is a Pacific day
+
 logger = logging.getLogger()
 
 BUCKET = os.environ.get("BUCKET_NAME", "matthew-life-platform")
@@ -101,12 +103,17 @@ def build_key(surface, variant=None, now=None):
     """Pure: the S3 key for one archived generation. Date-first so the D3 review
     pack lists a week with 7 prefix listings across ALL surfaces."""
     now = now or datetime.now(timezone.utc)
+    # #2811 — the key's DAY is what `list_day()` and the D3 review pack index on, and
+    # "a week" there has to be the platform's week. The instant stays whatever the
+    # caller passed; only its rendering is re-framed, and BOTH halves of the key are
+    # re-framed together so a key can never carry a Pacific day beside a UTC time.
+    local = now.astimezone(PACIFIC)
     parts = [_clean_segment(surface)]
     if variant:
         parts.append(_clean_segment(variant))
-    parts.append(now.strftime("%H%M%S"))
+    parts.append(local.strftime("%H%M%S"))
     parts.append(uuid.uuid4().hex[:8])
-    return f"{TEXT_PREFIX}{now.date().isoformat()}/{'--'.join(parts)}.json"
+    return f"{TEXT_PREFIX}{local.date().isoformat()}/{'--'.join(parts)}.json"
 
 
 def build_body(surface, text, meta=None, variant=None, now=None):
@@ -117,7 +124,10 @@ def build_body(surface, text, meta=None, variant=None, now=None):
         "schema": 1,
         "surface": surface,
         "variant": variant,
-        "date": now.date().isoformat(),
+        # #2811 — `date` must be the same Pacific day `build_key` partitions on, or the
+        # body and its own key disagree about which day the generation belongs to.
+        # `archived_at` stays the raw INSTANT: an instant is frame-free, only a day isn't.
+        "date": now.astimezone(PACIFIC).date().isoformat(),
         "archived_at": now.isoformat(),
         "text": (text or "")[:_TEXT_CAP],
         "meta": meta or {},
