@@ -86,7 +86,8 @@
       "Effect": "Allow",
       "Action": [
         "dynamodb:GetItem",
-        "dynamodb:Query"
+        "dynamodb:Query",
+        "dynamodb:DescribeTimeToLive"
       ],
       "Resource": "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform"
     },
