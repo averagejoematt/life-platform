@@ -627,7 +627,31 @@ def _mcp_tool_counts() -> tuple[int, int]:
 CONTRACT_REGISTRY_PATH = ROOT / "tests" / "pair_contract_registry.py"
 
 
-def extract_contracts() -> list[dict]:
+CONTRACT_FIELDS = ("name", "producer", "consumer", "partition", "mutations", "note", "floor", "enrolled")
+
+
+def _contract_floor(tree: ast.AST) -> tuple[tuple[str, ...], int]:
+    """The registry's own floor declarations: ``KNOWN_MUST_AGREE_PAIRS`` + ``ENROLLED_FLOOR``.
+
+    These are what make the plane a registry of pairs this platform KNOWS must agree
+    (#2847 box 2) rather than a list of whatever happens to be enrolled today: the
+    tuple only ever grows, and the int is the ratchet. Both are module-level literal
+    assignments, so both lift by AST like every other authority in this generator.
+    """
+    known: tuple[str, ...] = ()
+    ratchet = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if "KNOWN_MUST_AGREE_PAIRS" in targets and isinstance(node.value, (ast.Tuple, ast.List)):
+            known = tuple(e.value for e in node.value.elts if isinstance(e, ast.Constant) and isinstance(e.value, str))
+        if "ENROLLED_FLOOR" in targets and isinstance(node.value, ast.Constant) and isinstance(node.value.value, int):
+            ratchet = node.value.value
+    return known, ratchet
+
+
+def extract_contracts() -> tuple[list[dict], int]:
     """The #2847 producer/consumer contract plane — the pairs that must agree.
 
     AST over ``tests/pair_contract_registry.py``, never an import: the generator's
@@ -639,10 +663,16 @@ def extract_contracts() -> list[dict]:
     test-side wiring — it names a producer, a consumer, and the mutations that must
     red on both — but WHICH pairs are contracted is a platform fact, so it belongs
     in the model. Only the literal string kwargs are lifted.
+
+    The plane is the union of the ENROLLED pairs and the KNOWN floor (#2847 box 2), so a
+    floor name whose registry entry rotted away is VISIBLE in the artifact as
+    ``enrolled: false`` rather than only red in a test. Returns the plane plus the
+    ``ENROLLED_FLOOR`` ratchet.
     """
     if not CONTRACT_REGISTRY_PATH.is_file():
-        return []
+        return [], 0
     tree = ast.parse(CONTRACT_REGISTRY_PATH.read_text(encoding="utf-8"), filename=str(CONTRACT_REGISTRY_PATH))
+    known, ratchet = _contract_floor(tree)
     out: list[dict] = []
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "PairContract"):
@@ -657,8 +687,27 @@ def extract_contracts() -> list[dict]:
         fields["mutations"] = sum(
             1 for kw in node.keywords if kw.arg == "mutations" and isinstance(kw.value, (ast.Tuple, ast.List)) for _ in kw.value.elts
         )
-        out.append({k: fields.get(k) for k in ("name", "producer", "consumer", "partition", "mutations", "note")})
-    return sorted(out, key=lambda c: c["name"])
+        fields["floor"] = fields["name"] in known
+        fields["enrolled"] = True
+        out.append({k: fields.get(k) for k in CONTRACT_FIELDS})
+    declared = {c["name"] for c in out}
+    for name in known:
+        if name in declared:
+            continue
+        # A floor name with no live PairContract — the "registry quietly rotted" state.
+        out.append(
+            {
+                "name": name,
+                "producer": None,
+                "consumer": None,
+                "partition": None,
+                "mutations": 0,
+                "note": "",
+                "floor": True,
+                "enrolled": False,
+            }
+        )
+    return sorted(out, key=lambda c: c["name"]), ratchet
 
 
 def build_model() -> dict:
@@ -666,7 +715,7 @@ def build_model() -> dict:
     alarms = extract_alarms()
     partitions = extract_partitions()
     edges, edge_stats = extract_edges(lambdas)
-    contracts = extract_contracts()
+    contracts, contract_ratchet = extract_contracts()
     tool_count, tool_modules = _mcp_tool_counts()
 
     scheduled = {n: r for n, r in lambdas.items() if r["schedules"]}
@@ -681,7 +730,10 @@ def build_model() -> dict:
                 "alarms": "cdk/stacks/*.py alarm_name= declarations (AST) + variable-traced SNS routing",
                 "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) × lambdas/ingestion/source_registry facets",
                 "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
-                "contracts": "tests/pair_contract_registry.py PairContract(...) declarations (AST) — the #2847 enrolled producer/consumer pairs",
+                "contracts": (
+                    "tests/pair_contract_registry.py (AST) — PairContract(...) declarations for the #2847 enrolled pairs, "
+                    "unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR"
+                ),
             },
             "counts": {
                 "lambdas": len(lambdas),
@@ -690,6 +742,9 @@ def build_model() -> dict:
                 "partitions": len(partitions),
                 "edges": len(edges),
                 "contracts": len(contracts),
+                "contracts_enrolled": sum(1 for c in contracts if c["enrolled"]),
+                "contracts_known": sum(1 for c in contracts if c["floor"]),
+                "contracts_ratchet": contract_ratchet,
                 "mcp_tools": tool_count,
                 "mcp_tool_modules": tool_modules,
             },
@@ -703,7 +758,7 @@ def build_model() -> dict:
                 "privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled",
                 "helper-default error alarms (ingestion-error-<fn>) are not enumerated — the alarms plane matches the #2844 vocabulary (explicit alarm_name declarations)",
                 "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)",
-                "the contracts plane lists ENROLLED pairs (#2847), not every must-agree pair — without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is a floor + ratchet in tests/test_pair_contract_sweep_2847.py",
+                "the contracts plane lists the KNOWN pairs (#2847 — the enrolled contracts unioned with the KNOWN_MUST_AGREE_PAIRS floor), not every must-agree pair on the platform — without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is the counts.contracts_ratchet floor plus the ratchets in tests/test_pair_contract_sweep_2847.py",
             ],
         },
         "lambdas": lambdas,
@@ -797,17 +852,22 @@ def render_doc(model: dict) -> str:
     add("")
     add("## 4b. Producer/Consumer Contracts (#2847)")
     add("")
-    add("Pairs enrolled in the contract sweep: the real producer's output is round-tripped")
-    add("through the real consumer, then a disagreement is injected into BOTH sides")
-    add("(`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is one registry entry in")
-    add("`tests/pair_contract_registry.py`. This lists what IS contracted — see `meta.scope_cuts`")
-    add("for why it is not a census of every must-agree pair.")
+    add("The registry of pairs this platform KNOWS must agree (#2847 box 2). For each, the real")
+    add("producer's output is round-tripped through the real consumer, then a disagreement is")
+    add("injected into BOTH sides (`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is")
+    add("one registry entry in `tests/pair_contract_registry.py`. **Floor** = named in")
+    add("`KNOWN_MUST_AGREE_PAIRS` (only ever grows); **Enrolled** = a live `PairContract` backs it —")
+    add(f"a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = {counts['contracts_ratchet']}.")
+    add("See `meta.scope_cuts` for why this is not a census of every must-agree pair.")
     add("")
-    add("| Pair | Producer | Consumer | Partition | Mutations |")
-    add("|------|----------|----------|-----------|-----------|")
+    add("| Pair | Producer | Consumer | Partition | Mutations | Floor | Enrolled |")
+    add("|------|----------|----------|-----------|-----------|-------|----------|")
     for rec in model.get("contracts", []):
         part = f"`{rec['partition']}`" if rec.get("partition") else "—"
-        add(f"| {rec['name']} | `{rec['producer']}` | `{rec['consumer']}` | {part} | {rec['mutations']} |")
+        producer = f"`{rec['producer']}`" if rec.get("producer") else "—"
+        consumer = f"`{rec['consumer']}`" if rec.get("consumer") else "—"
+        flags = ("yes" if rec.get("floor") else "no", "yes" if rec.get("enrolled") else "**no**")
+        add(f"| {rec['name']} | {producer} | {consumer} | {part} | {rec['mutations']} | {flags[0]} | {flags[1]} |")
     add("")
     add("## 5. Alarms + Routing")
     add("")

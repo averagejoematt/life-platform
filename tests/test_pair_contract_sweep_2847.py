@@ -66,6 +66,24 @@ overlap on contracted partitions by design; ratchet 3 is the strict subset with 
 bar. Enrolling a pair HERE removes rows from THAT ledger, which is the link that makes the
 seam guard an enforcement of this registry rather than a bystander standing beside it.
 
+BOX 2 ("the registry of known pairs lives in the system model")
+---------------------------------------------------------------
+``scripts/generate_platform_model.py::extract_contracts`` lifts this registry into the
+#2845 model's ``contracts`` plane by AST — the enrolled ``PairContract(...)`` declarations
+UNIONED with the ``KNOWN_MUST_AGREE_PAIRS`` floor, each row flagged ``floor`` / ``enrolled``,
+with ``ENROLLED_FLOOR`` carried as ``meta.counts.contracts_ratchet``. So the committed
+``model/platform_model.json`` (and its ``docs/DEPENDENCY_GRAPH.md`` §4b rendering) is the
+readable index of which pairs this platform knows must agree, and a floor name whose
+registry entry rotted away is visible in the ARTIFACT as ``enrolled: false``.
+
+``test_platform_model_drift.py`` keeps that artifact byte-current against a fresh
+regeneration; what it cannot catch is a projection that regenerates FAITHFULLY into
+something wrong (an extractor that quietly stopped lifting ``mutations`` would regenerate,
+commit clean, and stay green forever). ``_contract_plane_findings`` therefore joins the
+committed plane to the LIVE registry objects field by field, and is mutation-proved in
+both directions — ten single-field corruptions of the real committed model, plus a
+registry and a floor that grow past it.
+
 Plus the #2640 blind-green guards: the derivation must be non-vacuous, and every
 registered ``partition`` must be a real modeled partition with both a writer and a
 cross-module reader — so a registry entry cannot name a fiction.
@@ -81,6 +99,7 @@ Run:  python3 -m pytest tests/test_pair_contract_sweep_2847.py -v
 """
 
 import collections
+import copy
 import json
 import os
 import sys
@@ -299,20 +318,191 @@ def test_every_registered_partition_is_a_real_contracted_partition():
     assert not bogus, "registry entr(ies) naming a partition the #2845 model cannot ground:\n" + "\n".join(bogus)
 
 
-def test_the_enrolled_set_is_visible_in_the_system_model():
-    """#2847 acceptance: the registry of known pairs lives in the system model.
+# ══════════════════════════════════════════════════════════════════════════════
+# Box 2 — the registry of known pairs LIVES IN the #2845 system model
+#
+# The generator lifts the literal declarations out of tests/pair_contract_registry.py
+# by AST (never by import — the model's stated method: the entries carry live test
+# closures the generator must never construct). The plane is the union of the ENROLLED
+# PairContract(...) declarations and the KNOWN_MUST_AGREE_PAIRS floor, so a floor name
+# whose registry entry rotted away shows up in the ARTIFACT as `enrolled: false` rather
+# than only as a red test.
+#
+# test_platform_model_drift.py keeps the committed model byte-current against a fresh
+# regeneration. What THAT cannot catch is a projection that regenerated faithfully into
+# something wrong — an extractor that quietly stopped lifting `mutations`, or a floor
+# tuple the plane no longer reflects, would regenerate, commit clean, and stay green.
+# So the join is checked here against the LIVE registry objects, field by field, and the
+# checker is mutation-proved below on the real committed model.
+# ══════════════════════════════════════════════════════════════════════════════
 
-    The generator lifts the literal declarations out of tests/pair_contract_registry.py
-    by AST (never by import — the model's stated method), so the committed model is the
-    readable index of which pairs are contracted. test_platform_model_drift.py keeps it
-    byte-current; this asserts the two agree on the SET.
+
+def _contract_plane_findings(model, registry, known, ratchet):
+    """Every disagreement between the model's contracts plane and the live registry.
+
+    Returns a list of human-readable findings — empty means the model IS the registry.
+    Pure over its four arguments so the mutation proofs can drive it with perturbed
+    copies of the real committed model.
     """
-    contracts = _model().get("contracts")
-    assert contracts, "the model has no `contracts` plane — regenerate: python3 scripts/generate_platform_model.py"
-    assert {c["name"] for c in contracts} == {p.name for p in PAIR_CONTRACT_REGISTRY}, (
-        "the model's contracts plane and the live registry disagree about which pairs are enrolled — "
-        "run: python3 scripts/generate_platform_model.py and commit the result"
+    plane = model.get("contracts") or []
+    counts = (model.get("meta") or {}).get("counts") or {}
+    findings = []
+    if not plane:
+        findings.append("the model has no `contracts` plane at all")
+        return findings
+
+    by_name = {}
+    for rec in plane:
+        if rec["name"] in by_name:
+            findings.append(f"{rec['name']}: duplicated in the model's contracts plane")
+        by_name[rec["name"]] = rec
+
+    expected = {p.name for p in registry} | set(known)
+    for name in sorted(expected - set(by_name)):
+        findings.append(f"{name}: known/enrolled in the registry but ABSENT from the model plane")
+    for name in sorted(set(by_name) - expected):
+        findings.append(f"{name}: in the model plane but neither enrolled nor on the floor")
+
+    for pair in registry:
+        rec = by_name.get(pair.name)
+        if rec is None:
+            continue
+        for field, live in (("producer", pair.producer), ("consumer", pair.consumer), ("partition", pair.partition)):
+            if rec.get(field) != live:
+                findings.append(f"{pair.name}: model {field}={rec.get(field)!r} but the registry says {live!r}")
+        if rec.get("mutations") != len(pair.mutations):
+            findings.append(f"{pair.name}: model records {rec.get('mutations')} mutation(s), the registry declares {len(pair.mutations)}")
+        if rec.get("enrolled") is not True:
+            findings.append(f"{pair.name}: enrolled in the registry but the model marks it enrolled={rec.get('enrolled')!r}")
+
+    for name, rec in sorted(by_name.items()):
+        if rec.get("floor") is not (name in known):
+            findings.append(f"{name}: model floor={rec.get('floor')!r} but KNOWN_MUST_AGREE_PAIRS membership is {name in known}")
+        if not rec.get("enrolled") and rec.get("floor"):
+            findings.append(f"{name}: on the KNOWN floor with NO live PairContract — the registry entry rotted away")
+
+    for key, live in (
+        ("contracts_enrolled", len(registry)),
+        ("contracts_known", len(set(known))),
+        ("contracts_ratchet", ratchet),
+    ):
+        if counts.get(key) != live:
+            findings.append(f"meta.counts.{key}={counts.get(key)!r} but the registry says {live!r}")
+    return findings
+
+
+def test_the_known_pair_registry_lives_in_the_system_model():
+    """#2847 box 2 acceptance, on the real committed model."""
+    findings = _contract_plane_findings(_model(), PAIR_CONTRACT_REGISTRY, seed.KNOWN_MUST_AGREE_PAIRS, seed.ENROLLED_FLOOR)
+    assert not findings, (
+        "the #2845 model's contracts plane and the live pair registry disagree — "
+        "run: python3 scripts/generate_platform_model.py and commit the result:\n" + "\n".join(f"  {f}" for f in findings)
     )
+
+
+def _plane_mutations():
+    """Single-field corruptions of the REAL committed plane, each of which must red.
+
+    Every one of these regenerates and commits cleanly as far as the byte-diff drift gate
+    is concerned — they are exactly the faithful-looking-but-wrong projections this
+    checker exists to catch.
+    """
+    victim = sorted(p.name for p in PAIR_CONTRACT_REGISTRY)[0]
+
+    def find(model):
+        return next(c for c in model["contracts"] if c["name"] == victim)
+
+    def drop_entry(model):
+        model["contracts"] = [c for c in model["contracts"] if c["name"] != victim]
+
+    def rename_producer(model):
+        find(model)["producer"] = "somewhere.else::moved"
+
+    def forget_partition(model):
+        find(model)["partition"] = None
+
+    def zero_mutations(model):
+        find(model)["mutations"] = 0
+
+    def unset_floor(model):
+        find(model)["floor"] = False
+
+    def unenroll(model):
+        find(model)["enrolled"] = False
+
+    def invent_a_pair(model):
+        model["contracts"] = model["contracts"] + [dict(find(model), name="a pair nobody registered")]
+
+    def lower_the_ratchet(model):
+        model["meta"]["counts"]["contracts_ratchet"] = 1
+
+    def stale_enrolled_count(model):
+        model["meta"]["counts"]["contracts_enrolled"] = 99
+
+    def empty_the_plane(model):
+        model["contracts"] = []
+
+    return [
+        (fn.__name__, fn)
+        for fn in (
+            drop_entry,
+            rename_producer,
+            forget_partition,
+            zero_mutations,
+            unset_floor,
+            unenroll,
+            invent_a_pair,
+            lower_the_ratchet,
+            stale_enrolled_count,
+            empty_the_plane,
+        )
+    ]
+
+
+@pytest.mark.parametrize("case", _plane_mutations(), ids=lambda case: case[0])
+def test_the_plane_checker_reds_on_every_single_field_corruption(case):
+    """Mutation proof, model side — a guard that cannot fail is not a guard."""
+    label, mutate = case
+    model = copy.deepcopy(_model())
+    mutate(model)
+    findings = _contract_plane_findings(model, PAIR_CONTRACT_REGISTRY, seed.KNOWN_MUST_AGREE_PAIRS, seed.ENROLLED_FLOOR)
+    assert findings, f"{label}: the contracts-plane checker stayed GREEN on a corrupted model"
+
+
+def test_the_plane_checker_reds_when_the_registry_grows_past_the_model():
+    """Mutation proof, registry side — enrolling a pair without regenerating must red.
+
+    The real failure mode in this direction: a PR adds a PairContract and forgets
+    `python3 scripts/generate_platform_model.py`, so the model silently under-reports.
+    """
+    from pair_contract import Mutation, PairContract
+
+    grown = list(PAIR_CONTRACT_REGISTRY) + [
+        PairContract(
+            name="an unregenerated newcomer",
+            producer="new.producer::write",
+            consumer="new.consumer::read",
+            produce=dict,
+            consume=lambda p: p,
+            agree=lambda _p, _c: None,
+            mutations=(Mutation(("x",), "drop"),),
+        )
+    ]
+    findings = _contract_plane_findings(_model(), grown, seed.KNOWN_MUST_AGREE_PAIRS, seed.ENROLLED_FLOOR)
+    assert any("an unregenerated newcomer" in f for f in findings), findings
+
+
+def test_the_plane_checker_reds_when_the_floor_grows_past_the_model():
+    """Mutation proof, floor side — naming a new KNOWN pair without regenerating must red."""
+    findings = _contract_plane_findings(
+        _model(), PAIR_CONTRACT_REGISTRY, tuple(seed.KNOWN_MUST_AGREE_PAIRS) + ("a pair we know must agree",), seed.ENROLLED_FLOOR
+    )
+    assert any("a pair we know must agree" in f for f in findings), findings
+
+
+def test_the_plane_checker_is_green_on_the_real_model_after_a_no_op_roundtrip():
+    """The other direction of the proof: deep-copying the real model changes nothing."""
+    assert not _contract_plane_findings(copy.deepcopy(_model()), PAIR_CONTRACT_REGISTRY, seed.KNOWN_MUST_AGREE_PAIRS, seed.ENROLLED_FLOOR)
 
 
 def test_status_page_email_log_derivation_is_still_the_mirrored_one():

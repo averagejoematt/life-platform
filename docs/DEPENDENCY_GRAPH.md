@@ -236,22 +236,24 @@ readers under the `life-platform-mcp` lambda.
 
 ## 4b. Producer/Consumer Contracts (#2847)
 
-Pairs enrolled in the contract sweep: the real producer's output is round-tripped
-through the real consumer, then a disagreement is injected into BOTH sides
-(`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is one registry entry in
-`tests/pair_contract_registry.py`. This lists what IS contracted — see `meta.scope_cuts`
-for why it is not a census of every must-agree pair.
+The registry of pairs this platform KNOWS must agree (#2847 box 2). For each, the real
+producer's output is round-tripped through the real consumer, then a disagreement is
+injected into BOTH sides (`tests/test_pair_contract_sweep_2847.py`). Enrolling a pair is
+one registry entry in `tests/pair_contract_registry.py`. **Floor** = named in
+`KNOWN_MUST_AGREE_PAIRS` (only ever grows); **Enrolled** = a live `PairContract` backs it —
+a floor row reading `no` is a rotted registry entry. Ratchet: `ENROLLED_FLOOR` = 8.
+See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 
-| Pair | Producer | Consumer | Partition | Mutations |
-|------|----------|----------|-----------|-----------|
-| adaptive_mode -> /api/ask grounding reads | `compute.adaptive_mode_lambda::store_adaptive_mode` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `adaptive_mode` | 3 |
-| ai_analysis EXPERT# -> observatory card journaling prompt | `intelligence.ai_expert_analyzer_lambda::generate_and_cache` | `coach.coach_observatory_renderer::journaling_prompt_for_domain` | `ai_analysis` | 3 |
-| computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 |
-| computed_metrics -> site-stats-refresh tier0_streak | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `web.site_stats_refresh_lambda::resolve_tier0_streak` | `computed_metrics` | 3 |
-| engagement_state -> /api/presence | `content.engagement_core::compute_presence` | `web.site_api_freshness::presence` | `engagement_state` | 4 |
-| input_manifest -> character page projection | `common.input_manifest::build_input_manifest` | `web.site_api_character::_public_input_manifest` | `computed_metrics` | 4 |
-| public_stats.json -> fingerprint broadcast projection | `content.site_writer::write_public_stats` | `content.fingerprint_broadcast::project_public` | — | 4 |
-| send_ledger row -> replay guard + status page | `common.send_ledger::record_sent` | `common.send_ledger::already_sent` | — | 3 |
+| Pair | Producer | Consumer | Partition | Mutations | Floor | Enrolled |
+|------|----------|----------|-----------|-----------|-------|----------|
+| adaptive_mode -> /api/ask grounding reads | `compute.adaptive_mode_lambda::store_adaptive_mode` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `adaptive_mode` | 3 | yes | yes |
+| ai_analysis EXPERT# -> observatory card journaling prompt | `intelligence.ai_expert_analyzer_lambda::generate_and_cache` | `coach.coach_observatory_renderer::journaling_prompt_for_domain` | `ai_analysis` | 3 | yes | yes |
+| computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 | yes | yes |
+| computed_metrics -> site-stats-refresh tier0_streak | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `web.site_stats_refresh_lambda::resolve_tier0_streak` | `computed_metrics` | 3 | yes | yes |
+| engagement_state -> /api/presence | `content.engagement_core::compute_presence` | `web.site_api_freshness::presence` | `engagement_state` | 4 | yes | yes |
+| input_manifest -> character page projection | `common.input_manifest::build_input_manifest` | `web.site_api_character::_public_input_manifest` | `computed_metrics` | 4 | yes | yes |
+| public_stats.json -> fingerprint broadcast projection | `content.site_writer::write_public_stats` | `content.fingerprint_broadcast::project_public` | — | 4 | yes | yes |
+| send_ledger row -> replay guard + status page | `common.send_ledger::record_sent` | `common.send_ledger::already_sent` | — | 3 | yes | yes |
 
 ## 5. Alarms + Routing
 
