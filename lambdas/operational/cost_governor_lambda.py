@@ -294,6 +294,9 @@ def _non_ai_daily_series(month_start: datetime, now: datetime) -> list[tuple[str
     Fix: group by SERVICE and drop any service whose name contains "bedrock" in code
     (robust to model-name rotation). AI is metered separately from token metrics
     because CE Bedrock cost lags 24-48h."""
+    # A Cost Explorer TimePeriod bound. CE's own day/month boundaries are UTC, so a Pacific
+    # day here would ask AWS for a window AWS does not bill in — the "billing calendar" case
+    # utc-exempt(#2798): genuinely UTC, not a DATE# key. Both bounds, one ruling.
     start_str = month_start.strftime("%Y-%m-%d")
     end_str = now.strftime("%Y-%m-%d")
     if start_str == end_str:
@@ -451,6 +454,8 @@ def _active_ceilings() -> tuple[float, float]:
     if _CEILING_ENV_OVERRIDE:
         return MONTHLY_CEILING, SURGE_CEILING_USD
     start, end = _TEMP_CEILING_WINDOW
+    # utc-exempt(#2798): the dated ceiling window is scoped to a BILLING month (ADR-133's
+    # August raise reverts as the AWS budget month rolls). Pacific would revert it 7-8h late.
     if start <= datetime.now(timezone.utc).date() < end:
         return _TEMP_CEILING_USD, _TEMP_SURGE_CEILING_USD
     return MONTHLY_CEILING, SURGE_CEILING_USD
@@ -477,6 +482,8 @@ def _active_ceiling_window():
     if _CEILING_ENV_OVERRIDE:
         return None
     start, end = _TEMP_CEILING_WINDOW
+    # utc-exempt(#2798): mirrors `_active_ceilings()` byte-for-byte on purpose — the pair must
+    # never disagree about which window is in effect (billing calendar, see above).
     if not (start <= datetime.now(timezone.utc).date() < end):
         return None
     return {
@@ -577,6 +584,8 @@ def _tier_crossing_forecast(mtd: float, projected: float, daily_burn: float, now
         bands = {tier: threshold * ratio for threshold, tier in _active_thresholds()}
         projected_tier = _tier_for(projected, ceiling)
         _, days_in_month = _month_bounds(now)
+        # utc-exempt(#2798): both days are positions inside the AWS BILLING month that `mtd`
+        # and `daily_burn` were measured over — the projection must use the same calendar CE does.
         month_end = now.replace(day=days_in_month).date()
         today = now.date()
         for t in (1, 2, 3):

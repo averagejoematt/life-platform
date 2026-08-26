@@ -20,10 +20,11 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 import boto3
+from common.pacific_time import pacific_today  # #2798: routine target_date is a Pacific-day WRITE KEY
 
 if TYPE_CHECKING:  # #1656: the annotation-only import (runtime import stays inside the function)
     from training.routine_generator import GeneratorInputs
@@ -70,7 +71,13 @@ def _emit_metric(metric_name: str, value: float = 1.0, unit: str = "Count") -> N
 def _target_date_for_event(event: dict[str, Any]) -> str:
     if event.get("target_date"):
         return event["target_date"]
-    return date.today().isoformat()
+    # #2798 — THE PAIR. `target_date` is a WRITE KEY: `training.routine_repo` derives
+    # `routine_id` from (target_date, archetype, variant) (#3115) and indexes the routine
+    # at `DATE#{target_date}#ROUTINE#…`. The other author of that same key is
+    # `mcp.tools_hevy_routine`, used interactively in PT evenings — so a UTC day here and
+    # a UTC day there agreed only by accident of this cron's 06:30-PT slot. Both sides move
+    # to Pacific in one change; converting either alone authors a different routine row.
+    return pacific_today()
 
 
 def _gates(event: dict[str, Any]) -> dict[str, str | bool | int]:

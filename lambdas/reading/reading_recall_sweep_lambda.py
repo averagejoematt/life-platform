@@ -18,9 +18,9 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
 
 import boto3
+from common.pacific_time import pacific_now  # #2798: the GSI1 due bound is a Pacific day
 
 from reading import reading_keys as rk, reading_store
 
@@ -56,7 +56,10 @@ def _write_snapshot(due: list, now_iso: str):
 def lambda_handler(event, context=None):
     """Daily sweep. Surfaces due recall prompts to the owner-private nudge snapshot."""
     try:
-        now_iso = datetime.now(timezone.utc).isoformat()
+        # #2798 — this instant is ALSO the GSI1 day bound (`due_recalls` compares it
+        # against `nextDue`, a Pacific `YYYY-MM-DD`). A UTC `now_iso` surfaced tomorrow's
+        # probes from 17:00 PT onward; the sweep's 07:00-PT cron only masked it.
+        now_iso = pacific_now().isoformat()
         due = reading_store.due_recalls(now=now_iso)
         _write_snapshot(due, now_iso)
         _emit(len(due))

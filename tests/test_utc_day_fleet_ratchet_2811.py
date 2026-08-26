@@ -78,12 +78,28 @@ own dates, never off "today").
 **#2817 added the two packages #2811 named as the follow-up**, and they arrived with the
 entries #2811 predicted. Measured against `origin/main` @ `1812f01f8`:
 `lambdas/emails/` 60 sites / 18 files → **0**, `mcp/` 89 sites / 24 files → **12**, all
-12 in the two files below whose fix is blocked on a writer in an unguarded package.
+12 in two files whose fix was blocked on a writer in an unguarded package.
 Nothing in either package was ruled genuinely-UTC: unlike `lambdas/ingestion/`, neither
-talks to a vendor whose day boundary is UTC, and the one `logger.set_date` here follows
+talks to a vendor whose day boundary is UTC, and the one `logger.set_date` there follows
 the fleet's `pacific_today()` convention rather than #2811's instant-derived exception.
-`test_residue_is_exactly_the_measured_coordination_debt` pins the map by NAME and NUMBER,
+
+**#2798 paid those two entries off by bringing their PARTNERS onto the surface** —
+`lambdas/reading/` (4 sites / 3 files), `lambdas/training/` (3 / 2) and
+`lambdas/operational/` (21 / 12), measured against `origin/main` @ `d3d68d75f`. Each pair
+converted on both sides in one change: `reading_store.log_session`'s session `date` with
+`mcp/tools_reading._input_streak`, and the routine `target_date` WRITE KEY with
+`hevy_routine_cron` / `hevy_restamp` / `exercise_history`. **One file was ruled
+genuinely-UTC** — `cost_governor_lambda.py`, whose days are Cost Explorer / AWS Budgets
+days (the "billing calendar" case named below) — and it carries five
+`# utc-exempt(#2798)` markers with the reason written down.
+`test_residue_is_exactly_the_measured_coordination_debt` pins the map (now empty again)
 so appending an entry — or quietly widening one — has to argue with a test.
+
+**A shape guard is not a pair guard.** Two of #2798's fixes are structurally invisible to
+the matcher below (`reading_store`'s `date = now[:10]`, a cross-function taint; the MCP
+adherence check's `start_time[:10]`, a vendor instant). The AGREEMENT half of the contract
+lives in `tests/test_pt_day_pair_contracts_2798.py`, which drives both sides of both pairs
+at one PT-evening instant. Both files are load-bearing; neither subsumes the other.
 
 Run:  python3 -m pytest tests/test_utc_day_fleet_ratchet_2811.py -v
 """
@@ -119,40 +135,35 @@ SURFACE_PACKAGES = (
     "lambdas/intelligence",
     # #2817 — the named follow-up. `lambdas/emails/` (60 day-semantics sites in 18
     # files) and `mcp/` (89 in 24) were the two packages #2811 deliberately left out
-    # because concurrent PRs owned those files that night. They arrive WITH residue
+    # because concurrent PRs owned those files that night. They arrived WITH residue
     # entries, exactly as #2811's docstring predicted.
     "lambdas/emails",
     "mcp",
+    # #2798 — the PARTNER packages, joined here because they are the other half of the
+    # two pairs #2817 held back. `lambdas/reading/` (4 sites) owns the session/recall day
+    # `mcp/tools_reading.py` reads; `lambdas/training/` (3) + `lambdas/operational/` (21)
+    # co-author the routine `target_date` WRITE KEY with `mcp/tools_hevy_routine.py`.
+    # Adding them is what let `_UTC_DAY_RESIDUE` go back to empty.
+    "lambdas/reading",
+    "lambdas/training",
+    "lambdas/operational",
 )
 
 # ── THE RATCHET. Repo-relative file -> maximum day-semantics sites allowed. ──
 # Entries only ever come OUT (or get smaller). An entry is a DEBT, and the prose
 # beside it is the debt's terms: what else has to move before the file can be fixed.
 #
-# THE RULE THIS MAP ENCODES (#2817): a consumer is only converted together with the
-# WRITER whose sort key it matches. #2815 is the incident behind that sentence —
-# converting one side of an `OUTPUT#{date}` pair desynchronises it, which is worse
-# than both sides being wrong in the same direction. Both entries below are the same
-# shape: the mcp/ side is ready, the partner lives in a package (`lambdas/reading/`,
-# `lambdas/training/` + `lambdas/operational/`) that neither this ratchet nor #2414's
-# zero surface covers yet, so converting mcp/ alone would split the pair.
-_UTC_DAY_RESIDUE: dict[str, int] = {
-    # Reading. `_input_streak` walks back day-by-day from "today" over session rows
-    # whose `date` is written by `lambdas/reading/reading_store.log_session` as
-    # `_now_iso()[:10]` — the UTC day. `_today()` (7 call sites) and `_prior_iso_week`
-    # feed the same partition, and `reading_recall.next_due()/_today()` stamp the
-    # recall `nextDue` dates this module then queries. Convert with reading_store.py +
-    # reading_recall.py in one change, or a session logged at 6pm PT lands on
-    # tomorrow's row and the streak reads 0.
-    "mcp/tools_reading.py": 6,
-    # Hevy routines. `target_date` here is a WRITE key: `training.routine_repo`
-    # versions one routine per target_date (#3115). The other writer of that same key
-    # is `lambdas/operational/hevy_routine_cron_lambda._target_date_for_event`
-    # (`date.today()`), with `lambdas/training/exercise_history.load_recent_history`
-    # bounding its history window off the same day. Converting the MCP side alone
-    # would make a manual evening draft author a DIFFERENT routine row than the cron's.
-    "mcp/tools_hevy_routine.py": 6,
-}
+# THE MAP IS EMPTY AGAIN, AND THAT IS THE POINT OF #2798.
+# It was empty when #2811 shipped. #2817 admitted exactly two entries — `mcp/tools_
+# reading.py` and `mcp/tools_hevy_routine.py` — and neither was a budget: each named a
+# WRITER, in a package outside the scanned surface, that had to move in the same change
+# or the pair would split (the #2815 incident, stated as a data structure). #2798 is that
+# same change: it brings `lambdas/reading/`, `lambdas/training/` and `lambdas/operational/`
+# onto the surface and converts each pair on BOTH sides at once, so the debt is PAID and
+# the entries are DELETED rather than shrunk. `test_residue_has_no_stale_entries` is what
+# forces the deletion; `test_residue_is_exactly_the_measured_coordination_debt` is what
+# stops the next slice from re-opening the map without a named, two-sided blocker.
+_UTC_DAY_RESIDUE: dict[str, int] = {}
 
 
 def _surface_files() -> list[pathlib.Path]:
@@ -258,6 +269,9 @@ def test_surface_is_derived_and_covers_every_scoped_package():
         "lambdas/intelligence/intelligence_common.py",
         "lambdas/emails/freshness_checker_lambda.py",  # #2817 — 9 sites, the heaviest single file
         "mcp/tools_lifestyle.py",  # #2817 — 15 sites, the heaviest mcp file
+        "lambdas/reading/reading_store.py",  # #2798 — the session-`date` writer of pair 1
+        "lambdas/training/exercise_history.py",  # #2798 — bounds its window off the routine day
+        "lambdas/operational/hevy_routine_cron_lambda.py",  # #2798 — the other author of `target_date`
     ):
         assert expected in rels, f"derived surface lost {expected}"
 
@@ -310,19 +324,24 @@ def test_residue_is_exactly_the_measured_coordination_debt():
     """The map is not a budget — it is a NAMED debt with a named blocker each.
 
     #2811 took its four packages to zero and pinned the empty map so nobody could
-    baseline instead of fix. #2817 kept that pressure while admitting two real
-    entries: pin them by name AND number, so growing an existing entry (the quieter
-    regression) is as loud as appending a new one. Anything added here must come with
-    the same thing these two came with — a writer, in another package, that has to
-    move in the same change.
+    baseline instead of fix. #2817 admitted exactly two entries, each naming a WRITER in
+    an unguarded package that had to move in the same change. #2798 made that change: the
+    partner packages are on the surface, both pairs converted on both sides, and the two
+    entries are DELETED rather than shrunk — the only honest way an entry leaves.
+
+    Empty is therefore the assertion again. Anything added back must come with what those
+    two came with: a specific writer, in another package, that has to move with it. A bare
+    number with no partner named is a baseline, and this test exists to say so out loud.
     """
-    assert _UTC_DAY_RESIDUE == {"mcp/tools_reading.py": 6, "mcp/tools_hevy_routine.py": 6}, (
-        "The #2811/#2817 surface was measured on 2026-08-25: four packages plus "
-        "lambdas/emails/ at ZERO, and exactly two mcp/ files held back because their "
-        "sort-key WRITER lives in an unguarded package (see the map's comments).\n"
-        "A changed map means either that debt was paid (delete the entry — do not "
-        "shrink it and leave it) or a site was baselined instead of fixed. Fix it, or "
-        "mark it `# utc-exempt(#NNNN): <reason>`. Current map:\n" + "\n".join(f"  {k}: {v}" for k, v in sorted(_UTC_DAY_RESIDUE.items()))
+    assert _UTC_DAY_RESIDUE == {}, (
+        "The #2811/#2817/#2798 surface is SEVEN packages at ZERO: compute, ingestion, "
+        "coach, intelligence, emails, mcp, reading, training and operational (the mcp/ "
+        "residue was paid off in #2798 by converting each pair's writer at the same "
+        "time).\n"
+        "A non-empty map means either a new two-sided coordination debt (name the writer, "
+        "the package it lives in, and why it cannot move in this change) or a site that "
+        "was baselined instead of fixed. Fix it, or mark it "
+        "`# utc-exempt(#NNNN): <reason>`. Current map:\n" + "\n".join(f"  {k}: {v}" for k, v in sorted(_UTC_DAY_RESIDUE.items()))
     )
 
 
@@ -345,6 +364,28 @@ def test_no_utc_day_site_survives_in_the_2817_packages_outside_the_residue():
     )
 
 
+def test_no_utc_day_site_survives_in_the_2798_partner_packages():
+    """#2798's own acceptance: the two mcp/ residue entries' PARTNER packages.
+
+    Says the sentence a future reader needs, in one place. `lambdas/reading/` writes the
+    session `date` and the recall `nextDue` that `mcp/tools_reading.py` reads back;
+    `lambdas/operational/` (the hevy routine cron + the overnight re-stamp) and
+    `lambdas/training/` (`exercise_history`, `training_notes`) co-author and bound the
+    routine `target_date` that `mcp/tools_hevy_routine.py` also writes. `target_date` is
+    a WRITE KEY — `routine_repo` derives `routine_id` from it (#3115) — so these packages
+    and their mcp/ partners are ONE frame or the key space forks.
+    """
+    counts = _measure()
+    partners = ("lambdas/reading/", "lambdas/training/", "lambdas/operational/")
+    offenders = sorted(rel for rel in counts if rel.startswith(partners) and rel not in _UTC_DAY_RESIDUE)
+    assert not offenders, (
+        "The #2798 partner packages were swept to the Pacific frame (4 + 3 + 21 sites, "
+        "with the cost-governor's billing-calendar reads ruled genuinely-UTC and marked). "
+        "These files regrew a UTC day — check whether the mcp/ side agrees before you "
+        "fix one of them alone:\n" + "\n".join(offenders)
+    )
+
+
 def test_the_exempt_valve_is_actually_in_use_and_reasoned():
     """The three genuinely-UTC sites this issue ruled on must keep their written reason.
 
@@ -359,6 +400,29 @@ def test_the_exempt_valve_is_actually_in_use_and_reasoned():
         src = (ROOT / rel).read_text(encoding="utf-8")
         assert "utc-exempt(#2811)" in src, f"{rel} lost its #2811 exemption marker"
         assert needle in src, f"{rel}'s #2811 exemption lost its stated reason"
+
+
+def test_the_billing_calendar_exemption_is_the_only_2798_one_and_is_reasoned():
+    """#2798 ruled exactly ONE file genuinely-UTC, and the ruling has to keep its reason.
+
+    `cost_governor_lambda.py` is the "billing calendar" case this module's docstring names:
+    its days are Cost Explorer / AWS Budgets days, which are UTC, and the dated ADR-133
+    ceiling window reverts as the AWS budget month rolls. Asking CE for a Pacific window
+    would query a calendar AWS does not bill in. Everything else in the three packages
+    converted, so a SECOND `#2798` marker appearing anywhere is a new ruling that owes
+    the reader an argument — this test makes it show up in a diff.
+    """
+    rel = "lambdas/operational/cost_governor_lambda.py"
+    src = (ROOT / rel).read_text(encoding="utf-8")
+    assert "utc-exempt(#2798)" in src, f"{rel} lost its #2798 billing-calendar exemption marker"
+    assert "billing calendar" in src.lower(), f"{rel}'s #2798 exemption lost its stated reason"
+
+    marked = sorted(str(p.relative_to(ROOT)) for p in _surface_files() if "utc-exempt(#2798)" in p.read_text(encoding="utf-8"))
+    assert marked == [rel], (
+        "#2798's exemption ruling was: exactly one genuinely-UTC file (the billing "
+        "calendar). A new `# utc-exempt(#2798)` site is a NEW ruling — give it its own "
+        "issue number so the reason is attributable. Currently marked:\n" + "\n".join(marked)
+    )
 
 
 # ── mutation proofs: every matcher must FIRE, and the ratchet must refuse growth ──
@@ -439,13 +503,38 @@ def test_a_planted_site_reds_the_guard_in_the_2817_packages_too():
         assert len(utc_day_semantics_sites(planted, filename=rel)) == 1, f"the guard would not fire on {rel}"
 
 
+def test_a_planted_site_reds_the_guard_in_the_2798_packages_too():
+    """The #2798 half of the mutation proof — one REAL file per newly-added package.
+
+    Widening `SURFACE_PACKAGES` is the whole change on the guard side, and a widened glob
+    that quietly matches nothing (wrong dir name, a `_SKIP_PATH_MARKERS` collision, a
+    package that is not importable from `tests/`) reports green forever. Planting the
+    defect in the actual file proves the new surface is live, not merely declared — and
+    doing it per-package means dropping ONE of the three from the tuple cannot pass.
+    """
+    surface = {str(p.relative_to(ROOT)) for p in _surface_files()}
+    for rel in (
+        "lambdas/reading/reading_store.py",
+        "lambdas/training/exercise_history.py",
+        "lambdas/operational/hevy_routine_cron_lambda.py",
+    ):
+        assert rel not in _UTC_DAY_RESIDUE
+        assert rel in surface, f"{rel} is not on the scanned surface"
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        assert utc_day_semantics_sites(src, filename=rel) == [], f"precondition: {rel} is clean today"
+        planted = src + '\n\n_PLANTED = datetime.now(timezone.utc).strftime("%Y-%m-%d")\n'
+        assert len(utc_day_semantics_sites(planted, filename=rel)) == 1, f"the guard would not fire on {rel}"
+
+
 def test_the_residue_files_are_frozen_not_forgotten():
     """A residue entry has to be a CEILING on a real file, not a name nobody re-reads.
 
-    Both entries are held at their measured 6. Proving the count is exact (not merely
-    "at most 6") is what makes `test_residue_entries_do_not_grow` a ratchet: a 7th site
-    added to either file reds, and a fix that drains one to zero reds
-    `test_residue_has_no_stale_entries` until the entry is deleted.
+    Vacuous while the map is empty (#2798 paid both entries off), and deliberately kept:
+    the moment anyone re-opens the map this is what makes it a ratchet rather than a
+    budget — the count must be EXACT, so one more site reds `test_residue_entries_do_not_
+    grow` and a drained file reds `test_residue_has_no_stale_entries` until it is pruned.
+    The arithmetic itself stays exercised while the map is empty by
+    `test_the_ratchet_refuses_growth_and_stale_entries`, which drives it synthetically.
     """
     counts = _measure()
     for rel, cap in _UTC_DAY_RESIDUE.items():

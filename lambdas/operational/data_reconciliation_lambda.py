@@ -35,9 +35,10 @@ v1.0.0 — 2026-03-08 (DATA-3)
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import boto3
+from common.pacific_time import pacific_today  # #2798: the coverage window bounds DATE# keys — Pacific days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -217,7 +218,7 @@ def lambda_handler(event, context):
     dry_run = is_dry_run(event)
     logger.info("[reconciliation] Starting weekly data reconciliation")
 
-    today = datetime.now(timezone.utc).date()
+    today = date.fromisoformat(pacific_today())
     # Check last 7 completed days (not today — ingestion may still be running)
     dates = [(today - timedelta(days=i)).isoformat() for i in range(LOOKBACK_DAYS, 0, -1)]
     logger.info(f"[reconciliation] Checking dates: {dates[0]} → {dates[-1]}")

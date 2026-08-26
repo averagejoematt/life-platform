@@ -39,10 +39,11 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 import boto3
+from common.pacific_time import pacific_today  # #2798: routine target_date is a Pacific-day WRITE KEY
 
 try:
     from common.platform_logger import get_logger
@@ -94,7 +95,13 @@ def _emit_metric(metric_name: str, value: float = 1.0, unit: str = "Count") -> N
 def _target_date_for_event(event: dict[str, Any]) -> str:
     if event.get("target_date"):
         return event["target_date"]
-    return date.today().isoformat()
+    # #2798 — THE PAIR. `target_date` is a WRITE KEY: `training.routine_repo` derives
+    # `routine_id` from (target_date, archetype, variant) (#3115) and indexes the routine
+    # at `DATE#{target_date}#ROUTINE#…`. The other author of that same key is
+    # `mcp.tools_hevy_routine`, used interactively in PT evenings. This handler READS that
+    # key (`_find_pushed_routine` → `list_by_date_range(target_date, target_date)`), so it
+    # must name the same day the authors do or an off-cron invoke restamps nothing.
+    return pacific_today()
 
 
 def _gates(event: dict[str, Any]) -> dict[str, Any]:

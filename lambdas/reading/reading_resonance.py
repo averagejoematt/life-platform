@@ -69,6 +69,8 @@ from __future__ import annotations
 
 from datetime import date as _date, timedelta
 
+from common.pacific_time import pacific_today  # #2798: the journal DATE# window is a Pacific day range
+
 # ── calibration band (see the module docstring for the measurement + its n) ────
 COSINE_FLOOR = 0.07  # p10 of the measured pair distribution — below this: no resonance
 COSINE_CEILING = 0.31  # p95 — at/above this the term saturates at 1.0
@@ -169,7 +171,7 @@ def journal_theme_entries(table, *, today: str = "", lookback_days: int = LOOKBA
     """
     from boto3.dynamodb.conditions import Key
 
-    end = today or _date.today().isoformat()
+    end = today or pacific_today()
     try:
         start = (_date.fromisoformat(end) - timedelta(days=int(lookback_days))).isoformat()
     except ValueError:

@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.numeric import decimals_to_float, floats_to_decimal
+from common.pacific_time import pacific_date_of, pacific_now, pacific_today  # #2798: session/recall DAYS are Pacific
 
 from reading import reading_keys as rk
 
@@ -38,7 +39,7 @@ def _now_iso() -> str:
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return pacific_today()
 
 
 def _put(item: dict) -> dict:
@@ -154,7 +155,12 @@ def log_session(
     """Log a READING_SESSION input event, stamped onto GSI2 for history-by-date.
     `location`/`mood_snapshot` are PRIVATE (mind-body bridge inputs)."""
     now = now or _now_iso()
-    date = date or now[:10]
+    # #2798 — THE PAIR. `date` is the GSI2 sort key `mcp.tools_reading._input_streak`
+    # walks back over day-by-day, and the streak reads Pacific days. `now` stays the UTC
+    # INSTANT (it is the `ts` and the SESSION# sk); only its DAY rendering has a frame,
+    # and that frame is Pacific. `now[:10]` made an 18:00-PT session land on tomorrow's
+    # row, which read as a broken streak the next morning.
+    date = date or pacific_date_of(now) or now[:10]
     item = {"bookId": book_id, "date": date, "minutes": minutes, "ts": now}
     if pages is not None:
         item["pages"] = pages
@@ -469,7 +475,11 @@ def recalls(book_id: str) -> list:
 def due_recalls(now: str | None = None) -> list:
     """§2.4 — due recall prompts via the SPARSE GSI1 (GSI1SK <= now). Only active
     prompts project into this index, so the sweep never scans the table."""
-    now = now or _now_iso()
+    # #2798 — the READ side of the `nextDue` pair. GSI1SK holds a DAY (`reading_recall.
+    # next_due()` writes `YYYY-MM-DD`), so this `lte` bound is a day comparison wearing an
+    # instant's clothes: a UTC `now` makes tomorrow's probe due at 17:00 PT today. The
+    # bound is the Pacific instant, matching the frame the writer stamps.
+    now = now or pacific_now().isoformat()
     items = _query(
         IndexName=rk.GSI1_NAME,
         KeyConditionExpression=Key(rk.GSI1_PK_ATTR).eq(rk.RECALL_DUE_VALUE) & Key(rk.GSI1_SK_ATTR).lte(now),

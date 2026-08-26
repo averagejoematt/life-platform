@@ -37,6 +37,8 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Callable, Iterable, Optional
 
+from common.pacific_time import PACIFIC  # #2798: the archive is named for its Pacific day
+
 from operational import permanence_terms as terms, public_archive_registry as reg
 
 try:
@@ -330,8 +332,12 @@ def build_archive(
     build the whole thing and report on it without touching S3.
     """
     ts = now or datetime.now(timezone.utc)
-    generated_at = ts.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    day = ts.strftime("%Y-%m-%d")
+    if ts.tzinfo is None:  # a caller-supplied naive stamp is UTC (#1964's one semantic)
+        ts = ts.replace(tzinfo=timezone.utc)
+    generated_at = ts.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    # #2798: `generated_at` is the INSTANT and stays UTC; the archive's DAY-name is Pacific,
+    # matching every other day this platform publishes.
+    day = ts.astimezone(PACIFIC).strftime("%Y-%m-%d")
     root = f"public-archive-{day}"
 
     members, s3_stats = collect_s3_members(s3, bucket)

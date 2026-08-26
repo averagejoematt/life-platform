@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now, pacific_today  # #2798: reading DAYS are Pacific (pairs with reading_store)
 from reading import (
     horizons_garden,
     horizons_retrospective,
@@ -91,7 +92,7 @@ _CONSTELLATION_MIN_NODES = 4  # honest empty state below this (brief §2)
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return pacific_today()
 
 
 def _abandoned_shelf() -> list:
@@ -138,8 +139,11 @@ def _shelf_entry(state: dict) -> dict:
 
 def _input_streak(sessions: list) -> int:
     """Consecutive days with a reading session, counting back from today."""
+    # #2798 — THE PAIR. `s["date"]` is written by `reading.reading_store.log_session` as the
+    # PACIFIC day of the session instant; counting back from a UTC 'today' skipped a row
+    # every evening from 17:00 PT and reported the streak as 0.
     days = {s.get("date") for s in sessions if s.get("date")}
-    streak, cursor = 0, datetime.now(timezone.utc).date()
+    streak, cursor = 0, pacific_now().date()
     while cursor.isoformat() in days:
         streak += 1
         cursor = cursor.fromordinal(cursor.toordinal() - 1)
@@ -306,7 +310,7 @@ def tool_get_reading_history(args):
 def tool_get_due_recalls(args):
     """Spaced-retrieval prompts due now (the sparse-GSI1 sweep; private)."""
     due = reading_store.due_recalls()
-    return {"due": due, "count": len(due), "as_of": datetime.now(timezone.utc).isoformat()}
+    return {"due": due, "count": len(due), "as_of": pacific_now().isoformat()}
 
 
 def tool_get_reading_track_record(args):
@@ -346,8 +350,8 @@ def tool_get_constellation(args):
 
 # ── HORIZONS: the weekly coach media pick (#1705, epic #1686 S1) ──────────────
 def _iso_week(d=None) -> str:
-    """ISO week label 'YYYY-Www' for a date (default: today, UTC)."""
-    d = d or datetime.now(timezone.utc).date()
+    """ISO week label 'YYYY-Www' for a date (default: the Pacific today)."""
+    d = d or pacific_now().date()
     year, week, _ = d.isocalendar()
     return f"{year}-W{week:02d}"
 
@@ -513,7 +517,8 @@ def tool_curate_horizon(args=None):
 
 def _prior_iso_week() -> str:
     """The ISO-week label for 7 days ago (the pick due for its retrospective)."""
-    return _iso_week((datetime.now(timezone.utc).date().fromordinal(datetime.now(timezone.utc).date().toordinal() - 7)))
+    today = pacific_now().date()
+    return _iso_week(today.fromordinal(today.toordinal() - 7))
 
 
 def tool_archive_horizon(args=None):

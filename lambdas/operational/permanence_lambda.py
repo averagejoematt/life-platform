@@ -33,11 +33,12 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import boto3
 from common import dry_run
+from common.pacific_time import pacific_today  # #2798: the silence ladder counts Pacific DATE# days
 from common.send_guard import guarded_send_email
 
 from operational import continuity_watch as watch, permanence_terms as terms, public_archive, public_archive_registry as reg
@@ -213,7 +214,9 @@ def _run(event):  # noqa: C901 - a linear sequence, not a branch thicket
 
     # 1 ── measure the silence
     signals = watch.read_signals(table, USER_ID)
-    verdict = watch.evaluate(signals, now.date())
+    # #2798: `signals` carry `DATE#` days (Pacific), so `days_silent` must be measured
+    # against the Pacific today. `now` stays the UTC instant — it is the `generated_at`.
+    verdict = watch.evaluate(signals, date.fromisoformat(pacific_today()))
     previous = _read_previous_continuity(s3)
     state_doc = watch.apply_transition(previous, verdict, now_iso)
 
