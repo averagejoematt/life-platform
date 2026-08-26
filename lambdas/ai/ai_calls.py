@@ -1249,7 +1249,17 @@ def _quality_gate_correction_note(report):
     return "\n".join(lines)
 
 
-def _retain_coach_brief_flag(coach_id, verdict, draft, final, report):
+def _grounding_allowlist(generation_brief):
+    """The #2573 allow-list carried on the brief, as a set (empty when absent) — #3202."""
+    if not isinstance(generation_brief, dict):
+        return set()
+    try:
+        return {float(n) for n in (generation_brief.get("grounding_allowlist") or [])}
+    except (TypeError, ValueError):  # noqa: BLE001 — retention is never load-bearing
+        return set()
+
+
+def _retain_coach_brief_flag(coach_id, verdict, draft, final, report, generation_brief=None):
     """#744: persist a fired coach-quality-gate verdict (draft + findings +
     disposition) as eval data via the SAME `eval_retention.py` mechanism #812
     wired for the other 5 surfaces. `ai_calls._enforce_quality_gate` is the
@@ -1275,13 +1285,24 @@ def _retain_coach_brief_flag(coach_id, verdict, draft, final, report):
         for v in report.get("cycle_boundary_violations") or []:  # #1973
             if isinstance(v, dict):
                 findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
+        # #3202: the ONE class that actually held the two reader-facing coaches was the
+        # one this retention dropped. Its absence is why root-causing the 08-26 holds
+        # meant reconstructing the drafts from DDB and re-running the grounder offline:
+        # the retained record had the text and not the reason. With this, the next
+        # diagnosis is a query.
+        _grounding = report.get("number_grounding") if isinstance(report.get("number_grounding"), dict) else {}
+        for f in _grounding.get("findings") or []:
+            if isinstance(f, dict):
+                findings.append({"type": f.get("type"), "detail": f.get("detail", "")})
         eval_retention.retain(
             "coach_brief",
             verdict,
             draft=draft or "",
             final=final or "",
             findings=findings,
-            extra={"coach_id": coach_id, "score": report.get("score")},
+            allowed=set(_grounding_allowlist(generation_brief)),
+            facts=(generation_brief or {}).get("authoritative_facts") if isinstance(generation_brief, dict) else None,
+            extra={"coach_id": coach_id, "score": report.get("score"), "grounding_verdict": _grounding.get("verdict")},
         )
     except Exception:  # noqa: BLE001 — retention is never load-bearing
         pass
@@ -1347,11 +1368,13 @@ def _enforce_quality_gate(
         except Exception as e:
             print(f"[COACH-QUALITY-GATE:{coach_id}] CloudWatch held-metric emit failed (non-fatal): {e}")
         if fired:
-            _retain_coach_brief_flag(coach_id, "flagged_dropped", original_draft, output_text, report)
+            _retain_coach_brief_flag(coach_id, "flagged_dropped", original_draft, output_text, report, generation_brief)
         return None, report
 
     if fired:
-        _retain_coach_brief_flag(coach_id, "flagged_corrected" if attempts else "flagged_kept_best", original_draft, output_text, report)
+        _retain_coach_brief_flag(
+            coach_id, "flagged_corrected" if attempts else "flagged_kept_best", original_draft, output_text, report, generation_brief
+        )
     return output_text, report
 
 
@@ -1928,8 +1951,25 @@ Write your {domain_label} coaching section now."""
                 except Exception:  # noqa: BLE001
                     _sr_mod = None
 
+                # #3202: arm the cycle-freshness classes HERE, in the corrective-rewrite
+                # loop. They were armed only on the BLOCKING quality gate
+                # (coach_quality_gate._number_grounding_report spreads
+                # **cycle_gate_params) and on an advisory post-gate check further down
+                # this function that a held draft never reaches — so a stale_phase /
+                # experiment_span / stale_baseline finding met the hard gate having
+                # never been offered a rewrite. coach_quality_gate's own docstring says
+                # the two gates "cannot disagree by construction"; with an asymmetric
+                # armed-class set that was not true, and the disagreement is exactly
+                # what held nutrition_coach and mind_coach dark every cycle.
+                try:
+                    from ai.grounding_gate_params import cycle_gate_params as _cgp
+
+                    _fresh_kwargs = _cgp()
+                except Exception:  # noqa: BLE001 — same fail-soft contract as the module itself
+                    _fresh_kwargs = {}
+
                 def _findings_fn(_t):
-                    _f = _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed)
+                    _f = _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed, **_fresh_kwargs)
                     if _sr_mod is not None:
                         _f = _f + _sr_mod.precedent_citation_findings(_t, _recall_precedents)
                     return _f

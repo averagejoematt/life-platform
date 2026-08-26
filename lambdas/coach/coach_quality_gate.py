@@ -403,6 +403,35 @@ def _number_grounding_report(output_text, generation_brief, generation_date=None
         return {"status": "error", "verdict": None, "advisory": True, "error": str(e)}
 
 
+def _grounding_findings_summary(grounding, max_findings=6, detail_cap=220):
+    """Render the grounding verdict's finding TYPES + DETAILS for the log line (#3202).
+
+    Returns "" when there is nothing to say (clean, or the check did not run), so the
+    COMPLETE line is byte-identical to its pre-#3202 form on a passing draft and the
+    30-day CloudWatch re-eval queries that parse it keep working. On a hold it appends
+    `, grounding_findings=[stale_phase: …]` — the detail the operator previously had to
+    re-run the gate to see.
+    """
+    if not isinstance(grounding, dict):
+        return ""
+    if grounding.get("status") != "measured":
+        # Honest absence is worth naming too — "no_grounding_context" and "clean" are
+        # very different states behind the same `verdict=None`/`verdict=clean` word.
+        detail = grounding.get("error") or grounding.get("detail")
+        return f", grounding_status={grounding.get('status')}" + (f" ({str(detail)[:detail_cap]})" if detail else "")
+    findings = grounding.get("findings") or []
+    if not findings:
+        return ""
+    parts = []
+    for f in findings[:max_findings]:
+        if not isinstance(f, dict):
+            continue
+        parts.append(f"{f.get('type')}: {str(f.get('detail') or '')[:detail_cap]}")
+    if len(findings) > max_findings:
+        parts.append(f"(+{len(findings) - max_findings} more)")
+    return ", grounding_findings=[" + " | ".join(parts) + "]"
+
+
 def _number_grounding_block(grounding):
     """Render the deterministic verdict for the judge prompt — as a DECIDED input,
     not a question. The judge is told the answer and told not to re-litigate it."""
@@ -667,6 +696,11 @@ def _build_fallback_report(coach_id, error_msg):
     }
 
 
+# #3202: the finding types that really are about a digit. Everything else the
+# deterministic grounder emits is a framing/behaviour class riding the same report.
+_NUMERIC_FINDING_TYPES = frozenset({"fabricated_number", "contradiction", "band_contradiction", "night_value_mismatch"})
+
+
 def _apply_number_grounding_verdict(result, grounding):
     """Consume the deterministic verdict (#2573) — the LLM cannot overrule it.
 
@@ -687,7 +721,13 @@ def _apply_number_grounding_verdict(result, grounding):
         # Rendered into the corrective-rewrite note by ai_calls._quality_gate_correction_note,
         # which already walks `suggestions` — so the regeneration loop gets the specific
         # number complaint without ai_calls learning a new field.
-        msg = f"Ungrounded number ({f.get('type')}): {f.get('detail')}"
+        # #3202: only the digit classes are "ungrounded numbers". The freshness
+        # classes (stale_phase / stale_baseline / experiment_span) and the behavioural
+        # ones are framing errors, and telling a coach its phase framing was an
+        # ungrounded NUMBER sent every corrective rewrite hunting a figure that was
+        # never wrong — measured on the 2026-08-26 nutrition/mind holds.
+        label = "Ungrounded number" if f.get("type") in _NUMERIC_FINDING_TYPES else "Grounding violation"
+        msg = f"{label} ({f.get('type')}): {f.get('detail')}"
         if msg not in result.get("suggestions", []):
             result.setdefault("suggestions", []).append(msg)
     return result
@@ -852,12 +892,22 @@ def lambda_handler(event, context):
         report["number_grounding"] = grounding
 
         logger.info(
-            "coach-quality-gate COMPLETE — coach=%s, passed=%s, score=%s, repetition=%s, number_grounding=%s",
+            "coach-quality-gate COMPLETE — coach=%s, passed=%s, score=%s, repetition=%s, number_grounding=%s%s",
             coach_id,
             report.get("passed"),
             report.get("score"),
             repetition.get("verdict"),
             grounding.get("verdict"),
+            # #3202: the verdict word alone made a hold undiagnosable — three cycles of
+            # `number_grounding=ungrounded` with no way to tell WHICH number (or, as it
+            # turned out, that it was not a number at all) without a re-run. This is
+            # the single line the whole root-cause dig would have been. It rides the
+            # COMPLETE line because that line is the ONE exit every path reaches: both
+            # `_run_quality_gate` fallbacks (non-dict payload, LLM call failed) RETURN
+            # into this function and log here. The handler's own `except` below is the
+            # only exit that skips it, and there the grounding report is an error dict
+            # with no findings to name.
+            _grounding_findings_summary(grounding),
         )
 
         return {

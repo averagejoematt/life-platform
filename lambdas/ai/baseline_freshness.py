@@ -77,6 +77,45 @@ _BASELINE_FRAMING_RE = re.compile(
 # for the pre-start case (a "Day 0"/countdown framing is the CORRECT pre-start form).
 _DAY_N_RE = re.compile(r"\bday\s+(\d{1,4})\b", re.IGNORECASE)
 
+# ── #3202: stale_phase is a SELF-LOCATION check, not a "Day N" token ban ──────
+# This module's own docstring (and grounding_gate_params.py's) call the freshness
+# classes FRAMING-SCOPED. That was true of stale_baseline — it requires a weight
+# token within `proximity` of _BASELINE_FRAMING_RE — and false of stale_phase,
+# which flagged EVERY `day <digits>` token in the text with no framing requirement
+# at all. Measured cost (2026-08-26 17:00Z, the real held drafts retained at
+# EVALRET#coach_brief): mind_coach's second attempt said "you're at Day 10" — the
+# CORRECT day — and was held anyway for the comparative clause "matters more at
+# Day 10 than it did at Day 1"; nutrition_coach's second attempt was held for
+# "silent since Day 1", a span anchor. Both are references to another point in
+# time, not claims about where the narrative is now, and neither is fixable: the
+# correction note says "use Day 10", the model complies, and any sentence that
+# names an earlier day re-trips the gate. That is why the corrective-rewrite loop
+# reproduced its own verdict attempt after attempt.
+#
+# Two structural exclusions, both about the CLAIM rather than the phrase:
+#
+#   1. The text also cites the correct day. A narrative cannot be at two days at
+#      once; having located itself correctly, its other Day tokens are references.
+#      Set-level, no phrase matching, and inert in the pre_start phase (there is
+#      no correct day to cite there — every "Day N" is a mis-location, which is
+#      the exact #1691 incident and stays caught).
+#   2. The token is governed by a span/comparison anchor. "since Day 1", "than
+#      Day 1", "back on Day 3", "from Day 1", "compared to Day 4" — a closed set
+#      of function words after which English cannot state a present location
+#      ("we are since Day 1" is not a sentence). Deliberately EXCLUDES "on"/"at",
+#      which are exactly how a self-location IS stated ("we're on Day 10").
+_DAY_REFERENCE_ANCHOR_RE = re.compile(
+    r"(?:\bthan|\bsince|\bfrom|\bversus|\bvs\.?|\bcompared\s+(?:to|with)|\bbetween|\bback\s+(?:on|to|at))\s+$",
+    re.IGNORECASE,
+)
+_DAY_ANCHOR_LOOKBACK = 24  # chars of preceding text the anchor may occupy
+
+
+def _is_day_reference(text: str, start: int) -> bool:
+    """True when the "Day N" token at ``start`` refers to another point in time
+    rather than locating the narrative's present (see the #3202 note above)."""
+    return bool(_DAY_REFERENCE_ANCHOR_RE.search(text[max(0, start - _DAY_ANCHOR_LOOKBACK) : start]))
+
 
 def _phase_for(generation_date_iso: str, start_date_iso: str):
     """Pure phase resolver mirroring pre_start_meta()/day_n().
@@ -350,10 +389,16 @@ def baseline_freshness_findings(
     # ── stale_phase ───────────────────────────────────────────────────────────
     phase, expected_day = _phase_for(generation_date_iso, start_date_iso)
     if phase is not None:
+        # #3202 exclusion 1 — the narrative already located itself correctly, so
+        # every OTHER Day token in it is a reference. Inert pre-start by design.
+        located_correctly = phase == "in_experiment" and any(int(m.group(1)) == expected_day for m in _DAY_N_RE.finditer(text))
         seen_days = set()
         for dm in _DAY_N_RE.finditer(text):
             n = int(dm.group(1))
             if n in seen_days:
+                continue
+            # #3202 exclusion 2 — a span/comparison anchor governs this token.
+            if located_correctly or _is_day_reference(text, dm.start()):
                 continue
             if phase == "pre_start":
                 if n >= 1:
