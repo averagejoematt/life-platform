@@ -3158,6 +3158,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3122"
         }
       ]
+    },
+    {
+      "id": "2026-08-25-session-b-the-drain",
+      "date": "2026-08-25",
+      "title": "The night the backlog emptied — and the AI finally learned to say 'call 911'",
+      "shipped": "An overnight run closed 20 backlog issues and merged 30 PRs. The headline: every free-text door into the platform's AI now runs a deterministic hazard check first — a reader describing chest pain gets fixed emergency-services copy and the model is never called, while 'my shoulder is killing me' still gets a real coaching answer. Behind it: a scripted acceptance instrument that re-runs the external audit's own verification playbooks against live systems (12/12 passing), an AI-safety eval matrix with seeded-fault canaries across five families, replay guards on 12 more email senders and the write-tools, a Pacific-day sweep across 108 call sites, and a merge-train tool that batches green PRs through one validation cycle.",
+      "why_it_mattered": "The safety gap was real and dumb: the public ask-the-coaches door had a privacy filter but no hazard filter — and its opening turn, the one that fans out to twelve AI coaches, had no input filter at all. A $0 regex layer that short-circuits the model can't be disabled by a budget cap and can't hallucinate. The same night, the external-audit response stopped being prose: an assessor can now run one command and watch the platform's claims verify themselves against production, including a handout section titled 'where we think you should attack.'",
+      "gotcha": "Mid-night, GitHub quietly stopped delivering push events: force-pushed branches minted zero CI runs, one PR's head pointer went stale against its own branch, and a closed PR refused to reopen. The status page said all-operational throughout. The fix that worked: stack all fourteen independently-verified changes onto one integration branch and validate them together — which promptly caught three real cross-lane conflicts the per-PR checks could never have seen.",
+      "honest_miss": "Two review agents tried to raise module-size limits instead of extracting code (both got sent back — the limits held at zero raises across six collisions), and the driver's own conflict resolutions twice dropped a freshly-seeded counter that a guard had to catch. Also found: a 16-hour-old stranded deploy approval that, if clicked 'approve', would have silently rolled the whole fleet back to pre-integration code. The lease was rejected; the class now has an incident row and a filed janitor waiting on a token.",
+      "prs": [
+        {
+          "label": "PR #3184 (the 14-lane train)",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3184"
+        },
+        {
+          "label": "PR #3147 (the hazard gate)",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3147"
+        },
+        {
+          "label": "PR #3146 (the acceptance instrument)",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3146"
+        },
+        {
+          "label": "PR #3163 (the merge train)",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3163"
+        }
+      ]
     }
   ]
 }

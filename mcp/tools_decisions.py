@@ -16,6 +16,7 @@ v1.0.0 — 2026-03-07
 
 from datetime import datetime, timedelta, timezone
 
+from mcp import idempotency as _idem
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
 
@@ -64,6 +65,19 @@ def tool_log_decision(args):
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     sk = f"DECISION#{ts}"
+
+    # #3114: the sk is a millisecond wall-clock stamp, so every replay of the same
+    # call minted a SECOND decision that no later read could tell from a genuine
+    # second one — and the decision ledger is a denominator in the trust-calibration
+    # metric (ADR-104/105). The sk stays time-ordered (get_decisions sorts on it);
+    # the dedup lives in its own partition, claimed before the write. Permanent
+    # claim, no window: logging the same decision twice on the same day is a replay,
+    # not a second decision — a genuinely different call differs in some field.
+    key = _idem.content_key(date, decision_text, source, followed, override_reason, pillars, note)
+    guard = _idem.claim(table, "log_decision", key, payload={"sk": sk, "date": date})
+    if not guard["claimed"]:
+        prior = _idem.first_payload(guard)
+        return {"status": "duplicate", "sk": prior.get("sk"), "date": prior.get("date") or date, "note": _idem.DUPLICATE_NOTE}
 
     item = {
         "pk": _decisions_pk(),

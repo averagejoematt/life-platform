@@ -85,7 +85,13 @@ def test_write_call_site_canary():
 
 # ── #531: the AI lambda's write scope (board_ask episodic write-back) ─────────
 
-_AI_LAMBDA = os.path.join(_REPO, "lambdas", "web", "site_api_ai_lambda.py")
+# #3118: the AI lambda is a handler + `site_api_ai_*.py` siblings that hold extracted
+# bodies (request parsing #2688, context #2667, the #546 session store #3118). The
+# canary counts the FAMILY — globbed, never hand-listed, exactly like _SOCIAL_FAMILY —
+# because the previous single-file form went from 3 writes to 1 the moment the session
+# store moved out, and a canary that reads "fewer writes now" as a pass is a canary
+# that has gone blind rather than one reporting good news.
+_AI_FAMILY = sorted(glob(os.path.join(_WEB, "site_api_ai*.py")))
 
 # Every concrete partition-key the AI lambda writes: rate-limit counters
 # (rate_limiter.py, UpdateItem) + the coach interaction write-back (PutItem).
@@ -117,14 +123,14 @@ def test_ai_leadingkeys_cover_every_ai_lambda_write():
 
 
 def test_ai_write_call_site_canary():
-    """The AI lambda's in-module DDB writes: the #531 interaction write-back
-    (PutItem, COACH#*) + the #546 board-session mint (PutItem) and follow-up
-    append (UpdateItem, BOARDSESS#*). Rate-limit counters live in the shared
+    """The AI family's DDB writes: the #531 interaction write-back (PutItem,
+    COACH#*) + the #546 board-session mint (PutItem) and follow-up append
+    (UpdateItem, BOARDSESS#*). Rate-limit counters live in the shared
     rate_limiter module. If this count changes, scope the new write's partition
     first."""
-    n = len(re.findall(r"\.(put_item|update_item)\(", _read(_AI_LAMBDA)))
+    n = sum(len(re.findall(r"\.(put_item|update_item)\(", _read(f))) for f in _AI_FAMILY)
     assert n == 3, (
-        f"site_api_ai write count is {n}, baseline 3 — a write was added/removed. "
+        f"site_api_ai family write count is {n}, baseline 3 — a write was added/removed. "
         "Confirm its partition is in site_api_ai()'s LeadingKeys + _AI_WRITTEN_KEYS, then update this baseline."
     )
 

@@ -114,6 +114,8 @@ import re
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+
 logger = logging.getLogger(__name__)
 
 SUMMARY_SK_PREFIX = "CHAT#summary#"
@@ -609,7 +611,7 @@ def time_gap_line(table, pk: str, today: Optional[str] = None) -> str:
     * the gap is shorter than ``QUIET_GAP_DAYS`` (an active thread must never
       get gap commentary — same-day and few-day back-and-forth is normal).
     """
-    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today or pacific_today()
     last_date = _latest_chat_date(table, pk)
     if not last_date:
         return ""
@@ -676,7 +678,7 @@ def ensure_daily_summary(
     AFTER a reply has been sent — its failure modes are all "no summary yet",
     never a broken chat. The conditional put makes concurrent workers converge.
     """
-    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today or pacific_today()
     try:
         days = _chat_days(table, pk, today)
         if not days:

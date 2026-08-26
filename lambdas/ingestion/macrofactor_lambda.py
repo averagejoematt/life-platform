@@ -26,6 +26,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import boto3
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -650,7 +651,7 @@ def archive_raw(bucket, source_key, content_bytes, subfolder=""):
 
 def lambda_handler(event, context):
     if hasattr(logger, "set_date"):
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        logger.set_date(pacific_today())  # OBS-1
     print(f"Event: {json.dumps(event)}")
 
     if "Records" in event:

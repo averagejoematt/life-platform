@@ -74,6 +74,7 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
     ir.version = int(ir.version)
     if ir.parent_version is not None:
         ir.parent_version = int(ir.parent_version)
+    attempted_version = ir.version
     body = serialize(ir)
     pk = _pk(ir.routine_id)
     history_sk = _version_sk(ir.version)
@@ -85,7 +86,14 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
             ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
         )
     except _ddb.meta.client.exceptions.ConditionalCheckFailedException as e:
-        raise RoutineConflict(f"VERSION#{ir.version:06d} for routine {ir.routine_id} already exists") from e
+        # #3115: the caller bumps `ir.version` BEFORE calling us (`ir.parent_version =
+        # ir.version; ir.version += 1`), so a refused write used to leave the in-memory
+        # IR one version ahead of the store — the counter advanced on a write that never
+        # happened, and the next attempt skipped a version number for no reason. Rewind
+        # to the version this object actually has persisted before surfacing the conflict.
+        if ir.parent_version is not None and ir.parent_version < attempted_version:
+            ir.version = int(ir.parent_version)
+        raise RoutineConflict(f"VERSION#{attempted_version:06d} for routine {ir.routine_id} already exists") from e
 
     pointer_item = {**body, "pk": pk, "sk": "VERSION#current"}
     _table.put_item(Item=pointer_item)
@@ -107,6 +115,38 @@ def put_versioned(ir: RoutineSpec) -> RoutineSpec:
         }
     )
     return ir
+
+
+def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
+    """Persist a DRAFT idempotently (#3115) — the entry point every drafting path uses.
+
+    `routine_id` is now derived from `(target_date, archetype, variant)` rather than a
+    `uuid4` (`routine_generator._new_routine_id`), so a re-run of the authoring cron or
+    a retried `manage_hevy_routine draft` lands on the SAME partition. A bare
+    `put_versioned` at `version=1` would then hit the `attribute_not_exists` guard and
+    raise `RoutineConflict`, which is not the answer either — a re-draft is legitimate.
+
+    So adopt the stored routine: write the new draft as the NEXT version of it, and
+    carry the Hevy linkage forward so the following commit takes the UPDATE branch
+    instead of POSTing a second remote routine. That is the actual cure for "a replay
+    of a fresh draft creates a second remote routine".
+
+    An ARCHIVED predecessor's Hevy link is deliberately NOT carried: that routine has
+    been renamed `[archived …]` and moved to the Archive folder in Hevy, so pointing a
+    new draft at it would resurrect an archived routine rather than create today's.
+    """
+    existing = get_current(ir.routine_id)
+    if not existing:
+        return put_versioned(ir)
+    ir.parent_version = int(existing.version)
+    ir.version = int(existing.version) + 1
+    if existing.status != "archived":
+        ir.hevy_routine_id = ir.hevy_routine_id or existing.hevy_routine_id
+        ir.hevy_updated_at = ir.hevy_updated_at or existing.hevy_updated_at
+        ir.hevy_folder_id = ir.hevy_folder_id or existing.hevy_folder_id
+        ir.hevy_pushed_at = ir.hevy_pushed_at or existing.hevy_pushed_at
+    logger.info(f"re-draft of {ir.routine_id} adopted as version {ir.version} (hevy={ir.hevy_routine_id or 'unpushed'})")
+    return put_versioned(ir)
 
 
 def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list[RoutineSpec]:

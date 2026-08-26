@@ -21,6 +21,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -62,7 +63,7 @@ def fetch_record(source, date_str):
 def fetch_recent_dates(source, days=7, base_date=None):
     """Fetch records for the last N days."""
     if base_date is None:
-        base_date = datetime.now(timezone.utc).date()
+        base_date = pacific_now().date()
     records = {}
     for i in range(days):
         d = (base_date - timedelta(days=i)).isoformat()
@@ -375,13 +376,13 @@ def compute_adaptive_mode(date_str):
 
 def _engagement_reference_today():
     """The real 'now' Pacific day — engagement is measured from now, not from the
-    yesterday that adaptive_mode scores. Falls back to UTC if pacific_time absent."""
-    try:
-        from common.pacific_time import pacific_today
+    yesterday that adaptive_mode scores.
 
-        return pacific_today()
-    except Exception:
-        return datetime.now(timezone.utc).date().isoformat()
+    #2811: the local import + UTC fallback retired — `common.pacific_time` is a bundled
+    shared module imported at the top of this file, so an ImportError here was never a
+    reachable state, and its fallback was a naive-UTC day (the exact class #2811 bans).
+    """
+    return pacific_today()
 
 
 def _log_dates(source, today, window_days=35, attrs=(), predicate=None, floor=None):
@@ -581,13 +582,13 @@ def lambda_handler(event, context):
         # Determine date(s) to process
         if "backfill_days" in event:
             days = int(event["backfill_days"])
-            base = datetime.now(timezone.utc).date()
+            base = pacific_now().date()
             dates = [(base - timedelta(days=i)).isoformat() for i in range(days)]
         elif "date" in event:
             dates = [event["date"]]
         else:
             # Default: yesterday (Daily Brief reads yesterday's data)
-            yesterday = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+            yesterday = (pacific_now().date() - timedelta(days=1)).isoformat()
             dates = [yesterday]
 
         results = []

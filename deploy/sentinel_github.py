@@ -69,6 +69,7 @@ PUSH_TRIGGER_GLOBS = (
     "CLAUDE.md",
     ".claude/commands/**",
     "deploy/sync_doc_metadata.py",
+    "deploy/sync_census_fact.py",  # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
     "scripts/check_doc_*.py",
     "scripts/doc_facts_ops.py",
     "scripts/generate_adr_index.py",

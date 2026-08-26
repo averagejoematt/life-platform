@@ -35,6 +35,7 @@ from web.site_api_common import (
     USER_PREFIX,
     _error,
     _ok,
+    _public_input_manifest,  # DIL-049 D4 — readiness shares /api/character's disclosure shape
     _window_span,
     logger,
     night_of_for,
@@ -393,6 +394,16 @@ def _latest_readiness(*, _g) -> dict | None:
         "components": components,
         "tsb_basis": _tsb_conf or None,
         "as_of": (rec.get("sk", "") or "").replace("DATE#", "") or rec.get("date"),
+        # DIL-049 (D4 score-transparency, cheap half): `computed_metrics` is one of
+        # #3049's stamped output partitions (daily-metrics-compute), so a run built
+        # on stale/missing upstream data already carries `input_manifest` on the
+        # DDB record — it just never reached this endpoint. A reader looking at the
+        # Cockpit's readiness score had no way to tell a fully-qualified score from
+        # one computed on a data-degraded morning; they render identically without
+        # this. Same shape /api/character already publishes (`_public_input_manifest`,
+        # site_api_common.py) — None for a pre-contract record, never a fabricated
+        # "complete".
+        "input_manifest": _public_input_manifest(rec),
     }
 
 

@@ -277,7 +277,7 @@ def _apply_recovery_adaptation(ir: Any, ctx: dict[str, Any], inputs_current_thro
 
 def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     from training.routine_generator import generate_routines
-    from training.routine_repo import put_versioned
+    from training.routine_repo import draft_versioned  # #3115: re-draft = next VERSION, never a 2nd routine
 
     target_date = args.get("target_date") or datetime.now(timezone.utc).date().isoformat()
 
@@ -305,7 +305,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     adaptation = _apply_recovery_adaptation(ideal, ctx, inputs_current_through) if ideal else {}
 
     for ir in routines:
-        put_versioned(ir)
+        draft_versioned(ir)
     return {
         "status": "drafted",
         "target_date": inputs.target_date,
@@ -683,7 +683,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     """
     from training.routine_generator import _new_routine_id, _now_iso
     from training.routine_ir import ExerciseBlock, RoutineSpec
-    from training.routine_repo import put_versioned
+    from training.routine_repo import draft_versioned  # #3115
 
     raw_exercises = args.get("exercises")
     if not isinstance(raw_exercises, list) or not raw_exercises:
@@ -790,7 +790,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
     title = ((supplied_title if forced and supplied_title else placeholder) or placeholder)[:60]
 
     ir = RoutineSpec(
-        routine_id=_new_routine_id(),
+        routine_id=_new_routine_id(target_date, archetype, "custom", blocks),  # #3115: content-derived, not uuid4
         target_date=target_date,
         archetype=archetype,
         variant="ideal",
@@ -817,7 +817,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         ],
         caps={},
     )
-    put_versioned(ir)
+    draft_versioned(ir)
     resp = {
         "status": "drafted_custom",
         "routine_id": ir.routine_id,
@@ -1136,20 +1136,20 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
 
 def _action_floor(args: dict[str, Any]) -> dict[str, Any]:
     from training.routine_generator import generate_routines
-    from training.routine_repo import put_versioned
+    from training.routine_repo import draft_versioned  # #3115
 
     inputs = _generator_inputs(args)
     routines = generate_routines(inputs)
     floor = next((r for r in routines if r.variant == "floor"), None)
     if not floor:
         return mcp_error("Generator did not produce a floor variant", error_code="INTERNAL")
-    put_versioned(floor)
+    draft_versioned(floor)
     return {"status": "drafted_floor", "routine_id": floor.routine_id, "target_date": floor.target_date}
 
 
 def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
     from training.routine_generator import GeneratorInputs, generate_routines
-    from training.routine_repo import put_versioned
+    from training.routine_repo import draft_versioned  # #3115
 
     base = _generator_inputs(args)
     inputs = GeneratorInputs(
@@ -1166,7 +1166,7 @@ def _action_re_entry(args: dict[str, Any]) -> dict[str, Any]:
     re_entry = next((r for r in routines if r.variant == "re_entry"), None)
     if not re_entry:
         return mcp_error("Generator did not produce a re_entry variant", error_code="INTERNAL")
-    put_versioned(re_entry)
+    draft_versioned(re_entry)
     return {"status": "drafted_re_entry", "routine_id": re_entry.routine_id, "target_date": re_entry.target_date}
 
 

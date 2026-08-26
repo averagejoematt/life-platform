@@ -208,26 +208,23 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-25 (Fable 5, autonomous — *"Boot Session A"* of
-`~/.claude/plans/shimmering-snacking-quokka.md`). **Session A DONE: D3 complete + the
-foundation trio live + 25 PRs merged, all deploys postflight-verified; 13 issues closed
-with verdicts.** Foundation: #3103 `wait_pr_green.sh` (the blessed watcher), #3102
-judge confirm-before-gate, #3101 the literal-conflict class KILLED (six counters →
-generated `platform_counts.py`; the night paid the seam ~10 more times first). All five
-DIL lanes: 024 input manifests at `tag_record` · 025 idempotency census (senders 7→28,
-live DLQ replay vector, brief send-ledger) · 026 lifecycle+65GiB · 027 us-east-2 raw/
-backup ($0.015/mo; backfill = owner click) · 028 replay proof (filename_legacy facets).
-**The CodeQL sentinel had never once read the API** (3 independent defects; fixed
-fail-closed, live-verified clean). #3108: all 8 coaches' relationship-state writes had
-crashed silently since 08-13 — migrated. #2888 measured: the cache had ZERO writes ever
-(no `system=` + Haiku's 4096 floor); $1–3/mo honest, not $8–15. Incidents: the 20:43Z
-site auto-rollback (mixed-state during the train; rerun green) + the Collect-lane 10m
-timeout rendering as `cancelled` (#3141). **Owner-ratified strategy change (plan
-amendment): severity-weighted wrap metrics, discovery-source tagging, discovery/drain
-session split; D5 re-grade prioritized.** Honest misses: 20 filing-contract violations
-were this session's own filings (11 missing prio labels); the literal seam cost ~5
-resolution rounds before its killer merged; a U+2192 in an IAM description redded the
-first Backup deploy. Main green at wrap. **Next: Session B on OPUS** — the plan file
-§Session B + its 2026-08-24 amendment; owner batch riding in the handover (10 items).
-Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-25 (Opus 5, autonomous overnight ~20h — *"Boot Session B"* of
+`~/.claude/plans/shimmering-snacking-quokka.md` + two escalating owner directives:
+clear ALL Now/Next, keep pulling until 6am). **The queue EMPTIED: 20 issues closed
+with verdicts (4 P2), 30 PRs merged, 5 recurrence classes structurally killed, net
+−14.** D5's acceptance instrument live (`scripts/diligence_verify.py`, 12/12 PASS
+--strict; the re-grade brief ready — owner batch item 10); D4 complete (safety eval
+matrix + the clinical-lite hazard gate, wire-proven on production: a chest-pain
+question gets fixed 911 copy and ZERO model calls — board_ask's opening turn had NO
+input filter at all before tonight). GitHub dropped synchronize events for ~13h
+mid-night; recovery = the 14-lane integration train #3184 (each lane green-verified
+solo first; the stacked validation caught 3 real cross-lane frictions). Deploys ALL
+postflight: fleet 105/0/0, site-api pair, hevy-cron, 5 cdk stacks. TWO stranded
+production leases disposed — one 16.4h old whose approval would have REGRESSED the
+fleet. 6 module-size ceilings paid by extraction, zero baselines raised. 5 epics got
+box-level acceptance audits (all honestly KEEP OPEN; the audit indicted two closed
+issues' claims → #3156, #3161, both fixed same night). Main green at the train sha.
+**Next:** the owner's #3042 external re-grade (pack ready) · #2957/#2888 mature today
+(~10am cycle, 17:00Z brief) · Now refilled to 5 by stored rank · owner batch rides
+the handover (10 items). Full narrative: `handovers/HANDOVER_LATEST.md`.
 

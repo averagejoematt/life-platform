@@ -63,6 +63,7 @@ from typing import Any
 
 import boto3
 from common import stats_core  # #543: the sanctioned EWMA (stats_core.ewma_series), ADR-105
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 try:
     from common.platform_logger import get_logger
@@ -347,7 +348,7 @@ def _lambda_handler_impl(event, context):
         target_date = event["date"]
         logger.info("Override date: %s", target_date)
     else:
-        today = datetime.now(timezone.utc).date()
+        today = pacific_now().date()
         target_date = (today - timedelta(days=1)).isoformat()
 
     # Fetch Whoop strain records — 84 days back gives the 28d chronic EWMA burn-in room

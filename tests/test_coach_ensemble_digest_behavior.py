@@ -41,6 +41,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
+from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
@@ -172,6 +173,7 @@ def offline(monkeypatch):
     """
     monkeypatch.setattr(coach_checkin, "read_cycle", lambda *a, **k: FROZEN_CYCLE)
     monkeypatch.setattr(ced, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, ced, _FrozenDatetime)
     monkeypatch.setattr(ced, "_cw", FakeCloudWatch())
     monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
 

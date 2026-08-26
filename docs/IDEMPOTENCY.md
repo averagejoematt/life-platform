@@ -195,6 +195,14 @@ functions carry FunctionURLs: `site_api_lambda`, `site_api_ai_lambda`
 vote / follow / certify family writes a *conditional dedup row first*, so the
 counter `ADD` is structurally unreachable a second time.
 
+The two rows the census marked **N** were closed by #3118 with that same pattern,
+one on each store: `put_object(IfNoneMatch="*")` is S3's `attribute_not_exists`,
+and the follow-up's `turn_ids` set makes the turn's own identity part of the
+ConditionExpression. Both fail **open** — a capture door losing a reader's
+submission is worse than a duplicate pending row — and the per-IP rate token is
+still spent by a replay, which fails *closed* and is why the limiter can never be
+the dedup primitive (see the `rate_limiter` row).
+
 | Route | Mechanism today | Replay-safe |
 |---|---|---|
 | `/api/challenge_vote`, `/api/experiment_vote`, `/api/predict_week`, `/api/replicate_certify` | Conditional put on `IP#{ip_hash}#…` (`attribute_not_exists(pk)`) gates the `ADD` counter; replay 429s or returns `counted: false` | **Y** |
@@ -204,9 +212,9 @@ counter `ADD` is structurally unreachable a second time.
 | `/api/cohort_submit`, `/api/ritual_log` | Natural-key overwrite (`SUBMIT#{ip_hash}`, `DATE#{date}`) | **Y** |
 | `/api/subscribe` | Natural key `EMAIL#{sha256}` — no duplicate row, but a resubmit mints a **new token** and re-sends the confirmation | **Partial** — accepted (#3113 §2b: a resubmit is a reader action, not a replay) |
 | `/api/subscribe?action=confirm` / `unsubscribe` | Token is `REMOVE`d on confirm (self-invalidating); unsubscribe guarded by a status read | **Y** |
-| `/api/submit_finding`, `/api/board_question` | Content-addressed — but under a `{date}` / `{YYYY-MM}` prefix, and an unconditional `put_object` | **N** — a boundary-crossing retry duplicates AND resets `status` over a moderation decision. `filed #3118` |
-| `site_api_ai` follow-up turn | `ADD followup_count` + `list_append`; the condition enforces the **cap and IP**, never turn identity | **N** — a duplicate appends the same turn twice and burns two of three reader follow-ups. `filed #3118` |
-| `site_api_ai` session mint | `pk = SESSION#{secrets.token_urlsafe(24)}` | **N** — mints a second row; bounded by a ≤1h TTL. `filed #3118` |
+| `/api/submit_finding`, `/api/board_question` | Content hash **alone** for the key (no clock in it) **+** `put_object(IfNoneMatch="*")` → true no-op, `duplicate: true` (`web/site_api_capture_store.py`) | **Y** — #3118. The clock left the key, so there is no boundary to cross; the conditional put means a replay cannot overwrite a moderation decision |
+| `site_api_ai` follow-up turn | Pre-spend `replayed_turn` match serves the stored answer, **and** the condition adds `NOT contains(turn_ids, :tid)` alongside the cap and IP (`web/site_api_ai_session.py`) | **Y** — #3118. A redelivery costs no model call and no turn; the DDB condition closes the simultaneous-delivery race the pre-check can't see |
+| `site_api_ai` session mint | `pk = SESSION#{secrets.token_urlsafe(24)}` | **Accepted N** — a replay mints a second row, bounded by a ≤1h TTL and reachable only with the token the *first* response returned, so no reader-visible loss and no unbounded growth. Left random deliberately (#3118): the token must stay unguessable and un-derived from any request field |
 | `common/rate_limiter.py` | Unguarded atomic `ADD` | **N by design** — fails *closed* (a replay only rate-limits you harder). Not a correctness bug, but it means **the limiter can never be the dedup primitive** for a replayed request. |
 
 ---
@@ -214,7 +222,7 @@ counter `ADD` is structurally unreachable a second time.
 ## 5. Write-capable MCP tools
 
 `mcp/audit.py::is_write_tool` classifies by leading verb; that yields **26
-write-capable tools** of the 75 in `mcp/registry.py`. Most write on a
+write-capable tools** of the 76 in `mcp/registry.py`. Most write on a
 deterministic key and are replay-safe by overwrite — `write_platform_memory`,
 `manage_sick_days`, `log_evening_intake`, `end_experiment`,
 `update_insight_outcome`, `update_decision_outcome`, `mark_journal_quote`
@@ -227,19 +235,62 @@ audit object at `s3://…/mcp-audit/…/{HHMMSS}-{tool}-{uuid4}.json`
 (`mcp/handler.py:82` → `mcp/audit.py:154`). That is an append-only trail; a
 duplicate entry is the correct record of a duplicate call.
 
-**Not replay-safe — `filed #3114`:** `log_decision` (`DECISION#{ms-ts}`),
-`save_insight` (`INSIGHT#{second-ts}`), `log_coach_correction` and
-`audit_coach_dossier` retract/correct (uuid4 ledger sk), `manage_reading`
-`log_session` / `add_note` / `debrief` (timestamp-derived ids — `debrief` also
-starts a **second spaced-repetition clock**), `curate_horizon`'s follow-up arm
-(`CHECKIN#{date}#{uuid4[:8]}`).
+**Every write tool now DECLARES its replay semantics in source** —
+`mcp/idempotency.py::REPLAY_SEMANTICS`, one row per tool (mechanism + reason).
+`tests/test_mcp_write_idempotency_3114_3115.py` derives the write set from
+`is_write_tool` over the live registry and fails BY NAME on a 27th write tool with
+no declaration, so this section can never silently fall behind the code again.
+That module also holds the **claim ledger** (`claim` / `record` / `release`) — a
+conditional dedup row in its own `USER#matthew#MCP_IDEMPOTENCY` partition, taken
+before the guarded write. It is the vote/follow family's
+conditional-dedup-row-before-counter (§4), lifted out and shared. It **fails open**:
+a broken ledger degrades to a possible duplicate, never to a dropped write.
 
-**Not replay-safe against a vendor — `filed #3115`:** `create_todoist_task`
-(Todoist mints a task per call, no idempotency header), `close_todoist_task` on
-a **recurring** task (close *advances* the recurrence — a replay skips a real
-occurrence), `manage_hevy_routine` draft (`ROUTINE#{uuid4}` per draft) and
-first-push commit (`POST /routines`). Hevy *template* and *folder* creates are
-already genuine find-or-create — that is the shape the routine create lacks.
+### Was not replay-safe — **fixed in `#3114`**
+
+| tool | old key | mechanism now | evidence |
+|---|---|---|---|
+| `log_decision` | `DECISION#{ms-ts}` | claim ledger on (date, decision, source, followed, override, pillars, note); sk stays time-ordered for `get_decisions` | `mcp/tools_decisions.py::tool_log_decision` |
+| `save_insight` | `INSIGHT#{second-ts}` | claim ledger on (date, text, source, tags) | `mcp/tools_lifestyle.py::tool_save_insight` |
+| `log_coach_correction`, `audit_coach_dossier` retract/correct | `CORRECTION#{date}#{uuid4[:8]}` | `derive_correction_id` = sha256(item_ref, text, error_class)[:8] + conditional put, so a replay also cannot re-open an `applied-to-prompt` correction | `lambdas/coach/coach_corrections.py::derive_correction_id` |
+| `manage_reading log_session` | `SESSION#{iso-ts}` | claim ledger, **15-minute window** on (book, date, minutes, pages) — a session's own fields are not unique over a day, so this is a replay window, not a permanent key | `mcp/tools_reading.py::_action_log_session` |
+| `manage_reading add_note` | `note_id = %Y%m%dT%H%M%S` | content-derived `n-{content_key(book, text, type)}`; an explicit `note_id` still wins | `mcp/tools_reading.py::_action_add_note` |
+| `manage_reading debrief` | `debrief-{ts}` + `probe-{ts}` | one debrief per book (`note_id="debrief"`) and the recall probe is **read before write** — including the legacy `probe-<timestamp>` rows — so a replay never restarts the retention clock | `mcp/tools_reading.py::_existing_debrief_probe`, `reading_store.recalls` |
+| `curate_horizon` follow-up | `CHECKIN#{date}#{uuid4[:8]}` | `coach_checkin.checkin_uid(week, coach, type, text)` + a conditional put; the pick's stored `surfaced_checkin_sk` is now READ, covering a re-curate after UTC midnight | `lambdas/coach/coach_checkin.py::checkin_uid` |
+
+Residual, stated plainly: `log_decision`'s sk is millisecond-granular and
+`save_insight`'s is second-granular, so two *genuinely distinct* records written
+inside one tick would still overwrite. That is a machine-speed collision on a
+human-speed tool; the claim ledger is what makes a *replay* safe, and no key change
+was made that could break `update_decision_outcome`/`update_insight_outcome`, which
+address rows by that sk.
+
+### Was not replay-safe against a vendor — **fixed in `#3115`**
+
+| path | side effect | mechanism now | evidence |
+|---|---|---|---|
+| `create_todoist_task` | `POST /tasks` | claim ledger, **15-minute window** on (content, project, due, description, labels); the claim is **released** if the POST fails, so an honest retry still works | `mcp/tools_todoist.py::create_todoist_task` |
+| `close_todoist_task` | `POST /tasks/{id}/close` | claim ledger, **60-minute window** on `task_id` — a replay is refused with a reason rather than advancing a recurring task's schedule | `mcp/tools_todoist.py::close_todoist_task` |
+| `manage_hevy_routine` draft / draft_custom / floor / re_entry | `ROUTINE#{uuid4}` ×N | `routine_id` derived from `(target_date, archetype, variant)` (`draft_custom` adds its authored blocks); `routine_repo.draft_versioned` makes a re-draft the **next VERSION** of the existing routine and carries its Hevy link forward | `lambdas/training/routine_generator.py::_new_routine_id`, `lambdas/training/routine_repo.py::draft_versioned` |
+| `manage_hevy_routine` commit (first push) | `POST /v1/routines` | `create_routine` is now **find-or-create**: an exact-title lookup first, and an existing routine is LINKED, never re-created. Deliberately a link and not a `PUT` — there is no `expected_updated_at` here, so an update could clobber an in-app edit, which `update_routine_with_guard` exists to refuse | `lambdas/training/hevy_write_client.py::find_routine_by_title` |
+| `manage_hevy_routine` version counter | `VERSION#{n:06d}` | `put_versioned` rewinds `ir.version` when the conditional put is refused, so the counter can no longer advance on a write that never happened | `lambdas/training/routine_repo.py::put_versioned` |
+
+**Vendor-side residual — Todoist.** Todoist's REST surface (`/api/v1/tasks`) offers
+no `X-Request-Id` / `Idempotency-Key` header; its idempotency primitive lives on the
+**Sync API**, where each *command* carries a client-generated `uuid` the server
+refuses to execute twice. Moving these two calls onto Sync is the real vendor-side
+fix and is **not done**: it is an endpoint *and* response-shape change that cannot be
+verified without live vendor calls, which this repo's tests may not make. The local
+windowed claim is therefore the guard, and it is honestly weaker — it cannot stop a
+duplicate raised from a *different* client.
+
+**Vendor-side residual — Hevy.** Hevy's public API documents no idempotency header
+(its Swagger UI is a client-rendered SPA, so this could not be verified from the
+docs either). The find-or-create title lookup is the whole mechanism, and it fails
+**soft**: a lookup outage lets the POST through, because a duplicate routine is
+something Matthew can delete and a blocked push is a session he cannot train. Hevy
+*template* and *folder* creates were already genuine find-or-create — that was the
+shape the routine create lacked, and now shares.
 
 **Guarded, not naturally idempotent** (worth naming so a refactor does not
 remove the guard by accident): `log_coach_calibration` does a read-modify-write

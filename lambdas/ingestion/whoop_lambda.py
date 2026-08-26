@@ -1044,6 +1044,9 @@ def _reconcile(event: dict, context) -> dict:
         # Source=whoop alarm's recovery path.
 
         token = secret["access_token"]
+        # utc-exempt(#2811): bounds a UTC ISO window sent to the Whoop API
+        # (`{start}T00:00:00.000Z` .. `{today+1}T00:00:00.000Z`), not a DATE# key —
+        # Whoop's own collection boundaries are UTC, so the request frame must be too.
         today = datetime.now(timezone.utc).date()
         start = today - timedelta(days=RECONCILE_WINDOW_DAYS)
         start_dt = f"{start.isoformat()}T00:00:00.000Z"

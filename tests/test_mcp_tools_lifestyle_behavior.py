@@ -286,7 +286,9 @@ def test_save_insight_writes_the_declared_key_shape(table):
     out = call("save_insight", {"text": "Cut caffeine after 10am", "tags": ["sleep"], "source": "chat"})
     assert out["saved"] is True
     assert out["insight_id"] == "2026-08-08T17:30:00"  # frozen UTC clock, second precision
-    item = t.puts[0]
+    # #3114 put the replay claim on the wire first (its own partition), so select the
+    # insight row by its pk rather than by position.
+    item = next(p for p in t.puts if p["pk"] == INSIGHTS_PK)
     assert item["pk"] == INSIGHTS_PK and item["sk"] == "INSIGHT#2026-08-08T17:30:00"
     assert item["status"] == "open" and item["date_saved"] == TODAY and item["outcome_notes"] == ""
 

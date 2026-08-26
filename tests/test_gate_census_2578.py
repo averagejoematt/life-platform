@@ -36,6 +36,14 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+# `gate_census.py` imports its own #1665 extraction siblings (gate_census_precision,
+# _structural, _sentinel, _proofs) by bare module name, so scripts/ must be importable
+# BEFORE exec_module. In a full-suite run some earlier test file happens to have put it
+# there already — which made this module silently un-runnable in isolation (`pytest
+# tests/test_gate_census_2578.py` alone errored at collection). Made explicit here so a
+# `-k` rerun of the census tests works on its own.
+if str(REPO_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
 _SPEC = importlib.util.spec_from_file_location("gate_census", REPO_ROOT / "scripts" / "gate_census.py")
 assert _SPEC and _SPEC.loader
 gc = importlib.util.module_from_spec(_SPEC)

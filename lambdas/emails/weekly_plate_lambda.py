@@ -527,12 +527,20 @@ def call_anthropic(system_prompt, user_message):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     from common import retry_utils
 
+    # #2888: caching OFF, deliberately. The system prompt clears Sonnet 4.6's 1,024-token
+    # floor, so the ADR-049 auto-wrap DOES engage and DOES pay the ~1.25x write premium —
+    # but weekly-plate makes exactly ONE Bedrock call per weekly invocation, so the write can
+    # never be read back (the next run is seven days later, past even a 1h TTL). This is
+    # the same measured inverse as D-01 (ai_calls.daily_brief_shared_system: 0 reads /
+    # 10K writes per 14d) and state-of-matthew (24,159 writes / 0 reads). Re-enable ONLY
+    # against a measured CacheRead > 0.
     return retry_utils.call_anthropic_api(
         prompt=user_message,
         max_tokens=4096,
         system=system_prompt,
         temperature=0.6,
         timeout=120,
+        cache_system=False,
     )
 
 

@@ -116,6 +116,10 @@
       "routing": "digest",
       "stack": "operational_stack"
     },
+    "life-platform-og-image-errors": {
+      "routing": "unresolved",
+      "stack": "web_stack"
+    },
     "life-platform-recursive-loop": {
       "routing": "digest",
       "stack": "mcp_stack"
@@ -125,6 +129,10 @@
       "stack": "mcp_stack"
     },
     "mcp-warmer-error": {
+      "routing": "digest",
+      "stack": "mcp_stack"
+    },
+    "mcp-warmer-no-invocations-24h": {
       "routing": "digest",
       "stack": "mcp_stack"
     },
@@ -225,6 +233,56 @@
       "stack": "email_stack"
     }
   },
+  "contracts": [
+    {
+      "consumer": "web.site_api_ai_context::_ask_fetch_computed_reads",
+      "mutations": 3,
+      "name": "adaptive_mode -> /api/ask grounding reads",
+      "note": "The runtime `ingestion_validator` schema for adaptive_mode requires pk/sk/date/engagement_score/brief_mode/computed_at \u2014 it does NOT require `mode_label` or `factors`, and `mode_label` is the key the entire consumer block is gated on. Every AI answer loses its precomputed 'what drove today' silently.",
+      "partition": "adaptive_mode",
+      "producer": "compute.adaptive_mode_lambda::store_adaptive_mode"
+    },
+    {
+      "consumer": "experiment.canonical_facts::build_canonical_facts",
+      "mutations": 4,
+      "name": "computed_metrics -> canonical facts",
+      "note": "canonical_facts' own docstring says 'the field names here MUST match what it writes'. The runtime `ingestion_validator` schema covers only 6 of the 10 numeric fields, so a rename of `latest_weight` or `weekly_rate_lbs` passes every existing gate.",
+      "partition": "computed_metrics",
+      "producer": "compute.daily_metrics_compute_lambda::store_computed_metrics"
+    },
+    {
+      "consumer": "web.site_api_freshness::presence",
+      "mutations": 4,
+      "name": "engagement_state -> /api/presence",
+      "note": "The reader defaults `presence_class` to 'present' on an absent field \u2014 a producer rename reads as 'Matthew is fine' rather than as an error. Exactly the cycle-4 failure (#914: fourteen silent days no standing surface showed).",
+      "partition": "engagement_state",
+      "producer": "content.engagement_core::compute_presence"
+    },
+    {
+      "consumer": "web.site_api_character::_public_input_manifest",
+      "mutations": 4,
+      "name": "input_manifest -> character page projection",
+      "note": "#3049 / DIL-024. The reader is a fail-closed allowlist projection, so a producer rename degrades to nulls rather than an error \u2014 silent by construction, which is why it needs a pair test.",
+      "partition": "computed_metrics",
+      "producer": "common.input_manifest::build_input_manifest"
+    },
+    {
+      "consumer": "content.fingerprint_broadcast::project_public",
+      "mutations": 4,
+      "name": "public_stats.json -> fingerprint broadcast projection",
+      "note": "The producer owns the BLOCK STRUCTURE and the `_json_safe` cast; the leaf values arrive from its caller (daily_brief). Block nesting is precisely what `project_public`'s `(stats.get(block) or {}).get(key)` traverses, and it degrades to None rather than raising \u2014 so a producer that flattened or renamed a block would publish an empty mark, silently.",
+      "partition": null,
+      "producer": "content.site_writer::write_public_stats"
+    },
+    {
+      "consumer": "common.send_ledger::already_sent",
+      "mutations": 3,
+      "name": "send_ledger row -> replay guard + status page",
+      "note": "DIL-025. Nine other senders write this same row WITHOUT `period_key` (weekly_digest, monday_compass, anomaly_detector, \u2026) \u2014 for those the guard structurally cannot fire. #3113 is enrolling them; this pair pins the shape they are converging on.",
+      "partition": null,
+      "producer": "common.send_ledger::record_sent"
+    }
+  ],
   "edges": [
     {
       "direction": "read",
@@ -5435,13 +5493,13 @@
       "timeout_seconds": 180
     },
     "health-auto-export-webhook": {
-      "declared_alarm": null,
+      "declared_alarm": "hae-webhook-errors",
       "handler": "ingestion.health_auto_export_lambda.lambda_handler",
-      "memory_mb": null,
+      "memory_mb": 256,
       "module": "lambdas/ingestion/health_auto_export_lambda.py",
       "schedules": [],
       "stack": "ingestion_stack",
-      "timeout_seconds": null
+      "timeout_seconds": 300
     },
     "hevy-backfill": {
       "declared_alarm": "ingestion-error-hevy-backfill",
@@ -6256,12 +6314,14 @@
   "meta": {
     "authorities": {
       "alarms": "cdk/stacks/*.py alarm_name= declarations (AST) + variable-traced SNS routing",
+      "contracts": "tests/pair_contract_registry.py PairContract(...) declarations (AST) \u2014 the #2847 enrolled producer/consumer pairs",
       "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
       "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 56,
+      "alarms": 58,
+      "contracts": 6,
       "edges": 665,
       "lambdas": 104,
       "mcp_tool_modules": 26,
@@ -6292,7 +6352,8 @@
       "field-level edges wait on the #2797 per-field wiring registry",
       "privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) \u2014 not modeled",
       "helper-default error alarms (ingestion-error-<fn>) are not enumerated \u2014 the alarms plane matches the #2844 vocabulary (explicit alarm_name declarations)",
-      "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)"
+      "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)",
+      "the contracts plane lists ENROLLED pairs (#2847), not every must-agree pair \u2014 without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is a floor + ratchet in tests/test_pair_contract_sweep_2847.py"
     ],
     "spec": "#2845 (epic #2842) \u2014 generated by scripts/generate_platform_model.py; drift-gated by tests/test_platform_model_drift.py"
   },

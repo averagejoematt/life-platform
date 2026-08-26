@@ -206,7 +206,16 @@ jobs:
       # content assertions retry within a bounded propagation budget
       # (deploy/lib/cache_aware_fetch.sh) as the second net. This job stays
       # deliberately AWS-credential-free.
+      # #2978 — the convergence gate's one input: WHICH build this job is judging.
+      # Without it the smoke can only guess whether a red is a race or a defect,
+      # which is how five per-symptom fixes accumulated while the class's rate
+      # went from 1-per-2.2-days to 1-per-1.5-days. deploy_convergence.py polls
+      # the viewer-path fingerprint (/version.json == this SHA) and the other
+      # convergence signals before the first check runs. Credential-free by
+      # construction, so this job stays exactly as credential-free as before.
       - name: Run site smoke test (pure HTTP — no AWS access)
+        env:
+          SMOKE_EXPECT_BUILD: ${{ github.sha }}
         run: |
           bash deploy/smoke_test_site.sh
 
@@ -255,6 +264,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run visual + AI-vision QA sweep
+        env:
+          # #2978: same convergence gate as the smoke job — the sweep refuses to
+          # capture a single page until the edge serves THIS build. The 2026-08-25
+          # 20:43Z rollback is the counter-case that must keep failing: there every
+          # signal HAD converged, so the sweep runs and reds exactly as it did live.
+          VISUAL_QA_EXPECT_BUILD: ${{ github.sha }}
         run: |
           # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
           # time; the deterministic sweep + --reader-truth are unaffected (full surface).

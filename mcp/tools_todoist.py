@@ -12,8 +12,31 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 
-from mcp.config import logger
+from mcp import idempotency as _idem
+from mcp.config import logger, table
 from mcp.core import query_source
+
+# ── #3115: replay guards for the two writes that leave the platform ───────────
+#
+# The Todoist REST surface this client speaks (`/api/v1/tasks`) offers NO vendor
+# idempotency key: a retried POST mints a second task with a new id, and there is
+# no `X-Request-Id`/`Idempotency-Key` header to attach. (Todoist's idempotency
+# primitive lives on its SYNC API, where each *command* carries a client-generated
+# `uuid` that the server refuses to execute twice. Moving these two calls onto the
+# Sync API is the real vendor-side fix and is recorded as the residual in
+# docs/IDEMPOTENCY.md — it is an endpoint AND response-shape change that cannot be
+# verified without live calls, which this repo's tests are not allowed to make.)
+#
+# So the guard is local and windowed: claim the call's semantic identity in our own
+# ledger before the POST, and release the claim if the POST fails so a real retry
+# still works. Fail-open — a broken ledger means a possible duplicate task, never a
+# task Matthew asked for that was never created.
+_CREATE_WINDOW_SECONDS = 15 * 60
+#: `close` on a RECURRING task ADVANCES the recurrence, so a replay silently skips a
+#: real occurrence — the tool's own docstring says so. Wider window than create: the
+#: damage is worse and a deliberate second close of the SAME task id within the hour
+#: is not a thing Matthew does.
+_CLOSE_WINDOW_SECONDS = 60 * 60
 
 # ── Todoist API client ────────────────────────────────────────────────────────
 
@@ -268,10 +291,25 @@ def create_todoist_task(args):
             payload["description"] = description
         if labels:
             payload["labels"] = labels
-        result = _todoist_request("POST", "/tasks", payload)
+        # #3115: find-or-create over OUR record of the create — Todoist has no
+        # idempotency header, so this is the only thing standing between a retry and
+        # a duplicate task Matthew has to delete by hand.
+        key = _idem.content_key(content, project_id, due_string, due_date, description, labels)
+        dup = _idem.guard(table, "create_todoist_task", key, payload={"task_id": ""}, window_seconds=_CREATE_WINDOW_SECONDS)
+        if dup:
+            return {**dup, "created": False}
+        try:
+            result = _todoist_request("POST", "/tasks", payload)
+        except Exception:
+            # The POST failed, so nothing was created — hand the claim back or the
+            # honest retry is blocked for the whole window (the fail-CLOSED direction).
+            _idem.release(table, "create_todoist_task", key)
+            raise
+        task_id = str(result.get("id", ""))
+        _idem.record(table, "create_todoist_task", key, {"task_id": task_id, "content": content})
         return {
             "created": True,
-            "task_id": str(result.get("id", "")),
+            "task_id": task_id,
             "content": result.get("content", ""),
             "due": result.get("due"),
             "project_id": str(result.get("project_id", "")),
@@ -299,7 +337,19 @@ def close_todoist_task(args):
         task_id = args.get("task_id")
         if not task_id:
             return {"error": "task_id is required"}
-        _todoist_request("POST", f"/tasks/{task_id}/close")
+        # #3115: for a RECURRING task, close ADVANCES the recurrence — a replayed close
+        # marks a real future occurrence done that Matthew never did. Refuse a second
+        # close of the same task id inside the window; the response says so plainly
+        # rather than reporting a success that already happened.
+        key = _idem.content_key(task_id)
+        dup = _idem.guard(table, "close_todoist_task", key, payload={"task_id": str(task_id)}, window_seconds=_CLOSE_WINDOW_SECONDS)
+        if dup:
+            return {**dup, "closed": False, "task_id": task_id, "reason": "already closed within the replay window (#3115)"}
+        try:
+            _todoist_request("POST", f"/tasks/{task_id}/close")
+        except Exception:
+            _idem.release(table, "close_todoist_task", key)
+            raise
         return {"closed": True, "task_id": task_id}
     except Exception as e:
         logger.error(f"close_todoist_task error: {e}")

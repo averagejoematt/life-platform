@@ -140,6 +140,20 @@ DEFAULT_STALE_HOURS = 48
 #                  into several raw trees (apple_health's HAE datatypes) carries them as a
 #                  `sub_layouts` sub-dict, each with its own prefix/scheme/filename
 #                  (#2278 — a prose `note` is not something a reader can resolve).
+#                  `sub_layouts` also covers a temporal PREDECESSOR generation that lives
+#                  under a wholly different prefix, not just a different leaf (whoop/#3128:
+#                  a pre-2026-05-17 per-metric-type split at raw/matthew/whoop/{cycle,sleep,
+#                  recovery,workout}/, where `filename_legacy` — same prefix, different leaf
+#                  — doesn't fit).
+#   unmodeled_legacy  (#3128) a DATED, documented exclusion for a real generation found live
+#                  but deliberately left unresolved (no `sub_layouts`/`filename_legacy`
+#                  entry) because modeling it is real effort beyond the finding PR's scope.
+#                  {dated, prefix, scheme, filename, note} — read by no production code path
+#                  (there is nothing to resolve yet); it exists so a registry reader sees an
+#                  honest, sized gap instead of silently inferring a source has no more
+#                  history. The alternative to `unmodeled_legacy` is always to model instead
+#                  — this facet is for the case that's out of scope, not a shortcut around one
+#                  that isn't.
 #   inbound_mode   (#1677) how a record can arrive AT ALL. Absent = a fetch of some kind
 #                  exists. 'paste-only' = the closed platforms (X/Instagram/TikTok):
 #                  no client, no secret, no token path in this repo — the owner pastes
@@ -225,7 +239,65 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "method": "OAuth API pull, 5x daily",
         "metrics": "Recovery, sleep, HRV, resting HR, strain",
         "posture": "load-bearing",
-        "raw_layout": {"prefix": "raw/matthew/whoop", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
+        "raw_layout": {
+            "prefix": "raw/matthew/whoop",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            # #3128 (DIL-028 residual, live-confirmed 2026-08-25): the combined
+            # date-tree above only goes back to 2026-05-17 (the SIMP-2 migration
+            # date). Before that, whoop wrote a structurally distinct PER-METRIC
+            # archive — a separate date tree per stream under
+            # raw/matthew/whoop/{cycle,sleep,recovery,workout}/ — that the single
+            # `raw_layout` above can't express (a different S3 PREFIX per stream,
+            # not just a different leaf filename, so `filename_legacy` —
+            # same-prefix-different-leaf — doesn't fit). Modeled below as
+            # `sub_layouts`, the idiom apple_health's HAE fan-out already uses,
+            # even though this occurrence is a temporal PREDECESSOR generation
+            # rather than a currently-parallel stream. cycle/sleep/recovery are
+            # plain DD.json date trees, live-confirmed 2026-03-09..2026-05-17 (70
+            # objects each, e.g. `raw/matthew/whoop/cycle/2026/03/09.json`).
+            # workout is denser still — one folder PER DAY holding one-or-more
+            # per-workout UUID files (26 objects, live-confirmed
+            # 2026-03-13..2026-04-14, e.g.
+            # `raw/matthew/whoop/workout/2026/03/13/b8d9b2db-....json`) — no
+            # single per-day key exists, so its `filename` is documentary only
+            # (the `macrofactor` idiom: `raw_date_key` raises "unhandled leaf
+            # filename" rather than guessing one).
+            "sub_layouts": {
+                "cycle": {"prefix": "raw/matthew/whoop/cycle", "scheme": "date-tree", "filename": "DD.json"},
+                "sleep": {"prefix": "raw/matthew/whoop/sleep", "scheme": "date-tree", "filename": "DD.json"},
+                "recovery": {"prefix": "raw/matthew/whoop/recovery", "scheme": "date-tree", "filename": "DD.json"},
+                "workout": {
+                    "prefix": "raw/matthew/whoop/workout",
+                    "scheme": "date-tree",
+                    "filename": "DD/{workout_uuid}.json",
+                    "note": "one folder per day, 0-N per-workout UUID files inside — no per-day key; "
+                    "raw_date_key() raises by design (macrofactor idiom).",
+                },
+            },
+            # #3128: an EVEN OLDER third generation exists one prefix further
+            # back — raw/whoop/{cycle,sleep,recovery,workout}/ (no `matthew`
+            # user segment, the X-9 legacy-prefix family) — live-confirmed
+            # 2020-03-01..2026-03-08 (2199 objects each for cycle/sleep/recovery,
+            # 2546 for workout; every object's mtime is 2026-02-21, a one-time
+            # bulk historical import, not organic daily writes). This is real,
+            # evidence-based scope BEYOND #3128's named subtree, and modeling it
+            # (a fifth generation, on top of workout's already-nested UUID
+            # scheme) is real effort past this issue's Small estimate — left as
+            # the dated, explicit exclusion #3128's own acceptance criteria
+            # sanctions instead of silence: a walker reading this key knows
+            # there's a real, sized, dated gap rather than inferring "whoop has
+            # no more history."
+            "unmodeled_legacy": {
+                "dated": "2026-08-25",
+                "prefix": "raw/whoop/{cycle,sleep,recovery,workout}",
+                "scheme": "date-tree",
+                "filename": "DD.json (workout: DD/{workout_uuid}.json)",
+                "note": "no-user-segment predecessor of the sub_layouts above; live-confirmed 2020-03-01..2026-03-08 via "
+                "read-only aws s3 ls, 2026-08-25 — 2199 objects each under cycle/sleep/recovery, 2546 under workout, all "
+                "written 2026-02-21 (bulk import). File a follow-up if pre-2026-03 whoop replay is ever needed (#3128).",
+            },
+        },
         # TR-07 (#415): opt-in provider-diff reconciliation. Whoop pulls 5x daily
         # (#2204 — the hourly cron spent a refresh-token rotation every run) with
         # no rate-limit breaker, so a daily trailing-window diff (sleeps + workouts)

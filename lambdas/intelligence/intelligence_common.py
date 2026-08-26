@@ -23,6 +23,7 @@ import boto3
 from boto3.dynamodb.conditions import Attr, Key
 from coach.reading_date_fidelity import guard_derived_summary  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
@@ -104,8 +105,8 @@ def build_data_inventory() -> dict:
     from `phase_taxonomy` (#2092's shape), so adding an EXPERIMENT_SCOPED partition to
     the inventory later keeps its filter without anyone remembering to ask.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d90 = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    today = pacific_today()
+    d90 = (pacific_now() - timedelta(days=90)).strftime("%Y-%m-%d")
 
     inventory: dict[str, Any] = {}
     seen_partitions = set()
@@ -258,7 +259,7 @@ def build_data_maturity(inventory: dict) -> dict:
 
     Returns dict of domain → {days, phase, threshold, established_at, unit, voice_template}.
     """
-    today = datetime.now(timezone.utc)
+    today = pacific_now()  # #2811: maturity is counted in PACIFIC days of data
     maturity = {}
 
     for domain, thresholds in _MATURITY_THRESHOLDS.items():
@@ -491,7 +492,7 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
     # Days-since-latest computed inline so coaches know NOT to opine on stale
     # sources. The evaluator's distinction between "no data" and "stale data"
     # matters here — silent-failure mode was the v7.x audit's #1 cost driver.
-    _today = datetime.now(timezone.utc).date()
+    _today = pacific_now().date()
     inventory_lines = []
     stale_sources = []  # sources stale enough to warrant a separate hard warning
     for src, info in sorted(inventory.items()):
@@ -676,8 +677,6 @@ def validate_coach_output(coach_id: str, domain: str, narrative: str, inventory:
 
     Returns list of flag dicts: {check, severity, detail, source_text}.
     """
-    import re
-
     flags = []
     text_lower = narrative.lower()
 
@@ -919,7 +918,7 @@ def complete_action(action_id: str, method: str = "manual", note: str = None) ->
     accountability record could gain completions for work never assigned. A conditional
     failure now surfaces as the same raised exception every other write failure uses.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     update_expr = "SET #st = :completed, completion_date = :cd, completion_method = :cm"
     attr_names = {"#st": "status"}
     attr_values = {
@@ -975,8 +974,8 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
       30-60: tipping (platform significantly exceeds health)
       60-100: displaced (heavy platform work, minimal health execution)
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    today = pacific_today()
+    start = (pacific_now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     # Platform activity: Todoist tasks completed (ADR-058: phase=pilot filtered)
     platform_tasks = 0
@@ -1290,7 +1289,7 @@ def write_coach_thread(coach_id: str, entry: dict) -> bool:
     Entry should contain: position_summary, predictions, surprises,
     stance_changes, emotional_investment, open_questions, learning_log.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     week = _iso_week(today)
 
     item = {
@@ -1522,7 +1521,7 @@ def stamp_thread_predictions(coach_id: str, raw_predictions: list, today: str = 
 
     Returns the cleaned prediction list (deduped within the batch by semantic_key).
     """
-    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = today or pacific_today()
     day_compact = today.replace("-", "")
 
     # Prior OPEN predictions by semantic key — so a re-emitted claim reuses its

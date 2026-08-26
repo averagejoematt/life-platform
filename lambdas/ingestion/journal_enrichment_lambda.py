@@ -54,7 +54,7 @@ from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import pacific_now, parse_iso_utc  # #1964: the one Pacific frame + the one ISO parser
+from common.pacific_time import pacific_now, pacific_today, parse_iso_utc  # #1964: the one Pacific frame + the one ISO parser
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -471,7 +471,7 @@ def lambda_handler(event: dict, context) -> dict:
           {"force": true}                 → re-enrich already-enriched entries
         """
         if hasattr(logger, "set_date"):
-            logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+            logger.set_date(pacific_today())  # OBS-1
         force = event.get("force", False)
         full_sync = event.get("full_sync", False)
 

@@ -40,6 +40,8 @@ import boto3
 from common.constants import EXPERIMENT_START_DATE, day_n  # ADR-058
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
+from coach import coach_brief_input_gate as _input_gate  # #3107 — system prompt + the upstream change-gate
+
 # Structured logger
 try:
     from common.platform_logger import get_logger
@@ -145,10 +147,8 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from common.numeric import (
-    decimals_to_float as _decimal_to_float,  # noqa: E402,F401
-    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
-)
+from common.numeric import decimals_to_float as _decimal_to_float, floats_to_decimal  # noqa: E402,F401  # canonical float->Decimal (#1207)
+from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from common.retry_utils import _emit_token_metrics  # noqa: E402,F401
@@ -189,7 +189,7 @@ def _track_record_block(coach_id: str) -> str:
 
         from boto3.dynamodb.conditions import Key as _Key
 
-        cutoff = (datetime.now(timezone.utc) - _td(days=60)).strftime("%Y-%m-%d")
+        cutoff = (pacific_now() - _td(days=60)).strftime("%Y-%m-%d")
         r = table.query(
             KeyConditionExpression=_Key("pk").eq(f"COACH#{coach_id}") & _Key("sk").gt(f"LEARNING#{cutoff}"),
         )
@@ -512,7 +512,7 @@ def _gather_all_state(coach_id):
     # 9b. Commitments (#532) — the concrete actions this coach pushed. Due/overdue
     # pending ones get injected so the coach MUST revisit its own advice; recently
     # resolved kept/broken ones frame follow-through. Bounded read (most recent 50).
-    _today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    _today_str = pacific_today()
     all_commitments = _query_begins_with(coach_pk, "COMMITMENT#", scan_forward=False, limit=50)
     due_commitments = [c for c in all_commitments if c.get("status") == "pending" and str(c.get("due_date") or "9999") <= _today_str]
     resolved_commitments = [c for c in all_commitments if c.get("status") in ("kept", "broken")][:5]
@@ -649,8 +649,8 @@ def _gather_journal_mood_signal():
     try:
         from boto3.dynamodb.conditions import Key as _Key
 
-        end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        start = (datetime.now(timezone.utc) - timedelta(days=JOURNAL_MOOD_WINDOW_DAYS)).strftime("%Y-%m-%d")
+        end = pacific_today()
+        start = (pacific_now() - timedelta(days=JOURNAL_MOOD_WINDOW_DAYS)).strftime("%Y-%m-%d")
         pk = f"USER#{USER_ID}#SOURCE#notion"
         kwargs = with_phase_filter(
             {
@@ -865,43 +865,12 @@ def _engagement_for_brief(signal):
 # SYSTEM PROMPT
 # ══════════════════════════════════════════════════════════════════════════════
 
-SYSTEM_PROMPT = (
-    "You are the Narrative Orchestrator — the 'showrunner' for a team of "
-    "AI health coaches. Your job is to produce a structured generation brief "
-    "that will guide one specific coach's next output.\n\n"
-    "You are NOT the coach. You do not write the coaching content. You plan "
-    "what the coach should write about, which threads to reference, what "
-    "cross-coach context to incorporate, and what voice/structural guidance "
-    "to follow.\n\n"
-    "## Your Responsibilities\n\n"
-    "1. **Thread management**: Identify which open threads the coach should "
-    "address, which to leave dormant, and whether new threads should be "
-    "opened based on computation results.\n\n"
-    "2. **Cross-coach context**: Determine which other coaches' concerns, "
-    "recommendations, or disagreements are relevant to this coach's domain. "
-    "Weight by influence graph.\n\n"
-    "3. **Prediction accountability**: Flag predictions that need addressing "
-    "— confirmed, refuted, or approaching their evaluation window.\n\n"
-    "4. **Narrative beat**: Set the narrative tone for this output based on "
-    "the journey phase, recent arc history, and current data state.\n\n"
-    "5. **Voice guidance**: Based on the coach's voice state, recommend "
-    "opening types (avoiding overused patterns), structural approaches, and "
-    "any anti-patterns to watch for.\n\n"
-    "6. **Decision class ceiling**: Based on available evidence and data "
-    "maturity, set the maximum decision class "
-    "(observational/directional/interventional) the coach should use.\n\n"
-    "7. **Computation context**: Package relevant trend data, statistical "
-    "flags, and regression-to-mean warnings for the coach.\n\n"
-    "## Statistical Guardrails (ENFORCE THESE)\n\n"
-    '- <7 days of data: "Observational only — no directional claims"\n'
-    '- <14 days of data: "Use preliminary framing"\n'
-    '- Regression-to-mean warnings: "Do not claim intervention effect"\n'
-    '- Autocorrelation flags: "Likely autocorrelation, not independent signal"\n'
-    '- N=1 constraint: Always. "Unusual for you" only, never "unusual."\n\n'
-    "## Output Format\n\n"
-    "Return ONLY valid JSON matching the generation_brief schema. "
-    "No markdown, no explanation, no preamble."
-)
+# #3107: the literal moved to coach/coach_brief_input_gate.py — the upstream
+# change-gate hashes it as part of the prompt-template digest, and extracting it
+# is what paid (under the #2610 earned-headroom rule) for the fingerprint-only
+# dispatch below. Re-exported so `orch.SYSTEM_PROMPT` is unchanged for every
+# caller and test.
+SYSTEM_PROMPT = _input_gate.ORCHESTRATOR_SYSTEM_PROMPT
 
 
 def _build_user_message(state, coach_id, today):
@@ -1205,12 +1174,19 @@ def lambda_handler(event, context):
     Returns the generation brief JSON.
     """
     coach_id = event.get("coach_id", TARGET_COACH)
-    today = event.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    today = event.get("date", pacific_today())
 
     logger.info("Starting narrative orchestrator for %s on %s", coach_id, today)
 
     # Gather all state
     state = _gather_all_state(coach_id)
+
+    # #3107: fingerprint-only mode — hash what this leg READS and return, with no
+    # model call. The caller's upstream change-gate needs the orchestrator's own
+    # inputs (this state is a large DDB/S3 read the caller cannot see); without
+    # them a skip would be blind to a real change. See coach_brief_input_gate.
+    if event.get("mode") == _input_gate.FINGERPRINT_MODE:
+        return {"coach_id": coach_id, _input_gate.FINGERPRINT_MODE: _input_gate.orchestrator_input_digest(state)}
 
     # Build the orchestrator prompt
     user_message = _build_user_message(state, coach_id, today)

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+from common.pacific_time import pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 
 PLATFORM_MAP = {
     "doordash": "doordash",
@@ -335,7 +336,7 @@ def lambda_handler(event, context):
             print(f"No food delivery rows in {key}")
             return {"statusCode": 200, "body": "No rows"}
 
-        import_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        import_date = pacific_today()
         result = ingest_food_delivery_rows(table, food_rows, import_date)
 
         # Write DATE# record for freshness checker

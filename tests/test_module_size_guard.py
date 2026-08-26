@@ -182,7 +182,7 @@ BASELINE = {
     # unchanged. 132 lines came out; 26 of them (a fifth — the #2610 earned-headroom rule)
     # are banked so the re-bill fix and the #3084 budget-stop clause have room, and 106 are
     # handed back. Measured 2264. Terminal cure is still under 1200 and pruning this line.
-    "lambdas/ai/ai_calls.py": 2290,
+    "lambdas/ai/ai_calls.py": 2245,
     # 2216 -> 1828 by #2221: the pure record->summary extractors were lifted into
     # lambdas/emails/weekly_digest_extractors.py (559 lines, under the ceiling) so the
     # honest-numbers fixes could land without raising this number. The ratchet tightening.
@@ -201,7 +201,12 @@ BASELINE = {
     # cohesive lambdas/web/site_api_ai_context.py (459 lines, under the ceiling) so
     # the per-metric as-of work had room. Extracted ~312 net; banked 62 (a fifth,
     # the #2610 earned-headroom rule), handed the rest back.
-    "lambdas/web/site_api_ai_lambda.py": 1753,
+    # 1753 -> 1700 by #3118 (2026-08-24): the #546 board-session store (mint / load /
+    # conditional append + its security-posture block) moved to cohesive
+    # lambdas/web/site_api_ai_session.py (168 lines, under the ceiling), which paid for
+    # the #3118 turn-identity replay guard that stayed behind. Extracted 98, spent 38,
+    # measured 1693; banked 7 of the ~19 the earned-headroom rule allows. Lowering.
+    "lambdas/web/site_api_ai_lambda.py": 1700,
     # 1989 -> 1829 by #2221: tool_get_social_connection_trend was lifted into cohesive
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)
@@ -277,7 +282,7 @@ BASELINE = {
     # the OLDEST reading in a 14-day window). The single line buys one shared definition —
     # the ratchet's first real bump, and the shape it is meant to allow.
     "lambdas/compute/daily_metrics_compute_lambda.py": 1370,
-    "lambdas/coach/coach_narrative_orchestrator.py": 1315,
+    "lambdas/coach/coach_narrative_orchestrator.py": 1292,
     # 1268 -> 1233 (#2418): the ADR-104 grounding gate on the derived reader prose is
     # ~85 lines of new substance, and this file was AT its recorded number. Paid for the
     # #2221 way rather than by raising it — the 143-line extraction-prompt literal moved

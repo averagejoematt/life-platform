@@ -14,11 +14,8 @@ from pathlib import Path
 
 import aws_cdk as cdk
 from aws_cdk import (
-    Duration,
     Stack,
     aws_apigatewayv2 as apigwv2,
-    aws_cloudwatch as cloudwatch,
-    aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
@@ -33,7 +30,7 @@ from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
-from stacks.lambda_helpers import create_platform_lambda, staged_tree_asset
+from stacks.lambda_helpers import create_platform_lambda
 
 # ── #2806/#2807/#2808: the social-enrichment channel set, derived at synth time ──
 # from lambdas/ingestion/source_registry.py — the ONE registry vocabulary for
@@ -523,32 +520,40 @@ class IngestionStack(Stack):
         # backfill/archive/backfill_apple_health.py (hard-guarded).
 
         # ── 15. Health Auto Export Webhook — API Gateway trigger
-        hae_role = iam.Role(
-            self,
-            "HaeWebhookRole",
-            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            managed_policies=[iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole")],
-        )
-        for stmt in rp.ingestion_hae():
-            hae_role.add_to_policy(stmt)
-        # NOTE: HAE uses code= (the staged full-tree bundle), not source_file=.
-        # Handler health_auto_export_lambda.lambda_handler → lambdas/health_auto_export_lambda.py  # noqa: CDK_HANDLER_ORPHAN
-        hae = _lambda.Function(
+        # #2846 (2026-08-24): migrated from a raw `_lambda.Function` to the paved
+        # road. It was one of the two raw constructions left in cdk/stacks/, and
+        # being raw made it invisible to every derivation keyed on the constructor
+        # — deploy/check_lambda_config_drift.py never checked its timeout/memory
+        # against live, and its `# noqa: CDK_HANDLER_ORPHAN` bought it a free pass
+        # from the handler-consistency guard (H1/H3) on a Lambda whose handler had
+        # been hand-maintained. Nothing about the deployed shape changes except the
+        # conventions it now inherits (X-Ray, 30-day log retention, budget-tier
+        # read); the hand-rolled #2822 error alarm below it — whose own comment
+        # said "shape mirrors lambda_helpers' fleet error_alarm exactly" — is now
+        # literally that alarm, same logical id, same name, same digest routing.
+        # Phase 1.6 (2026-05-16): 60s→300s. Large Apple Health exports (10-50MB)
+        # silently 504'd. BUG-07.
+        hae = create_platform_lambda(
             self,
             "HaeWebhook",
             function_name="health-auto-export-webhook",
-            runtime=_lambda.Runtime.PYTHON_3_12,
+            source_file="lambdas/ingestion/health_auto_export_lambda.py",
             handler="ingestion.health_auto_export_lambda.lambda_handler",
-            code=staged_tree_asset(),
-            role=hae_role,
-            timeout=Duration.seconds(300),
-            memory_size=256,
-            environment={
-                "TABLE_NAME": local_table.table_name,
-                "S3_BUCKET": local_bucket.bucket_name,
-                "USER_ID": self.node.try_get_context("user_id") or "matthew",
-            },
-        )  # Phase 1.6 (2026-05-16): 60s→300s. Large Apple Health exports (10-50MB) silently 504'd. BUG-07.
+            timeout_seconds=300,
+            memory_mb=256,
+            custom_policies=rp.ingestion_hae(),
+            table=local_table,
+            bucket=local_bucket,
+            # No DLQ: a synchronous API-GW invoke has nowhere to park a failure
+            # (the #2822 comment below reasons the alarm from exactly this).
+            dlq=None,
+            # #2822's carve-out, now expressed as the fleet convention rather than
+            # a hand-rolled copy of it.
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+            alarm_name="hae-webhook-errors",
+        )
 
         # ── HTTP API front door (#500/D-7) ──
         # Imported into CDK: this was console-created 2026-02-24 (api id
@@ -621,6 +626,13 @@ class IngestionStack(Stack):
         # story removes).
 
         # ── #2822: hae-webhook Errors alarm — the near-real-time carve-out ──
+        # #2846: this alarm is now produced by the create_platform_lambda call
+        # above (alarm_name="hae-webhook-errors", digest=True) — same logical id
+        # HaeWebhookErrorAlarm, same 1h/Sum>=1/eval-1/NOT_BREACHING shape, same
+        # digest-topic action. The reasoning is kept here verbatim because it is
+        # the argument for the carve-out, and the carve-out is the reason the
+        # `alarm_name=` override exists on that call rather than the fleet default.
+        #
         # The webhook's only dedicated watch was the no-invocations heartbeat in
         # monitoring_stack (Invocations < 1 / 24h): a 100%-ERROR state (bad payload
         # class, secret rotation, schema change) keeps invocations FLOWING and that
@@ -643,19 +655,6 @@ class IngestionStack(Stack):
         # Digest routing (ADR-050, like every ingestion-error-* alarm before it):
         # a next-morning digest line converts the 2-3 day blind window to <24h;
         # an erroring webhook is a fix-today item, not a 2am page.
-        hae_errors = hae.metric_errors(
-            period=Duration.hours(1),
-            statistic="Sum",
-        ).create_alarm(
-            self,
-            "HaeWebhookErrorAlarm",
-            alarm_name="hae-webhook-errors",
-            evaluation_periods=1,
-            threshold=1,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        hae_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── 16. Google Calendar — RETIRED (ADR-030, v3.7.46)
         # All integration paths blocked by Smartsheet IT policy or macOS restrictions.

@@ -20,11 +20,11 @@ yield the same routine. Tested via golden + property + cap tests.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import random
-import uuid
 from datetime import date
 from typing import Any
 
@@ -225,8 +225,26 @@ def _portfolio_guard(z2_minutes_7d: float, z2_floor: float) -> bool:
     return z2_minutes_7d >= z2_floor
 
 
-def _new_routine_id() -> str:
-    return uuid.uuid4().hex
+def _new_routine_id(*identity: object) -> str:
+    """The routine's SEMANTIC id — 32 hex, the shape `uuid4().hex` had (#3115).
+
+    It WAS `uuid.uuid4().hex`, and that is the whole bug: every draft minted a fresh
+    `ROUTINE#` partition, so a re-run of the authoring cron or a retried `manage_hevy_
+    routine draft` left two independent routines for the same session, and committing
+    each POSTed a second routine to Hevy that Matthew had to delete by hand. Nothing
+    anywhere deduped on `(target_date, archetype, variant)` — which is what actually
+    identifies a programmed session.
+
+    Callers pass the fields that make two drafts the SAME draft: the generator passes
+    that triple; `draft_custom` passes the triple plus its hand-authored blocks, because
+    two different custom sessions on one day are genuinely two routines.
+
+    A collision is the POINT, not a hazard: `routine_repo.draft_versioned` turns a
+    re-draft into a new VERSION of the existing routine and carries its Hevy link
+    forward, so the following commit UPDATES the remote routine instead of re-creating it.
+    """
+    canonical = json.dumps([str(part) for part in identity], separators=(",", ":"), default=str, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
 
 
 def _now_iso() -> str:
@@ -325,7 +343,7 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     assert est_minutes <= caps["session_minutes"], f"BUG: est_minutes {est_minutes} > cap {caps['session_minutes']}"
 
     ideal = RoutineSpec(
-        routine_id=_new_routine_id(),
+        routine_id=_new_routine_id(inputs.target_date, archetype, "ideal"),
         target_date=inputs.target_date,
         archetype=archetype,
         variant="ideal",
@@ -450,7 +468,7 @@ def _make_floor(
             tag = f"floor_{muscle}"
             exercises.append(_block_from_pick(mk, mdef, tag))
     return RoutineSpec(
-        routine_id=_new_routine_id(),
+        routine_id=_new_routine_id(inputs.target_date, archetype, "floor"),
         target_date=inputs.target_date,
         archetype=archetype,
         variant="floor",
@@ -495,7 +513,7 @@ def _make_re_entry(
         for mk, mdef in picks:
             exercises.append(_block_from_pick(mk, mdef, f"re_entry_{muscle}"))
     return RoutineSpec(
-        routine_id=_new_routine_id(),
+        routine_id=_new_routine_id(inputs.target_date, archetype, "re_entry"),
         target_date=inputs.target_date,
         archetype=archetype,
         variant="re_entry",
@@ -523,7 +541,7 @@ def _non_lifting_pair(
     catalog: dict[str, Any],
 ) -> list[RoutineSpec]:
     ideal = RoutineSpec(
-        routine_id=_new_routine_id(),
+        routine_id=_new_routine_id(inputs.target_date, archetype, "ideal"),
         target_date=inputs.target_date,
         archetype=archetype,
         variant="ideal",

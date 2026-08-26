@@ -47,7 +47,8 @@ DISCOVERED_COUNTS = {
     "data_sources": 20,
     "mcp_tools": 76,
     "lambdas": 104,
-    "alarms": 114,
+    "alarms": 116,
+    "cdk_stacks": 10,
     "adrs": 153,
-    "test_count": 17099,
+    "test_count": 17331,
 }

@@ -29,6 +29,7 @@ from datetime import date as _date_cls, timedelta as _timedelta_cls
 from typing import Any, Optional
 
 import boto3
+from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import pacific_today
 
@@ -1605,6 +1606,34 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
                 _comp_results_cache = {}
         comp_results = _comp_results_cache
 
+        # Step 1.5 (#3107): the UPSTREAM change-gate. Everything from Step 2 down
+        # costs model calls (orchestrator Haiku, generation Sonnet, gate rewrites);
+        # these inputs cost none. If they are byte-identical to the last gate-passed
+        # run, the whole leg is skipped. This gate exists because the ADR-126
+        # DOWNSTREAM fingerprint's largest part is `brief` — the orchestrator's Haiku
+        # output at temperature 0.3 — so it could never hit (0/56 consecutive-day
+        # pairs, #2889). The full rationale + the fail-closed rules: coach_brief_input_gate.
+        output_type = f"daily_brief_{domain_label.lower().replace(' ', '_')}"
+        _data_inventory = _in_gate.data_inventory(data)
+        corrections_block = _coach_corrections_block(coach_id, surface="coach_brief")
+        # Step 3 (voice spec) runs HERE — a deterministic S3 read, and a gate input.
+        try:
+            voice_spec = json.loads(s3.get_object(Bucket="matthew-life-platform", Key=f"config/coaches/{coach_id}.json")["Body"].read())
+        except Exception as e:
+            print(f"[COACH-V2:{coach_id}] Voice spec load failed: {e} — falling back to legacy")
+            return None
+        try:
+            _tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
+        except Exception as _tbl_e:
+            print(f"[COACH-V2:{coach_id}] generation cache table unavailable (non-blocking): {_tbl_e}")
+            _tbl = None
+        _gate = _in_gate.BriefCacheGate(lambda_client, _tbl, _cw, _CW_NAMESPACE, coach_id, output_type)
+        _reuse = _gate.check_upstream(
+            domain_label, comp_results, domain_data, _data_inventory, corrections_block, voice_spec, pacific_today()
+        )
+        if _reuse:
+            return _reuse
+
         # Step 2: Narrative orchestrator
         print(f"[COACH-V2:{coach_id}] Step 2: Invoking narrative orchestrator...")
         try:
@@ -1626,15 +1655,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
             print(f"[COACH-V2:{coach_id}] Orchestrator failed: {e} — falling back to legacy")
             return None
 
-        # Step 3: Load voice spec from S3
-        try:
-            vs_resp = s3.get_object(Bucket="matthew-life-platform", Key=f"config/coaches/{coach_id}.json")
-            voice_spec = json.loads(vs_resp["Body"].read())
-        except Exception as e:
-            print(f"[COACH-V2:{coach_id}] Voice spec load failed: {e} — falling back to legacy")
-            return None
-
-        # Step 4: Build prompt
+        # Step 4: Build prompt (Step 3, the voice-spec load, moved up to Step 1.5 — #3107)
         few_shots = voice_spec.get("few_shot_examples", [])
         few_shot_block = ""
         if few_shots:
@@ -1816,25 +1837,8 @@ DATA INTERPRETATION RULES:
 
 Write 2-4 paragraphs of {domain_label} coaching for Matthew. Be specific, reference numbers, and stay within your evidence ceiling. Write in your distinctive voice — not a generic AI coach voice."""
 
-        # Build data inventory — tell the coach what data sources are available
-        _inventory_parts = []
-        for _src_name, _src_val in [
-            ("DEXA body composition", data.get("dexa")),
-            ("Lab bloodwork", data.get("labs")),
-            ("Body measurements", data.get("measurements")),
-            ("MacroFactor nutrition", data.get("macrofactor")),
-            ("Whoop recovery/sleep", data.get("whoop")),
-            ("Garmin steps", data.get("garmin")),
-            ("Strava activities", data.get("strava_7d")),
-            ("Eight Sleep bed temp", data.get("eightsleep")),
-            ("CGM glucose", data.get("apple_health") or data.get("apple")),
-        ]:
-            if _src_val and (not isinstance(_src_val, list) or len(_src_val) > 0):
-                _inventory_parts.append(f"  - {_src_name}: AVAILABLE")
-            else:
-                _inventory_parts.append(f"  - {_src_name}: not available")
-        _data_inventory = "\n".join(_inventory_parts)
-
+        # `_data_inventory` was built at Step 1.5 by `_in_gate.data_inventory(data)` —
+        # the gate and the prompt must read the SAME bytes, never two copies (#3107).
         user_message = f"""GENERATION BRIEF:
 {json.dumps(brief, indent=2, default=str)}
 
@@ -1860,8 +1864,8 @@ Write your {domain_label} coaching section now."""
         #   • Rolling bounded window, not auto-transition: corrections stay "open"
         #     and keep suppressing their class every cycle; "no unbounded
         #     re-injection" is met by the BOUND, not an open->applied-to-prompt flip.
-        # Fail-soft: any error → empty block, generation unchanged.
-        corrections_block = _coach_corrections_block(coach_id, surface="coach_brief")
+        # Fail-soft: any error → empty block, generation unchanged. (#3107: built at
+        # Step 1.5 — it is also an upstream-gate input, and must be the same bytes.)
 
         # The dynamic user portion the model actually receives. The corrections
         # block rides HERE — outside any cached system prefix — but is DELIBERATELY
@@ -1870,58 +1874,18 @@ Write your {domain_label} coaching section now."""
         # figure ("stop citing 315 lbs as current") must never license that number.
         user_message_full = user_message + (("\n\n" + corrections_block) if corrections_block else "")
 
-        # Step 4.5 (#738 / ADR-126): hash-and-reuse. On a quiet day the semantic
-        # brief is identical to the last one, and regenerating just re-says the
-        # same silence at full Sonnet + gate cost. Fingerprint the exact generation
-        # inputs (system_prompt + user_message carry the facts, forecast, brief
-        # thread-state, and domain data); if it matches the last gate-passed run,
-        # reuse that stored output and skip the whole generation path. The
-        # fingerprint covers every semantic input — a staleness day-count ticking
-        # up busts it — so reuse is never stale-but-fresh. Entirely fail-soft.
-        output_type = f"daily_brief_{domain_label.lower().replace(' ', '_')}"
-        _gen_cache = None
-        _cache_tbl = None
-        _brief_fp = _fp_parts = None
-        try:
-            from common import generation_cache as _gen_cache
-
-            _cache_tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
-            # #2889: STRUCTURE, never rendered prose — canonicalize strips by dict KEY. See generation_cache.
-            _fp_parts = _gen_cache.brief_parts(
-                system_prompt, brief, domain_data, comp_results.get("trends", {}), _data_inventory, corrections_block
-            )
-            _brief_fp, _reuse, _unchanged_since = _gen_cache.check_reuse_or_explain(_cache_tbl, coach_id, output_type, _fp_parts)
-            if _reuse:
-                print(f"[COACH-V2:{coach_id}] brief unchanged since {_unchanged_since} — reusing gated output, skipping generation")
-                # #2815: OUTPUT# frame — this feeds coach-state-updater's `generation_date`
-                # (the OUTPUT# sk) exactly like the fresh-generation write below, so it must
-                # resolve the SAME Pacific day, not a naive UTC one.
-                _today = pacific_today()
-                _gen_cache.record_reuse(_cache_tbl, coach_id, output_type, _today)
-                _gen_cache.emit_skip_metric(_cw, _CW_NAMESPACE, coach_id, surface="coach_brief")
-                # Still record today's section (no Bedrock generation cost) so the
-                # downstream contract — today has a coach record + thread state — is
-                # unchanged from a real generation.
-                try:
-                    lambda_client.invoke(
-                        FunctionName="coach-state-updater",
-                        InvocationType="Event",
-                        Payload=json.dumps(
-                            {
-                                "coach_id": coach_id,
-                                "output_text": _reuse,
-                                "output_type": output_type,
-                                "generation_date": _today,
-                                "unchanged_since": _unchanged_since,
-                            }
-                        ).encode(),
-                    )
-                except Exception as e:
-                    print(f"[COACH-V2:{coach_id}] State updater invoke (reuse) failed (non-blocking): {e}")
-                return _reuse
-        except Exception as _gc_e:
-            print(f"[COACH-V2:{coach_id}] generation cache unavailable (non-blocking): {_gc_e}")
-            _gen_cache = None
+        # Step 4.5 (#738 / ADR-126): hash-and-reuse — the DOWNSTREAM gate, now the second
+        # of two. It is retained exactly as it was (it is the fallback whenever the
+        # upstream digest is unavailable, and #3073's sibling surfaces share its
+        # machinery); #3107 only stopped it being the ONLY one, because its largest part
+        # is the orchestrator's temp-0.3 Haiku sample and so it could never hit.
+        # #2815: `pacific_today()` — the reuse path feeds coach-state-updater's
+        # `generation_date` (the OUTPUT# sk) exactly like the fresh write below, so it
+        # must resolve the SAME Pacific day, not a naive UTC one.
+        _trends = comp_results.get("trends", {})
+        _reuse = _gate.check_downstream(system_prompt, brief, domain_data, _trends, _data_inventory, corrections_block, pacific_today())
+        if _reuse:
+            return _reuse
 
         # Step 5: Generate with Sonnet
         print(f"[COACH-V2:{coach_id}] Generating output...")
@@ -2046,11 +2010,10 @@ Write your {domain_label} coaching section now."""
         # Step 6.5 (#738): persist this fresh, gate-passed output under its brief
         # fingerprint so an unchanged brief tomorrow reuses it. Only reached on a
         # cache MISS, so first_generated resets the unchanged-since clock.
-        if _gen_cache is not None and _cache_tbl is not None and _brief_fp and output:
-            # #2815: Pacific frame — consistent with the reuse-path `_today` above and the
-            # OUTPUT# write below, so the cache's first_generated/last_generated bookkeeping
-            # never disagrees with the sk it corresponds to.
-            _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, pacific_today(), parts=_fp_parts)
+        # #2815: Pacific frame — consistent with the reuse paths above and the OUTPUT#
+        # write below, so first_generated/last_generated never disagrees with its sk.
+        # #3107: writes BOTH rows (upstream + downstream) from this one gate-passed text.
+        _gate.store(output, pacific_today())
 
         # #1691 (epic #1687): baseline-freshness gate — ADVISORY. The DATA-grounding
         # gates above pass a brief that is digit-grounded yet cites a STALE cycle

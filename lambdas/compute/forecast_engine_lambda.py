@@ -30,13 +30,14 @@ daily-brief lane, so coaches narrate today's expectation, not yesterday's.
 
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 import boto3
 from common import stats_core
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
 
 try:
@@ -278,7 +279,7 @@ def compute_coverage(today_str):
 
 
 def lambda_handler(event: dict, context) -> dict:
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     today_str = today.isoformat()
     start = (today - timedelta(days=HISTORY_DAYS)).isoformat()
 
