@@ -71,11 +71,44 @@ def test_pre_start_reference_anchor_still_fires_when_the_text_only_mislocates():
 
 
 # ── the FALSE positives that held two coaches dark every cycle ────────────────
-def test_correct_day_cited_makes_the_other_day_tokens_references():
+def test_correct_day_cited_makes_an_EARLIER_day_token_a_back_reference():
     """mind_coach attempt 2's form. It located itself CORRECTLY ("Day 10") and was
-    held for the comparative clause. A narrative cannot be at two days at once."""
+    held for the comparative clause naming an EARLIER day.
+
+    Note this case needs exclusion 1 specifically: the span-anchor rule does not
+    reach it, because "it did at " sits between "than" and the token."""
     text = "You're at Day 10. That distinction matters more at Day 10 than it did at Day 1."
     assert _phase_findings(text) == []
+
+
+def test_correct_day_cited_does_NOT_clear_a_wrong_FUTURE_day():
+    """The blind spot in the first cut of exclusion 1: it cleared the ENTIRE text as
+    soon as the correct day appeared anywhere, so a self-contradicting narrative that
+    ALSO claimed a future day passed silently — a real #1691 mis-location. Nothing in
+    a narrative can refer FORWARD to a day that has not happened, so a future token is
+    never a back-reference. Measured before the fix: this returned [] (clean)."""
+    text = "You're at Day 10 of the experiment. We're now on Day 12 and the trend holds."
+    assert [f["claimed_day"] for f in _phase_findings(text)] == [12], _phase_findings(text)
+
+
+def test_wrong_future_day_alone_still_fires_the_control():
+    """The same claim with no correct day present — exclusion 1 is off entirely and
+    the finding was never in doubt. Pinned so the case above cannot pass for the
+    wrong reason (e.g. the gate silently disarming)."""
+    assert [f["claimed_day"] for f in _phase_findings("We're now on Day 12 and the trend holds.")] == [12]
+
+
+def test_backward_mislocation_beside_the_correct_day_is_KNOWN_UNCOVERED():
+    """Stated, not papered over: "You're at Day 10 … we're on Day 3" is cleared,
+    because it is genuinely ambiguous with the back-reference exclusion 1 exists to
+    permit ("at Day 3 you were still ramping"). The deterministic layer cannot
+    separate those without reading intent, and ADR-105 sends a semantic question to
+    the judge rather than a regex. This test documents the hole so a future change
+    that closes it has to delete this pin deliberately."""
+    text = "You're at Day 10 of the experiment. We're now on Day 3 and the trend holds."
+    assert _phase_findings(text) == []
+    # …and the same claim WITHOUT the correct day present is still caught.
+    assert [f["claimed_day"] for f in _phase_findings("We're now on Day 3 and the trend holds.")] == [3]
 
 
 def test_span_anchor_day_reference_is_not_a_self_location_claim():

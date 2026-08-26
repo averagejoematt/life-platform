@@ -94,16 +94,34 @@ _DAY_N_RE = re.compile(r"\bday\s+(\d{1,4})\b", re.IGNORECASE)
 #
 # Two structural exclusions, both about the CLAIM rather than the phrase:
 #
-#   1. The text also cites the correct day. A narrative cannot be at two days at
-#      once; having located itself correctly, its other Day tokens are references.
+#   1. The text also cites the correct day, AND the token is a PAST day (n <
+#      expected_day). Having located itself correctly, a narrative's references to
+#      earlier days are back-references — but a WRONG FUTURE day is never one:
+#      nothing can refer forward to a day that has not happened, so "You're at Day
+#      10 … We're now on Day 12" is a real #1691 mis-location and still fires. The
+#      first cut of this exclusion cleared the whole text once the correct day
+#      appeared anywhere, which silently passed exactly that draft; a
+#      self-contradicting narrative is what an LLM actually produces, and when it
+#      does claim two days that IS the defect, not evidence there is none.
 #      Set-level, no phrase matching, and inert in the pre_start phase (there is
 #      no correct day to cite there — every "Day N" is a mis-location, which is
 #      the exact #1691 incident and stays caught).
+#
+#      KNOWN UNCOVERED, stated rather than papered over: a BACKWARD mis-location
+#      co-occurring with the correct day — "You're at Day 10 … we're on Day 3" —
+#      is still cleared, because it is genuinely ambiguous with the back-reference
+#      this exclusion exists to permit ("at Day 3 you were still ramping"). The
+#      deterministic layer cannot separate those two without reading intent, and
+#      ADR-105 says a semantic question goes to the judge, not to a regex. The
+#      same claim with NO correct day present still fires (exclusion 1 is off).
 #   2. The token is governed by a span/comparison anchor. "since Day 1", "than
 #      Day 1", "back on Day 3", "from Day 1", "compared to Day 4" — a closed set
 #      of function words after which English cannot state a present location
 #      ("we are since Day 1" is not a sentence). Deliberately EXCLUDES "on"/"at",
-#      which are exactly how a self-location IS stated ("we're on Day 10").
+#      which are exactly how a self-location IS stated ("we're on Day 10"). Note
+#      this does NOT subsume exclusion 1: the real mind_coach clause "matters more
+#      at Day 10 than it did at Day 1" has "it did at " between the anchor and the
+#      token, so only exclusion 1 clears it.
 _DAY_REFERENCE_ANCHOR_RE = re.compile(
     r"(?:\bthan|\bsince|\bfrom|\bversus|\bvs\.?|\bcompared\s+(?:to|with)|\bbetween|\bback\s+(?:on|to|at))\s+$",
     re.IGNORECASE,
@@ -389,16 +407,20 @@ def baseline_freshness_findings(
     # ── stale_phase ───────────────────────────────────────────────────────────
     phase, expected_day = _phase_for(generation_date_iso, start_date_iso)
     if phase is not None:
-        # #3202 exclusion 1 — the narrative already located itself correctly, so
-        # every OTHER Day token in it is a reference. Inert pre-start by design.
+        # #3202 exclusion 1 — the narrative already located itself correctly, so its
+        # references to EARLIER days are back-references. Scoped to n < expected_day:
+        # a wrong FUTURE day can never be a back-reference and still fires. Inert
+        # pre-start by design.
         located_correctly = phase == "in_experiment" and any(int(m.group(1)) == expected_day for m in _DAY_N_RE.finditer(text))
         seen_days = set()
         for dm in _DAY_N_RE.finditer(text):
             n = int(dm.group(1))
             if n in seen_days:
                 continue
+            if located_correctly and expected_day is not None and n < expected_day:
+                continue
             # #3202 exclusion 2 — a span/comparison anchor governs this token.
-            if located_correctly or _is_day_reference(text, dm.start()):
+            if _is_day_reference(text, dm.start()):
                 continue
             if phase == "pre_start":
                 if n >= 1:
