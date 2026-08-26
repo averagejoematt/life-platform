@@ -271,14 +271,6 @@ for why it is not a census of every must-agree pair.
 | `hevy-restamp-errors` | operational_stack | digest |
 | `hevy-routine-cron-errors` | operational_stack | digest |
 | `ingest-auth-unhealthy-24h` | monitoring_stack | urgent |
-| `ingestion-error-eightsleep` | ingestion_stack | unresolved |
-| `ingestion-error-enrichment` | ingestion_stack | unresolved |
-| `ingestion-error-hevy-backfill` | ingestion_stack | unresolved |
-| `ingestion-error-macrofactor` | ingestion_stack | unresolved |
-| `ingestion-error-strava` | ingestion_stack | unresolved |
-| `ingestion-error-todoist` | ingestion_stack | unresolved |
-| `ingestion-error-whoop` | ingestion_stack | unresolved |
-| `ingestion-error-withings` | ingestion_stack | unresolved |
 | `key-rotator-errors` | operational_stack | digest |
 | `life-platform-daily-brief-memory-high` | monitoring_stack | digest |
 | `life-platform-data-export-errors` | operational_stack | digest |
@@ -320,6 +312,6 @@ for why it is not a census of every must-agree pair.
 
 - Edge sites: 1142 total · 826 resolved · 316 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 58 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
+- Alarms: 50 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled

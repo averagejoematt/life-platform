@@ -11,6 +11,20 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 CF_DIST_ID = os.environ.get("CF_DIST_ID", "E3S424OXQZ8NBE")
 
+# ── DynamoDB TTL attribute (table-config-noop-ttl, #2799 residual — #951 recurrence) ──
+# `life-platform` is imported into CDK (`Table.from_table_name`), so its
+# TimeToLiveSpecification is not a CFN resource — it was enabled once out-of-band via
+# the AWS API, with no declared source anywhere for which attribute name carries the
+# expiry epoch. That gap is exactly how #951 shipped: email_subscriber_lambda wrote its
+# expiry to `expires_at` while the table's live TTL was actually enabled on `ttl`
+# (rate_limiter.py's attribute) — 550 rows accumulated forever behind a code comment
+# claiming DDB would reap them, and nothing compared the two. This constant is now the
+# ONE declared name; every writer of a TTL-bearing item should key its expiry field to
+# it, and `deploy/drift_sentinel.py::check_dynamodb_ttl` asserts the live
+# `describe_time_to_live` response actually matches (same declared-vs-live idiom as
+# `check_s3_lifecycle`, deploy/drift_sentinel.py:525).
+TABLE_TTL_ATTRIBUTE = os.environ.get("TABLE_TTL_ATTRIBUTE", "ttl")
+
 # ── DIL-027: the isolated backup of the irreplaceable zone ────────────────────
 # `raw/` is the ONLY unrecomputable data on the platform (original wearable/API
 # captures; every DDB metric, every derived artifact and the whole site can be
