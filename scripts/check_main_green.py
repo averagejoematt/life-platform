@@ -115,6 +115,28 @@ error (API read failure) returns 2, never 0 — "could not verify" must never
 read as "coverage OK", and must not be conflated with a CONFIRMED swallow (1)
 either, since only the latter should page.
 
+#3212 wires that discriminator into its OTHER consumer — `main()`, the gate a
+session actually runs at boot and at wrap. Until then `classify_zero_run_head`
+was reachable ONLY from the scheduled `--head-coverage-check` path, so `main()`
+printed the #2762 swallowed-push text on every `uncovered` HEAD without ever
+asking. A session's own wrap commit is docs-only BY CONSTRUCTION, so the gate
+red-flagged every wrap and the documented remedy was to wave it through with
+`--decoded` — training for waving through the real thing. Live-proved at
+Session E boot: the same repo state, the same file, two different answers for
+main's HEAD 57baffd9 (bare `main()` said swallowed-push, exit 1;
+`--head-coverage-check` said path-filter skip and named the five sibling
+workflows that HAD run, exit 0 — the second is correct).
+
+The fix is shared plumbing, not a second copy: `diagnose_uncovered_head()` is
+the one impure fetch+classify step, and BOTH consumers call it. `render()`
+maps the four states honestly — `path-filter-skip` and `bot-push-no-dispatch`
+do not fail the gate, `swallowed` keeps the #2762 recovery text verbatim, and
+`indeterminate` (including "nobody ran the discriminator") stays non-green
+while explicitly NOT claiming a confirmed swallow. Every run prints one
+machine-readable `HEAD-COVERAGE: <state> <sha8>` line, keyed off the same
+state constants, so `wrap_gates.py` (and a handover decode line) can QUOTE the
+concluded state instead of paraphrasing prose.
+
 Usage:
   python3 scripts/check_main_green.py                    # gate: not-green main → exit 1
   python3 scripts/check_main_green.py --decoded           # operator wrote the decode line → exit 0 with reminder
@@ -298,6 +320,39 @@ ZR_INDETERMINATE = "indeterminate"
 ZR_BOT_PUSH_NO_DISPATCH = "bot-push-no-dispatch"
 BOT_COMMITTERS = {"github-actions[bot]", "web-flow"}
 
+# #3212: the two zero-run states that are EXPECTED and must not fail the gate.
+# Consumers key off these constants — never off matching a workflow name or a
+# phrase in the reason text (the #3199 lesson: every phrase-matched suppressor
+# in this repo has failed in the field).
+ZR_NOT_A_FAILURE = frozenset({ZR_PATH_FILTER_SKIP, ZR_BOT_PUSH_NO_DISPATCH})
+
+# #3212: the one machine-readable line every run prints, so a consumer
+# (wrap_gates.py's draft marker line, a handover decode) can QUOTE the state
+# the gate concluded instead of paraphrasing its prose. Format:
+#   HEAD-COVERAGE: <state> <sha8>
+HEAD_COVERAGE_PREFIX = "HEAD-COVERAGE:"
+
+
+def head_coverage_state_name(state: dict) -> str:
+    """The ONE name for what this run concluded about main's HEAD.
+
+    `covered` / `pending` / `unknown` come straight from `head_coverage()`; an
+    `uncovered` HEAD resolves to the #2826 discriminator's verdict, and to
+    `indeterminate` when no discriminator verdict is present at all (a caller
+    that never ran it knows nothing — it must never inherit a confirmed
+    swallow, which is exactly the #3212 bug).
+    """
+    cov = (state.get("head_cov") or {}).get("state")
+    if cov != "uncovered":
+        return cov or "unknown"
+    return ((state.get("head_zr") or {}).get("state")) or ZR_INDETERMINATE
+
+
+def head_coverage_ok(state: dict) -> bool:
+    """True iff HEAD's coverage does not, by itself, disqualify a green."""
+    name = head_coverage_state_name(state)
+    return name in ("covered", "pending", "unknown") or name in ZR_NOT_A_FAILURE
+
 
 def classify_zero_run_head(
     all_runs_at_head: list[dict],
@@ -340,11 +395,11 @@ def classify_zero_run_head(
     if path_matches_ci_filter(changed_paths, ci_paths):
         return {
             "state": ZR_SWALLOWED,
-            "reason": f"other workflow(s) ran ({names}) but NOT ci-cd.yml, even though the diff touches its paths: filter",
+            "reason": f"other workflow(s) ran ({names}) but NOT ci-cd.yml, even though the diff touches its `paths:` filter",
         }
     return {
         "state": ZR_PATH_FILTER_SKIP,
-        "reason": f"diff touches none of ci-cd.yml's paths: filter; other workflow(s) ran instead: {names}",
+        "reason": f"the diff touches none of ci-cd.yml's `paths:` filter; other workflow(s) ran instead: {names}",
     }
 
 
@@ -604,11 +659,39 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
         cov = (state.get("head_cov") or {}).get("state")
         head8 = (state.get("head_sha") or "")[:8]
         if cov == "uncovered":
-            lines.append(
-                f"🛑 …but that vouches ONLY for {sha8}: main's HEAD is {head8} and NO CI/CD run of any status\n"
-                "   references it — the swallowed-push shape (#2762). Re-push or workflow_dispatch ci-cd.yml so\n"
-                "   HEAD earns its own verdict; a green over an unwatched HEAD is not green."
-            )
+            # #3212: NO CI/CD run at HEAD has FOUR causes, and only one of them
+            # is an incident. The verdict comes from the #2826 discriminator's
+            # returned state constant — never from the text of its reason.
+            zr = state.get("head_zr") or {}
+            zr_state = zr.get("state") or ZR_INDETERMINATE
+            reason = zr.get("reason") or "the #2826 discriminator was never run for this HEAD, so nothing was ruled out"
+            if zr_state == ZR_PATH_FILTER_SKIP:
+                lines.append(
+                    f"ℹ️  HEAD {head8} minted no CI/CD run of its own — an EXPECTED path-filter skip (#2826), not a\n"
+                    f"   swallowed push: {reason}.\n"
+                    f"   ci-cd.yml declined the push by its own `paths:` filter, so the green above vouches for {sha8},\n"
+                    "   the newest sha that filter actually governed."
+                )
+            elif zr_state == ZR_BOT_PUSH_NO_DISPATCH:
+                lines.append(
+                    f"ℹ️  HEAD {head8} minted no CI/CD run of its own — EXPECTED, not a swallowed push: {reason}.\n"
+                    "   GitHub suppresses workflow dispatch for GITHUB_TOKEN pushes by design (anti-recursion), so a\n"
+                    f"   zero-run HEAD is the normal shape here; the green above vouches for {sha8}."
+                )
+            elif zr_state == ZR_SWALLOWED:
+                lines.append(
+                    f"🛑 …but that vouches ONLY for {sha8}: main's HEAD is {head8} and NO CI/CD run of any status\n"
+                    "   references it — the swallowed-push shape (#2762). Re-push or workflow_dispatch ci-cd.yml so\n"
+                    "   HEAD earns its own verdict; a green over an unwatched HEAD is not green.\n"
+                    f"   Confirmed by the #2826 discriminator: {reason}."
+                )
+            else:
+                lines.append(
+                    f"⚠️  main's HEAD is {head8} and no CI/CD run references it, but whether that is a swallowed push\n"
+                    f"   or an expected path-filter skip could NOT be determined: {reason}.\n"
+                    "   This is not a confirmed swallow and it is not an OK either — re-run once the read recovers, or\n"
+                    "   decode it by hand (`gh api repos/…/actions/runs?head_sha=<full sha>`)."
+                )
         elif cov == "pending":
             lines.append(f"ℹ️  HEAD {head8} has its run in flight — the green above vouches for {sha8} until it completes.")
         elif cov == "unknown" and state.get("head_sha_error"):
@@ -637,7 +720,13 @@ def render(state: dict, now: datetime | None = None) -> tuple[int, str]:
             f"becomes the #1901 stranded class at {STRANDED_WAIT_HOURS:g}h — action it via deploy/approve_deployment.sh)."
         )
 
-    green_ok = kind == GREEN and (state.get("head_cov") or {}).get("state") != "uncovered"
+    # #3212: name the concluded state in one machine-readable line so a consumer
+    # can quote the tool rather than paraphrase it. Emitted whenever HEAD coverage
+    # was evaluated at all — including on a red main, where it is context.
+    if state.get("head_cov"):
+        lines.append(f"{HEAD_COVERAGE_PREFIX} {head_coverage_state_name(state)} {(state.get('head_sha') or '')[:8] or '?'}")
+
+    green_ok = kind == GREEN and head_coverage_ok(state)
     return (0 if green_ok else 1), "\n".join(lines)
 
 
@@ -647,6 +736,53 @@ REPO = "averagejoematt/life-platform"
 def _gh_json(args: list[str]):
     out = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=60, check=True).stdout
     return json.loads(out)
+
+
+def diagnose_uncovered_head(head_sha: str) -> dict:
+    """The impure half of the #2826 discriminator: fetch the fleet-level facts an
+    `uncovered` HEAD needs, then classify. Returns `classify_zero_run_head`'s
+    dict plus a `warnings` list of degrade notes for the caller to print.
+
+    Shared by BOTH consumers — `main()` (the boot/wrap gate) and
+    `main_head_coverage()` (the 15-minute cron) — deliberately: #3212 exists
+    because the classification step lived inside one consumer, so the other
+    could not reach it. A second copy would reproduce the bug on the next
+    divergence.
+
+    Never raises. An API read failure degrades to ZR_INDETERMINATE — never to a
+    manufactured swallow, and never to a false path-filter-skip.
+    """
+    warnings: list[str] = []
+    try:
+        all_runs = _gh_json(["api", f"repos/{REPO}/actions/runs?head_sha={head_sha}&per_page=100"])["workflow_runs"]
+    except Exception as e:  # noqa: BLE001 - execution error, never a false verdict either way
+        return {
+            "state": ZR_INDETERMINATE,
+            "reason": f"could not read the all-workflow run list at {head_sha[:8]} ({str(e)[:80]})",
+            "warnings": warnings,
+        }
+
+    changed_paths = None
+    committer_login = None
+    try:
+        commit = _gh_json(["api", f"repos/{REPO}/commits/{head_sha}"])
+        changed_paths = [f.get("filename") for f in (commit.get("files") or []) if f.get("filename")]
+        # Same payload — no extra request. Used to spot a GITHUB_TOKEN push,
+        # which never dispatches workflows (the reconcile-commit false positive).
+        committer_login = ((commit.get("committer") or {}).get("login")) or ((commit.get("author") or {}).get("login"))
+    except Exception as e:  # noqa: BLE001 - degrades to indeterminate via classify_zero_run_head, never to a false OK
+        warnings.append(f"could not read changed files for {head_sha[:8]} ({str(e)[:80]}) — paths treated as unreadable.")
+
+    try:
+        with open(os.path.join(_REPO_ROOT, ".github", "workflows", CI_CD_WORKFLOW_FILE)) as f:
+            ci_paths = ci_cd_push_paths(f.read())
+    except Exception as e:  # noqa: BLE001 - an empty filter reads as "everything matches" (fail toward in-scope)
+        warnings.append(f"could not read ci-cd.yml's `paths:` filter ({str(e)[:80]}) — treating as unrestricted.")
+        ci_paths = []
+
+    verdict = classify_zero_run_head(all_runs, changed_paths, ci_paths, committer_login=committer_login)
+    verdict["warnings"] = warnings
+    return verdict
 
 
 def main() -> int:
@@ -714,6 +850,13 @@ def main() -> int:
         state["head_sha"] = None
         state["head_sha_error"] = str(e)[:80]
     state["head_cov"] = head_coverage(runs, state["head_sha"])
+    # #3212: an `uncovered` HEAD is FOUR different things — ask the #2826
+    # discriminator instead of printing the swallowed-push text on all four.
+    if state["head_cov"]["state"] == "uncovered" and state["head_sha"]:
+        zr = diagnose_uncovered_head(state["head_sha"])
+        for warning in zr.pop("warnings", []):
+            print(f"⚠️  check_main_green: {warning}")
+        state["head_zr"] = zr
     code, message = render(state)
     print(message)
     if code == 0:
@@ -738,7 +881,8 @@ def main_head_coverage() -> int:
     as "coverage OK", and must not be conflated with a CONFIRMED swallow either,
     since only the latter should page):
 
-      0 = OK             — covered, pending, or a proven path-filter-skip
+      0 = OK             — covered, pending, a proven path-filter-skip, or a
+                            bot (GITHUB_TOKEN) push that cannot dispatch at all
       1 = SWALLOWED PUSH  — confirmed: the caller (the workflow step) should
                             fail loudly
       2 = INDETERMINATE   — an API read failed or the paths data was
@@ -773,49 +917,34 @@ def main_head_coverage() -> int:
         print(f"⚠️  head-coverage-check: could not read main's HEAD ({e}) — INDETERMINATE, not OK.")
         return 2
 
+    def _named(concluded: str, code: int) -> int:
+        # #3212: same machine-readable line the wrap gate prints, so both
+        # consumers name their conclusion in one quotable vocabulary.
+        print(f"{HEAD_COVERAGE_PREFIX} {concluded} {head_sha[:8]}")
+        return code
+
     cov = head_coverage(ci_runs, head_sha)
     if cov["state"] != "uncovered":
         print(f"✅ head-coverage-check: HEAD {head_sha[:8]} is {cov['state']} — no action needed.")
-        return 0
+        return _named(cov["state"], 0)
 
-    try:
-        all_runs = _gh_json(["api", f"repos/{REPO}/actions/runs?head_sha={head_sha}&per_page=100"])["workflow_runs"]
-    except Exception as e:  # noqa: BLE001
-        print(f"⚠️  head-coverage-check: could not read all-workflow runs at {head_sha[:8]} ({e}) — INDETERMINATE, not OK.")
-        return 2
-
-    changed_paths = None
-    committer_login = None
-    try:
-        commit = _gh_json(["api", f"repos/{REPO}/commits/{head_sha}"])
-        changed_paths = [f.get("filename") for f in (commit.get("files") or []) if f.get("filename")]
-        # Same payload — no extra request. Used to spot a GITHUB_TOKEN push,
-        # which never dispatches workflows (the reconcile-commit false positive).
-        committer_login = ((commit.get("committer") or {}).get("login")) or ((commit.get("author") or {}).get("login"))
-    except Exception as e:  # noqa: BLE001 - degrades to indeterminate via classify_zero_run_head, never to a false OK
-        print(f"⚠️  head-coverage-check: could not read changed files for {head_sha[:8]} ({e}) — paths treated as unreadable.")
-
-    try:
-        with open(os.path.join(_REPO_ROOT, ".github", "workflows", CI_CD_WORKFLOW_FILE)) as f:
-            ci_paths = ci_cd_push_paths(f.read())
-    except Exception as e:  # noqa: BLE001 - an empty filter reads as "everything matches" (fail toward in-scope)
-        print(f"⚠️  head-coverage-check: could not read ci-cd.yml's paths: filter ({e}) — treating as unrestricted.")
-        ci_paths = []
-
-    verdict = classify_zero_run_head(all_runs, changed_paths, ci_paths, committer_login=committer_login)
+    # #3212: one shared fetch+classify step, called by BOTH consumers.
+    verdict = diagnose_uncovered_head(head_sha)
+    for warning in verdict.get("warnings", []):
+        print(f"⚠️  head-coverage-check: {warning}")
     state = verdict["state"]
     if state == ZR_BOT_PUSH_NO_DISPATCH:
         print(f"✅ head-coverage-check: {head_sha[:8]} minted no CI/CD run — expected: {verdict['reason']}")
-        return 0
+        return _named(state, 0)
     if state == ZR_PATH_FILTER_SKIP:
         print(f"✅ head-coverage-check: {head_sha[:8]} minted no CI/CD run — expected path-filter skip: {verdict['reason']}")
-        return 0
+        return _named(state, 0)
     if state == ZR_SWALLOWED:
         print(f"🛑 SWALLOWED PUSH (#2826 class) at {head_sha[:8]}: {verdict['reason']}")
         print("   Recovery: workflow_dispatch ci-cd.yml on main (or re-push) so HEAD earns a real verdict.")
-        return 1
+        return _named(state, 1)
     print(f"⚠️  head-coverage-check: {head_sha[:8]} — {verdict['reason']} — INDETERMINATE, not OK, not a confirmed swallow.")
-    return 2
+    return _named(ZR_INDETERMINATE, 2)
 
 
 if __name__ == "__main__":
