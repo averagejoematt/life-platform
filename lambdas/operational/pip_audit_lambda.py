@@ -38,7 +38,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone  # noqa: F401 — `timezone` still used for instants
+from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3

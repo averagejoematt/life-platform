@@ -654,8 +654,6 @@ def build_record(findings, judge, digest, worst, skipped=None, blind=False):
     advisory judge is surfaced but never flips it. A transport-BLIND run keeps
     worst=ALARM on the gauge but says BLIND here, so a human triaging latest.json
     never mistakes an unreachable endpoint for a bad answer (#1589)."""
-    from datetime import datetime, timezone  # noqa: F401 — `timezone` kept for the instants below
-
     from common.pacific_time import pacific_today
 
     disagrees = _judge_disagrees(findings, judge)
