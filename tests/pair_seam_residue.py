@@ -56,7 +56,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "adaptive_mode::mcp/tools_reading.py::read": SEED_DATE,
     "ai_analysis::lambdas/compute/state_of_matthew_lambda.py::read": SEED_DATE,
     "ai_analysis::lambdas/emails/chronicle_data.py::read": SEED_DATE,
-    "ai_analysis::lambdas/intelligence/ai_expert_analyzer_lambda.py::write": SEED_DATE,
     "ai_analysis::lambdas/operational/coherence_sentinel_lambda.py::read": SEED_DATE,
     "ai_analysis::lambdas/web/site_api_coach_narrative.py::read": SEED_DATE,
     "ai_analysis::lambdas/web/site_api_coach_stance.py::read": SEED_DATE,
