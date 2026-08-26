@@ -227,7 +227,7 @@ def describe(key: str, counterparts: List[str]) -> str:
 
 
 if __name__ == "__main__":  # pragma: no cover — re-seeding aid, see pair_seam_residue.py
-    print("PAIR_SEAM_BASELINE: dict[str, str] = {")
+    print("PAIR_SEAM_RESIDUE: dict[str, str] = {")
     for _key in sorted(sweep()):
         print(f'    "{_key}": "SEED_DATE",')
     print("}")

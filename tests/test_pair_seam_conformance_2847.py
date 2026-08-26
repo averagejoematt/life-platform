@@ -68,7 +68,7 @@ for _p in (os.path.join(_REPO, "tests"), os.path.join(_REPO, "lambdas")):
 import pair_contract_registry  # noqa: E402,F401 — importing populates the registry
 import pair_seam_guard_lib as lib  # noqa: E402
 from pair_contract import PAIR_CONTRACT_REGISTRY  # noqa: E402
-from pair_seam_residue import PAIR_SEAM_BASELINE, PAIR_SEAM_EXEMPTIONS, SEED_DATE  # noqa: E402
+from pair_seam_residue import PAIR_SEAM_DECISIONS, PAIR_SEAM_RESIDUE, SEED_DATE  # noqa: E402
 
 _REASON_FLOOR = 40  # the #2846 bar: a dated exemption's reason must be an argument
 _BASELINE_CEILING = 286  # the seed census — the frozen baseline may only shrink
@@ -76,7 +76,7 @@ _BASELINE_CEILING = 286  # the seed census — the frozen baseline may only shri
 _FIX = (
     "Enroll the pair in tests/pair_contract_registry.py (one register(PairContract(...)) call,\n"
     "two-sided mutation proof — see tests/pair_contract.py), or add the seam key to\n"
-    "PAIR_SEAM_EXEMPTIONS in tests/pair_seam_residue.py with the date and the VERIFIED\n"
+    "PAIR_SEAM_DECISIONS in tests/pair_seam_residue.py with the date and the VERIFIED\n"
     "reason the two sides cannot disagree about the shape."
 )
 
@@ -94,7 +94,7 @@ def test_no_new_must_agree_seam_lands_without_a_contract_or_a_dated_reason():
     path is a contract, not a bigger baseline.
     """
     findings = lib.sweep()
-    dispositioned = set(PAIR_SEAM_BASELINE) | set(PAIR_SEAM_EXEMPTIONS)
+    dispositioned = set(PAIR_SEAM_RESIDUE) | set(PAIR_SEAM_DECISIONS)
     new = sorted(set(findings) - dispositioned)
     assert not new, (
         f"{len(new)} new must-agree seam(s) with no producer/consumer contract (#2847 box 4).\n"
@@ -112,7 +112,7 @@ def test_ledger_has_no_dead_entries():
     out — so enrollment is forced to shrink the ledger rather than sit beside it.
     """
     findings = lib.sweep()
-    dead = sorted((set(PAIR_SEAM_BASELINE) | set(PAIR_SEAM_EXEMPTIONS)) - set(findings))
+    dead = sorted((set(PAIR_SEAM_RESIDUE) | set(PAIR_SEAM_DECISIONS)) - set(findings))
     assert not dead, (
         "tests/pair_seam_residue.py pins seam(s) the sweep no longer finds — delete them "
         "(the ratchet counts down; a contracted seam's row comes OUT):\n  " + "\n  ".join(dead)
@@ -123,7 +123,7 @@ def test_the_ledger_itself_is_well_formed():
     """The baseline is a grandfather PIN, not a growable escape hatch.
 
     Two rules, one check: every baseline value is the frozen seed date and the
-    count may only shrink (otherwise "add a row to PAIR_SEAM_BASELINE" is a
+    count may only shrink (otherwise "add a row to PAIR_SEAM_RESIDUE" is a
     reasonless green path around ratchet direction 1 — the move #2844's
     content-keying exists to make impossible), and every post-seed exemption
     carries an argued reason (#2846's 40-character floor).
@@ -132,7 +132,7 @@ def test_the_ledger_itself_is_well_formed():
     synthetic ledgers below; on a healthy ledger they are all unreachable, and an
     unreachable assertion asserted inline is a check nobody has seen run.
     """
-    defects = lib.ledger_defects(PAIR_SEAM_BASELINE, PAIR_SEAM_EXEMPTIONS, SEED_DATE, _REASON_FLOOR, _BASELINE_CEILING)
+    defects = lib.ledger_defects(PAIR_SEAM_RESIDUE, PAIR_SEAM_DECISIONS, SEED_DATE, _REASON_FLOOR, _BASELINE_CEILING)
     assert not defects, "tests/pair_seam_residue.py is malformed:\n  " + "\n  ".join(defects)
 
 
@@ -147,7 +147,7 @@ def test_enrolling_a_contract_really_does_remove_seam_rows():
     live = covered & set(seams)
     assert live, "no enrolled PairContract covers a modeled seam — the coverage join is dead"
     assert not (live & set(lib.sweep())), "a seam covered by an enrolled contract still appears in the sweep"
-    assert not (live & set(PAIR_SEAM_BASELINE)), "a contracted seam is still pinned in the baseline — prune it"
+    assert not (live & set(PAIR_SEAM_RESIDUE)), "a contracted seam is still pinned in the baseline — prune it"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -8,7 +8,7 @@ new baseline row you add to make the red go away.
 
 Two dicts, and the difference between them is the whole point:
 
-``PAIR_SEAM_BASELINE`` — the must-agree seam census as it stood on the seed date.
+``PAIR_SEAM_RESIDUE`` — the must-agree seam census as it stood on the seed date.
     Reasonless by construction and honestly so: nobody can retroactively argue 286
     seams, and PR #3169 was right to refuse "299 rows of ceremony written by a model
     that cannot ground a single one of them". This is a PIN, not a debt claim —
@@ -17,7 +17,7 @@ Two dicts, and the difference between them is the whole point:
     cannot be smuggled in here with a later date. Rows leave when the seam
     disappears or when a ``PairContract`` covers it.
 
-``PAIR_SEAM_EXEMPTIONS`` — seams born AFTER the seed date that are deliberately
+``PAIR_SEAM_DECISIONS`` — seams born AFTER the seed date that are deliberately
     not contracted. ``(date, reason)``, and the reason has to be an argument, not a
     label: the guard enforces a 40-character floor, the same bar #2846 puts on its
     own dated exemptions. This dict starts EMPTY on purpose — the first row someone
@@ -29,12 +29,29 @@ partitions), the sweep's own output — no hand-typed list. Three seams the six
 enrolled #2847 contracts already cover are absent by construction:
 ``computed_metrics`` <- daily_metrics_compute (write), ``adaptive_mode`` <-
 adaptive_mode_lambda (write), ``engagement_state`` -> site_api_freshness (read).
+
+THE NAMES ARE LOAD-BEARING (measured in CI, 2026-08-25)
+--------------------------------------------------------
+The first draft called these ``PAIR_SEAM_BASELINE`` / ``PAIR_SEAM_EXEMPTIONS``, and
+the #3000 doc literal moved 557 -> 844 declared gates. ``scripts/gate_census.py``'s
+``_REGISTRY_NAME`` matches ``.*_BASELINE`` and ``.*_EXEMPT.*``, so it enumerated all
+286 rows as 286 SEPARATE gates and, because its exemption-data branch tests
+``(root / entry).exists()``, flagged every one of them ``stale-exemption`` — the
+keys are composite seam identities that merely CONTAIN a path, not paths. One gate
+with 286 dated rows was being reported as 286 gates and 286 false leads.
+
+Renamed to sit where its two siblings already sit: ``CONFORMANCE_RESIDUE`` (#2844)
+and ``RAW_CONSTRUCTIONS``/``DEPLOY_REGISTRATION`` (#2846) do not match that regex
+either, and they are the same kind of object. This is consistency, not evasion —
+the census's composite-key blind spot is real and worth its own look, but silently
+inflating the platform's gate count by 51% to make the point would be the wrong way
+to raise it. Do not rename these back without re-measuring the census.
 """
 
 SEED_DATE = "2026-08-25"
 
 #: The grandfathered census. FROZEN at SEED_DATE — see the module docstring.
-PAIR_SEAM_BASELINE: dict[str, str] = {
+PAIR_SEAM_RESIDUE: dict[str, str] = {
     "adaptive_mode::mcp/tools_coach_checkin.py::read": SEED_DATE,
     "adaptive_mode::mcp/tools_reading.py::read": SEED_DATE,
     "ai_analysis::lambdas/compute/state_of_matthew_lambda.py::read": SEED_DATE,
@@ -325,6 +342,6 @@ PAIR_SEAM_BASELINE: dict[str, str] = {
 
 #: Seams born after SEED_DATE that are deliberately not contracted: (date, reason).
 #: The reason must be an argument (40-char floor, enforced by the guard).
-PAIR_SEAM_EXEMPTIONS: dict[str, tuple[str, str]] = {}
+PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {}
 
-__all__ = ["PAIR_SEAM_BASELINE", "PAIR_SEAM_EXEMPTIONS", "SEED_DATE"]
+__all__ = ["PAIR_SEAM_RESIDUE", "PAIR_SEAM_DECISIONS", "SEED_DATE"]
