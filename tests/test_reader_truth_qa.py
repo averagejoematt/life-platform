@@ -767,6 +767,95 @@ def test_day_counter_bound_never_touches_other_categories():
     assert rtq.is_day_counter_bound_inference(f) is False
 
 
+# ── #3208: the '9/10' progress-fraction shape that escaped the lexical matcher ─
+# CI run 33001307897 (job 98291865117, 2026-08-26T19:27Z) gated main's
+# post-deploy visual-qa on /method/intelligence/. Note recovered from the run
+# artifact `visual-qa-screenshots` (artifact id 9620239145), `report.json`'s
+# per-page `truth_findings` entry — never the truncated log line (fixture must
+# be the wire).
+_NOTE_3208_CI = (
+    "States 'DAYS OF DATA TOWARD THE FIRST CORRELATION MATRIX · 9/10' and 'No correlations yet — the "
+    "honest state, not a broken pipeline. The weekly matrix computes its first pairs once 10 overlapping days "
+    "of this cycle's data exist.' On Day 10 of the cycle, 10 days of data should exist, making this claim "
+    "impossible. The page claims correlations cannot compute until 10 days exist, yet we are on Day 10, so "
+    "this is contradictory."
+)
+
+# The already-working phrasing: a live re-run of the identical scoped sweep
+# (`python3 tests/visual_qa.py --page /method/intelligence/ --reader-truth`)
+# against the same page independently generated this note, which DID happen to
+# carry "a maximum of" and demoted correctly under the pre-#3208 matcher —
+# captured live during this fix's own verification. It must keep demoting so
+# the widening in #3208 is proven additive, not a replacement that regresses.
+_NOTE_3208_LIVE_WORKING = (
+    "Page states 'DAYS OF DATA TOWARD THE FIRST CORRELATION MATRIX · 9/10' but the phase is Day 10 of the "
+    "experiment. On Day 10, a maximum of 10 days of current-cycle data can exist, not 9. The counter should "
+    "read 10/10 or indicate 10 overlapping days are now available for the first correlation matrix computation."
+)
+
+_DAY_10 = (_START + timedelta(days=9)).isoformat()
+
+
+def test_day_counter_bound_fires_on_the_recovered_ci_note():
+    """The exact CI note text (#3208) — no only/at most/maximum scaffold, only
+    the '9/10' fraction whose denominator is the cited Day 10."""
+    f = {"page": "/method/intelligence/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3208_CI}
+    assert rtq.is_day_counter_bound_inference(f) is True
+
+
+def test_day_counter_bound_still_fires_on_the_already_working_live_phrasing():
+    """No regression: the lexical scaffold path (kept, not replaced) still demotes."""
+    f = {"page": "/method/intelligence/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3208_LIVE_WORKING}
+    assert rtq.is_day_counter_bound_inference(f) is True
+
+
+def test_day_counter_bound_fraction_spares_a_genuine_wrong_day_defect():
+    # The #2941 wrong-Day-number shape (a prior TRUE positive), synthesized onto
+    # the fraction context: the '9/10' denominator (10) disagrees with the
+    # cited day (8) by MORE than 1 — a real day-stamp defect, not the injected
+    # counter artifact, and must keep gating.
+    note = (
+        "States 'DAYS OF DATA TOWARD THE FIRST CORRELATION MATRIX · 9/10' but today is actually Day 8 — "
+        "the site's own day-stamp is running two days fast for the third day running, so the 9/10 denominator "
+        "overstates how many days have elapsed."
+    )
+    f = {"page": "/method/intelligence/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_day_counter_bound_inference(f) is False
+
+
+def test_day_counter_bound_fraction_spares_an_unrelated_ratio():
+    # A fraction with no 'data' framing nearby (a score, not a data-quantity
+    # claim) must not be swept in just because its denominator happens to
+    # coincide with the cited day.
+    note = "Coach commentary rates today's adherence 9/10 for consistency. Today is Day 10 of the cycle."
+    f = {"page": "/coaching/", "category": "temporal_contradiction", "severity": "high", "note": note}
+    assert rtq.is_day_counter_bound_inference(f) is False
+
+
+def test_assess_prose_demotes_the_3208_ci_note_high_to_low(capsys):
+    """The predicate is wired: the recovered CI note reaches the gate as low."""
+    verdict = {
+        "findings": [
+            {"page": "/method/intelligence/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3208_CI},
+        ],
+        "severity": "high",
+        "summary": "x",
+    }
+    pages = [
+        {
+            "name": "Method · Intelligence",
+            "path": "/method/intelligence/",
+            "prose": "DAYS OF DATA TOWARD THE FIRST CORRELATION MATRIX · 9/10",
+        }
+    ]
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_10)
+    assert errors == []
+    assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"
+    assert findings[0]["severity"] == "low"
+    assert findings[0]["note"] == _NOTE_3208_CI, "demotion must not lose the evidence"
+    assert "demoted a day-counter-bound finding" in capsys.readouterr().out
+
+
 # ── #2959: a finding whose own note withdraws the claim ────────────────────────
 # Run 32618360726 emitted BOTH of these at gating severity; each note's final
 # sentence retracts the contradiction it reports. Verbatim wire notes.

@@ -367,24 +367,100 @@ _DAY_BOUND_RE = re.compile(
 )
 _DAY_N_RE = re.compile(r"\bday\s+(\d{1,3})\b", re.I)
 
+# ── WIDENED STRUCTURALLY (#3208, 2026-08-26) ───────────────────────────────────
+#
+# THE OBSERVED FAILURE. CI run 33001307897 (job 98291865117) gated main's
+# post-deploy visual-qa on /method/intelligence/ — verbatim wire note, pulled
+# from the run artifact (never the truncated log line, per
+# reference_judge_flake_ground_truth):
+#
+#   "States 'DAYS OF DATA TOWARD THE FIRST CORRELATION MATRIX · 9/10' and 'No
+#    correlations yet — the honest state, not a broken pipeline. The weekly
+#    matrix computes its first pairs once 10 overlapping days of this cycle's
+#    data exist.' On Day 10 of the cycle, 10 days of data should exist, making
+#    this claim impossible. The page claims correlations cannot compute until
+#    10 days exist, yet we are on Day 10, so this is contradictory."
+#
+# Same substance as every #2959 instance above — the day counter (Day 10) turned
+# into a bound on what data can exist — but "once 10 overlapping days … exist"
+# and "10 days of data should exist" never say only / at most / a maximum of, so
+# `_DAY_BOUND_RE` missed it. A live re-run of the identical scoped sweep against
+# the same page reproduced the same underlying objection worded two more ways in
+# the same evening — one that DID happen to carry "a maximum of" (coincidence,
+# not the fix) and a second, independent generation that again used neither
+# keyword and went on to a #3102 non-reproduction rather than a demotion. Three
+# independently-generated notes, one true shape, and the lexical matcher caught
+# it by luck in one of the three — #2613's and #2741's measured lesson (a
+# suppressor keyed to one phrasing does not survive the oracle's non-stationary
+# rephrasing) applies here too.
+#
+# THE STRUCTURAL FIX. Alongside the original lexical scaffold (kept — it still
+# fires on every previously-observed note, so no regression), a SECOND, purely
+# numeric channel: an "N/M" progress-fraction claim (the '9/10' shape) whose
+# denominator M is the day counter is exactly the same tell as the lexical
+# "only M days" bound — a claimed data-quantity that coincides with the injected
+# day counter — just spelled as a fraction instead of a sentence. Guarded two
+# ways against a false read: the numerator must not exceed the denominator (a
+# completed/total shape, never a reversed or unrelated ratio — a date written
+# "8/17" has numerator > nothing special, but a 'day' progress fraction is
+# always <= 1, so this alone would not exclude it) AND the word "data" must
+# appear within a short window around the fraction — every observed note pairs
+# the count with a "data" framing ('DAYS OF DATA', "cycle's data exist",
+# "current-cycle data"), which an unrelated fraction (a score, a calendar date
+# written N/M) will not carry beside it.
+#
+# RESIDUE, named honestly: a genuine day-arithmetic defect — the page's own day
+# stamp actually wrong, so the claimed number and the true day number disagree
+# by MORE than 1 (the #2941 wrong-Day-number shape) — is not swept in by either
+# channel; the ±1 tolerance is the whole discriminator, unchanged from #2959.
+_PROGRESS_FRACTION_RE = re.compile(r"\b(\d{1,3})\s*/\s*(\d{1,3})\b")
+_FRACTION_CONTEXT_CHARS = 60
+
+
+def _fraction_day_bound_candidates(note):
+    """Denominators of 'N/M' progress-fraction spans that plausibly claim a
+    day-count threshold (#3208) — e.g. 'DAYS OF DATA … 9/10'. See the comment
+    block above for the two guards (numerator <= denominator; 'data' nearby)."""
+    candidates = set()
+    for m in _PROGRESS_FRACTION_RE.finditer(note):
+        n, denom = int(m.group(1)), int(m.group(2))
+        if n > denom:
+            continue
+        window = note[max(0, m.start() - _FRACTION_CONTEXT_CHARS) : m.end() + _FRACTION_CONTEXT_CHARS]
+        if "data" in window.lower():
+            candidates.add(denom)
+    return candidates
+
 
 def is_day_counter_bound_inference(finding):
-    """True when a temporal_contradiction's bound is the day counter itself (#2959).
+    """True when a temporal_contradiction's bound is the day counter itself
+    (#2959, widened structurally #3208).
 
-    Structural conditions, all required: temporal_contradiction; the note states a
-    "only/at most/maximum N days" bound on data/history; the note also cites the
-    experiment day ("Day M"); and N is M (±1 for the PT/UTC boundary). A bound
-    unrelated to the day counter (retention windows, product limits) or a note
-    that never mentions the day number survives untouched.
+    Structural conditions, all required: temporal_contradiction; the note cites
+    the experiment day ("Day M"); and the note also states a claimed
+    data-quantity number matching M (±1 for the PT/UTC boundary) — either the
+    original lexical "only/at most/maximum N days … data/entries/history/
+    exist/possible" scaffold, OR an "N/M" progress-fraction claim in a
+    data-quantity context (the '9/10' shape that escaped the lexical-only
+    matcher, #3208). A bound unrelated to the day counter (retention windows,
+    product limits), an unrelated fraction (no 'data' framing nearby), or a
+    note that never mentions the day number survives untouched. A genuinely
+    wrong day-count — the claimed number differs from the cited day by MORE
+    than 1, the #2941 shape — also survives: that gap is a real defect, not the
+    injected-counter artifact this predicate exists to catch.
     """
     if finding.get("category") != "temporal_contradiction":
         return False
     note = finding.get("note") or ""
-    bound = _DAY_BOUND_RE.search(note)
-    if not bound:
-        return False
     day_ns = {int(m) for m in _DAY_N_RE.findall(note)}
-    return any(abs(int(bound.group(1)) - m) <= 1 for m in day_ns)
+    if not day_ns:
+        return False
+    candidates = set()
+    bound = _DAY_BOUND_RE.search(note)
+    if bound:
+        candidates.add(int(bound.group(1)))
+    candidates |= _fraction_day_bound_candidates(note)
+    return any(abs(c - m) <= 1 for c in candidates for m in day_ns)
 
 
 # ── a finding whose own note withdraws the claim (#2959, 2026-08-23) ──────────
