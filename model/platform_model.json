@@ -243,10 +243,26 @@
       "producer": "compute.adaptive_mode_lambda::store_adaptive_mode"
     },
     {
+      "consumer": "coach.coach_observatory_renderer::journaling_prompt_for_domain",
+      "mutations": 3,
+      "name": "ai_analysis EXPERT# -> observatory card journaling prompt",
+      "note": "#3172 (found seeding #2847 in PR #3169). coach_state_updater._write_output_record's OUTPUT# item never had a journaling_prompt key at all \u2014 this was never a rename or a drop in production, it was two systems (the COACH# persona pipeline and the EXPERT# ai_analysis pipeline) sharing a reader's assumption without ever sharing a write.",
+      "partition": "ai_analysis",
+      "producer": "intelligence.ai_expert_analyzer_lambda::generate_and_cache"
+    },
+    {
       "consumer": "experiment.canonical_facts::build_canonical_facts",
       "mutations": 4,
       "name": "computed_metrics -> canonical facts",
       "note": "canonical_facts' own docstring says 'the field names here MUST match what it writes'. The runtime `ingestion_validator` schema covers only 6 of the 10 numeric fields, so a rename of `latest_weight` or `weekly_rate_lbs` passes every existing gate.",
+      "partition": "computed_metrics",
+      "producer": "compute.daily_metrics_compute_lambda::store_computed_metrics"
+    },
+    {
+      "consumer": "web.site_stats_refresh_lambda::resolve_tier0_streak",
+      "mutations": 3,
+      "name": "computed_metrics -> site-stats-refresh tier0_streak",
+      "note": "#3172 (found seeding #2847 in PR #3169). habit_scores.store_habit_scores writes the SAME concept under a different name (`t0_perfect_streak`) on a DIFFERENT partition entirely \u2014 three names/places for one number is exactly how a reader ends up dead-zone reading one of them.",
       "partition": "computed_metrics",
       "producer": "compute.daily_metrics_compute_lambda::store_computed_metrics"
     },
@@ -436,6 +452,13 @@
       "lambda": null,
       "module": "lambdas/coach/coach_nudge_engine.py",
       "partition": "macrofactor",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-observatory-renderer",
+      "module": "lambdas/coach/coach_observatory_renderer.py",
+      "partition": "ai_analysis",
       "via": "pk"
     },
     {
@@ -4362,7 +4385,7 @@
       "direction": "read",
       "lambda": "site-stats-refresh",
       "module": "lambdas/web/site_stats_refresh_lambda.py",
-      "partition": "habitify",
+      "partition": "computed_metrics",
       "via": "local-seam"
     },
     {
@@ -6321,8 +6344,8 @@
     },
     "counts": {
       "alarms": 58,
-      "contracts": 6,
-      "edges": 665,
+      "contracts": 8,
+      "edges": 666,
       "lambdas": 104,
       "mcp_tool_modules": 26,
       "mcp_tools": 76,
@@ -6331,9 +6354,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 314,
-        "sites_resolved": 824,
-        "sites_total": 1138
+        "sites_dynamic": 316,
+        "sites_resolved": 826,
+        "sites_total": 1142
       },
       "schedule_resolution": {
         "dynamic": 0,

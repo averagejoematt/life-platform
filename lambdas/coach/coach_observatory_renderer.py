@@ -47,6 +47,7 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
+USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 from common.constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 from common.pacific_time import PACIFIC as PT  # #2414: reader-bound "today"/windows anchor in the Pacific day
@@ -79,9 +80,18 @@ DOMAIN_COACH_MAP = {
 # `title`), so this surface now derives entirely rather than keeping its own copy.
 # `include=("operational", "retired")` keeps the retired training_coach entry
 # resolvable, for cross-coach references inside historical OUTPUT#/ENSEMBLE# records.
-from coach.persona_registry import display_map as _registry_display_map
+from coach.persona_registry import (
+    OPERATIONAL_SHORT_IDS,  # #3172: the ai_analysis EXPERT# keyspace
+    display_map as _registry_display_map,
+)
 
 COACH_DISPLAY = _registry_display_map(include=("operational", "retired"))
+
+# #3172: "training" has no dedicated `ai_analysis` EXPERT# row of its own — the
+# coaching-team v2 merge (2026-08-10) folded it into physical_coach, and
+# ai_expert_analyzer_lambda's roster (OPERATIONAL_SHORT_IDS) never grew a
+# separate "training" expert_key to match. See DOMAIN_COACH_MAP above.
+_EXPERT_KEY_ALIAS = {"training": "physical"}
 
 # Domain → source mapping for statistical guardrails lookup
 DOMAIN_SOURCE_MAP = {
@@ -227,6 +237,25 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None):
         return []
 
 
+def journaling_prompt_for_domain(domain):
+    """#3172: ``journaling_prompt`` is written by
+    ``intelligence.ai_expert_analyzer_lambda::generate_and_cache`` onto the
+    ``ai_analysis`` ``EXPERT#{expert_key}`` row — the ``COACH#{coach_id}``
+    ``OUTPUT#`` row this renderer otherwise reads never carries it
+    (``coach.coach_state_updater::_write_output_record``'s item dict has no such
+    key; it never did). Reading ``output.get("journaling_prompt")`` off the
+    OUTPUT# row was therefore a permanent dead-zone None. The two pipelines share
+    the same domain vocabulary (``DOMAIN_COACH_MAP`` above / ``OPERATIONAL_SHORT_IDS``
+    in ``coach.persona_registry``, alias `training`->`physical`), so resolve straight
+    from the real producer instead.
+    """
+    expert_key = _EXPERT_KEY_ALIAS.get(domain, domain)
+    if expert_key not in OPERATIONAL_SHORT_IDS:
+        return None
+    item = _get_item(f"{USER_PREFIX}ai_analysis", f"EXPERT#{expert_key}")
+    return (item or {}).get("journaling_prompt")
+
+
 def _compute_experiment_timing():
     """Compute current week number and days in experiment."""
     try:
@@ -282,7 +311,7 @@ def _render_coach_card(domain, include_threads=True):
     themes = output.get("themes", [])
     key_recommendation = output.get("key_recommendation")
     elena_quote = output.get("elena_quote")
-    journaling_prompt = output.get("journaling_prompt")
+    journaling_prompt = journaling_prompt_for_domain(domain)  # #3172: real producer is ai_analysis EXPERT#, not this OUTPUT# row
 
     # ── 2. Open threads ─────────────────────────────────────────────────────
     thread_reference = None
