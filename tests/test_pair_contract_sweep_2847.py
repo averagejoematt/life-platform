@@ -10,10 +10,12 @@ through the REAL consumer and then injects a disagreement into BOTH sides.
 
 The defect class is fixture-not-the-wire: producer and consumer each pass their own
 tests against their own idea of the shape, and the wire disagrees. Two live instances
-found while seeding the registry, both green in every existing test:
-``site_stats_refresh_lambda`` reads ``tier0_streak`` off ``habit_scores`` (which writes
-``t0_perfect_streak``), and ``coach_observatory_renderer`` reads ``journaling_prompt``
-off ``OUTPUT#`` rows (which no writer emits).
+found while seeding the registry, both green in every existing test — both root-caused,
+fixed, and enrolled by #3172 (pairs 7 and 8 in ``tests/pair_contract_registry.py``):
+``site_stats_refresh_lambda`` read ``tier0_streak`` off the raw ``habitify`` partition
+(which has no such field — it lives on ``computed_metrics``), and
+``coach_observatory_renderer`` read ``journaling_prompt`` off ``OUTPUT#`` rows (which no
+writer ever emitted — it lives on the ``ai_analysis`` ``EXPERT#`` row).
 
 THE TWO SIDES, NAMED
 --------------------
@@ -50,10 +52,19 @@ parts, each of which reds:
   2. ``ENROLLED_FLOOR`` — the count may only grow. Deleting a pair to make CI green reds.
   3. ``PARTITION_WRITER_LEDGER`` — for every partition an enrolled pair travels over, the
      pinned set of modules that WRITE it. A new writer to a contracted shape must either
-     be enrolled or written into the ledger with a reason. This is the "adding a pair
-     without a contract test is a finding" box, scoped to where the model can ground it:
-     the second-writer-with-a-different-field-set class (#2214/#2804) is exactly how these
-     shapes have actually diverged.
+     be enrolled or written into the ledger with a REASON. The second-writer-with-a-
+     different-field-set class (#2214/#2804) is exactly how these shapes have actually
+     diverged, so a contracted partition keeps the higher bar.
+
+BOX 4 ("adding a pair without a contract test is a conformance finding") LIVES NEXT DOOR
+-----------------------------------------------------------------------------------------
+Ratchet 3 above is the *reasoned* gate over CONTRACTED partitions. The fleet-wide form —
+every must-agree seam on every partition, contracted or not — is
+``tests/test_pair_seam_conformance_2847.py`` (sweep ``pair_seam_guard_lib``, ledger
+``pair_seam_residue``): charter standing rule 3's counterpart to #2844's rule 1. The two
+overlap on contracted partitions by design; ratchet 3 is the strict subset with the higher
+bar. Enrolling a pair HERE removes rows from THAT ledger, which is the link that makes the
+seam guard an enforcement of this registry rather than a bystander standing beside it.
 
 Plus the #2640 blind-green guards: the derivation must be non-vacuous, and every
 registered ``partition`` must be a real modeled partition with both a writer and a
@@ -113,6 +124,10 @@ PARTITION_WRITER_LEDGER = {
     },
     "adaptive_mode": {
         "lambdas/compute/adaptive_mode_lambda.py": "enrolled — the pair below",
+    },
+    # #3172
+    "ai_analysis": {
+        "lambdas/intelligence/ai_expert_analyzer_lambda.py": "enrolled — the pair below",
     },
 }
 

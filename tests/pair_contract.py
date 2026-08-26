@@ -12,16 +12,23 @@ wider than timezones. The general defect is the **fixture-not-the-wire** failure
     both are green; the WIRE disagrees, and nobody finds out until an incident.
 
 Two live examples found while seeding this registry, both of which were green in
-every existing test:
+every existing test (both root-caused, fixed, and enrolled by #3172):
 
-  * ``lambdas/web/site_stats_refresh_lambda.py`` reads ``tier0_streak`` off the
-    ``habit_scores`` partition. ``store_habit_scores`` writes ``t0_perfect_streak``
-    there; ``tier0_streak`` lives on ``computed_metrics``. The read is a
-    permanent ``None`` and no test noticed (#2804's dead-zone-read class).
-  * ``coach_observatory_renderer`` reads ``journaling_prompt`` and
-    ``generated_at`` off ``OUTPUT#`` rows. No ``OUTPUT#`` writer emits either.
+  * ``lambdas/web/site_stats_refresh_lambda.py`` read ``tier0_streak`` off the raw
+    ``habitify`` ingestion partition, which has no such field at all — it is a
+    DERIVED value that only ever lived on ``computed_metrics``
+    (``store_computed_metrics``). The read was a permanent ``None``/stale-value
+    fallback and no test noticed (#2804's dead-zone-read class). Fixed by pointing
+    the consumer at the real producer (``resolve_tier0_streak``); see pair 7 in
+    ``tests/pair_contract_registry.py``.
+  * ``coach_observatory_renderer`` (and ``site_api_coach_narrative``'s
+    ``handle_coach_analysis``) read ``journaling_prompt`` off ``COACH#``/``OUTPUT#``
+    rows. No ``OUTPUT#`` writer (``coach_state_updater._write_output_record``) ever
+    emitted it — the field only ever existed on the ``ai_analysis`` ``EXPERT#`` row
+    ``ai_expert_analyzer_lambda.generate_and_cache`` writes. Fixed by resolving it
+    from the real producer via the shared domain vocabulary; see pair 8.
 
-Neither is a bug in the producer OR in the consumer taken alone. It is a bug in
+Neither was a bug in the producer OR in the consumer taken alone. It was a bug in
 the PAIR, and a pair has no owner until something like this registry gives it one.
 
 THE INJECTION IS TWO-SIDED — THAT IS THE WHOLE POINT

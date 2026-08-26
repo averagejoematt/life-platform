@@ -60,6 +60,7 @@ on:
       - '.claude/commands/**'
       - 'deploy/sync_doc_metadata.py'
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
+      - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
@@ -100,6 +101,7 @@ on:
       - '.claude/commands/**'
       - 'deploy/sync_doc_metadata.py'
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
+      - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'

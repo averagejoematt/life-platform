@@ -382,8 +382,12 @@ def test_card_prefers_observatory_summary_over_full_content(monkeypatch):
                 themes=["wind-down", "consistency"],
                 key_recommendation="Anchor the wake time.",
                 elena_quote="Notice what the evening asks of you.",
-                journaling_prompt="What made last night different?",
-            )
+            ),
+            # #3172: journaling_prompt is NEVER on the OUTPUT# row — it lives on the
+            # ai_analysis EXPERT# row generate_and_cache actually writes. Putting it
+            # here instead would be the fixture-not-the-wire defect this pair-contract
+            # issue exists to kill.
+            {"pk": f"{cobs.USER_PREFIX}ai_analysis", "sk": "EXPERT#sleep", "journaling_prompt": "What made last night different?"},
         ],
     )
     card = cobs._render_coach_card("sleep")
@@ -393,6 +397,29 @@ def test_card_prefers_observatory_summary_over_full_content(monkeypatch):
     assert card["elena_quote"] == "Notice what the evening asks of you."
     assert card["journaling_prompt"] == "What made last night different?"
     assert card["generated_at"] == "2026-08-09T00:00:00Z"  # falls back from created_at
+
+
+def test_card_journaling_prompt_training_domain_aliases_to_the_physical_expert_key(monkeypatch):
+    """#3172: `training` has no ai_analysis EXPERT# row of its own — the coaching-team
+    v2 merge folded it into physical_coach, and ai_expert_analyzer_lambda's roster
+    never grew a separate "training" expert_key to match. The alias must resolve it."""
+    _install(
+        monkeypatch,
+        [
+            _output(sk="OUTPUT#2026-08-09", pk="COACH#physical_coach", observatory_summary="Training summary."),
+            {"pk": f"{cobs.USER_PREFIX}ai_analysis", "sk": "EXPERT#physical", "journaling_prompt": "What's the load telling you?"},
+        ],
+    )
+    card = cobs._render_coach_card("training")
+    assert card["journaling_prompt"] == "What's the load telling you?"
+
+
+def test_card_journaling_prompt_is_absent_when_no_ai_analysis_record_exists(monkeypatch):
+    """No EXPERT# row yet (e.g. the analyzer hasn't run this cycle) degrades to None,
+    which the card's None-stripping step (#3172-adjacent, pre-existing behavior) drops."""
+    _install(monkeypatch, [_output(observatory_summary="Short version.")])
+    card = cobs._render_coach_card("sleep")
+    assert "journaling_prompt" not in card
 
 
 def test_card_quotes_the_most_referenced_open_thread(monkeypatch):

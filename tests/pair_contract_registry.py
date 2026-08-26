@@ -562,6 +562,185 @@ register(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PAIR 7 — computed_metrics.tier0_streak -> site-stats-refresh's public_stats.json
+#   compute.daily_metrics_compute_lambda.store_computed_metrics
+#     -> web.site_stats_refresh_lambda.resolve_tier0_streak
+#
+# #3172: found while seeding this registry (PR #3169) — site_stats_refresh_lambda
+# read `tier0_streak` off the raw `habitify` ingestion partition (which has no such
+# field; it is a DERIVED value) rather than `computed_metrics`, where
+# store_computed_metrics actually writes it. A permanent dead-zone read (#2804's
+# class): the 4x/day refresh cron's own comment promised to keep the streak current
+# intraday and never could. Root-caused and fixed on the CONSUMER side (this pair's
+# producer, store_computed_metrics, was always right — it is pair 3's producer too);
+# `resolve_tier0_streak` is the extracted, importable, real function the fix reads
+# through, in place of the dead `habitify` lookup inline in `lambda_handler`.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _consume_tier0_streak(item):
+    from web.site_stats_refresh_lambda import resolve_tier0_streak
+
+    # existing_platform={} isolates the contract to the computed_metrics read path —
+    # the fallback-to-yesterday's-value half is not what this pair is about.
+    return resolve_tier0_streak(item, {})
+
+
+def _agree_tier0_streak(produced, consumed):
+    assert consumed == int(
+        produced["tier0_streak"]
+    ), "the refresh cron's resolved streak disagrees with what daily-metrics-compute actually wrote"
+
+
+register(
+    PairContract(
+        name="computed_metrics -> site-stats-refresh tier0_streak",
+        producer="compute.daily_metrics_compute_lambda::store_computed_metrics",
+        consumer="web.site_stats_refresh_lambda::resolve_tier0_streak",
+        partition="computed_metrics",
+        produce=_produce_computed_metrics,  # the same real producer call pair 3 uses
+        consume=_consume_tier0_streak,
+        agree=_agree_tier0_streak,
+        mutations=(
+            Mutation(("tier0_streak",), "drop", why="the whole field the refresh cron exists to keep current intraday"),
+            Mutation(("tier0_streak",), "rename", to="tier0_streak_count", why="a plausible drift of the exact key name the cron reads"),
+            Mutation(("tier0_streak",), "retype", to="five", why="a type the cron's float() cast cannot use"),
+        ),
+        note=(
+            "#3172 (found seeding #2847 in PR #3169). habit_scores.store_habit_scores writes the SAME concept "
+            "under a different name (`t0_perfect_streak`) on a DIFFERENT partition entirely — three names/places "
+            "for one number is exactly how a reader ends up dead-zone reading one of them."
+        ),
+    )
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAIR 8 — ai_analysis EXPERT# row -> the observatory card's journaling prompt
+#   intelligence.ai_expert_analyzer_lambda.generate_and_cache
+#     -> coach.coach_observatory_renderer.journaling_prompt_for_domain
+#
+# #3172: found while seeding this registry (PR #3169) — coach_observatory_renderer
+# (and site_api_coach_narrative's handle_coach_analysis) read `journaling_prompt`
+# off the COACH#{coach_id} OUTPUT# row. No OUTPUT# writer
+# (coach_state_updater._write_output_record) has ever put that key in its item —
+# `journaling_prompt` is written by the ai_expert_analyzer_lambda's EXPERT# row
+# system instead (parsed off the model's own "JOURNALING PROMPT:" tag, mind-only).
+# Root-caused and fixed on the CONSUMER side: the OUTPUT# system never had this
+# concept to begin with, so the fix resolves it from the real producer via the
+# shared domain vocabulary (DOMAIN_COACH_MAP / OPERATIONAL_SHORT_IDS) instead of a
+# field that could never be there.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class _EmptyReadTable(CapturingTable):
+    """Captures the put_item this contract is about while answering every READ
+    with nothing — `generate_and_cache`'s data-gathering is fail-soft on an empty
+    window by design (every behavioral test in test_ai_expert_analyzer_behavior.py
+    runs the analyzer the same way); the point of THIS contract is the tag
+    extraction and the write shape, not the richness of the input data.
+    """
+
+    def get_item(self, Key, **_kw):  # noqa: N803
+        return {}
+
+    def query(self, **_kw):
+        return {"Items": []}
+
+
+def _produce_journaling_prompt():
+    from common import retry_utils
+    from intelligence import ai_expert_analyzer_lambda as az
+
+    table = _EmptyReadTable()
+    saved = (
+        az.table,
+        az._HAS_INTELLIGENCE_COMMON,
+        az._HAS_AI_VALIDATOR,
+        az._persona_core,
+        az._load_canonical_facts,
+        az._get_api_key,
+        retry_utils.call_anthropic_raw,
+    )
+    az.table = table
+    az._HAS_INTELLIGENCE_COMMON = False
+    az._HAS_AI_VALIDATOR = False
+    az._persona_core = None
+    az._load_canonical_facts = dict
+    az._get_api_key = lambda: "sk-test"
+    # The Anthropic call IS the transport here (stubbing it is the exact "fake
+    # table/s3_client that captures the item" idiom, applied to the one wire kind
+    # this producer speaks over that the other 6 pairs never needed). The tag
+    # extraction, gating, and DDB item assembly below all run for real.
+    reply = (
+        "The gap between what you log and what you notice is the whole story this month.\n\n"
+        "KEY RECOMMENDATION: Write the thing down before the feeling passes.\n"
+        "JOURNALING PROMPT: What did you decide not to say today?\n"
+        "ELENA QUOTE: He counts what he cannot yet feel.\n"
+    )
+    retry_utils.call_anthropic_raw = lambda req, timeout=None: {"content": [{"type": "text", "text": reply}]}
+    try:
+        az.generate_and_cache("mind")  # #3172: only "mind" is ever asked for a journaling prompt
+    finally:
+        (
+            az.table,
+            az._HAS_INTELLIGENCE_COMMON,
+            az._HAS_AI_VALIDATOR,
+            az._persona_core,
+            az._load_canonical_facts,
+            az._get_api_key,
+            retry_utils.call_anthropic_raw,
+        ) = saved
+    assert table.items, "generate_and_cache refused the write (empty/gated response?) — no payload to contract on"
+    return table.items[0]
+
+
+def _consume_journaling_prompt(item):
+    from coach import coach_observatory_renderer as cobs
+
+    class _Singleton:
+        def get_item(self, Key, **_kw):  # noqa: N803
+            return {"Item": dict(item)} if item.get("pk") == Key.get("pk") and item.get("sk") == Key.get("sk") else {}
+
+    real_table = cobs.table
+    cobs.table = _Singleton()
+    try:
+        return cobs.journaling_prompt_for_domain("mind")
+    finally:
+        cobs.table = real_table
+
+
+def _agree_journaling_prompt(produced, consumed):
+    assert consumed == produced["journaling_prompt"], "the card's journaling prompt disagrees with what the analyzer actually wrote"
+
+
+register(
+    PairContract(
+        name="ai_analysis EXPERT# -> observatory card journaling prompt",
+        producer="intelligence.ai_expert_analyzer_lambda::generate_and_cache",
+        consumer="coach.coach_observatory_renderer::journaling_prompt_for_domain",
+        partition="ai_analysis",
+        produce=_produce_journaling_prompt,
+        consume=_consume_journaling_prompt,
+        agree=_agree_journaling_prompt,
+        mutations=(
+            Mutation(("journaling_prompt",), "drop", why="the whole field; a producer that dropped it must read as absent, not stale"),
+            Mutation(
+                ("journaling_prompt",), "rename", to="journal_prompt", why="a plausible drift of the exact key name the card indexes on"
+            ),
+            Mutation(("sk",), "retype", to="EXPERT#sleep", why="the expert_key-keyed row the card's domain lookup indexes on"),
+        ),
+        note=(
+            "#3172 (found seeding #2847 in PR #3169). coach_state_updater._write_output_record's OUTPUT# item "
+            "never had a journaling_prompt key at all — this was never a rename or a drop in production, it was "
+            "two systems (the COACH# persona pipeline and the EXPERT# ai_analysis pipeline) sharing a reader's "
+            "assumption without ever sharing a write."
+        ),
+    )
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # THE FLOOR — pairs this platform KNOWS must agree.
 #
 # Sourced from the #2813 follow-up disposition and the two contracts built this
@@ -580,11 +759,15 @@ KNOWN_MUST_AGREE_PAIRS = (
     "engagement_state -> /api/presence",
     "adaptive_mode -> /api/ask grounding reads",
     "public_stats.json -> fingerprint broadcast projection",
+    # #3172 — the two live mismatches found while seeding this registry (PR #3169),
+    # now root-caused, fixed, and enrolled.
+    "computed_metrics -> site-stats-refresh tier0_streak",
+    "ai_analysis EXPERT# -> observatory card journaling prompt",
 )
 
 #: The enrollment ratchet (see the sweep's module docstring for why this, and not
 #: a 299-entry exemption ledger, is the coverage instrument). Raise it in the same
 #: PR that enrolls a pair; it may never be lowered.
-ENROLLED_FLOOR = 6
+ENROLLED_FLOOR = 8
 
 __all__ = ["ENROLLED_FLOOR", "KNOWN_MUST_AGREE_PAIRS"]

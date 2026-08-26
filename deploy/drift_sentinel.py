@@ -109,7 +109,15 @@ from datetime import datetime, timezone
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# table-config-noop-ttl (#2799 residual): TABLE_TTL_ATTRIBUTE is declared once in
+# cdk/stacks/constants.py (the platform's single source of truth for shared infra
+# constants) — imported here rather than re-declared, so the declared side of
+# check_dynamodb_ttl below can never drift from it by hand-edit.
+sys.path.insert(0, os.path.join(_ROOT, "cdk"))
+from stacks.constants import TABLE_TTL_ATTRIBUTE  # noqa: E402
 
 # The 9 CDK stacks and the region each deploys to (Web is us-east-1 for CloudFront).
 # Source of truth: cdk/app.py.
@@ -566,6 +574,53 @@ def check_s3_lifecycle():
     return result
 
 
+# ── 4c. DynamoDB TTL declared-vs-live (table-config-noop-ttl, #2799 residual) ──
+# `life-platform` is imported into CDK, so its TimeToLiveSpecification is invisible to
+# check_cfn_drift (not a CFN resource on an imported table) — the same "not a template,
+# nothing compares it" gap check_s3_lifecycle closed for the bucket's lifecycle rules
+# (DIL-026). #951 shipped exactly this shape once already: email_subscriber_lambda wrote
+# its expiry to `expires_at` while the table's live TTL was enabled on `ttl`
+# (rate_limiter.py's attribute) — 550 rows never reaped behind a code comment claiming
+# they would be, and `grep -rn describe_time_to_live` found zero callers anywhere in the
+# repo. Declared side: cdk/stacks/constants.py's TABLE_TTL_ATTRIBUTE (the ONE name a
+# writer must key its expiry field to). Live side: describe_time_to_live. Same
+# declared-vs-live, rule-by-rule idiom as check_s3_lifecycle above — here there is
+# exactly one "rule" (which attribute, and whether it's actually enabled).
+def check_dynamodb_ttl():
+    """The live DynamoDB TTL config on `life-platform` must be ENABLED on the
+    attribute name declared in cdk/stacks/constants.py (TABLE_TTL_ATTRIBUTE)."""
+    try:
+        ddb = _client("dynamodb")
+        live = ddb.describe_time_to_live(TableName=TABLE_NAME)["TimeToLiveDescription"]
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"describe_time_to_live: {e}"}
+
+    live_status = live.get("TimeToLiveStatus")
+    live_attr = live.get("AttributeName")
+    enabled = live_status in ("ENABLED", "ENABLING")
+    attr_matches = live_attr == TABLE_TTL_ATTRIBUTE
+
+    result = {
+        "status": "clean" if (enabled and attr_matches) else "drift",
+        "declared_attribute": TABLE_TTL_ATTRIBUTE,
+        "live_attribute": live_attr,
+        "live_status": live_status,
+    }
+    if result["status"] == "drift":
+        if not enabled:
+            result["detail"] = (
+                f"live TTL status is {live_status!r} on table {TABLE_NAME!r}, not ENABLED — "
+                "any item carrying an expiry attribute is never reaped"
+            )
+        elif not attr_matches:
+            result["detail"] = (
+                f"live TTL attribute is {live_attr!r}, declared (cdk/stacks/constants.py "
+                f"TABLE_TTL_ATTRIBUTE) is {TABLE_TTL_ATTRIBUTE!r} — the #951 shape: a writer "
+                "keying its expiry to the undeclared name is never reaped"
+            )
+    return result
+
+
 def _fetch_live_version(url):
     """GET /version.json and parse it. Raises on any network/parse failure — the
     caller turns that into a soft 'error' status, never a crash."""
@@ -943,6 +998,7 @@ def run_sweep():
         "orphan_functions": check_orphan_functions(),
         "bucket_policy": check_bucket_policy(),
         "s3_lifecycle": check_s3_lifecycle(),
+        "dynamodb_ttl": check_dynamodb_ttl(),
         "oidc_iam": check_oidc_iam(),
         "doc_literals": check_doc_literals(),
         "site_sha_ancestry": check_site_sha_ancestry(),
@@ -987,6 +1043,7 @@ def _summary(status, checks):
         ("orphan_functions", "orphan function(s)"),
         ("bucket_policy", "delete-protection gap"),
         ("s3_lifecycle", "S3 lifecycle configuration diverges from declared rules"),
+        ("dynamodb_ttl", "DynamoDB TTL config diverges from the declared attribute"),
         ("doc_literals", "doc-literal drift"),
         ("site_sha_ancestry", "live site SHA not on main"),
         ("github_config", "GitHub config diverges from documented posture"),

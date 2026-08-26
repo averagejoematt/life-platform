@@ -119,7 +119,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-665 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+666 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -147,7 +147,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `coach_gen_cache` | generation_cache.py | generation_cache.py |
 | `coach_thread` | training_notes.py | tools_coach_intelligence.py |
 | `computed_insights` | daily_brief_lambda.py, daily_insight_compute_lambda.py | daily_insight_compute_lambda.py, weekly_signal_lambda.py |
-| `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, site_api_discovery.py, site_api_habits.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
+| `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, site_api_discovery.py, site_api_habits.py, site_stats_refresh_lambda.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
 | `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py |
 | `decisions` | — | site_api_thirdwall.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
@@ -176,7 +176,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `genome` | — | nutrition_review_lambda.py, site_api_biomarkers.py |
 | `habit_causality` | — | site_api_habits.py |
 | `habit_scores` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coach_prediction_evaluator.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, site_api_ai_context.py, site_api_habits.py, site_api_mind.py |
-| `habitify` | — | ai_expert_analyzer_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py, site_stats_refresh_lambda.py |
+| `habitify` | — | ai_expert_analyzer_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py |
 | `health_check` | pipeline_health_check_lambda.py | site_api_status.py |
 | `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, daily_metrics_compute_lambda.py, site_api_pulse.py, site_api_training.py, tools_hevy_routine.py, tools_strength.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
 | `hevy_id_map` | routine_repo.py | routine_repo.py |
@@ -245,7 +245,9 @@ for why it is not a census of every must-agree pair.
 | Pair | Producer | Consumer | Partition | Mutations |
 |------|----------|----------|-----------|-----------|
 | adaptive_mode -> /api/ask grounding reads | `compute.adaptive_mode_lambda::store_adaptive_mode` | `web.site_api_ai_context::_ask_fetch_computed_reads` | `adaptive_mode` | 3 |
+| ai_analysis EXPERT# -> observatory card journaling prompt | `intelligence.ai_expert_analyzer_lambda::generate_and_cache` | `coach.coach_observatory_renderer::journaling_prompt_for_domain` | `ai_analysis` | 3 |
 | computed_metrics -> canonical facts | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `experiment.canonical_facts::build_canonical_facts` | `computed_metrics` | 4 |
+| computed_metrics -> site-stats-refresh tier0_streak | `compute.daily_metrics_compute_lambda::store_computed_metrics` | `web.site_stats_refresh_lambda::resolve_tier0_streak` | `computed_metrics` | 3 |
 | engagement_state -> /api/presence | `content.engagement_core::compute_presence` | `web.site_api_freshness::presence` | `engagement_state` | 4 |
 | input_manifest -> character page projection | `common.input_manifest::build_input_manifest` | `web.site_api_character::_public_input_manifest` | `computed_metrics` | 4 |
 | public_stats.json -> fingerprint broadcast projection | `content.site_writer::write_public_stats` | `content.fingerprint_broadcast::project_public` | — | 4 |
@@ -269,14 +271,6 @@ for why it is not a census of every must-agree pair.
 | `hevy-restamp-errors` | operational_stack | digest |
 | `hevy-routine-cron-errors` | operational_stack | digest |
 | `ingest-auth-unhealthy-24h` | monitoring_stack | urgent |
-| `ingestion-error-eightsleep` | ingestion_stack | unresolved |
-| `ingestion-error-enrichment` | ingestion_stack | unresolved |
-| `ingestion-error-hevy-backfill` | ingestion_stack | unresolved |
-| `ingestion-error-macrofactor` | ingestion_stack | unresolved |
-| `ingestion-error-strava` | ingestion_stack | unresolved |
-| `ingestion-error-todoist` | ingestion_stack | unresolved |
-| `ingestion-error-whoop` | ingestion_stack | unresolved |
-| `ingestion-error-withings` | ingestion_stack | unresolved |
 | `key-rotator-errors` | operational_stack | digest |
 | `life-platform-daily-brief-memory-high` | monitoring_stack | digest |
 | `life-platform-data-export-errors` | operational_stack | digest |
@@ -316,8 +310,8 @@ for why it is not a census of every must-agree pair.
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1138 total · 824 resolved · 314 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1142 total · 826 resolved · 316 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 58 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
+- Alarms: 50 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled

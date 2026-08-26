@@ -250,6 +250,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps .claude/commands + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
+        # #2986/#2838: the generic re-stamp rule, derived from sync_doc_metadata.RULES. Its
+        # verdict is pure repo shape (0.5s), and the change that can break it — a new stamped
+        # literal, or an edit to deploy/sync_doc_metadata.py — is exactly a PR's own diff, so
+        # putting it post-merge would repeat this epic's own "model-guard-post-merge-only" fold.
+        "test_doc_restamp_rule_2986.py",
         "test_budget_guard_fail_closed_2824.py",  # #2824: os.walk sweep — no lambdas/mcp module may re-declare FAIL_CLOSED_FEATURES; membership lives in budget_guard alone
         "test_csp_hardening_3048.py",  # #3048: site/ tree sweep — no non-legacy page may reintroduce an executable inline script; repo-shape, pre-merge
         "test_grant_enumeration_drift.py",  # #2824: consumer⊆granted across cdk/stacks + lambdas/ + .github/workflows + infra/iam — a new fail-closed consumer (or a role that drops a grant) must red BEFORE the merge, not after the channel is already stranded
@@ -280,6 +285,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # files rather than sweeping the tree, so premerge_derivation cannot discover
         # it — hand-listed, same as #2813 above.
         "test_pair_contract_sweep_2847.py",
+        # #2847 box 4: the must-agree SEAM guard — charter standing rule 3's fleet-wide
+        # enforcement, the peer of #2844's rule-1 guard. Its whole premise is that the
+        # birth of a must-agree pair is a decision made ON the PR that creates it; a red
+        # arriving post-merge is the seam already shipped, which is exactly how #2804's
+        # dead-zone read and #2214's dual writer both reached production. Builds the
+        # #2845 model from source rather than sweeping the tree (~7s), so
+        # premerge_derivation cannot discover it — hand-listed, same as the sweep above.
+        "test_pair_seam_conformance_2847.py",
         # #3101: the doc-literal conflict surface. Its verdict is pure repo shape —
         # whether a discovered counter has grown a SECOND committed home, and whether
         # the single-writer plumbing (agent_commit refusal, hook stage pathspec,

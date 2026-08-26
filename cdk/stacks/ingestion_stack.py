@@ -102,7 +102,6 @@ class IngestionStack(Stack):
             handler="ingestion.whoop_lambda.lambda_handler",
             schedule=f"cron(0 {WHOOP_HOURS} * * ? *)",
             timeout_seconds=300,
-            alarm_name="ingestion-error-whoop",
             # No async retry: Whoop rotates its refresh token on every refresh, so
             # a failed run is almost always a token-rotation race (HTTP 400). The
             # default 2 EventBridge retries just re-hit it with the same stale
@@ -264,7 +263,6 @@ class IngestionStack(Stack):
             handler="ingestion.withings_lambda.lambda_handler",
             schedule=f"cron(5 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120,
-            alarm_name="ingestion-error-withings",
             custom_policies=rp.ingestion_withings(),
             **shared,
         )
@@ -300,7 +298,6 @@ class IngestionStack(Stack):
             handler="ingestion.strava_lambda.lambda_handler",
             schedule=f"cron(10 {INGEST_HOURLY} * * ? *)",  # RE-ENABLED 2026-06-20
             timeout_seconds=300,
-            alarm_name="ingestion-error-strava",
             custom_policies=rp.ingestion_strava(),
             **shared,
         )
@@ -355,7 +352,6 @@ class IngestionStack(Stack):
                 "S3_BUCKET": "matthew-life-platform",
                 "TABLE_NAME": TABLE_NAME,
             },
-            alarm_name="ingestion-error-hevy-backfill",
             custom_policies=rp.ingestion_hevy_backfill(),
             **shared,
         )
@@ -425,7 +421,6 @@ class IngestionStack(Stack):
             handler="ingestion.todoist_lambda.lambda_handler",
             schedule="cron(0 14 * * ? *)",
             timeout_seconds=120,
-            alarm_name="ingestion-error-todoist",
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
             custom_policies=rp.ingestion_todoist(),
             **shared,
@@ -440,7 +435,6 @@ class IngestionStack(Stack):
             handler="ingestion.eightsleep_lambda.lambda_handler",
             schedule=f"cron(15 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120,
-            alarm_name="ingestion-error-eightsleep",
             custom_policies=rp.ingestion_eightsleep(),
             **shared,
         )
@@ -455,7 +449,6 @@ class IngestionStack(Stack):
             handler="ingestion.enrichment_lambda.lambda_handler",
             schedule="cron(30 15 * * ? *)",
             timeout_seconds=300,
-            alarm_name="ingestion-error-enrichment",
             custom_policies=rp.ingestion_activity_enrichment(),
             **shared,
         )
@@ -472,7 +465,6 @@ class IngestionStack(Stack):
             source_file="lambdas/ingestion/macrofactor_lambda.py",
             handler="ingestion.macrofactor_lambda.lambda_handler",
             timeout_seconds=300,
-            alarm_name="ingestion-error-macrofactor",
             custom_policies=rp.ingestion_macrofactor(),
             **shared,
         )

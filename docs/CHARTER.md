@@ -79,7 +79,17 @@ sweeps keep re-finding; if a road is missing, pave it before driving.
    it by construction; the only green path is deriving from the registry.
 2. **Debt counts only ratchet down.**
 3. **Every new "must agree" pair gets a contract test at birth**, on the real wire
-   shape.
+   shape. The fleet-wide enforcement is the #2847 must-agree seam guard —
+   `tests/test_pair_seam_conformance_2847.py`, rule 3's counterpart to rule 1's
+   #2844 guard and built on the same three mechanics: the seam census
+   `(partition, module, direction)` is derived from the #2845 model's edge plane
+   (built live, never read from the commit), seams covered by an enrolled
+   `PairContract` drop out, and everything else must sit in the dated shrink-only
+   ledger `tests/pair_seam_residue.py`. So enrolling a contract is the only way a
+   row leaves, and a module joining a shape someone else already depends on is a
+   decision made on the PR that makes it. The contracts themselves are
+   `tests/pair_contract_registry.py` (#2847), driven two-sided by
+   `tests/pair_contract.py`.
 4. **Every scheduled thing gets a dead-man at birth**, and every metric states its
    absence semantics at birth (ADR-104 — honest numbers; ADR-105 — uncertainty and
    n on every statistical claim, deterministic computation before any LLM verdict).

@@ -27,6 +27,7 @@ This module does NOT import the facade; no import cycle.
 from boto3.dynamodb.conditions import Key
 from coach import audience_guard  # #2972 — the public-audience frame (public_read)
 from coach.persona_registry import (  # coaching-team v2: names come from the registry
+    OPERATIONAL_SHORT_IDS,  # #3172: the ai_analysis EXPERT# keyspace
     display_map as _registry_display_map,
     short_id_names as _registry_short_names,
 )
@@ -221,6 +222,35 @@ def handle_ai_analysis(event, *, _g):
     if ai_item.get("days_in_experiment"):
         resp_data["days_in_experiment"] = int(ai_item["days_in_experiment"])
     return _ok(resp_data, cache_seconds=300)
+
+
+# #3172: "training" has no dedicated `ai_analysis` EXPERT# row of its own — the
+# coaching-team v2 merge (2026-08-10) folded it into physical_coach, and
+# ai_expert_analyzer_lambda's roster (OPERATIONAL_SHORT_IDS) never grew a
+# separate "training" expert_key to match. Mirrors coach_observatory_renderer's
+# alias of the same name.
+_EXPERT_KEY_ALIAS = {"training": "physical"}
+
+
+def _journaling_prompt_for_domain(table, domain):
+    """#3172: ``journaling_prompt`` is written by
+    ``intelligence.ai_expert_analyzer_lambda::generate_and_cache`` onto the
+    ``ai_analysis`` ``EXPERT#{expert_key}`` row — the ``COACH#{coach_id}``
+    ``OUTPUT#`` row ``handle_coach_analysis`` otherwise reads never carries it
+    (``coach.coach_state_updater::_write_output_record``'s item dict has no such
+    key; it never did), so ``output.get("journaling_prompt")`` was a permanent
+    dead-zone None. Resolve from the real producer instead.
+    """
+    expert_key = _EXPERT_KEY_ALIAS.get(domain, domain)
+    if expert_key not in OPERATIONAL_SHORT_IDS:
+        return None
+    try:
+        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": f"EXPERT#{expert_key}"}).get("Item")
+    except Exception:
+        return None
+    if not singleton_visible(item):
+        return None
+    return (item or {}).get("journaling_prompt")
 
 
 def handle_coach_analysis(event, *, _g):
@@ -421,7 +451,7 @@ def handle_coach_analysis(event, *, _g):
             "public_read": audience_guard.public_read(output),
             "key_recommendation": output.get("key_recommendation") or (output.get("themes", [""])[0] if output.get("themes") else None),
             "elena_quote": output.get("elena_quote"),
-            "journaling_prompt": output.get("journaling_prompt"),
+            "journaling_prompt": _journaling_prompt_for_domain(table, domain),  # #3172: real producer is ai_analysis EXPERT#
             "thread_reference": thread_reference,
             "revision_signal": revision_signal,
             "cross_coach_reference": cross_coach_reference,

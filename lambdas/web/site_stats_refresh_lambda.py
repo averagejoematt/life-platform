@@ -82,6 +82,22 @@ def _get_latest(table, source, days_back=2):
         return {}
 
 
+def resolve_tier0_streak(computed_metrics_record, existing_platform):
+    """#3172: `tier0_streak` is written by daily-metrics-compute onto the
+    ``computed_metrics`` ``DATE#`` row (``store_computed_metrics`` in
+    ``compute.daily_metrics_compute_lambda``) — it was never on the raw ``habitify``
+    ingestion partition this refresh cron used to read it from. habitify's raw
+    payload has no ``tier0_streak`` field at all, so that read was a permanent
+    dead-zone None (#2804's class): this section always silently fell through to
+    whatever `platform.tier0_streak` the morning brief had last written, and could
+    never actually refresh intraday the way its own docstring/comment promised.
+    Falls back to the existing public_stats.json value when computed_metrics
+    hasn't landed for today yet (pre ~9:40am PT) or is itself absent.
+    """
+    fresh = _safe_float(computed_metrics_record or {}, "tier0_streak")
+    return int(fresh) if fresh is not None else (existing_platform or {}).get("tier0_streak")
+
+
 def lambda_handler(event, context):
     print("[INFO] site-stats-refresh starting...")
 
@@ -100,7 +116,7 @@ def lambda_handler(event, context):
     # ── 2. Read fresh records from DynamoDB ───────────────────────────────────
     table = _dynamo.Table(TABLE_NAME)
     withings = _get_latest(table, "withings")
-    habitify = _get_latest(table, "habitify")
+    computed_metrics = _get_latest(table, "computed_metrics")
     apple_health = _get_latest(table, "apple_health")
     character = _get_latest(table, "character_sheet")
 
@@ -158,10 +174,9 @@ def lambda_handler(event, context):
         "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
     }
 
-    # ── 5. Update tier0_streak from habitify if available ────────────────────
+    # ── 5. Update tier0_streak from computed_metrics if available (#3172) ────
     ep = existing.get("platform", {})
-    fresh_streak = _safe_float(habitify, "tier0_streak")
-    fresh_streak = int(fresh_streak) if fresh_streak is not None else ep.get("tier0_streak")
+    fresh_streak = resolve_tier0_streak(computed_metrics, ep)
 
     # ── 5b. Water from apple_health ───────────────────────────────────────────
     water_ml = _safe_float(apple_health, "water_intake_ml")
