@@ -44,6 +44,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import check_handover_lines  # noqa: E402  (same directory; the ONE marker derivation, #3006)
+import check_main_green  # noqa: E402  (same directory; the ONE head-coverage state vocabulary, #3212)
 
 TIMEOUT = 300  # seconds per gate; the whole battery is ~10s in practice
 
@@ -100,8 +101,24 @@ def run_gate(gate: Gate):
         return gate, False, None, f"(runner) could not execute {' '.join(gate.cmd)}: {e}"
 
 
+# #3212: check_main_green.py ends with one machine-readable line naming the state it
+# concluded about main's HEAD — `HEAD-COVERAGE: <state> <sha8>`. Parsing that declared
+# contract (and the state CONSTANTS behind it) is how this runner stays accurate without
+# phrase-matching the gate's prose, which is the failure mode every suppressor in this
+# repo has eventually hit.
+_HEAD_COV_RE = re.compile(r"^" + re.escape(check_main_green.HEAD_COVERAGE_PREFIX) + r"\s+(\S+)(?:\s+([0-9a-f?]{1,40}))?\s*$", re.M)
+
+
+def _head_coverage(out: str) -> tuple:
+    """(state, sha8) from the gate's HEAD-COVERAGE line, or (None, "") if absent."""
+    m = _HEAD_COV_RE.search(out or "")
+    return (m.group(1), m.group(2) or "") if m else (None, "")
+
+
 def _last_line(out: str) -> str:
     lines = [ln.strip() for ln in out.strip().splitlines() if ln.strip()]
+    # The HEAD-COVERAGE contract line is machine output, not the decode a human needs.
+    lines = [ln for ln in lines if not ln.startswith(check_main_green.HEAD_COVERAGE_PREFIX)] or lines
     return lines[-1] if lines else ""
 
 
@@ -123,7 +140,22 @@ def draft_lines(results) -> list:
     filled = {}
     if "main-green" in by_name:
         ok, out = by_name["main-green"]
-        filled["Main"] = f"green ({_sha_from(out)})" if ok else f"<red|stranded — decode: {_last_line(out)[:100]}>"
+        cov_state, head8 = _head_coverage(out)
+        if ok and cov_state in check_main_green.ZR_NOT_A_FAILURE:
+            # #3212: green, but HEAD minted no CI/CD run of its own for a REASON the gate
+            # proved benign. The marker must say so — the old draft line ("green (<sha>)")
+            # silently attributed the verdict to a sha that is not HEAD.
+            filled["Main"] = (
+                f"green ({_sha_from(out)}) — HEAD {head8} minted no CI/CD run of its own: {cov_state} (expected, not a swallow)"
+            )
+        elif ok:
+            filled["Main"] = f"green ({_sha_from(out)})"
+        elif cov_state == check_main_green.ZR_INDETERMINATE:
+            filled["Main"] = (
+                f"<undetermined — HEAD {head8} has no CI/CD run and the swallow discriminator could not read: {_last_line(out)[:80]}>"
+            )
+        else:
+            filled["Main"] = f"<red|stranded — decode: {_last_line(out)[:100]}>"
     if "stash" in by_name and "hooks" in by_name:
         s_ok, _ = by_name["stash"]
         h_ok, _ = by_name["hooks"]

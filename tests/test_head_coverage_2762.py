@@ -43,12 +43,29 @@ def test_unreadable_head_is_unknown_never_a_verdict():
 
 
 def test_green_over_uncovered_head_exits_nonzero_and_names_both_shas():
+    """#3212 amendment: an uncovered HEAD is only a CONFIRMED swallow once the
+    #2826 discriminator says so — the caller now supplies that verdict. The
+    #2762 contract itself is unchanged: a green over a HEAD that nothing tested
+    still exits 1 and still names both shas."""
+    state = cmg.classify_pipeline([OLD])
+    state["head_sha"] = HEAD
+    state["head_cov"] = cmg.head_coverage([OLD], HEAD)
+    state["head_zr"] = {"state": cmg.ZR_SWALLOWED, "reason": "no workflow run of any kind references head_sha"}
+    code, msg = cmg.render(state)
+    assert code == 1
+    assert "swallowed-push" in msg and ("a" * 8) in msg and ("b" * 8) in msg
+
+
+def test_green_over_an_undiagnosed_uncovered_head_still_exits_nonzero():
+    """#3212: without a discriminator verdict the gate knows nothing — it must
+    still refuse to declare green (never a silent pass), and must not claim a
+    confirmed swallow it did not prove."""
     state = cmg.classify_pipeline([OLD])
     state["head_sha"] = HEAD
     state["head_cov"] = cmg.head_coverage([OLD], HEAD)
     code, msg = cmg.render(state)
     assert code == 1
-    assert "swallowed-push" in msg and ("a" * 8) in msg and ("b" * 8) in msg
+    assert "swallowed-push" not in msg
 
 
 def test_green_with_pending_head_still_exits_zero():
