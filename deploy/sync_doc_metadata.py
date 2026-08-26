@@ -24,7 +24,7 @@ USAGE:
                                                # literal + its live-verified date (#1957)
 
 WHAT IT UPDATES:
-  - Version + date in all doc headers
+  - Version + date in doc headers — the DATE only where the run regenerated content (#2986)
   - Lambda count, tool count, module count, secret count, alarm count
   - Secret state (active vs deleted)
   - Secrets Manager cost line
@@ -50,6 +50,7 @@ DOCS = ROOT / "docs"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import doc_alarm_inventory as _alarm_inv  # noqa: E402 — #2649: extracted sibling (MONITORING.md inventory)
+import doc_restamp_guard as _restamp  # noqa: E402 — #2986/#2838: the generic re-stamp rule
 import endpoint_registry  # noqa: E402 — the shared /api/* enumerator (#1436)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1095,23 +1096,13 @@ def apply_facts(template: str) -> str:
     return result
 
 
-# #2649: the reconcile DATE stamp is not a discovered literal about the system — it
-# is a timestamp of when the sync last ran. `facts["date"]` is set to *today* on every
-# invocation, so under --check every doc goes stale at 00:00Z and stays red until the
-# next merge re-stamps it. Docs CI was 40/40 red, and because a date-only diff and a
-# genuine drift are reported identically, a real drift was invisible inside the noise.
-#
-# --apply still refreshes the stamp (it should stay current). --check ignores a change
-# whose ONLY difference is a date, so the gate fails on substance and nothing else.
-_DATE_STAMP_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+# #2649 (a date-only diff is not drift) and #2986/#2838 (a date may only be advanced on
+# content this run regenerated or verified) are ONE rule, and it lives in one place:
+# deploy/doc_restamp_guard.py — read that docstring before touching the stamp path.
+_differs_only_by_date_stamp = _restamp.differs_only_by_date_stamp  # #2649 contract, re-exported
 
 
-def _differs_only_by_date_stamp(old: str, new: str) -> bool:
-    """True when `old` and `new` are identical once every YYYY-MM-DD is masked."""
-    return _DATE_STAMP_RE.sub("<date>", old) == _DATE_STAMP_RE.sub("<date>", new)
-
-
-def process_doc(rel_path: str, dry_run: bool, is_check: bool = False) -> list[str]:
+def process_doc(rel_path: str, dry_run: bool) -> list[str]:
     """Apply all matching rules to a doc. Returns list of change descriptions."""
     full_path = ROOT / rel_path
     if not full_path.exists():
@@ -1120,6 +1111,8 @@ def process_doc(rel_path: str, dry_run: bool, is_check: bool = False) -> list[st
     original = full_path.read_text(encoding="utf-8")
     current = original
     changes = []
+    held = []  # date-only rewrites, deferred until the run proves it earned them (#2986)
+    rederived = False  # did THIS run rewrite a non-date literal here?
 
     for doc, pattern, replacement_template in RULES:
         if doc != rel_path:
@@ -1139,13 +1132,17 @@ def process_doc(rel_path: str, dry_run: bool, is_check: bool = False) -> list[st
             if old_match:
                 old_text = old_match.group(0)[:80]
                 new_text = replacement[:80]
-                # #2649: under --check, a diff that is ONLY the reconcile date stamp is
-                # not drift — see _differs_only_by_date_stamp. Still rewritten by --apply.
-                if is_check and _differs_only_by_date_stamp(old_match.group(0), replacement):
-                    current = new
+                # A date-ONLY difference is never drift (#2649) and never an entitlement to
+                # re-stamp (#2986) — defer it; `resolve()` below decides if the run earned it.
+                if _restamp.differs_only_by_date_stamp(old_match.group(0), replacement):
+                    held.append((pattern, replacement))
                     continue
                 changes.append(f"  ~ {old_text!r}\n    → {new_text!r}")
+                rederived = True
             current = new
+
+    current, notes = _restamp.resolve(ROOT, rel_path, original, current, held, rederived)
+    changes += notes
 
     if current != original and not dry_run:
         full_path.write_text(current, encoding="utf-8")
@@ -1216,14 +1213,17 @@ def main():
         drifted_docs.append("docs/MONITORING.md")
 
     for rel_path in docs_to_process:
-        changes = process_doc(rel_path, dry_run, is_check=is_check)
+        changes = process_doc(rel_path, dry_run)
+        # A HELD re-stamp (#2986) is a correct outcome, not a stale literal — never count it.
+        drift = [c for c in changes if not c.startswith(_restamp.HOLD_PREFIX)]
         if changes:
             print(f"[{rel_path}]")
             for c in changes:
                 print(c)
             print()
-            total_changes += len(changes)
-            drifted_docs.append(rel_path)
+            total_changes += len(drift)
+            if drift:
+                drifted_docs.append(rel_path)
         else:
             print(f"[{rel_path}] — already in sync ✓")
 
