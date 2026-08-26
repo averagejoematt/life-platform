@@ -1835,7 +1835,7 @@ DATA INTERPRETATION RULES:
 - Garmin is the step count source of truth (wearable). Ignore Apple Health step counts if Garmin is available.
 {few_shot_block}
 
-Write 2-4 paragraphs of {domain_label} coaching for Matthew. Be specific, reference numbers, and stay within your evidence ceiling. Write in your distinctive voice — not a generic AI coach voice."""
+Write 2-4 paragraphs of {domain_label} coaching for Matthew — target 300-450 words, and do not exceed 500 words (#3190: this was previously unbounded, which is why generation was truncating against max_tokens). Be specific, reference numbers, and stay within your evidence ceiling. Write in your distinctive voice — not a generic AI coach voice."""
 
         # `_data_inventory` was built at Step 1.5 by `_in_gate.data_inventory(data)` —
         # the gate and the prompt must read the SAME bytes, never two copies (#3107).
@@ -1892,8 +1892,8 @@ Write your {domain_label} coaching section now."""
         # #2888: `system_prompt` rides the SYSTEM slot, never concatenated into the
         # user turn — that left body["system"] unset, so ADR-049's auto-wrap had
         # nothing to wrap and these seven calls carried no cache_control at all.
-        # Rationale, measurements and the cross-coach follow-up: ai/prompt_cache.py.
-        output = call_anthropic(user_message_full, api_key, max_tokens=600, system=system_prompt)
+        # Rationale, measurements and the cross-coach follow-up: ai/prompt_cache.py. max_tokens=1000, not 600 (#3190 — see PR body for the arithmetic).
+        output = call_anthropic(user_message_full, api_key, max_tokens=1000, system=system_prompt)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
 
         # #952 (ai-content-6): Bedrock outage / tier-3 cutoff returns the
@@ -1941,8 +1941,8 @@ Write your {domain_label} coaching section now."""
                     output,
                     _findings_fn,
                     # #2888: system in the system slot; the correction stays in the
-                    # user turn (dynamic — it must never enter the cached prefix).
-                    lambda _corr: call_anthropic(user_message_full + "\n\n" + _corr, api_key, max_tokens=600, system=system_prompt),
+                    # user turn (dynamic — it must never enter the cached prefix). max_tokens=1000, not 600 (#3190).
+                    lambda _corr: call_anthropic(user_message_full + "\n\n" + _corr, api_key, max_tokens=1000, system=system_prompt),
                     surface=f"coach_v2:{coach_id}",
                 )
                 if _corrected:
@@ -1965,8 +1965,8 @@ Write your {domain_label} coaching section now."""
             coach_id,
             output,
             brief_with_grounding(generation_brief, _canon_facts, _allowed),  # #2573: deterministic grounding context
-            # #2888: system in the system slot; the gate note stays user-side (dynamic).
-            regenerate_fn=lambda _note: call_anthropic(user_message_full + "\n\n" + _note, api_key, max_tokens=600, system=system_prompt),
+            # #2888: system in the system slot; the gate note stays user-side (dynamic). max_tokens=1000, not 600 (#3190).
+            regenerate_fn=lambda _note: call_anthropic(user_message_full + "\n\n" + _note, api_key, max_tokens=1000, system=system_prompt),
         )
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
@@ -1987,8 +1987,8 @@ Write your {domain_label} coaching section now."""
                 output, _ack_finding = _ec.enforce_presence_acknowledgment(
                     output,
                     _psig,
-                    # #2888: system slot; gate note stays user-side (dynamic).
-                    regenerate_fn=lambda _n: call_anthropic(user_message_full + "\n\n" + _n, api_key, max_tokens=600, system=system_prompt),
+                    # #2888: system slot; gate note stays user-side (dynamic). max_tokens=1000, not 600 (#3190).
+                    regenerate_fn=lambda n: call_anthropic(user_message_full + "\n\n" + n, api_key, max_tokens=1000, system=system_prompt),
                 )
                 if _ack_finding:
                     print(f"[COACH-V2:{coach_id}] presence-ack gate fired: {_ack_finding.get('detail')}")
@@ -2129,11 +2129,11 @@ Write your {domain_label} coaching section now."""
             _sgv_findings = _gg_sgv.self_graded_verdict_findings(output or "", evaluated_predictions=_eval_n)
             if _sgv_findings:
                 print(f"[COACH-V2:{coach_id}] self-graded-verdict gate fired: " + "; ".join(f.get("detail", "") for f in _sgv_findings))
-                # #2888: system in the system slot; the correction stays user-side.
+                # #2888: system in the system slot; the correction stays user-side. max_tokens=1000, not 600 (#3190).
                 _regen = call_anthropic(
                     user_message_full + "\n\n" + _gg_sgv.correction_prompt(_sgv_findings),
                     api_key,
-                    max_tokens=600,
+                    max_tokens=1000,
                     system=system_prompt,
                 )
                 if _regen and not _is_ai_unavailable(_regen):
