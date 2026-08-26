@@ -10,10 +10,12 @@ through the REAL consumer and then injects a disagreement into BOTH sides.
 
 The defect class is fixture-not-the-wire: producer and consumer each pass their own
 tests against their own idea of the shape, and the wire disagrees. Two live instances
-found while seeding the registry, both green in every existing test:
-``site_stats_refresh_lambda`` reads ``tier0_streak`` off ``habit_scores`` (which writes
-``t0_perfect_streak``), and ``coach_observatory_renderer`` reads ``journaling_prompt``
-off ``OUTPUT#`` rows (which no writer emits).
+found while seeding the registry, both green in every existing test — both root-caused,
+fixed, and enrolled by #3172 (pairs 7 and 8 in ``tests/pair_contract_registry.py``):
+``site_stats_refresh_lambda`` read ``tier0_streak`` off the raw ``habitify`` partition
+(which has no such field — it lives on ``computed_metrics``), and
+``coach_observatory_renderer`` read ``journaling_prompt`` off ``OUTPUT#`` rows (which no
+writer ever emitted — it lives on the ``ai_analysis`` ``EXPERT#`` row).
 
 THE TWO SIDES, NAMED
 --------------------
@@ -113,6 +115,10 @@ PARTITION_WRITER_LEDGER = {
     },
     "adaptive_mode": {
         "lambdas/compute/adaptive_mode_lambda.py": "enrolled — the pair below",
+    },
+    # #3172
+    "ai_analysis": {
+        "lambdas/intelligence/ai_expert_analyzer_lambda.py": "enrolled — the pair below",
     },
 }
 
