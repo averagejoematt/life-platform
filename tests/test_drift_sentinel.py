@@ -164,6 +164,55 @@ def test_s3_lifecycle_error_when_declared_file_unreadable(monkeypatch, tmp_path)
     assert res["status"] == "error"
 
 
+# ── DynamoDB TTL declared-vs-live (table-config-noop-ttl, #2799 residual) ────
+# Before this file, `grep -rn describe_time_to_live` found zero callers anywhere in the
+# repo — the #951 shape (a writer keying its expiry to an attribute the table's live TTL
+# config was never enabled on) had no assertion that could have caught it, or a
+# recurrence of it, short of a manual `aws dynamodb describe-time-to-live` read.
+
+
+class _FakeDynamoDB:
+    def __init__(self, desc):
+        self._desc = desc
+
+    def describe_time_to_live(self, TableName):  # noqa: N803 — boto3 kwarg casing
+        if self._desc is None:
+            raise RuntimeError("describe_time_to_live unavailable")
+        return {"TimeToLiveDescription": self._desc}
+
+
+def test_dynamodb_ttl_clean_when_live_matches_declared(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeDynamoDB({"TimeToLiveStatus": "ENABLED", "AttributeName": "ttl"}))
+    res = ds.check_dynamodb_ttl()
+    assert res["status"] == "clean"
+    assert res["declared_attribute"] == "ttl" == ds.TABLE_TTL_ATTRIBUTE
+    assert res["live_attribute"] == "ttl"
+
+
+def test_dynamodb_ttl_drift_when_live_attribute_is_the_951_mismatch(monkeypatch):
+    # Mutation proof for the exact #951 shape: TTL is live-ENABLED, but on a DIFFERENT
+    # attribute name than the one writers are supposed to key their expiry to.
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeDynamoDB({"TimeToLiveStatus": "ENABLED", "AttributeName": "expires_at"}))
+    res = ds.check_dynamodb_ttl()
+    assert res["status"] == "drift"
+    assert res["live_attribute"] == "expires_at"
+    assert "expires_at" in res["detail"]
+    assert "#951" in res["detail"]
+
+
+def test_dynamodb_ttl_drift_when_live_is_disabled(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeDynamoDB({"TimeToLiveStatus": "DISABLED", "AttributeName": "ttl"}))
+    res = ds.check_dynamodb_ttl()
+    assert res["status"] == "drift"
+    assert "never reaped" in res["detail"]
+
+
+def test_dynamodb_ttl_error_is_soft(monkeypatch):
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeDynamoDB(None))
+    res = ds.check_dynamodb_ttl()
+    assert res["status"] == "error"
+
+
 # ── orphan allowlist (AC2 — no functions outside IaC) ────────────────────────
 
 
@@ -255,6 +304,7 @@ def _patch_all(
     hae=None,
     raw_replication=None,
     s3_lifecycle=None,
+    dynamodb_ttl=None,
     cadence=None,
 ):
     # DIL-027 (#3042): the raw/ cross-region backup check. Patched here like every
@@ -279,6 +329,11 @@ def _patch_all(
         ds,
         "check_s3_lifecycle",
         lambda: s3_lifecycle or {"status": "clean", "missing_rule_ids": [], "extra_rule_ids": [], "changed_rule_ids": []},
+    )
+    monkeypatch.setattr(
+        ds,
+        "check_dynamodb_ttl",
+        lambda: dynamodb_ttl or {"status": "clean", "declared_attribute": "ttl", "live_attribute": "ttl", "live_status": "ENABLED"},
     )
     monkeypatch.setattr(ds, "check_doc_literals", lambda: doc or {"status": "clean", "mismatches": []})
     monkeypatch.setattr(ds, "check_site_sha_ancestry", lambda: site or {"status": "clean", "live_sha": "deadbeef"})
@@ -384,6 +439,30 @@ def test_sweep_s3_lifecycle_drift(monkeypatch):
     assert sig is not None
     assert "s3_lifecycle" in sig["flagging"]
     assert sig["flagging"]["s3_lifecycle"]["status"] == "drift"
+
+
+def test_sweep_dynamodb_ttl_drift(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean"},
+        dynamodb_ttl={
+            "status": "drift",
+            "declared_attribute": "ttl",
+            "live_attribute": "expires_at",
+            "live_status": "ENABLED",
+            "detail": "live TTL attribute is 'expires_at', declared is 'ttl' — the #951 shape",
+        },
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "DynamoDB TTL config diverges from the declared attribute" in rec["summary"]
+    sig = drift_report.as_signal(rec)
+    assert sig is not None
+    assert "dynamodb_ttl" in sig["flagging"]
+    assert sig["flagging"]["dynamodb_ttl"]["status"] == "drift"
 
 
 # ── report seam (AC4) ────────────────────────────────────────────────────────

@@ -456,6 +456,15 @@ PROOF_INDEX: dict[str, dict[str, object]] = {
         "cannot_observe": (_DS, "test_s3_lifecycle_error_when_declared_file_unreadable"),
         "note": "Pre-existing (DIL-026). Cannot-observe proved on BOTH sides — unreadable live config and unreadable declared JSON.",
     },
+    "sentinel::deploy/drift_sentinel.py::check_dynamodb_ttl": {
+        "detect": (_DS, "test_dynamodb_ttl_drift_when_live_attribute_is_the_951_mismatch"),
+        "cannot_observe": (_DS, "test_dynamodb_ttl_error_is_soft"),
+        "note": (
+            "NEW 2026-08-25 (#2799 residual table-config-noop-ttl, #951 recurrence). Declared side is "
+            "cdk/stacks/constants.py TABLE_TTL_ATTRIBUTE; live side is describe_time_to_live. Detect proves "
+            "the exact #951 shape (ENABLED but on the wrong attribute), not just wholesale disablement."
+        ),
+    },
     "sentinel::deploy/drift_sentinel.py::check_site_sha_ancestry": {
         "detect": (_DS, "test_site_sha_ancestry_drift_when_sha_diverged"),
         "cannot_observe": (_DS, "test_site_sha_ancestry_error_on_fetch_failure"),
@@ -621,4 +630,4 @@ def test_json_report_is_still_parseable_with_the_new_verdicts():
     census = gc.build_census(Path(_ROOT), families=("sentinel",))
     payload = json.loads(json.dumps(census, default=str))
     proven = [g for g in payload["gates"] if g["verdict"] == "can-fail (proven)"]
-    assert len(proven) == len(PROOF_INDEX) == 15
+    assert len(proven) == len(PROOF_INDEX) == 16

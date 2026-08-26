@@ -203,6 +203,31 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": _PROVED_ON,
     },
+    "sentinel::deploy/drift_sentinel.py::check_dynamodb_ttl": {
+        "gate_name": "check_dynamodb_ttl",
+        "command": f"{_DS_SUITE} -k dynamodb_ttl -q",
+        "mutation": (
+            "NEW 2026-08-25 (#2799 residual table-config-noop-ttl, #951 recurrence): (a) a fake "
+            "describe_time_to_live returning the #951 shape itself — TimeToLiveStatus=ENABLED but "
+            "AttributeName='expires_at' against the declared 'ttl' (cdk/stacks/constants.py "
+            "TABLE_TTL_ATTRIBUTE), and separately TimeToLiveStatus=DISABLED on the correct attribute. "
+            "(b) describe_time_to_live raising."
+        ),
+        "observed": (
+            "exit 0 with (a) both shapes reporting status='drift' — the attribute-mismatch case names "
+            "both the live and declared attribute in `detail` and cites #951; the disabled case says "
+            "'never reaped'. The matching ENABLED/'ttl' response reports 'clean'. (b) -> status='error' "
+            "naming describe_time_to_live; never clean."
+        ),
+        "scope": (
+            "Declared-vs-live on ONE table config leg (which attribute, and whether it's enabled) — same "
+            "idiom as check_s3_lifecycle, one rule instead of several. It does NOT check that any "
+            "individual item WRITER keys its expiry field to the declared attribute (the actual #951 "
+            "defect was a writer using 'expires_at'); that would need a repo-wide writer sweep, which is "
+            "out of scope for this check and not yet built. " + _ERROR_IS_NOT_A_SIGNAL
+        ),
+        "proved_on": _PROVED_ON,
+    },
     "sentinel::deploy/drift_sentinel.py::check_site_sha_ancestry": {
         "gate_name": "check_site_sha_ancestry",
         "command": f"{_DS_SUITE} -k site_sha_ancestry -q",
