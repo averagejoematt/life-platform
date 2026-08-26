@@ -354,6 +354,41 @@ merge_pr() {
   gh pr merge "${pr}" --repo "${REPO}" --squash --delete-branch
 }
 
+# _watch_pr_green <pr>
+#   The ONE call site both Phase 1 and Phase 4's post-rebase re-check use to
+#   invoke deploy/wait_pr_green.sh — folded here (#3200) so the two identical
+#   blocks that used to exist independently never drift from each other.
+#   Streams the watcher's own output live, indented, exactly as before (`tee`
+#   into a scratch file while piping through `sed` for the live view), then ALSO
+#   reads that captured output back to classify wait_pr_green.sh's exit code:
+#
+#     rc 0            plain GREEN — proceed. _WATCH_RECONCILE_RED is cleared.
+#     rc 4 (#3200)    GREEN-WITH-RECONCILE-OWNED-RED — also proceed, but
+#                     _WATCH_RECONCILE_RED is set to the comma-joined path list
+#                     off the watcher's own "RECONCILE-OWNED-RED <name>: <paths>"
+#                     line, so the caller can name it in the train report
+#                     instead of reporting a bare, unqualified "green".
+#     anything else   passed straight through UNCHANGED (1=FAIL, 2=WAITING) —
+#                     this function does not remap or reinterpret a real
+#                     failure, it only adds a second "proceed" outcome next to
+#                     the existing one. The #3103 discipline is unchanged: this
+#                     reads wait_pr_green.sh's verdict and returns; the merge
+#                     itself is always the caller's own, later, separate call.
+_WATCH_RECONCILE_RED=""
+_watch_pr_green() {
+  local pr="$1" tmp rc out
+  tmp="$(mktemp "${TMPDIR:-/tmp}/merge-train-watch.XXXXXX")"
+  bash "${WAIT_PR_GREEN}" "${pr}" --repo "${REPO}" --timeout "${GREEN_TIMEOUT}" 2>&1 | tee "${tmp}" | sed 's/^/    /'
+  rc="${PIPESTATUS[0]}"
+  out="$(cat "${tmp}")"
+  rm -f "${tmp}"
+  _WATCH_RECONCILE_RED=""
+  if [[ "${rc}" -eq 4 ]]; then
+    _WATCH_RECONCILE_RED="$(printf '%s\n' "${out}" | sed -n 's/^RECONCILE-OWNED-RED [^:]*: //p' | paste -sd '; ' -)"
+  fi
+  return "${rc}"
+}
+
 # ── the offline stacked validation ───────────────────────────────────────────
 run_offline_gate() {
   local rc=0
@@ -500,7 +535,7 @@ main() {
   root="$(git rev-parse --show-toplevel)" || return 2
 
   # Parallel arrays (bash 3.2 — macOS ships no associative arrays).
-  local -a dispo=() detail=() head_ref=() head_sha=() needs_push=() local_branch=()
+  local -a dispo=() detail=() head_ref=() head_sha=() needs_push=() local_branch=() reconcile_red=()
   local i n
   n=${#prs[@]}
   for ((i = 0; i < n; i++)); do
@@ -510,6 +545,7 @@ main() {
     head_sha+=("")
     needs_push+=("0")
     local_branch+=("")
+    reconcile_red+=("")
   done
 
   echo "═══ MERGE TRAIN (#3104) ═════════════════════════════════════════════"
@@ -548,15 +584,23 @@ main() {
     fi
 
     echo "  #${pr}: watching checks (deploy/wait_pr_green.sh)…"
-    bash "${WAIT_PR_GREEN}" "${pr}" --repo "${REPO}" --timeout "${GREEN_TIMEOUT}" 2>&1 | sed 's/^/    /'
-    _grc="${PIPESTATUS[0]}"
-    if [[ "${_grc}" -ne 0 ]]; then
+    _watch_pr_green "${pr}"
+    _grc=$?
+    # rc 0 = plain green; rc 4 (#3200) = green except a CLASSIFIED
+    # reconcile-owned red — both proceed, only the second is named. Anything
+    # else (1=FAIL, 2=WAITING, …) drops the PR exactly as before this existed.
+    if [[ "${_grc}" -ne 0 && "${_grc}" -ne 4 ]]; then
       dispo[$i]="DROPPED"
       detail[$i]="not green — wait_pr_green.sh exited ${_grc} (2 = WAITING gated-deployment lease, a human disposes it)"
       echo "  #${pr}: DROPPED — ${detail[$i]}"
       continue
     fi
-    echo "  #${pr}: GREEN"
+    if [[ "${_grc}" -eq 4 ]]; then
+      reconcile_red[$i]="${_WATCH_RECONCILE_RED}"
+      echo "  #${pr}: GREEN (reconcile-owned red classified, #3200: ${reconcile_red[$i]})"
+    else
+      echo "  #${pr}: GREEN"
+    fi
   done
   echo ""
 
@@ -627,7 +671,7 @@ main() {
   if [[ "${any_reconciled}" -eq 0 ]]; then
     echo "no PR survived reconciliation — nothing to validate, nothing to merge."
     cd "${saved_pwd}" || true
-    _emit_report prs dispo detail
+    _emit_report prs dispo detail reconcile_red
     _cleanup_worktree "${root}" "${wt}" 1
     return 1
   fi
@@ -647,7 +691,7 @@ main() {
       fi
     done
     cd "${saved_pwd}" || true
-    _emit_report prs dispo detail
+    _emit_report prs dispo detail reconcile_red
     return 1
   fi
   echo ""
@@ -680,15 +724,22 @@ main() {
         # Re-watch. This is the only re-check the train pays, and only the PRs
         # that actually conflicted pay it.
         echo "  #${pr}: branch changed — re-watching checks before merging"
-        bash "${WAIT_PR_GREEN}" "${pr}" --repo "${REPO}" --timeout "${GREEN_TIMEOUT}" 2>&1 | sed 's/^/    /'
-        _rrc="${PIPESTATUS[0]}"
+        _watch_pr_green "${pr}"
+        _rrc=$?
         # VERDICT READ ABOVE, IN ITS OWN COMMAND. The merge below is a separate
-        # statement guarded by that verdict — never chained to it (#3103).
-        if [[ "${_rrc}" -ne 0 ]]; then
+        # statement guarded by that verdict — never chained to it (#3103). rc 0
+        # or rc 4 (#3200's classified reconcile-owned red) both proceed; the
+        # re-classified paths (if any) overwrite the phase-1 note so the final
+        # report reflects the post-rebase state, not a stale pre-rebase one.
+        if [[ "${_rrc}" -ne 0 && "${_rrc}" -ne 4 ]]; then
           dispo[$i]="DROPPED"
           detail[$i]="post-rebase checks not green (wait_pr_green.sh exited ${_rrc})"
           echo "  #${pr}: DROPPED — ${detail[$i]}"
           continue
+        fi
+        if [[ "${_rrc}" -eq 4 ]]; then
+          reconcile_red[$i]="${_WATCH_RECONCILE_RED}"
+          echo "  #${pr}: GREEN (reconcile-owned red classified, #3200: ${reconcile_red[$i]})"
         fi
       fi
     fi
@@ -717,7 +768,7 @@ main() {
 
   cd "${saved_pwd}" || true
   echo ""
-  _emit_report prs dispo detail
+  _emit_report prs dispo detail reconcile_red
   local exit_rc=0
   for ((i = 0; i < n; i++)); do
     case "${dispo[$i]}" in
@@ -739,17 +790,32 @@ _cleanup_worktree() {
     echo "scratch worktree removed."
 }
 
-# _emit_report <prs-array-name> <dispo-array-name> <detail-array-name>
+# _emit_report <prs-array-name> <dispo-array-name> <detail-array-name> [<reconcile-red-array-name>]
 #   bash 3.2 has no nameref, so this reads the arrays via indirect expansion of
-#   the caller's array names.
+#   the caller's array names. The 4th argument (#3200) is OPTIONAL for backward
+#   compatibility with the offline test harness, which sources this file and
+#   calls _emit_report directly with only 3 arrays; when a PR's classified
+#   reconcile-owned red survived to report time, its DETAIL column names it
+#   explicitly instead of leaving the classification invisible in the one place
+#   an operator actually reads — "merge_train phase 1 consumes the classified
+#   verdict; its report names the reconcile-owned red per PR" (#3200 acceptance).
 _emit_report() {
-  local pa="$1" da="$2" ta="$3"
+  local pa="$1" da="$2" ta="$3" ra="${4:-}"
   eval "local -a _p=(\"\${${pa}[@]}\")"
   eval "local -a _d=(\"\${${da}[@]}\")"
   eval "local -a _t=(\"\${${ta}[@]}\")"
+  local -a _r=()
+  if [[ -n "${ra}" ]]; then
+    eval "_r=(\"\${${ra}[@]}\")"
+  fi
   local i
   echo "═══ TRAIN REPORT ════════════════════════════════════════════════════"
   printf '%-8s %-14s %s\n' "PR" "DISPOSITION" "DETAIL"
+  for ((i = 0; i < ${#_p[@]}; i++)); do
+    if [[ -n "${_r[$i]:-}" ]]; then
+      _t[$i]="${_t[$i]} [reconcile-owned red, #3200: ${_r[$i]}]"
+    fi
+  done
   for ((i = 0; i < ${#_p[@]}; i++)); do
     printf '#%-7s %-14s %s\n' "${_p[$i]}" "${_d[$i]}" "${_t[$i]}"
   done

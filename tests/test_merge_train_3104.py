@@ -403,3 +403,101 @@ def test_a_non_numeric_argument_is_rejected(tmp_path):
     p = _sh(f"bash '{_SCRIPT}' not-a-pr", env={"PATH": _gh_stub_path(tmp_path)})
     assert p.returncode == 2
     assert "not a PR number" in (p.stdout + p.stderr)
+
+
+# ── 6. #3200: the train consumes wait_pr_green.sh's classified verdict ───────
+#
+# `_watch_pr_green` is the ONE place both Phase 1 and Phase 4's post-rebase
+# re-check call deploy/wait_pr_green.sh (folded from two identical blocks,
+# #3200). It is injectable via MERGE_TRAIN_WAIT_SCRIPT (already the mechanism
+# the header comment documents), which is exactly what lets these tests drive
+# it with a lightweight stub instead of a real gh/network call.
+
+
+def _stub_wait_pr_green(tmp_path, rc, extra_echo=""):
+    """A stand-in for deploy/wait_pr_green.sh: prints one line (mirroring its
+    real RECONCILE-OWNED-RED output shape when asked) and exits with the given
+    code — no gh, no network."""
+    stub = tmp_path / "wait_pr_green_stub.sh"
+    lines = ["#!/usr/bin/env bash", 'echo "Watching PR (stub)"']
+    if extra_echo:
+        lines.append(f'echo "{extra_echo}"')
+    lines.append(f"exit {rc}")
+    stub.write_text("\n".join(lines) + "\n")
+    stub.chmod(stub.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return str(stub)
+
+
+def test_watch_pr_green_folds_a_classified_rc4_into_the_reconcile_red_sidechannel(tmp_path):
+    stub = _stub_wait_pr_green(tmp_path, 4, extra_echo="RECONCILE-OWNED-RED Wiki drift gates: lambdas/web/platform_counts.py")
+    p = _sourced(
+        '_watch_pr_green 999\nrc=$?\necho "RC=$rc"\necho "RED=${_WATCH_RECONCILE_RED}"',
+        cwd=tmp_path,
+        env={"MERGE_TRAIN_WAIT_SCRIPT": stub, "MERGE_TRAIN_GREEN_TIMEOUT": "5"},
+    )
+    assert "RC=4" in p.stdout, p.stdout + p.stderr
+    assert "RED=lambdas/web/platform_counts.py" in p.stdout, p.stdout + p.stderr
+    assert "Watching PR (stub)" in p.stdout, "the watcher's own output must still stream through"
+
+
+def test_watch_pr_green_plain_rc0_clears_the_reconcile_red_sidechannel(tmp_path):
+    # A prior call in the same process could have left _WATCH_RECONCILE_RED set
+    # (Phase 1 classified, Phase 4's re-check did not) — a plain green MUST
+    # clear it, never leave a stale classification from an earlier PR/call.
+    stub = _stub_wait_pr_green(tmp_path, 0)
+    p = _sourced(
+        '_WATCH_RECONCILE_RED="stale-from-a-previous-call"\n'
+        "_watch_pr_green 999\nrc=$?\n"
+        'echo "RC=$rc"\necho "RED=[${_WATCH_RECONCILE_RED}]"',
+        cwd=tmp_path,
+        env={"MERGE_TRAIN_WAIT_SCRIPT": stub, "MERGE_TRAIN_GREEN_TIMEOUT": "5"},
+    )
+    assert "RC=0" in p.stdout, p.stdout + p.stderr
+    assert "RED=[]" in p.stdout, p.stdout + p.stderr
+
+
+def test_watch_pr_green_passes_through_a_real_failure_unchanged(tmp_path):
+    stub = _stub_wait_pr_green(tmp_path, 1)
+    p = _sourced(
+        '_watch_pr_green 999\nrc=$?\necho "RC=$rc"',
+        cwd=tmp_path,
+        env={"MERGE_TRAIN_WAIT_SCRIPT": stub, "MERGE_TRAIN_GREEN_TIMEOUT": "5"},
+    )
+    assert "RC=1" in p.stdout, p.stdout + p.stderr
+
+
+def test_emit_report_names_the_reconcile_owned_red_per_pr(tmp_path):
+    p = _sourced(
+        "prs=(101 102)\n"
+        "dispo=(MERGED MERGED)\n"
+        'detail=("squash sha abc123" "squash sha def456")\n'
+        'reconcile_red=("lambdas/web/platform_counts.py" "")\n'
+        "_emit_report prs dispo detail reconcile_red",
+        cwd=tmp_path,
+    )
+    assert p.returncode == 0, p.stdout + p.stderr
+    lines = p.stdout.splitlines()
+    pr101 = next(ln for ln in lines if ln.startswith("#101"))
+    pr102 = next(ln for ln in lines if ln.startswith("#102"))
+    assert "reconcile-owned red, #3200: lambdas/web/platform_counts.py" in pr101, pr101
+    assert "reconcile-owned red" not in pr102, "a PR with no classified red must not be annotated: " + pr102
+
+
+def test_emit_report_still_works_without_a_reconcile_red_array(tmp_path):
+    # Backward-compat: a caller passing only 3 arrays (the pre-#3200 shape)
+    # must not crash.
+    p = _sourced(
+        'prs=(101)\ndispo=(MERGED)\ndetail=("squash sha abc123")\n_emit_report prs dispo detail',
+        cwd=tmp_path,
+    )
+    assert p.returncode == 0, p.stdout + p.stderr
+    assert "#101" in p.stdout
+
+
+def test_phase1_and_phase4_share_the_one_watch_call_site():
+    # #3200 folds what used to be two separately-maintained
+    # `bash "${WAIT_PR_GREEN}" ... | sed` blocks into _watch_pr_green. Assert
+    # there is exactly ONE call site left — the extraction actually happened,
+    # this isn't a wrapper added alongside the old duplication.
+    code = "".join(_executable_lines())
+    assert code.count('bash "${WAIT_PR_GREEN}"') == 1, "expected _watch_pr_green to be the ONE call site"
