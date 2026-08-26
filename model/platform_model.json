@@ -204,6 +204,8 @@
   "contracts": [
     {
       "consumer": "web.site_api_ai_context::_ask_fetch_computed_reads",
+      "enrolled": true,
+      "floor": true,
       "mutations": 3,
       "name": "adaptive_mode -> /api/ask grounding reads",
       "note": "The runtime `ingestion_validator` schema for adaptive_mode requires pk/sk/date/engagement_score/brief_mode/computed_at \u2014 it does NOT require `mode_label` or `factors`, and `mode_label` is the key the entire consumer block is gated on. Every AI answer loses its precomputed 'what drove today' silently.",
@@ -212,6 +214,8 @@
     },
     {
       "consumer": "coach.coach_observatory_renderer::journaling_prompt_for_domain",
+      "enrolled": true,
+      "floor": true,
       "mutations": 3,
       "name": "ai_analysis EXPERT# -> observatory card journaling prompt",
       "note": "#3172 (found seeding #2847 in PR #3169). coach_state_updater._write_output_record's OUTPUT# item never had a journaling_prompt key at all \u2014 this was never a rename or a drop in production, it was two systems (the COACH# persona pipeline and the EXPERT# ai_analysis pipeline) sharing a reader's assumption without ever sharing a write.",
@@ -220,6 +224,8 @@
     },
     {
       "consumer": "experiment.canonical_facts::build_canonical_facts",
+      "enrolled": true,
+      "floor": true,
       "mutations": 4,
       "name": "computed_metrics -> canonical facts",
       "note": "canonical_facts' own docstring says 'the field names here MUST match what it writes'. The runtime `ingestion_validator` schema covers only 6 of the 10 numeric fields, so a rename of `latest_weight` or `weekly_rate_lbs` passes every existing gate.",
@@ -228,6 +234,8 @@
     },
     {
       "consumer": "web.site_stats_refresh_lambda::resolve_tier0_streak",
+      "enrolled": true,
+      "floor": true,
       "mutations": 3,
       "name": "computed_metrics -> site-stats-refresh tier0_streak",
       "note": "#3172 (found seeding #2847 in PR #3169). habit_scores.store_habit_scores writes the SAME concept under a different name (`t0_perfect_streak`) on a DIFFERENT partition entirely \u2014 three names/places for one number is exactly how a reader ends up dead-zone reading one of them.",
@@ -236,6 +244,8 @@
     },
     {
       "consumer": "web.site_api_freshness::presence",
+      "enrolled": true,
+      "floor": true,
       "mutations": 4,
       "name": "engagement_state -> /api/presence",
       "note": "The reader defaults `presence_class` to 'present' on an absent field \u2014 a producer rename reads as 'Matthew is fine' rather than as an error. Exactly the cycle-4 failure (#914: fourteen silent days no standing surface showed).",
@@ -244,6 +254,8 @@
     },
     {
       "consumer": "web.site_api_character::_public_input_manifest",
+      "enrolled": true,
+      "floor": true,
       "mutations": 4,
       "name": "input_manifest -> character page projection",
       "note": "#3049 / DIL-024. The reader is a fail-closed allowlist projection, so a producer rename degrades to nulls rather than an error \u2014 silent by construction, which is why it needs a pair test.",
@@ -252,6 +264,8 @@
     },
     {
       "consumer": "content.fingerprint_broadcast::project_public",
+      "enrolled": true,
+      "floor": true,
       "mutations": 4,
       "name": "public_stats.json -> fingerprint broadcast projection",
       "note": "The producer owns the BLOCK STRUCTURE and the `_json_safe` cast; the leaf values arrive from its caller (daily_brief). Block nesting is precisely what `project_public`'s `(stats.get(block) or {}).get(key)` traverses, and it degrades to None rather than raising \u2014 so a producer that flattened or renamed a block would publish an empty mark, silently.",
@@ -260,6 +274,8 @@
     },
     {
       "consumer": "common.send_ledger::already_sent",
+      "enrolled": true,
+      "floor": true,
       "mutations": 3,
       "name": "send_ledger row -> replay guard + status page",
       "note": "DIL-025. Nine other senders write this same row WITHOUT `period_key` (weekly_digest, monday_compass, anomaly_detector, \u2026) \u2014 for those the guard structurally cannot fire. #3113 is enrolling them; this pair pins the shape they are converging on.",
@@ -6305,7 +6321,7 @@
   "meta": {
     "authorities": {
       "alarms": "cdk/stacks/*.py alarm_name= declarations (AST) + variable-traced SNS routing",
-      "contracts": "tests/pair_contract_registry.py PairContract(...) declarations (AST) \u2014 the #2847 enrolled producer/consumer pairs",
+      "contracts": "tests/pair_contract_registry.py (AST) \u2014 PairContract(...) declarations for the #2847 enrolled pairs, unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR",
       "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
       "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
@@ -6313,6 +6329,9 @@
     "counts": {
       "alarms": 50,
       "contracts": 8,
+      "contracts_enrolled": 8,
+      "contracts_known": 8,
+      "contracts_ratchet": 8,
       "edges": 666,
       "lambdas": 104,
       "mcp_tool_modules": 26,
@@ -6344,7 +6363,7 @@
       "privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) \u2014 not modeled",
       "helper-default error alarms (ingestion-error-<fn>) are not enumerated \u2014 the alarms plane matches the #2844 vocabulary (explicit alarm_name declarations)",
       "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)",
-      "the contracts plane lists ENROLLED pairs (#2847), not every must-agree pair \u2014 without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is a floor + ratchet in tests/test_pair_contract_sweep_2847.py"
+      "the contracts plane lists the KNOWN pairs (#2847 \u2014 the enrolled contracts unioned with the KNOWN_MUST_AGREE_PAIRS floor), not every must-agree pair on the platform \u2014 without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is the counts.contracts_ratchet floor plus the ratchets in tests/test_pair_contract_sweep_2847.py"
     ],
     "spec": "#2845 (epic #2842) \u2014 generated by scripts/generate_platform_model.py; drift-gated by tests/test_platform_model_drift.py"
   },
