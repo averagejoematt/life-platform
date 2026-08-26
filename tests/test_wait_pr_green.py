@@ -372,6 +372,49 @@ def test_extract_wiki_drift_files_handles_multiple_files():
     assert p.stdout.strip().splitlines() == ["lambdas/web/platform_counts.py", "docs/DECISIONS.md"], p.stdout + p.stderr
 
 
+def test_extract_wiki_drift_files_parses_the_raw_rest_endpoint_log_shape():
+    # #3209: `gh run view --job <id> --log` (the #3200 original source) reliably
+    # omitted the failing step's own output for PR #3206's drift-gate job
+    # (98291682348) while including 404-shaped lines for every OTHER step —
+    # reproduced twice, not transient. `gh api repos/.../actions/jobs/<id>/logs`
+    # returned the block reliably instead. That endpoint's shape has NO
+    # `JOBNAME<TAB>STEPNAME<TAB>` prefix — just a bare `TIMESTAMPZ content` line —
+    # so this is the regression proof that `_extract_wiki_drift_files` (unchanged
+    # by #3209; only the log SOURCE moved) still parses it via its leading-timestamp
+    # `sub()`, not the tab-split. These are the REAL bytes of that job's log
+    # (`gh api repos/averagejoematt/life-platform/actions/jobs/98291682348/logs`,
+    # captured 2026-08-26), not synthesized text.
+    raw_log = (
+        "2026-08-26T19:10:43.1516897Z [docs/SCHEMA.md] — already in sync ✓\n"
+        "2026-08-26T19:10:43.1517391Z [docs/SLOs.md] — already in sync ✓\n"
+        "2026-08-26T19:10:43.1517885Z [docs/TESTING.md] — already in sync ✓\n"
+        "2026-08-26T19:10:43.1518941Z [docs/content/CAREER_ARTIFACT_SUBMISSION_KIT.md] — already in sync ✓\n"
+        "2026-08-26T19:10:43.1519773Z [docs/content/ESSAY_ORG_CHART_OF_ONE.md] — already in sync ✓\n"
+        "2026-08-26T19:10:43.1520184Z \n"
+        "2026-08-26T19:10:43.1520364Z ============================================================\n"
+        "2026-08-26T19:10:43.1521001Z   ❌ CHECK FAILED — 1 stale literal(s) across 1 file(s):\n"
+        "2026-08-26T19:10:43.1521538Z        - lambdas/web/platform_counts.py\n"
+        "2026-08-26T19:10:43.1522072Z   Fix: python3 deploy/sync_doc_metadata.py --apply\n"
+        "2026-08-26T19:10:43.1522615Z ============================================================\n"
+        "2026-08-26T19:10:43.1522940Z \n"
+        "2026-08-26T19:10:43.1708661Z ##[error]Process completed with exit code 1.\n"
+    )
+    p = _source_call("_extract_wiki_drift_files", stdin=raw_log)
+    assert p.stdout.strip().splitlines() == ["lambdas/web/platform_counts.py"], p.stdout + p.stderr
+
+
+def test_enrich_wiki_drift_checks_json_sources_the_raw_rest_endpoint_not_gh_run_view():
+    # #3209's actual code-level fix: `_enrich_wiki_drift_checks_json` must call
+    # `gh api repos/${REPO}/actions/jobs/${jobid}/logs`, not
+    # `gh run view --job ... --log` (the unreliable #3200 original). A static
+    # sweep rather than a live-`gh` proof, matching how this function's other
+    # fail-closed branches are already covered (it "is nothing but `gh`/`jq`
+    # plumbing" per its own docstring — not unit-tested by invocation).
+    code = "".join(_non_comment_lines(_SCRIPT))
+    assert 'gh api "repos/${REPO}/actions/jobs/${jobid}/logs"' in code, "the reliable log source must be present"
+    assert "gh run view --job" not in code, "the unreliable #3200 log source must be gone, not merely supplemented"
+
+
 # ── structural guarantees: never merges, never truncates a sha ────────────────
 
 
