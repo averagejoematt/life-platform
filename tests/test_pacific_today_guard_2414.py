@@ -176,14 +176,65 @@ def _is_day_only_fmt(value) -> bool:
     return isinstance(value, str) and _DAY_FMT in value and not any(t in value for t in _TIME_MARKERS)
 
 
-def _subtree_dirty(node, tainted: set, aliases: dict) -> bool:
-    """True if `node` derives from a UTC/naive now (directly or via a tainted name)
-    and shows NO explicit `.astimezone(...)` — the deliberate-frame escape hatch."""
+def _is_clock_fn_call(node, clock_fns: frozenset) -> bool:
+    """A call to a same-file helper whose RETURN is a UTC/naive clock (#2811).
+
+    THE BLINDNESS THIS CLOSES. Every predicate below asks whether an expression
+    *contains* a literal `datetime.now(timezone.utc)` or a tainted NAME. A repo
+    idiom that is neither — ``now = now or _now_iso()`` followed by ``now[:10]``,
+    where ``_now_iso()`` is a one-line helper two hundred lines up — was
+    therefore invisible, and #2798 found it in production
+    (`reading/reading_store.log_session`) only by reading the pair by hand.
+    A call is the third face of "a clock", and it is now matched like the others.
+
+    Only a bare name (`_now_iso()`) or `self.<name>()` counts. Matching any
+    `<anything>.<name>()` collides with unrelated methods that happen to share a
+    helper's name, which measured as a false-positive generator on the live tree.
+    """
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id in clock_fns
+    return isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id == "self" and func.attr in clock_fns
+
+
+def _clock_returning_functions(tree: ast.AST, aliases: dict) -> frozenset:
+    """Functions in this file that RETURN a value built from a UTC/naive clock.
+
+    Deliberately STRICT: the return expression must contain a *literal* clock
+    call, not merely a tainted name. The loose form was measured on the live
+    tree and cascades — `_latest_item()` returns a record that happens to carry
+    a timestamp, every caller of it goes dirty, and the guard starts flagging
+    `DATE#`-key normalisations. A guard that cries wolf gets muted, so the
+    over-approximation stops one hop out.
+    """
+    found: set = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for sub in ast.walk(node):
+            if not (isinstance(sub, ast.Return) and sub.value is not None):
+                continue
+            if any(
+                isinstance(s, ast.Call) and isinstance(s.func, ast.Attribute) and s.func.attr == "astimezone" for s in ast.walk(sub.value)
+            ):
+                continue  # a named frame was chosen inside the helper — that is the whole point
+            if any(_is_utc_anchored_now(s, aliases) or _is_naive_clock(s, aliases) for s in ast.walk(sub.value)):
+                found.add(node.name)
+                break
+    return frozenset(found)
+
+
+def _subtree_dirty(node, tainted: set, aliases: dict, clock_fns: frozenset = frozenset()) -> bool:
+    """True if `node` derives from a UTC/naive now (directly, via a tainted name,
+    or via a call to a clock-returning helper — #2811) and shows NO explicit
+    `.astimezone(...)`, the deliberate-frame escape hatch."""
     dirty = False
     for sub in ast.walk(node):
         if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute) and sub.func.attr == "astimezone":
             return False
-        if _is_utc_anchored_now(sub, aliases) or _is_naive_clock(sub, aliases):
+        if _is_utc_anchored_now(sub, aliases) or _is_naive_clock(sub, aliases) or _is_clock_fn_call(sub, clock_fns):
             dirty = True
         elif isinstance(sub, ast.Name) and sub.id in tainted:
             dirty = True
@@ -213,12 +264,80 @@ def _tainted_names(tree: ast.AST, aliases: dict) -> set:
     return tainted
 
 
+def _own_scope_nodes(scope):
+    """Every node inside `scope` WITHOUT descending into a nested function/class.
+
+    Scope precision is what keeps the #2811 call-taint from cascading: in
+    `compute/episode_detect_lambda.py`, `build_episode_record` assigns
+    ``item = {..., "computed_at": _now_iso()}`` while a *different* function
+    takes an `item` PARAMETER and slices its stored `DATE#` key. File-wide
+    taint conflates the two and flags correct code; per-scope taint does not.
+    """
+    stack = list(ast.iter_child_nodes(scope))
+    while stack:
+        node = stack.pop()
+        yield node
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            continue
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def _taint_index(tree: ast.AST, aliases: dict):
+    """`(clock_fns, tainted_at)` — the taint view a site should be judged against.
+
+    `tainted_at(node)` is the file-wide literal-clock taint (unchanged since
+    #2414) UNION the clock-helper-call taint of every function scope enclosing
+    `node`. Splitting the two is deliberate: literal clocks are rare enough that
+    file-wide over-approximation is cheap, while helper calls are ordinary code
+    and only mean "a clock" inside the scope that bound the name.
+    """
+    clock_fns = _clock_returning_functions(tree, aliases)
+    file_tainted = _tainted_names(tree, aliases)
+
+    parents: dict = {}
+    scope_tainted: dict = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+        if not isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        names: set = set()
+        for node in _own_scope_nodes(parent):
+            if not isinstance(node, ast.Assign):
+                continue
+            if not any(_is_clock_fn_call(s, clock_fns) for s in ast.walk(node.value)):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    names.add(target.id)
+        scope_tainted[parent] = names
+
+    cache: dict = {}
+
+    def tainted_at(node) -> set:
+        chain: list = []
+        cur = parents.get(node)
+        while cur is not None:
+            if isinstance(cur, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                chain.append(cur)
+            cur = parents.get(cur)
+        key = tuple(id(c) for c in chain)
+        if key not in cache:
+            merged = set(file_tainted)
+            for fn in chain:
+                merged |= scope_tainted.get(fn, set())
+            cache[key] = merged
+        return cache[key]
+
+    return clock_fns, tainted_at
+
+
 def naive_utc_today_sites(source: str, filename: str = "<source>") -> list[str]:
     """Every reader-'today'-shaped derivation from a UTC/naive clock in `source`."""
     tree = ast.parse(source, filename=filename)
     lines = source.splitlines()
     aliases = _import_aliases(tree)
-    tainted = _tainted_names(tree, aliases)
+    clock_fns, tainted_at = _taint_index(tree, aliases)
     findings: list[str] = []
 
     def _exempt(lineno: int) -> bool:
@@ -237,16 +356,17 @@ def naive_utc_today_sites(source: str, filename: str = "<source>") -> list[str]:
             continue
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             attr = node.func.attr
+            tainted = tainted_at(node)
             if attr == "strftime" and node.args and _is_day_only_fmt(getattr(node.args[0], "value", None)):
-                if _subtree_dirty(node.func.value, tainted, aliases):
+                if _subtree_dirty(node.func.value, tainted, aliases, clock_fns):
                     _flag(node, "date-only strftime on a UTC-anchored now")
-            elif attr == "date" and not node.args and _subtree_dirty(node.func.value, tainted, aliases):
+            elif attr == "date" and not node.args and _subtree_dirty(node.func.value, tainted, aliases, clock_fns):
                 _flag(node, ".date() on a UTC-anchored now")
-            elif attr == "isocalendar" and _subtree_dirty(node.func.value, tainted, aliases):
+            elif attr == "isocalendar" and _subtree_dirty(node.func.value, tainted, aliases, clock_fns):
                 _flag(node, ".isocalendar() on a UTC-anchored now")
         if isinstance(node, ast.FormattedValue) and node.format_spec is not None:
             spec = "".join(str(v.value) for v in ast.walk(node.format_spec) if isinstance(v, ast.Constant))
-            if _is_day_only_fmt(spec) and _subtree_dirty(node.value, tainted, aliases):
+            if _is_day_only_fmt(spec) and _subtree_dirty(node.value, tainted_at(node), aliases, clock_fns):
                 _flag(node, "date-only f-string format on a UTC-anchored now")
     return findings
 
@@ -331,6 +451,52 @@ def test_fires_on_every_naive_clock_face():
     for face in ("datetime.utcnow()", "datetime.today()", "date.today()", "datetime.now()"):
         src = f"x = {face}\n"
         assert len(naive_utc_today_sites(src)) == 1, f"matcher missed naive face: {face}"
+
+
+def test_fires_on_a_clock_returning_helper_call():
+    """#2811 — THE THIRD FACE OF A CLOCK: a CALL.
+
+    Before this, every predicate asked whether an expression contained a literal
+    `datetime.now(timezone.utc)` or a tainted NAME, so a one-line helper laundered
+    the clock past the guard completely. `reading/reading_store.py` shipped exactly
+    this shape through TWO ratchet slices (#2817 and #2798) reporting green.
+
+    Both routes must fire: calling the helper inline, and binding its result first.
+    """
+    inline = 'def _now_iso():\n    return datetime.now(timezone.utc)\nday = _now_iso().strftime("%Y-%m-%d")\n'
+    assert len(naive_utc_today_sites(inline)) == 1, "a day rendering of a clock-helper CALL must fire"
+
+    bound = 'def _now_iso():\n    return datetime.now(timezone.utc)\n\n\ndef f(now=None):\n    now = now or _now_iso()\n    return now.strftime("%Y-%m-%d")\n'
+    assert len(naive_utc_today_sites(bound)) == 1, "a name bound from a clock-helper call must be tainted in that scope"
+
+    method = "class C:\n    def _now(self):\n        return datetime.now(timezone.utc)\n\n    def day(self):\n        return self._now().date()\n"
+    assert len(naive_utc_today_sites(method)) == 1, "`self._now()` must fire like a bare helper call"
+
+
+def test_the_helper_taint_stops_at_a_named_frame_and_at_the_scope_boundary():
+    """The judgment half of #2811's call face — both directions, because an
+    over-firing guard gets muted and an under-firing one reports false green.
+
+    `_pt_now()` picks a frame; that is the whole point of the guard, so calls to it
+    are clean. And the taint a helper call creates belongs to the function that
+    BOUND it — `lambdas/compute/episode_detect_lambda.py` has one function assigning
+    `item = {..., "computed_at": _now_iso()}` and a *different* one taking an `item`
+    PARAMETER whose stored `DATE#` key it slices. File-wide taint flags the second
+    one, which is correct code.
+    """
+    framed = 'def _pt_now():\n    return datetime.now(timezone.utc).astimezone(PT)\nday = _pt_now().strftime("%Y-%m-%d")\n'
+    assert naive_utc_today_sites(framed) == [], "a helper that names its frame is not a naive clock"
+
+    scoped = (
+        "def _now_iso():\n"
+        "    return datetime.now(timezone.utc).isoformat()\n\n\n"
+        "def build(rec):\n"
+        '    item = {"computed_at": _now_iso()}\n'
+        "    return item\n\n\n"
+        "def read(item):\n"
+        '    return datetime.strptime(item["day"], "%Y-%m-%d").date()\n'
+    )
+    assert naive_utc_today_sites(scoped) == [], "helper-call taint must not leak across function scopes"
 
 
 def test_fires_on_the_aliased_date_import_shape():

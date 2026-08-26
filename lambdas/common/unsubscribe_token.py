@@ -47,6 +47,8 @@ import logging
 import os
 from datetime import date, datetime, timedelta, timezone
 
+from common.pacific_time import pacific_now  # #2811: the #3044 sunset is a Pacific day
+
 logger = logging.getLogger(__name__)
 
 UNSUB_TOKEN_VERSION = "v1"  # noqa: S105 — token format version, not a secret
@@ -138,5 +140,9 @@ def unsub_url_or_fallback(email: str, site_url: str) -> str:
 
 def legacy_email_param_accepted(today: date | None = None) -> bool:
     """True while the #3044 grace window for pre-token `email=` links is open."""
-    today = today or datetime.now(timezone.utc).date()
+    # #2811 — the sunset is a platform policy date, not a vendor's. `lambdas/web/
+    # email_subscriber_lambda.py` already checks this same #3044 grace window in the
+    # PACIFIC frame (#2414); the two must not disagree about which day it is, or a link
+    # is accepted by one door and refused by the other for 7-8 hours every evening.
+    today = today or pacific_now().date()
     return today < LEGACY_EMAIL_PARAM_SUNSET

@@ -8,7 +8,8 @@ Used by: daily_brief_lambda.py (import, not standalone)
 """
 
 import logging
-from datetime import datetime, timezone
+
+from common.pacific_time import pacific_now  # #2811: the rotation week is a Pacific week
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +92,10 @@ def build_genome_coaching_context(table, user_prefix):
         if not snps:
             return ""
 
-        # Rotate which insights surface — use week number
-        week_num = datetime.now(timezone.utc).isocalendar()[1]
+        # Rotate which insights surface — use week number. #2811: the ISO week is a
+        # DAY-derived label, and the platform's weeks are Pacific ones; a UTC week
+        # number rotates the insight set on Sunday at 17:00 PT instead of midnight.
+        week_num = pacific_now().isocalendar()[1]
         # Select 2-3 insights per week, rotating through the list
         start_idx = (week_num * 2) % len(GENOME_INSIGHTS)
         selected = []

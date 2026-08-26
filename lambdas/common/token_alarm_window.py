@@ -45,6 +45,8 @@ change (that part is not auto-derived).
 
 from datetime import date, timedelta
 
+from common.pacific_time import pacific_now  # #2811: the stamped window is in Pacific days
+
 # How many days before / after the stamped genesis the rebuild spike is expected
 # to land. BEFORE covers the UTC/PT calendar-day slop observed in cycle 11 (spike
 # posted the day before the stamped genesis); AFTER covers the typical full-cycle
@@ -63,7 +65,12 @@ def is_within_token_alarm_window(check_date: date | None = None) -> bool:
     rebuild window `[start, end)`. Never raises: a malformed stamp is treated as
     "not in window" (the safer default — an alarm still pages rather than being
     silently swallowed by a corrupt window)."""
-    d = check_date or date.today()
+    # #2811 — NOT an exemption. The window is stamped from the genesis date, which is a
+    # PACIFIC platform day (EXPERIMENT_START_DATE), so the check has to read the same
+    # calendar. `date.today()` is the naive runner clock (UTC in Lambda) and opened the
+    # window 7-8h early / closed it 7-8h early every evening — which is exactly the slop
+    # WINDOW_DAYS_BEFORE was widened to absorb.
+    d = check_date or pacific_now().date()
     try:
         start = date.fromisoformat(TOKEN_ALARM_GENESIS_WINDOW[0])
         end = date.fromisoformat(TOKEN_ALARM_GENESIS_WINDOW[1])

@@ -13,9 +13,10 @@ Early-cut water weight makes a raw rate wildly fast, so the rate is flagged
 >= 21 days (matches the existing handle_journey guard). Pure module, layer-deployed.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from common import stats_core  # bundled shared module (#529): block-bootstrap CI for the projection slope
+from common.pacific_time import pacific_now  # #2811: the trend's reference DAY is Pacific
 
 
 def _ols_slope(xs, ys):
@@ -114,7 +115,10 @@ def weight_trajectory(
     None when provisional), days_to_goal, projected_goal_date_earliest/latest,
     projection_confidence.
     """
-    ref = ref_dt or datetime.now(timezone.utc)
+    # #2811 — `ref` is only ever rendered as a DAY here: the `cutoff` compared against
+    # `DATE#`-derived (Pacific) weigh-in days, and the projected goal DATE published to
+    # readers. Both frames must be the same one, and the platform's is Pacific.
+    ref = ref_dt or pacific_now()
     cutoff = (ref - timedelta(days=window_days)).strftime("%Y-%m-%d")
     recent = sorted((d, w) for d, w in weight_series if d >= cutoff and w)
 

@@ -39,10 +39,11 @@ from __future__ import annotations
 import json
 import statistics
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Optional
 
 from common.numeric import floats_to_decimal
+from common.pacific_time import pacific_now, pacific_today  # #2811: ESTIMATE#/GRADE# sk days are Pacific
 
 # ── The dedicated partition. NEVER the nutrition partition. ───────────────────
 # Written as ONE full literal (not an f-string fragment) so an auditor — and the AST
@@ -105,7 +106,11 @@ def build_estimate_item(
     explicit `data_class: "estimate"` and `never_nutrition: True` marker — a self-describing
     record that it is a graded probe, never nutrition data.
     """
-    now = now or datetime.now(timezone.utc)
+    # #2811 — `date_str` is a WRITE KEY (`sk = ESTIMATE#{date}#{id}`) and the `date`
+    # field the grader joins on. A meal photographed at dinner is the archetypal
+    # after-17:00-PT call, so this is the one site here that is NOT schedule-masked:
+    # every evening estimate landed on tomorrow's partition and never met its grade.
+    now = now or pacific_now()
     estimate_id = estimate_id or uuid.uuid4().hex[:_ID_LEN]
     date_str = now.strftime("%Y-%m-%d")
     est = {m: macros.get(m) for m in MACROS}
@@ -239,7 +244,9 @@ def _grounded_note(note: Optional[str], macros: dict, *, now: Optional[datetime]
         str(note),
         allowed=grounded_generation.allowed_numbers(macros),
         allowed_dates=set(),
-        generation_date_iso=(now or datetime.now(timezone.utc)).strftime("%Y-%m-%d"),
+        # #2811 — the grounding gate adjudicates PACIFIC days (#2675); handing it a UTC
+        # one is the exact defect that issue fixed, re-introduced by a default argument.
+        generation_date_iso=(now or pacific_now()).strftime("%Y-%m-%d"),
         start_date_iso=EXPERIMENT_START_DATE,
     )
     return None if findings else str(note)
@@ -309,7 +316,9 @@ def build_grade_item(
     now: Optional[datetime] = None,
 ) -> dict:
     """PURE: build the DDB item for one grade, in the eyeball partition. Decimal-safe."""
-    now = now or datetime.now(timezone.utc)
+    # #2811 — the GRADE# side of the same write key. It must resolve to the same day
+    # `build_estimate_item` chose or the pair splits (the #2815 shape).
+    now = now or pacific_now()
     date_str = date or now.strftime("%Y-%m-%d")
     item: dict[str, Any] = {
         "pk": EYEBALL_PK,
@@ -365,7 +374,9 @@ def build_reliability_artifact(grades: list[dict], *, min_n: int = MIN_N_FOR_STA
     n_days = len(graded_dates)
     artifact: dict[str, Any] = {
         "source": EYEBALL_SOURCE,
-        "as_of": as_of or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        # #2811 — `as_of` labels an artifact whose `graded_dates` are the Pacific day
+        # keys above; the label and the data it summarises share one calendar.
+        "as_of": as_of or pacific_today(),
         "n_days": n_days,
         "min_n": min_n,
         "macros": {},

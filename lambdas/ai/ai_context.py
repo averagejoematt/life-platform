@@ -11,6 +11,7 @@ import re
 from datetime import date as _date_cls
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
+from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from intelligence import weight_recency  # #1894/#1924: staleness defined once, used by both coach generators
 
 from ai.ai_summaries import _avg, _safe_float  # noqa: F401
@@ -87,7 +88,9 @@ def _build_journey_context(profile, current_date_str=None):
     start_str = profile.get("journey_start_date", EXPERIMENT_START_DATE)
     try:
         start = _date_cls.fromisoformat(start_str)
-        today = _date_cls.fromisoformat(current_date_str) if current_date_str else _date_cls.today()
+        # #2811 — counted from the Pacific genesis anchor; the naive runner clock
+        # advanced the journey (and the coaching stage) a day early every PT evening.
+        today = _date_cls.fromisoformat(current_date_str) if current_date_str else pacific_now().date()
         days_in = max(1, (today - start).days + 1)
         week_num = max(1, (days_in + 6) // 7)
     except Exception:
@@ -184,12 +187,9 @@ EARLY_PHASE_GUARDRAIL_DAYS = 14
 
 
 def _phase_today_pt():
-    """Today as a PT calendar date — mirrors pre_start_meta's PT day boundary
-    (user-facing dates are Pacific) without importing web/ into this pure module."""
-    from datetime import datetime as _dt
-    from zoneinfo import ZoneInfo
-
-    return _dt.now(ZoneInfo(EXPERIMENT_TZ)).date()
+    """Today as a PT calendar date (pre_start_meta's day boundary). #2811 folded a
+    private `ZoneInfo(EXPERIMENT_TZ)` fork onto the one Pacific frame (#1964)."""
+    return pacific_now().date()
 
 
 def build_experiment_phase_context(profile=None, current_date_str=None):

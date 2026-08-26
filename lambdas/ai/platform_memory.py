@@ -46,7 +46,9 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import date as _date, datetime, timezone
+from datetime import date as _date
+
+from common.pacific_time import pacific_now  # #2811: memory relevance windows age in Pacific days
 
 logger = logging.getLogger(__name__)
 
@@ -369,7 +371,10 @@ def select_conversation_memories(records, coach_id=None, max_items: int = DEFAUL
     set for one coach: channel == conversation, category sanctioned for
     conversation, tier not private, inside the category relevance window, and
     domain-relevant. Returns newest-first, capped at max_items."""
-    today = today or datetime.now(timezone.utc).date()
+    # #2811 — `today` is only used to age each record against its own stored day (the
+    # category relevance window), and those days are Pacific. A UTC "today" after
+    # 17:00 PT aged every memory by an extra day and dropped the oldest ones a day early.
+    today = today or pacific_now().date()
     domain = normalize_domain(coach_id) if coach_id else None
     picked = []
     for rec in records or []:

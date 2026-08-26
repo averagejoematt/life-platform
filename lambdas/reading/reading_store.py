@@ -160,7 +160,12 @@ def log_session(
     # INSTANT (it is the `ts` and the SESSION# sk); only its DAY rendering has a frame,
     # and that frame is Pacific. `now[:10]` made an 18:00-PT session land on tomorrow's
     # row, which read as a broken streak the next morning.
-    date = date or pacific_date_of(now) or now[:10]
+    # #2811 — the FALLBACK had to move too. `pacific_date_of` returns None on an
+    # unparseable `now`, and `or now[:10]` handed that case straight back to the UTC
+    # day this line exists to remove. A slice of a CALL-derived name is invisible to a
+    # name-taint matcher, which is why #2798's own ratchet reported `lambdas/reading/`
+    # clean with this still here; the matcher now sees it, and the fallback is Pacific.
+    date = date or pacific_date_of(now) or pacific_today()
     item = {"bookId": book_id, "date": date, "minutes": minutes, "ts": now}
     if pages is not None:
         item["pages"] = pages
