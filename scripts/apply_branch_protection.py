@@ -54,6 +54,20 @@ WHAT IT WILL NEVER DO
     (id 19162901, #1325). Selection is by NAME, and the preserved ruleset's name/id is a
     hard refusal.
   * It never mutates anything without `--apply`. Default is a printed plan.
+  * It never applies a posture entry marked `applied: false` (#3207). That marker is how
+    deploy/github_posture.json says "declared, deliberately not yet applied, blocked on
+    X" — the state D0.6's `main-required-fast-lane` has been in. The 2026-08-26
+    remediation sweep read the resulting declared-vs-live difference as a critical
+    regression and recommended this script's `--apply`; running it would have wedged the
+    post-merge reconcile push on every merge. Landing such a surface means flipping
+    `applied` to true in the posture file (a reviewable diff) in the same PR, which is
+    also what lets the sentinel report an applied-live-but-still-marked-false surface as
+    real drift instead of letting the marker rot into a false green.
+  * It never applies a bypass actor that nothing could satisfy
+    (`bypass_actor_satisfiability_problems()`, offline, in preflight): a `User` bypass is
+    only real if the pushing workflow actually checks out with that user's PAT secret.
+    And when the secret's existence cannot be READ, it refuses rather than proceeding on
+    trust — `--allow-unverified-bypass-secret` is the deliberate, typed override.
 
 USAGE
   python3 scripts/apply_branch_protection.py            # dry run — print the plan, no writes
@@ -94,6 +108,13 @@ DEFAULT_REPO = "averagejoematt/life-platform"
 # The ruleset this tool must never select, update, or delete (#1325).
 PRESERVED_RULESET_NAME = "main-block-force-push-and-deletion"
 PRESERVED_RULESET_ID = 19162901
+
+# Keys in a posture entry that are METADATA about the claim, never a live value to
+# compare or PATCH. Kept in sync with deploy/sentinel_github.py::_POSTURE_META_KEYS —
+# parity pinned by tests/test_posture_pending_marker.py. `applied`/`blocked_on`/
+# `ledger_row` are the #3207 declared-but-not-yet-applied marker; PATCHing `applied`
+# to /repos/{owner}/{repo} would be nonsense, so it must never reach diff or payload.
+POSTURE_META_KEYS = ("source", "applied", "blocked_on", "ledger_row")
 
 # Rule types that would put a human approval in the loop. Solo operator — see ADR-148.
 FORBIDDEN_RULE_TYPES = ("pull_request", "required_deployments", "required_signatures")
@@ -209,6 +230,68 @@ def preflight_contexts(spec: dict) -> list[str]:
                 "`name:`, so the required context would never be satisfied"
             )
     return problems
+
+
+def bypass_actor_satisfiability_problems(spec: dict, workflow: str = "ci-cd.yml") -> list[str]:
+    """#3207 — can the declared bypass actor actually be SATISFIED by a live push?
+
+    A `User` bypass actor only matches a push AUTHENTICATED as that user (#2198). The
+    only thing that pushes directly to `main` is ci-cd.yml's `reconcile` job, and it
+    authenticates as that user ONLY if it checks out with a PAT secret. So a `User`
+    bypass is satisfiable iff:
+
+      1. the spec names the secret (`reconcile_push_secret`), AND
+      2. some job in the pushing workflow checks out with `token:` referencing that
+         secret — the actual wire, read out of the workflow YAML.
+
+    If (2) is missing, applying the ruleset wedges the reconcile push on the very next
+    merge no matter what any advice text says. Returns human-readable problems (empty
+    == satisfiable); the caller refuses `--apply` on a non-empty list.
+
+    Deliberately checked OFFLINE and BEFORE any network call, and run by `--check` and
+    `--preflight-only` too — a workflow edit that drops the token wiring is then a red
+    test, not a wedged merge day."""
+    problems: list[str] = []
+    user_actors = [b for b in spec.get("bypass_actors", []) if b.get("actor_type") == "User"]
+    if not user_actors:
+        return problems
+    secret_name = spec.get("reconcile_push_secret")
+    if not secret_name:
+        problems.append(
+            f"{len(user_actors)} `User` bypass actor(s) declared but the spec names no `reconcile_push_secret` — "
+            "a User bypass only matches a push authenticated as that user, so nothing on this repo could satisfy it "
+            "and every reconcile push to main would be rejected (#2198/#3207)"
+        )
+        return problems
+    doc = _load_workflow(workflow)
+    wired = False
+    for job in (doc.get("jobs") or {}).values():
+        for step in (job or {}).get("steps") or []:
+            if not isinstance(step, dict) or "checkout" not in str(step.get("uses", "")):
+                continue
+            if f"secrets.{secret_name}" in str((step.get("with") or {}).get("token", "")):
+                wired = True
+    if not wired:
+        problems.append(
+            f"no job in {workflow} checks out with `token: ${{{{ secrets.{secret_name} }}}}` — the direct push to "
+            f"main would still authenticate as github-actions[bot], which a `User` bypass actor does NOT cover, so "
+            "applying this ruleset would reject the post-merge reconcile push on every merge (#2198/#3207)"
+        )
+    return problems
+
+
+def declared_but_unapplied(entry: dict) -> str | None:
+    """#3207 — the `applied: false` marker, read STRUCTURALLY (never by ruleset name).
+
+    Returns the human-readable blocker when this posture entry is declared but
+    deliberately not yet applied, else None. `--apply` refuses on a non-None result:
+    the posture file is the single place that says whether a surface is meant to be
+    live, so landing it means flipping `applied` to true in the SAME PR — which is also
+    what keeps `deploy/drift_sentinel.py`'s `pending` verdict from rotting into a false
+    green (it reports an applied-live-but-still-marked-false surface as drift)."""
+    if entry.get("applied", True):
+        return None
+    return entry.get("blocked_on") or "an unnamed blocker (add `blocked_on` to deploy/github_posture.json)"
 
 
 # ── gh plumbing ──────────────────────────────────────────────────────────────
@@ -396,7 +479,7 @@ def diff_ruleset(live: dict | None, desired: dict) -> list[str]:
 def diff_repo_settings(live: dict, want: dict) -> list[str]:
     problems = []
     for key, value in want.items():
-        if key == "source":
+        if key in POSTURE_META_KEYS:
             continue
         if live.get(key) != value:
             problems.append(f"{key}={live.get(key)!r} (want {value!r})")
@@ -437,6 +520,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--apply", action="store_true", help="actually create/update the ruleset + repo toggle")
     ap.add_argument("--check", action="store_true", help="drift gate: exit 1 when live state differs from the spec")
     ap.add_argument("--preflight-only", action="store_true", help="offline: validate the spec against the workflow YAML and exit")
+    ap.add_argument(
+        "--allow-unverified-bypass-secret",
+        action="store_true",
+        help="proceed when the bypass actor's PAT secret cannot be READ (not when it is known absent) — #3207 fail-closed override",
+    )
     ap.add_argument("--repo", default=None, help=f"owner/repo (default {DEFAULT_REPO} or $GITHUB_REPOSITORY)")
     args = ap.parse_args(argv)
 
@@ -450,12 +538,17 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         problems = preflight_contexts(spec)
+        # #3207: the bypass actor's SATISFIABILITY is preflighted with the contexts —
+        # offline, before any network call, on every mode. An unsatisfiable bypass wedges
+        # the reconcile push exactly the way an unreportable required context wedges PRs.
+        problems += bypass_actor_satisfiability_problems(spec)
     except SpecError as e:
         print(f"FAIL: {e}", file=sys.stderr)
         return 2
     if problems:
         print(
-            "FAIL: required-context preflight (a required check that does not run on every PR blocks that PR class forever):",
+            "FAIL: spec preflight (a required check that does not run on every PR blocks that PR class forever; "
+            "an unsatisfiable bypass actor wedges the post-merge reconcile push on every merge):",
             file=sys.stderr,
         )
         for p in problems:
@@ -506,16 +599,58 @@ def main(argv: list[str] | None = None) -> int:
 
     _print_plan(spec, desired, ruleset_problems, settings_problems)
 
+    # #3207: the declared-but-not-yet-applied marker, read structurally off `applied`.
+    ruleset_blocker = declared_but_unapplied(spec)
+    settings_blocker = declared_but_unapplied(want_settings)
+    if ruleset_blocker:
+        print(f"\nPENDING: ruleset `{spec['name']}` is declared `applied: false` — blocked on: {ruleset_blocker}")
+    if settings_blocker:
+        print(f"PENDING: repo_settings is declared `applied: false` — blocked on: {settings_blocker}")
+
     if args.check:
-        if ruleset_problems or settings_problems:
-            print("\nDRIFT: live GitHub state does not match deploy/github_posture.json — run with --apply", file=sys.stderr)
+        # A difference from a surface the posture says is NOT applied is the documented
+        # desired state, not drift — and "run with --apply" is exactly the advice that
+        # would wedge the reconcile push (#3207). Judge each surface against its marker.
+        real_drift = []
+        if ruleset_problems and not ruleset_blocker:
+            real_drift.append("ruleset")
+        if settings_problems and not settings_blocker:
+            real_drift.append("repo settings")
+        # An APPLIED-live surface still marked `applied: false` is a stale marker: the
+        # posture claims pending while live says otherwise, and that is real drift.
+        if ruleset_blocker and not ruleset_problems:
+            real_drift.append("ruleset (applied live but posture says `applied: false` — flip the marker)")
+        if settings_blocker and not settings_problems:
+            real_drift.append("repo settings (applied live but posture says `applied: false` — flip the marker)")
+        if real_drift:
+            print(f"\nDRIFT: {', '.join(real_drift)} — live GitHub state does not match deploy/github_posture.json", file=sys.stderr)
             return 1
+        if ruleset_blocker or settings_blocker:
+            print("\npending: declared but deliberately not yet applied — satisfy the blocker above, THEN flip `applied` to true")
+            return 0
         print("\nclean: live GitHub state matches the documented posture")
         return 0
 
     if not args.apply:
         print("\ndry run — nothing mutated. Re-run with --apply to make it so.")
         return 0
+
+    # ── #3207: refuse to apply a surface the posture itself declares unapplied. ──
+    # This is the wedge stopped AT THE WRITER, not in advice text: the 2026-08-26
+    # remediation sweep recommended exactly this `--apply` for D0.6's deliberately
+    # unapplied ruleset, and running it would have rejected the post-merge reconcile
+    # push on every merge. Landing the change means flipping `applied` in the posture
+    # file — a reviewable diff — so the marker and reality can never silently diverge.
+    if ruleset_blocker or settings_blocker:
+        for label, blocker in (("main_required_checks_ruleset", ruleset_blocker), ("repo_settings", settings_blocker)):
+            if blocker:
+                print(f"FAIL: deploy/github_posture.json marks `{label}` as `applied: false` — blocked on: {blocker}", file=sys.stderr)
+        print(
+            "Refusing to write. Satisfy the blocker, then flip `applied` to true (and update the matching "
+            "docs/MANAGED_WHERE_LEDGER.md row) in the SAME PR — re-run --apply from that branch.",
+            file=sys.stderr,
+        )
+        return 2
 
     # ── #2198: refuse to apply a `User` bypass actor before the reconcile job can
     # authenticate as that user. Applying first would strand the very next reconcile
@@ -538,10 +673,25 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 2
         if provisioned is None:
+            # #3207: "could not verify" is not "verified". This branch used to proceed
+            # on trust, which meant the wedge guard silently evaporated for exactly the
+            # token that most operators run this with (no secrets:read). A fail-closed
+            # path that cannot observe must refuse, not assume — the override exists so
+            # an operator who HAS confirmed it out of band can still land the change,
+            # but it has to be typed on purpose.
+            if not args.allow_unverified_bypass_secret:
+                print(
+                    f"FAIL: could not verify that repo secret `{secret_name}` exists — the current token cannot read "
+                    "/actions/secrets (needs Administration/secrets:read; see GH_POSTURE_TOKEN). Applying a `User` "
+                    "bypass actor whose PAT may not exist would reject ci-cd.yml's reconcile push to main on the very "
+                    "next merge. Re-run with a token that can read repo secrets, or pass "
+                    "--allow-unverified-bypass-secret once you have confirmed the secret exists.",
+                    file=sys.stderr,
+                )
+                return 2
             print(
-                f"WARN: could not verify repo secret `{secret_name}` exists (soft-fail — token may lack "
-                "Administration/secrets read); proceeding on trust. Confirm it exists before this run, or the "
-                "next reconcile push may be silently rejected.",
+                f"WARN: --allow-unverified-bypass-secret given; proceeding without confirming repo secret "
+                f"`{secret_name}` exists. If it does not, the next reconcile push to main is rejected.",
                 file=sys.stderr,
             )
 
@@ -561,7 +711,7 @@ def main(argv: list[str] | None = None) -> int:
         print("ruleset already matches — no write")
 
     if settings_problems:
-        body = {k: v for k, v in want_settings.items() if k != "source"}
+        body = {k: v for k, v in want_settings.items() if k not in POSTURE_META_KEYS}
         _, err = gh_json(f"/repos/{repo}", method="PATCH", payload=body)
         if err:
             print(f"FAIL: repo settings write: {err}", file=sys.stderr)

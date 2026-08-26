@@ -745,6 +745,7 @@ from sentinel_github import (  # noqa: E402,F401,I001
     GITHUB_POSTURE_FILE,
     PAT_FIX,
     PUSH_TRIGGER_GLOBS,
+    _classify_declared_but_unapplied,
     _commit_files,
     _gh_api_result,
     _github_repo,
@@ -1027,11 +1028,28 @@ def run_sweep():
     }
 
 
+def _pending_note(checks):
+    """#3207 — one clause naming every declared-but-not-yet-applied posture surface.
+
+    Rendered on EVERY summary, clean or not. `pending` deliberately does not red the
+    sweep, and a state that neither alarms nor prints is exactly how a stale marker
+    rots into a false green — so it always says which surfaces are waiting."""
+    waiting = []
+    for check in checks.values():
+        for surface, blocker in (check.get("pending") or {}).items():
+            waiting.append(f"{surface} (blocked on: {str(blocker).split(' — ')[0]})")
+    if not waiting:
+        return ""
+    return f"{len(waiting)} declared-but-not-yet-applied posture surface(s) PENDING, not drift: {'; '.join(waiting)}"
+
+
 def _summary(status, checks):
+    pending_note = _pending_note(checks)
     if status == "clean":
         n = len(STACKS)
-        return f"All clear: {n}/{n} stacks in sync, no config/layer/asset drift, no orphan functions, data delete-protection intact."
-    parts = []
+        clear = f"All clear: {n}/{n} stacks in sync, no config/layer/asset drift, no orphan functions, data delete-protection intact."
+        return f"{clear} {pending_note}" if pending_note else clear
+    parts = [pending_note] if pending_note else []
     cfn = checks["cfn_drift"]
     drifted_stacks = [s for s, v in cfn.get("stacks", {}).items() if v.get("status") == "drift"]
     if drifted_stacks:
@@ -1087,7 +1105,7 @@ def print_summary(record):
     print(f"{icon} {record['status'].upper()}: {record['summary']}")
     for name, c in record["checks"].items():
         st = c.get("status")
-        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "degraded": "🟡", "unavailable": "⚪"}.get(st, "·")
+        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "degraded": "🟡", "unavailable": "⚪", "pending": "🔵"}.get(st, "·")
         detail = ""
         if st == "drift":
             if name == "cfn_drift":
@@ -1123,6 +1141,11 @@ def print_summary(record):
                 detail = f" — {c.get('detail', '')}"
             elif name == "sentinel_cadence":
                 detail = f" — {c.get('detail', '')}"
+        elif st == "pending":
+            # #3207: a declared-but-not-yet-applied posture surface. Distinct from drift
+            # and never an alarm, but it must NEVER print as a silent pass — the whole
+            # point of the state is that the sweep says what is waiting, and on what.
+            detail = f" — {c.get('pending') or c.get('detail', '')}"
         elif st == "degraded":
             # DIL-027: "could not observe" is a distinct verdict from clean and must
             # print its reason — a check that sampled nothing has not passed.

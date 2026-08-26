@@ -6,7 +6,16 @@
     "RULES: (1) every entry carries a `source` naming the doc that makes the claim — this file",
     "declares the documented posture, never a wish; (2) a PR that amends the claiming docs (e.g.",
     "the #1319 approval-gate fork) MUST flip the matching entry in the same PR, or the sentinel",
-    "will honestly report the divergence every Monday; (3) never run black on this file (JSON)."
+    "will honestly report the divergence every Monday; (3) never run black on this file (JSON);",
+    "(4) #3207 — an entry that is DECLARED but DELIBERATELY NOT YET APPLIED carries `applied:",
+    "false` plus `blocked_on` (the human-readable blocker) and `ledger_row` (a substring that",
+    "identifies its row in docs/MANAGED_WHERE_LEDGER.md). The sentinel then reports that surface",
+    "as `pending` — a state distinct from drift — and recommends satisfying the blocker, NEVER",
+    "`apply_branch_protection.py --apply`. The applier refuses `--apply` on an `applied: false`",
+    "entry for the same reason. When the blocker is satisfied and the change is applied, flip",
+    "`applied` to true in the SAME PR: the sentinel reports a live-applied surface still marked",
+    "`applied: false` as DRIFT (a stale marker), so the marker cannot rot into a false green.",
+    "tests/test_posture_pending_marker.py pins the marker <-> ledger agreement."
   ],
   "environment_production": {
     "name": "production",
@@ -27,6 +36,9 @@
   },
   "main_required_checks_ruleset": {
     "name": "main-required-fast-lane",
+    "applied": false,
+    "blocked_on": "RECONCILE_PUSH_TOKEN (A-Grade Program D0.6, #3042) — the fine-grained PAT ci-cd.yml's reconcile job must push with to match the `User` bypass actor below. Applying this ruleset before that secret exists wedges the post-merge reconcile push on EVERY merge (#3207): the job falls back to GITHUB_TOKEN, which authenticates as github-actions[bot] and is not covered by a `User` bypass.",
+    "ledger_row": "main-required-fast-lane",
     "target": "branch",
     "enforcement": "active",
     "include_refs": [
@@ -66,10 +78,13 @@
       "Wiki drift gates (docs-ci.yml), Surface-drift gate (surface-drift.yml), Migration coverage + HTML well-formedness / Render + accuracy gate (v4-gate.yml) — all PATH-FILTERED, so they simply do not report on PRs outside their globs and would block those PRs forever.",
       "Unit Tests / Lint + Syntax Check (ci-cd.yml) and Visual + AI-vision QA — post-merge (push/scheduled) only; they emit no PR check-run to require."
     ],
-    "source": "ADR-148 (branch protection: fast-lane required checks + auto-merge, #1662, epic #1648) + docs/CONVENTIONS.md drift-discovery table + docs/MANAGED_WHERE_LEDGER.md. Applied by scripts/apply_branch_protection.py --apply (driver-run, post-merge); until that runs the sentinel reports this surface as drift BY DESIGN, per rule (2) above."
+    "source": "ADR-148 (branch protection: fast-lane required checks + auto-merge, #1662, epic #1648) + docs/CONVENTIONS.md drift-discovery table + docs/MANAGED_WHERE_LEDGER.md. Applied by scripts/apply_branch_protection.py --apply (driver-run, post-merge). It has NOT been applied — see `applied`/`blocked_on` above; until the blocker is satisfied the sentinel reports this surface as `pending`, not drift (#3207, rule (4) above)."
   },
   "repo_settings": {
     "allow_auto_merge": true,
+    "applied": false,
+    "blocked_on": "RECONCILE_PUSH_TOKEN (A-Grade Program D0.6, #3042) — auto-merge is only useful once the fast-lane required checks exist, so it flips in the SAME `--apply` as main_required_checks_ruleset and inherits the same blocker (#3207).",
+    "ledger_row": "GitHub repo merge settings",
     "source": "ADR-148 (#1662): auto-merge is the mechanism that makes fast-lane required checks cost zero wall-clock — the operator arms the merge once and GitHub lands it when the required checks go green. Applied by scripts/apply_branch_protection.py --apply."
   },
   "vulnerability_alerts": {

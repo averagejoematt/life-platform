@@ -33,6 +33,14 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GITHUB_POSTURE_FILE = os.path.join(_ROOT, "deploy", "github_posture.json")
 DEFAULT_REPO = "averagejoematt/life-platform"
 
+# Keys in a posture entry that are METADATA about the claim, never a live value to
+# compare. `source` names the doc making the claim (#1320); `applied`/`blocked_on`/
+# `ledger_row` are the #3207 declared-but-not-yet-applied marker. Kept in sync with
+# scripts/apply_branch_protection.py::POSTURE_META_KEYS (parity pinned by
+# tests/test_posture_pending_marker.py) — a new metadata key added to only one of the
+# two would be silently compared against live state by the other.
+_POSTURE_META_KEYS = ("source", "applied", "blocked_on", "ledger_row")
+
 # The one-time owner fix for every scope-gapped surface below (#1320 gate:owner
 # remainder): a fine-grained PAT scoped to this repo, stored as the repo secret
 # GH_POSTURE_TOKEN (the sentinel prefers it over the ambient GH_TOKEN when set).
@@ -246,6 +254,60 @@ def _judge_required_checks(live, want):
     }
 
 
+def _classify_declared_but_unapplied(want, applied_live, drift_result):
+    """#3207 — apply the `applied: false` marker to ONE surface's verdict.
+
+    `deploy/github_posture.json` can only express DESIRED state, so a deliberately
+    unapplied entry (D0.6's `main-required-fast-lane`, blocked on RECONCILE_PUSH_TOKEN)
+    reported as permanent critical drift with "run --apply to restore" — advice that
+    would have wedged the post-merge reconcile push on every merge.
+
+    The classification keys off the machine-readable `applied` field ONLY — never off
+    the ruleset's name or any phrase in its detail text (the suppressor-rules-must-be-
+    STRUCTURAL rule; every phrase-matched member of that family has failed in the field).
+
+      * `applied` absent / true  → caller's verdict is returned untouched.
+      * `applied: false` and NOT live  → `pending`: expected, names its blocker, and
+        deliberately carries NO --apply recommendation.
+      * `applied: false` and live      → `drift`: the MARKER is stale. Applying without
+        flipping it in the same PR is exactly how a "pending" state rots into a false
+        green, so the drift verdict says flip it, and the caller's own judgement of the
+        live record (if any) is preserved alongside.
+
+    `applied_live` is the surface's own "has this been applied?" predicate — ruleset
+    existence for a ruleset, value-match for a settings toggle — passed in by the caller
+    because only the caller knows the shape.
+    """
+    if want.get("applied", True):
+        return drift_result
+    if not applied_live:
+        blocked_on = want.get("blocked_on") or "an unnamed blocker (add `blocked_on` to deploy/github_posture.json)"
+        return {
+            "status": "pending",
+            "applied": False,
+            "blocked_on": blocked_on,
+            "detail": (
+                "DECLARED BUT NOT YET APPLIED (posture `applied: false`) — this is the documented desired state, "
+                f"not a regression. Blocked on: {blocked_on} "
+                "Do NOT run scripts/apply_branch_protection.py --apply: the applier refuses while `applied` is false, "
+                "and applying ahead of the blocker is the wedge this marker exists to prevent (#3207). "
+                "Next step: satisfy the blocker, then flip `applied` to true in deploy/github_posture.json in the "
+                "SAME PR that applies it."
+            ),
+        }
+    stale = (
+        "posture declares `applied: false` but this surface IS applied live — the marker is STALE. "
+        "Flip `applied` to true in deploy/github_posture.json (and its docs/MANAGED_WHERE_LEDGER.md row) "
+        "so the surface is judged against the spec again (#3207)"
+    )
+    merged = dict(drift_result)
+    merged["status"] = "drift"
+    merged["stale_applied_marker"] = True
+    prior = drift_result.get("detail")
+    merged["detail"] = f"{stale}; also: {prior}" if prior else stale
+    return merged
+
+
 def check_github_config():
     """#1320 — GET-only asserts of documented GitHub config vs. live state.
 
@@ -273,7 +335,14 @@ def check_github_config():
 
     Fail-soft: a surface the credential can't read reports status "unavailable"
     plus a needs_owner line naming the exact fine-grained-PAT permission (see
-    PAT_FIX) — never a red. Overall: drift > error > unavailable > clean."""
+    PAT_FIX) — never a red. Overall: drift > error > unavailable > pending > clean.
+
+    DECLARED-BUT-NOT-YET-APPLIED (#3207): a posture entry carrying `applied: false`
+    is judged by `_classify_declared_but_unapplied()` — its expected live state is
+    "not applied", so absence reports `pending` (naming `blocked_on`, with NO --apply
+    recommendation) instead of drift, and being applied live while still marked false
+    reports `drift` on the stale marker. See that function; the classification is
+    structural (the `applied` field), never a name/phrase match."""
     try:
         posture = _load_github_posture()
     except Exception as e:  # noqa: BLE001
@@ -359,17 +428,24 @@ def check_github_config():
         else:
             match = next((rs for rs in (data or []) if rs.get("name") == want_rc.get("name")), None)
             if match is None:
-                surfaces["main_required_checks_ruleset"] = {
-                    "status": "drift",
-                    "detail": f"ruleset {want_rc.get('name')!r} is absent — `main` has NO required status checks "
-                    "(fix: python3 scripts/apply_branch_protection.py --apply)",
-                }
+                # #3207: "the ruleset exists" IS the applied-predicate for this surface.
+                surfaces["main_required_checks_ruleset"] = _classify_declared_but_unapplied(
+                    want_rc,
+                    applied_live=False,
+                    drift_result={
+                        "status": "drift",
+                        "detail": f"ruleset {want_rc.get('name')!r} is absent — `main` has NO required status checks "
+                        "(fix: python3 scripts/apply_branch_protection.py --apply)",
+                    },
+                )
             else:
                 full, err2 = _gh_api_result(f"repos/{repo}/rulesets/{match['id']}")
                 if err2:
                     surfaces["main_required_checks_ruleset"] = {"status": "error", "detail": err2["detail"]}
                 else:
-                    surfaces["main_required_checks_ruleset"] = _judge_required_checks(full, want_rc)
+                    surfaces["main_required_checks_ruleset"] = _classify_declared_but_unapplied(
+                        want_rc, applied_live=True, drift_result=_judge_required_checks(full, want_rc)
+                    )
 
     # 2c. repo-level merge settings — auto-merge is the mechanism ADR-148 depends on
     want_settings = posture.get("repo_settings")
@@ -378,15 +454,19 @@ def check_github_config():
         if err:
             surfaces["repo_settings"] = {"status": "error", "detail": err["detail"]}
         else:
-            mismatches = {k: {"documented": v, "live": data.get(k)} for k, v in want_settings.items() if k != "source" and data.get(k) != v}
+            declared = {k: v for k, v in want_settings.items() if k not in _POSTURE_META_KEYS}
+            mismatches = {k: {"documented": v, "live": data.get(k)} for k, v in declared.items() if data.get(k) != v}
             if mismatches:
-                surfaces["repo_settings"] = {
+                verdict = {
                     "status": "drift",
                     "detail": "; ".join(f"{k}: documented {m['documented']!r}, live {m['live']!r}" for k, m in mismatches.items())
                     + " (fix: python3 scripts/apply_branch_protection.py --apply)",
                 }
             else:
-                surfaces["repo_settings"] = {"status": "clean", "live": {k: data.get(k) for k in want_settings if k != "source"}}
+                verdict = {"status": "clean", "live": {k: data.get(k) for k in declared}}
+            # #3207: for a settings toggle there is no "absent" shape — "every declared
+            # key already matches" IS the applied-predicate.
+            surfaces["repo_settings"] = _classify_declared_but_unapplied(want_settings, applied_live=not mismatches, drift_result=verdict)
 
     # 3. vulnerability / Dependabot alerts enablement (ADR-082's remediation channel)
     want_va = bool(posture.get("vulnerability_alerts", {}).get("enabled"))
@@ -423,9 +503,18 @@ def check_github_config():
         status = "error"
     elif "unavailable" in statuses:
         status = "unavailable"
+    elif "pending" in statuses:
+        # #3207: `pending` ranks BELOW unavailable and ABOVE clean — it is not a
+        # regression (so it must not red the sweep or reach the needs-human triage),
+        # but a sweep carrying an unapplied declared surface has not "all-cleared"
+        # either, and saying so is what stops the marker from rotting unseen.
+        status = "pending"
     else:
         status = "clean"
     result = {"status": status, "surfaces": surfaces}
+    pending = {k: v.get("blocked_on") for k, v in surfaces.items() if v.get("status") == "pending"}
+    if pending:
+        result["pending"] = pending
     if scope_gaps:
         result["needs_owner"] = f"GitHub posture surface(s) unreadable with the current token: {'; '.join(scope_gaps)}. {PAT_FIX}."
     return result
