@@ -5,7 +5,7 @@
   evidence.js (#581) — no behavior change.
 */
 import { icon } from "/assets/js/icons.js";
-import { fmt, fig, sec, note } from "/assets/js/evidence_shared.js";
+import { fmt, fig, sec, note, fmtShort } from "/assets/js/evidence_shared.js";
 
 export const DF_CX = 150, DF_CROTCH = 372, DF_FOOT = 606;
 
@@ -49,7 +49,13 @@ export function dataFigure(j) {
   if (!isFinite(start) || !isFinite(goal) || !isFinite(now) || start === goal) return "";
   const lost = Number(j.lost_lbs);
   const moved = isFinite(lost) ? (lost > 0.05 ? `down ${fmt(Math.abs(lost))} lb` : (lost < -0.05 ? `up ${fmt(Math.abs(lost))} lb` : "even")) : "";
-  const ms = [[start, "start"], [now, "now"], [Math.round((start + goal) / 2), ""], [goal, "goal"]]
+  // #3197 — the start value needs its provenance: an undated "321 start" beside a
+  // 1-reading-so-far cycle reads as fabricated history. Derive a short date label from
+  // journey.started_date (never hardcoded — the next reset re-anchors it); #948-style
+  // fallback: no started_date ⇒ startDate is "" ⇒ every string below is unchanged.
+  const startDate = fmtShort(j.started_date);
+  const startWord = startDate ? `the ${startDate} baseline` : "the start";
+  const ms = [[start, "start" + (startDate ? ` · ${startDate}` : "")], [now, "now"], [Math.round((start + goal) / 2), ""], [goal, "goal"]]
     .filter(([w], i, a) => a.findIndex(([x]) => Math.round(x) === Math.round(w)) === i);
   return `<section class="rd-sec df-sec" data-df data-start="${start}" data-goal="${goal}" data-now="${now}">
     <h2 class="rd-h">The figure, drawn from the numbers</h2>
@@ -64,9 +70,9 @@ export function dataFigure(j) {
       <div class="df-togoal"><span class="label">to goal</span><span data-df-tg class="num">—</span></div>
     </div>
     <input class="df-scrub" data-df-scrub type="range" min="0" max="1" step="0.001" value="0" aria-label="Scrub the figure between start and goal weight">
-    <div class="df-axis"><span class="label">${Math.round(start)} start</span><span class="label">${Math.round(goal)} goal</span></div>
+    <div class="df-axis"><span class="label">${Math.round(start)} start${startDate ? ` · ${startDate} baseline` : ""}</span><span class="label">${Math.round(goal)} goal</span></div>
     <div class="df-buttons">${ms.map(([w, lbl]) => `<button class="df-btn" data-df-to="${w}">${lbl ? lbl + " · " : ""}${Math.round(w)}</button>`).join("")}<button class="df-btn df-play" data-df-play>${icon("play")} morph</button></div>
-    <p class="rd-why df-note"><strong>A representative figure, not a photo.</strong> The silhouette's girth is a direct function of the real measured weight — heaviest at ${Math.round(start)}, leanest at ${Math.round(goal)} — with no face, no identity, and nothing generated or guessed. It moves only when the actual number moves${moved && moved !== "even" ? ` (currently ${moved} from the start)` : ""}.</p>
+    <p class="rd-why df-note"><strong>A representative figure, not a photo.</strong> The silhouette's girth is a direct function of the real measured weight — heaviest at ${Math.round(start)}, leanest at ${Math.round(goal)} — with no face, no identity, and nothing generated or guessed. It moves only when the actual number moves${moved && moved !== "even" ? ` (currently ${moved} from ${startWord})` : ""}.</p>
   </section>`;
 }
 
