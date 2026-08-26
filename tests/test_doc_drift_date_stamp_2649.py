@@ -20,7 +20,10 @@ Case C is why the masking is per-change rather than per-file: `docs/ARCHITECTURE
 carries the date and the Lambda count on the SAME line, so a naive "ignore any line
 containing a date" would have swallowed the count too.
 
-`--apply` still refreshes the stamp; only `--check` ignores it.
+`--check` ignores a date-only difference. `--apply` used to refresh the stamp
+unconditionally; since #2986 it refreshes only what the run regenerated or verified
+(`deploy/doc_restamp_guard.py`, guarded by `tests/test_doc_restamp_rule_2986.py`) — the
+four cases above are unchanged, because a held stamp is a date-only difference too.
 """
 
 from __future__ import annotations

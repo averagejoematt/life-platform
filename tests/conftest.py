@@ -250,6 +250,11 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps .claude/commands + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
+        # #2986/#2838: the generic re-stamp rule, derived from sync_doc_metadata.RULES. Its
+        # verdict is pure repo shape (0.5s), and the change that can break it — a new stamped
+        # literal, or an edit to deploy/sync_doc_metadata.py — is exactly a PR's own diff, so
+        # putting it post-merge would repeat this epic's own "model-guard-post-merge-only" fold.
+        "test_doc_restamp_rule_2986.py",
         "test_budget_guard_fail_closed_2824.py",  # #2824: os.walk sweep — no lambdas/mcp module may re-declare FAIL_CLOSED_FEATURES; membership lives in budget_guard alone
         "test_csp_hardening_3048.py",  # #3048: site/ tree sweep — no non-legacy page may reintroduce an executable inline script; repo-shape, pre-merge
         "test_grant_enumeration_drift.py",  # #2824: consumer⊆granted across cdk/stacks + lambdas/ + .github/workflows + infra/iam — a new fail-closed consumer (or a role that drops a grant) must red BEFORE the merge, not after the channel is already stranded

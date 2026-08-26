@@ -873,6 +873,21 @@ AI powered down.** Four layers, each with a named owner-mechanism:
 4. **Periodic verification.** Each canonical page's `> **Status:** … · **Verified:**`
    header records when a human/agent last verified its content against reality; the
    freshness report is the re-verification worklist. `/accuracy-review` is the deep pass.
+5. **The re-stamp rule — the machine is held to it too (#2986, folding #2838).** *A
+   sync/apply run may only advance a freshness date on content it actually regenerated or
+   verified.* The human rule above ("never bump the stamp alone") had no machine
+   counterpart, so `deploy/sync_doc_metadata.py --apply` re-stamped every doc it opened —
+   which is how `docs/MCP_TOOL_CATALOG.md` read `Total tools: 76` two lines above
+   `## All 72 Tools` for a month, wearing a timestamp the reconcile bot refreshed daily.
+   The rule now lives in `deploy/doc_restamp_guard.py`: a date-only rewrite is HELD unless
+   (a) the same run rewrote a non-date literal in that doc, or (b) the doc's date-masked
+   bytes already differ from `HEAD` (a generator or a human rewrote the body first). Every
+   comparison masks `YYYY-MM-DD` first, so staling a stamp cannot launder itself as
+   regeneration; if git cannot answer, the stamp is held (fail-closed). **A held stamp is
+   never a red** — `--check` has ignored date-only diffs since #2649. The guarded surface
+   is derived from `RULES` itself (every template containing `{date}`), so a new stamped
+   literal is covered by existing; `tests/test_doc_restamp_rule_2986.py` mutation-proves
+   both directions and reds if a new template's date change stops being recognisable.
 
 **Adding a page:** flat in `docs/` if canonical (`specs/` dated spec, `archive/`
 superseded) → status header → one line in `docs/README.md` → checkers green. That is
