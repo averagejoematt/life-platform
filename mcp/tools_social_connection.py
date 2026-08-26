@@ -8,7 +8,9 @@ The registered entry point is ``get_social_connection_trend``; ``mcp/registry.py
 imports ``tool_get_social_connection_trend`` from here.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.core import query_source
 from mcp.helpers import correlation_report, normalize_whoop_sleep
@@ -138,8 +140,8 @@ def tool_get_social_connection_trend(args):
     correlates with health outcomes. The `perma_context` field (a Seligman
     PERMA / Holt-Lunstad citation) is gated on n — see `_SOCIAL_CITATION_MIN_N` (#758).
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
+    start_date = args.get("start_date", (pacific_now() - timedelta(days=90)).strftime("%Y-%m-%d"))
 
     journal_items = query_source("notion", start_date, end_date)
     if not journal_items:
@@ -193,7 +195,7 @@ def tool_get_social_connection_trend(args):
             break
 
     days_since_meaningful = None
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     for d in reversed(sorted_dates):
         if daily_social[d]["score"] >= 3:
             days_since_meaningful = (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(d, "%Y-%m-%d")).days

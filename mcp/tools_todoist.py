@@ -8,9 +8,10 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import boto3
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp import idempotency as _idem
 from mcp.config import logger, table
@@ -85,7 +86,7 @@ def _todoist_request(method, path, payload=None):
 
 def _get_todoist_range(days=30):
     """Fetch todoist records for the last N days. Returns list of day items."""
-    end = datetime.now(timezone.utc).date()
+    end = pacific_now().date()
     start = end - timedelta(days=days - 1)
     return query_source("todoist", str(start), str(end))
 
@@ -170,7 +171,7 @@ def get_todoist_day(date: str = None):
     """
     try:
         if not date:
-            date = (datetime.now(timezone.utc).date() - timedelta(days=1)).strftime("%Y-%m-%d")
+            date = (pacific_now().date() - timedelta(days=1)).strftime("%Y-%m-%d")
 
         items = query_source("todoist", date, date)
         if not items:

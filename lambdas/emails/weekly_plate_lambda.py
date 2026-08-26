@@ -32,6 +32,7 @@ from common import (
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -286,7 +287,7 @@ def fetch_profile():
 
 def gather_data():
     """Gather 14 days of food logs + 30 days of weight data."""
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     end_date = (today - timedelta(days=1)).isoformat()
     start_14d = (today - timedelta(days=14)).isoformat()
     weight_start = (today - timedelta(days=30)).isoformat()
@@ -386,7 +387,7 @@ def extract_weight_trend(withings_data):
     latest = weights[-1]["weight_lbs"]
     earliest = weights[0]["weight_lbs"]
     # 7-day trend
-    week_weights = [w for w in weights if w["date"] >= (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat()]
+    week_weights = [w for w in weights if w["date"] >= (pacific_now().date() - timedelta(days=7)).isoformat()]
     week_change = round(week_weights[-1]["weight_lbs"] - week_weights[0]["weight_lbs"], 1) if len(week_weights) >= 2 else None
     return {
         "latest_weight_lbs": latest,
@@ -601,7 +602,7 @@ def _period_key():
     redrive up to Monday 02:00 UTC still lands inside the same ISO week, which
     a date-shaped key would not.
     """
-    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date() - timedelta(days=1))}"
+    return f"week:{send_ledger.iso_week_key(pacific_now().date() - timedelta(days=1))}"
 
 
 def record_email_send(table, lambda_name, period_key):
@@ -645,7 +646,7 @@ def lambda_handler(event, context):
     logger.info(f"Food data: {len(days)} days, {len(all_foods)} food items")
 
     # P1: Load plate history to prevent repeats
-    today_str = datetime.now(timezone.utc).date().isoformat()
+    today_str = pacific_now().date().isoformat()
     plate_history = load_plate_history(today_str)
     history_context = build_plate_history_context(plate_history)
 

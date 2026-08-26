@@ -5,9 +5,10 @@ Data access tools: sources, latest, daily summary, date range, search, compare.
 import bisect
 import math
 import operator
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from ingestion.strava_population import DISTANCE_POPULATION_LABEL, ELEVATION_POPULATION_LABEL
 from privacy.field_tiers import strip_map
 
@@ -104,7 +105,7 @@ def tool_get_sources(_args):
     """
     from ingestion.source_state import has_rate_limit_marker, resolve_source_state
 
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = pacific_now().date().isoformat()
     result = {}
     for source in SOURCES:
         pk = f"{USER_PREFIX}{source}"
@@ -461,7 +462,7 @@ def _population_label(sort_by):
 
 def tool_search_activities(args):
     start_date = args.get("start_date", "2010-01-01")
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
     name_contains = args.get("name_contains", "").lower()
     sport_type = args.get("sport_type", "").lower()
     min_distance = args.get("min_distance_miles")
@@ -570,8 +571,8 @@ def tool_get_intelligence_quality(args):
     severity_filter = args.get("severity")  # error, warning, or None for all
     coach_filter = args.get("coach")
 
-    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    end_date = pacific_today()
+    start_date = (pacific_now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     # Query all intelligence_quality records in date range
     try:

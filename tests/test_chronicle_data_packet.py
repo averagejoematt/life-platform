@@ -44,6 +44,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
 from emails import chronicle_data as cd  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 from privacy import diary_consent  # noqa: E402
 
 # The genesis every packet fixture is anchored to. Explicit — never read off the
@@ -164,6 +165,7 @@ class _FrozenClock(datetime):
 
 def _freeze(monkeypatch):
     monkeypatch.setattr(cd, "datetime", _FrozenClock)
+    freeze_pacific(monkeypatch, cd, _FrozenClock)  # #2817: pin the PACIFIC helpers this module now calls
     # today = 2026-08-12 → end = yesterday, start = 7 days back, weights 30 back
     return {"start": "2026-08-05", "end": "2026-08-11", "weight_start": "2026-07-13"}
 

@@ -21,11 +21,12 @@ WHY A SECOND GUARD AND NOT MORE OF #2414
 `tests/test_pacific_today_guard_2414.py` holds a **zero** over a reader-shaped surface
 (`lambdas/web/` + named reader-bound writers). Its acceptance is "no sites at all", and
 that must stay true. This file guards a *different, larger* surface — the compute /
-ingestion / coach / intelligence packages — under a **shrink-only ratchet**, so the
-class can be frozen fleet-wide before it is fully drained. The AST predicates are
-IMPORTED from the #2414 module rather than re-implemented: a forked matcher that drifts
-from the original is the exact failure this epic keeps finding ("guard the SET, not the
-instance" — a second copy is a second instance).
+ingestion / coach / intelligence packages, plus `lambdas/emails/` and `mcp/` since
+#2817 — under a **shrink-only ratchet**, so the class can be frozen fleet-wide before it
+is fully drained. The AST predicates are IMPORTED from the #2414 module rather than
+re-implemented: a forked matcher that drifts from the original is the exact failure this
+epic keeps finding ("guard the SET, not the instance" — a second copy is a second
+instance).
 
 THE BOUNDARY, HONESTLY DRAWN — day semantics vs. an instant
 ───────────────────────────────────────────────────────────
@@ -65,17 +66,24 @@ its number reds, a file absent from the map must be at zero, an entry naming a f
 no longer exists must be pruned, and an entry whose file has reached zero must be pruned
 so the ratchet cannot silently license a regrowth back up to the old number.
 
-**The map is empty, and that is a measurement, not an oversight.** The 2026-08-25 epic
-audit measured 96 naive-UTC-day sites in `lambdas/` outside `web/`; of those, 111
-day-semantics sites fell in these four packages, and #2811's sweep converted all of them
-(4 took inline `utc-exempt(#2811)` markers instead — Habitify's UTC deadline comparison,
-the Strava/Whoop reconcile windows, which bound UTC-epoch API requests rather than DDB
-keys, and health_auto_export's `logger.set_date` correlation id, which is a CloudWatch
-log dimension on a webhook that keys its records off the payload's own dates, never off
-"today"). `test_residue_is_empty_by_measurement` pins that
-claim so it becomes false loudly if anyone re-adds an entry instead of fixing a site.
-The map's machinery stays because `lambdas/emails/` (18 sites, #2817) and `mcp/`
-(51 sites) enter this surface next and will arrive WITH entries.
+**The map was empty when #2811 shipped, and that was a measurement, not an oversight.**
+The 2026-08-25 epic audit measured 96 naive-UTC-day sites in `lambdas/` outside `web/`;
+of those, 111 day-semantics sites fell in the first four packages, and #2811's sweep
+converted all of them (4 took inline `utc-exempt(#2811)` markers instead — Habitify's UTC
+deadline comparison, the Strava/Whoop reconcile windows, which bound UTC-epoch API
+requests rather than DDB keys, and health_auto_export's `logger.set_date` correlation id,
+which is a CloudWatch log dimension on a webhook that keys its records off the payload's
+own dates, never off "today").
+
+**#2817 added the two packages #2811 named as the follow-up**, and they arrived with the
+entries #2811 predicted. Measured against `origin/main` @ `1812f01f8`:
+`lambdas/emails/` 60 sites / 18 files → **0**, `mcp/` 89 sites / 24 files → **12**, all
+12 in the two files below whose fix is blocked on a writer in an unguarded package.
+Nothing in either package was ruled genuinely-UTC: unlike `lambdas/ingestion/`, neither
+talks to a vendor whose day boundary is UTC, and the one `logger.set_date` here follows
+the fleet's `pacific_today()` convention rather than #2811's instant-derived exception.
+`test_residue_is_exactly_the_measured_coordination_debt` pins the map by NAME and NUMBER,
+so appending an entry — or quietly widening one — has to argue with a test.
 
 Run:  python3 -m pytest tests/test_utc_day_fleet_ratchet_2811.py -v
 """
@@ -109,12 +117,42 @@ SURFACE_PACKAGES = (
     "lambdas/ingestion",
     "lambdas/coach",
     "lambdas/intelligence",
+    # #2817 — the named follow-up. `lambdas/emails/` (60 day-semantics sites in 18
+    # files) and `mcp/` (89 in 24) were the two packages #2811 deliberately left out
+    # because concurrent PRs owned those files that night. They arrive WITH residue
+    # entries, exactly as #2811's docstring predicted.
+    "lambdas/emails",
+    "mcp",
 )
 
 # ── THE RATCHET. Repo-relative file -> maximum day-semantics sites allowed. ──
-# Entries only ever come OUT (or get smaller). See the module docstring for why it
-# is empty today and what fills it next.
-_UTC_DAY_RESIDUE: dict[str, int] = {}
+# Entries only ever come OUT (or get smaller). An entry is a DEBT, and the prose
+# beside it is the debt's terms: what else has to move before the file can be fixed.
+#
+# THE RULE THIS MAP ENCODES (#2817): a consumer is only converted together with the
+# WRITER whose sort key it matches. #2815 is the incident behind that sentence —
+# converting one side of an `OUTPUT#{date}` pair desynchronises it, which is worse
+# than both sides being wrong in the same direction. Both entries below are the same
+# shape: the mcp/ side is ready, the partner lives in a package (`lambdas/reading/`,
+# `lambdas/training/` + `lambdas/operational/`) that neither this ratchet nor #2414's
+# zero surface covers yet, so converting mcp/ alone would split the pair.
+_UTC_DAY_RESIDUE: dict[str, int] = {
+    # Reading. `_input_streak` walks back day-by-day from "today" over session rows
+    # whose `date` is written by `lambdas/reading/reading_store.log_session` as
+    # `_now_iso()[:10]` — the UTC day. `_today()` (7 call sites) and `_prior_iso_week`
+    # feed the same partition, and `reading_recall.next_due()/_today()` stamp the
+    # recall `nextDue` dates this module then queries. Convert with reading_store.py +
+    # reading_recall.py in one change, or a session logged at 6pm PT lands on
+    # tomorrow's row and the streak reads 0.
+    "mcp/tools_reading.py": 6,
+    # Hevy routines. `target_date` here is a WRITE key: `training.routine_repo`
+    # versions one routine per target_date (#3115). The other writer of that same key
+    # is `lambdas/operational/hevy_routine_cron_lambda._target_date_for_event`
+    # (`date.today()`), with `lambdas/training/exercise_history.load_recent_history`
+    # bounding its history window off the same day. Converting the MCP side alone
+    # would make a manual evening draft author a DIFFERENT routine row than the cron's.
+    "mcp/tools_hevy_routine.py": 6,
+}
 
 
 def _surface_files() -> list[pathlib.Path]:
@@ -212,12 +250,14 @@ def test_surface_is_derived_and_covers_every_scoped_package():
     for pkg in SURFACE_PACKAGES:
         assert (ROOT / pkg).is_dir(), f"scanned package missing on disk: {pkg}"
         assert any(r.startswith(pkg + "/") for r in rels), f"glob matched nothing under {pkg}"
-    # Spot-check the carriers this issue actually swept, one per package.
+    # Spot-check the carriers these issues actually swept, one per package.
     for expected in (
         "lambdas/compute/hypothesis_engine_lambda.py",
         "lambdas/ingestion/enrichment_lambda.py",
         "lambdas/coach/coach_domain_facts.py",
         "lambdas/intelligence/intelligence_common.py",
+        "lambdas/emails/freshness_checker_lambda.py",  # #2817 — 9 sites, the heaviest single file
+        "mcp/tools_lifestyle.py",  # #2817 — 15 sites, the heaviest mcp file
     ):
         assert expected in rels, f"derived surface lost {expected}"
 
@@ -266,12 +306,42 @@ def test_residue_has_no_stale_entries():
     assert not drained, "_UTC_DAY_RESIDUE names files that are now CLEAN — prune them so they cannot regrow:\n" + "\n".join(drained)
 
 
-def test_residue_is_empty_by_measurement():
-    """#2811's sweep took all four packages to zero. Pinned so a future 'just baseline
-    it' reflex has to argue with a test instead of quietly appending a line."""
-    assert _UTC_DAY_RESIDUE == {}, (
-        "The scoped packages were measured clean on 2026-08-25. A new entry means a site "
-        "was baselined instead of fixed — fix it, or mark it `# utc-exempt(#NNNN): <reason>`:\n" + "\n".join(sorted(_UTC_DAY_RESIDUE))
+def test_residue_is_exactly_the_measured_coordination_debt():
+    """The map is not a budget — it is a NAMED debt with a named blocker each.
+
+    #2811 took its four packages to zero and pinned the empty map so nobody could
+    baseline instead of fix. #2817 kept that pressure while admitting two real
+    entries: pin them by name AND number, so growing an existing entry (the quieter
+    regression) is as loud as appending a new one. Anything added here must come with
+    the same thing these two came with — a writer, in another package, that has to
+    move in the same change.
+    """
+    assert _UTC_DAY_RESIDUE == {"mcp/tools_reading.py": 6, "mcp/tools_hevy_routine.py": 6}, (
+        "The #2811/#2817 surface was measured on 2026-08-25: four packages plus "
+        "lambdas/emails/ at ZERO, and exactly two mcp/ files held back because their "
+        "sort-key WRITER lives in an unguarded package (see the map's comments).\n"
+        "A changed map means either that debt was paid (delete the entry — do not "
+        "shrink it and leave it) or a site was baselined instead of fixed. Fix it, or "
+        "mark it `# utc-exempt(#NNNN): <reason>`. Current map:\n" + "\n".join(f"  {k}: {v}" for k, v in sorted(_UTC_DAY_RESIDUE.items()))
+    )
+
+
+def test_no_utc_day_site_survives_in_the_2817_packages_outside_the_residue():
+    """#2817's own acceptance, stated as its own failure message.
+
+    `test_no_new_utc_day_site_outside_the_residue` covers this, but it reports for six
+    packages at once. This one says the sentence a future reader needs: the email fleet
+    and the MCP tool surface are at zero, and the only two files that are not are the
+    two whose writer is elsewhere.
+    """
+    counts = _measure()
+    offenders = sorted(rel for rel in counts if rel.startswith(("lambdas/emails/", "mcp/")) and rel not in _UTC_DAY_RESIDUE)
+    assert not offenders, (
+        "lambdas/emails/ and mcp/ were swept to the Pacific frame by #2817 (60 + 89 "
+        "sites; the email fleet writes `email_log#…` `DATE#` rows that "
+        "lambdas/web/site_api_status.py reads on the PACIFIC day, and the MCP tools are "
+        "used interactively in PT evenings, when a UTC 'today' selects tomorrow's empty "
+        "day). These files regrew a UTC day:\n" + "\n".join(offenders)
     )
 
 
@@ -348,6 +418,41 @@ def test_a_planted_site_in_a_real_scoped_file_would_red_the_guard():
     assert utc_day_semantics_sites(src, filename=rel) == [], "precondition: the file is clean today"
     planted = src + '\n\n_PLANTED = datetime.now(timezone.utc).strftime("%Y-%m-%d")\n'
     assert len(utc_day_semantics_sites(planted, filename=rel)) == 1
+
+
+def test_a_planted_site_reds_the_guard_in_the_2817_packages_too():
+    """The #2817 half of the mutation proof, run against the REAL text of one
+    `lambdas/emails/` module and one `mcp/` module.
+
+    Widening `SURFACE_PACKAGES` is the whole change on the guard side, and a widened
+    glob that quietly matches nothing (wrong dir name, a `_SKIP_PATH_MARKERS`
+    collision, a package that is not importable from `tests/`) reports green forever.
+    Planting the defect in the actual file proves the new surface is live, not just
+    declared.
+    """
+    for rel in ("lambdas/emails/freshness_checker_lambda.py", "mcp/tools_habits.py"):
+        assert rel not in _UTC_DAY_RESIDUE
+        assert rel in {str(p.relative_to(ROOT)) for p in _surface_files()}, f"{rel} is not on the scanned surface"
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        assert utc_day_semantics_sites(src, filename=rel) == [], f"precondition: {rel} is clean today"
+        planted = src + '\n\n_PLANTED = datetime.now(timezone.utc).strftime("%Y-%m-%d")\n'
+        assert len(utc_day_semantics_sites(planted, filename=rel)) == 1, f"the guard would not fire on {rel}"
+
+
+def test_the_residue_files_are_frozen_not_forgotten():
+    """A residue entry has to be a CEILING on a real file, not a name nobody re-reads.
+
+    Both entries are held at their measured 6. Proving the count is exact (not merely
+    "at most 6") is what makes `test_residue_entries_do_not_grow` a ratchet: a 7th site
+    added to either file reds, and a fix that drains one to zero reds
+    `test_residue_has_no_stale_entries` until the entry is deleted.
+    """
+    counts = _measure()
+    for rel, cap in _UTC_DAY_RESIDUE.items():
+        assert (ROOT / rel).exists(), f"{rel} left the tree — prune its entry"
+        assert (
+            counts.get(rel, 0) == cap
+        ), f"{rel} measures {counts.get(rel, 0)} sites, entry says {cap} — re-measure, do not adjust the entry to fit"
 
 
 def test_the_ratchet_refuses_growth_and_stale_entries():

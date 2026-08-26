@@ -14,7 +14,8 @@ docs/MCP_TOOL_AUDIT.md. Remaining: training views + CGM dashboard.
 
 import json
 import time
-from datetime import datetime, timezone
+
+from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import logger
 from mcp.core import ddb_cache_set, mem_cache_set
@@ -28,7 +29,7 @@ def nightly_cache_warmer():
     Per-step timing is logged so slowdowns are easy to diagnose.
     """
     warmer_start = time.time()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     results = {}
     logger.info(f"[warmer] START date={today}")
 

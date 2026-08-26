@@ -44,6 +44,7 @@ from decimal import Decimal
 from typing import Any
 
 import boto3
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -162,7 +163,7 @@ def _get_this_weeks_installment() -> dict | None:
     a catch-up guard for anything approve hasn't already sent — no code change to
     its schedule needed for that demotion to take effect.
     """
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     week_ago = (today - timedelta(days=7)).isoformat()
     today_str = today.isoformat()
 
@@ -242,7 +243,7 @@ def _record_email_send(sent_count: int) -> None:
     preview to email_log#wednesday_chronicle_preview; this row means mail was delivered.
 
     Fail-soft: a failed status write must never fail an otherwise-successful send."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     try:
         table.put_item(
             Item={

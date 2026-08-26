@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # tests/test_coach_roster_set_guard_2334.py). The coach package is on the MCP
 # bundle's path already (tools_coach_checkin imports persona_registry the same way).
 from coach.persona_registry import OPERATIONAL_SHORT_IDS, short_id_names as _short_id_names
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 COACH_IDS = list(OPERATIONAL_SHORT_IDS)
 # Registry-derived (coaching-team v2); retired coaches stay resolvable so their
@@ -219,7 +220,7 @@ def tool_get_coach_track_record(args):
 
     days = int(args.get("days") or 30)
     subdomain_filter = (args.get("subdomain") or "").strip().lower() or None
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (pacific_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     coach_pk = f"COACH#{cid}"
 
     try:

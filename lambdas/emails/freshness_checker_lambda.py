@@ -71,6 +71,7 @@ AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 # (a sensor-session lapse reports, it never pages). Lookback below covers the widest.
 # #746: the list now lives in the canonical source_registry (apple_health.hae_datatypes)
 # so every source threshold sits in one place; this is an alias, not a second copy.
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from ingestion.source_registry import hae_datatype_thresholds  # noqa: E402
 
 HAE_DATATYPES = hae_datatype_thresholds()
@@ -180,7 +181,7 @@ def check_apple_health_activity(table, now, sick_suppress):
         "    small payload) — raw per-sample exports 413 silently.\n"
         "  • If it just broke, re-send via a one-time Apple Health file export\n"
         "    (run the HAE 'Health Data' export for the gap window and re-ingest).\n\n"
-        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+        f"Checked at: {now.strftime('%Y-%m-%d %H:%M PT')}"
     )
     return msg, metrics
 
@@ -244,7 +245,7 @@ def check_notion_journal_staleness(table, now, sick_suppress=False):
             "  • Write a journal entry (any template), or run a journal-interview chat\n"
             "    mode, which creates a Notion page via the MCP connector.\n"
             "    See docs/coaching/CHAT_MODES.md.\n\n"
-            f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+            f"Checked at: {now.strftime('%Y-%m-%d %H:%M PT')}"
         )
         return msg, metrics
 
@@ -278,7 +279,7 @@ def check_notion_journal_staleness(table, now, sick_suppress=False):
         "  • Write a journal entry (any template), or run a journal-interview chat mode,\n"
         "    which creates a Notion page via the MCP connector.\n"
         "    See docs/coaching/CHAT_MODES.md.\n\n"
-        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+        f"Checked at: {now.strftime('%Y-%m-%d %H:%M PT')}"
     )
     return msg, metrics
 
@@ -537,8 +538,13 @@ FIELD_COMPLETENESS_CHECKS: dict[str, list[str]] = {
 
 def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
-    now = datetime.now(timezone.utc)
-    now - timedelta(hours=STALE_HOURS)
+    # #2817: the PACIFIC frame. Every `now.date()` below is compared against a
+    # `DATE#` sort key, and `DATE#` keys name Pacific calendar days — so a UTC
+    # `now` made this checker read tomorrow's (empty) day on any invoke, retry or
+    # DLQ redrive after 17:00 PT. `pacific_now()` is timezone-AWARE, so the
+    # instant arithmetic below (`now - last_date`, `now - last_changed`) is
+    # unchanged and exact: subtracting two aware datetimes ignores their frames.
+    now = pacific_now()
 
     # ── Sick day check: suppress stale alerts if any of the last N days was sick ──
     # ADR-052: extended from yesterday-only to a N-day lookback so multi-day
@@ -682,7 +688,7 @@ def lambda_handler(event, context):
                 f"The following sources have not updated in over {STALE_HOURS} hours:\n\n"
                 f"{stale_list}{remediation}\n\n"
                 f"Full source status:\n{status_list}\n\n"
-                f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+                f"Checked at: {now.strftime('%Y-%m-%d %H:%M PT')}"
             )
             try:
                 sns.publish(
@@ -708,7 +714,7 @@ def lambda_handler(event, context):
                     f"⚠️ Life Platform: Partial Data Detected\n\n"
                     f"The following sources have fresh records but are missing expected fields:\n\n"
                     f"{partial_list}\n\n"
-                    f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+                    f"Checked at: {now.strftime('%Y-%m-%d %H:%M PT')}"
                 ),
             )
             logger.info("Partial completeness alert sent for %d source(s)", len(partial_sources))
@@ -742,7 +748,7 @@ def lambda_handler(event, context):
                         f"The last {len(drift_recs)} MacroFactor records all have an empty food_log "
                         f"(entries_count == 0). The derived meal layer (macrofactor_meals) is starved — "
                         f"new days won't group.\n\nFix: re-export the *diary* format from MacroFactor.\n\n"
-                        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+                        f"Checked at: {now.strftime('%Y-%m-%d %H:%M PT')}"
                     ),
                 )
                 logger.info("MacroFactor format-drift alert sent (%d/%d empty)", len(empties), len(drift_recs))
@@ -916,7 +922,7 @@ def lambda_handler(event, context):
                         f"{stale_list}\n\n"
                         f"Action: trigger a manual data pull for each source to force a token refresh,\n"
                         f"or verify tokens are still valid in AWS Secrets Manager.\n\n"
-                        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+                        f"Checked at: {now.strftime('%Y-%m-%d %H:%M PT')}"
                     ),
                 )
                 logger.info("OAuth token health alert sent for %d secret(s)", len(oauth_stale))

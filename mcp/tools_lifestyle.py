@@ -9,11 +9,12 @@ from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from ingestion.source_registry import raw_date_key  # bundled shared module: the X-9 raw/ layout facts (#2278)
 
 from mcp import idempotency as _idem
 from mcp.config import EXPERIMENTS_PK, INSIGHTS_PK, S3_BUCKET, TRAVEL_PK, USER_ID, USER_PREFIX, logger, s3_client, table
-from mcp.core import decimal_to_float, parallel_query_sources, query_source
+from mcp.core import _apply_phase_filter, decimal_to_float, parallel_query_sources, query_source  # ADR-058
 from mcp.helpers import normalize_whoop_sleep
 
 # ── Travel constants ──
@@ -64,7 +65,7 @@ def _tz_offset(tz_name):
 
 def _is_traveling(date_str=None):
     """Check if a given date (or today) falls within an active trip. Returns trip dict or None."""
-    check_date = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    check_date = date_str or pacific_today()
     try:
         resp = table.query(
             KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
@@ -270,7 +271,7 @@ def tool_save_insight(args):
         "sk": f"INSIGHT#{ts}",
         "insight_id": ts,
         "text": text,
-        "date_saved": now.strftime("%Y-%m-%d"),
+        "date_saved": pacific_today(),  # #2817: the id above is a UTC instant; the DAY is Pacific
         "source": source,
         "status": "open",
         "outcome_notes": "",
@@ -299,9 +300,7 @@ def tool_get_insights(args):
     """
     status_filter = args.get("status_filter")  # None = all
     limit = 50 if args.get("limit") is None else max(1, int(args["limit"]))  # #2660: `or 50` read a supplied 0 as absent
-    today = datetime.now(timezone.utc).date()
-
-    from mcp.core import _apply_phase_filter  # ADR-058
+    today = pacific_now().date()
 
     # #2221: the PAGE and the CORPUS are different numbers, and the tool used to publish
     # the page as `total`. Two compounding causes: DynamoDB applies `Limit` to items READ
@@ -396,7 +395,7 @@ def tool_update_insight_outcome(args):
         ExpressionAttributeValues={
             ":s": new_status,
             ":o": outcome_notes,
-            ":d": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            ":d": pacific_today(),
         },
     )
     logger.info(f"update_insight_outcome: insight_id={insight_id} status={new_status}")
@@ -411,8 +410,8 @@ def tool_update_insight_outcome(args):
 
 def _get_state_of_mind_trend(args):
     """State of Mind valence trend from How We Feel / Apple Health."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    start = args.get("start_date", (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d"))
+    today = pacific_today()
+    start = args.get("start_date", (pacific_now() - timedelta(days=90)).strftime("%Y-%m-%d"))
     end = args.get("end_date", today)
 
     # ── Load daily aggregates from DynamoDB ──
@@ -486,7 +485,7 @@ def _get_state_of_mind_trend(args):
     total_check_ins = sum(d["check_in_count"] for d in days_data)
 
     # 7-day rolling average for recent trend
-    recent_7 = [d for d in days_data if d["date"] >= (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")]
+    recent_7 = [d for d in days_data if d["date"] >= (pacific_now() - timedelta(days=7)).strftime("%Y-%m-%d")]
     recent_avg = sum(d["avg_valence"] for d in recent_7) / len(recent_7) if recent_7 else None
 
     # Trend direction (first half vs second half)
@@ -742,7 +741,7 @@ def tool_create_experiment(args):
                 "randomized-start design: do not pass start_date — the start is drawn at random "
                 "from the pre-declared window at creation (SCED, #1413)"
             )
-        ok, issue = experiment_design.validate_start_window_not_past(randomized_start, now.strftime("%Y-%m-%d"))
+        ok, issue = experiment_design.validate_start_window_not_past(randomized_start, pacific_today())
         if not ok:
             raise ValueError(f"invalid design (pre-registration rejected): {issue}")
         start_date, start_draw = experiment_design.draw_start_date(randomized_start)
@@ -750,7 +749,7 @@ def tool_create_experiment(args):
         logger.info(f"create_experiment: randomized start drawn — {start_date} from {randomized_start} (SCED #1413)")
 
     if not start_date:
-        start_date = now.strftime("%Y-%m-%d")
+        start_date = pacific_today()
 
     # Generate a slug-style ID
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
@@ -926,9 +925,7 @@ def tool_list_experiments(args):
     Shows days active, whether minimum duration (14d) has been met.
     """
     status_filter = args.get("status")  # None = all
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    from mcp.core import _apply_phase_filter  # ADR-058
+    today = pacific_today()
 
     resp = table.query(
         **_apply_phase_filter(
@@ -1043,7 +1040,7 @@ def tool_get_experiment_results(args):
         raise ValueError(f"No experiment found with id={exp_id}")
 
     start_date = item.get("start_date", "")
-    end_date = item.get("end_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    end_date = item.get("end_date") or pacific_today()
     status = item.get("status", "active")
     hypothesis = item.get("hypothesis", "")
 
@@ -1262,7 +1259,7 @@ def tool_end_experiment(args):
         raise ValueError(f"Experiment is already {existing.get('status')} — cannot end again")
 
     if not end_date:
-        end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        end_date = pacific_today()
 
     # Auto-infer grade if not provided
     if not grade:
@@ -1492,8 +1489,8 @@ LEDGER_PK = f"USER#{USER_ID}#SOURCE#ledger"
 
 def _get_movement_score(args):
     """Daily movement & NEAT analysis."""
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", pacific_today())
+    start_date = args.get("start_date", (pacific_now() - timedelta(days=30)).strftime("%Y-%m-%d"))
     step_target = args.get("step_target", 8000)
 
     # DI-1.2: Hevy is the primary "did he train" signal. A step count must never, on
@@ -1635,8 +1632,10 @@ def tool_get_field_notes(args):
     """
     week = args.get("week")
     if not week:
-        now = datetime.now(timezone.utc)
-        year, wk, _ = now.isocalendar()
+        # #2817: `WEEK#` rows are written on the PACIFIC week by
+        # `intelligence/field_notes_lambda.get_iso_week()` (#2811) — a UTC week label
+        # missed the row entirely every Sunday evening PT (a week off, not a day).
+        year, wk, _ = pacific_now().isocalendar()
         week = f"{year}-W{wk:02d}"
 
     resp = table.get_item(Key={"pk": FIELD_NOTES_PK, "sk": f"WEEK#{week}"})
@@ -1781,7 +1780,6 @@ def tool_log_evening_intake(args):
       can say "updated tonight's count 2 -> 1" instead of silently re-writing.
     """
     from coach.intake_response import PRIVATE_INTAKE_PK
-    from common.pacific_time import pacific_today
 
     try:
         count = int(args.get("count"))

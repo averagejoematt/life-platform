@@ -53,8 +53,9 @@ from common.digest_utils import (
     get_food_delivery_streak_state,  # #2235: one read path for STREAK#current
     safe_float,
 )
+from common.pacific_time import PACIFIC, pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
-from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -227,7 +228,7 @@ def weight_projection(w4_weight_avgs, goal_weight, current_weight):
     if rate_per_week >= 0:
         return {"status": "not_losing"}
     weeks_to_goal = (current_weight - goal_weight) / abs(rate_per_week)
-    eta = datetime.now(timezone.utc).date() + timedelta(weeks=weeks_to_goal)
+    eta = pacific_now().date() + timedelta(weeks=weeks_to_goal)
     return {"status": "ok", "weeks": round(weeks_to_goal), "rate_per_week": round(abs(rate_per_week), 1), "eta": eta.strftime("%B %Y")}
 
 
@@ -259,27 +260,28 @@ def compute_sleep_debt(whoop_dict, target_hrs=7.5):
 def _days_open(saved, now):
     """Age in days of an insight's `date_saved`, or None if it cannot be read.
 
-    #2221: BOTH writers store a DATE-ONLY string — mcp/tools_lifestyle.py:278 and
-    insight_email_parser_lambda.py:137 both use `now.strftime("%Y-%m-%d")`. That
-    parses NAIVE, so subtracting it from a tz-aware `now` raised TypeError, the bare
+    #2221: BOTH writers store a DATE-ONLY string (`tool_save_insight` in
+    mcp/tools_lifestyle.py, `save_insight` in insight_email_parser_lambda.py), which
+    parses NAIVE — subtracting it from a tz-aware `now` raised TypeError, the bare
     `except` set days_open = 0, and `0 >= 7` was never true: the "⏳ N Open Insights"
-    box had never once rendered for a real insight. A naive parse is UTC-anchored
-    here, matching the writers' own `datetime.now(timezone.utc)`.
+    box had never once rendered for a real insight.
+    #2817 moved BOTH writers to `pacific_today()`, so this consumer moved WITH them
+    (#2815: converting one side of a pair is worse than neither) — the naive stamp is
+    anchored PACIFIC and `now` normalised to the same frame, so the age counts Pacific
+    days whatever frame the caller passes. An older UTC-written row keeps its own
+    offset and still subtracts exactly, differing by hours inside a 7-day threshold.
     """
     try:
         saved_dt = datetime.fromisoformat(str(saved).replace("Z", "+00:00"))
     except Exception:
         return None
     if saved_dt.tzinfo is None:
-        saved_dt = saved_dt.replace(tzinfo=timezone.utc)
-    return (now - saved_dt).days
+        saved_dt = saved_dt.replace(tzinfo=PACIFIC)
+    return (now.astimezone(PACIFIC) - saved_dt).days
 
 
 def fetch_stale_insights(days_threshold=7):
     try:
-        # ADR-058: phase=pilot hidden by default.
-        from experiment.phase_filter import with_phase_filter
-
         # #2221: paginate. A single query truncates at DynamoDB's 1 MB page, and the
         # items that fall off are the OLDEST — exactly the ones this section exists to
         # surface — so a truncated accountability list read as a complete one.
@@ -468,7 +470,7 @@ def get_mcp_mutations_digest_line(start_date: str, end_date: str):
 
 
 def gather_all():
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     # This week = yesterday back 7 days; prior week = 8-14 days back
     w1_end = (today - timedelta(days=1)).isoformat()
     w1_start = (today - timedelta(days=7)).isoformat()
@@ -588,8 +590,6 @@ def gather_all():
     # = TSB = 0.0, which the form bands read as "Fresh" rather than as no data, for the
     # first six weeks of every cycle. The include_pilot decision is derived from the
     # source's own class, exactly as #2109 established for the compute-layer readers.
-    from experiment.phase_filter import source_reads_cross_phase
-
     strava_60d = query_range("strava", (today - timedelta(days=60)).isoformat(), w1_end, include_pilot=source_reads_cross_phase("strava"))
     training_load = compute_banister(strava_60d)
 
@@ -772,7 +772,7 @@ def call_haiku(data, profile):
     # P2: Dynamic journey context (replaces hardcoded 'Phase 1 Ignition')
     try:
         _start = datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()
-        _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
+        _days_in = max(1, (pacific_now().date() - _start).days + 1)
         _week_num = max(1, (_days_in + 6) // 7)
         _start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
         _goal_w = profile.get("goal_weight_lbs", 185)
@@ -1723,7 +1723,7 @@ def lambda_handler(event, context):
     # the ISO WEEK, not a date: `gather_all` derives its window from the wall
     # clock, so a redrive crossing UTC midnight computes a shifted `this_end`
     # (Sunday 16:00 UTC covers through Saturday) — the same ISO week either way.
-    period_key = f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date() - timedelta(days=1))}"
+    period_key = f"week:{send_ledger.iso_week_key(pacific_now().date() - timedelta(days=1))}"
     if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
         logger.warning("[DIL-025] weekly digest for %s already sent — refusing to send it twice (force_send overrides)", period_key)
         return {"statusCode": 200, "body": f"Weekly digest for {period_key} already sent — skipped (replay guard)"}

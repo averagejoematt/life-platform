@@ -89,6 +89,7 @@ from common.digest_utils import (
     ex_whoop_sleep_from_list as ex_whoop_sleep,
     ex_withings_from_list as ex_withings,
 )
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 # ── The letter RENDERER (#1654) ───────────────────────────────────────────────
 # build_html + its section-header classifier live in the sibling
@@ -176,7 +177,7 @@ def fetch_range(source, start, end):
 
 
 def get_date_windows():
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
 
     # Current month: last 30 days up through yesterday
     cur_end = (today - timedelta(days=1)).isoformat()
@@ -404,7 +405,7 @@ def compute_annual_goals(cur, windows, profile=None):
     Accepts the full profile dict (from PROFILE#v1) so we avoid a redundant
     DynamoDB fetch. Falls back to module-level constants if profile is absent.
     """
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     year_start = today.replace(month=1, day=1)
     days_elapsed = (today - year_start).days
     # Derived, not hard-coded 365 (#1658): in a leap year every "Year elapsed"
@@ -680,7 +681,7 @@ def call_haiku_monthly(data, goals):
 
 
 def gather_all():
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     wins = get_date_windows()
 
     # ── Profile (needed for profile-driven targets) ──
@@ -845,7 +846,7 @@ def lambda_handler(event, context):
     # guard that stays is the one that matters: at most one letter per calendar
     # month, from the send log this handler now writes.
     dry_run = is_dry_run(event)
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     if not dry_run and _already_sent_this_month(today):
         logger.info(f"[SKIP] Monthly digest: a letter is already recorded for {today.strftime('%B %Y')}. Exiting.")
         return {"statusCode": 200, "body": "skipped — already sent this month"}

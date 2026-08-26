@@ -16,6 +16,8 @@ v1.0.0 — 2026-03-07
 
 from datetime import datetime, timedelta, timezone
 
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+
 from mcp import idempotency as _idem
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
@@ -53,7 +55,7 @@ def tool_log_decision(args):
     followed = args.get("followed")
     override_reason = args.get("override_reason", "")
     pillars = args.get("pillars", [])
-    date = args.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = args.get("date") or pacific_today()
     # #1569 the Third Wall, widened to decisions: an OPTIONAL verbatim Matthew note —
     # "his call, in his words" — the human voice beside the platform's recommendation.
     # Opt-in per decision; absent = the field isn't written and the site renders
@@ -141,7 +143,7 @@ def tool_get_decisions(args):
     )
     items = resp.get("Items", [])
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    cutoff = (pacific_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     items = [i for i in items if i.get("date", "") >= cutoff]
 
     if pillar_filter:
@@ -247,7 +249,7 @@ def tool_update_decision_outcome(args):
         expr_values[":ef"] = int(effectiveness)
 
     update_parts.append("outcome_date = :odate")
-    expr_values[":odate"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    expr_values[":odate"] = pacific_today()
 
     if not update_parts:
         return {"error": "Provide at least one outcome field"}

@@ -85,6 +85,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from common.pacific_time import pacific_now  # #2817: the senders name the PACIFIC day
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -404,9 +405,11 @@ def _seed_sent(table, period_key, sent_on="2026-08-24"):
 
 
 def _brief_date_for(event):
-    """The content date the handler derives — `yesterday` in UTC. Computed the
-    same way the handler computes it so the fixture cannot drift from it."""
-    return (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+    """The content date the handler derives — `yesterday` in the PACIFIC frame
+    since #2817. Computed the same way the handler computes it so the fixture
+    cannot drift from it (it did: a UTC `yesterday` here stopped matching the
+    handler's between 17:00 PT and midnight)."""
+    return (_platform_today() - timedelta(days=1)).isoformat()
 
 
 class _Sentinel(Exception):
@@ -597,12 +600,20 @@ except Exception as _e:  # pragma: no cover — only when the bundle layout chan
 fleet = pytest.mark.skipif(_fleet_import_err is not None, reason=f"fleet senders unavailable: {_fleet_import_err}")
 
 
-def _utc_today():
-    return datetime.now(timezone.utc).date()
+def _platform_today():
+    """The day the senders themselves name — PACIFIC since #2817.
+
+    This helper used to read `datetime.now(timezone.utc).date()`, which agreed with
+    the wire only for the 17 hours a day the two calendars overlap. Every assertion
+    below compares a real sender's live `_period_key()` against this value, so a
+    UTC helper made the whole suite red between 17:00 PT and midnight — the very
+    window the senders were fixed for. The fixture moves with the wire.
+    """
+    return pacific_now().date()
 
 
 def _this_iso_week(offset_days: int = 0) -> str:
-    return f"week:{send_ledger.iso_week_key(_utc_today() - timedelta(days=offset_days))}"
+    return f"week:{send_ledger.iso_week_key(_platform_today() - timedelta(days=offset_days))}"
 
 
 class _FleetTable(_FakeLedgerTable):
@@ -844,7 +855,7 @@ class TestWeeklyLettersReplay:
         """Pinned on its own because it is the one sender whose key differs, and
         a copy-paste of the look-back rule would be invisible for six days of
         every seven (they only disagree on a Monday)."""
-        assert compass._period_key() == f"week:{send_ledger.iso_week_key(_utc_today())}"
+        assert compass._period_key() == f"week:{send_ledger.iso_week_key(_platform_today())}"
         assert weekly is not compass
 
 
@@ -959,7 +970,8 @@ class TestAnomalyDetectorReplay:
         return t, written
 
     def _yesterday(self):
-        return (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
+        # #2817: the detector's own `yesterday` is PACIFIC — derive it the same way.
+        return (_platform_today() - timedelta(days=1)).isoformat()
 
     def test_replay_suppresses_the_mail_but_still_writes_the_record(self, wired, monkeypatch):
         t, written = wired

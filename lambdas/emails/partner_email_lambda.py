@@ -29,7 +29,7 @@ import os
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import boto3
 from ai.grounded_generation import allowed_dates, allowed_numbers, correction_prompt, grounding_findings  # ADR-104 gate (#2423)
@@ -39,6 +39,7 @@ from common import (
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -151,7 +152,7 @@ def _normalize_whoop_sleep(item):
 
 
 def gather_all():
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     w_end = (today - timedelta(days=1)).isoformat()
     w_start = (today - timedelta(days=7)).isoformat()
     print("[INFO] Gathering " + w_start + " → " + w_end)
@@ -847,13 +848,13 @@ def _period_key() -> str:
     Sunday 17:30 UTC, whose `w_end` is Saturday; the redrive six hours later
     computes Sunday — the SAME ISO week, so the guard still fires.
     """
-    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date() - timedelta(days=1))}"
+    return f"week:{send_ledger.iso_week_key(pacific_now().date() - timedelta(days=1))}"
 
 
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
     if hasattr(logger, "set_date"):
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
+        logger.set_date(pacific_today())  # OBS-1
     if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
         logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Partner send")
         return {"statusCode": 200, "body": "skipped: external emails disabled", "skipped": True}

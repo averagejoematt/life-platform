@@ -24,6 +24,8 @@ can inject conversation-derived memories without passing them off as data.
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+
 from mcp.config import USER_ID as _user_id_ref, table as _table_ref
 from mcp.core import decimal_to_float as _d2f
 
@@ -99,7 +101,7 @@ def tool_write_platform_memory(args: dict) -> dict:
     domains = args.get("domains")
 
     table = _get_table()
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = pacific_now().date().isoformat()
     date_str = date or today
 
     if not raw_category:
@@ -211,7 +213,7 @@ def tool_read_platform_memory(args: dict) -> dict:
     days = min(max(1, int(days)), 365)
     limit = min(max(1, int(limit)), 50)
 
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     start = (today - timedelta(days=days)).isoformat()
     end = today.isoformat()
 
@@ -261,7 +263,7 @@ def tool_list_memory_categories(args: dict) -> dict:
     days = min(max(1, int(args.get("days", 90))), 365)
 
     table = _get_table()
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     start = (today - timedelta(days=days)).isoformat()
 
     # #2663: `days` was applied to the WRONG SEGMENT of the sort key. The sk is

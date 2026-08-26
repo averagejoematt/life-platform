@@ -29,7 +29,9 @@ SNS alert is suppressed; without one, an identical stale condition sends it.
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
+
+from common.pacific_time import pacific_now  # #2817: the handler derives sick-day windows in the Pacific frame
 
 os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -200,8 +202,9 @@ def test_handler_sick_suppress_silences_the_stale_alert(monkeypatch):
     publish the stale-source alert — while the underlying staleness is still
     honestly reported in the return body (suppression is about paging, not
     about pretending the data is fresh)."""
-    now = datetime.now(timezone.utc)
-    yesterday = (now - timedelta(days=1)).date()
+    # #2817: plant the sick row in the HANDLER'S OWN day frame — a UTC 'yesterday'
+    # lands outside the Pacific lookback window between 17:00 and 24:00 PT
+    yesterday = (pacific_now() - timedelta(days=1)).date()
     table = FakeTable(rows=[_sick_row(yesterday)])
     sns, _cw = _install(monkeypatch, table)
 

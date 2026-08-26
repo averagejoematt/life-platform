@@ -71,6 +71,7 @@ ses = boto3.client("sesv2", region_name=REGION)
 
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
 from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
 
@@ -123,7 +124,7 @@ def gather_digest() -> dict:
         logger.warning("what_changed read skipped: %s", e)
 
     # 2. Freshly graded predictions — the /api/predictions records.
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=DECIDED_WINDOW_DAYS)).strftime("%Y-%m-%d")
+    cutoff = (pacific_now() - timedelta(days=DECIDED_WINDOW_DAYS)).strftime("%Y-%m-%d")
     for cid in COACH_IDS:
         try:
             resp = table.query(
@@ -285,7 +286,7 @@ def _period_key() -> str:
     The note is weekly (Sunday 17:00 UTC); one per ISO week is the invariant
     that survives that drift.
     """
-    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+    return f"week:{send_ledger.iso_week_key(pacific_now().date())}"
 
 
 def lambda_handler(event: dict, context) -> dict:

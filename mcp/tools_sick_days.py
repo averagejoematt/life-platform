@@ -29,6 +29,7 @@ SICK_DAYS_PK = f"USER#{USER_ID}#SOURCE#sick_days"
 
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 # ── Tool: log_sick_day ────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ def _log_sick_day(args):
 
 def _get_sick_days(args):
     """List sick/rest days within a date range."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     end_date = args.get("end_date") or today
     start_date = args.get("start_date") or (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=90)).strftime("%Y-%m-%d")
 

@@ -100,6 +100,7 @@ except ImportError:
 
 
 from common.digest_utils import d2f, safe_float  # shared bundled helpers (#970)
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 
 def query_range(source, start_date, end_date):
@@ -138,7 +139,7 @@ def fetch_profile():
 
 
 def gather_nutrition_data():
-    today = datetime.now(timezone.utc).date()
+    today = pacific_now().date()
     w1_end = (today - timedelta(days=1)).isoformat()
     w1_start = (today - timedelta(days=7)).isoformat()
     w2_end = (today - timedelta(days=8)).isoformat()
@@ -395,7 +396,7 @@ def extract_dexa_context(dexa):
     scan_date = dexa.get("scan_date", "unknown")
     try:
         sd = datetime.strptime(scan_date, "%Y-%m-%d").date()
-        months_ago = round((datetime.now(timezone.utc).date() - sd).days / 30.44)
+        months_ago = round((pacific_now().date() - sd).days / 30.44)
     except Exception:
         months_ago = None
     return {
@@ -874,7 +875,7 @@ def _period_key():
     redrive crossing UTC midnight. The ISO week does not: Saturday and the
     following Sunday close the same one.
     """
-    return f"week:{send_ledger.iso_week_key(datetime.now(timezone.utc).date())}"
+    return f"week:{send_ledger.iso_week_key(pacific_now().date())}"
 
 
 def record_email_send(table, lambda_name, period_key):
@@ -948,7 +949,7 @@ def lambda_handler(event, context):
     # P2: Dynamic journey context — panel must know stage for appropriate coaching
     try:
         _start = datetime.strptime(profile.get("journey_start_date", EXPERIMENT_START_DATE), "%Y-%m-%d").date()
-        _days_in = max(1, (datetime.now(timezone.utc).date() - _start).days + 1)
+        _days_in = max(1, (pacific_now().date() - _start).days + 1)
         _week_num = max(1, (_days_in + 6) // 7)
         _start_w = profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
         _goal_w = profile.get("goal_weight_lbs", 185)

@@ -69,6 +69,7 @@ os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
 import wednesday_chronicle_lambda as m  # noqa: E402
 from ai import budget_guard as _budget_guard  # noqa: E402
 from experiment import eval_retention  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 from privacy import privacy_guard  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -100,10 +101,12 @@ class _FrozenDatetime(datetime):
 @pytest.fixture
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(m, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, m, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     for mod_name in ("emails.chronicle_store", "emails.chronicle_render", "emails.chronicle_recap"):
         mod = sys.modules.get(mod_name)
         if mod is not None and hasattr(mod, "datetime"):
             monkeypatch.setattr(mod, "datetime", _FrozenDatetime)
+            freeze_pacific(monkeypatch, mod, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     return FROZEN_NOW
 
 

@@ -42,6 +42,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS = os.path.join(ROOT, "lambdas")
@@ -109,12 +110,14 @@ class _FrozenDatetime(datetime):
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(wd, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, wd, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     # digest_utils carries its own `datetime` import and is what dates the
     # Banister decay window — freezing only the handler's copy would leave a
     # fixture date being differenced against the real clock.
     from common import digest_utils
 
     monkeypatch.setattr(digest_utils, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, digest_utils, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     return FROZEN_NOW
 
 

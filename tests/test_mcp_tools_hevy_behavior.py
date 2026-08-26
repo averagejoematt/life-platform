@@ -42,9 +42,10 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config requires these at import
 os.environ.setdefault("USER_ID", "matthew")
 
-from datetime import date, timedelta  # noqa: E402
+from datetime import timedelta  # noqa: E402
 
 import pytest  # noqa: E402
+from common.pacific_time import pacific_now  # noqa: E402  # #2817: expectation in the module's own frame
 
 from mcp import tools_hevy as th  # noqa: E402
 
@@ -239,7 +240,9 @@ def patched_range(monkeypatch):
 def test_get_workouts_defaults_to_a_30_day_window_ending_today(patched_range):
     patched_range({})
     out = th.tool_get_workouts({})
-    today = date.today()
+    today = (
+        pacific_now().date()
+    )  # #2817: tools_hevy keys days in the Pacific frame; date.today() is runner-local and reds on UTC runners 17:00-24:00 PT
     assert out["end_date"] == today.isoformat()
     assert out["start_date"] == (today - timedelta(days=30)).isoformat()
     assert out["source_filter"] is None
@@ -362,7 +365,9 @@ def test_get_workout_detail_looks_back_five_years_and_includes_pilot(patched_ran
     source, start, end, include_pilot = q.calls[0]
     assert source == "hevy"
     assert include_pilot is True, "history predates genesis; detail must not hide it"
-    today = date.today()
+    today = (
+        pacific_now().date()
+    )  # #2817: tools_hevy keys days in the Pacific frame; date.today() is runner-local and reds on UTC runners 17:00-24:00 PT
     assert end == today.isoformat()
     assert start == (today - timedelta(days=5 * 365)).isoformat()
 

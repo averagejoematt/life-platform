@@ -7,9 +7,10 @@ pre-flight pain surface. Raw notes stay sovereign; this only reads the derived
 `training_notes` projection (written by the on-ingest extractor in hevy_backfill_lambda).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import table
 from mcp.core import decimal_to_float
@@ -29,8 +30,8 @@ def _resolve_template_id(exercise: str, lookback_days: int) -> tuple[str | None,
     if looks_like_id:
         return ex, None
 
-    start = (datetime.now(timezone.utc).date() - timedelta(days=lookback_days)).isoformat()
-    today = datetime.now(timezone.utc).date().isoformat()
+    start = (pacific_now().date() - timedelta(days=lookback_days)).isoformat()
+    today = pacific_now().date().isoformat()
     try:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#hevy") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~"),
@@ -63,7 +64,7 @@ def tool_get_exercise_notes(args):
     if not template_id:
         return {"error": f"No exercise matching {exercise!r} found in the last {lookback_days}d of workouts.", "exercise": exercise}
 
-    start = (datetime.now(timezone.utc).date() - timedelta(days=lookback_days)).isoformat()
+    start = (pacific_now().date() - timedelta(days=lookback_days)).isoformat()
     try:
         resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"USER#matthew#SOURCE#{NOTES_SOURCE}#EXERCISE#{template_id}")

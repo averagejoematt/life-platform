@@ -54,6 +54,7 @@ os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
 import nutrition_review_lambda as m  # noqa: E402
 from ai import ai_output_validator as aiv  # noqa: E402
 from experiment.phase_filter import with_phase_filter  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Frozen clock — Saturday 2026-06-13 17:00 UTC (the lambda's real fire slot)
@@ -81,6 +82,7 @@ class _FrozenDatetime(datetime):
 @pytest.fixture
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(m, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, m, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     return FROZEN_NOW
 
 

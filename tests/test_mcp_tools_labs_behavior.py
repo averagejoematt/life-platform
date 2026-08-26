@@ -60,6 +60,7 @@ from datetime import datetime, timezone  # noqa: E402
 import pytest  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
 from ingestion.source_registry import DEFAULT_STALE_HOURS, mcp_sources, stale_hours_overrides  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import labs_helpers as lh, tools_labs as tl  # noqa: E402
 from mcp.registry import TOOLS  # noqa: E402
@@ -104,6 +105,7 @@ class _FrozenDatetime(datetime):
 def frozen_clock(monkeypatch):
     _FROZEN[0] = NOW
     monkeypatch.setattr(tl, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tl, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     yield
 
 

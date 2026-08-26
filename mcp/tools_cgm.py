@@ -6,6 +6,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from ingestion.source_registry import raw_date_key, raw_year_prefix  # bundled shared module: the X-9 raw/ layout facts (#2278/#2286)
 
 from mcp.config import S3_BUCKET, USER_PREFIX, logger, s3_client, table
@@ -141,7 +142,7 @@ def _load_cgm_readings(date_str):
 
 def _get_cgm_dashboard(args):
     """CGM glucose daily dashboard from DynamoDB aggregates."""
-    end_date = args.get("end_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    end_date = args.get("end_date") or pacific_today()
     start_date = args.get("start_date")
     if not start_date:
         # `days` is DECLARED in mcp/registry.py's get_cgm inputSchema; before #2221 it was
@@ -153,7 +154,7 @@ def _get_cgm_dashboard(args):
         try:
             anchor = datetime.strptime(end_date, "%Y-%m-%d")
         except (TypeError, ValueError):
-            anchor = datetime.now(timezone.utc)
+            anchor = pacific_now()
             end_date = anchor.strftime("%Y-%m-%d")
         start_date = (anchor - timedelta(days=span - 1)).strftime("%Y-%m-%d")
 

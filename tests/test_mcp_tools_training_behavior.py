@@ -54,6 +54,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")  # mcp.config reads 
 os.environ.setdefault("USER_ID", "matthew")
 
 import pytest  # noqa: E402
+from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
 
 from mcp import core as mcp_core, tools_correlation as tc, tools_training as tt  # noqa: E402
 from mcp.registry import TOOLS  # noqa: E402
@@ -197,7 +198,9 @@ def computed_metrics_day(date: str, **fields) -> dict:
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(tt, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tt, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
     monkeypatch.setattr(tc, "datetime", _FrozenDatetime)
+    freeze_pacific(monkeypatch, tc, _FrozenDatetime)  # #2817: pin the PACIFIC helpers this module now calls
 
 
 @pytest.fixture(autouse=True)
