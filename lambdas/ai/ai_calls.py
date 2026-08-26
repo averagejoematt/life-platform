@@ -1302,7 +1302,10 @@ def _retain_coach_brief_flag(coach_id, verdict, draft, final, report, generation
             findings=findings,
             allowed=set(_grounding_allowlist(generation_brief)),
             facts=(generation_brief or {}).get("authoritative_facts") if isinstance(generation_brief, dict) else None,
-            extra={"coach_id": coach_id, "score": report.get("score"), "grounding_verdict": _grounding.get("verdict")},
+            # `extra` stays exactly the two keys #744 defined — the grounding verdict is
+            # already recoverable from the retained findings, and tests/test_coach_quality_gate_390.py
+            # pins this dict by equality on purpose.
+            extra={"coach_id": coach_id, "score": report.get("score")},
         )
     except Exception:  # noqa: BLE001 — retention is never load-bearing
         pass

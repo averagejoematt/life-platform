@@ -215,7 +215,9 @@ class TestEnforceQualityGateRetention:
         )
         output, report = ai_calls._enforce_quality_gate(client, "nutrition_coach", "first draft", {}, lambda note: "regenerated draft")
         assert output == "regenerated draft"
-        retain.assert_called_once_with("nutrition_coach", "flagged_corrected", "first draft", "regenerated draft", report)
+        # #3202: the brief rides along so the retained record carries the grounding
+        # allow-list + facts that produced the verdict, not just the draft text.
+        retain.assert_called_once_with("nutrition_coach", "flagged_corrected", "first draft", "regenerated draft", report, {})
 
     def test_fired_then_held_retains_the_pair(self, monkeypatch):
         retain = MagicMock()
@@ -226,7 +228,7 @@ class TestEnforceQualityGateRetention:
         )
         output, report = ai_calls._enforce_quality_gate(client, "glucose_coach", "first draft", {}, lambda note: "still bad draft")
         assert output is None
-        retain.assert_called_once_with("glucose_coach", "flagged_dropped", "first draft", "still bad draft", report)
+        retain.assert_called_once_with("glucose_coach", "flagged_dropped", "first draft", "still bad draft", report, {})  # #3202
 
     def test_fired_then_regeneration_exception_retains_the_original_draft(self, monkeypatch):
         retain = MagicMock()

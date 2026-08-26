@@ -165,3 +165,40 @@ def test_non_numeric_findings_are_not_labelled_ungrounded_number():
     joined = "\n".join(result["suggestions"])
     assert "Grounding violation (stale_phase)" in joined
     assert "Ungrounded number (fabricated_number)" in joined
+
+
+def test_retention_carries_the_grounding_findings_and_allowlist(monkeypatch):
+    """The class that actually held two coaches dark was the one `_retain_coach_brief_flag`
+    dropped: the retained record had the draft text and not the reason. That is why this
+    root-cause dig needed the drafts reconstructed and the grounder re-run offline."""
+    from ai import ai_calls
+    from experiment import eval_retention
+
+    captured = {}
+
+    def _fake_retain(surface, verdict, **kw):
+        captured.update(kw)
+        captured["surface"] = surface
+        return True
+
+    monkeypatch.setattr(eval_retention, "retain", _fake_retain)
+    ai_calls._retain_coach_brief_flag(
+        "nutrition_coach",
+        "flagged_dropped",
+        "draft",
+        "final",
+        {
+            "score": 28,
+            "number_grounding": {
+                "status": "measured",
+                "verdict": "ungrounded",
+                "findings": [{"type": "stale_phase", "detail": 'cites "Day 1"'}],
+            },
+        },
+        {"grounding_allowlist": [72.0, 45.4], "authoritative_facts": {"recovery_pct": 72}},
+    )
+
+    assert captured["surface"] == "coach_brief"
+    assert {"type": "stale_phase", "detail": 'cites "Day 1"'} in captured["findings"]
+    assert captured["allowed"] == {72.0, 45.4}
+    assert captured["facts"] == {"recovery_pct": 72}
