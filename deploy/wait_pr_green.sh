@@ -24,9 +24,9 @@
 # WHAT THIS DOES
 #   - Resolves the PR's current head via the FULL 40-char sha (`gh pr view --json
 #     headRefOid`), never a shell-truncated prefix.
-#   - Reads checks via `gh pr checks <pr> --json name,state,bucket`, which gh itself
-#     scopes to the PR's head — no hand-rolled `actions/runs?head_sha=` query exists
-#     in this script at all, which structurally forecloses failure mode #1.
+#   - Reads checks via `gh pr checks <pr> --json name,state,bucket,link`, which gh
+#     itself scopes to the PR's head — no hand-rolled `actions/runs?head_sha=` query
+#     exists in this script at all, which structurally forecloses failure mode #1.
 #   - Derives a default expected-check-by-NAME set from the PR's changed paths
 #     (grounded in the real `.github/workflows/*.yml` `name:`/`paths:` fields — see
 #     `derive_expected_checks` below — never invented), extendable with `--expect`.
@@ -408,12 +408,24 @@ evaluate_checks_json() {
 #   file list and stamps it onto the entry as `driftFiles` for
 #   evaluate_checks_json to classify.
 #
-#   ANY failure along this path (no link, `gh api`/`gh run view` error, empty
-#   file list, another step also failed) leaves checks_json byte-for-byte
-#   UNTOUCHED — fail-closed to the pre-#3200 plain-NONGREEN path, never guessed.
+#   ANY failure along this path (no link, `gh api` error, empty file list,
+#   another step also failed) leaves checks_json byte-for-byte UNTOUCHED —
+#   fail-closed to the pre-#3200 plain-NONGREEN path, never guessed.
 #   Not unit-tested directly (it is nothing but `gh`/`jq` plumbing); the logic it
 #   feeds (`evaluate_checks_json` + `_is_reconcile_owned_path`) is the part that
 #   is mutation-proved, via fixtures that supply `driftFiles` directly.
+#
+#   #3209: the job log is fetched via the raw REST endpoint
+#   (`gh api repos/.../actions/jobs/<job>/logs`), NOT `gh run view --job --log`.
+#   The latter was the #3200 original and is reliably wrong: for job 98291682348
+#   it returned a log covering every OTHER step in the job (404-shaped lines)
+#   while omitting the one step that actually failed — reproduced twice, and
+#   inconsistent job-to-job (an earlier job on the same workflow/step DID
+#   return it via `gh run view`). The raw endpoint returned the failing step's
+#   own `CHECK FAILED` block reliably. `_extract_wiki_drift_files` already
+#   parses this endpoint's unprefixed-text shape unmodified (it was written to
+#   take awk's `$NF`, so a leading `TIMESTAMP<TAB>` prefix is optional) — only
+#   the log SOURCE changed here, not the parser.
 _enrich_wiki_drift_checks_json() {
   local checks_json="$1"
   local entry bucket link jobid steps_json other_fail raw_log drift_files drift_files_json
@@ -446,7 +458,7 @@ _enrich_wiki_drift_checks_json() {
     return 0
   fi
 
-  raw_log=$(gh run view --job "${jobid}" --repo "${REPO}" --log 2>/dev/null) || {
+  raw_log=$(gh api "repos/${REPO}/actions/jobs/${jobid}/logs" 2>/dev/null) || {
     printf '%s' "${checks_json}"
     return 0
   }
