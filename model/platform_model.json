@@ -56,38 +56,6 @@
       "routing": "urgent",
       "stack": "monitoring_stack"
     },
-    "ingestion-error-eightsleep": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
-    "ingestion-error-enrichment": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
-    "ingestion-error-hevy-backfill": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
-    "ingestion-error-macrofactor": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
-    "ingestion-error-strava": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
-    "ingestion-error-todoist": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
-    "ingestion-error-whoop": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
-    "ingestion-error-withings": {
-      "routing": "unresolved",
-      "stack": "ingestion_stack"
-    },
     "key-rotator-errors": {
       "routing": "digest",
       "stack": "operational_stack"
@@ -4965,7 +4933,7 @@
   ],
   "lambdas": {
     "activity-enrichment": {
-      "declared_alarm": "ingestion-error-enrichment",
+      "declared_alarm": null,
       "handler": "ingestion.enrichment_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/enrichment_lambda.py",
@@ -5382,7 +5350,7 @@
       "timeout_seconds": 120
     },
     "eightsleep-data-ingestion": {
-      "declared_alarm": "ingestion-error-eightsleep",
+      "declared_alarm": null,
       "handler": "ingestion.eightsleep_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/eightsleep_lambda.py",
@@ -5525,7 +5493,7 @@
       "timeout_seconds": 300
     },
     "hevy-backfill": {
-      "declared_alarm": "ingestion-error-hevy-backfill",
+      "declared_alarm": null,
       "handler": "ingestion.hevy_backfill_lambda.lambda_handler",
       "memory_mb": 256,
       "module": "lambdas/ingestion/hevy_backfill_lambda.py",
@@ -5868,7 +5836,7 @@
       "timeout_seconds": 120
     },
     "macrofactor-data-ingestion": {
-      "declared_alarm": "ingestion-error-macrofactor",
+      "declared_alarm": null,
       "handler": "ingestion.macrofactor_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/macrofactor_lambda.py",
@@ -6113,7 +6081,7 @@
       "timeout_seconds": 60
     },
     "strava-data-ingestion": {
-      "declared_alarm": "ingestion-error-strava",
+      "declared_alarm": null,
       "handler": "ingestion.strava_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/strava_lambda.py",
@@ -6172,7 +6140,7 @@
       "timeout_seconds": 10
     },
     "todoist-data-ingestion": {
-      "declared_alarm": "ingestion-error-todoist",
+      "declared_alarm": null,
       "handler": "ingestion.todoist_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/todoist_lambda.py",
@@ -6284,7 +6252,7 @@
       "timeout_seconds": 300
     },
     "whoop-data-ingestion": {
-      "declared_alarm": "ingestion-error-whoop",
+      "declared_alarm": null,
       "handler": "ingestion.whoop_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/whoop_lambda.py",
@@ -6306,7 +6274,7 @@
       "timeout_seconds": 300
     },
     "withings-data-ingestion": {
-      "declared_alarm": "ingestion-error-withings",
+      "declared_alarm": null,
       "handler": "ingestion.withings_lambda.lambda_handler",
       "memory_mb": null,
       "module": "lambdas/ingestion/withings_lambda.py",
@@ -6343,7 +6311,7 @@
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
     },
     "counts": {
-      "alarms": 58,
+      "alarms": 50,
       "contracts": 8,
       "edges": 666,
       "lambdas": 104,
