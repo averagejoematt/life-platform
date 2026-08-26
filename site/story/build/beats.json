@@ -3185,6 +3185,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3163"
         }
       ]
+    },
+    {
+      "id": "2026-08-26-session-c-the-pipeline-healed",
+      "date": "2026-08-26",
+      "title": "The evening the pipeline healed itself — and the truth-checker rolled back its own fix",
+      "shipped": "A seven-hour landing session took the deploy pipeline from red to green end-to-end: the CI role got the one S3 permission that had been failing fleet deploys after all 105 functions updated (proven twice on the wire — the rollback artifact is finally the true prior code), the AI coaches' word budget was fixed so their narratives stop getting cut off mid-sentence (every single generation had been silently truncated at a 600-token cap, then failing its own quality gate — three days of a stale weight number on the site traced back to exactly that), and the reader-truth debt ledger hit zero standing findings. Twelve PRs merged, six issues closed with evidence, and the start-weight figure on the results page now says which day its baseline comes from.",
+      "why_it_mattered": "Two of this platform's proudest mechanisms — the quality gate that refuses bad AI output and the truth-checker that refuses dishonest pages — were quietly working against the reader. The gate was holding narratives because the model was never allowed to finish a sentence, so the site served a week-old weight; and the truth-checker's AI judge graded two TRUE statements as lies, one of which auto-rolled-back the very deploy that carried its fix. Finding the mechanical causes under both meant the honest machinery goes back to catching real problems instead of manufacturing them.",
+      "gotcha": "The judge that gates deploys flagged 'one weight reading in nine days' as impossible — over a page that says, in so many words, '1 reading so far.' The database agrees: one reading. The claim was true, the copy was honest, and the deploy still got reverted. The fix isn't to argue with the judge per-page; it's deterministic demotion rules for the two ways it mis-graded truth, with both instances baselined and owned by an issue until those rules land.",
+      "honest_miss": "The previous session's own wrap-up commit got silently swallowed by GitHub — zero CI runs minted — so its incident records landed with stale derived summaries and nobody's gate ever saw them. It took this session's first pull-request suite inheriting the failure to notice. The new reflex is unglamorous: after every push, count the check-runs at that exact commit; zero means it never happened.",
+      "prs": [
+        {
+          "label": "PR #3188",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3188"
+        },
+        {
+          "label": "PR #3192",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3192"
+        },
+        {
+          "label": "PR #3196",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3196"
+        },
+        {
+          "label": "PR #3198",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3198"
+        }
+      ]
     }
   ]
 }

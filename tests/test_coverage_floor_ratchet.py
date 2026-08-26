@@ -101,7 +101,10 @@ RATCHET_FLOOR = 74
 # Raised 80.20 -> 81.60 (2026-08-16): green main run 31923965259 measured 81.71%,
 # 1.51pt past the deadband — the ::warning:: fired and this is the sanctioned
 # response (bank the gain, #1658). Same just-under-measured convention.
-RATCHET_HIGH_WATER = 81.60
+# Raised 81.60 -> 83.20 (2026-08-26): green main run 32925488120 measured 83.27%,
+# 1.67pt past the deadband — same fired-warning, same sanctioned response, same
+# just-under-measured convention.
+RATCHET_HIGH_WATER = 83.20
 
 # The regression tolerance CI runs with. Mirrors coverage_gap_warn.py's default;
 # asserted equal below so the two can't drift (the #1206 drift class again).

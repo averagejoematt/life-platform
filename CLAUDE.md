@@ -208,23 +208,24 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-25 (Opus 5, autonomous overnight ~20h — *"Boot Session B"* of
-`~/.claude/plans/shimmering-snacking-quokka.md` + two escalating owner directives:
-clear ALL Now/Next, keep pulling until 6am). **The queue EMPTIED: 20 issues closed
-with verdicts (4 P2), 30 PRs merged, 5 recurrence classes structurally killed, net
-−14.** D5's acceptance instrument live (`scripts/diligence_verify.py`, 12/12 PASS
---strict; the re-grade brief ready — owner batch item 10); D4 complete (safety eval
-matrix + the clinical-lite hazard gate, wire-proven on production: a chest-pain
-question gets fixed 911 copy and ZERO model calls — board_ask's opening turn had NO
-input filter at all before tonight). GitHub dropped synchronize events for ~13h
-mid-night; recovery = the 14-lane integration train #3184 (each lane green-verified
-solo first; the stacked validation caught 3 real cross-lane frictions). Deploys ALL
-postflight: fleet 105/0/0, site-api pair, hevy-cron, 5 cdk stacks. TWO stranded
-production leases disposed — one 16.4h old whose approval would have REGRESSED the
-fleet. 6 module-size ceilings paid by extraction, zero baselines raised. 5 epics got
-box-level acceptance audits (all honestly KEEP OPEN; the audit indicted two closed
-issues' claims → #3156, #3161, both fixed same night). Main green at the train sha.
-**Next:** the owner's #3042 external re-grade (pack ready) · #2957/#2888 mature today
-(~10am cycle, 17:00Z brief) · Now refilled to 5 by stored rank · owner batch rides
-the handover (10 items). Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-26 (Opus 5, autonomous evening ~7h — *"Boot Session C"* of
+`~/.claude/plans/purring-popping-nygaard.md`; wrap run with the owner). **Main GREEN
+end-to-end** (run 32925488120 @ a5eb40ee: fleet 105/0/0, MCP rollback artifacts green
+— the #3186 fix proven twice — smoke + visual-qa + integration all green; site at
+ed9efba; site-api postflight sha-verified). **6 closed with verdicts (4 P2 + the #2986
+epic), 12 PRs merged, net −3** (filings all incident-tagged: #3190 #3197 #3199). The
+harvest decoded the qa-smoke red to **100% coach-v2 generation truncation at the
+600-token cap** (gate held nutrition 3 cycles, 62→58→28) → cap/prompt pair fixed AND
+pinned (#3192); #2888 matured GREEN (cache-writes 0→26,933); #2883's gap SIZED (cache
+tokens ~55% — the interactive-session fingerprint, owner call filed). The reader-truth
+judge flaked HIGH twice on TRUE claims and one flake **auto-rolled-back the deploy
+carrying its own fix** (#3199 owns the demotion rules; both instances baselined;
+redeploy green). B's wrap push was itself event-swallowed — stale derived blocks
+surfaced only in C's first PR suite; **swallow-check every push** (3 more caught
+live). The #2847 seam-guard countdown fired 3× for real within hours of landing.
+Coverage high-water banked 81.60→83.20. **Next:** #3199 (top actionable) · the 08-26
+17:00Z brief = #3190's wire boxes + the qa-smoke self-clear window (expires
+08-27T19:00Z → #3083) · owner batch 12 items (incl. #3042 re-grade + the #2883 box-4
+call) · #2849 Fable session stays banked until after the re-grade. Full narrative:
+`handovers/HANDOVER_LATEST.md`.
 
