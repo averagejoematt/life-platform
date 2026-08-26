@@ -254,8 +254,24 @@ class _FakeGh:
         raise AssertionError(f"unrouted gh_json call in test: {path} {method}")
 
 
+def _applied_posture():
+    """The checked-in posture with the #3207 `applied: false` markers flipped to true.
+
+    The shipped file marks `main_required_checks_ruleset` + `repo_settings` as declared
+    but NOT YET APPLIED (D0.6, blocked on RECONCILE_PUSH_TOKEN), and `--apply` refuses
+    outright on that marker — so the tests below, which exercise what a real apply
+    WOULD send, have to run against the post-D0.6 shape of the same file. The refusal
+    itself is proved in tests/test_posture_pending_marker.py."""
+    with open(abp.POSTURE_FILE) as f:  # read the file directly — load_spec is patched
+        posture = json.load(f)
+    posture["main_required_checks_ruleset"]["applied"] = True
+    posture["repo_settings"]["applied"] = True
+    return posture
+
+
 def test_apply_refuses_when_reconcile_secret_is_missing(monkeypatch, capsys):
     fake = _FakeGh(secret_present=False, live_ruleset=None)
+    monkeypatch.setattr(abp, "load_spec", lambda path=abp.POSTURE_FILE: _applied_posture())
     monkeypatch.setattr(abp, "gh_json", fake)
     rc = abp.main(["--apply", "--repo", "averagejoematt/life-platform"])
     assert rc == 2
@@ -266,6 +282,7 @@ def test_apply_refuses_when_reconcile_secret_is_missing(monkeypatch, capsys):
 
 def test_apply_sends_the_exact_ruleset_payload_when_secret_is_present(monkeypatch):
     fake = _FakeGh(secret_present=True, live_ruleset=None)
+    monkeypatch.setattr(abp, "load_spec", lambda path=abp.POSTURE_FILE: _applied_posture())
     monkeypatch.setattr(abp, "gh_json", fake)
     rc = abp.main(["--apply", "--repo", "averagejoematt/life-platform"])
     assert rc == 0
