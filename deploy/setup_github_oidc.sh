@@ -152,6 +152,15 @@ PERMISSION_POLICY=$(cat <<EOF
       ]
     },
     {
+      "Sid": "S3DeployArtifactTagging",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObjectTagging",
+        "s3:PutObjectTagging"
+      ],
+      "Resource": "arn:aws:s3:::matthew-life-platform/deploys/*"
+    },
+    {
       "Sid": "CloudFrontSiteInvalidate",
       "Effect": "Allow",
       "Action": [
