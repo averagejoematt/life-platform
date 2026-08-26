@@ -67,6 +67,17 @@
 #      absent/pending — NONGREEN lines name every offending check.
 #   2  a WAITING (gated-deployment) check was observed — WAITING lines name it; a
 #      human must approve or reject the lease, this script does not wait it out.
+#   4  GREEN-WITH-RECONCILE-OWNED-RED (#3200) — every expected check is green
+#      EXCEPT "Wiki drift gates", whose only red is `sync_doc_metadata.py
+#      --check` naming exclusively reconcile-owned paths (docs/*, CLAUDE.md,
+#      .claude/README.md, the generated lambdas/web/platform_counts.py — the
+#      driver reconciles these once per merge on main, #3101; a branch cannot
+#      carry them at all, `agent_commit.sh` refuses them outright). This is a
+#      structural PASS for merge purposes — see `_is_reconcile_owned_path`
+#      below — reported distinctly (an explicit RECONCILE-OWNED-RED line) so a
+#      caller can name what it waved through instead of silently treating it
+#      as an ordinary green. ANY other red, or a non-reconcile path in that
+#      gate's own ❌ list, still exits 1 exactly like before this existed.
 #
 # SELF-TEST (fixture mode, no network, no `gh` calls — see tests/test_wait_pr_green.py)
 #   deploy/wait_pr_green.sh --fixture path/to/checks.json [--expect NAME]... [--no-derive]
@@ -74,7 +85,10 @@
 #   returns) exactly once — no polling, no PR number, no gh calls — and exits with the
 #   same codes as the real run. This is also how the core logic is testable in CI's
 #   offline unit suite: `deploy/wait_pr_green.sh --fixture` sourced or spawned as a
-#   subprocess, fed a fixture, asserted on exit code + NONGREEN/WAITING output.
+#   subprocess, fed a fixture, asserted on exit code + NONGREEN/WAITING output. A
+#   fixture entry named "Wiki drift gates" may additionally carry a `driftFiles`
+#   array (the gate's own ❌ file list) to exercise the #3200 classifier — see
+#   `_is_reconcile_owned_path` and `evaluate_checks_json` below.
 #
 # This file is also SOURCEABLE (`source deploy/wait_pr_green.sh --source-only`) so a
 # test harness can call `derive_expected_checks` / `evaluate_checks_json` directly —
@@ -135,6 +149,110 @@ derive_expected_checks() {
   fi
 }
 
+# ── the sanctioned reconcile-owned path set (#3200) — DERIVED, never hand-listed ──
+#
+# The incident (#3200, live 2026-08-26): the ONLY red on PR #3201 was "Wiki drift
+# gates", whose failing step (`sync_doc_metadata.py --check`) named exactly ONE
+# stale literal: `lambdas/web/platform_counts.py`. That file is refused outright by
+# `deploy/agent_commit.sh` — a branch structurally cannot carry it — so this was
+# never a real defect, it was the exact shape of PR the merge train (#3104) exists
+# to carry. The workaround that night was a human eyeballing the ❌ list and
+# verifying every path was reconcile-owned before merging by hand. This section
+# retires that step.
+#
+# `deploy/agent_commit.sh`'s `is_literal_file()` is already the ONE real
+# enforcement point for "which paths are reconciled on main, never on a branch" —
+# see its own header comment. The universe of paths `sync_doc_metadata.py --check`
+# can print in its ❌ list is exactly that same set: `docs_to_process` in
+# sync_doc_metadata.py's `main()` is every doc under `RULES` (all `docs/*`) plus
+# `CLAUDE.md` / `.claude/README.md`, and the generated-counter drift
+# (`lambdas/web/platform_counts.py`) and the MONITORING.md alarm-inventory drift
+# (already a `docs/*` path) are reported the same way. Re-typing that pattern here
+# would be a second source of truth that drifts the moment either list changes —
+# the issue calls this out explicitly — so it is extracted from agent_commit.sh at
+# runtime instead.
+_AGENT_COMMIT_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/agent_commit.sh"
+
+# _derive_reconcile_owned_pattern
+#   Prints the exact `|`-joined case-pattern list out of agent_commit.sh's
+#   `is_literal_file()`, e.g. `docs/*|CLAUDE.md|.claude/README.md|lambdas/web/platform_counts.py`.
+#   Prints NOTHING if agent_commit.sh is missing or its shape changed enough that
+#   the extraction no longer matches (function renamed, case arm restructured) —
+#   the caller (`_is_reconcile_owned_path`) treats an empty pattern as "derivation
+#   failed" and fails CLOSED, never treats an unclassifiable path as sanctioned.
+_derive_reconcile_owned_pattern() {
+  [[ -r "${_AGENT_COMMIT_SH}" ]] || return 0
+  awk '
+    /^is_literal_file\(\)/ { infn = 1; next }
+    infn && /return 0 ;;/ {
+      line = $0
+      sub(/^[[:space:]]*/, "", line)
+      sub(/\)[[:space:]]*return 0 ;;.*/, "", line)
+      print line
+      exit
+    }
+    infn && /^}/ { exit }
+  ' "${_AGENT_COMMIT_SH}" 2>/dev/null
+}
+
+# _is_reconcile_owned_path <repo-relative-path>
+#   True iff <path> matches the pattern derived above. Deliberately NOT a bare
+#   `case "$path" in $pattern)` — an unquoted `|`-joined variable used as a case
+#   pattern does NOT act as an alternation list in bash (the `|` produced by an
+#   expansion is a literal character, not a separator; a `case` needs it literally
+#   in the script source to split alternatives) — verified empirically while
+#   building this, it silently matched nothing at all. `@(pat1|pat2|...)` extglob
+#   syntax fixes that, but `bash -n` (CI's shell-syntax-check job, ci-lint.yml
+#   #2881) parses this file WITHOUT ever running a `shopt -s extglob` that lives
+#   later in the same file, so extglob patterns fail bash -n outright. Splitting
+#   the pattern into an array on `|` and matching each one individually against
+#   plain `[[ == ]]` globbing sidesteps both problems — no extglob needed, no
+#   alternation-list footgun. `read -ra` (not an unquoted `(${pattern})` array
+#   assignment) is deliberate too: the latter also performs PATHNAME expansion on
+#   each word, so `docs/*` would silently expand against whatever files happen to
+#   exist in the CURRENT directory instead of staying a literal pattern — caught
+#   live while building this (see tests/test_wait_pr_green.py's regression proof).
+_is_reconcile_owned_path() {
+  local path="$1"
+  local pattern_str
+  pattern_str="$(_derive_reconcile_owned_pattern)"
+  [[ -n "${pattern_str}" ]] || return 1
+  local -a patterns
+  IFS='|' read -ra patterns <<<"${pattern_str}"
+  local pat
+  for pat in "${patterns[@]}"; do
+    [[ "${path}" == ${pat} ]] && return 0
+  done
+  return 1
+}
+
+# _extract_wiki_drift_files <raw log text on stdin>
+#   Pulls the file list out of sync_doc_metadata.py --check's own
+#   "❌ CHECK FAILED — N stale literal(s) across M file(s):" block — one
+#   "     - <path>" line per file, terminated by the "Fix:" line (see
+#   deploy/sync_doc_metadata.py's `main()`). Ground-truthed against the real
+#   bytes of run 32998950747 / job 98275389042 (#3200), which is tab-prefixed by
+#   `gh run view --job --log` as `JOBNAME<TAB>STEPNAME<TAB>TIMESTAMPZ<content>` —
+#   this takes awk's `$NF` (the last tab-separated field) so it works unprefixed
+#   too (e.g. raw `gh api .../logs` text), not just the `gh run view` shape.
+#   Pure text processing — no gh, no network — fully unit-testable on its own.
+_extract_wiki_drift_files() {
+  awk -F'\t' '
+    {
+      msg = $NF
+      sub(/^[0-9TZ:.\-]+Z[[:space:]]?/, "", msg)
+      if (msg ~ /CHECK FAILED/) { collecting = 1; next }
+      if (collecting && msg ~ /^[[:space:]]*Fix:/) { collecting = 0; next }
+      if (collecting) {
+        line = msg
+        gsub(/^[[:space:]]*-[[:space:]]*/, "", line)
+        gsub(/[[:space:]]+$/, "", line)
+        if (line != "") print line
+      }
+    }
+  '
+}
+
 # ── the pure evaluator — no gh, no network, fully unit-testable ──────────────
 #
 # evaluate_checks_json <checks-json> <expected-name-1> [<expected-name-2> ...]
@@ -151,14 +269,30 @@ derive_expected_checks() {
 #     PENDING <name> <state>
 #     WAITING <name>
 #     NONGREEN <name> <state-or-ABSENT>
+#     RECONCILE-OWNED-RED <name>: <path>[, <path>...]   (#3200, "Wiki drift
+#       gates" only — see below)
 #   then a final line:
-#     VERDICT SUCCESS|PENDING|WAITING|FAIL
-#   Returns 0=SUCCESS, 3=PENDING (keep polling), 2=WAITING, 1=FAIL.
+#     VERDICT SUCCESS|PENDING|WAITING|FAIL|GREEN-WITH-RECONCILE-OWNED-RED
+#   Returns 0=SUCCESS, 3=PENDING (keep polling), 2=WAITING, 1=FAIL,
+#   4=GREEN-WITH-RECONCILE-OWNED-RED.
+#
+#   #3200: when the expected check is literally "Wiki drift gates" and its
+#   entry carries a `driftFiles` array (that gate's own ❌ file list — real
+#   mode: `_enrich_wiki_drift_checks_json`; fixture mode: put it directly in
+#   the fixture JSON), a bucket=fail/skipping/cancel state that would
+#   otherwise be a plain NONGREEN is instead classified: if EVERY path in
+#   `driftFiles` is reconcile-owned (`_is_reconcile_owned_path`, derived from
+#   agent_commit.sh — never hand-listed), it's printed as RECONCILE-OWNED-RED
+#   and rolled into `any_reconcile_owned_red`, not `any_nongreen`. An empty or
+#   absent `driftFiles`, or ANY path that isn't reconcile-owned, falls straight
+#   through to the plain NONGREEN path below — fail-closed by construction, and
+#   a second red check (any other expected name failing) still fails the whole
+#   set exactly as before (`any_nongreen` wins the verdict priority below).
 evaluate_checks_json() {
   local checks_json="$1"
   shift
   local -a expected=("$@")
-  local any_waiting=0 any_nongreen=0 any_pending=0
+  local any_waiting=0 any_nongreen=0 any_pending=0 any_reconcile_owned_red=0
   local exp entry state bucket
 
   # bash 3.2 (macOS's shipped /bin/bash — this repo's scripts run there locally
@@ -200,8 +334,34 @@ evaluate_checks_json() {
       # NONGREEN. A skipped-but-expected check never satisfies this watch (a skip on
       # a check we ourselves asserted as required almost always means a job-level
       # `if:` regressed, not that it's fine to proceed).
-      echo "NONGREEN ${exp} ${state:-${bucket}}"
-      any_nongreen=1
+      #
+      # #3200: ONE exception. "Wiki drift gates" failing because
+      # sync_doc_metadata.py --check named ONLY reconcile-owned paths is not a
+      # real red — see the header comment above and this function's docstring.
+      local classified=0
+      if [[ "${exp}" == "Wiki drift gates" ]]; then
+        local drift_json drift_count all_owned dpath
+        drift_json=$(jq -c '.driftFiles // empty' <<<"${entry}" 2>/dev/null)
+        if [[ -n "${drift_json}" && "${drift_json}" != "null" ]]; then
+          drift_count=$(jq 'length' <<<"${drift_json}" 2>/dev/null || echo 0)
+          if [[ "${drift_count}" -gt 0 ]]; then
+            all_owned=1
+            while IFS= read -r dpath; do
+              [[ -n "${dpath}" ]] || continue
+              _is_reconcile_owned_path "${dpath}" || all_owned=0
+            done < <(jq -r '.[]' <<<"${drift_json}")
+            if [[ "${all_owned}" -eq 1 ]]; then
+              echo "RECONCILE-OWNED-RED ${exp}: $(jq -r 'join(", ")' <<<"${drift_json}")"
+              any_reconcile_owned_red=1
+              classified=1
+            fi
+          fi
+        fi
+      fi
+      if [[ "${classified}" -eq 0 ]]; then
+        echo "NONGREEN ${exp} ${state:-${bucket}}"
+        any_nongreen=1
+      fi
     fi
   done
 
@@ -227,8 +387,79 @@ evaluate_checks_json() {
     echo "VERDICT PENDING"
     return 3
   fi
+  if [[ "${any_reconcile_owned_red}" -eq 1 ]]; then
+    echo "VERDICT GREEN-WITH-RECONCILE-OWNED-RED"
+    return 4
+  fi
   echo "VERDICT SUCCESS"
   return 0
+}
+
+# ── real-mode-only enrichment (#3200) — the ONLY function here that shells out ──
+#
+# _enrich_wiki_drift_checks_json <checks-json>
+#   When "Wiki drift gates" is present in <checks-json> and bucket=fail, fetches
+#   that check's own job (via its `link` field, an `.../actions/runs/<run>/job/
+#   <job>` URL — `gh pr checks` must be called with `--json ...,link` for this to
+#   have anything to read) and, IFF the literal-drift-gate step is the ONLY
+#   failing step in that job — every gate step there runs `if: always()` (#749:
+#   one red never masks the rest), so a second, unrelated gate could fail
+#   alongside it in the same job, and that must never be swept in — pulls its ❌
+#   file list and stamps it onto the entry as `driftFiles` for
+#   evaluate_checks_json to classify.
+#
+#   ANY failure along this path (no link, `gh api`/`gh run view` error, empty
+#   file list, another step also failed) leaves checks_json byte-for-byte
+#   UNTOUCHED — fail-closed to the pre-#3200 plain-NONGREEN path, never guessed.
+#   Not unit-tested directly (it is nothing but `gh`/`jq` plumbing); the logic it
+#   feeds (`evaluate_checks_json` + `_is_reconcile_owned_path`) is the part that
+#   is mutation-proved, via fixtures that supply `driftFiles` directly.
+_enrich_wiki_drift_checks_json() {
+  local checks_json="$1"
+  local entry bucket link jobid steps_json other_fail raw_log drift_files drift_files_json
+
+  entry=$(jq -c '[.[] | select(.name == "Wiki drift gates")] | .[0] // empty' <<<"${checks_json}" 2>/dev/null)
+  if [[ -z "${entry}" || "${entry}" == "null" ]]; then
+    printf '%s' "${checks_json}"
+    return 0
+  fi
+  bucket=$(jq -r '.bucket // ""' <<<"${entry}")
+  if [[ "${bucket}" != "fail" ]]; then
+    printf '%s' "${checks_json}"
+    return 0
+  fi
+
+  link=$(jq -r '.link // ""' <<<"${entry}")
+  jobid="${link##*/job/}"
+  if [[ -z "${link}" || "${jobid}" == "${link}" || -z "${jobid}" ]]; then
+    printf '%s' "${checks_json}"
+    return 0
+  fi
+
+  steps_json=$(gh api "repos/${REPO}/actions/jobs/${jobid}" --jq '.steps' 2>/dev/null) || {
+    printf '%s' "${checks_json}"
+    return 0
+  }
+  other_fail=$(jq -r '[.[] | select(.conclusion == "failure" and .name != "Literal-drift gate (sync_doc_metadata --check)")] | length' <<<"${steps_json}" 2>/dev/null)
+  if [[ "${other_fail}" != "0" ]]; then
+    printf '%s' "${checks_json}"
+    return 0
+  fi
+
+  raw_log=$(gh run view --job "${jobid}" --repo "${REPO}" --log 2>/dev/null) || {
+    printf '%s' "${checks_json}"
+    return 0
+  }
+  drift_files=$(_extract_wiki_drift_files <<<"${raw_log}")
+  if [[ -z "${drift_files}" ]]; then
+    printf '%s' "${checks_json}"
+    return 0
+  fi
+
+  drift_files_json=$(printf '%s\n' "${drift_files}" | jq -R . | jq -s .)
+  jq --argjson df "${drift_files_json}" \
+    'map(if .name == "Wiki drift gates" then . + {driftFiles: $df} else . end)' \
+    <<<"${checks_json}" 2>/dev/null || printf '%s' "${checks_json}"
 }
 
 # ── CLI driver ─────────────────────────────────────────────────────────────
@@ -362,7 +593,8 @@ main() {
     elapsed=$((now - start))
     if [[ "${elapsed}" -ge "${timeout}" ]]; then
       echo "TIMEOUT after ${elapsed}s (budget ${timeout}s) — last known state:"
-      checks_json=$(gh pr checks "${pr}" --repo "${REPO}" --json name,state,bucket 2>/dev/null || echo '[]')
+      checks_json=$(gh pr checks "${pr}" --repo "${REPO}" --json name,state,bucket,link 2>/dev/null || echo '[]')
+      checks_json=$(_enrich_wiki_drift_checks_json "${checks_json}")
       evaluate_checks_json "${checks_json}" "${expected[@]}"
       return 1
     fi
@@ -377,7 +609,8 @@ main() {
       continue
     fi
 
-    checks_json=$(gh pr checks "${pr}" --repo "${REPO}" --json name,state,bucket 2>/dev/null || echo '[]')
+    checks_json=$(gh pr checks "${pr}" --repo "${REPO}" --json name,state,bucket,link 2>/dev/null || echo '[]')
+    checks_json=$(_enrich_wiki_drift_checks_json "${checks_json}")
     out=$(evaluate_checks_json "${checks_json}" "${expected[@]}")
     rc=$?
 
@@ -403,6 +636,11 @@ main() {
         green_count=$(grep -c '^GREEN ' <<<"${out}" || true)
         echo "  ... ${green_count}/${#expected[@]} green (elapsed ${elapsed}s/${timeout}s), polling again in ${interval}s"
         sleep "${interval}"
+        ;;
+      4)
+        echo "${out}"
+        echo "GREEN except a classified reconcile-owned red (elapsed ${elapsed}s) — see the RECONCILE-OWNED-RED line(s) above (#3200). This still never merges; the exit code (4) is the caller's own signal to name it and proceed."
+        return 4
         ;;
     esac
   done
