@@ -3212,6 +3212,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3198"
         }
       ]
+    },
+    {
+      "id": "2026-08-26-the-tools-that-lied",
+      "date": "2026-08-26",
+      "title": "The night four safety nets turned out to have holes",
+      "shipped": "Five fixes, all merged and deployed to the fleet (105 functions, 0 failed). The reader-truth checker stopped crying wolf: two new rules teach it that a page saying '1 reading so far' is being honest about sparse data, not contradicting itself, and that 'nothing logged since Aug 17' is a true statement about deliberate logging even while sleep and heart-rate keep recording automatically. A third rule, added later the same night, teaches it that '9 of 10 days of data' on day 10 is arithmetic, not a lie — today isn't over yet. The clock correction that has been rolling through the codebase reached 40 more places, including one that was quietly stamping the public continuity page with tomorrow's date every single night.",
+      "why_it_mattered": "These checks guard what the site publishes. When one of them raises a false alarm, the deploy pipeline stops and sometimes rolls back a perfectly good release — that happened yesterday, to a release carrying the fix for the very thing the checker was complaining about. Every false alarm also trains you to ignore the next one, which is how a real problem eventually slips through. The truth ledger — the list of known-wrong things the checker is allowed to overlook — is back to empty, which is where it should be.",
+      "gotcha": "A tool merged earlier the same evening, complete with passing tests, turned out to do nothing at all. It was supposed to recognise one specific harmless failure and wave it through; run against a real pull request an hour later, it just said 'failed' like always. The cause was mundane: it fetched the build log through a command that, for some jobs and not others, returns every step except the one that failed. Its tests passed because they fed it a saved copy of a log that happened to be complete. Nothing was broken enough to notice — it failed safely, which meant it failed invisibly.",
+      "honest_miss": "The measurement that mattered most tonight disproved yesterday's conclusion. Yesterday's diagnosis was that the coaching write-ups were being cut off mid-sentence by a length limit. That was true, and fixing it worked — the cut-offs went from about fourteen a day to zero. But two of the seven coaches are still being held back from publishing, now for a completely different reason: they cite numbers the fact-checker can't find in the data. The first fix was hiding the second problem. Separately, the continuous glucose monitor stopped reporting on August 24 and nothing noticed for two days, because the health feed it arrives on kept delivering everything else on time.",
+      "prs": [
+        {
+          "label": "PR #3201",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3201"
+        },
+        {
+          "label": "PR #3210",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3210"
+        },
+        {
+          "label": "PR #3211",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3211"
+        },
+        {
+          "label": "PR #3206",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3206"
+        },
+        {
+          "label": "PR #3203",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3203"
+        }
+      ]
     }
   ]
 }
