@@ -326,20 +326,30 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
             "reviewers (the #1319 dead-approval-gate class), vulnerability alerts disabled, the main ruleset "
             "weakened, the ruleset deleted outright, a required-check context dropped, the bot bypass removed, and "
             "an out-of-band review rule added. (b) the admin-read surfaces returning a 403 scope error, and the "
-            "bypass-actor user lookup unavailable."
+            "bypass-actor user lookup unavailable. (c) #3207, in tests/test_posture_pending_marker.py: the SAME "
+            "absent-ruleset / auto-merge-off live shape judged against `applied: true` vs `applied: false`, plus a "
+            "surface that IS applied live while still marked `applied: false`, plus the spec renamed so the "
+            "classification cannot be keyed on a name."
         ),
         "observed": (
             "exit 0 with every (a) shape reporting status='drift' on the specific surface; the posture file's own "
             "declared state reports 'clean'. (b) scope gap -> status='unavailable' with a needs_owner line naming "
             "the exact fine-grained-PAT permission ('Administration:read') and the secret ('GH_POSTURE_TOKEN'); the "
-            "user-lookup gap -> degraded. Never clean, never a silent pass."
+            "user-lookup gap -> degraded. (c) `applied: true` + absent -> 'drift' with the --apply fix intact; "
+            "`applied: false` + absent -> the distinct status 'pending', naming blocked_on and carrying NO --apply "
+            "recommendation; `applied: false` + applied-live -> 'drift' on the STALE MARKER, so the suppression "
+            "cannot rot into a false green; the rename does not change any verdict. Never clean, never a silent pass."
         ),
         "scope": (
             "The cannot-observe verdict is the third status `unavailable`, and it aggregates as CLEAN at sweep level "
             "by deliberate #1320 design (a fork without the PAT must not red-wall). It is honest rather than the "
             "#3156 shape — the status is distinct, print_summary emits the needs-owner line, and nothing falls back "
             "to a remembered value while claiming it measured — but it means green on this check can mean 'four "
-            "surfaces asserted' or 'two asserted, two unreadable'. Read the needs_owner line, not the colour."
+            "surfaces asserted' or 'two asserted, two unreadable'. Read the needs_owner line, not the colour. "
+            "A FIFTH status exists since #3207: `pending`, for a posture entry marked `applied: false`. It "
+            "aggregates below `unavailable` and above `clean`, never reaches the needs-human triage, and is always "
+            "printed with its blocker — the suppression is scoped to the ABSENCE of a surface the posture itself "
+            "declares unapplied, and the opposite arm (applied live, marker still false) is drift."
         ),
         "proved_on": _PROVED_ON,
     },

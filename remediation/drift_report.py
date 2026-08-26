@@ -46,6 +46,11 @@ def as_signal(record):
         return None
     checks = record.get("checks", {})
     flagging = {k: v for k, v in checks.items() if v.get("status") == "drift"}
+    if not flagging:
+        # #3207 defence-in-depth: a record whose only non-clean surfaces are `pending`
+        # must never spin up a needs-human triage run. If the top-level status ever says
+        # drift while no check does, there is nothing for a human to act on here.
+        return None
     return {
         "status": "drift",
         "date": record.get("date"),
@@ -77,6 +82,21 @@ def status_html(record):
     if gaps:
         joined = " ".join(sorted(set(gaps)))
         html += f"<p><b>needs-owner (not an alarm):</b> {joined}</p>"
+    # #3207: declared-but-not-yet-applied posture surfaces render as their OWN line —
+    # named, with their blocker, and explicitly not an alarm. The 2026-08-26 sweep
+    # reported D0.6's unapplied `main-required-fast-lane` as a critical regression whose
+    # recommended fix (`apply_branch_protection.py --apply`) would have wedged the
+    # post-merge reconcile push on every merge. Pending is not drift, and the report
+    # says so instead of staying silent.
+    pending = []
+    for check in (record.get("checks") or {}).values():
+        for surface, blocker in (check.get("pending") or {}).items():
+            pending.append(f"<li><code>{surface}</code> — blocked on: {blocker}</li>")
+    if pending:
+        html += (
+            "<p><b>pending, declared but not yet applied (not drift, no action recommended):</b></p>"
+            "<ul>" + "".join(sorted(set(pending))) + "</ul>"
+        )
     return html
 
 

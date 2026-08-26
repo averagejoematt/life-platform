@@ -771,6 +771,22 @@ def _fake_gh(monkeypatch, routes):
     monkeypatch.setattr(ds, "_gh_api_result", fake)
 
 
+def _posture_applied(monkeypatch):
+    """Flip the #3207 `applied: false` markers to true for one test.
+
+    The shipped `deploy/github_posture.json` marks the ADR-148 required-checks ruleset
+    and `repo_settings` as declared-but-NOT-YET-applied (D0.6, blocked on
+    RECONCILE_PUSH_TOKEN), so those surfaces report `pending` rather than drift. The
+    tests below exercise the POST-apply judging — which is the behaviour `applied: true`
+    restores byte-for-byte. Both directions are mutation-proved in
+    tests/test_posture_pending_marker.py."""
+    posture = json.loads(json.dumps(sg._load_github_posture()))
+    posture["main_required_checks_ruleset"]["applied"] = True
+    posture["repo_settings"]["applied"] = True
+    monkeypatch.setattr(sg, "_load_github_posture", lambda: posture)
+    return posture
+
+
 def _config_routes(env=None, ruleset=None, vuln=None, rc_list=None, rc_full=None, repo=None):
     # ORDER MATTERS: _fake_gh returns the first substring match, so the id-qualified
     # ruleset routes must precede the bare `rulesets` list route, and the bare
@@ -935,6 +951,7 @@ def test_github_config_ruleset_drift_when_deleted(monkeypatch):
 def test_github_config_required_checks_clean_when_applied(monkeypatch):
     # Post-apply steady state: the ADR-148 ruleset exists with the documented contexts,
     # strict off, the github-actions Integration bypass present, auto-merge on.
+    _posture_applied(monkeypatch)
     _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None)))
     res = ds.check_github_config()
     rc = res["surfaces"]["main_required_checks_ruleset"]
@@ -944,9 +961,16 @@ def test_github_config_required_checks_clean_when_applied(monkeypatch):
 
 
 def test_github_config_required_checks_drift_when_absent(monkeypatch):
-    # TODAY'S LIVE STATE (2026-08-03, pre-apply): only the #1325 ruleset exists and
-    # auto-merge is off, so BOTH new surfaces must fire. This is the guard-red the
-    # driver's post-merge `--apply` turns green — and it stays honest if that never runs.
+    # The APPLIED-then-deleted shape: the ruleset was live and has since been removed
+    # (and auto-merge turned off), so BOTH surfaces must fire.
+    #
+    # #3207 changed what this fixture means. When the posture entry says `applied:
+    # false` — the shipped D0.6 state — the same live shape is the DOCUMENTED desired
+    # state and reports `pending`, not drift; before that marker existed, this
+    # permanent false alarm recommended an `--apply` that would have wedged the
+    # post-merge reconcile push on every merge. `applied: true` is what makes absence a
+    # regression, so this test now declares it explicitly rather than inheriting it.
+    _posture_applied(monkeypatch)
     _fake_gh(
         monkeypatch,
         _config_routes(
@@ -1006,6 +1030,7 @@ def test_github_config_required_checks_degrades_when_user_lookup_unavailable(mon
     # #2198: the checked-in spec's bypass actor is a `User`, resolved via /users/{login}
     # — that lookup down should degrade the comparison to (actor_type, bypass_mode) and
     # SAY so, rather than silently reporting a numeric match that was never made.
+    _posture_applied(monkeypatch)
     routes = _config_routes(env=(_ENV_WITH_REVIEWERS, None))
     routes["/users/averagejoematt"] = (None, {"classification": "error", "detail": "gh: timeout"})
     _fake_gh(monkeypatch, routes)
@@ -1037,10 +1062,20 @@ def test_github_config_scope_gap_is_needs_owner_not_red(monkeypatch):
     # exact fine-grained-PAT permission; NEVER drift/error for a known scope gap.
     _fake_gh(
         monkeypatch,
-        _config_routes(env=(_ENV_WITH_REVIEWERS, None), ruleset=(None, _SCOPE_ERR), rc_list=(None, _SCOPE_ERR), vuln=(None, _SCOPE_ERR)),
+        _config_routes(
+            env=(_ENV_WITH_REVIEWERS, None),
+            ruleset=(None, _SCOPE_ERR),
+            rc_list=(None, _SCOPE_ERR),
+            vuln=(None, _SCOPE_ERR),
+            # today's real repo state, so repo_settings reports #3207 `pending`: the
+            # aggregation must still rank `unavailable` ABOVE pending — a scope gap is
+            # "I could not look", which outranks "declared, not yet applied".
+            repo=(_REPO_AUTO_MERGE_OFF, None),
+        ),
     )
     res = ds.check_github_config()
     assert res["status"] == "unavailable"
+    assert res["surfaces"]["repo_settings"]["status"] == "pending"
     assert res["surfaces"]["main_ruleset"]["status"] == "unavailable"
     assert res["surfaces"]["vulnerability_alerts"]["status"] == "unavailable"
     assert "Administration:read" in res["needs_owner"]

@@ -745,14 +745,19 @@ from sentinel_github import (  # noqa: E402,F401,I001
     GITHUB_POSTURE_FILE,
     PAT_FIX,
     PUSH_TRIGGER_GLOBS,
+    _classify_declared_but_unapplied,
     _commit_files,
     _gh_api_result,
     _github_repo,
     _is_bot_commit,
     _judge_required_checks,
     _load_github_posture,
+    _github_drift_detail,
+    _github_extra_lines,
     _matches_push_trigger,
     _parse_gh_date,
+    _pending_detail,
+    _pending_note,
     check_github_config,
     check_github_push_runs,
 )
@@ -768,6 +773,7 @@ from sentinel_quota import (  # noqa: E402,F401
     _gh_run_list_trailing,
     _run_duration_seconds,
     check_github_quota,
+    quota_summary_lines,
 )
 
 # ── 9. CodeQL open-alert regrowth (#1902) ────────────────────────────────────
@@ -1028,10 +1034,12 @@ def run_sweep():
 
 
 def _summary(status, checks):
+    pending_note = _pending_note(checks)
     if status == "clean":
         n = len(STACKS)
-        return f"All clear: {n}/{n} stacks in sync, no config/layer/asset drift, no orphan functions, data delete-protection intact."
-    parts = []
+        clear = f"All clear: {n}/{n} stacks in sync, no config/layer/asset drift, no orphan functions, data delete-protection intact."
+        return f"{clear} {pending_note}" if pending_note else clear
+    parts = [pending_note] if pending_note else []
     cfn = checks["cfn_drift"]
     drifted_stacks = [s for s, v in cfn.get("stacks", {}).items() if v.get("status") == "drift"]
     if drifted_stacks:
@@ -1087,7 +1095,7 @@ def print_summary(record):
     print(f"{icon} {record['status'].upper()}: {record['summary']}")
     for name, c in record["checks"].items():
         st = c.get("status")
-        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "degraded": "🟡", "unavailable": "⚪"}.get(st, "·")
+        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "degraded": "🟡", "unavailable": "⚪", "pending": "🔵"}.get(st, "·")
         detail = ""
         if st == "drift":
             if name == "cfn_drift":
@@ -1109,11 +1117,8 @@ def print_summary(record):
                 detail = f" — {[(m['fact'], m['documented'], 'live', m['live']) for m in c.get('mismatches', [])]}"
             elif name == "site_sha_ancestry":
                 detail = f" — {c.get('detail', '')}"
-            elif name == "github_config":
-                bad = {k: v.get("detail", "") for k, v in c.get("surfaces", {}).items() if v.get("status") == "drift"}
-                detail = f" — {bad}"
-            elif name == "github_push_runs":
-                detail = f" — {c.get('detail', '')}"
+            elif name in ("github_config", "github_push_runs"):
+                detail = _github_drift_detail(name, c)
             elif name == "github_quota":
                 detail = f" — {c.get('warn', '')}"
             elif name == "codeql_alerts":
@@ -1123,6 +1128,8 @@ def print_summary(record):
                 detail = f" — {c.get('detail', '')}"
             elif name == "sentinel_cadence":
                 detail = f" — {c.get('detail', '')}"
+        elif st == "pending":
+            detail = _pending_detail(c)
         elif st == "degraded":
             # DIL-027: "could not observe" is a distinct verdict from clean and must
             # print its reason — a check that sampled nothing has not passed.
@@ -1138,24 +1145,11 @@ def print_summary(record):
             noisy = {s: len(v.get("filtered_noise", [])) for s, v in c.get("stacks", {}).items() if v.get("filtered_noise")}
             if noisy:
                 print(f"      [filtered known-noise, #1781] {noisy}")
-        # #1320 fail-soft honesty: a scope-gapped GitHub surface surfaces its
-        # needs-owner line (the exact PAT permission to add) — visible, never red.
-        if name in ("github_config", "github_push_runs") and c.get("needs_owner"):
-            print(f"      [needs-owner] {c['needs_owner']}")
-        # GitHub quota/billing facts always print, regardless of status (#1334/#1453 —
-        # this is a monthly-glance line, not just an alert): the real usage pct when
-        # the billing API is available, the fail-soft reason when it isn't, and the
-        # top-consuming workflows either way so run-rate regressions are attributable.
+        for line in _github_extra_lines(name, c):
+            print(line)
         if name == "github_quota":
-            b = c.get("billing_api", {})
-            if b.get("available"):
-                print(f"      Actions minutes used: {b.get('total_minutes_used')}/{b.get('included_minutes')} ({b.get('pct_used')}%)")
-            else:
-                print(f"      {b.get('detail', 'billing API unavailable')}")
-            for w in c.get("top_workflows_7d", [])[:5]:
-                print(f"      · {w['workflow']}: {w['wall_clock_minutes']} min (7d wall-clock proxy)")
-            if c.get("top_workflows_error"):
-                print(f"      [warn] top-workflows proxy: {c['top_workflows_error']}")
+            for line in quota_summary_lines(c):
+                print(line)
 
 
 def main() -> int:

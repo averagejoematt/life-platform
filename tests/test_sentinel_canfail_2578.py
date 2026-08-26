@@ -493,7 +493,10 @@ PROOF_INDEX: dict[str, dict[str, object]] = {
             "Pre-existing (#1320). SCOPE: cannot-observe reports the third status `unavailable`, which aggregates as CLEAN at sweep "
             "level and never reaches as_signal — deliberate fail-soft (a public fork must not red-wall), and honest because the "
             "status is distinct and print_summary emits a needs-owner line naming the exact PAT permission. It is NOT the #3156 "
-            "shape: nothing falls back to a stale value while claiming it measured."
+            "shape: nothing falls back to a stale value while claiming it measured. #3207 adds a FIFTH status, "
+            "`pending` (posture entry marked `applied: false`), proved in BOTH directions by "
+            "tests/test_posture_pending_marker.py — an APPLIED entry still drifts, and an applied-live surface still "
+            "marked `applied: false` drifts on the stale marker, so the suppression cannot become a one-way silencer."
         ),
     },
     "sentinel::deploy/sentinel_github.py::check_github_push_runs": {
