@@ -196,13 +196,18 @@ export function physicalStatCluster(readings, j, goal) {
   const prevWord = prevD && prevD === dayBefore(todayPT()) && latestD === todayPT() ? "yesterday" : (_physShortDate(prevD) || "previous");
   const ydayCap = dayDelta == null ? prevWord : `${prevWord} · ${dayDelta > 0 ? "+" : ""}${fmt(dayDelta)} lb`;
   const pct = j.progress_pct != null ? j.progress_pct : Math.round((j.start_weight_lbs - latest) / (j.start_weight_lbs - goal) * 1000) / 10;
+  // #3197 — same undated-321 problem as the data figure: label the start value with its
+  // baseline date so "to goal · 321→185" can't read as an uncounted reading. Derived from
+  // journey.started_date, never hardcoded; #948-style fallback when absent leaves the
+  // strings below byte-for-byte unchanged.
+  const startTag = fmtShort(j.started_date) ? ` (${fmtShort(j.started_date)} baseline)` : "";
   return figs([
     fig(fmt(high) + " lb", "high"),
     fig(fmt(latest) + " lb", latestCap),
     fig(fmt(low) + " lb", "low"),
     prev != null && fig(fmt(prev) + " lb", ydayCap),
-    pct != null && fig(fmt(pct) + "%", `to goal · ${fmt(j.start_weight_lbs ?? 314.5)}→${fmt(goal)}`),
-  ]) + `<p class="rd-meta label">The weight figures lead the page now — the body-composition percentages move to the dated scan arc below. % complete is against the full ${fmt(j.start_weight_lbs ?? 314.5)} → ${fmt(goal)} lb span.</p>`;
+    pct != null && fig(fmt(pct) + "%", `to goal · ${fmt(j.start_weight_lbs ?? 314.5)}${startTag}→${fmt(goal)}`),
+  ]) + `<p class="rd-meta label">The weight figures lead the page now — the body-composition percentages move to the dated scan arc below. % complete is against the full ${fmt(j.start_weight_lbs ?? 314.5)}${startTag} → ${fmt(goal)} lb span.</p>`;
 }
 
 // P0.4 — the milestone ladder: the measuring-rule tick-spine made vertical, 315 → 185 in
