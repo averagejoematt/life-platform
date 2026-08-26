@@ -39,6 +39,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from operational import pipeline_health_check_lambda as phc
+from pacific_clock import freeze_pacific
 
 NOW = datetime(2026, 8, 8, 16, 58, tzinfo=timezone.utc)
 TODAY = "2026-08-08"
@@ -318,7 +319,7 @@ def test_liveness_paused_source_is_excluded_and_stamped(liveness_env):
 
 def test_liveness_persists_the_verdicts_for_the_status_page(liveness_env):
     t, rec = liveness_env(["whoop"], [_sentinel("whoop")])
-    phc._check_ingest_liveness(NOW)
+    phc._check_ingest_liveness(NOW, TODAY)
     (item,) = t.puts
     assert item["pk"] == "USER#matthew#SOURCE#ingest_liveness"
     assert item["sk"] == f"DATE#{TODAY}"
@@ -355,7 +356,7 @@ def test_liveness_survives_failures_of_every_optional_side_effect(liveness_env, 
 
 def test_handler_routes_to_the_liveness_mode(monkeypatch, fake_lambda):
     fake_lambda()
-    monkeypatch.setattr(phc, "_check_ingest_liveness", lambda now: {"unhealthy_count": 2, "verdicts": []})
+    monkeypatch.setattr(phc, "_check_ingest_liveness", lambda now, day=None: {"unhealthy_count": 2, "verdicts": []})
     resp = phc.lambda_handler({"check_ingest_liveness": True}, None)
     assert json.loads(resp["body"])["unhealthy_count"] == 2
 
@@ -386,6 +387,10 @@ def frozen_handler_clock(monkeypatch):
             return phc.datetime(y, m, d, 17, 0, 0, tzinfo=tz or timezone.utc)
 
     monkeypatch.setattr(phc, "datetime", _FrozenDatetime)
+    # #2798: `lambda_handler` now derives `today_str` from `pacific_today()`, which reads
+    # `common.pacific_time`'s OWN `datetime` — the patch above cannot reach it. Pin both
+    # from the SAME instant or the handler drifts against the real wall clock.
+    freeze_pacific(monkeypatch, phc, _FrozenDatetime)
     return _FrozenDatetime
 
 

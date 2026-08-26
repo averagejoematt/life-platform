@@ -23,6 +23,7 @@ import os
 from datetime import datetime, timezone
 
 import boto3
+from common.pacific_time import pacific_today  # #2798: the DATE# rows this writes name Pacific days
 
 try:
     from common.platform_logger import get_logger
@@ -196,7 +197,7 @@ def _check_compute_outputs(today_str: str) -> dict:
     return {"missing": missing, "present": present, "all_present": not missing}
 
 
-def _check_ingest_liveness(now: datetime) -> dict:
+def _check_ingest_liveness(now: datetime, day: str | None = None) -> dict:
     """ER-01: read the INGEST_HEALTH sentinels and assert per-source infra-liveness.
 
     Distinct from behavioral freshness: this fires when an ingestion Lambda has been
@@ -205,6 +206,7 @@ def _check_ingest_liveness(now: datetime) -> dict:
     UnhealthySourceCount to LifePlatform/IngestLiveness and pushes a distinct-subject
     digest alert when any source is unhealthy.
     """
+    day = day or pacific_today()
     if not _INGEST_HEALTH_AVAILABLE:
         logger.warning("ingest_liveness: ingest_health module unavailable (layer not rebuilt?) — skipping")
         return {"skipped": "ingest_health_unavailable"}
@@ -276,8 +278,8 @@ def _check_ingest_liveness(now: datetime) -> dict:
         table.put_item(
             Item={
                 "pk": f"USER#{USER_ID}#SOURCE#ingest_liveness",
-                "sk": f"DATE#{now.strftime('%Y-%m-%d')}",
-                "date": now.strftime("%Y-%m-%d"),
+                "sk": f"DATE#{day}",
+                "date": day,
                 "checked_at": now.isoformat(),
                 "unhealthy_count": unhealthy_count,
                 "verdicts": json.dumps(verdicts, default=str),
@@ -292,15 +294,18 @@ def _check_ingest_liveness(now: datetime) -> dict:
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     if hasattr(logger, "set_date"):
-        logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        logger.set_date(pacific_today())
 
+    # #2798: `now` is the INSTANT (attempt-staleness arithmetic, `checked_at`); `today_str`
+    # is the DAY, and every day this handler touches — the `DATE#` rows it writes and the
+    # compute outputs it verifies — is a Pacific day. The 16:00Z cron only masked the split.
     now = datetime.now(timezone.utc)
-    today_str = now.strftime("%Y-%m-%d")
+    today_str = pacific_today()
 
     # ER-01: infra-liveness mode — assert each active source's ingestion Lambda ran
     # and 200'd, independent of whether new data came back.
     if event.get("check_ingest_liveness"):
-        return {"statusCode": 200, "body": json.dumps(_check_ingest_liveness(now), default=str)}
+        return {"statusCode": 200, "body": json.dumps(_check_ingest_liveness(now, today_str), default=str)}
 
     # Phase 3.2: compute-output verification mode
     if event.get("check_compute_outputs"):
@@ -437,8 +442,8 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
         table.put_item(
             Item={
                 "pk": f"USER#{USER_ID}#SOURCE#health_check",
-                "sk": f"DATE#{now.strftime('%Y-%m-%d')}",
-                "date": now.strftime("%Y-%m-%d"),
+                "sk": f"DATE#{today_str}",
+                "date": today_str,
                 "checked_at": now.isoformat(),
                 "total": len(PIPELINES),
                 "passed": pass_count,

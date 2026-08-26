@@ -34,6 +34,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_today  # #2798: hevy DATE# keys name Pacific days
 
 logger = logging.getLogger("exercise_history")
 
@@ -90,7 +91,10 @@ def load_recent_history(
     ignored on purpose — pre-write-loop history is preserved in DDB but
     not surfaced into routine notes.
     """
-    today = today or date.today()
+    # #2798 — THE PAIR. The window bounds `DATE#` keys in the SOURCE#hevy partition,
+    # whose days are Pacific (`adherence_calc.pacific_date_of`), and it is co-consumed
+    # with the `target_date` that `hevy_routine_cron`/`manage_hevy_routine` author.
+    today = today or date.fromisoformat(pacific_today())
     start = (today - timedelta(days=lookback_days)).isoformat()
     pk = f"USER#{USER_ID}#SOURCE#hevy"
     index: dict[str, list[dict[str, Any]]] = {}

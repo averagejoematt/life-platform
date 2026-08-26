@@ -16,7 +16,9 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
+
+from common.pacific_time import pacific_now, pacific_today  # #2798: THE Pacific frame — nextDue/askedAt name Pacific days
 
 logger = logging.getLogger()
 
@@ -39,13 +41,13 @@ _GIST_SYSTEM = (
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return pacific_today()
 
 
 def next_due(interval_index: int, *, from_date: str | None = None) -> str:
     """The next-due ISO date for a probe at this interval index (clamped to range)."""
     idx = max(0, min(int(interval_index), len(INTERVALS) - 1))
-    base = date.fromisoformat(from_date) if from_date else datetime.now(timezone.utc).date()
+    base = date.fromisoformat(from_date) if from_date else pacific_now().date()
     return (base + timedelta(days=INTERVALS[idx])).isoformat()
 
 

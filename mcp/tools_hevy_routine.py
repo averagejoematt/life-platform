@@ -36,8 +36,10 @@ from __future__ import annotations
 import logging
 import time
 import urllib.error
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
+
+from common.pacific_time import pacific_date_of, pacific_today  # #2798: target_date is a Pacific-day WRITE KEY
 
 from mcp.utils import mcp_error
 
@@ -140,7 +142,7 @@ def _generator_inputs(args: dict[str, Any]):
     from training.routine_generator import GeneratorInputs
 
     return GeneratorInputs(
-        target_date=args.get("target_date") or datetime.now(timezone.utc).date().isoformat(),
+        target_date=args.get("target_date") or pacific_today(),
         recovery_tier=args.get("recovery_tier", "yellow"),
         acwr_flag=args.get("acwr_flag", "safe"),
         volume_7d=args.get("volume_7d") or {},
@@ -160,8 +162,6 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
     to author when an input lags the latest ingested session. Reuses the Stage-1
     get_muscle_volume `completeness` signal and the Whoop recovery high-water mark.
     """
-    from datetime import datetime as _dt, timedelta as _td
-
     from mcp.recovery_authoring import assess_authoring_freshness
 
     vol_completeness = None
@@ -169,7 +169,7 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
     try:
         from mcp.tools_strength import tool_get_muscle_volume
 
-        start = (_dt.strptime(target_date, "%Y-%m-%d").date() - _td(days=30)).isoformat()
+        start = (datetime.strptime(target_date, "%Y-%m-%d").date() - timedelta(days=30)).isoformat()
         mv = tool_get_muscle_volume({"start_date": start, "end_date": target_date})
         vol_completeness = mv.get("completeness")
         if vol_completeness:
@@ -203,8 +203,6 @@ def _authoring_freshness_gate(target_date: str) -> dict[str, Any]:
 
 def _gather_training_context(target_date: str) -> dict[str, Any]:
     """Recent-streak / deficit / tissue context → ceiling+floor modulation (brief §4)."""
-    from datetime import datetime as _dt, timedelta as _td
-
     from mcp.recovery_authoring import derive_training_context
 
     workout_dates: list[str] = []
@@ -213,7 +211,7 @@ def _gather_training_context(target_date: str) -> dict[str, Any]:
 
         from mcp.config import table
 
-        start = (_dt.strptime(target_date, "%Y-%m-%d").date() - _td(days=14)).isoformat()
+        start = (datetime.strptime(target_date, "%Y-%m-%d").date() - timedelta(days=14)).isoformat()
         r = table.query(
             KeyConditionExpression=_K("pk").eq("USER#matthew#SOURCE#hevy") & _K("sk").between(f"DATE#{start}", f"DATE#{target_date}~"),
             ProjectionExpression="sk",
@@ -279,7 +277,7 @@ def _action_draft(args: dict[str, Any]) -> dict[str, Any]:
     from training.routine_generator import generate_routines
     from training.routine_repo import draft_versioned  # #3115: re-draft = next VERSION, never a 2nd routine
 
-    target_date = args.get("target_date") or datetime.now(timezone.utc).date().isoformat()
+    target_date = args.get("target_date") or pacific_today()
 
     # Freshness/completeness gate (brief §6/E3) — refuse to author on stale inputs.
     gate = _authoring_freshness_gate(target_date)
@@ -766,7 +764,7 @@ def _action_draft_custom(args: dict[str, Any]) -> dict[str, Any]:
         )
 
     archetype = (args.get("archetype") or "custom").strip().lower()
-    target_date = args.get("target_date") or datetime.now(timezone.utc).date().isoformat()
+    target_date = args.get("target_date") or pacific_today()
     total_sets = sum(len(b.sets) for b in blocks)
 
     warnings: list[str] = []
@@ -1120,7 +1118,7 @@ def _action_archive(args: dict[str, Any]) -> dict[str, Any]:
         created = wc.create_folder("Archive")
         new_folder = created.get("routine_folder") or created
         archive_folder_id = new_folder.get("id")
-    ir.title = f"[archived {datetime.now(timezone.utc).date().isoformat()}] {ir.title or ir.archetype}"
+    ir.title = f"[archived {pacific_today()}] {ir.title or ir.archetype}"
     ir.hevy_folder_id = archive_folder_id
     body = to_update_body(ir, resolve_movement)
     try:
@@ -1184,7 +1182,9 @@ def _action_adherence(args: dict[str, Any]) -> dict[str, Any]:
     workouts = wc.get_workouts(page=1, page_size=10).get("workouts") or []
     performed: dict[str, Any] = {}
     for w in workouts:
-        if (w.get("start_time") or "")[:10] == ir.target_date:
+        # #2798: `start_time` is a UTC instant; its DAY is Pacific (`health.adherence_calc`
+        # already resolves it that way). A raw [:10] compared an evening workout to tomorrow.
+        if pacific_date_of(w.get("start_time")) == ir.target_date:
             performed = w
             break
     if not performed:

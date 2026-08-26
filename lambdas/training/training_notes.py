@@ -34,6 +34,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
+from common.pacific_time import pacific_today  # #2798: workout DATE# keys name Pacific days
+
 # pk SOURCE partition is `training_notes`; the projection's `source` label is the
 # locked `training_feedback_loop` (§13). Two names, deliberately (see brief §5 vs §13).
 NOTES_SOURCE = "training_notes"
@@ -353,8 +355,9 @@ def training_notes_health(table, lookback_days=14, user="matthew") -> dict:
 
     from boto3.dynamodb.conditions import Key as _K
 
-    start = (_date.today() - timedelta(days=lookback_days)).isoformat()
-    today = _date.today().isoformat()
+    # #2798: the scanned window is `DATE#` keys in the SOURCE#hevy partition — Pacific days.
+    today = pacific_today()
+    start = (_date.fromisoformat(today) - timedelta(days=lookback_days)).isoformat()
     noted = 0
     have_record = 0
     degraded = 0

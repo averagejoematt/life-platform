@@ -21,6 +21,7 @@ is unit-testable with plain fakes.
 from datetime import date, datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import PACIFIC  # #2798: raw/{YYYY}/{MM} partitions are named by the Pacific data day
 
 USER_PREFIX = "USER#matthew#SOURCE#"
 
@@ -30,9 +31,16 @@ _RAW_LIVENESS_MAX_PAGES = 10  # per-prefix pagination bound (a busy HAE month ca
 
 
 def _raw_month_prefixes(prefix, now_utc):
-    """Current + previous month partitions — always covers the liveness window."""
-    prev = (now_utc.date().replace(day=1) - timedelta(days=1)).strftime("%Y/%m")
-    return [f"{prefix}/{prev}/", f"{prefix}/{now_utc.strftime('%Y/%m')}/"]
+    """Current + previous month partitions — always covers the liveness window.
+
+    #2798: the month segment is NOT the runner's month. `ingestion_framework._archive_raw`
+    slices `{YYYY}/{MM}` out of the record's `date_str`, which is a PACIFIC calendar day —
+    so on the last PT evening of a month a UTC-derived pair listed next month (empty) plus
+    the current one, and dropped the month that actually held the newest object.
+    """
+    today = now_utc.astimezone(PACIFIC).date()
+    prev = (today.replace(day=1) - timedelta(days=1)).strftime("%Y/%m")
+    return [f"{prefix}/{prev}/", f"{prefix}/{today.strftime('%Y/%m')}/"]
 
 
 def _newest_raw_object_age_days(s3, s3_bucket, layout, now_utc):

@@ -38,10 +38,11 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone  # noqa: F401 — `timezone` still used for instants
 from pathlib import Path
 
 import boto3
+from common.pacific_time import pacific_now  # #2798: the operator reads this subject in PT
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -447,7 +448,7 @@ def _is_first_monday_of_month() -> bool:
 
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
-    scan_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    scan_date = pacific_now().strftime("%Y-%m-%d %H:%M PT")
 
     # First-Monday guard (bypass with event={"force": true})
     if not event.get("force") and not _is_first_monday_of_month():

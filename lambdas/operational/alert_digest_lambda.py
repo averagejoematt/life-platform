@@ -32,6 +32,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 import boto3
+from common.pacific_time import pacific_today  # #2798: the digest names the Pacific day
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 try:
@@ -173,7 +174,7 @@ def _fetch_standing_alarms():
 
 def _format_email(grouped, standing=None):
     standing = standing or []
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()
     distinct = len(grouped)
     total = sum(g["count"] for g in grouped.values())
     subject = f"[LP digest {today}] {distinct} alarm(s), {total} fire(s)"

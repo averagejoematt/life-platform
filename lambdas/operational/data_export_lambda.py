@@ -22,11 +22,11 @@ Environment variables:
 import json
 import logging
 import os
-from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common.pacific_time import pacific_today  # #2798: the export is named for the Pacific day it covers
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -148,7 +148,7 @@ def lambda_handler(event, context):
           {"export_type": "source", "source": "whoop"} — single source
         """
         export_type = event.get("export_type", "full")
-        export_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        export_date = pacific_today()
 
         logger.info(f"Starting {export_type} export for {export_date}")
 
