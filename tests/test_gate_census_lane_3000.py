@@ -81,7 +81,27 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # Seeded 2026-08-24 (#3000): measured 523 gates total, 513 unproven, 7 proven, 3
 # attempted-unproven (`python3 scripts/gate_census.py --json`). Ceilings banked with
 # headroom above that, not at the exact measured value.
-BASELINE_TOTAL_GATES = 560
+# 2026-08-26 (#3202): 560 → 561. The one new entry, named because a ceiling bump whose
+# diff does not say what grew the inventory is the silent drift this ratchet exists to
+# prevent. Diffed census-vs-census (origin/main tree vs this branch): exactly one id
+# ADDED, none removed —
+#
+#     guard::lambdas/ai/coach_gate_retention.py   family=guard-script   verdict=unproven
+#
+# RULING: it is NOT a gate, and it is unproven by CLASSIFICATION rather than by neglect.
+# The file is `ai_calls._retain_coach_brief_flag`'s body, extracted so the #1665 module-size
+# ratchet on `ai_calls.py` stayed honest; it persists a fired quality-gate verdict as eval
+# data (`eval_retention.retain`). It enforces nothing, blocks nothing, and is deliberately
+# fail-soft (`except Exception: pass` — "retention is never load-bearing"), so #2578's
+# can-fail bar does not apply: there is no failure for it to be proven capable of.
+# It matched on FILENAME ONLY — `_GUARD_NAME`'s `.*_gate[a-z0-9_]*\.py$` alternative fires
+# on "coach_GATE_retention.py" — and then landed in `discover_guard_scripts`' `no_nonzero_exit`
+# bucket, whose own detail line already anticipates this case: "it may be a library, or it
+# may be unable to fail". It is a library. Recorded here rather than dodged by renaming the
+# module, because the name is accurate (it IS the coach gate's retention) and because the
+# census's own false-positive rate is worth seeing in the ledger.
+# Unproven is 535 against the 550 ceiling — untouched, no bump needed.
+BASELINE_TOTAL_GATES = 561
 BASELINE_UNPROVEN_GATES = 550
 
 
