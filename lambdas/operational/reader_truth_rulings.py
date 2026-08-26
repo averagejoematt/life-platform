@@ -645,11 +645,18 @@ def is_sparsity_objection(finding):
 # continuing elsewhere corroborates nothing about whether the ACTIVE categories
 # were touched. DEMOTED to low, never dropped — advisory, printed, never silently
 # swallowed.
+#
+# THE PHRASING IS LOOSELY MATCHED ON PURPOSE (the #3199 sparsity-objection sibling
+# measured, live, that a keyword-matched suppressor does not survive the oracle's
+# rephrasing, #2959): the silence verb and the Day-1/current-cycle clause each
+# tolerate the ordinary paraphrases observed across this file's other #2959
+# members, rather than requiring the wire note's exact word order.
 _ACTIVE_LOGGING_SILENT_RE = re.compile(
-    r"\bactive\s+(?:logging|tracking)\s+(?:went\s+silent|has\s+been\s+silent|stopped|paused|gone\s+quiet)\b", re.I
+    r"\bactive\s+(?:logging|tracking)\b[^.?!]{0,60}?\b(?:went\s+silent|has\s+been\s+silent|silent|stopped|paused|gone\s+quiet|quiet)\b",
+    re.I,
 )
-_SINCE_DAY_ONE_RE = re.compile(r"\bis\s+Day\s+1\s+of\s+the\s+current\s+cycle\b", re.I)
-_TODAY_IS_DAY_N_RE = re.compile(r"\btoday\s+is\s+Day\s+\d{1,3}\b", re.I)
+_SINCE_DAY_ONE_RE = re.compile(r"\bis\s+Day\s+1\b[^.?!]{0,40}?\b(?:cycle|genesis)\b", re.I)
+_TODAY_IS_DAY_N_RE = re.compile(r"\btoday\b[^.?!]{0,20}?\bDay\s+(\d{1,3})\b|\bDay\s+(\d{1,3})\b[^.?!]{0,20}?\btoday\b", re.I)
 
 
 def is_active_vs_passive_objection(finding):
@@ -657,9 +664,10 @@ def is_active_vs_passive_objection(finding):
     claim with nothing but a Day-1/today restatement (#3199).
 
     Structural conditions, all required: temporal_contradiction; the note quotes
-    an "active logging/tracking went silent" claim; the note states that the
-    claimed since-date is Day 1 of the current cycle; and the note states today's
-    day number. A note offering any OTHER evidence against the claim (a cited
+    an "active logging/tracking … silent" claim; the note states that the claimed
+    since-date is Day 1 of the current cycle; and the note states today's day
+    number, which must be greater than 1 (the elapsed-time restatement this class
+    is). A note offering any OTHER evidence against the claim (a cited
     active-category entry after the since-date, a since-date that is NOT Day 1 —
     the banner-itself-wrong shape, #2941) is a live objection and survives.
     """
@@ -670,4 +678,8 @@ def is_active_vs_passive_objection(finding):
         return False
     if not _SINCE_DAY_ONE_RE.search(note):
         return False
-    return bool(_TODAY_IS_DAY_N_RE.search(note))
+    m = _TODAY_IS_DAY_N_RE.search(note)
+    if not m:
+        return False
+    today_n = int(m.group(1) or m.group(2))
+    return today_n > 1
