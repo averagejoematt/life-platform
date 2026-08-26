@@ -1249,66 +1249,11 @@ def _quality_gate_correction_note(report):
     return "\n".join(lines)
 
 
-def _grounding_allowlist(generation_brief):
-    """The #2573 allow-list carried on the brief, as a set (empty when absent) — #3202."""
-    if not isinstance(generation_brief, dict):
-        return set()
-    try:
-        return {float(n) for n in (generation_brief.get("grounding_allowlist") or [])}
-    except (TypeError, ValueError):  # noqa: BLE001 — retention is never load-bearing
-        return set()
-
-
-def _retain_coach_brief_flag(coach_id, verdict, draft, final, report, generation_brief=None):
-    """#744: persist a fired coach-quality-gate verdict (draft + findings +
-    disposition) as eval data via the SAME `eval_retention.py` mechanism #812
-    wired for the other 5 surfaces. `ai_calls._enforce_quality_gate` is the
-    ORIGINAL surface #744 named — the highest-fire-rate ADR-104-adjacent gate
-    in the platform (10.2% of 206 logged verdicts over 30 days, ADR-108) — and
-    #812 did not reach it (it wired the 5 newer golden_surface_eval surfaces
-    only). Fail-soft: never affects the coach pipeline.
-    """
-    try:
-        from experiment import eval_retention
-
-        findings = []
-        for v in report.get("anti_pattern_violations") or []:
-            phrase = v.get("phrase") if isinstance(v, dict) else v
-            if phrase:
-                findings.append({"type": "anti_pattern", "detail": phrase})
-        for v in report.get("decision_class_violations") or []:
-            if isinstance(v, dict):
-                findings.append({"type": "decision_class", "detail": v.get("excerpt", "")})
-        for flag in report.get("cross_coach_similarity_flags") or []:
-            if isinstance(flag, dict):
-                findings.append({"type": "cross_coach_similarity", "detail": flag.get("reason", "")})
-        for v in report.get("cycle_boundary_violations") or []:  # #1973
-            if isinstance(v, dict):
-                findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
-        # #3202: the ONE class that actually held the two reader-facing coaches was the
-        # one this retention dropped. Its absence is why root-causing the 08-26 holds
-        # meant reconstructing the drafts from DDB and re-running the grounder offline:
-        # the retained record had the text and not the reason. With this, the next
-        # diagnosis is a query.
-        _grounding = report.get("number_grounding") if isinstance(report.get("number_grounding"), dict) else {}
-        for f in _grounding.get("findings") or []:
-            if isinstance(f, dict):
-                findings.append({"type": f.get("type"), "detail": f.get("detail", "")})
-        eval_retention.retain(
-            "coach_brief",
-            verdict,
-            draft=draft or "",
-            final=final or "",
-            findings=findings,
-            allowed=set(_grounding_allowlist(generation_brief)),
-            facts=(generation_brief or {}).get("authoritative_facts") if isinstance(generation_brief, dict) else None,
-            # `extra` stays exactly the two keys #744 defined — the grounding verdict is
-            # already recoverable from the retained findings, and tests/test_coach_quality_gate_390.py
-            # pins this dict by equality on purpose.
-            extra={"coach_id": coach_id, "score": report.get("score")},
-        )
-    except Exception:  # noqa: BLE001 — retention is never load-bearing
-        pass
+# #3202: the body moved to ai/coach_gate_retention.py (the #1665 ratchet's "cohesive
+# helper module beside it", not a baseline raise). Re-exported under its original name so
+# every caller and the #390 tests that monkeypatch `ai_calls._retain_coach_brief_flag`
+# keep working unchanged — `_enforce_quality_gate` resolves it from this module's globals.
+from ai.coach_gate_retention import retain_coach_brief_flag as _retain_coach_brief_flag  # noqa: E402
 
 
 def _enforce_quality_gate(
@@ -1375,9 +1320,8 @@ def _enforce_quality_gate(
         return None, report
 
     if fired:
-        _retain_coach_brief_flag(
-            coach_id, "flagged_corrected" if attempts else "flagged_kept_best", original_draft, output_text, report, generation_brief
-        )
+        _v = "flagged_corrected" if attempts else "flagged_kept_best"
+        _retain_coach_brief_flag(coach_id, _v, original_draft, output_text, report, generation_brief)
     return output_text, report
 
 
@@ -1954,21 +1898,15 @@ Write your {domain_label} coaching section now."""
                 except Exception:  # noqa: BLE001
                     _sr_mod = None
 
-                # #3202: arm the cycle-freshness classes HERE, in the corrective-rewrite
-                # loop. They were armed only on the BLOCKING quality gate
-                # (coach_quality_gate._number_grounding_report spreads
-                # **cycle_gate_params) and on an advisory post-gate check further down
-                # this function that a held draft never reaches — so a stale_phase /
-                # experiment_span / stale_baseline finding met the hard gate having
-                # never been offered a rewrite. coach_quality_gate's own docstring says
-                # the two gates "cannot disagree by construction"; with an asymmetric
-                # armed-class set that was not true, and the disagreement is exactly
-                # what held nutrition_coach and mind_coach dark every cycle.
+                # #3202: arm the cycle-freshness classes HERE too. Only the BLOCKING quality
+                # gate spread **cycle_gate_params, so a stale_phase/experiment_span finding
+                # met the hard gate having never been offered a rewrite — the asymmetry that
+                # held nutrition_coach and mind_coach dark every cycle.
                 try:
                     from ai.grounding_gate_params import cycle_gate_params as _cgp
 
                     _fresh_kwargs = _cgp()
-                except Exception:  # noqa: BLE001 — same fail-soft contract as the module itself
+                except Exception:  # noqa: BLE001 — the gate-params module's own fail-soft contract
                     _fresh_kwargs = {}
 
                 def _findings_fn(_t):

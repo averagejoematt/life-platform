@@ -84,6 +84,25 @@ except Exception:  # noqa: BLE001
     pass
 
 
+def grounding_from_brief(generation_brief: Any) -> tuple:
+    """The READ half of `brief_with_grounding` — ``(allowed_numbers_set, facts_or_None)``
+    recovered from a brief that carries the #2573 grounding context (#3202).
+
+    Lives here because this module already owns both keys; the alternative was a private
+    reader in the size-ratcheted `ai_calls`, which is exactly the "cohesive helper module
+    beside it" case the #1665 ratchet asks for. Total, never raising: a brief that is not
+    a dict, or carries no allow-list, or carries an unparseable one, yields ``(set(), …)``
+    — its only caller is `eval_retention`, which is never load-bearing.
+    """
+    if not isinstance(generation_brief, dict):
+        return set(), None
+    try:
+        allowed = {float(n) for n in (generation_brief.get(GROUNDING_ALLOWLIST_KEY) or [])}
+    except (TypeError, ValueError):
+        allowed = set()
+    return allowed, generation_brief.get(AUTHORITATIVE_FACTS_KEY)
+
+
 def brief_with_grounding(
     generation_brief: Any,
     canonical_facts: Optional[dict] = None,
