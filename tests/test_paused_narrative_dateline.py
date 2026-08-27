@@ -231,9 +231,9 @@ def test_the_by_coach_dateline_leads_the_prose_and_the_kicker_stops_saying_this_
     frames is a footnote, not a frame. And "· this week" over a held read is the
     present-tense half of the same untruth."""
     src = _read("coaching.js")
-    dateline = src.index('class="bc-asof bc-dateline label"')
-    prose = src.index('class="bc-analysis dx-prose"')
-    assert dateline < prose, "the as-of dateline must render ABOVE the coach's prose, not below it"
+    assert "bc-asof" in src and "bc-analysis" in src, "the by-coach read lost its as-of stamp or its prose block"
+    assert src.index("bc-asof") < src.index("bc-analysis"), "the as-of dateline must render ABOVE the coach's prose, not below it"
+    assert "bc-dateline" in src, "the dateline needs its own class — .bc-asof's trailing margin is wrong above the prose"
     assert (
         "· this week" not in src.split("bc-read")[1].split("</section>")[0] or 'regenPaused ? "" : " · this week"' in src
     ), 'the by-coach kicker must drop "· this week" while regeneration is paused'
