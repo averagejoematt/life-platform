@@ -182,9 +182,9 @@ _SCAN_DIRS = ("lambdas", "tests", "scripts", "mcp", "deploy", "cdk")
 _SKIP_PARTS = {"__pycache__", "node_modules", "cdk.out", ".venv", "site-packages"}
 
 
-def _python_files():
+def _python_files(root=_ROOT):
     for top in _SCAN_DIRS:
-        for dirpath, dirnames, filenames in os.walk(os.path.join(_ROOT, top)):
+        for dirpath, dirnames, filenames in os.walk(os.path.join(root, top)):
             dirnames[:] = [d for d in dirnames if d not in _SKIP_PARTS and not d.startswith(".")]
             for fn in filenames:
                 if fn.endswith(".py"):
@@ -203,17 +203,17 @@ def _is_image_block_dict(node):
     return False
 
 
-def _census():
+def _census(root=_ROOT):
     """{(relpath, enclosing function or '<module>')} for every image-block literal."""
     found = set()
-    for path in _python_files():
+    for path in _python_files(root):
         with open(path, encoding="utf-8") as f:
             src = f.read()
         if '"type": "image"' not in src and "'type': 'image'" not in src:
             continue  # cheap prefilter only — the AST below is the authority
         tree = ast.parse(src, filename=path)
         funcs = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-        rel = os.path.relpath(path, _ROOT)
+        rel = os.path.relpath(path, root)
         for node in ast.walk(tree):
             if not _is_image_block_dict(node):
                 continue
@@ -241,27 +241,49 @@ def test_exactly_one_screenshot_to_judge_image_block_implementation():
     )
 
 
-def test_the_census_actually_detects_a_new_copy(tmp_path, monkeypatch):
+def test_the_census_actually_detects_a_new_copy(tmp_path):
     """The negative control, made to FAIL for real. A guard that cannot fail is the
-    #2578 class — so plant a fresh copy on disk inside the scanned tree and prove
-    the census names it."""
-    planted = os.path.join(_ROOT, "scripts", "_zz_3079_census_probe.py")
-    with open(planted, "w", encoding="utf-8") as f:
-        f.write(
-            "def _sneaky_copy(path):\n"
-            "    import base64\n"
-            "    with open(path, 'rb') as fh:\n"
-            "        b64 = base64.b64encode(fh.read()).decode()\n"
-            '    return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}\n'
-        )
-    try:
-        found = _census()
-        assert ("scripts/_zz_3079_census_probe.py", "_sneaky_copy") in found, "the census must see a newly added copy"
-        assert found - set(SANCTIONED_IMAGE_BLOCK_SITES), "an unregistered copy must be reported, not tolerated"
-    finally:
-        os.remove(planted)
+    #2578 class — so plant a fresh copy and prove the census names it.
 
-    # and with the probe gone, the guard is green again — no residue
+    The probe lives in a synthetic tree under tmp_path, NOT in the repo. Writing it
+    into the real `scripts/` would have been a stronger-looking proof and a worse
+    test: this file now runs in the pre-merge lane alongside a dozen other tree
+    sweeps (test_root_clutter_guard, test_gate_census_2578, test_leak_token_sweep),
+    and any hard exit that skips the cleanup — a lane timeout, a kill — leaves an
+    untracked stray that reds one of THOSE, somewhere else, on someone else's PR.
+    Coverage of the real tree is asserted separately below, where it costs nothing.
+    """
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "sneaky.py").write_text(
+        "def _sneaky_copy(path):\n"
+        "    import base64\n"
+        "    with open(path, 'rb') as fh:\n"
+        "        b64 = base64.b64encode(fh.read()).decode()\n"
+        '    return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}\n',
+        encoding="utf-8",
+    )
+    found = _census(root=str(tmp_path))
+    assert ("scripts/sneaky.py", "_sneaky_copy") in found, "the census must see a newly added copy"
+    assert found - set(SANCTIONED_IMAGE_BLOCK_SITES), "an unregistered copy must be reported, not tolerated"
+
+
+def test_the_census_sweep_actually_reaches_every_directory_it_claims(tmp_path):
+    """The other half of the control: a detector that works on a synthetic tree is
+    worthless if the real sweep never walks the directories a copy would land in.
+    Pin one known file per scanned top-level dir — an os.walk that silently stopped
+    covering `scripts/` (where the #3079 copy actually lived) reds here."""
+    swept = {os.path.relpath(p, _ROOT) for p in _python_files()}
+    for known in (
+        "scripts/fresh_eyes_discovery.py",
+        "tests/visual_ai_qa.py",
+        "lambdas/experiment/eyeball_calibration.py",
+        "mcp/registry.py",
+        "deploy/sync_doc_metadata.py",
+        "cdk/stacks/operational_stack.py",
+    ):
+        assert known in swept, f"the census sweep never reaches {known} — a copy hidden there would be invisible"
+
+    # and the guard's real-tree verdict has no residue of the synthetic probe above
     assert not (_census() - set(SANCTIONED_IMAGE_BLOCK_SITES))
 
 

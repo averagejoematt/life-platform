@@ -265,6 +265,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # putting it post-merge would repeat this epic's own "model-guard-post-merge-only" fold.
         "test_doc_restamp_rule_2986.py",
         "test_budget_guard_fail_closed_2824.py",  # #2824: os.walk sweep — no lambdas/mcp module may re-declare FAIL_CLOSED_FEATURES; membership lives in budget_guard alone
+        # #3079: the ONE screenshot -> vision-judge prepare path. An os.walk AST census
+        # over lambdas/ tests/ scripts/ mcp/ deploy/ cdk/ for every `{"type": "image"}`
+        # block, checked against a registry carrying a written reason per site. Pure repo
+        # shape, and pre-merge because the whole defect was a SECOND copy of the prepare
+        # path landing without anyone having to decide it was a good idea — a red that
+        # arrives after the merge is the unguarded copy already in the tree, which is the
+        # post-merge-only fold #2372 exists to stop. 8 tests in ~1.2s.
+        "test_shared_image_prepare_3079.py",
         "test_csp_hardening_3048.py",  # #3048: site/ tree sweep — no non-legacy page may reintroduce an executable inline script; repo-shape, pre-merge
         "test_grant_enumeration_drift.py",  # #2824: consumer⊆granted across cdk/stacks + lambdas/ + .github/workflows + infra/iam — a new fail-closed consumer (or a role that drops a grant) must red BEFORE the merge, not after the channel is already stranded
         "test_no_hardcoded_feature_tier.py",
