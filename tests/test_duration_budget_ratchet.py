@@ -87,6 +87,19 @@ files that hold the repo-scan family, before vs after, same machine):
   after   129 tests in 135.41s   -28.35s (-17.3%); 2003 and wiki::test_doc_facts_clean
                                  leave the top-20 entirely (they are now cache hits)
 
+AND THE SHED'S OWN FIRST ATTEMPT SHIPPED HALF-BROKEN, which is the lesson worth more
+than the seconds. PR #3231's first CI run still showed
+`test_wiki_checkers.py::test_doc_facts_clean` at 21.59s: the cache's own test file
+used an autouse `cache_clear()` on the SHARED memo table, and it sorts BETWEEN
+`test_doc_facts_ops_*.py` and `test_wiki_checkers.py`, so it discarded a scan the
+suite had already paid for. Every one of those tests was green; the entire symptom
+was one line in a `--durations` block. The fixture now swaps in a private table
+(`repo_scan_cache.new_cache()`) and `test_k_this_files_own_fixture_must_never_clear_
+the_SHARED_cache` pins it via AST. Re-measured locally in the interleaved order
+(1957 -> 2003 -> the cache tests -> wiki): ONE 14.92s scan remains, plus the
+deliberately-unshared decade-clock advisory run. A performance fix has no failing
+test to tell you it did not work — check the durations, not the checkmarks.
+
 THE CLASS IS THEREFORE NOT "we keep adding tests". It is:
 
     suite cost = (number of tests that shell out to a shared repo scanner)

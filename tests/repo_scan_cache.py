@@ -65,12 +65,31 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-@functools.lru_cache(maxsize=None)
-def _run_once(argv: tuple[str, ...], cwd: str, env_overrides: tuple[tuple[str, str], ...]) -> subprocess.CompletedProcess:
-    env = None
-    if env_overrides:
-        env = dict(os.environ, **dict(env_overrides))
-    return subprocess.run(list(argv), cwd=cwd, capture_output=True, text=True, env=env)
+def new_cache():
+    """A FRESH, independent memo table.
+
+    Exists so the cache's own tests can `monkeypatch.setattr(repo_scan_cache,
+    "_run_once", repo_scan_cache.new_cache())` and exercise hit/miss behaviour in
+    isolation, with monkeypatch restoring the shared table afterwards. THIS IS NOT
+    COSMETIC — #3224's first CI run proved it. The test file used an autouse
+    `cache_clear()` on the SHARED table; it sorts between `test_doc_facts_ops_*.py`
+    and `test_wiki_checkers.py`, so it threw away a scan already paid for and
+    `test_wiki_checkers.py::test_doc_facts_clean` re-spawned at 21.59s. Half the
+    saving evaporated with all 12 of those tests still green — visible ONLY in the
+    `--durations` block. Never clear the shared table to set up a test; swap.
+    """
+
+    @functools.lru_cache(maxsize=None)
+    def _run(argv: tuple[str, ...], cwd: str, env_overrides: tuple[tuple[str, str], ...]) -> subprocess.CompletedProcess:
+        env = None
+        if env_overrides:
+            env = dict(os.environ, **dict(env_overrides))
+        return subprocess.run(list(argv), cwd=cwd, capture_output=True, text=True, env=env)
+
+    return _run
+
+
+_run_once = new_cache()
 
 
 def run_repo_scan(script: str, *args: str, cwd: Path | str | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
@@ -90,9 +109,12 @@ def run_repo_scan(script: str, *args: str, cwd: Path | str | None = None, env: d
 
 
 def cache_clear() -> None:
-    """Drop every memoized scan. For the cache's own tests — not for test setup:
-    if a test needs a fresh scan because it changed the tree, it must call
-    ``subprocess.run`` directly (see the module docstring)."""
+    """Drop every memoized scan on the CURRENT table.
+
+    Do NOT call this to set up a test — see `new_cache()` for the incident that
+    warning is made of. It exists for a caller that genuinely invalidated the tree
+    and knows every other consumer wants the new answer.
+    """
     _run_once.cache_clear()
 
 
