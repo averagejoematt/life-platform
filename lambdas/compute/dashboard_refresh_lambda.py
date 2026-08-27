@@ -370,16 +370,23 @@ def refresh_dashboard(profile, yesterday, today):
     #       rows for steps and water, so today's glucose-free row was truthy and
     #       SHADOWED yesterday's real reading — the source went backwards, silently.
     #   (b) every write was `if glucose_x:` with no `else`, so once a value was in
-    #       `existing` nothing could ever remove it. The doc carries no date, so a
+    #       `existing` nothing could ever REMOVE it. The doc carries no date, so a
     #       retained number is not merely old, it is undatable.
-    # Now: pick the newest row that actually CARRIES glucose, then let the registry's
-    # reader bar decide whether it may still be published as current — and CLEAR the
-    # fields when it may not, so absence is stated rather than papered over (ADR-104).
+    # The per-field `if value:` retention INSIDE the live branch is deliberate and
+    # stays: this lambda runs at 2 PM and 6 PM and merges into the morning brief's
+    # doc, so a partial day that has not yet computed an average must not blank the
+    # morning's. That is intraday accumulation, not staleness. What was missing is
+    # the `else` — a day with NO live sensor at all, where retention has nothing to
+    # accumulate toward and simply preserves a dead number forever.
     gl = existing.setdefault("glucose", {})  # the stored doc predates this key on a cold artifact
     glucose_src = None
     glucose_as_of = None
     for row, row_date in ((apple_today, today.isoformat()), (apple, yesterday)):
-        if row and safe_float(row, "blood_glucose_avg"):
+        # Presence is ANY `blood_glucose_*` attribute, not specifically the average:
+        # a partial intraday row can carry readings and variability before an average
+        # is computed, and such a row IS a live sensor. The glucose-free steps/water
+        # row that caused (a) carries none of them, so it can no longer shadow.
+        if row and any(str(k).startswith("blood_glucose_") for k in row):
             glucose_src, glucose_as_of = row, row_date
             break
     if glucose_src and carry_forward_ok("cgm", glucose_as_of, today.isoformat()):
@@ -387,8 +394,9 @@ def refresh_dashboard(profile, yesterday, today):
         glucose_tir = safe_float(glucose_src, "time_in_range_pct")
         glucose_std = safe_float(glucose_src, "blood_glucose_std")
         glucose_min = safe_float(glucose_src, "blood_glucose_min")
-        gl["avg"] = glucose_avg
         gl["as_of"] = glucose_as_of
+        if glucose_avg:
+            gl["avg"] = glucose_avg
         if glucose_tir:
             gl["tir_pct"] = glucose_tir
         if glucose_std:

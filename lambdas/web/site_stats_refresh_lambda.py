@@ -83,6 +83,47 @@ def _get_latest(table, source, days_back=2):
         return {}
 
 
+def resolve_glucose(apple_health, existing_vitals, today):
+    """The CGM average public_stats.json may publish, and the day it is from (#3204).
+
+    Returns ``(glucose_avg, glucose_as_of)`` — both None when there is nothing
+    honest to publish.
+
+    This was three lines inline, and the `else` branch re-read this artifact's OWN
+    previous ``public_stats.json``:
+
+        glucose_avg = _safe_float(apple_health, "blood_glucose_avg")
+        if glucose_avg: fresh_vitals["glucose_avg"] = round(glucose_avg)
+        else:           fresh_vitals["glucose_avg"] = ev.get("glucose_avg")
+
+    So when the Dexcom Stelo session ended on 2026-08-24 the file went on
+    republishing ``glucose_avg: 107`` every single day — **undated**, sitting beside
+    a correctly dated ``weight_as_of``, with no mechanism anywhere that could expire
+    it. Worse than ``/api/glucose``, which at least stamped a date a reader (and the
+    nightly oracle) could check.
+
+    Carrying a value forward is honest only while it is still current, and "still
+    current" is the registry's number, not this module's opinion — ``reader_surface.
+    max_days_behind`` for the ``cgm`` sub-datatype (ADR-104, #2003). A carried value
+    now travels WITH its date, so the next run can judge it; a value that fails the
+    bar is dropped rather than republished. A pre-#3204 artifact has no
+    ``glucose_as_of`` to judge, and an undatable number cannot be shown to be
+    current, so it is dropped too — self-healing on the first day a sensor lands.
+
+    Extracted so the decision is reachable by a test: ``lambda_handler`` synchronously
+    invokes the real ingestion Lambdas before it gets here, so the branch was
+    unreachable in-process while it lived inline.
+    """
+    fresh = _safe_float(apple_health, "blood_glucose_avg")
+    if fresh:
+        return round(fresh), (apple_health.get("sk", "").replace("DATE#", "") or None)
+
+    prior_as_of = (existing_vitals or {}).get("glucose_as_of")
+    if prior_as_of and carry_forward_ok("cgm", prior_as_of, today):
+        return (existing_vitals or {}).get("glucose_avg"), prior_as_of
+    return None, None
+
+
 def resolve_tier0_streak(computed_metrics_record, existing_platform):
     """#3172: `tier0_streak` is written by daily-metrics-compute onto the
     ``computed_metrics`` ``DATE#`` row (``store_computed_metrics`` in
@@ -191,26 +232,7 @@ def lambda_handler(event, context):
     char_tier = character.get("character_tier") if character else None
 
     # ── 5d. Glucose average (CGM from apple_health) ──────────────────────
-    # #3204: the `else` here used to re-read this artifact's OWN previous
-    # public_stats.json, so once the 2026-08-24 sensor session ended the file kept
-    # republishing `glucose_avg: 107` every single day — UNDATED, beside a correctly
-    # dated `weight_as_of`, with nothing to make it decay. Worse than the endpoint,
-    # which at least stamps a date. Carrying a value forward is only honest while it
-    # is still current, and "still current" is the registry's number (ADR-104).
-    glucose_avg = _safe_float(apple_health, "blood_glucose_avg")
-    if glucose_avg:
-        fresh_vitals["glucose_avg"] = round(glucose_avg)
-        fresh_vitals["glucose_as_of"] = apple_health.get("sk", "").replace("DATE#", "") or None
-    else:
-        prior_as_of = ev.get("glucose_as_of")
-        if prior_as_of and carry_forward_ok("cgm", prior_as_of, datetime.now(PT).strftime("%Y-%m-%d")):
-            fresh_vitals["glucose_avg"] = ev.get("glucose_avg")
-            fresh_vitals["glucose_as_of"] = prior_as_of
-        else:
-            # Sensor dark (or a pre-#3204 artifact with no date to judge). State the
-            # absence; never republish an undatable number as though it were today's.
-            fresh_vitals["glucose_avg"] = None
-            fresh_vitals["glucose_as_of"] = None
+    fresh_vitals["glucose_avg"], fresh_vitals["glucose_as_of"] = resolve_glucose(apple_health, ev, datetime.now(PT).strftime("%Y-%m-%d"))
 
     # ── 5e. Nutrition summary (MacroFactor) ──────────────────────────────
     macrofactor = _get_latest(table, "macrofactor")

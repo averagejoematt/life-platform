@@ -252,3 +252,59 @@ def test_a_dark_endpoint_no_longer_trips_the_reader_truth_oracle():
     # trivially the assertion above proves nothing.
     stale_shape = {"glucose": {"avg_mg_dl": 104.3, "as_of_date": LAST_READING}}
     assert len(_stale_as_of_findings("/api/glucose", stale_shape, TODAY)) == 1
+
+
+# ── generated/public_stats.json — the undated artifact that never decayed ─────
+
+
+def _resolve_glucose(*args):
+    from web.site_stats_refresh_lambda import resolve_glucose
+
+    return resolve_glucose(*args)
+
+
+def test_public_stats_publishes_todays_reading_with_the_day_it_came_from():
+    """A carried value must travel WITH its date. The artifact published
+    `glucose_avg` beside a dated `weight_as_of` and no glucose date at all, so
+    nothing downstream — including the next run — could ever judge its age."""
+    row = {"sk": f"DATE#{TODAY}", "blood_glucose_avg": 104.3}
+    assert _resolve_glucose(row, {}, TODAY) == (104, TODAY)
+
+
+def test_public_stats_carries_yesterdays_reading_forward_inside_the_bar():
+    """Not a blanket ban on carry-forward: the writer runs before the day's CGM
+    aggregate lands, and one day behind is inside the registry's reader bar."""
+    prior = {"glucose_avg": 107, "glucose_as_of": "2026-08-26"}
+    assert _resolve_glucose({}, prior, TODAY) == (107, "2026-08-26")
+
+
+def test_public_stats_drops_a_reading_older_than_the_reader_bar():
+    """The #3204 wire state. Pre-fix this returned 107 forever, undated. The
+    must-fail control: the assertion is that the VALUE is gone, not that some key
+    exists — asserting presence would have passed against the bug."""
+    prior = {"glucose_avg": 107, "glucose_as_of": LAST_READING}
+    assert _resolve_glucose({}, prior, TODAY) == (None, None)
+
+
+def test_public_stats_drops_an_undatable_number_from_a_pre_fix_artifact():
+    """The first run after deploy meets an artifact carrying `glucose_avg: 107` and
+    no date. An undatable number cannot be shown to be current, so it is dropped —
+    and self-heals the moment a sensor lands. Publishing it 'just this once' is how
+    the value survived for days in the first place."""
+    assert _resolve_glucose({}, {"glucose_avg": 107}, TODAY) == (None, None)
+
+
+def test_public_stats_states_absence_when_there_is_no_history_at_all():
+    assert _resolve_glucose({}, {}, TODAY) == (None, None)
+
+
+def test_the_handler_actually_calls_the_extracted_decision():
+    """Extraction is only worth anything if the running path goes through it — an
+    inline copy left behind would make every test above a test of dead code."""
+    import inspect
+
+    from web import site_stats_refresh_lambda as srl
+
+    src = inspect.getsource(srl.lambda_handler)
+    assert "resolve_glucose(" in src, "the handler must delegate the decision"
+    assert 'ev.get("glucose_avg")' not in src, "the unconditional self-re-read must not survive in the handler"
