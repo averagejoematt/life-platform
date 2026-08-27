@@ -20,6 +20,7 @@ import boto3
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058 / #2109
+from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -362,21 +363,43 @@ def refresh_dashboard(profile, yesterday, today):
     # Glucose (CGM data accumulates throughout day)
     apple = fetch_date("apple_health", yesterday)
     apple_today = fetch_date("apple_health", today.isoformat())
-    # Use today's data if available (more current), else yesterday's
-    glucose_src = apple_today or apple
-    if glucose_src:
+    # #3204 — two defects lived in the three lines this replaces, and together they
+    # made the persisted dashboard doc the platform's longest-lived stale number:
+    #   (a) `apple_today or apple` picked the row, not the READING. When the CGM
+    #       session ended on 2026-08-24 the apple_health partition kept writing daily
+    #       rows for steps and water, so today's glucose-free row was truthy and
+    #       SHADOWED yesterday's real reading — the source went backwards, silently.
+    #   (b) every write was `if glucose_x:` with no `else`, so once a value was in
+    #       `existing` nothing could ever remove it. The doc carries no date, so a
+    #       retained number is not merely old, it is undatable.
+    # Now: pick the newest row that actually CARRIES glucose, then let the registry's
+    # reader bar decide whether it may still be published as current — and CLEAR the
+    # fields when it may not, so absence is stated rather than papered over (ADR-104).
+    gl = existing.setdefault("glucose", {})  # the stored doc predates this key on a cold artifact
+    glucose_src = None
+    glucose_as_of = None
+    for row, row_date in ((apple_today, today.isoformat()), (apple, yesterday)):
+        if row and safe_float(row, "blood_glucose_avg"):
+            glucose_src, glucose_as_of = row, row_date
+            break
+    if glucose_src and carry_forward_ok("cgm", glucose_as_of, today.isoformat()):
         glucose_avg = safe_float(glucose_src, "blood_glucose_avg")
         glucose_tir = safe_float(glucose_src, "time_in_range_pct")
         glucose_std = safe_float(glucose_src, "blood_glucose_std")
         glucose_min = safe_float(glucose_src, "blood_glucose_min")
-        if glucose_avg:
-            existing["glucose"]["avg"] = glucose_avg
+        gl["avg"] = glucose_avg
+        gl["as_of"] = glucose_as_of
         if glucose_tir:
-            existing["glucose"]["tir_pct"] = glucose_tir
+            gl["tir_pct"] = glucose_tir
         if glucose_std:
-            existing["glucose"]["variability"] = glucose_std
+            gl["variability"] = glucose_std
         if glucose_min:
-            existing["glucose"]["fasting_proxy"] = glucose_min
+            gl["fasting_proxy"] = glucose_min
+    else:
+        # Sensor dark. Absence STATED — the keys survive as nulls so a consumer sees
+        # "no reading", not a missing section it might paper over with a default.
+        for _k in ("avg", "tir_pct", "variability", "fasting_proxy", "as_of"):
+            gl[_k] = None
 
     # Zone 2 (may have done an afternoon workout)
     try:

@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta, timezone
 import boto3
 from common.constants import EXPERIMENT_START_DATE  # ADR-058
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
+from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 
 from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
 
@@ -190,11 +191,26 @@ def lambda_handler(event, context):
     char_tier = character.get("character_tier") if character else None
 
     # ── 5d. Glucose average (CGM from apple_health) ──────────────────────
+    # #3204: the `else` here used to re-read this artifact's OWN previous
+    # public_stats.json, so once the 2026-08-24 sensor session ended the file kept
+    # republishing `glucose_avg: 107` every single day — UNDATED, beside a correctly
+    # dated `weight_as_of`, with nothing to make it decay. Worse than the endpoint,
+    # which at least stamps a date. Carrying a value forward is only honest while it
+    # is still current, and "still current" is the registry's number (ADR-104).
     glucose_avg = _safe_float(apple_health, "blood_glucose_avg")
     if glucose_avg:
         fresh_vitals["glucose_avg"] = round(glucose_avg)
+        fresh_vitals["glucose_as_of"] = apple_health.get("sk", "").replace("DATE#", "") or None
     else:
-        fresh_vitals["glucose_avg"] = ev.get("glucose_avg")
+        prior_as_of = ev.get("glucose_as_of")
+        if prior_as_of and carry_forward_ok("cgm", prior_as_of, datetime.now(PT).strftime("%Y-%m-%d")):
+            fresh_vitals["glucose_avg"] = ev.get("glucose_avg")
+            fresh_vitals["glucose_as_of"] = prior_as_of
+        else:
+            # Sensor dark (or a pre-#3204 artifact with no date to judge). State the
+            # absence; never republish an undatable number as though it were today's.
+            fresh_vitals["glucose_avg"] = None
+            fresh_vitals["glucose_as_of"] = None
 
     # ── 5e. Nutrition summary (MacroFactor) ──────────────────────────────
     macrofactor = _get_latest(table, "macrofactor")
