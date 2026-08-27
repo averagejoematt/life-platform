@@ -74,8 +74,8 @@ CADENCE: dict[str, Any] = {
     "cost_usd_per_run": 3.73,  # measured 2026-08-10: $2.88 corpus + $0.85 panel
     "wall_clock_minutes": 25,
     "not_a_ci_gate_because": (
-        "ADR-063/133: the AI ceiling is $150 base (a $200 dated window for August 2026 only, "
-        "auto-reverting 2026-09-01) and the month is already projecting over it. At ~$3.73 and "
+        "ADR-063/133: the AI ceiling is $150 base (for August 2026 only, raised to $200 by a "
+        "dated window auto-reverting 2026-09-01) and the month is already projecting over it. At ~$3.73 and "
         "~25 minutes a run, gating every PR would spend more on measuring the coaches than on "
         "running them, and would trip the tier ladder into pausing the reader-facing narratives "
         "(band 2) to pay for a dev metric — exactly the audience ordering ADR-125 forbids. The "
