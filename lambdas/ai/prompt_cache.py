@@ -121,6 +121,65 @@ _CONSERVATIVE_FLOOR = 4096
 _CHARS_PER_TOKEN = 3.6
 
 
+# ── The per-caller decision register (#3085) ────────────────────────────────
+# `cache_control` on a call site is NOT evidence that the call site caches. The
+# registry above says what the floor IS; this one says, per caller, what we
+# DECIDED about that floor and on what measurement — so a reader at a call site
+# carrying `cache_control` can tell "this caches" from "this was measured and
+# deliberately left un-caching" without re-running the numbers.
+#
+# `prefix_tokens` is a WIRE measurement, not `estimate_tokens`: Bedrock
+# `CountTokens` against `anthropic.claude-haiku-4-5-20251001-v1:0` (the base id
+# of the `us.` inference profile the platform actually invokes — CountTokens
+# rejects the profile id itself), counting a request with the system block minus
+# the same request without it. Re-measure with that method if you change a prompt.
+#
+# The LIVE counterpart is `PromptCacheNoOp` (#2888): this register is the
+# intent, that metric is the outcome. `tests/test_prompt_cache_decisions_3085.py`
+# holds the two consistent.
+CACHING_DECISIONS: dict[str, dict[str, Any]] = {
+    "coach-quality-gate": {
+        "engaged": False,
+        "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "prefix_tokens": 814,
+        "decided": "2026-08-27",
+        "issue": 3085,
+        "why": (
+            "814 tok against Haiku 4.5's 4,096 floor — needs 5.03x growth to cache at all. "
+            "The largest legitimate prefix available is 2,238 tok (the whole of "
+            "config/coaches/_shared_standard.json hoisted in), 55% of the floor, so reaching "
+            "it needs ~1,858 tok of PURE PADDING inside a quality-JUDGE prompt. Measured prize "
+            "for padding both callers to the floor: $0.29/mo; the ceiling if the floor did not "
+            "exist at all is $0.69/mo (0.46% of the $150 ADR-133 ceiling). Not worth degrading "
+            "the judge for. Revisit if the model's floor drops or the prompt grows on its merits."
+        ),
+    },
+    "coach-state-updater": {
+        "engaged": False,
+        "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "prefix_tokens": 1783,
+        "decided": "2026-08-27",
+        "issue": 3085,
+        "why": (
+            "1,783 tok against Haiku 4.5's 4,096 floor — needs 2.30x growth. Its user turn is the "
+            "per-coach narrative (volatile by construction) and the metric allow-list is already "
+            "inside the system prompt, so there is no run-invariant block left to hoist: the "
+            "remaining 2,313 tok would be padding. Same $0.29/mo joint prize as the gate above."
+        ),
+    },
+}
+
+
+def caching_decision(function_name: Optional[str]) -> Optional[dict[str, Any]]:
+    """The recorded caching decision for `function_name`, or None if unrecorded.
+
+    Unrecorded is not a defect — most callers have never been measured. A caller
+    that IS recorded has been measured on the wire, and the test holds its
+    `engaged` flag consistent with `prefix_tokens` against its model's floor.
+    """
+    return CACHING_DECISIONS.get(function_name or "")
+
+
 def cache_floor(model_id: Optional[str]) -> int:
     """The minimum cacheable prefix, in tokens, for `model_id`.
 

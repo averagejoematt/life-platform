@@ -301,6 +301,10 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
         "messages": [{"role": "user", "content": user_message}],
     }
     if system:
+        # #3085: this `cache_control` is a NO-OP and that is the measured decision, not an
+        # oversight — EXTRACTION_SYSTEM_PROMPT is 1,783 tok against Haiku 4.5's 4,096 floor.
+        # It is left on deliberately (an ignored marker costs nothing, and it engages for free
+        # if the prompt ever grows on its merits). See ai.prompt_cache.CACHING_DECISIONS.
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
     payload = json.dumps(body).encode()
