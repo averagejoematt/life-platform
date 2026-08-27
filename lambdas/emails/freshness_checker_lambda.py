@@ -71,7 +71,7 @@ AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 # (a sensor-session lapse reports, it never pages). Lookback below covers the widest.
 # #746: the list now lives in the canonical source_registry (apple_health.hae_datatypes)
 # so every source threshold sits in one place; this is an alias, not a second copy.
-from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.pacific_time import PACIFIC, pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from ingestion.source_registry import hae_datatype_thresholds  # noqa: E402
 
 HAE_DATATYPES = hae_datatype_thresholds()
@@ -609,7 +609,21 @@ def lambda_handler(event, context):
         date_str = sk.replace("DATE#", "")[:10]  # Take only YYYY-MM-DD, ignore sub-record suffixes
 
         try:
-            last_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            # #2817: ANCHOR THE DAY IN THE FRAME THAT NAMES IT.
+            # `date_str` came off a `DATE#` sort key, and `DATE#` keys name PACIFIC
+            # calendar days. Anchoring it at UTC midnight placed the day's start
+            # 7h (PDT) / 8h (PST) BEFORE the day actually began, so `age_hours`
+            # overstated staleness by exactly the Pacific offset and the alert and
+            # warning tiers both fired that much early — with a silent one-hour
+            # seasonal shift across a DST transition. Invisible to the #2811/#2414
+            # matchers, which do not treat `strptime` as a clock: the sweep moved
+            # `now` to Pacific and left the other operand's anchor in UTC. The three
+            # sibling checks in this module (`compute_datatype_liveness`,
+            # `check_apple_health_datatypes`, `check_apple_health_activity`) already
+            # do honest day-vs-day arithmetic; this is the one that mixed a day with
+            # an instant. `.replace(tzinfo=PACIFIC)` is DST-correct — zoneinfo
+            # resolves the offset from the wall time, unlike a fixed -7/-8.
+            last_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=PACIFIC)
             age_hours = (now - last_date).total_seconds() / 3600
 
             source_stale_hrs = SOURCE_STALE_HOURS.get(source_key, STALE_HOURS)
