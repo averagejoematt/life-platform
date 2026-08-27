@@ -189,12 +189,27 @@ content had merged as #3259
    (#3045) · Notion secret deletion (#2890) · DIL-027 restore drill · S3 Batch Replication
    backfill · #3042 re-grade · Whoop re-auth · the `cf-auth-errors` alarm deletion.
 
-## Session I
+## Residual / next picks
 
-1. **#3260 and #3261 are the best-value work on the board** — both S-effort, both verified with
-   live positive controls, and #3261 is a reader-facing honesty violation republishing daily.
-2. **Run `fullreview-delta` only after deciding what it is.** #3250 covers it. If #3245's
-   consolidation lands first, the next run is a **new baseline**, not a delta — say so.
-3. **#2999** — Lane 4's status is the one open thread at wrap; check it before re-scoping.
-4. **#2848 box 4 needs gap 1 first**: deploy authorization exists nowhere in the repo. This
-   session exercised that authority from a boot prompt alone.
+- **#3260** — `slo-ai-coaching-success` is dimensionless and cannot fire; it slept through 191 real
+  failures in a single day. S-effort, verified with live positive controls. Best value on the board.
+- **#3261** — two live OG share cards publish fabricated numbers and regenerate **daily**, so this is
+  a reader-facing honesty violation that republishes itself every 24h. S-effort.
+- **#3257** — `/api/source_freshness` ages a Pacific key at UTC midnight; the public board and the ops
+  checker now disagree by 7h on the same key.
+- **#3250** — decide what `fullreview-delta` IS before running it. If #3245's review consolidation
+  lands first, the next run is a **new baseline**, not a delta, and must be recorded as one.
+- **#3264** — deploy authorization exists nowhere in the repo; #2848's box 4 cannot be checked until
+  this is closed. This session exercised that authority from a boot prompt alone.
+- **#2848** — open with a box-by-box verdict; boxes 2 and 4 unmet, five-item cold-read gap list posted.
+- **#2578** — carries #2999's residual (90 of family 5's 105 structural gates unproven; the other four
+  census families have no generated verdicts at all) plus the garmin alarm fold.
+- **#2801 / #2833 / #2834 / #3083 / #3251** — all `gate:owner`; parked, awaiting decisions — **not-work
+  — blocked on an owner call, not on an implementer.**
+- The **September 1 ceiling cliff** is 4 days out and #2801 is the decision that governs it —
+  **not-work — the call is the owner's; the measurement is done and posted.**
+- `Now` is lane-concentrated **sonnet 0 · opus 3 · fable 0** — a sonnet or fable session finds zero
+  startable stories however the total reads (#3254's new `now_lane_coverage` advisory reports it
+  every run) — **not-work — a supply fact, not a defect to fix.**
+- Five session worktrees remain at `/tmp/h-lane2`, `/tmp/h-lane3`, `/tmp/h-lane4`, `/tmp/h-lane5`,
+  `/tmp/sessionH` — **not-work — housekeeping; reap with `scripts/worktree_reaper.py`.**
