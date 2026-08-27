@@ -35,10 +35,19 @@ name: Cron freshness
 #      own CLI at session boot. A repo dormant that long is one where GitHub is
 #      auto-disabling the crons anyway and there is no live surface to protect.
 #
-# NO `paths:` FILTER, DELIBERATELY. The subject is the state of GitHub's scheduler, not
-# the content of the push. Filtering on paths would mean a week of site-only commits
-# leaves the check unrun — reintroducing this issue's own failure mode through the side
-# door.
+# THE `paths:` FILTER IS A DELIBERATE SUBSET OF WHAT ALREADY TRIGGERS ON MAIN.
+# The instinct is to run on every push with no filter at all — the subject is the state
+# of GitHub's scheduler, not the content of the push. That instinct is wrong here, and
+# for a specific reason: `deploy/drift_sentinel.py`'s swallowed-push detector (#1544)
+# models "a push whose files match no push-trigger glob legitimately queues zero runs".
+# A workflow firing on pushes that no other workflow fires on would make that model
+# report a falsehood — the correct use of gate A breaking gate B, the #2590 cross-gate
+# class. So this list is drawn ENTIRELY from globs already in the union
+# (`tests/test_drift_sentinel.py::test_push_trigger_globs_match_workflows` reds if it
+# ever is not), which leaves that detector's model exactly as true as it was.
+# Residual, bounded: a run of consecutive handover/MEMORY-only pushes matches nothing
+# here. Those are wrap commits — a handful per session, never a week — and the weekly
+# rows carry a 192h deadline, so a normal working week clears it many times over.
 #
 # LOUDNESS: on a detection the job FAILS, and the last step files ONE deduped tracked
 # issue via the same `.github/actions/advisory-failure-issue` composite every other
@@ -48,6 +57,26 @@ name: Cron freshness
 on:
   push:
     branches: [main]
+    # Every glob below already appears in another push-to-main workflow's filter — see
+    # the note above. Widening this list with a NEW glob is the thing to think twice
+    # about; narrowing it only costs fire frequency.
+    paths:
+      - 'lambdas/**'
+      - 'mcp/**'
+      - 'mcp_server.py'
+      - 'tests/**'
+      - 'cdk/**'
+      - 'ci/**'
+      - 'config/**'
+      - 'deploy/**'
+      - 'site/**'
+      - 'docs/**'
+      - '.claude/commands/**'
+      - '.github/workflows/**'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - 'README.md'
+      - 'CLAUDE.md'
   workflow_dispatch: {} # manual sweep / after a suspected cron outage
 
 permissions:
@@ -72,7 +101,9 @@ jobs:
       # requirements-dev.txt, never copied here (CQ-01, #2609). A missing PyYAML makes
       # the script exit 2 ("DARK"), never 0 — an unparseable board is not a clean one.
       - name: Install PyYAML (pinned from requirements-dev.txt)
-        run: python3 -m pip install --quiet "$(grep -iE '^pyyaml==' requirements-dev.txt)"
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pyyaml)   # versions from requirements-dev.txt (CQ-01, #2609)
+          pip install $PINS
 
       - name: Scheduled-workflow cadence watch
         env:
