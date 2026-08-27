@@ -16,6 +16,18 @@ write surface is your own worktree and your own branch.
 
 ## Non-negotiables (each one is a past incident)
 
+0. **Lane-unique scratch filenames.** The scratchpad is SHARED across concurrent agents.
+   Two lanes both wrote `pr_body.md`, clobbered each other in both directions, and a stray
+   `Fixes` line falsely auto-closed #3222 while that issue's work sat unmerged. Put your
+   issue number in every scratch filename, or pipe content via stdin.
+
+0b. **Your worktree lives OUTSIDE the repo** — not the .claude/worktrees or .worktrees
+   directories inside the checkout.
+   An in-repo worktree is a full second checkout that every repo-wide sweep walks: it has
+   red-mained the suite twice (#953), and it makes local runs disagree with CI in BOTH
+   directions. Beware the macOS case-twin — `~/Documents/Claude` and `~/documents/claude`
+   are the same directory, and edits through one leak into the tree the other names.
+
 1. **Stay in your assigned worktree.** Never `cd` into the main checkout and never use a
    different-case path variant of it — on macOS the case-insensitive "twin" path leaks
    your edits into the shared main tree (this has happened; it corrupts the driver's

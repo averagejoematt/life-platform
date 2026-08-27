@@ -29,6 +29,37 @@ behavior that full context explains.
    with read-only AWS/HTTP calls — never trust a number the finder quotes from memory.
    Read-only ONLY: no writes, no deploys, no invocations.
 
+## Five ways a finding is wrong that step 1 will not catch
+
+These accumulated after this file was first written, and each cost a real session.
+
+5. **Re-measure the PREMISE, not just the evidence.** The finding's own framing is a
+   hypothesis. Three of eight lanes in one session falsified the premise of the issue they
+   were sent to fix — a "composite score" that does not exist, 57 sites already swept, a
+   suite whose growth was 79.7% existing tests slowing down. If the premise is false, say
+   so; that is a more valuable result than a confirmed fix.
+6. **A wrong query form reads exactly like a defect.** Four times in one session: a
+   missing `--no-paginate`, an unpassed dimension, logs queried where metrics live, bash
+   syntax run under zsh. Before filing, **re-measure a different way**. Two methods
+   agreeing is evidence; one method repeated is not.
+7. **A measurement that examined nothing returns clean.** A 401 with no body read as a
+   clean privacy verdict; an argv overflow made `grep -c` return a confident `0`; a
+   CloudWatch query against a log group that does not exist returned 0 events and inverted
+   a live finding to "latent". **Print the denominator** — rows, bytes, files — beside any
+   verdict you report.
+8. **Never diagnose from a truncated log line.** A 300-char summary produced a confident,
+   wrong root cause that was reported to the owner. Pull the run artifact. This applies
+   doubly to an LLM judge's HIGH: the judge flakes HIGH on TRUE claims, and one flake
+   rolled back the very fix it was judging.
+9. **Check the finding is not machine-local.** A defect that reproduces only on the
+   finder's box is not a defect: a stale worktree, a gitignored build-staging directory,
+   or an untracked `.git/info/exclude` rule all make a sweep see files no clean checkout
+   has. Ask whether git tracks what the evidence depends on.
+
+Two standing cautions: a `Verified` stamp is a human claim (one doc carried 18 of 27
+`file:line` citations wrong while green — re-derive, do not trust the stamp), and do not
+take any agent's account of elapsed time or its own exit code at face value.
+
 ## Verdicts
 
 - **CONFIRMED** — you reproduced the defect/claim yourself; include YOUR reproduction
