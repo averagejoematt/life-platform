@@ -212,7 +212,7 @@ silent omission is not an outcome.**
 boot prompt. AUTONOMOUS with merge+deploy authority, ALL-OPUS, seven lanes; Fable untouched, so #3042 and
 #2849 were out of scope. **5 closed** (#3139, #3204, #2888, **#2798 — an EPIC**, #3079), **8 PRs merged**,
 **ZERO standalone filings** (findings folded as epic checkboxes: #2799 ×5, #2578 ×2 *closed*, #2798 ×1,
-#2801 ×1). **Open 47 → 43, net −4**, counting the machine-filed #3237 against me. **The spine epic #2801
+#2801 ×1). **Open 47 → 42, net −5** (#3237 was machine-filed AND machine-closed within the session). **The spine epic #2801
 was NOT closed, and that is the session's most important result:** every child closed and every `Done when`
 box verified true (the AWS backstop really is at $150; the EMF ledger really exists, 57 tests) — yet the
 Outcome fails. Live SSM shows projected **$175.18** against a ceiling that **auto-reverts $200 → $150 on

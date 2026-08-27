@@ -14,7 +14,10 @@ scope by definition. Previous handover archived as
 - **ZERO standalone issues filed.** Findings folded as epic checkboxes per CONVENTIONS §10 — #2798 ×1,
   #2799 ×5, #2578 ×2 (both **closed**), #2801 ×1 (a keep-open verdict). One issue, **#3237**, was
   auto-filed by #3213's own watcher, not by me.
-- **Open count 47 → 43. Net −4**, counting #3237 honestly against me. Inside the 4–7 / −3 to −6 target.
+- **Open count 47 → 42. Net −5.** Five closed by me; **#3237 was filed AND auto-closed by machinery**
+  within the session — #3213's watcher filed it when the cron went missing, GitHub finally delivered a
+  scheduled run, and the tracker closed itself on the green, exactly as its close policy says. It nets to
+  zero rather than counting against me. Inside the 4–7 / −3 to −6 target.
 - **Three deploys, verified by content, not by sha**: `life-platform-site-api`, `site-stats-refresh` and
   `dashboard-refresh` at `e06d88dc` — each bundle unzipped and grepped: `health/sensor_absence.py`
   present at **8,759 bytes** with its caller wired in all three. Plus the CI/CD fleet deploy at
@@ -224,8 +227,9 @@ verbatim; deferring deliberately to the #2999 sweep that will re-price the censu
 - **#2799**'s five new checkboxes — rollback-scope-must-match-failure-class, rollback-success-is-
   unasserted, sub-datatype liveness never emitted, series helpers dropping absent days, and the AI
   context map having no glucose entry.
-- **#3237** — auto-filed advisory tracker for the cron-freshness red; auto-closes on the next green run
-  of that workflow, which requires GitHub to actually deliver a scheduled `deploy-wedge-watch` run.
+- **#3237** — CLOSED during the wrap. GitHub delivered a scheduled `deploy-wedge-watch` run, cron-freshness
+  went green, and the tracker auto-closed on its own policy. The *underlying* finding stands and is owner
+  batch item 15: the declared `*/15` has been delivered **0 of 99** times.
 - **not-work — the two remaining `#2578` residuals are named in-file**: a discoverer returning `None`
   for a *structural* reason still falls back silently to `PLATFORM_FACTS` (deliberately not gated, with
   a test pinning that choice, because gating `_count_adrs` would rebuild the #1908 trap by hand), and
