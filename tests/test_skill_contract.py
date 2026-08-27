@@ -139,15 +139,31 @@ def test_a_real_reference_is_not_reported():
 def test_gitignored_path_is_reported():
     """A path that exists only on this machine is the local-pass/CI-fail split.
 
-    Found live 2026-08-27: design-implement told sessions to build worktrees in
-    `.claude/worktrees/`, which is gitignored. skill_lint passed on a laptop carrying
-    stale worktrees and failed in a clean checkout. Judging by tracked-ness rather than
-    os.path.exists makes the verdict identical everywhere — the property a gate needs
-    before anyone can trust it. (It also contradicted the repo's own rule that worktrees
-    live OUTSIDE the checkout; that prose is fixed too.)
+    Found live 2026-08-27: design-implement told sessions to build worktrees in a
+    gitignored directory. skill_lint passed on a laptop carrying stale worktrees and
+    failed in a clean checkout. Judging by tracked-ness rather than os.path.exists makes
+    the verdict identical everywhere.
+
+    The ignore VERDICT is pre-seeded rather than read from the repo, because the first
+    version of this test asserted on a path whose ignore rule lived in
+    `.git/info/exclude` — untracked, so the rule existed on one machine and in no clean
+    checkout, and the test reproduced the exact local-pass/CI-fail split it was written
+    to catch. Twice in one session, the same shape.
     """
-    out = lint_mod.check_references("x.md", "Branch in `.claude/worktrees/` here.\n")
-    assert any("gitignored" in f.message for f in out), "a gitignored path must not read as resolved"
+    lint_mod._IGNORE_CACHE.clear()
+    lint_mod._IGNORE_CACHE["docs/CHARTER.md"] = True  # a real, existing file, declared ignored
+    try:
+        out = lint_mod.check_references("x.md", "See `docs/CHARTER.md` here.\n")
+        assert any("gitignored" in f.message for f in out), "a gitignored path must not read as resolved"
+    finally:
+        lint_mod._IGNORE_CACHE.clear()
+
+
+def test_is_gitignored_reads_a_committed_rule():
+    """Against the real repo, using a rule that lives in the tracked .gitignore."""
+    lint_mod._IGNORE_CACHE.clear()
+    assert lint_mod._is_gitignored(".worktrees/") is True
+    lint_mod._IGNORE_CACHE.clear()
 
 
 def test_gitignore_check_fails_open_without_git():
