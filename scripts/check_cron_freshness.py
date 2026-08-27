@@ -83,10 +83,17 @@ EXIT STATUS
      blind run)
   1  at least one watched workflow is stale / never-fired, or the registry and
      .github/workflows/ have drifted apart
-  2  the instrument is DARK — nothing could be verified at all (no `gh`, no auth, no
-     network). Deliberately not 0: "I could not look" reported as a pass is the single
-     most repeated failure in this repo's incident log. `--allow-unverified` downgrades
-     it to 0 for the offline local path, which is an explicit choice at the call site.
+  2  the instrument is DARK — nothing could be verified at all. Deliberately not 0:
+     "I could not look" reported as a pass is the single most repeated failure in this
+     repo's incident log. Two distinct causes, and `--allow-unverified` covers only the
+     first, on purpose:
+       * every Actions lookup failed (no `gh`, no auth, rate limit, offline) — a
+         property of the ENVIRONMENT the caller is in, so the offline local path may
+         opt out with `--allow-unverified`, which is an explicit choice at that call
+         site rather than a default;
+       * PyYAML is not importable, so not one workflow could be PARSED — a broken
+         install, not a blind network. That stays 2 with or without the flag: a run
+         that cannot read its own subjects has no board to report on at all.
 
 USAGE
 -----
@@ -295,7 +302,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--allow-unverified",
         action="store_true",
-        help="a wholly blind run exits 0 instead of 2 (offline / no gh auth). Explicit by design.",
+        help="a LOOKUP-blind run exits 0 instead of 2 (offline / no gh auth). Explicit by design. "
+        "Does NOT cover an unimportable PyYAML — that is a broken install, not a blind network.",
     )
     args = ap.parse_args(argv)
 
@@ -303,6 +311,8 @@ def main(argv: list[str] | None = None) -> int:
         rows = discover_scheduled_workflows()
         unruled, orphaned = unruled_workflows(), orphaned_policy_rows()
     except ImportError:
+        # NOT downgradable by --allow-unverified, deliberately: without a parser there
+        # are no subjects, no registry cross-check and no board — nothing to opt out of.
         print("DARK: PyYAML is not importable, so no workflow could be parsed. NOT a clean board.", file=sys.stderr)
         return 2
 

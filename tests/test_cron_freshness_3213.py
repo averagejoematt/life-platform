@@ -398,3 +398,27 @@ def test_i_a_clean_board_says_so_with_its_population():
 
 def test_i_an_unparseable_timestamp_is_unverified_not_ok():
     assert watch.classify("not-a-timestamp", 38.0, NOW)[0] == watch.UNVERIFIED
+
+
+def test_i_the_two_dark_causes_are_not_downgradable_alike(monkeypatch):
+    """`--allow-unverified` covers a blind NETWORK, never a missing parser.
+
+    Measured by hand before this test existed: with `gh` absent the flag turns exit 2
+    into 0 (correct — the offline operator chose that at the call site), and with
+    PyYAML absent it stays 2 with or without the flag. Without a parser there are no
+    subjects and no registry cross-check, so there is no board to opt out of reporting.
+    Pinned here so the two paths cannot quietly converge on the permissive one.
+    """
+
+    def _no_yaml(*_a, **_k):
+        raise ImportError("No module named 'yaml'")
+
+    monkeypatch.setattr(watch, "discover_scheduled_workflows", _no_yaml)
+    assert watch.main([]) == 2
+    assert watch.main(["--allow-unverified"]) == 2
+
+    # The lookup-blind path, by contrast, IS downgradable.
+    monkeypatch.undo()
+    monkeypatch.setattr(watch, "newest_scheduled_run", lambda _f: False)
+    assert watch.main([]) == 2
+    assert watch.main(["--allow-unverified"]) == 0
