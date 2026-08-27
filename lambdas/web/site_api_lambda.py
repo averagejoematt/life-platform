@@ -93,12 +93,14 @@ from web.site_api_coach import (
 # ROUTES dict) reference them unchanged.
 from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request-id state (set by lambda_handler; read by _ok/_error)
     CORS_HEADERS,
+    EXPERIMENT_START,
     S3_REGION,
     SITE_API_ORIGIN_SECRET,
     USER_PREFIX,
     _decimal_to_float,
     _error,
     _ok,
+    as_of_day_n as _as_of_day_n,
     get_request_id,
     logger,
     pre_start_meta,
@@ -787,6 +789,12 @@ def _dispatch_route(event, path, method):
                 # as-of date so the "EACH COACH'S READ" cards can't present a stale
                 # Day-1 vitals quote tense-free next to a cockpit showing fresh values.
                 coach_entry["analysis_generated_at"] = ""
+                # 2026-08-27: the DAY-NUMBER half of that stamp. The card's prose can
+                # bake an absolute day ("Day 10 as of today") into cacheable text, and a
+                # calendar date alone never reconciles it — see site_api_common.as_of_day_n.
+                # None (unknown) until an OUTPUT# with a parseable timestamp is found;
+                # coachAsOf renders nothing for an unknown day, never a guess.
+                coach_entry["analysis_as_of_day_n"] = None
 
                 # Latest output for position_summary
                 try:
@@ -823,6 +831,7 @@ def _dispatch_route(event, path, method):
                             if len(_cd_sk_parts) >= 2 and _cd_sk_parts[1]:
                                 _cd_asof = _cd_sk_parts[1]
                         coach_entry["analysis_generated_at"] = _cd_asof
+                        coach_entry["analysis_as_of_day_n"] = _as_of_day_n(_cd_asof, EXPERIMENT_START)
                         # #2575: the cockpit's reading AT PUBLICATION, frozen with the
                         # narrative (coach/published_vitals.py). Absent on records
                         # written before that stamp shipped — the nightly cross-surface

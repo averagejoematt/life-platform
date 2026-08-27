@@ -30,7 +30,7 @@ from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for down
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
 from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024 / DIL-049
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
-from common.pacific_time import PACIFIC
+from common.pacific_time import PACIFIC, pacific_date_of, pacific_day_n  # #1964/#1955 — the canonical frame, parse and day-index
 from experiment.phase_filter import with_phase_filter
 
 from web.platform_counts import DISCOVERED_COUNTS
@@ -330,6 +330,67 @@ def _clamp_today(date_str: str, _now_date: str | None = None) -> str:
     upper bound. `_now_date` is a test seam only."""
     today = _now_date or datetime.now(PT).strftime("%Y-%m-%d")
     return min(date_str, today)
+
+
+def as_of_day_n(generated_at, start_date: str) -> "int | None":
+    """The experiment day a stored narrative WAS WRITTEN ON — the dateline half of
+    the staleness contract.
+
+    `_current_day_n` answers "what day is it"; this answers "what day is this text
+    ABOUT". The two diverge exactly while budget_guard pauses regeneration (ADR-125
+    tier >= 2), and that divergence is a live reader-facing defect, not a cosmetic
+    one: coach prose bakes an ABSOLUTE day number into cacheable text ("Day 10 as of
+    today"), so a held read gains one full day of error every day the pause lasts.
+    Measured 2026-08-27: /coaching/by-coach/#physical_coach served a Day-10 sentence
+    on Day 11 and tripped the gating visual-QA judge.
+
+    Serving the content's own day number lets the reader-facing dateline reconcile
+    the frozen sentence ("as of Aug 26 · Day 10") instead of leaving an absolute day
+    number unanchored next to a calendar date the reader cannot convert. ADR-104:
+    a narrative surface may not assert a number it cannot stand behind — but it MAY
+    assert it under a dateline that says which day it belongs to.
+
+    DERIVED from the timestamp, never read from a writer's own `days_in_experiment`
+    stamp: the timestamp is written on every record, the stamp is optional, and a
+    derived value cannot inherit a bad one (the #3111 discipline).
+
+    Composed entirely from the #1964/#1955 canonical helpers — `pacific_date_of`
+    (which owns the tz-less-means-UTC semantic) and `pacific_day_n` (which owns the
+    one day-index formula). This function contributes exactly ONE rule of its own,
+    the branch below; it re-derives neither the Pacific frame nor the ISO parse.
+
+    Args:
+        generated_at: an ISO-8601 instant (trailing "Z" ok; a naive value is read
+            as UTC, which is what every writer here emits) OR a bare `YYYY-MM-DD`.
+            An instant is converted to its PACIFIC calendar date — the site's day
+            frame (#2506/#2675).
+        start_date: the cycle genesis (`EXPERIMENT_START`), passed in rather than
+            read from module state so callers that repoint it stay honest.
+
+    Returns the 1-indexed day, or None when there is no parseable instant or the
+    instant predates genesis. None means UNKNOWN — an unknown dateline renders
+    nothing, never a guess (the absent-is-unknown rule, #1971).
+    """
+    if not generated_at or not isinstance(generated_at, str):
+        return None
+    raw = generated_at.strip()
+    if "T" in raw or " " in raw:
+        # An INSTANT: which Pacific day did it land on? (An evening-PT write rolls
+        # into the next UTC day — the whole reason this helper exists.)
+        written = pacific_date_of(raw)
+    else:
+        # A bare `YYYY-MM-DD` (the OUTPUT# sk fallback) is ALREADY a calendar day and
+        # is taken as-is. Sending it through the instant path instead would read it
+        # as UTC midnight and convert it BACK a day — the #3196 "Pacific date
+        # anchored at UTC midnight" class, which here prints Day 9 over Day-10 prose.
+        # Pinned by tests/test_paused_narrative_dateline.py; do not collapse this
+        # branch into the call above.
+        written = raw
+    if not written:
+        return None
+    # pacific_day_n clamps to 0 for BOTH a pre-genesis date and an unparseable one,
+    # and 0 is not a day this dateline may ever print — so 0 collapses to UNKNOWN.
+    return pacific_day_n(start_date, written) or None
 
 
 def pre_start_meta() -> dict | None:

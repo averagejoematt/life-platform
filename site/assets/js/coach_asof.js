@@ -10,13 +10,35 @@
 
 const PT_TZ = "America/Los_Angeles";
 
-export function coachAsOf(generatedAt, paused) {
+// 2026-08-27 — the DAY NUMBER is part of the dateline, not decoration.
+//
+// A coach's frozen prose dates ITSELF in experiment days ("I'm ten days into
+// this restart with you — Day 10 as of today"), because that is the frame the
+// coach is written in. A dateline in calendar days alone ("as of Aug 26") does
+// not reconcile that sentence: the reader would have to know that Aug 26 was
+// Day 10 to hear "Day 10" as history rather than as a claim about today. While
+// regeneration is paused the gap grows by one day EVERY day, and on 2026-08-27
+// a Day-10 sentence served on Day 11 tripped the gating visual-QA judge on
+// /coaching/by-coach/#physical_coach and auto-rolled the site back.
+//
+// So the dateline carries BOTH frames — "as of Aug 26 · Day 10" — and the
+// frozen "Day 10" inside the prose is then correctly datelined rather than
+// silently re-asserted as current. `asOfDayN` is the API's derived
+// `as_of_day_n`; anything that is not a positive integer is UNKNOWN and renders
+// NOTHING (the same absent-is-unknown discipline as regenerationPaused below —
+// a wrong day number would be strictly worse than no day number).
+function dayLabel(asOfDayN) {
+  return Number.isInteger(asOfDayN) && asOfDayN > 0 ? `Day ${asOfDayN}` : "";
+}
+
+export function coachAsOf(generatedAt, paused, asOfDayN) {
   const d = generatedAt ? new Date(generatedAt) : null;
   const valid = d && !isNaN(d.getTime());
   const dateStr = valid ? d.toLocaleDateString("en-US", { timeZone: PT_TZ, month: "short", day: "numeric" }) : "";
-  if (paused) return dateStr ? `as of ${dateStr} — refresh paused (budget guard)` : "refresh paused (budget guard)";
-  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `as of ${dateStr} — next refresh pending`;
-  return dateStr ? `as of ${dateStr}` : "";
+  const stamp = [dateStr ? `as of ${dateStr}` : "", dayLabel(asOfDayN)].filter(Boolean).join(" · ");
+  if (paused) return stamp ? `${stamp} — refresh paused (budget guard)` : "refresh paused (budget guard)";
+  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `${stamp} — next refresh pending`;
+  return stamp;
 }
 
 // #1971 — the one honest reading of an API payload's `regeneration_paused`

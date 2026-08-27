@@ -517,7 +517,10 @@ async function renderReadToday(read) {
       // read's own as-of date so a stale Day-1 vitals quote can't read as current.
       // Graceful when the field is absent (an API deploy racing the site deploy) —
       // coachAsOf returns "" and no kicker renders, never a crash.
-      const asOf = coachAsOf(c.analysis_generated_at, regenPaused);
+      // 2026-08-27: `analysis_as_of_day_n` is the DAY the card's prose is about —
+      // the frame the prose itself uses. Absent (an API deploy racing the site
+      // deploy) renders exactly what rendered before the field existed.
+      const asOf = coachAsOf(c.analysis_generated_at, regenPaused, c.analysis_as_of_day_n);
       h += `<li class="rd-card" data-coach="${esc(c.coach_id + "_coach")}" style="--coach:${esc(c.color || "")}"><button type="button" class="rd-btn">` +
         `<span class="sigil-md">${sigil(c, { title: "" })}</span><span class="rd-body">` +
         `<span class="rd-top"><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
@@ -706,15 +709,28 @@ async function renderByCoach(read, id) {
     // staggered days, so any two can quote different "current" vitals) AND
     // disclose when the budget guard has paused regeneration — a served read
     // can then be a HELD read from before the pause, not today's (#802).
-    const asOf = coachAsOf(analysis.generated_at, regenerationPaused(analysis));
-    h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)} · this week</p>`;
+    // 2026-08-27 — a DATELINE, not a footnote. The prose is frozen text that dates
+    // itself in experiment days ("Day 10 as of today"); under a budget-guard pause
+    // (ADR-125 tier >= 2) it is re-served unchanged while the real day advances, so
+    // on 2026-08-27 a Day-10 sentence was served on Day 11 and the gating visual-QA
+    // judge failed the page. Three things make the held text honest without touching
+    // the pause (which is correct and stays):
+    //   1. the stamp carries the READ's OWN day number (`as_of_day_n`), the same
+    //      frame the sentence inside uses — so "Day 10" reads as datelined history;
+    //   2. it renders ABOVE the prose, where a dateline belongs — a reader must meet
+    //      the frame before the claim, not after three paragraphs of it;
+    //   3. the kicker drops "· this week" while paused — a held read is not this
+    //      week's read, and saying so was the present-tense half of the same lie.
+    const regenPaused = regenerationPaused(analysis);
+    const asOf = coachAsOf(analysis.generated_at, regenPaused, analysis.as_of_day_n);
+    h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)}${regenPaused ? "" : " · this week"}</p>`;
+    // #1397: asOf is escaped (it is plain text), so the "why is this paused" link is
+    // appended OUTSIDE the esc() call — putting it inside would render as literal markup.
+    if (asOf) h += `<p class="bc-asof bc-dateline label">${esc(asOf)}${regenPaused ? ' <a href="/method/receipts/">See the live budget and the current tier →</a>' : ""}</p>`;
     if (analysis.analysis) h += `<p class="bc-analysis dx-prose">${esc(analysis.analysis)}</p>`;
     if (analysis.key_recommendation) h += `<p class="bc-rec"><span class="label">the one thing</span> ${esc(analysis.key_recommendation)}</p>`;
     if (analysis.cross_domain_note) h += `<p class="bc-xnote label">cross-domain: ${esc(analysis.cross_domain_note)}</p>`;
     if (analysis.confidence_language) h += `<p class="bc-conf label">${esc(analysis.confidence_language)}</p>`;
-    // #1397: asOf is escaped (it is plain text), so the "why is this paused" link is
-    // appended OUTSIDE the esc() call — putting it inside would render as literal markup.
-    if (asOf) h += `<p class="bc-asof label">${esc(asOf)}${regenerationPaused(analysis) ? ' <a href="/method/receipts/">See the live budget and the current tier →</a>' : ""}</p>`;
     h += `</section>`;
   } else if (typeof coach.daily === "string" && coach.daily.trim()) {
     h += `<section class="bc-read"><p class="dx-kicker label">today's read</p><p class="bc-analysis dx-prose">${esc(coach.daily)}</p></section>`;

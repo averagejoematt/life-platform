@@ -39,6 +39,7 @@ from web.site_api_common import (
     _decimal_to_float,
     _error,
     _ok,
+    as_of_day_n,
     logger,
     pre_start_meta,
 )
@@ -433,6 +434,17 @@ def handle_coach_analysis(event, *, _g):
             pass
 
         display = _coach_display.get(coach_id, {})
+        # The dateline (2026-08-27). `generated_at` alone dates the read in CALENDAR
+        # terms, but the frozen prose dates ITSELF in EXPERIMENT-DAY terms ("Day 10 as
+        # of today") — two frames that never reconcile for a reader who cannot convert
+        # Aug 26 into Day 10. While regeneration is paused (ADR-125 tier >= 2) the gap
+        # widens by a day every day, and on 2026-08-27 a Day-10 sentence served on
+        # Day 11 tripped the gating visual-QA judge on /coaching/by-coach/#physical_coach.
+        # Serving the content's OWN day number is the fix: the pause stays exactly as
+        # it is, and the held text is LABELLED with the day it describes instead of
+        # being re-served as though it were today's. Derived, never re-read from the
+        # record's optional `days_in_experiment` stamp (see as_of_day_n's docstring).
+        _generated_at = output.get("created_at") or output.get("generated_at", "")
         resp = {
             "coach_id": coach_id,
             "coach_name": display.get("name", ""),
@@ -462,7 +474,8 @@ def handle_coach_analysis(event, *, _g):
             "ensemble_fallback": ensemble_fallback,
             "confidence_language": confidence_language,
             "data_availability": data_availability,
-            "generated_at": output.get("created_at") or output.get("generated_at", ""),
+            "generated_at": _generated_at,
+            "as_of_day_n": as_of_day_n(_generated_at, _g["EXPERIMENT_START"]),
             "week_number": output.get("week_number"),
             "days_in_experiment": output.get("days_in_experiment"),
             # #802: coach_narrative_orchestrator skips this coach's OUTPUT# write
