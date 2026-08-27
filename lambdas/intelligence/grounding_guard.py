@@ -1,3 +1,11 @@
+# gate-entrypoint: the SS-10 tight canonical-contradiction verdict.
+# `hard_canonical_contradictions` returns the hits that
+# `field_notes_lambda._note_grounding_findings` HOLDS on and that
+# `ai_expert_analyzer_lambda` block-and-regens on. A list of hits IS the verdict, so
+# there is no raise and no exit for the AST to see: if this function silently returned
+# `[]` both consumers would publish unchecked and every check would stay green — the
+# exact dark-gate shape #2578 exists to count. Nothing else in the census reports it
+# (#2578 adjudication of #3220's ten name-only rows).
 """grounding_guard.py — the shared TIGHT canonical-facts contradiction detector.
 
 SS-10: one un-driftable detector for "the narrative states a physiological number

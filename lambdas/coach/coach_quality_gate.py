@@ -1,3 +1,10 @@
+# gate-entrypoint: ADR-108's blocking coach-output gate. This module COMPUTES the
+# pass/fail verdict; `ai_calls._enforce_quality_gate` obeys it — regenerate once, then
+# `CoachHold(coach_id, "quality_gate")`, i.e. the brief ships without that coach. The
+# enforcement therefore sits behind a Lambda RequestResponse boundary no AST walk can
+# cross, and no other census row reports this verdict, so without this line the
+# platform's only blocking AI-output gate is absent from the inventory entirely
+# (#2578 adjudication of #3220's ten name-only rows).
 """
 coach_quality_gate.py — Coach Intelligence: Post-Generation Quality Gate
 

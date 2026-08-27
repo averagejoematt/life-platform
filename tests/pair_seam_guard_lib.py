@@ -1,3 +1,12 @@
+# gate-entrypoint: the #2847 must-agree-seam verdict (charter standing rule 3).
+# `ledger_defects()` is what `tests/test_pair_seam_conformance_2847.py` and
+# `tests/test_pair_contract_sweep_2847.py` assert on, and NEITHER of those test modules
+# is visible to the census's structural-test family — that family enumerates
+# TREE-SWEEPING tests, and this ratchet derives from the #2845 model instead — so with
+# no marker here the seam ratchet is absent from the inventory entirely. Its peer
+# #2844's library needs no marker for the opposite reason: `test_conformance_guard_2844.py`
+# IS discovered, so claiming the library too would put one verdict in the count twice
+# (#2578 adjudication of #3220's ten name-only rows).
 """tests/pair_seam_guard_lib.py — the must-agree seam sweep (#2847 box 4, epic #2842).
 
 The fleet-wide form of **charter standing rule 3** — *every new "must agree" pair
