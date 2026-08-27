@@ -32,9 +32,15 @@ def discover_structural_test_gates(
     sys.path.insert(0, str(root / "tests"))
     try:
         from premerge_derivation import discover_tree_sweeping_test_files  # type: ignore
-    except ImportError:  # pragma: no cover
+    except ImportError as exc:  # pragma: no cover
+        # #2578: the log line alone was not enough. A skipped family used to leave
+        # `build_census()` returning a gate list short by this family's n with NOTHING
+        # in the census structure to say so, and `deploy/sync_census_fact.py` then
+        # reported that short number to the doc-sync layer as a successful measurement
+        # (104 gates short, measured 2026-08-27: 554 -> 450 with this import blocked).
+        # The reason travels in the counters so a consumer can refuse the sweep.
         log_fn("tests/premerge_derivation.py not importable — structural-test family SKIPPED (n unknown)")
-        return [], {"importable": 0}
+        return [], {"importable": 0, "skipped_reason": f"tests/premerge_derivation.py not importable ({type(exc).__name__}: {exc})"}
     names = sorted(discover_tree_sweeping_test_files(root / "tests"))
     gates: list[Any] = []
     for name in names:

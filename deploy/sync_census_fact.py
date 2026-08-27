@@ -70,6 +70,15 @@ def discover_gate_census_count(root: Path | None = None) -> tuple[int | None, st
     swallowed with no trace at all, which is how a frozen fallback could pass for a
     measurement one layer up in `apply()`). `error` is None-only-on-success, so a caller
     can tell "underivable" from "zero gates found" without inspecting both fields blindly.
+
+    #2578 — THE SECOND WAY THIS FACT CAN BE WRONG, and it does not raise. #3156 closed
+    the case where the census cannot run AT ALL (a missing dep at import). It left open
+    the case where the census runs and one FAMILY cannot: `build_census()` used to return
+    a gate list short by that family's n, with only a log line to say so, and this
+    function reported it as a measurement. Measured 2026-08-27 by blocking
+    `tests/premerge_derivation.py`'s import: 554 -> 450, `error` None, and an `--apply`
+    run in that lane would have stamped 450 into docs/PROPORTIONALITY.md as the honest
+    live number. A partial sweep is now refused exactly like an absent one.
     """
     root = root or ROOT
     scripts_dir = root / "scripts"
@@ -85,6 +94,13 @@ def discover_gate_census_count(root: Path | None = None) -> tuple[int | None, st
         gates = census.get("gates")
         if not gates:
             return None, "build_census() returned zero gates"
+        skipped = census.get("families_skipped") or []
+        if skipped:
+            detail = "; ".join(f"{s['family']} — {s['reason']}" for s in skipped)
+            return None, (
+                f"incomplete sweep: {len(skipped)} gate family/families could not run, so "
+                f"the {len(gates)} gates found are a floor, not a count ({detail})"
+            )
         return len(gates), None
     except Exception as exc:
         return None, f"{type(exc).__name__}: {exc}"

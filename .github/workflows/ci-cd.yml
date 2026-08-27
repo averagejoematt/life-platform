@@ -217,6 +217,22 @@ jobs:
       # test_check_is_clean_on_repo_head`. Measured twice on 2026-08-27: `51f2f53f`
       # (#3220 moved the census 560->551) and `5081953404` (#3222 moved it 551->552),
       # each redding main until a human pushed a manual reconcile.
+      # #2578 — THE REST OF THE LEDGER, AUDITED RATHER THAN ASSUMED. #3234 fixed the one
+      # fact that needed a package here; the obvious next question is which OTHER
+      # sync_doc_metadata-owned literal has the same shape. Measured 2026-08-27 by running
+      # every discoverer twice — once normally, once behind a `sys.meta_path` finder that
+      # RAISES ModuleNotFoundError for anything outside `sys.stdlib_module_names` plus what
+      # this job installs — and diffing the sixteen values. Verdict: `gate_census_count` is
+      # the ONLY one with a third-party dependency. The other fifteen (tool_count,
+      # lambda_count, alarm_count, cdk_stacks, endpoint_count, module_count,
+      # tool_module_count, test_count, adr_count, version, adr_max, the restart page/
+      # endpoint pair, hypothesis_cadence, experiment_genesis, experiment_cycle) are pure
+      # `ast`/`re`/`pathlib` over the checked-out tree and returned byte-identical values
+      # with every non-stdlib import blocked. `boto3` is ATTEMPTED somewhere in the import
+      # closure and its absence changed nothing. The negative control was verified to
+      # actually fail before the result was trusted: `import boto3` raised under the
+      # blocker, and `import yaml` raised in the arm where PyYAML was withheld — which is
+      # the arm that reproduces #3234 (census -> None, reason printed).
       - name: Install census dependency (PyYAML)
         run: |
           PINS=$(python3 scripts/ci_pins.py pyyaml)
@@ -336,6 +352,41 @@ jobs:
           done
 
           echo "build_sha=$BUILD_SHA" >> "$GITHUB_OUTPUT"
+
+      # #2578 — THE JOB MUST NOT REPORT SUCCESS ON A TREE IT LEFT DRIFTED.
+      #
+      # Everything above verifies the COMMIT (whitelist-clean, pushed). Nothing above
+      # verifies the RESULT. That gap is what #3234 fell through twice on 2026-08-27:
+      # a fact that could not be derived was skipped honestly, the generators then left
+      # the tree byte-identical, `DIRTY` was empty, this job printed "✅ derived
+      # artifacts already match config truth" and went green — and `test / Unit Tests`
+      # IN THE SAME RUN failed on the literal drift the job had just declined to fix.
+      # Main went red twice with a green reconcile job sitting above it. Installing the
+      # missing dep fixed that instance; it did not give the job a way to notice the
+      # NEXT one, and any other fact whose discoverer can return None has the identical
+      # shape (deploy/sync_census_fact.py's `families_skipped` refusal is the second
+      # such shape, found while writing this step).
+      #
+      # The verdict is `--check`, on the tree this job is leaving behind. That is not a
+      # new opinion: `tests/test_sync_doc_metadata_check.py::test_check_is_clean_on_repo_head`
+      # already asserts exactly this, on exactly this tree, one job later — so this step
+      # adds NO false-positive surface. All it changes is WHERE the failure surfaces and
+      # what it says: here, naming reconcile, instead of two jobs later as a mystery unit
+      # test on someone else's commit.
+      #
+      # Deliberately a separate step, not a line appended to the one above: a compound
+      # command hands its exit status to whatever ran last, which is the swallow idiom
+      # the gate census flags (`_SWALLOW`) and the one this repo has been bitten by.
+      # Runs on push only — the reconcile step no-ops on every other event.
+      - name: Reconcile verdict — the tree this job leaves must be literal-clean (#2578)
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          if ! python3 deploy/sync_doc_metadata.py --check; then
+            echo "::error::reconcile left the tree DRIFTED. The generators ran (and any commit above was pushed), but 'python3 deploy/sync_doc_metadata.py --check' is still non-zero on the result — so this job would have reported success while 'test / Unit Tests' failed on the same tree later in this run (#3234, twice on 2026-08-27). Read the --check output above: a literal it could not DERIVE is skipped with a printed reason (that skip is correct, #3156 — the missing piece is usually a dependency this job's environment lacks; the shared setup-ci composite installs no packages, so add the pin here the way 'Install census dependency (PyYAML)' does). A literal it derived and could not WRITE is a generator/RULES bug. Either way the fix belongs in this job, not in a manual push to main."
+            exit 1
+          fi
+          echo "✅ sync_doc_metadata --check is clean on the reconciled tree"
 
   # ════════════════════════════════════════════════════════════════
   # Job 1: Lint + Syntax Check

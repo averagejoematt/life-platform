@@ -182,10 +182,19 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 #
 # Measured on a clean tree, both directions: 554 before the four markers, 558 after, and
 # the id-set difference is exactly those four `guard::` ids and nothing else.
-# BASELINE_UNPROVEN_GATES is deliberately NOT moved — the four arrive unproven, taking
-# the live count 527 -> 531, which is still under the committed 541. Four new rows of
-# real #2578 work; none of them is a verdict this PR claims to have watched fail.
-BASELINE_TOTAL_GATES = 558
+#
+# 558 -> 559: the same PR's second half adds ONE real CI gate — ci-cd.yml's
+# `reconcile / Reconcile verdict — the tree this job leaves must be literal-clean`. That
+# one IS inventory growth, and it is the honest kind: the reconcile job could report
+# success on a tree it left drifted (#3234, main red twice on 2026-08-27), and now it
+# cannot. Appended as the LAST step of its job on purpose — a CI-step id is positional
+# (`::<job>::<index>`), so inserting one mid-job slides every later id onto a different
+# gate; `orphan_proofs` is empty on the measured run, which is the check that it did not.
+#
+# BASELINE_UNPROVEN_GATES is deliberately NOT moved — all five arrive unproven, taking
+# the live count 527 -> 532, still under the committed 541. Five new rows of real #2578
+# work; none of them is a verdict this PR claims to have watched fail.
+BASELINE_TOTAL_GATES = 559
 BASELINE_UNPROVEN_GATES = 541
 
 
