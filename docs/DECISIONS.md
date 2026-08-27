@@ -1210,6 +1210,54 @@ The floor is also the trap Phase 2 walked into. **Haiku 4.5 requires a 4,096-tok
 
 The `cache_control` markers are deliberately **left in place** at both call sites — an ignored marker costs nothing, and it engages for free if the prefix ever clears the floor. What changed is that both sites now say so.
 
+**Amendment 2026-08-27 (#3139) — Phase 2's Haiku-for-structured default is RE-AFFIRMED on effective cache-aware cost. It is not inverted.**
+
+#3085 above establishes that Haiku's 4,096-token floor makes the cheap tier the hardest to cache. #3139 asked the natural follow-on: if a Sonnet cache READ is $0.30/M and an uncached Haiku input token is $1.00/M, has caching *inverted* the tiering rule — should structured features move to Sonnet-cached? **Measured answer: no, for every structured feature the platform runs, and the margin is not close.** Reproducible in `scripts/cache_aware_model_tiering.py` (`--live` re-pulls the corpus); guarded by `tests/test_cache_aware_model_tiering_3139.py`.
+
+**The issue's premise is half true, and the true half is not the deciding half.** Verified against the live `ai.bedrock_client._PRICES` table, not a remembered rate: a Sonnet cache read is **3.33x cheaper** than an uncached Haiku input token. But a per-*token* ratio is not a per-*run* cost. On Sonnet the volatile input and the output are each **3x dearer**, and a cache read only exists if a cache WRITE for a byte-identical prefix landed inside the TTL. The ratio the issue omits: a Sonnet cache **write** is **3.75x DEARER** than a Haiku input token.
+
+**The break-even, derived rather than asserted.** With P = stable-prefix tokens, V = volatile input, O = output, h = hit rate:
+
+    Haiku uncached:  C_H = (P+V)·$1.00 + O·$5.00
+    Sonnet cached:   C_S = h·P·$0.30 + (1−h)·P·$3.75 + V·$3.00 + O·$15.00
+
+(A cache write *replaces* the input charge for those tokens rather than adding to it.) Setting C_S < C_H at h=1 gives `P > (2V + 10O)/0.70`, and at V=0 — the most generous shape that can exist — **P > 14.29·O**. Since P can never exceed total input I, the screen is `I > 14.29·O`, computed from two numbers CloudWatch already records per feature. **A feature failing this screen cannot be rescued by any prompt restructuring, because the screen already assumes the restructuring succeeded perfectly.** That is what makes it worth running first: it is an upper bound, not an estimate.
+
+**Every structured feature, trailing 30d to 2026-08-27, `LifePlatform/AI`:**
+
+| feature | n | in/call | out/call | P needed | P available | ratio | verdict |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `ai-expert-analyzer` | 560 | 4,447 | 555 | 7,930 | 4,447 | 0.56 | impossible |
+| `life-platform-qa-smoke` | 506 | 4,293 | 243 | 3,473 | 4,293 | 1.24 | survives screen |
+| `coach-quality-gate` | 435 | 2,274 | 660 | 9,427 | 2,274 | 0.24 | impossible |
+| `coach-state-updater` | 290 | 2,344 | 1,313 | 18,760 | 2,344 | 0.12 | impossible |
+| `coach-daily-reflection` | 275 | 826 | 171 | 2,439 | 826 | 0.34 | impossible |
+| `life-platform-site-api-ai` | 168 | 1,897 | 132 | 1,888 | 1,897 | 1.00 | survives screen |
+| `coach-history-summarizer` | 84 | 3,564 | 1,440 | 20,564 | 3,564 | 0.17 | impossible |
+| `daily-debrief` | 27 | 702 | 369 | 5,276 | 702 | 0.13 | impossible |
+| `life-platform-ai-quality-canary` | 12 | 1,616 | 248 | 3,543 | 1,616 | 0.46 | impossible |
+| `field-notes-generate` | 6 | 827 | 466 | 6,662 | 827 | 0.12 | impossible |
+| `journal-enrichment` | 3 | 981 | 379 | 5,410 | 981 | 0.18 | impossible |
+| `challenge-generator` | 3 | 2,764 | 1,439 | 20,557 | 2,764 | 0.13 | impossible |
+
+Ten of twelve are arithmetically unreachable. **Both survivors are then falsified at the next gate by their actual prompt shape** — the byte-stability rule #2888 wrote down:
+
+* `life-platform-qa-smoke` (needs h ≥ 96.1% *and* a 100%-stable prompt) — its Bedrock calls come through `coach.coach_checkin.build_generation_prompt`, whose system prompt interpolates the **per-coach name and bio into its first line**. The prefix varies per coach at byte 0, so the prefix match is defeated before the floor is even reached; the remaining input is a per-run JSON snapshot, volatile by construction.
+* `life-platform-site-api-ai` (needs h ≥ 99.9%) — `/api/ask` builds its system prompt from `_ask_build_prompt(ctx)` where `ctx["archive_block"]` is **question-selected retrieval** (#2348). The system prompt changes with every reader question.
+
+**The cadence gate is the decisive omission.** h is not a free parameter. The default TTL is 5 minutes; h > 0 requires a second call on a byte-identical prefix inside that window. Most of this tier is once-daily cron singletons, where **h = 0 by construction** — so the achievable comparison is not the issue's read-vs-uncached but **write-vs-uncached**, and the prefix tokens the swap was meant to cheapen get 3.75x *dearer*. Priced over the measured corpus: the structured tier costs **$13.80/mo** on Haiku today; swapping it to Sonnet-cached costs **$21.86/mo** in the fantasy best case (h=1, V=0, every prompt perfectly stable) and **$46.81/mo** at the h=0 cron reality — **+$8.07 and +$33.02/mo respectively**. There is no version of the swap that saves money.
+
+**The forward rule (the "it depends, and here is the threshold" this replaces the blanket default with).** Route a structured feature to Sonnet-cached only when all four hold:
+
+1. `P > (2V + 10O)/0.70` at the feature's measured tokens — the arithmetic screen;
+2. `P ≥ 1,024` — Sonnet 4.6's cacheable-prefix floor (`prompt_cache.cache_floor`);
+3. the prefix is genuinely byte-stable, with every varying byte *after* the last breakpoint;
+4. the feature fans out ≥2 calls on that identical prefix inside the cache TTL, so a read can exist at all.
+
+Today nothing clears all four. The condition that would most plausibly change this is **output volume**, not prefix size: O sits in the denominator-facing term with a 14.29x weight, so a feature that grows its prompt while shrinking its output is the shape to watch. `tests/test_cache_aware_model_tiering_3139.py` re-derives the threshold from `_PRICES` on every run and fails if a third feature ever survives the screen, or if a survivor's required hit rate drops below 90% — so this is a ratchet, not a stamp.
+
+**No eval was run, deliberately.** The issue's second acceptance criterion is conditional — "*where Sonnet-cached wins*, an eval that outputs stay acceptable". Nowhere wins, so there is no swap to evaluate and no gate to re-baseline. Running one would have produced a green result about a change that is not being made. If the forward rule ever fires, the eval is owed *before* the swap, and the swap goes through the existing `AI_MODEL` / `AI_MODEL_HAIKU` env vars per Phase 2's reasoning #3 — per-feature, reversible without a code deploy, never a hardcoded flip.
+
 ---
 
 ### ADR-050 — TD-19: UTC as the platform-wide DDB partition convention
