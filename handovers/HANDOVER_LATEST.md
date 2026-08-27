@@ -1,234 +1,238 @@
-# Handover — 2026-08-27 (Opus 5, autonomous 9h overnight): Session F — eleven closed, net −11, and five green instruments that were not measuring anything
+# Handover — 2026-08-27 (Opus 5, Session G): five closed, net −4, and the cost epic I was sent to retire and did not
 
-**Session:** Opus 5. Drove: *"Boot Session F of the self-sustaining push — a 9-HOUR OVERNIGHT RUN,
-9pm–6am PT, owner ASLEEP and unavailable the whole time"*
-(`~/.claude/plans/purring-doodling-boot.md`, the OVERNIGHT boot prompt). AUTONOMOUS with
-merge+deploy authority. ALL-OPUS — driver and all eight implementation lanes. Fable untouched, so
-#3042 and #2849 were out of scope by definition. **Nobody was awake to ask; no lane was blocked on
-the owner and nothing idled waiting for one.** Previous handover archived as
-`HANDOVER_2026-08-26_session-e-drain.md` on `session-archive`.
+**Session:** Opus 5. Drove: *"Boot Session G of the self-sustaining push… THE SPINE IS EPIC #2801 (Cost)…
+Honest target: 4–7 closures, net −3 to −6, PLUS epic #2801"*
+(`~/.claude/plans/session-g-cost-cliff-and-class-fixes.md`). AUTONOMOUS with merge+deploy authority.
+ALL-OPUS — driver and all seven implementation lanes. Fable untouched, so #3042 and #2849 were out of
+scope by definition. Previous handover archived as
+`HANDOVER_2026-08-27_session-f-green-instruments.md` on `session-archive`.
 
-## The score — the metric the plan was written to fix
+## The score
 
-- **11 issues CLOSED with verdicts**: #2961, #3217, #3221, #3219, #3220, #3085, #3222, #3224,
-  #2817, #3065, #3213.
-- **12 PRs merged**: #3225, #3226, #3228, #3230, #3227, #3234, #3233, #3232, #3235, #3236, #3229
-  (plus #3231, merged then corrected by #3235).
-- **ZERO standalone issues filed.** Six findings folded onto existing epics as checkboxes per
-  CONVENTIONS §10 — #2799 ×1, #2578 ×3, #2798 ×2.
-- **Open count 58 → 47. Net −11.** Sessions D and E both closed 5 and both *grew* the backlog
-  (+1, +2). The three owner-ratified rules held: filings default to `Later` (and in the event, to
-  an epic checkbox); §10 class-first before filing standalone; batch S-effort disjoint-file fixes.
-  **The batch rule alone closed three issues in one CI cycle** (#3228 → #3221 + #3219 + #3220).
-- **Three deploys, each verified by content rather than by sha**: the fleet at `8c8be22e`
-  (CI took the "Fleet deploy (shared module changed)" path itself — the manual `deploy_fleet.sh`
-  would have been Session E's redundant-concurrent-deploy mistake); `site-api` at `cf899970`; and
-  `life-platform-freshness-checker` at `452929f1`. For the fleet I unzipped the deployed bundle
-  and grepped the shipped module — `ai/regen_keep_predicate.py` present at 10,477 bytes with the
-  `KEEP_FIGURE_REMOVED`/`DROP_*` arms, and `grounded_generation.py:102` importing it. Module
-  present, module correct, caller wired.
+- **5 issues CLOSED with verdicts**: #3139, #3204, #2888, **#2798 (an EPIC)**, #3079.
+- **8 PRs merged**: #3240, #3238, #3239, #3244, #3246, #3243, #3242, #3241.
+- **ZERO standalone issues filed.** Findings folded as epic checkboxes per CONVENTIONS §10 — #2798 ×1,
+  #2799 ×5, #2578 ×2 (both **closed**), #2801 ×1 (a keep-open verdict). One issue, **#3237**, was
+  auto-filed by #3213's own watcher, not by me.
+- **Open count 47 → 43. Net −4**, counting #3237 honestly against me. Inside the 4–7 / −3 to −6 target.
+- **Three deploys, verified by content, not by sha**: `life-platform-site-api`, `site-stats-refresh` and
+  `dashboard-refresh` at `e06d88dc` — each bundle unzipped and grepped: `health/sensor_absence.py`
+  present at **8,759 bytes** with its caller wired in all three. Plus the CI/CD fleet deploy at
+  `6a6ef3a1f`, approved rather than left stranded.
 
-## The through-line: instruments that report success without doing their job
+## The headline: I did not close epic #2801, and that is the session's most important result
 
-Not a theme I went looking for. It surfaced five times independently.
+Both of #2801's open children closed today (#2888, #3139), making **every child closed and every
+`Done when` box owned by a closed story.** I verified the boxes rather than reading their owners'
+states — the AWS Budgets backstop really is re-pointed to **$150** (live `describe-budgets`), the EMF
+namespace ledger really exists (`tests/test_emf_namespace_ledger_2837.py`, 57 passed), #2986 really
+closed the re-stamping class. **Judged by child count this was a closure.**
 
-1. **The gate census counted ten libraries as gates** (#3220). Not one — ten, measured by
-   `git archive`-ing both trees and diffing the id sets: 560 → **551**. `coach_quality_gate.py`,
-   `experiment_gates.py`, `item_size_guard.py`, `quality_gate_contract.py` and six more entered a
-   ratcheted inventory purely on a filename substring. **That is #2578's own denominator**, wrong
-   by ten the whole time. The lane deliberately did NOT hand-re-admit them — re-admission is a
-   one-line `# gate-entrypoint:` marker in the file being claimed, because a hand-list is the thing
-   the census exists to replace.
-2. **The engine-doc gate compares dates, not content** (folded → #2578). An end-to-end re-verify
-   found **18 of `COACH_STANCE.md`'s 27 `file:line` citations wrong** — eight of them a uniform +1
-   from a single import #2811 added. Worse: the 2026-08-25 stamp explicitly *recorded* that it had
-   re-checked an anchor and that it "still lands on its banner." It does not; that line is blank.
-   A `Verified` date is a human claim wearing the costume of a machine check.
-3. **`TruncatedResponses` has never fired for the function it guards** (posted on #3083). The same
-   function publishes `AnthropicOutputTokens` under the correct dimension, so the emit path works.
-   #3083's acceptance box 3 cannot be checked on present evidence.
-4. **The auto-reconcile job reported `success` while leaving the tree drifted** — twice, redding
-   main both times. Root cause below; it is the session's best single find.
-5. **My own negative control passed vacuously.** Proving the PyYAML theory, I first blocked the
-   import with a `sys.meta_path` finder using `find_module` — **removed in Python 3.12** — so
-   `import yaml` succeeded and the test returned 552 as though nothing were wrong. The real proof
-   is `sys.modules["yaml"] = None`. I made the same error twice: a CloudWatch query against a
-   log group that does not exist returned zero events, and I briefly read that as a measurement.
+Then I priced the cliff, and the Outcome does not hold. Live from SSM `/life-platform/budget-breakdown`
+at `2026-08-27T16:00:11Z`: MTD **$162.47**, projected **$175.18** (all-classes $189.05), ceiling $200,
+tier 2. AI spend by caller class, the #2892 dimension:
 
-## #3234 — the root cause behind two red trunks, found by refusing my own first answer
+```
+ci            $6.78/day   64.5%     <-- CI is 1.92x production
+prod-cron     $3.53/day   33.6%
+dev-session   $0.20/day    1.9%
+```
 
-I posted to #2578 that the reconcile job had a **whitelist gap**. That was wrong; the whitelist
-already covers `docs/*.md`. The real chain:
+On **2026-09-01** the ADR-133 window auto-reverts $200 → **$150** with no deploy. Bands are fixed
+fractions, so the thresholds become $109.50 / $130.50 / **$145.50**:
 
-`run_generators` → `sync_doc_metadata --apply` → `discover_gate_census_count()` →
-`gate_census.discover_ci_gates()` → **`import yaml`** — and `ci-cd.yml`'s reconcile job uses the
-shared `setup-ci` composite, which installs **no packages**.
+```
+$175.18/mo -> 116.8% of $150 => TIER 3   (Sept matches Aug projection)
+$189.05/mo -> 126.0% of $150 => TIER 3   (all-classes)
+$183.90/mo -> 122.6% of $150 => TIER 3   (current run-rate x30)
+$145.26/mo ->  96.8% of $150 => TIER 2   (ALL CI and dev AI removed — clears by 24 cents)
+```
 
-**#3156 fixed exactly this in `docs-ci.yml`. `ci-cd.yml`'s reconcile job has the identical need and
-was missed.** Post-#3156 it fails *honestly* — an underivable census outside `--check` is skipped
-with a printed reason rather than compared against a frozen fallback — which is precisely why
-nobody noticed. Proved with a control: without yaml `(None, ModuleNotFoundError)`, with it
-`(552, None)`. **Proven live within the hour of merging**: reconcile commit `1d5513b9c` moved the
-census fact 552 → 554 unaided, the first time all night it cleared drift without me.
+**Every realistic September scenario lands at tier 3** — the hard cutoff, where website AI pauses, the
+daily brief skips AI, `bedrock_client.invoke()` raises, and both AI CI gates go dark. This epic exists
+to stop the tier system describing the designed steady state; closing it while that is about to happen
+would be the phantom its own Problem statement warns about. **KEEP OPEN**, posted with the arithmetic.
 
-I posted the correction publicly on #2578 rather than editing the original, so the wrong diagnosis
-and how it was caught both stay visible.
+Uncertainty stated rather than skipped: the $6.78/day CI term is **session-driven, not structural**
+(n=4 complete days, the dimension has only existed since 08-24, window overlaps three heavy sessions).
+If September runs far fewer sessions the cliff softens; at August's pace tier 3 is arithmetic. I cannot
+forecast the owner's session cadence, so both bounds are given rather than one number.
 
-## A gate caught a live reader-facing bug nobody was looking for
+## The through-line: F found instruments that report success without doing their job. G found the next layer — instruments whose stated *reason* is false while their conclusion is right
 
-CI/CD run `33040437876` concluded `failure` with deploy, smoke and post-deploy integration checks
-all green. The sole failure was the gating visual-QA job, on one reproduced high:
+1. **The D-01 caching note** (PR #3246). It told the next reader that cross-region inference makes a
+   once/day brief "never get a cache HIT" and to re-enable only after "re-measuring CacheRead>0."
+   Measured on the same function, same profile: cache reads **38,872** and **22,068** against writes of
+   26,933/27,097 — reads exceed writes. **The mechanism is false and the re-entry condition is already
+   satisfied**, so anyone diligent enough to obey the instruction would ship a no-op plus a write
+   premium. The conclusion is still right, for a reason the note never gave: the block is ~784 tokens
+   against Sonnet's 1,024 floor.
+2. **The deploy-wedge cron declares a safety property it has never delivered** (posted to #3237).
+   Measured every consecutive scheduled gap, **n = 99**: the declared `*/15` was delivered **0 times**,
+   and the 17-minute blind window its own comment claims to bound held **1 of 99 (1.0%)**. Median 43
+   min, p90 71 min, max 6.99h — and by session end the gap was **10 hours**.
+3. **A site auto-rollback that cannot fix the class of failure that triggers it** (folded → #2799).
+   Detailed below.
+4. **My own vacuous control**, again — the exact rule I put in all seven lane briefs. Probing whether
+   the #2811 fleet matcher was blind, my first control used a shape that is itself blind, got `[]`, and
+   for a moment I read it as "the surface is clean." A six-shape probe replaced it. **4 of 6 fire; 2 do
+   not.**
 
-> 🔴 `/method/pipeline/`: Apple Health shows **'LAST UPDATE 2026-08-27'** but today is **2026-08-26**.
+## The rollback that reverted a good build, reported success, and left the defect live
 
-**Not a flake, and the harness proved that itself** — the same run's other new high failed to
-reproduce on the immediate second judge pass and was correctly ungated by #3102's confirm step.
-Ground-truthed against production: `/api/source_freshness` served `last_update: "2026-08-27"` at
-22:38 **Pacific on the 26th**. A UTC-keyed date on a Pacific-framed page, so readers saw a future
-date for seven hours a day. Fixed in #3232 — which **ruled the frame before touching the display**
-and established that the UTC `DATE#` key is deliberate and correct (TD-19 Phase 2), so the defect
-was presentation, not storage. It explicitly refused to clamp, and pinned a test that clamping is
-the wrong fix.
+Site deploy `33079187092` on Session F's wrap commit, this morning at 07:12 PT. Deploy succeeded — the
+commit touched exactly **one** file under `site/`: `site/story/build/beats.json`, +31 lines, **F's own
+published build beat**. Visual+AI QA then failed on one reproduced high: `/coaching/by-coach/` had
+Dr. Max Reyes saying *"Day 10 as of today"* on Day 11. Auto-rollback fired, reported success, and
+reverted `site/`.
 
-## Three lanes falsified the premise of the issue they were sent to fix
+The narrative is served from **DynamoDB** via `/api/coach_analysis`. The rollback reverts **`site/`
+objects in S3**. Disjoint. I re-pulled the endpoint after it completed: still `regeneration_paused:
+True`, still `generated_at 2026-08-26T17:02:28Z`, still Day 10. So in one run it **could not** fix its
+trigger, **deleted a wanted unrelated change**, **reported `success`**, and left the defect live.
 
-That is a better signal than the closure count: the backlog's *descriptions* are drifting from the
-code faster than the code is drifting from correct.
+Lane 6 made the finding stronger than I had it: the rollback is **asymmetric with the deploy** —
+`deploy-site` also runs `config_twin_sync.py --apply --strict` against bucket-root `config/`, which the
+site-api reads at runtime, and the rollback covers `site/` only, so **a bad `config/` twin survives a
+"successful" rollback**. It also re-stamps `/version.json` backwards. And it caught a stale line:
+`CLAUDE.md:124`'s "rollback's `needs` excludes it" describes `ci-cd.yml`, not `site-deploy.yml`, which
+gained the `visual-qa` dependency when #750 moved it.
 
-- **#3217** — `regen_once` is not in `ai_calls.py` (it is in `grounded_generation.py`), and there
-  is **no "composite quality score"**: the veto was `len(fixed) < len(findings)`, one
-  undifferentiated count across a dozen heterogeneous classes, so a `fabricated_number` removal was
-  outvoted by unrelated ones. Also: CodeQL flagged the arm literal `DISCARD_NOT_BETTER` as
-  clear-text logging of sensitive data — the substring **`card`** trips its payment-card heuristic.
-  Renamed to `DROP_*` rather than suppressed.
-- **#2817** — boxes 1 and 2 were **already closed by #3196 on 08-25**; 57 claimed sites measured
-  60 and all 60 were already swept. The lane refused to re-claim them and found instead **one real
-  defect both matchers are structurally blind to** (below).
-- **#3224** — the growth is **79.7% existing tests getting slower**, not new tests, falsifying both
-  the issue's framing and my own alternative hypothesis. Root cause isolated by `cProfile`:
-  #3126/#3156 put `gate_census.build_census()` on the doc-sync path, so the full suite performs
-  **19 complete census builds, mean 8.07s — 15.8% of wall clock**. Closed **without raising the
-  budget** — the first non-raise in the class's five-instance history — with
-  `HARD_CEILING_SECONDS = 2100` read from the workflow's own `timeout-minutes` so it cannot drift.
+Root cause of the trigger: ADR-125 tier 2 pauses regeneration, and the frozen text carries an
+**absolute day number** plus "as of today", so it goes stale by one more day every day. Fixed in #3243
+by datelining the read in the frame its own prose uses — not by weakening the pause, not by
+regenerating. F's build beat is confirmed back on the live site.
+
+## Four lanes falsified the premise of the work they were sent to do
+
+- **#2888** — the top row of its own ranking is not a feature. `unknown` is **46% / $33.19 per 30d**,
+  larger than daily-brief and the whole coach pipeline combined, and it is **CI**. Its dominant token
+  class is screenshot **image** input — uncacheable in principle, no stable prefix at any size. Closed
+  on a falsified premise after the lane went looking for one last trim lever (the daily-brief shared
+  block) and **measured it into the ground**: 784 tokens under a 1,024 floor, ~$0.8–1.1/mo even if it
+  cleared. The lane had told me to keep the issue open; it tested its own claim and reversed itself.
+- **#3139** — the caching inversion does not exist. `I > 14.29·O`; 10 of 12 features fail *impossibly*.
+- **#2835** — the issue over-counts itself. `pip-audit` is first-Monday-guarded, so it is **six** emails
+  on ~3 Mondays in 4 and the fold saves **two**, not three; the "or fold into ai-review-pack's Sunday
+  send" option is **13.5h out of phase**; "zero alarm/infra changes" is unachievable alongside its own
+  acceptance. Lane 5 refused to half-ship it and posted a working design instead.
+- **#3079** — "the two `_image_block` implementations" are **three**.
 
 ## Incidents & gotchas
 
-- **A production deploy lease sat STRANDED 7.5h** (#1901 class) and **approving it would have
-  rolled back two fixes deployed live the same session**. Found by the wrap's own (e2) gate.
-- **The freshness checker sent a real inflated alert.** `Alert sent for 5 stale source(s)` at
-  05:47Z (22:47 PT) with every age +7h. `freshness_checker_lambda.py:612` anchored a **Pacific**
-  `DATE#` day at **UTC midnight**. Structurally unreachable by both matchers — `strptime` is the
-  *inverse* of a clock — and **#3196's own sweep introduced it**, having applied the correct fix
-  200 lines away in the same package.
-- **#3222 was falsely auto-closed.** Root cause was **not** a mistyped PR number (my first
-  diagnosis, corrected publicly): two lanes both wrote their PR body to the shared
-  `<scratchpad>/pr_body.md`, clobbering each other in **both** directions. Fix is a lane-unique
-  filename; every lane launched after that point was instructed accordingly.
-- **#3231 shipped half-broken with all 12 of its tests green.** Its autouse fixture cleared the
-  *shared* cache mid-suite; the only symptom was one line in a durations block. I merged on a
-  correct green verdict ~10 min before the author's report arrived carrying the correction (#3235).
-- **The census baseline is a serialization point.** Four lanes rebased on one integer; one hit a
-  genuine merge conflict GitHub was still advertising as `MERGEABLE`. Two measurement traps were
-  found and recorded in-file: an unresolved merge makes git list a path once *per stage*, inflating
-  the count by +4; and **a comment can mint a gate** — spelling a tree-sweep idiom out in prose
-  reclassified a file and moved the census by one.
-- **Zero event swallows** — against five in Session E. Every push was swallow-checked at ~90s.
-- **My own elapsed-time errors, and the agents'.** Two lanes independently reported the suite as
-  "~90 minutes in" when it was 18; I checked the clock directly rather than taking either.
+- **Main was NOT green at boot**, and F's handover said it was. Two Session-F residuals: `CLAUDE.md`'s
+  wrap prose tripped `check_doc_facts` (its "12 tests" read as the suite count, truth 17,664), and the
+  INCIDENT_LOG Patterns block was **stale** while F's gate line claimed it was regenerated. All **10**
+  full-suite failures were that one root cause. Fixed at `25205ce5`.
+- **I then hit #1908's trap myself** — the docs-only fix could not re-run CI/CD, because `docs/**` is
+  not in its `paths:` filter, so the stale red persisted until I diagnosed it by hand. Hours later
+  Lane 4's first attempt at Item B **reintroduced that exact trap**, and #1908's own guard caught it.
+- **Two deploy leases rejected with decodes.** The first was 6 commits behind and would have shipped a
+  tree without #3239; the second was at `69a35909`, **older than my manual deploys**, so approving it
+  would have regressed live Lambdas. The third, at current main, was **approved** rather than stranded.
+- **A concurrent session is working in the primary clone.** It appeared mid-session as an unpushed
+  local commit and grew to **5 commits** (now PR #3245, the skills-corpus migration). I moved all
+  driver git work into an isolated worktree at `origin/main` and touched none of it.
+- **I fabricated a sha and then read my own bad input as a finding.** Swallow-checking a merge I typed
+  a 40-character sha rather than reading one, got zero rows, and briefly concluded the push was
+  swallowed. It was not. Corrected within the minute; recorded because it is the same class as the
+  vacuous control.
+- **The census is a serialization point and it bit a lane I had not warned.** I briefed Lanes 4 and 7
+  about `BASELINE_TOTAL_GATES`; Lane 5's **QA** fix also added a gate, which I had not anticipated. The
+  general rule, which Lane 5 articulated: **registering a file in `_PREMERGE_EXTRA_FILES` tends to move
+  the census, so every lane that adds a repo-shape guard is a census-baseline lane whether it knows it
+  or not.** Related trap Lane 4 flagged and Lane 5 then checked explicitly: `_tracked_files` derives
+  from git, so a **present-but-untracked** new guard reads as absent — measure staged or set a ceiling
+  that reds the commit introducing the file.
+- **Closing #3204 orphaned an alarm citation**, and the wrap's own (e10) gate caught it the same
+  session — `qa-smoke-failures` cited an issue that had closed hours earlier.
 
 ## Gate lines
 
-**Build beat:** 2026-08-27-the-green-instruments
-**Docs:** `docs/INCIDENT_LOG.md` (+5 rows, header + derived Patterns block regenerated) ·
-`docs/alarm_citations.json` (budget-tier-escalation flap cited to #2801) · `docs/CONVENTIONS.md`
-(agent_commit deletion/rename reflex, via #3228) · `docs/engines/COACH_STANCE.md` (18 of 27
-citations corrected by AST, via #3230) · `docs/PROPORTIONALITY.md` + `lambdas/web/platform_counts.py`
-reconciled on main · `deploy/sync_doc_metadata.py --apply`
-**Decisions:** none filed — the one governance-shaped call (design (a) for the `auto-filed` carve-out)
-is recorded at its point of enforcement in `scripts/check_backlog_hygiene.py` with (b) and its
-rejection reasons, per #3065's own acceptance box 1; it constrains one linter, not the architecture
-**Main:** green (`c78730ae`) — after rejecting the 7.5h stranded lease that was queuing every later
-run behind it at 0 jobs; the earlier `28233fe7` reconcile red was a push race against my own
-concurrent merges and self-healed at `1d5513b9c`, exactly as that job's error text predicts
-**Incidents:** 5 rows added — the 7.5h stranded lease with its rollback near-miss · main red twice
-on the census literal while the reconcile job reported success (#3234) · #3222's false auto-close
-from a shared scratchpad path · #3231's half-broken shed with 12 green tests · the live inflated
-stale-source alert from the UTC-midnight anchor
-**Stash/hooks:** clean
-**Closures:** #2961, #3217, #3221, #3219, #3220, #3085, #3222, #3224, #2817, #3065, #3213 — all 11
-commented with contract-shape Shipped/Outcome verdicts; **#2817 recorded `partial`** because its
-first two boxes were already closed by #3196 and the lane refused to re-claim them
-**Backlog:** `Now` refilled to 4 actionable — promoted **#2835** (1.00) and **#3079** (0.90) from
-`Later` by stored rank, score lines corrected to `→ Now` in the same edit. `Next` holds only #2849
-(Fable, banked by standing owner call), so refill from `Next` was impossible without overriding it —
-same constraint Session E hit. Later sweep: no stale issues
-**Alarms:** 4 lit, all cited; 1 fired-and-cleared flap now cited —
-`life-platform-budget-tier-escalation` entered and cleared ALARM **twice** in the 72h window as the
-projection oscillated across the ~87% band, cited to epic #2801 with the ADR-125 consequence named
-**CI warnings:** none — `check_ci_warnings` reports nothing to triage (it reads the latest *green*
-completed run; the queue was still draining behind the stranded lease at wrap time)
-**Ledger:** omitted — the one new standing subsystem (#3213's cron-freshness watcher) landed with
-its rent already priced *inside* the work: a derived-not-declared cadence registry, an explicit
-watched/unwatched ruling for all 11 scheduled workflows with RE-RULE IF conditions, and a
-`+2` gate-census entry adjudicated in-file. A `docs/PROPORTIONALITY.md` row would restate that
-verbatim; deferring it deliberately to the #2578 sweep that will re-price the census rows anyway
+**Build beat:** 2026-08-27-the-sensor-that-ended
+**Docs:** `docs/alarm_citations.json` (qa-smoke-failures re-cited; the glucose leg resolved and the
+weight leg restated) · `docs/DECISIONS.md` (ADR-049 amendment 2026-08-27, via #3238) ·
+`lambdas/ai/ai_calls.py`'s D-01 note corrected (via #3246) · `deploy/sync_doc_metadata.py --apply`
+**Decisions:** none needed — ADR-049's amendment was filed inside #3238 by its own lane; the two
+governance-shaped calls this session (keep #2801 open against a completed box set; close #2888 on a
+falsified premise) are recorded as verdicts on the issues themselves, where the evidence lives
+**Main:** red — the latest **completed** CI/CD run on main is the pre-boot `84052622`, which failed on
+the `check_doc_facts` prose line I fixed at `25205ce5`; because `docs/**` is outside ci-cd's `paths:`
+filter that docs-only fix could not re-run it (the #1908 trap). Newer runs at `6a6ef3a1f` and
+`3eff37e6` were **in flight** at wrap time with the production lease approved, not stranded
+**Incidents:** 4 rows added — the site auto-rollback that reverted F's build beat for a DynamoDB-sourced
+defect it could not fix · main red at boot on two Session-F doc residuals, invisible to re-run by the
+#1908 trap · two production deploy leases rejected as stale, one of which would have regressed live
+Lambdas · the deploy-wedge cron undelivered for 10h against a declared 15-minute cadence
+**Stash/hooks:** clean — `git stash list` empty
+**Closures:** #3139, #3204, #2888, #2798, #3079 — all five commented with contract-shape
+Shipped/Outcome verdicts; **#3204 recorded `partial`** because its operator/alerting leg was
+deliberately cut on my instruction and folded to #2799 rather than left implied
+**Backlog:** `Now` refilled to 4 actionable — promoted **#2999** (0.60) and **#2848** (0.50) from
+`Later` by stored rank, score lines corrected to `→ Now` in the same edit. `Next` held only #2849
+(Fable, out of scope by the brief), so refilling from `Next` would have meant queueing work this
+session type cannot do. **#3237 carried no milestone and was invisible to every ranked query** — set to
+`Later`. Later sweep: no stale issues
+**Alarms:** 1 lit >72h, cited — `qa-smoke-failures`, re-pointed at #3083 (open, `gate:owner`) after its
+glucose leg resolved; no uncited fired-and-cleared flaps in the window
+**CI warnings:** none to triage — `check_ci_warnings` reads the latest **green** completed run and
+there was not one at wrap time (the queue was still draining behind the approved lease)
+**Ledger:** omitted — the one new standing artifact (`deploy/verify_doc_facts_derivable.py`) landed
+with its rent priced inside the work: a bounded probe that reads no doc and compares no literal, a
+recorded ruling that it must **not** gate structural `None` fallbacks (with a test pinning that
+choice), and a `+2` census adjudication in-file. A `PROPORTIONALITY.md` row would restate that
+verbatim; deferring deliberately to the #2999 sweep that will re-price the census rows anyway
 
-## Owner batch (16 items — 13 carried + 3 new)
+## Owner batch (18 items)
 
-1. RECONCILE_PUSH_TOKEN PAT (D0.6) — **now measurably load-bearing:** the reconcile job lost a push
-   race twice tonight · 2. DEPLOY_GATE_JANITOR_TOKEN (#3021) — **also load-bearing:** a lease sat
-   stranded 7.5h and only the wrap gate found it · 3. respiratory_rate/disturbance_count consent
-   (#3045) · 4. Notion secret deletion (#2890) · 5. ~~#2961 cdk-import approval~~ **DONE — used, and
-   it paid off by falsifying the operation's premise** · 6. #2834 IAM posture · 7. **#3083 — the
-   measurement is posted (0 of 42, ≤7.1% ceiling); the fail-open-vs-hold posture call is yours** ·
-   8. DIL-027 restore-drill appointment · 9. S3 Batch Replication backfill click (~$0.49) ·
-   10. **#3042 re-grade** · 11. Whoop re-auth if pending · 12. #2883 box-4 call · 13. **NEW —
-   `aws cloudwatch delete-alarms --region us-east-1 --alarm-names life-platform-cf-auth-errors`**
-   (the #2961 disposition; joins #2962's existing leg) · 14. **NEW — the freshness-checker's alert
-   state write is failing:** `AccessDeniedException` on `dynamodb:PutItem` for the notion leg,
-   caught and logged non-fatally, so episode/dedup tracking for that path is silently broken ·
-   15. **NEW — `deploy-wedge-watch.yml` declares `*/15` and GitHub delivers 40–120 min** (4.3h gap
-   on 08-26); #3213's watcher makes declared-vs-delivered visible for the first time — decide
-   whether the declared cadence should be made honest · 16. **The September 1 cliff** — the ceiling
-   auto-reverts $200 → $150 in five days.
+1. **THE SEPTEMBER 1 CLIFF — now priced, and it is the top item.** The ceiling auto-reverts $200 → $150
+   in five days and every realistic run-rate lands at **tier 3**. Three options on #2801: raise the base
+   to ~$190–200 (and re-point the backstop with it), cut AI CI cadence, or accept tier 3 and re-band
+   honestly. **Doing nothing selects option 3 by default, with no deploy and no announcement.**
+2. **The AI-CI cadence decision** (#2888's residue) — the only lever that moves the number, worth up to
+   ~$6.78/day. It now has a price *and* a measured counter-argument: the `visual_ai_qa` gate caught a
+   live reader-facing defect **this morning** that nothing else was looking for.
+3. RECONCILE_PUSH_TOKEN PAT (D0.6) · 4. DEPLOY_GATE_JANITOR_TOKEN (#3021) — **two leases needed manual
+   disposal again today** · 5. respiratory_rate/disturbance_count consent (#3045) · 6. #2834 IAM posture
+7. **#3083 — still the standing `gate:owner` policy call**, and now the sole citation holding the
+   `qa-smoke-failures` alarm; its evidence is cleaner than ever · 8. DIL-027 restore-drill appointment
+9. S3 Batch Replication backfill click (~$0.49) · 10. **#3042 re-grade** (Fable) · 11. Whoop re-auth if
+   pending · 12. #2883 box-4 call · 13. `aws cloudwatch delete-alarms --region us-east-1 --alarm-names
+   life-platform-cf-auth-errors` · 14. the freshness-checker's `dynamodb:PutItem` AccessDenied on its
+   notion alert-state write · 15. **`deploy-wedge-watch.yml` — now measured, n=99: the declared `*/15`
+   has been delivered 0 times and its stated 17-minute safety property held 1%.** Decide: make the
+   declaration honest, or move detection to an event-driven trigger that actually bounds the window.
+16. **NEW — `CLAUDE.md:124` is provably stale**: "rollback's `needs` excludes it" describes `ci-cd.yml`,
+   not `site-deploy.yml`, which gained the `visual-qa` dependency at #750. Left untouched under
+   status-block discipline. 17. **NEW — a concurrent session holds PR #3245** (skills-corpus migration);
+   it was unpushed local work in the shared clone for part of today. 18. **NEW — the site rollback's
+   scope**: folded to #2799, but the `config/` asymmetry is arguably worse than the DynamoDB case
+   because `config/` **is** repo-versioned and **was** shipped by that very workflow.
 
 ## Residuals / next picks
 
-- **#3204** — the only `Now` bug left. **Its lane reported ~11h in, after this wrap, having been
-  pinged at 2h; no PR, working tree uncommitted.** (An earlier draft of this handover said it never
-  reported — that was true when written and is now wrong.) **The investigation is worth more than
-  the missing PR and is captured on the issue** (comment 5441525624): the wire confirms the owner's
-  Box-1 answer (rows arrive daily, `blood_glucose_*` absent 08-25/26/27); the per-sub-datatype
-  liveness machinery **already exists and is inert** — never emitted as a metric, never alerted on,
-  and the one qa-smoke check reading it rules on whether a *dark* datatype carries a number, never
-  on whether one **is** dark; and **two further reader-facing defects are worse than the endpoint
-  because they never decay** — `site_stats_refresh_lambda.py:193` re-reads its own prior
-  `public_stats.json` (live artifact publishes an **undated `glucose_avg: 107`** from before 08-24
-  beside a correctly-dated `weight_as_of`), and `dashboard_refresh_lambda.py:368` shadows yesterday
-  then writes with no `else`. The front-end is **accidentally** honest via a key mismatch
-  (`cur.avg` vs `avg_mg_dl`), and its empty state is gated on a 30-day `has_cgm` that would not have
-  shown until ~09-23. Note: `qa_smoke_lambda.py` is at **1198/1200**, so the new check must be paid
-  for by extraction, never a baseline raise. Start here.
-- **#2883** (P2, budget self-metric drift) and **#2888** (P2, input-token diet) — the two remaining
-  P2s on `Now`, both untouched tonight.
-- **#2835** and **#3079** — promoted to `Now` this wrap by stored rank; unstarted.
-- **#2578's three new checkboxes** — the ten name-only census rows someone must adjudicate, the
-  engine-doc citation gate, and the reconcile job's *class* fix (it should fail when
-  `sync_doc_metadata --check` is still non-zero after it runs; #3234 fixed the instance only).
-- **#2798's two new checkboxes** — the `/api/source_freshness` frame work is done in #3232, but the
-  epic stays open on the remaining tz children.
-- **#2799's checkbox** — six workflow runs stuck `queued` on deleted branches whose PRs already
-  merged, one since 2026-08-06.
-- **not-work — 10 unguarded UTC-anchor sites outside `lambdas/emails/`** (6 in `lambdas/web/`,
-  which owes #2414's stricter zero). Hand-read by the #2817 lane and believed correct, but that is
-  an audit, not a gate. Owner's call whether it earns an issue.
-- **not-work — `#3202`'s last acceptance box stays unproven.** Budget tier was ≥2 for the whole
-  session, which pauses `coach_narrative`, and the only effective override window (16:00–17:00Z)
-  falls after this session ended. Needs a 17:00Z brief with tier < 2.
-- **not-work — ~80 stale git worktrees** accumulated across sessions; `git worktree list` is
-  unreadable. Housekeeping, no defect.
-- **Dated observations (no action until they mature):** **2026-08-31 (Monday)** — #3178's sentinel
-  cadence proof and #3191's TTL-parity sweep · **~08-29** — `ai-tokens-platform-daily-total` and
-  `prediction-gradable-share-low` cross 72h · **2026-09-01** — the $200 → $150 ceiling revert ·
-  **~09-24** — #2978's 30-day re-measure · **2026-10-15** — WAF revisit · **2026-09-22** — legacy
-  unsubscribe sunset.
+- **#2801** (P2 epic, Cost) — every child closed, Outcome unmet, five days to the cliff. **Start here.**
+- **#2883** (#2883, P2, budget self-metric drift 2.44× → 1.37× against a <1.15 bar, nothing alarms on
+  it) — the last untouched P2 on `Now`; pairs with #2801 because you cannot price a cut on attribution
+  you do not trust.
+- **#2978** (P2 UMBRELLA, deploy-race false positives) and **#2835** (chore; Lane 5 posted a concrete
+  design and a corrected sizing at `issues/2835#issuecomment-5441892781`) — both on `Now`, unstarted.
+- **#2999** (P2, gates slice 2 — the verdict fraction) and **#2848** (P3) — promoted to `Now` this wrap
+  by stored rank. #2999 is the natural successor to this session's census work.
+- **#2799**'s five new checkboxes — rollback-scope-must-match-failure-class, rollback-success-is-
+  unasserted, sub-datatype liveness never emitted, series helpers dropping absent days, and the AI
+  context map having no glucose entry.
+- **#3237** — auto-filed advisory tracker for the cron-freshness red; auto-closes on the next green run
+  of that workflow, which requires GitHub to actually deliver a scheduled `deploy-wedge-watch` run.
+- **not-work — the two remaining `#2578` residuals are named in-file**: a discoverer returning `None`
+  for a *structural* reason still falls back silently to `PLATFORM_FACTS` (deliberately not gated, with
+  a test pinning that choice, because gating `_count_adrs` would rebuild the #1908 trap by hand), and
+  the structural-test family still cannot see `test_pair_seam_conformance_2847.py`.
+- **not-work — `#3202`'s last acceptance box stays unproven.** Budget tier was 2 all session, which
+  pauses `coach_narrative`; the only effective override window is 16:00–17:00Z. Unchanged from F.
+- **not-work — ~93 stale git worktrees.** The concurrent session appears to be building a reaper for
+  exactly this; leave it to them.
+- **Dated observations:** **2026-08-31 (Mon)** — #3178's sentinel cadence proof and #3191's TTL-parity
+  sweep · **~08-29** — `ai-tokens-platform-daily-total` and `prediction-gradable-share-low` cross 72h ·
+  **2026-09-01** — the ceiling revert · **~09-24** — #2978's 30-day re-measure · **2026-10-15** — WAF
+  revisit · **2026-09-22** — legacy unsubscribe sunset.
