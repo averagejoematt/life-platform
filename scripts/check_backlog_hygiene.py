@@ -41,6 +41,57 @@ BLOCKING BY DEFAULT (the ADR-108 promotion pattern — promoted on measured evid
   Staleness stays advisory in BOTH modes — an old `Later` issue is a triage
   signal, not a defect.
 
+THE `auto-filed` CARVE-OUT — DECIDED 2026-08-26 (#3065): design (a), (b) REJECTED
+  #3064 was auto-filed by the visual-qa advisory workflow, survived to the D1 wrap
+  on 2026-08-23, and red this gate: no `type:*`, no `model:*`, the retired
+  `outcome_if_fixed` form. Hand-patching it with `type:story` then armed the FULL
+  ADR-099 story contract (prio/milestone/score/epic/`## Acceptance`) on an issue
+  whose entire lifecycle is "a machine opens it on red and closes it on the next
+  green". The issue offered two designs. **(a) is implemented** — the linter holds
+  advisory trackers to a narrower tracker contract of their own (`TRACKER_RULES`).
+
+  **(b) — teach `scripts/advisory_failure_issue.py` to emit the full ADR-099 shape,
+  with a sanctioned score/milestone convention for ephemeral trackers — is
+  REJECTED**, for four reasons that are all readable in the code rather than
+  matters of taste:
+
+    1. It would make a rule in THIS file lie. `rule_now_liveness` counts
+       non-blocked `type:story` issues on `Now`. Under (b) a tracker carries a
+       `type:*` and a milestone; land two of them on `Now` and the queue-liveness
+       rule reports a live queue on the strength of two rows a machine will close
+       within hours. The gate that exists to say "the queue is dead" would be
+       fed by the filer.
+    2. It would corrupt the corpus `backlog_next.py` ranks (#1866). That selector
+       excludes only `type:epic` and sorts by the issue's OWN stored score. A
+       tracker's score would have to be minted at filing time — before the failure
+       is even diagnosed — so there is no Impact, no Confidence and no Effort to
+       measure. Every constant is wrong in one of two directions: high enough to be
+       visible is high enough to outrank real work, and low enough not to is a
+       fabricated number wearing a measurement's clothes. ADR-104/105 (honest
+       numbers, uncertainty stated) forbid both.
+    3. Nothing in the ADR-099 contract is read by the code that owns these issues.
+       `advisory_failure_issue.run()` creates on `--mode file` and closes on
+       `--mode recover`, deduped by the body marker `<!-- advisory-failure: slug -->`
+       and the `auto-filed` label — never by type, milestone, prio or score. Those
+       fields exist so a human or agent can SELECT work; no session ever selects a
+       tracker, because the tracker's fix is "make the workflow green".
+    4. `rule_score_line_canonical` requires the score line's `→ <milestone>` to
+       equal the real milestone. Under (b) the filer would have to keep a
+       fabricated arrow in sync with a milestone that nobody set deliberately —
+       new drift, invented on purpose, to satisfy a contract nothing consumes.
+
+  WHAT STOPS THE CARVE-OUT BECOMING A HOLE (see `is_tracker`): the predicate is a
+  three-way conjunction, and the first two halves are *the filer's own ownership
+  test*, verbatim — `auto-filed` + the body marker are exactly what
+  `advisory_failure_issue.find_open_issue()` matches on when it decides which issue
+  to CLOSE. Pasting that marker into a real story to dodge the contract hands the
+  advisory workflow the authority to close that story on its next green run. The
+  third half is the deliberate part: an issue carrying ANY `type:*` label has
+  declared itself backlog work and is held to the full contract, exemption label or
+  not. And the carve-out is not "no rules" — a tracker must still carry exactly one
+  `area:*` and an explicit `**Close policy:**`, because the close policy IS the
+  argument for the carve-out and a gate must verify its own premise.
+
 USAGE
   python3 scripts/check_backlog_hygiene.py                 # blocking (default): exit 1 on any violation
   python3 scripts/check_backlog_hygiene.py --advisory      # explicit opt-out: print, always exit 0
@@ -88,6 +139,19 @@ AUDIENCES: Dict[str, tuple] = {
 # issue's acceptance criteria name story/bug; `type:chore` is the same shape by the
 # ADR and is included so a chore cannot be filed as the one exempt type.
 WORK_TYPES = ("type:story", "type:bug", "type:chore")
+
+# ── the `auto-filed` ops-tracker carve-out (decision dated 2026-08-26, #3065) ──
+# Kept as three plain strings deliberately: each one is a literal that some OTHER
+# module writes, so a name is the join and a copy is the drift.
+#   TRACKER_LABEL  == advisory_failure_issue.MARKER_LABEL
+#   TRACKER_MARKER == the stable prefix of advisory_failure_issue.issue_marker()
+#   TRACKER_CLOSE_POLICY == the heading advisory_failure_issue.build_issue_body() emits
+# tests/test_backlog_hygiene_gate.py asserts the agreement against the real module
+# rather than re-typing them, so a rename over there reds here instead of silently
+# widening (or silently voiding) the carve-out.
+TRACKER_LABEL = "auto-filed"
+TRACKER_MARKER = "<!-- advisory-failure:"
+TRACKER_CLOSE_POLICY = "**Close policy:**"
 
 ACCEPTANCE_MIN, ACCEPTANCE_MAX = 3, 5
 NOW_LIVENESS_MIN = 3  # ≥3 non-blocked stories on `Now`, or the queue is not live
@@ -138,7 +202,38 @@ def build_ctx(issue: Dict[str, Any]) -> Dict[str, Any]:
         "raw_epic_line": bc.find_epic_line(body),
         "story_refs": bc.story_refs(body),
         "updated_at": issue.get("updatedAt") or issue.get("updated_at"),
+        # The raw body, for the #3065 tracker rules only: an ops tracker's contract is
+        # about text its own filer wrote, not about the ADR-099 grammar.
+        "body": body,
     }
+
+
+def is_tracker(ctx: Dict[str, Any]) -> bool:
+    """True only for a machine-owned advisory-failure tracker (#3065, decided 2026-08-26).
+
+    Three conditions, ALL required — the conjunction is what keeps the carve-out from
+    being a hole anyone can drive a real story through by adding one label:
+
+      1. the `auto-filed` label, AND
+      2. the dedup marker `advisory_failure_issue.issue_marker()` writes into the body,
+         AND
+      3. NO `type:*` label of any kind.
+
+    (1) and (2) together are not a passphrase — they are precisely the pair
+    `advisory_failure_issue.find_open_issue()` matches on to decide which issue its
+    `--mode recover` pass CLOSES. Forging them to dodge the filing contract means
+    handing the advisory workflow the authority to close your issue on its next green
+    run, so the forgery costs more than filing properly.
+
+    (3) is the deliberate one: applying ANY `type:*` label is the act of declaring the
+    issue backlog work, and something that has declared itself backlog work is held to
+    the backlog contract. `type:*` beats the exemption, never the other way round.
+    """
+    if TRACKER_LABEL not in ctx["labels"]:
+        return False
+    if TRACKER_MARKER not in ctx["body"]:
+        return False
+    return not ctx["types"]
 
 
 # ── rule helpers (string ops only — the grammar lives in backlog_contract) ──────
@@ -395,6 +490,28 @@ def rule_epic_link(ctx: Dict[str, Any]) -> List[Finding]:
     return []
 
 
+def rule_tracker_close_policy(ctx: Dict[str, Any]) -> List[Finding]:
+    """An auto-filed tracker states its own close policy in its body (#3065).
+
+    This rule is the price of the carve-out, not an afterthought to it. The whole
+    argument for exempting these issues from ADR-099 is "their lifecycle lives in
+    their body instead of in backlog fields" — so the linter verifies that the body
+    actually carries the lifecycle. Strip the `**Close policy:**` block out of
+    `advisory_failure_issue.build_issue_body()` and this fires: the tracker would then
+    be an issue with no contract at ALL, which is the thing #3065 must not create.
+    """
+    if TRACKER_CLOSE_POLICY not in ctx["body"]:
+        return [
+            Finding(
+                "tracker_close_policy",
+                ctx["number"],
+                f"`{TRACKER_LABEL}` tracker states no `{TRACKER_CLOSE_POLICY}` — "
+                "the carve-out from the ADR-099 contract is granted BECAUSE the lifecycle is in the body (#3065)",
+            )
+        ]
+    return []
+
+
 PER_ISSUE_RULES: List[Callable[[Dict[str, Any]], List[Finding]]] = [
     rule_one_type_label,
     rule_one_area_label,
@@ -405,6 +522,18 @@ PER_ISSUE_RULES: List[Callable[[Dict[str, Any]], List[Finding]]] = [
     rule_acceptance_count,
     rule_score_line_canonical,
     rule_epic_link,
+]
+
+# The narrower contract an `auto-filed` ops tracker is held to INSTEAD of (never in
+# addition to) PER_ISSUE_RULES — #3065's design (a). Two rules, both of which can and
+# do fail: the tracker must still be routable to an area, and it must state the close
+# policy that justifies its exemption. Everything ADR-099 asks a backlog issue for
+# (type, model, prio, milestone, audience, 3–5 acceptance boxes, a stored score, an
+# epic link) is deliberately absent, because a machine opens and closes these and no
+# session ever ranks one.
+TRACKER_RULES: List[Callable[[Dict[str, Any]], List[Finding]]] = [
+    rule_one_area_label,
+    rule_tracker_close_policy,
 ]
 
 
@@ -488,7 +617,11 @@ def check(issues: List[Dict[str, Any]], now: Optional[datetime] = None) -> List[
     ctxs = [build_ctx(issue) for issue in issues]
     findings: List[Finding] = []
     for ctx in ctxs:
-        for rule in PER_ISSUE_RULES:
+        # #3065: an auto-filed ops tracker answers to TRACKER_RULES instead of the
+        # ADR-099 backlog contract. The corpus/queue rules below need no carve-out —
+        # `now_liveness` selects on `type:story` and `later_staleness` on a milestone,
+        # neither of which a tracker can have and still be one (see `is_tracker`).
+        for rule in TRACKER_RULES if is_tracker(ctx) else PER_ISSUE_RULES:
             findings.extend(rule(ctx))
     findings.extend(rule_epic_story_coverage(ctxs))
     findings.extend(rule_now_liveness(ctxs))
