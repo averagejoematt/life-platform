@@ -194,10 +194,21 @@ verbatim; deferring it deliberately to the #2578 sweep that will re-price the ce
 
 ## Residuals / next picks
 
-- **#3204** — the only `Now` bug left; its lane ran ~2h without producing a PR and was pinged for
-  status but never reported. The owner's answer (the sensor ENDED; a legitimate absence, not a
-  broken pipe) still stands, and #3232 deliberately left the `datatypes[]` sub-datatype surface
-  untouched because it is #3204's. Start here.
+- **#3204** — the only `Now` bug left. **Its lane reported ~11h in, after this wrap, having been
+  pinged at 2h; no PR, working tree uncommitted.** (An earlier draft of this handover said it never
+  reported — that was true when written and is now wrong.) **The investigation is worth more than
+  the missing PR and is captured on the issue** (comment 5441525624): the wire confirms the owner's
+  Box-1 answer (rows arrive daily, `blood_glucose_*` absent 08-25/26/27); the per-sub-datatype
+  liveness machinery **already exists and is inert** — never emitted as a metric, never alerted on,
+  and the one qa-smoke check reading it rules on whether a *dark* datatype carries a number, never
+  on whether one **is** dark; and **two further reader-facing defects are worse than the endpoint
+  because they never decay** — `site_stats_refresh_lambda.py:193` re-reads its own prior
+  `public_stats.json` (live artifact publishes an **undated `glucose_avg: 107`** from before 08-24
+  beside a correctly-dated `weight_as_of`), and `dashboard_refresh_lambda.py:368` shadows yesterday
+  then writes with no `else`. The front-end is **accidentally** honest via a key mismatch
+  (`cur.avg` vs `avg_mg_dl`), and its empty state is gated on a 30-day `has_cgm` that would not have
+  shown until ~09-23. Note: `qa_smoke_lambda.py` is at **1198/1200**, so the new check must be paid
+  for by extraction, never a baseline raise. Start here.
 - **#2883** (P2, budget self-metric drift) and **#2888** (P2, input-token diet) — the two remaining
   P2s on `Now`, both untouched tonight.
 - **#2835** and **#3079** — promoted to `Now` this wrap by stored rank; unstarted.
