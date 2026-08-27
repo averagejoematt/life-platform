@@ -187,13 +187,21 @@ def daily_brief_shared_system(
     """Phase 3.8 (2026-05-16): build a stable system block reused across the 4
     daily-brief AI calls (BoD, training+nutrition, journal, TL;DR).
 
-    NOTE (D-01, 2026-06-05): prompt caching is intentionally DISABLED on the 4
-    daily-brief calls (cache_system=False). Bedrock cross-region inference routes
-    each call to a region-local cache, so a once/day brief never gets a cache HIT
-    — measured 0 reads / 10K writes per 14d, i.e. pure write-premium waste. Do NOT
-    re-enable caching here without re-measuring CacheRead>0. (The high-frequency
-    coach-narrative-orchestrator path DOES hit, and keeps caching on.) This shared
-    block is still built once and reused across the 4 calls for consistency.
+    NOTE (D-01, 2026-06-05; mechanism CORRECTED 2026-08-27, #2888): caching stays
+    DISABLED here (cache_system=False). The conclusion holds; the original REASON
+    does not, and it misleads whoever checks it. It said cross-region inference
+    routes each call to a region-local cache so a once/day brief "never gets a
+    cache HIT", with re-entry gated on re-measuring CacheRead>0. FALSIFIED: same
+    function, same profile, AnthropicCacheReadTokens{daily-brief} = 38,872 (08-25)
+    and 22,068 (08-26) vs writes 26,933/27,097 — reads EXCEED writes via
+    in-invocation reuse (#3138), so that re-entry condition is ALREADY met. The
+    real obstruction is prefix SIZE, never mentioned: this block is ~784 est.
+    tokens against Sonnet's 1,024 floor, and below the floor a cache_control
+    marker is silently ignored (prompt_cache.cache_floor(); ADR-049 2026-08-27).
+    Re-enable ONLY if the stable prefix measures >= that floor on the wire — not
+    on CacheRead>0. #2888 priced the whole prize at ~$0.8-1.1/mo regardless.
+    (coach-narrative-orchestrator DOES hit and keeps caching on.) This block is
+    still built once and reused across the 4 calls for consistency.
     """
     # #1086: the ONE shared experiment-phase block (journey + pre-start state +
     # audience + cannot-exist-yet guardrail) replaces the journey-only block.
