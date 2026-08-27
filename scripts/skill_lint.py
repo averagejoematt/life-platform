@@ -251,6 +251,18 @@ def check_references(rel: str, body: str) -> list[Finding]:
                 seen.add(key)
                 out.append(Finding("dead-ref", rel, f"`{path}` does not exist", lineno))
                 continue
+            if _is_gitignored(path):
+                # Exists HERE and nowhere else. This is the local-pass/CI-fail split, and
+                # it bit on 2026-08-27: design-implement pointed sessions at
+                # `.claude/worktrees/`, which is gitignored, so the gate passed on a
+                # machine carrying stale worktrees and failed in a clean checkout. Judging
+                # by tracked-ness rather than by os.path.exists makes the verdict identical
+                # everywhere — the property a gate needs before anyone can trust it.
+                seen.add(key)
+                out.append(
+                    Finding("dead-ref", rel, f"`{path}` is gitignored — it exists only on this machine, never in a clean checkout", lineno)
+                )
+                continue
             if target_line is not None and fp.is_file():
                 n = len(fp.read_text(encoding="utf-8", errors="replace").splitlines())
                 if target_line > n:
@@ -260,6 +272,21 @@ def check_references(rel: str, body: str) -> list[Finding]:
                 seen.add(key)
                 out.append(Finding("dead-ref", rel, f"`{path}::{anchor}` — symbol not found in that file", lineno))
     return out
+
+
+_IGNORE_CACHE: dict[str, bool] = {}
+
+
+def _is_gitignored(path: str) -> bool:
+    """True if git refuses to track `path` (so CI will never see it)."""
+    if path in _IGNORE_CACHE:
+        return _IGNORE_CACHE[path]
+    try:
+        r = subprocess.run(["git", "check-ignore", "-q", path], cwd=ROOT, capture_output=True, timeout=10)
+        _IGNORE_CACHE[path] = r.returncode == 0
+    except Exception:
+        _IGNORE_CACHE[path] = False  # fail OPEN: a missing git must not invent findings
+    return _IGNORE_CACHE[path]
 
 
 def _issue_state(num: str, cache: dict[str, str | None]) -> str | None:

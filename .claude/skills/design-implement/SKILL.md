@@ -90,8 +90,12 @@ proceed directly.
 **Never edit the shared main tree directly and never merge/deploy** (memory:
 `feedback_concurrent_session_worktree`, `reference_worktree_case_insensitive_pollution`,
 `reference_deploy_from_main_not_worktree_branch`). Branch `issue-<N>-<slug>` (or a
-descriptive slug if no issue number was given) off up-to-date `origin/main` in
-`.claude/worktrees/`.
+descriptive slug if no issue number was given) off up-to-date `origin/main`, in a
+worktree **outside the repo** — one fresh directory per agent, never a path inside the
+checkout. An in-repo worktree is a full second copy that repo-wide sweeps then walk:
+`test_hevy_compiler_isolation` red-mained twice on one (#953), and on 2026-08-27 a
+stale in-repo worktree made a corpus gate pass locally that CI correctly failed,
+because the directory is gitignored and exists only on that machine.
 
 **The proposal's HTML/CSS never gets copied into `site/` verbatim.** Re-express it:
 

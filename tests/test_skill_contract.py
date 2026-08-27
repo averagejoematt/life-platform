@@ -134,3 +134,23 @@ def test_a_real_reference_is_not_reported():
     """The negative control. A check that flags everything is not a check."""
     out = lint_mod.check_references("x.md", "See `docs/CHARTER.md` and `scripts/skill_lint.py`.\n")
     assert out == [], f"false positives on real paths: {[str(f) for f in out]}"
+
+
+def test_gitignored_path_is_reported():
+    """A path that exists only on this machine is the local-pass/CI-fail split.
+
+    Found live 2026-08-27: design-implement told sessions to build worktrees in
+    `.claude/worktrees/`, which is gitignored. skill_lint passed on a laptop carrying
+    stale worktrees and failed in a clean checkout. Judging by tracked-ness rather than
+    os.path.exists makes the verdict identical everywhere — the property a gate needs
+    before anyone can trust it. (It also contradicted the repo's own rule that worktrees
+    live OUTSIDE the checkout; that prose is fixed too.)
+    """
+    out = lint_mod.check_references("x.md", "Branch in `.claude/worktrees/` here.\n")
+    assert any("gitignored" in f.message for f in out), "a gitignored path must not read as resolved"
+
+
+def test_gitignore_check_fails_open_without_git():
+    """A missing git must not invent findings — fail OPEN, never fabricate."""
+    lint_mod._IGNORE_CACHE.clear()
+    assert lint_mod._is_gitignored("docs/CHARTER.md") is False
