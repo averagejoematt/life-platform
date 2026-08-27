@@ -30,7 +30,7 @@ from boto3.dynamodb.conditions import Key  # noqa: F401 — re-exported for down
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE as EXPERIMENT_START
 from common.input_manifest import manifest_note as _manifest_note  # #3049 DIL-024 / DIL-049
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
-from common.pacific_time import PACIFIC
+from common.pacific_time import PACIFIC, pacific_date_of, pacific_day_n  # #1964/#1955 — the canonical frame, parse and day-index
 from experiment.phase_filter import with_phase_filter
 
 from web.platform_counts import DISCOVERED_COUNTS
@@ -354,10 +354,16 @@ def as_of_day_n(generated_at, start_date: str) -> "int | None":
     stamp: the timestamp is written on every record, the stamp is optional, and a
     derived value cannot inherit a bad one (the #3111 discipline).
 
+    Composed entirely from the #1964/#1955 canonical helpers — `pacific_date_of`
+    (which owns the tz-less-means-UTC semantic) and `pacific_day_n` (which owns the
+    one day-index formula). This function contributes exactly ONE rule of its own,
+    the branch below; it re-derives neither the Pacific frame nor the ISO parse.
+
     Args:
         generated_at: an ISO-8601 instant (trailing "Z" ok; a naive value is read
-            as UTC, which is what every writer here emits). Converted to its
-            PACIFIC calendar date — the site's day frame (#2506/#2675).
+            as UTC, which is what every writer here emits) OR a bare `YYYY-MM-DD`.
+            An instant is converted to its PACIFIC calendar date — the site's day
+            frame (#2506/#2675).
         start_date: the cycle genesis (`EXPERIMENT_START`), passed in rather than
             read from module state so callers that repoint it stay honest.
 
@@ -368,29 +374,23 @@ def as_of_day_n(generated_at, start_date: str) -> "int | None":
     if not generated_at or not isinstance(generated_at, str):
         return None
     raw = generated_at.strip()
-    if "T" not in raw and " " not in raw:
-        # A bare `YYYY-MM-DD` (the OUTPUT# sk fallback) is ALREADY a calendar day and
-        # is taken as-is. Feeding it through the instant path instead would read it as
-        # UTC midnight and convert it back a day — the #3196 "Pacific date anchored at
-        # UTC midnight" class, which here would print Day 9 over Day-10 prose.
-        try:
-            written = date.fromisoformat(raw)
-        except ValueError:
-            return None
+    if "T" in raw or " " in raw:
+        # An INSTANT: which Pacific day did it land on? (An evening-PT write rolls
+        # into the next UTC day — the whole reason this helper exists.)
+        written = pacific_date_of(raw)
     else:
-        try:
-            stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        except ValueError:
-            return None
-        if stamp.tzinfo is None:
-            stamp = stamp.replace(tzinfo=timezone.utc)
-        written = stamp.astimezone(PT).date()
-    try:
-        start = date.fromisoformat(start_date)
-    except (TypeError, ValueError):
+        # A bare `YYYY-MM-DD` (the OUTPUT# sk fallback) is ALREADY a calendar day and
+        # is taken as-is. Sending it through the instant path instead would read it
+        # as UTC midnight and convert it BACK a day — the #3196 "Pacific date
+        # anchored at UTC midnight" class, which here prints Day 9 over Day-10 prose.
+        # Pinned by tests/test_paused_narrative_dateline.py; do not collapse this
+        # branch into the call above.
+        written = raw
+    if not written:
         return None
-    n = (written - start).days + 1
-    return n if n >= 1 else None
+    # pacific_day_n clamps to 0 for BOTH a pre-genesis date and an unparseable one,
+    # and 0 is not a day this dateline may ever print — so 0 collapses to UNKNOWN.
+    return pacific_day_n(start_date, written) or None
 
 
 def pre_start_meta() -> dict | None:
