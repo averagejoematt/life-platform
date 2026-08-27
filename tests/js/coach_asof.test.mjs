@@ -63,6 +63,39 @@ test("NOT paused, no date: empty string — no kicker renders at all", () => {
   assert.equal(coachAsOf(undefined, false), "");
 });
 
+/* ── the DAY NUMBER in the dateline (2026-08-27) ──────────────────────────
+
+   The live failure: /coaching/by-coach/#physical_coach served "I'm ten days into
+   this restart with you — Day 10 as of today" on Day 11, under a tier-2
+   regeneration pause. The prose dates ITSELF in experiment days, so a calendar
+   dateline alone ("as of Aug 26") never reconciles it — a reader would have to
+   know Aug 26 was Day 10. The stamp now carries both frames. */
+
+test("REPLAY 2026-08-27: the held read is datelined in the frame its prose uses", () => {
+  const s = coachAsOf("2026-08-26T17:02:28Z", true, 10);
+  assert.equal(s, "as of Aug 26 · Day 10 — refresh paused (budget guard)");
+  assert.match(s, /Day 10/, "the prose says Day 10; the dateline must say so too");
+});
+
+test("the day number rides the stale (un-paused) branch too", () => {
+  const fourDaysAgo = new Date(Date.now() - 96 * 3600e3).toISOString();
+  const s = coachAsOf(fourDaysAgo, false, 7);
+  assert.match(s, /· Day 7 — next refresh pending$/);
+});
+
+test("an UNKNOWN day renders nothing — never Day 0, never a guess", () => {
+  // A wrong day number over frozen prose is strictly worse than no day number:
+  // it would make the dateline endorse the error it exists to frame.
+  for (const bad of [undefined, null, 0, -3, NaN, "10", 10.5, true]) {
+    const s = coachAsOf("2026-08-26T17:02:28Z", true, bad);
+    assert.equal(s, "as of Aug 26 — refresh paused (budget guard)", `day ${String(bad)} must render nothing`);
+  }
+});
+
+test("no date + a day number still renders the day (the dateline degrades, never vanishes)", () => {
+  assert.equal(coachAsOf("", true, 10), "Day 10 — refresh paused (budget guard)");
+});
+
 /* ── regenerationPaused: absent field = unknown, render nothing new ──────── */
 
 test("regeneration_paused === true is the ONLY paused reading", () => {

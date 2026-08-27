@@ -332,6 +332,67 @@ def _clamp_today(date_str: str, _now_date: str | None = None) -> str:
     return min(date_str, today)
 
 
+def as_of_day_n(generated_at, start_date: str) -> "int | None":
+    """The experiment day a stored narrative WAS WRITTEN ON — the dateline half of
+    the staleness contract.
+
+    `_current_day_n` answers "what day is it"; this answers "what day is this text
+    ABOUT". The two diverge exactly while budget_guard pauses regeneration (ADR-125
+    tier >= 2), and that divergence is a live reader-facing defect, not a cosmetic
+    one: coach prose bakes an ABSOLUTE day number into cacheable text ("Day 10 as of
+    today"), so a held read gains one full day of error every day the pause lasts.
+    Measured 2026-08-27: /coaching/by-coach/#physical_coach served a Day-10 sentence
+    on Day 11 and tripped the gating visual-QA judge.
+
+    Serving the content's own day number lets the reader-facing dateline reconcile
+    the frozen sentence ("as of Aug 26 · Day 10") instead of leaving an absolute day
+    number unanchored next to a calendar date the reader cannot convert. ADR-104:
+    a narrative surface may not assert a number it cannot stand behind — but it MAY
+    assert it under a dateline that says which day it belongs to.
+
+    DERIVED from the timestamp, never read from a writer's own `days_in_experiment`
+    stamp: the timestamp is written on every record, the stamp is optional, and a
+    derived value cannot inherit a bad one (the #3111 discipline).
+
+    Args:
+        generated_at: an ISO-8601 instant (trailing "Z" ok; a naive value is read
+            as UTC, which is what every writer here emits). Converted to its
+            PACIFIC calendar date — the site's day frame (#2506/#2675).
+        start_date: the cycle genesis (`EXPERIMENT_START`), passed in rather than
+            read from module state so callers that repoint it stay honest.
+
+    Returns the 1-indexed day, or None when there is no parseable instant or the
+    instant predates genesis. None means UNKNOWN — an unknown dateline renders
+    nothing, never a guess (the absent-is-unknown rule, #1971).
+    """
+    if not generated_at or not isinstance(generated_at, str):
+        return None
+    raw = generated_at.strip()
+    if "T" not in raw and " " not in raw:
+        # A bare `YYYY-MM-DD` (the OUTPUT# sk fallback) is ALREADY a calendar day and
+        # is taken as-is. Feeding it through the instant path instead would read it as
+        # UTC midnight and convert it back a day — the #3196 "Pacific date anchored at
+        # UTC midnight" class, which here would print Day 9 over Day-10 prose.
+        try:
+            written = date.fromisoformat(raw)
+        except ValueError:
+            return None
+    else:
+        try:
+            stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        written = stamp.astimezone(PT).date()
+    try:
+        start = date.fromisoformat(start_date)
+    except (TypeError, ValueError):
+        return None
+    n = (written - start).days + 1
+    return n if n >= 1 else None
+
+
 def pre_start_meta() -> dict | None:
     """The pre-start countdown contract (#931). A reset can stage a FUTURE genesis
     (constants regenerate the night before Day 1), and for that window the site is

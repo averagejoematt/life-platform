@@ -927,6 +927,10 @@ body { overflow-x: hidden; }
 .bc-rec { margin: var(--sp-3) 0 0; }
 .bc-rec .label { color: var(--ember); display: block; margin-bottom: 2px; }
 .bc-xnote, .bc-conf, .bc-asof { color: var(--ink-faint); margin: var(--sp-2) 0 0; }
+/* The as-of stamp now leads the read as a DATELINE (2026-08-27) — the prose it
+   frames dates itself in experiment days, so the frame must arrive first. Sits
+   tight under the kicker with the gap below, inverting .bc-asof's trailing margin. */
+.bc-dateline { margin: var(--sp-1) 0 var(--sp-2); }
 .bc-data { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
 .bc-stat { margin: var(--sp-2) 0 0; }
 .bc-statn { font-family: var(--font-mono); font-size: var(--fs-h3); color: var(--ink); }
