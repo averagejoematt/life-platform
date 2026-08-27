@@ -57,6 +57,12 @@
 #                       the #3117 incident that motivated this warning).
 #   --timeout SECONDS  overall wait budget (default 1800 = 30 min).
 #   --interval SECONDS poll interval (default 30).
+#   --zero-check-grace SECONDS
+#                       how long ZERO attached checks is tolerated before the
+#                       swallow diagnosis runs (default 120). Long enough that
+#                       ordinary attach latency never trips it — #3219's whole
+#                       point is a named diagnosis, not a faster failure. Once
+#                       any check has attached the diagnosis never runs at all.
 #   --no-derive        skip path-based derivation; expect ONLY the baseline set
 #                       (unconditional PR checks) plus any --expect names.
 #   --repo OWNER/REPO  defaults to averagejoematt/life-platform.
@@ -67,6 +73,15 @@
 #      absent/pending — NONGREEN lines name every offending check.
 #   2  a WAITING (gated-deployment) check was observed — WAITING lines name it; a
 #      human must approve or reject the lease, this script does not wait it out.
+#   5  SWALLOWED PUSH (#3219) — after `--zero-check-grace` seconds with ZERO
+#      checks attached, `scripts/check_main_green.py --classify-sha <full40>`
+#      classified the head sha as `swallowed`: no workflow run of ANY kind
+#      references it, so no check will ever attach and polling to the 1800s
+#      timeout is dead time. Deliberately DISTINCT from 1 (a red or a timeout) —
+#      the action is not "fix and re-push", it is the event-swallow recovery
+#      ladder, which the script prints. The other zero-run states
+#      (path-filter-skip, bot-push-no-dispatch, indeterminate) are NAMED and
+#      polling CONTINUES — they are not swallows and must not be lumped in.
 #   4  GREEN-WITH-RECONCILE-OWNED-RED (#3200) — every expected check is green
 #      EXCEPT "Wiki drift gates", whose only red is `sync_doc_metadata.py
 #      --check` naming exclusively reconcile-owned paths (docs/*, CLAUDE.md,
@@ -251,6 +266,70 @@ _extract_wiki_drift_files() {
       }
     }
   '
+}
+
+# ── #3219: the zero-checks-attached diagnosis ────────────────────────────────
+#
+# THE INCIDENT (Session E, 2026-08-26, twice in one session). PR #3215 at
+# 5213b364 and PR #3214 at 769905bd each printed `0/7 green` every 30s until the
+# operator went and checked by hand. Both were genuine event swallows —
+# `actions/runs?head_sha=<full40>` returned `total_count=0` — and in both cases
+# that discriminating fact was available on the FIRST poll. `0/7 green` at 30s and
+# `0/7 green` at 300s render identically, so the script's own output never told
+# anyone to go look. ~10 minutes of dead polling, twice.
+#
+# What is NOT claimed: that waiting is wrong. Checks legitimately take time to
+# attach and a watcher that bailed on the first empty poll would be worse than
+# this bug. What is added is a NAMED DIAGNOSIS after a bounded grace, not a faster
+# failure — and only when ZERO checks have attached, never when some have.
+#
+# THE CLASSIFICATION IS NOT REIMPLEMENTED HERE. `scripts/check_main_green.py`
+# already owns it (`classify_zero_run_head`, #2826/#3212 — swallowed vs
+# path-filter-skip vs bot-push-no-dispatch vs indeterminate) together with the
+# impure fetch that feeds it (`diagnose_uncovered_head`, which issues the
+# FULL-40-char runs query and reads the commit's file list and committer). #3212
+# exists precisely because that logic lived inside one consumer and a second
+# consumer could not reach it; a second COPY would be the same bug with extra
+# steps. This script shells out to that module and reads its JSON.
+#
+# The command is overridable for tests (`WAIT_PR_GREEN_CLASSIFY_CMD`) — the only
+# way to exercise the diagnosis offline, since the real one needs the network.
+_WAIT_PR_GREEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+CLASSIFY_CMD="${WAIT_PR_GREEN_CLASSIFY_CMD:-python3 ${_WAIT_PR_GREEN_DIR}/../scripts/check_main_green.py --classify-sha}"
+
+# The states, named once. Keyed off check_main_green.py's own vocabulary — never
+# off a phrase in the reason text (the #3199 lesson: every phrase-matched
+# suppressor in this repo has failed in the field).
+ZC_SWALLOWED="swallowed"
+
+# classify_zero_check_diagnosis <classifier-json>
+#   Pure — takes the classifier's JSON, prints the operator-facing lines, and
+#   returns 5 for a CONFIRMED swallow (stop, this will never attach) or 0 for
+#   every other state (say what it is, keep polling). Unreadable or unparseable
+#   JSON returns 0 with a NOTE: a diagnosis that cannot be made must degrade to
+#   the pre-#3219 behaviour of waiting, never to a manufactured swallow — crying
+#   swallow on ordinary attach latency is worse than the bug being fixed.
+classify_zero_check_diagnosis() {
+  local raw="$1"
+  local state reason
+  state=$(jq -r '.state // ""' <<<"${raw}" 2>/dev/null)
+  reason=$(jq -r '.reason // ""' <<<"${raw}" 2>/dev/null)
+  if [[ -z "${state}" ]]; then
+    echo "NOTE zero-check diagnosis unavailable (classifier returned nothing usable) — continuing to poll."
+    return 0
+  fi
+  if [[ "${state}" == "${ZC_SWALLOWED}" ]]; then
+    echo "SWALLOWED-PUSH ${reason}"
+    echo "  The push minted no workflow run of any kind at this head sha. No check will ever attach."
+    echo "  Recovery ladder (docs/CONVENTIONS.md, reference_github_event_swallow_recovery.md):"
+    echo "    1. close/reopen the PR   — gh pr close <pr> && gh pr reopen <pr>"
+    echo "    2. supersede-PR          — new branch off the same tree, open a fresh PR"
+    echo "    3. integration train     — fold the branch into the driver's train and let that PR earn the checks"
+    return 5
+  fi
+  echo "DIAGNOSIS ${state} — ${reason}"
+  echo "  Not a swallow. Continuing to poll (this state is expected to resolve or to stay empty by design)."
+  return 0
 }
 
 # ── the pure evaluator — no gh, no network, fully unit-testable ──────────────
@@ -480,6 +559,7 @@ _usage() {
   cat <<'USAGE'
 usage: deploy/wait_pr_green.sh <pr-number> [--expect "Check name"]...
                                 [--timeout SECONDS] [--interval SECONDS]
+                                [--zero-check-grace SECONDS]
                                 [--no-derive] [--repo OWNER/REPO]
        deploy/wait_pr_green.sh --fixture FILE [--expect "Check name"]... [--no-derive]
 
@@ -490,12 +570,17 @@ USAGE
 
 main() {
   local pr="" fixture="" timeout=1800 interval=30 no_derive=0
+  local zero_check_grace="${WAIT_PR_GREEN_ZERO_CHECK_GRACE:-120}"
   local -a extra_expect=()
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --expect)
         extra_expect+=("$2")
+        shift 2
+        ;;
+      --zero-check-grace)
+        zero_check_grace="$2"
         shift 2
         ;;
       --timeout)
@@ -598,7 +683,14 @@ main() {
   echo "Expected checks (${#expected[@]}):"
   printf '  - %s\n' "${expected[@]}"
 
+  echo "Zero-check grace: ${zero_check_grace}s (then the #3219 swallow diagnosis runs at the full 40-char sha)"
+
   local start now elapsed checks_json out rc
+  # #3219 state. `saw_attach` latches on the first poll that sees ANY check: the
+  # diagnosis is for "nothing ever attached", and a PR whose checks arrived and
+  # then went quiet is a different animal that this must not misdiagnose.
+  # `diagnosed` keeps a non-swallow verdict from reprinting every interval.
+  local attached=0 saw_attach=0 diagnosed=0 diag_out diag_rc
   start=$(date +%s)
   while true; do
     now=$(date +%s)
@@ -623,6 +715,28 @@ main() {
 
     checks_json=$(gh pr checks "${pr}" --repo "${REPO}" --json name,state,bucket,link 2>/dev/null || echo '[]')
     checks_json=$(_enrich_wiki_drift_checks_json "${checks_json}")
+
+    # #3219: how many checks have ATTACHED at all — the fact the old progress
+    # line could not express. `0/7 green` was printed identically whether seven
+    # checks were queued or none existed.
+    attached=$(jq 'length' <<<"${checks_json}" 2>/dev/null || echo 0)
+    [[ "${attached}" -gt 0 ]] && saw_attach=1
+
+    if [[ "${attached}" -eq 0 && "${saw_attach}" -eq 0 && "${diagnosed}" -eq 0 && "${elapsed}" -ge "${zero_check_grace}" ]]; then
+      diagnosed=1
+      echo "No check has attached in ${elapsed}s (grace ${zero_check_grace}s) — classifying head sha ${head_sha} (#3219)."
+      # The FULL 40-char sha, never a prefix: a short-sha `actions/runs?head_sha=`
+      # query returns empty and would SELF-CONFIRM a swallow (failure mode #1 in
+      # this file's header). `head_sha` was length-checked at 40 above.
+      diag_out=$(${CLASSIFY_CMD} "${head_sha}" 2>/dev/null || true)
+      classify_zero_check_diagnosis "${diag_out}"
+      diag_rc=$?
+      if [[ "${diag_rc}" -eq 5 ]]; then
+        echo "Stopping at ${elapsed}s — a swallowed push will never go green. This script never merges and never re-pushes."
+        return 5
+      fi
+    fi
+
     out=$(evaluate_checks_json "${checks_json}" "${expected[@]}")
     rc=$?
 
@@ -644,9 +758,16 @@ main() {
         return 2
         ;;
       3)
+        # #3219: the two states get two visually distinct lines. They used to
+        # render identically (`0/7 green`), which is why ~10 minutes of dead
+        # polling on a swallowed push looked exactly like a healthy early run.
         local green_count
         green_count=$(grep -c '^GREEN ' <<<"${out}" || true)
-        echo "  ... ${green_count}/${#expected[@]} green (elapsed ${elapsed}s/${timeout}s), polling again in ${interval}s"
+        if [[ "${attached}" -eq 0 ]]; then
+          echo "  ... ⧗ NO CHECKS ATTACHED YET — 0 of ${#expected[@]} expected are present at ${head_sha:0:8} (elapsed ${elapsed}s/${timeout}s, grace ${zero_check_grace}s), polling again in ${interval}s"
+        else
+          echo "  ... ${green_count}/${#expected[@]} green — ${attached} check(s) attached (elapsed ${elapsed}s/${timeout}s), polling again in ${interval}s"
+        fi
         sleep "${interval}"
         ;;
       4)

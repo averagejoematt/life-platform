@@ -1034,6 +1034,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | A doc-sync literal is stale at commit time | `sync_doc_metadata.py --apply`, auto-staged | `scripts/install_hooks.sh` |
 | A PR's check rollup is EMPTY, or non-empty but missing a required check, and ad-hoc `gh pr checks \| grep -c` tooling reads it as green (#2830) | PR-green rollup assertion — `total>0` AND `0` not-green AND every expected check present; parses both the `statusCheckRollup` and `gh pr checks --json bucket` dialects | `scripts/assert_pr_green.py`; expected set derived from `deploy/github_posture.json` |
 | A push to `main` mints ZERO workflow runs (the swallowed push) and no session is watching (#2826) | `head_coverage()` on `deploy-wedge-watch.yml`'s 15-min cron; three-way exit (0 ok / 1 confirmed swallow / 2 indeterminate) so it cannot fail dark. Distinguishes a genuine swallow from a path-filter skip and from a `GITHUB_TOKEN` bot push, which never dispatches | `scripts/check_main_green.py --head-coverage-check` |
+| A PR's push is swallowed and the watcher polls `0/N green` for the full 30-minute timeout without ever saying so — twice in one session, ~10 min of dead polling each (#3219) | After `--zero-check-grace` (default 120s) with ZERO checks attached, `wait_pr_green.sh` classifies the FULL 40-char head sha and names the state. `swallowed` → **exit 5** (distinct from 1 = red/timeout) plus the recovery ladder; path-filter-skip / bot-push / indeterminate are named and polling continues. The classification is NOT reimplemented in bash — it shells out to `classify_zero_run_head` via the adapter below, because a second copy is how #3212 happened. Progress output distinguishes "no checks attached yet" from "N of M green" | `deploy/wait_pr_green.sh`; `scripts/check_main_green.py --classify-sha <FULL-40-CHAR-SHA>` |
 | A file that ships in every Lambda bundle changes, but the deploy plan does not notice — the run goes green with `Deploy: skipped` and production keeps the old value (#2920) | Bundled-config deploy triggers **derived** from what `build_bundle.py` stages, not hand-typed. The old `food_vocabulary.json`-only special case is exactly how `config/personas.json` (and 14 `config/coaches/*.json`) went untriggered | `deploy/build_bundle.py --print-bundled-config-paths`; guard `tests/test_bundle_deploy_trigger_registry.py` |
 | A PR lands a new API route and the page consuming it together, so the auto-deploying `site/**` ships before site-api's approval-gated deploy (#2831, fired >=5x) | API-before-frontend pre-merge check (advisory) — AST-diffs `site_api_lambda.py`'s route tables; declare in the registry to clear it | `scripts/check_api_before_frontend.py`; registry `deploy/api_deploy_sequencing.json` |
 
@@ -1150,6 +1151,54 @@ the changes into the commit yourself (`git add … && git commit --amend --no-ed
 `ALLOW_DOC_LITERALS` escape) and silently restores it if the hook already swept it,
 because the file is 100% regenerable and so has no authored content to lose. The
 reconcile bot on `main` is its only writer (§4c).
+
+**The restore source is the MERGE-BASE, never `origin/main` and never `HEAD` (#3221).**
+`origin/main` MOVES mid-session — on #3202 a sibling merge bumped `test_count`
+17436 → 17452 between the branch point and the restore, so restoring from the tip
+would have carried another PR's literal onto the branch: silent, plausible-looking,
+and wrong in exactly the way this whole guard exists to prevent. `HEAD` is not the
+answer either: if an earlier bypass already committed a swept literal onto the
+branch, `HEAD` *is* the swept value and restoring from it reports success while
+changing nothing. The script computes `git merge-base HEAD origin/main` (override
+with `AGENT_COMMIT_BASE_REF`; falls back to `HEAD` and says so when there is no
+`origin/main`). Verify a suspect branch with
+`git diff $(git merge-base HEAD origin/main) HEAD -- lambdas/web/platform_counts.py`
+— it must be empty. The same commit also fixed a latent no-op: the restore used to
+diff the INDEX against the worktree, and the hook's sweep ends in `git add`, so on
+its one real input it saw nothing to restore.
+
+### 12b. Deletions and renames go through `agent_commit.sh` too (#3221)
+
+`agent_commit.sh` used to `git reset` the index and then refuse any argument absent
+from disk, so **a deletion had no way through it** and a rename — deletion plus add
+— had none either. The only remaining route was a bare `git rm` + `git commit`
+outside the script, and on #3202 that bypass immediately produced the failure the
+script exists to prevent: the pre-commit hook ran `sync_doc_metadata.py --apply` and
+swept `lambdas/web/platform_counts.py` into the commit. A guard unavailable on the
+one operation whose hook behaviour is least predictable has a hole exactly where an
+implementer stands.
+
+The reflex now:
+
+- **A deleted or renamed file is named like any other path.** `bash
+  deploy/agent_commit.sh "refactor: rename x -> y" path/to/old.py path/to/new.py`
+  stages the removal and the addition in one guarded commit; git records the rename.
+  Every doc-literal refusal and restore applies identically on that commit.
+- **Still never pass a bare directory when you mean specific files.** A directory
+  that EXISTS covers its files (that is #2897's own fix — it used to `git checkout
+  HEAD` them and exit 0 claiming success, destroying 13 files of authored prose).
+  A directory that is **gone from disk** is refused outright and the refusal
+  enumerates the tracked files under it: one argument must not stand in for an
+  unenumerated set of removals, on the operation where a mistake is least
+  recoverable.
+- **A path that is neither on disk nor tracked at HEAD is still a refusal** — a typo
+  must not be absorbed as "a deletion of something that never existed". Every
+  refusal still exits nonzero through the single `refuse()` funnel with the terminal
+  `✋ REFUSED` line (#2464).
+
+`tests/test_agent_commit_deletion_3221.py` holds all of it, including a merge-base
+test that hands the three candidate refs three different literal values so a pass
+can only mean the merge-base.
 
 ---
 

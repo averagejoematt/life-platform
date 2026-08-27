@@ -81,8 +81,26 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # Seeded 2026-08-24 (#3000): measured 523 gates total, 513 unproven, 7 proven, 3
 # attempted-unproven (`python3 scripts/gate_census.py --json`). Ceilings banked with
 # headroom above that, not at the exact measured value.
-BASELINE_TOTAL_GATES = 560
-BASELINE_UNPROVEN_GATES = 550
+#
+# TIGHTENED 2026-08-26 (#3220), 560 -> 551 / 550 -> 541. This is the ratchet doing
+# its job, not a re-baseline: `scripts/gate_census.py` classified guards by FILENAME
+# alone, so ten modules with no structural way to fail were sitting in the inventory
+# because of a substring in their names. Measured by diffing the `--json` id sets
+# across the fix (the method the issue itself used): exactly 10 ids REMOVED, 1 ADDED
+# (`structural::test_gate_census_enforcement_3220.py`, the genuinely new test file
+# this PR brings), total 560 -> 551, unproven 534 -> 525. Both numbers move by the
+# same net 9 and keep their previous shape — total at measured, unproven with the
+# same 16 of headroom it had before — so nothing about the ratchet's tension
+# changed, only its honesty.
+# The ten are printed by path under "NAME-MATCHED, NO ENFORCEMENT PATH" in the
+# census report; they are UNPROVABLE, not unproven, and do not belong in #2578's
+# denominator. Re-admitting one is a `# gate-entrypoint:` marker in that file.
+#
+# This ceiling is MEANT to move with the real inventory (unlike the module-size
+# ratchet, whose numbers may never rise). Lowering it after a real measurement is
+# always welcome; raising it needs the reason in the same PR.
+BASELINE_TOTAL_GATES = 551
+BASELINE_UNPROVEN_GATES = 541
 
 
 def check_unproven_ceiling(total_gates: int, unproven_gates: int) -> tuple[bool, str]:

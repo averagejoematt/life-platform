@@ -40,10 +40,19 @@
 # flipped. `ALLOW_LITERAL_RESTORE=1` opts back into auto-restoring those files,
 # writing a recovery patch first.
 #
+# DELETIONS AND RENAMES (#3221). A named path that is gone from disk but still
+# tracked at HEAD is a DELETION and is staged as one — that is the half of a rename
+# the old script could not express at all. Because it could not, the only route for
+# a rename was a bare `git rm` + `git commit` outside this script, which is exactly
+# the bypass that let the pre-commit hook sweep lambdas/web/platform_counts.py into
+# a branch on #3202. A guard unavailable on the one operation whose hook behaviour
+# is least predictable is a guard with a hole where implementers stand. See the
+# staging block for the one shape still refused (a vanished DIRECTORY).
+#
 # Refuses to commit if: no paths given, an unresolved merge conflict (UU) exists,
 # a named path is a doc-sync literal file (or the generated counter module, which
-# has no override), a changed doc-literal file is unnamed, or black/ruff reject the
-# staged Python.
+# has no override), a changed doc-literal file is unnamed, a named path is neither
+# on disk nor tracked-and-deleted, or black/ruff reject the staged Python.
 # EVERY refusal exits nonzero and prints a terminal "REFUSED" line (#2464) — a
 # success is exit 0 plus the "✅ committed N path(s)" line, nothing else is.
 set -uo pipefail
@@ -124,6 +133,30 @@ for p in "${PATHS[@]}"; do
   fi
 done
 
+# ── The restore SOURCE is the MERGE-BASE, never the moving tip (#3221) ────────
+# The #3221 recovery had a second trap in it. The first restore of
+# platform_counts.py was taken from `origin/main`, which had MOVED mid-session (a
+# sibling merge bumped `test_count` 17436 -> 17452) — so restoring from it would
+# have carried ANOTHER PR's literal onto this branch: silent, plausible-looking and
+# wrong, which is the same cross-PR drift this whole script exists to prevent.
+#
+# The correct source is where this branch left main: `git merge-base HEAD
+# origin/main`. HEAD is not it either — if an earlier bypass already COMMITTED a
+# swept literal onto the branch (the exact #3221 shape), restoring from HEAD
+# restores the swept value and reports success.
+#
+# Falls back to HEAD when there is no origin/main to compute a base against (a
+# fresh clone, a scratch repo, a detached CI checkout) — a degraded source is still
+# better than none, and the fallback is named in the output so it is never silent.
+BASE_REF="${AGENT_COMMIT_BASE_REF:-origin/main}"
+LITERAL_REF="$(git merge-base HEAD "${BASE_REF}" 2>/dev/null || true)"
+if [ -n "${LITERAL_REF}" ]; then
+  LITERAL_REF_DESC="the merge-base with ${BASE_REF} (${LITERAL_REF})"
+else
+  LITERAL_REF="HEAD"
+  LITERAL_REF_DESC="HEAD (no ${BASE_REF} — could not compute a merge-base)"
+fi
+
 # ── The generated counter module is always safe to restore (#3101) ────────────
 # If an earlier commit attempt let the pre-commit hook run, platform_counts.py
 # carries a regenerated counter the agent never asked for. Unlike docs/, this file
@@ -132,9 +165,21 @@ done
 # structurally cannot apply, and restoring it is strictly better than making the
 # agent hand-fight the hook. Runs after the named-path loop above so that NAMING it
 # is still an explicit refusal, not a silent no-op.
-if ! git diff --quiet -- lambdas/web/platform_counts.py 2>/dev/null; then
-  git checkout HEAD -- lambdas/web/platform_counts.py 2>/dev/null &&
-    echo "[agent-commit] ↩ restored lambdas/web/platform_counts.py to HEAD (generated — the reconcile bot owns it, #3101)"
+#
+# #3221: diffed against ${LITERAL_REF}, NOT the index. The hook's sweep ends in
+# `git add`, so the swept file is STAGED — a bare `git diff -- <path>` compares
+# index-to-worktree, sees no difference, and this block did nothing on the one
+# input it was written for. A ref-to-worktree diff sees staged and unstaged alike.
+COUNTS_FILE="lambdas/web/platform_counts.py"
+if ! git diff --quiet "${LITERAL_REF}" -- "${COUNTS_FILE}" 2>/dev/null; then
+  if git checkout "${LITERAL_REF}" -- "${COUNTS_FILE}" 2>/dev/null; then
+    echo "[agent-commit] ↩ restored ${COUNTS_FILE} to ${LITERAL_REF_DESC}"
+    echo "[agent-commit]    (generated — the reconcile bot owns it, #3101)"
+  else
+    echo "[agent-commit] ❌ ${COUNTS_FILE} differs from ${LITERAL_REF_DESC} and could not be restored." >&2
+    echo "[agent-commit]    A branch must not carry it (#3101). Drop it by hand, then re-run." >&2
+    refuse 1
+  fi
 fi
 
 # ── Undo the hook's prior sweep ────────────────────────────────────────────────
@@ -197,13 +242,53 @@ if [ -n "${unnamed}" ]; then
 fi
 
 # ── Stage exactly what was asked for ──────────────────────────────────────────
+#
+# #3221: "absent from disk" is not one condition, it is three, and the old script
+# collapsed all three into "path does not exist" and refused:
+#
+#   (a) a tracked file the caller DELETED (or the old half of a rename) — a normal
+#       thing to commit. `git add -A -- <path>` stages the removal. Refusing here is
+#       what forced the bare-`git rm` bypass that let the hook sweep a doc literal
+#       onto a branch; supporting it is this issue.
+#   (b) a DIRECTORY (or glob) that is gone from disk but still has tracked files
+#       under it — REFUSED outright, and named. A vanished directory is the #2897
+#       silhouette: one argument standing for an unbounded set of removals the
+#       caller never enumerated, on the operation where a mistake is least
+#       recoverable. Name the deleted files. A directory that still EXISTS is
+#       unchanged — it covers its files exactly as #2897 made it (pinned by
+#       tests/test_agent_commit_exit_codes.py).
+#   (c) a typo / an unquoted multi-path argument — still the old refusal, still
+#       through refuse(), still nonzero with the terminal REFUSED line (#2464).
 git reset -q
 for p in "${PATHS[@]}"; do
-  if [ ! -e "${p}" ]; then
-    echo "[agent-commit] ❌ path does not exist: ${p}" >&2
+  if [ -e "${p}" ] || [ -L "${p}" ]; then
+    git add -- "${p}" || refuse 1
+    continue
+  fi
+
+  # `git ls-files` reads the INDEX, which `git reset -q` above has just restored to
+  # HEAD — so it answers "did this path exist at HEAD?" and a deleted-on-disk file
+  # is still listed. It also expands a directory/glob argument, which is how (b) is
+  # told apart from (a): one entry equal to the argument itself is a single file.
+  tracked="$(git ls-files -- "${p}" 2>/dev/null)"
+  if [ -z "${tracked}" ]; then
+    echo "[agent-commit] ❌ path does not exist and git does not track it: ${p}" >&2
+    echo "[agent-commit]    (a deleted file IS accepted — but only if it was tracked at HEAD)" >&2
     refuse 1
   fi
-  git add -- "${p}" || refuse 1
+  if [ "${tracked}" != "${p}" ]; then
+    n_tracked="$(printf '%s\n' "${tracked}" | wc -l | tr -d ' ')"
+    echo "[agent-commit] ❌ '${p}' is gone from disk and covers ${n_tracked} tracked file(s) — refusing (#3221/#2897)." >&2
+    echo "[agent-commit]    A vanished DIRECTORY cannot stand in for an unenumerated set of deletions." >&2
+    echo "[agent-commit]    Name each deleted file:" >&2
+    printf '%s\n' "${tracked}" | sed 's/^/[agent-commit]      /' >&2
+    refuse 1
+  fi
+
+  # (a) — stage the deletion. `-A` is explicit rather than relying on git >= 2.0's
+  # "plain `git add <pathspec>` also records removals" behaviour.
+  echo "[agent-commit] − staging deletion: ${p}"
+  git add -A -- "${p}" || refuse 1
 done
 
 STAGED="$(git diff --cached --name-only)"
@@ -213,7 +298,24 @@ if [ -z "${STAGED}" ]; then
 fi
 
 # ── The format gate, kept (this is the half CI actually enforces) ─────────────
-STAGED_PY="$(printf '%s\n' "${STAGED}" | grep -E '^(lambdas|mcp|cdk|tests|scripts|deploy)/.*\.py$' || true)"
+# #3221: a DELETED .py is in ${STAGED} but not on disk, and `black --check` on a
+# path that does not exist exits 2 — which would turn every rename into a
+# format-gate refusal, i.e. re-close the hole this issue opened. Filter the staged
+# list to what still exists before handing it to a formatter; there is nothing to
+# format about a removal.
+STAGED_PY=""
+while IFS= read -r _sp; do
+  [ -n "${_sp}" ] || continue
+  case "${_sp}" in
+    lambdas/*.py | mcp/*.py | cdk/*.py | tests/*.py | scripts/*.py | deploy/*.py) ;;
+    *) continue ;;
+  esac
+  [ -f "${_sp}" ] || continue
+  STAGED_PY="${STAGED_PY}${STAGED_PY:+
+}${_sp}"
+done <<EOF
+${STAGED}
+EOF
 
 # USE THE PINNED BLACK AND RUFF, NEVER THE ONES ON PATH. CI runs an exact pair
 # (requirements-dev.txt == ci-lint.yml, CQ-01); a typical local black is 25.9.0
