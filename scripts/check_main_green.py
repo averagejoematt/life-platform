@@ -947,7 +947,40 @@ def main_head_coverage() -> int:
     return _named(ZR_INDETERMINATE, 2)
 
 
+def main_classify_sha(head_sha: str) -> int:
+    """`--classify-sha <FULL-40-CHAR-SHA>` — print `diagnose_uncovered_head`'s
+    verdict as JSON on stdout, for a NON-python consumer (#3219).
+
+    Exists so `deploy/wait_pr_green.sh` can reach the #2826/#3212 classification
+    instead of reimplementing it in bash. #3212 happened because that logic lived
+    inside one consumer and the other could not call it; a bash re-derivation
+    would be the same bug a third time. This adds no classification of its own —
+    it is a stdout adapter over `diagnose_uncovered_head`, which owns both the
+    full-40-char runs query and `classify_zero_run_head`.
+
+    Refuses a short sha OUTRIGHT rather than querying with it: GitHub's Actions
+    API returns an empty run list for a 7-char prefix, which would read as
+    `swallowed` and self-confirm the very bug the caller is asking about.
+
+    Exit: 0 = a verdict was produced (READ THE `state` FIELD — this is an
+    instrument, not a gate; `swallowed` is still exit 0 here and it is the
+    caller that decides what to do about it). 2 = the input was unusable.
+    """
+    if len(head_sha) != 40 or not all(c in "0123456789abcdef" for c in head_sha.lower()):
+        print(
+            json.dumps(
+                {"state": ZR_INDETERMINATE, "reason": f"'{head_sha}' is not a full 40-char sha — refusing to query with a prefix (#3103)"}
+            )
+        )
+        return 2
+    print(json.dumps(diagnose_uncovered_head(head_sha)))
+    return 0
+
+
 if __name__ == "__main__":
     if "--head-coverage-check" in sys.argv:
         sys.exit(main_head_coverage())
+    if "--classify-sha" in sys.argv:
+        _i = sys.argv.index("--classify-sha")
+        sys.exit(main_classify_sha(sys.argv[_i + 1] if _i + 1 < len(sys.argv) else ""))
     sys.exit(main())

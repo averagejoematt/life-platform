@@ -71,8 +71,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
-# Split out by the module-size ratchet (#1665): the #2639 error-bar machinery lives in
-# gate_census_precision; re-exported here so the CLI report and tests keep one address.
+# Split out by the module-size ratchet (#1665). Two siblings:
+#   gate_census_enforcement — #3220's structural enforcement evidence, so a filename
+#     cannot admit a library to the ratcheted inventory;
+#   gate_census_precision  — the #2639 error-bar machinery.
+# Both re-exported here so the CLI report and tests keep one address.
+from gate_census_enforcement import NAME_ONLY_STATE, VERDICT_UNPROVABLE, classify_candidate  # noqa: F401
 from gate_census_precision import (  # noqa: F401
     FLAG_PRECISION,
     FlagPrecisionSample,
@@ -633,10 +637,19 @@ def discover_ci_gates(root: Path) -> tuple[list[Gate], dict[str, int]]:
 _GUARD_NAME = re.compile(r"(^|/)(check_|verify_|.*_guard|.*_gate|.*guard_|pii_surface|.*_audit)[a-z0-9_]*\.py$", re.I)
 _NONZERO_EXIT = re.compile(r"sys\.exit\(\s*(?!0\s*\))|SystemExit\(\s*(?!0)|exit\(1\)")
 
+# #3220: the filename is a CANDIDATE filter, never sufficient. `classify_candidate`
+# (scripts/gate_census_enforcement.py — extracted, not inlined, because this file
+# sits at the module-size ceiling) decides whether a name-matched file has any
+# structural way to fail. Name-only candidates are collected in NAME_ONLY_CANDIDATES
+# and returned OUT of the gate list, so they cannot enter the ratcheted total or
+# #2578's unproven column — while still being reported, by path.
+NAME_ONLY_CANDIDATES: list[dict[str, Any]] = []
+
 
 def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], dict[str, int]]:
     gates: list[Gate] = []
-    counters = {"candidates": 0, "no_nonzero_exit": 0, "shell_unscreened": 0}
+    NAME_ONLY_CANDIDATES.clear()
+    counters = {"candidates": 0, "no_nonzero_exit": 0, "shell_unscreened": 0, "name_only": 0}
 
     # The reference corpus is EVERY tracked non-doc file plus the git hooks. A narrower
     # corpus is how the first version of this detector produced 2 false positives out of
@@ -672,6 +685,15 @@ def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], d
             continue  # covered by the structural-test family
         counters["candidates"] += 1
         text = _read(path)
+        # #3220 — the seam. The `no_nonzero_exit` bucket's own detail line already
+        # said "it may be a library, or it may be unable to fail"; the census could
+        # see the condition and had no way to act on it. Now it does.
+        verdict = classify_candidate(rel, text)
+        if not verdict["enforces"]:
+            counters["no_nonzero_exit"] += 1
+            counters["name_only"] += 1
+            NAME_ONLY_CANDIDATES.append(verdict)
+            continue
         if not _NONZERO_EXIT.search(text):
             counters["no_nonzero_exit"] += 1
             gates.append(
@@ -682,7 +704,7 @@ def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], d
                     source=rel,
                     screened=True,
                     risk_flags=["swallowed-exit"],
-                    detail={"note": "no nonzero-exit path found — it may be a library, or it may be unable to fail"},
+                    detail={"note": "no nonzero-exit path found, but it CAN fail: " + ", ".join(verdict["evidence"])},
                 )
             )
             continue
@@ -982,6 +1004,12 @@ def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -
     unattached_attempts = sorted(set(ATTEMPTED_UNPROVEN) - {g.id for g in gates}) if full_run else []
 
     return {
+        # #3220: name-matched, no enforcement path. NOT in `gates`, so not in the
+        # ratcheted total and not in #2578's unproven column — but carried here by
+        # path so a guard that LOSES its enforcement path is REPORTED, never
+        # silently dropped from a count nobody was watching. A census that could
+        # quietly lose a gate would be committing its own subject.
+        "name_only_candidates": sorted(NAME_ONLY_CANDIDATES, key=lambda c: c["path"]) if "guard" in families else [],
         "orphan_proofs": orphans + mismatched,
         "unattached_attempts": unattached_attempts,
         "attempted_unproven": ATTEMPTED_UNPROVEN,
@@ -1027,144 +1055,10 @@ def annassign_exposure(root: Path, files: list[Path]) -> dict[str, Any]:
     }
 
 
-def _wrap(text: str, width: int = 88, indent: str = " " * 16) -> str:
-    """Soft-wrap a proof field so a long `observed` stays readable in a terminal."""
-    words, out, cur = text.split(), [], ""
-    for w in words:
-        if cur and len(cur) + 1 + len(w) > width:
-            out.append(cur)
-            cur = w
-        else:
-            cur = f"{cur} {w}".strip()
-    if cur:
-        out.append(cur)
-    return f"\n{indent}".join(out)
-
-
-def render_report(census: dict[str, Any]) -> str:
-    gates = census["gates"]
-    n = len(gates)
-    screened = [g for g in gates if g["screened"]]
-    unscreened = [g for g in gates if not g["screened"]]
-    flagged = [g for g in screened if g["risk_flags"]]
-    proven = [g for g in gates if g["verdict"] == "can-fail (proven)"]
-    attempted = [g for g in gates if g["verdict"] == "attempted-unproven"]
-    orphan_proofs = census.get("orphan_proofs") or []
-    unattached = census.get("unattached_attempts") or []
-
-    lines: list[str] = []
-    add = lines.append
-    add("=" * 78)
-    add("GATE CENSUS — #2578 (slice 1 inventory + static screen; slice 2 mutation verdicts)")
-    add("=" * 78)
-    add("")
-    add(f"gates found                  n = {n}")
-    add(f"  statically screened        n = {len(screened)}  ({len(screened) / n:.0%})" if n else "  (none)")
-    add(f"  could NOT be screened      n = {len(unscreened)}")
-    add(f"  carrying >=1 risk flag     n = {len(flagged)}")
-    add(f"  verdict proven can-fail    n = {len(proven)}   <- each cites the mutation that produced it")
-    add(f"  attempted, NOT proved      n = {len(attempted)}   <- recorded with the reason, never skipped")
-    add(f"  no verdict attempted       n = {n - len(proven) - len(attempted)}")
-    add("")
-    add(_render_error_bars(census))
-    add("")
-
-    add("-- VERDICTS: proven able to fail (mutation introduced, failure watched) " + "-" * 6)
-    if not proven:
-        add("  (none recorded — PROVEN_CAN_FAIL is empty)")
-    for g in sorted(proven, key=lambda x: x["id"]):
-        p = g["detail"].get("proof") or {}
-        add(f"  {g['id']}")
-        add(f"      gate      {g['name']}  [{g['source']}]")
-        add(f"      command   {p.get('command', '')}")
-        add(f"      mutation  {_wrap(p.get('mutation', ''))}")
-        add(f"      observed  {_wrap(p.get('observed', ''))}")
-        add(f"      scope     {_wrap(p.get('scope') or 'none found — the gate fires for the whole class it names')}")
-        add(f"      proved    {p.get('proved_on', '')}")
-    add("")
-
-    add("-- ATTEMPTED and NOT proved (a first-class result, not an omission) " + "-" * 10)
-    if not attempted:
-        add("  (none)")
-    for g in sorted(attempted, key=lambda x: x["id"]):
-        add(f"  {g['id']}")
-        add(f"      {_wrap(g['evidence'], indent=' ' * 6)}")
-    for gid in unattached:
-        add(f"  {gid}   [no gate matches this id in the current sweep]")
-        add(f"      {_wrap(ATTEMPTED_UNPROVEN[gid], indent=' ' * 6)}")
-    add("")
-
-    if orphan_proofs:
-        add("-- !! STALE PROOFS: recorded verdict no longer matches the gate at that id " + "-" * 3)
-        add("   A CI-step id is positional. These verdicts are REFUSED, not re-attached.")
-        for o in orphan_proofs:
-            add(f"  {o['id']}")
-            add(f"      recorded gate: {o['recorded_name']}")
-            add(f"      gate now here: {o['current_name']}")
-        add("")
-
-    add("-- by family " + "-" * 64)
-    fam: dict[str, list[dict]] = {}
-    for g in gates:
-        fam.setdefault(g["family"], []).append(g)
-    for name in sorted(fam):
-        items = fam[name]
-        fs = sum(1 for g in items if g["screened"])
-        add(f"  {name:<18} n = {len(items):>4}   screened {fs:>4}   unscreened {len(items) - fs:>4}")
-    add("")
-
-    add("-- risk flags (leads for adjudication, NOT defects) " + "-" * 26)
-    # Every DETECTABLE shape is printed, zeros included. A shape that simply vanishes
-    # from the report when it finds nothing is indistinguishable from a shape whose
-    # detector died — the exact confusion this census exists to end. The zeros are only
-    # meaningful because each detector has a planted-positive proof in
-    # tests/test_gate_census_2578.py.
-    hist: dict[str, int] = {k: 0 for k, v in census["shapes"].items() if v["detectable"] != "no"}
-    for g in screened:
-        for f in g["risk_flags"]:
-            hist[f] = hist.get(f, 0) + 1
-    for f, c in sorted(hist.items(), key=lambda kv: (-kv[1], kv[0])):
-        suffix = "   (detector proven live by a planted positive; zero here is a real result)" if c == 0 else ""
-        add(f"  {f:<28} n = {c}{suffix}")
-    add("")
-
-    add("-- why gates could not be screened " + "-" * 43)
-    reasons: dict[str, int] = {}
-    for g in unscreened:
-        reasons[g["unscreened_reason"]] = reasons.get(g["unscreened_reason"], 0) + 1
-    for r, c in sorted(reasons.items(), key=lambda kv: -kv[1]):
-        add(f"  n = {c:<5} {r}")
-    if not reasons:
-        add("  (none)")
-    add("")
-
-    add("-- failure shapes this census CANNOT see " + "-" * 37)
-    for name, spec in SHAPES.items():
-        if spec["detectable"] == "no":
-            add(f"  {name:<28} ({spec['seed']}) — needs a semantic probe, not a syntactic one")
-        elif spec["detectable"] == "partial":
-            add(f"  {name:<28} ({spec['seed']}) — PARTIAL: syntactic proxy only, both-way error")
-    add("")
-
-    exp = census.get("annassign_exposure") or {}
-    if exp:
-        add("-- AnnAssign exposure (taxonomy instance 5, measured) " + "-" * 24)
-        add(f"  source files whose AST walk sees `X = ...` but not `X: T = ...`   n = {exp['n_blind_walkers']}")
-        add(f"  module-level CONSTANTS currently bound with an annotation         n = {exp['n_annotated_module_constants']}")
-        add("  Every constant in the second set is invisible to every walker in the first.")
-        for w in exp["blind_walkers"][:15]:
-            add(f"    blind walker: {w}")
-        if len(exp["blind_walkers"]) > 15:
-            add(f"    ... and {len(exp['blind_walkers']) - 15} more (see --json; nothing is dropped from the count)")
-        add("")
-
-    add("-- raw discovery counters (what the sweep walked) " + "-" * 28)
-    for family, c in census["counters"].items():
-        add(f"  {family}: " + ", ".join(f"{k}={v}" for k, v in c.items()))
-    if census["families_dropped"]:
-        add(f"  DROPPED FAMILIES (bounded run): {census['families_dropped']}")
-    add("")
-    return "\n".join(lines)
+# The human-readable renderer lives in gate_census_report.py (#3220, module-size
+# ratchet #1665/#2610 — extraction, never a baseline raise). Re-exported so every
+# existing call site and test keeps `gate_census.render_report` / `._wrap`.
+from gate_census_report import _wrap, render_report  # noqa: E402,F401
 
 
 def main(argv: list[str] | None = None) -> int:
