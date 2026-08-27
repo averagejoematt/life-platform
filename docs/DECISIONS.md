@@ -78,7 +78,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-046 | S3 Prefix Separation: Static vs Generated Content | Active | 2026-04-05 |
 | ADR-047 | Coach Intelligence Architecture: Stateless Prompts → Stateful Agents | Active | 2026-04-06 |
 | ADR-048 | Observatory Integration: Coach Intelligence Replaces Expert Analyzer | Active | 2026-04-06 |
-| ADR-049 | COST-OPT-2: Prompt Caching + Strategic Model Downgrades (amended 2026-08-27, #3085 — a `cache_control` block is not evidence of caching; sub-floor markers are silently ignored) | Active | 2026-04-09 |
+| ADR-049 | COST-OPT-2: Prompt Caching + Strategic Model Downgrades | Active | 2026-04-09 |
 | ADR-050 | TD-19: UTC as the platform-wide DDB partition convention | Active (Phase 2 fix-forward shipped… | 2026-05-03 |
 | ADR-051 | WR-48: Stale-Source Alerts + Anthropic Canary (observability hardening) | Active (shipped 2026-05-03 v6.8.8 +… | 2026-05-03 |
 | ADR-052 | Two-tier alerting: urgent SNS + daily-batched digest | Active (shipped 2026-05-16, PR1 of the… | 2026-05-16 |
