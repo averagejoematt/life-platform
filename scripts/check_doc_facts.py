@@ -194,9 +194,16 @@ from budget_ceilings import (  # noqa: E402,F401
     _const_date,
     _const_number,
     governor_ceilings as _governor_ceilings,
+    retired_regex as _retired_regex,
+    retired_window_figures as _retired_window_figures,
 )
 
 BUDGET_OK, BUDGET_PROVENANCE = _governor_ceilings()
+
+# #3249: figures whose dated window has CLOSED — inert while it runs, so this is a
+# dead-man for the rollover. Proven able to fire in test_doc_facts_budget_2899.py.
+BUDGET_RETIRED = _retired_window_figures()
+_RETIRED_RE = _retired_regex(BUDGET_RETIRED)
 
 # A line framing a number as history is allowed to state the old value.
 # #1230: `original`/`reference`/`calibrat` cover the source scan's one legitimate $75 —
@@ -259,7 +266,7 @@ _BUDGET_AFTER_WINDOW = 20
 _BUDGET_POSTFIX_EXEMPT = re.compile(r"->|→|\breference\b|\boriginal\b|calibrat", re.I)
 
 
-def _budget_offenders(line: str, allowed=None) -> list[int]:
+def _budget_offenders(line: str, allowed=None, retired=None) -> list[int]:
     """Ceiling figures on `line` that claim to be CURRENT truth and are not.
 
     #2899 root cause: the exemption used to be per-LINE — `HISTORICAL.search(line)`
@@ -291,6 +298,17 @@ def _budget_offenders(line: str, allowed=None) -> list[int]:
         before = line[max(0, mo.start(grp) - _BUDGET_BEFORE_WINDOW) : mo.start(grp)]
         after = line[mo.end(grp) : mo.end(grp) + _BUDGET_AFTER_WINDOW]
         if HISTORICAL.search(before) or _BUDGET_POSTFIX_EXEMPT.search(after):
+            continue
+        out.add(amt)
+    # #3249: retired window figures are matched WITHOUT the proximity requirement —
+    # they are a closed set of dead literals, so there is nothing legitimate to shield.
+    rre = _RETIRED_RE if retired is None else _retired_regex(retired)
+    for mo in rre.finditer(line) if rre else ():
+        amt = int(mo.group(1))
+        b, e = mo.span(1)
+        if amt in allowed or HISTORICAL.search(line[max(0, b - _BUDGET_BEFORE_WINDOW) : b]):
+            continue
+        if _BUDGET_POSTFIX_EXEMPT.search(line[e : e + _BUDGET_AFTER_WINDOW]):
             continue
         out.add(amt)
     return sorted(out)

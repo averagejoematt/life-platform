@@ -242,3 +242,67 @@ def test_live_site_surface_states_no_stale_ceiling_now_and_after_the_window_reve
     finally:
         facts.BUDGET_OK = saved
     assert hits_post == [], "site quotes a dated-window ceiling that rots on revert:\n" + "\n".join(hits_post)
+
+
+# ── #3249: the rollover the allowed-set check could not see ───────────────────
+# `figures()` answers "may prose say this today?". On 2026-09-01 the August window
+# closes and $200/$235 simply drop out of the allowed set — but dropping OUT is not
+# the same as being FORBIDDEN, because `BUDGET_NEAR` only inspects a figure sitting
+# within 20 characters of a ceiling word. Measured on 2026-08-27 by standing the real
+# scanners at 2026-09-02: **2 of the 14 unframed $200/$235 occurrences were caught.**
+# The other 12 would have stated a retired ceiling as current truth with CI green.
+#
+# `retired_figures()` closes that by matching the retired pair with NO proximity
+# requirement — safe only because it is a closed set of dead literals, so there is no
+# population of legitimate matches to shield. The two tests below are the pair the
+# charter asks for: one proves the scan CAN fail, one proves the live tree is clean
+# at the date it will fire. Without the first, the second passes vacuously forever.
+
+
+def _at(facts, when):
+    """Run every budget surface as though `today` were `when`. Patches the SAME module
+    globals the live gate reads, so the test exercises the shipped code path."""
+    allowed, _ = facts._governor_ceilings(today=when)
+    retired = facts._retired_window_figures(today=when)
+    saved_ok, saved_re = facts.BUDGET_OK, facts._RETIRED_RE
+    try:
+        facts.BUDGET_OK = allowed
+        facts._RETIRED_RE = facts._retired_regex(retired)
+        hits = []
+        for doc in facts._scan_files():
+            rel = doc.relative_to(facts.ROOT)
+            for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+                hits += [f"{rel}:{lineno}: ${amt}" for amt in facts._budget_offenders(line)]
+        hits += facts._source_hits(facts._scan_source_files())
+        hits += facts._cost_tracker_hits(facts.ROOT / "docs" / "COST_TRACKER.md", today=when)
+        return hits
+    finally:
+        facts.BUDGET_OK, facts._RETIRED_RE = saved_ok, saved_re
+
+
+def test_retired_window_scan_can_actually_fail(facts):
+    """Mutation proof. A doc phrasing the retired pair with NO ceiling word nearby —
+    the exact shape `BUDGET_NEAR` is blind to — must flag once the window closes, and
+    must NOT flag while it is still in force."""
+    line = "August 2026 ONLY the base is $200 / surge $235, auto-reverting."
+    after = facts._retired_window_figures(today=dt.date(2026, 9, 2))
+    during = facts._retired_window_figures(today=dt.date(2026, 8, 15))
+
+    assert facts._budget_offenders(line, allowed={150, 176}, retired=after) == [200, 235], (
+        "the retired-window scan did not fire on a stale claim after the revert — " "this gate cannot fail, so it is not a gate"
+    )
+    assert during == set(), "inside its own window the pair is truth, not drift"
+    assert facts._budget_offenders(line, allowed={150, 176, 200, 235}, retired=during) == []
+
+    # ...and historical framing still exempts, or every honest retrospective reds.
+    framed = "For August 2026 only, a dated window raised the base to $200 / surge $235."
+    assert facts._budget_offenders(framed, allowed={150, 176}, retired=after) == []
+
+
+def test_live_tree_states_no_retired_ceiling_after_the_window_reverts(facts):
+    """The rollover assertion, run every day BEFORE the rollover. `test_live_site_...`
+    (above) already does this for the site surface only; docs, source and the spend
+    ledger had no equivalent, which is where all 12 missed occurrences lived."""
+    assert _at(facts, dt.date(2026, 8, 15)) == [], "the tree is not clean under today's own allowed set"
+    post = _at(facts, dt.date(2026, 9, 2))
+    assert post == [], "a live doc/source file states August's retired ceiling as current truth:\n" + "\n".join(post)
