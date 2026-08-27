@@ -158,7 +158,54 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # This ceiling is MEANT to move with the real inventory (unlike the module-size
 # ratchet, whose numbers may never rise). Lowering it after a real measurement is
 # always welcome; raising it needs the reason in the same PR.
-BASELINE_TOTAL_GATES = 554
+#
+# 554 -> 558 (2026-08-27, #2578): NOT inventory growth — an ADJUDICATION. #3220 removed
+# ten libraries that had entered this count on a filename substring alone, and
+# deliberately did not re-admit any of them by hand, leaving the ruling open. All ten
+# were ruled one at a time (the table lives in scripts/gate_census_enforcement.py, and
+# the ruling for each of the four below is written IN the file it re-admits, which is
+# the only sanctioned form — a hand-list at classify time is the thing this census
+# replaces). FOUR carried a real verdict that no other row in this census reports:
+#
+#   lambdas/coach/coach_quality_gate.py    ADR-108: ai_calls holds the coach's brief
+#   lambdas/intelligence/grounding_guard.py SS-10: field-notes holds, analyzer re-gens
+#   lambdas/privacy/memoir_gate.py         #553: a twice-failing memoir is dropped
+#   tests/pair_seam_guard_lib.py           #2847: the seam ratchet's own verdict
+#
+# The other six stay out on their merits, not by omission: two compute no verdict at all
+# (grounding_gate_params, quality_gate_contract), one is fail-soft by construction and
+# blocks nothing (item_size_guard), one is a threshold registry the engines read
+# (experiment_gates), and two ARE gate logic whose verdict another census row already
+# reports, so admitting them would count one verdict twice (conformance_guard_lib ->
+# test_conformance_guard_2844.py; truth_baseline_audit -> the `visual-qa / Run visual +
+# AI-vision QA sweep` CI step, itself a PROVEN row).
+#
+# Measured on a clean tree, both directions: 554 before the four markers, 558 after, and
+# the id-set difference is exactly those four `guard::` ids and nothing else.
+#
+# 558 -> 560: the same PR's second half adds TWO real gates, and both ARE inventory
+# growth of the honest kind — the reconcile job could report success while unable to
+# derive what it was there to reconcile (#3234, main red twice on 2026-08-27):
+#
+#   ci::ci-cd.yml::reconcile::4              the self-check STEP
+#   guard::deploy/verify_doc_facts_derivable.py  the script it runs
+#
+# Both counted, deliberately, and they are not a double count under the #3220 Q2 rule:
+# the step can fail for reasons the script cannot (the runner, the `if:`), and the script
+# is invocable outside CI. Appended as the LAST step of its job on purpose — a CI-step id
+# is positional (`::<job>::<index>`), so inserting one mid-job slides every later id onto
+# a different gate; `orphan_proofs` is empty on the measured run, which is the check that
+# it did not.
+#
+# MEASURE WITH THE NEW FILE STAGED. `gate_census._tracked_files` derives its corpus from
+# git, so an UNTRACKED new guard script is invisible and the census reads one low — 559,
+# not 560, measured here before `git add -N`. A ceiling set from that reading would have
+# redded the very commit that introduced the file.
+#
+# BASELINE_UNPROVEN_GATES is deliberately NOT moved — all six arrive unproven, taking the
+# live count 527 -> 533, still under the committed 541. Six new rows of real #2578 work;
+# none of them is a verdict this PR claims to have watched fail.
+BASELINE_TOTAL_GATES = 560
 BASELINE_UNPROVEN_GATES = 541
 
 

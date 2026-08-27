@@ -65,6 +65,66 @@ the ratcheted inventory only with structural evidence that it can enforce someth
                     a hand-list in the census, which is the thing the census is
                     for not being.
 
+THE TEN, ADJUDICATED (#2578, 2026-08-27)
+----------------------------------------
+#3220 removed ten libraries that had entered the ratcheted inventory on a filename
+substring alone (560 -> 551) and deliberately re-admitted none of them, leaving the
+per-file ruling open. Open is not a state a denominator can stay in, so each was
+ruled. This block is the REASONING, kept beside the rule it applies; it is read by
+nobody and consumed by nothing — `classify_candidate` below does not consult it, and
+must never be given a list like it. The operative artifact for a re-admitted file is
+the `# gate-entrypoint:` line IN that file, where a reviewer of that file sees it.
+
+Two questions, in order:
+
+  Q1  Does a blocking consumer obey this file's verdict? A file that computes no
+      verdict — a params provider, a payload builder, a threshold table — is not a
+      gate at any tier, whatever its name says.
+  Q2  If yes: is that same verdict already what some OTHER census row's own failure
+      reports? If it is, this file is the library of an already-counted gate, and
+      admitting it counts one verdict twice — its can-fail proof would be
+      indistinguishable from the covering row's, because it IS the covering row's.
+
+IN (4) — verdict computed here, blocking consumer elsewhere, no covering row:
+
+  lambdas/coach/coach_quality_gate.py     ADR-108. `ai_calls._enforce_quality_gate`
+                                          regenerates once then holds the coach.
+  lambdas/intelligence/grounding_guard.py SS-10. field-notes HOLDS on the hit list;
+                                          ai_expert_analyzer block-and-regens.
+  lambdas/privacy/memoir_gate.py          #553. A memoir failing twice is dropped.
+  tests/pair_seam_guard_lib.py            #2847. Its two test modules are invisible
+                                          to the structural-test family (that family
+                                          enumerates tree-sweeping tests; this one
+                                          derives from the #2845 model), so nothing
+                                          else counts the seam ratchet at all.
+
+OUT (6) — and each for a stated reason, not by omission:
+
+  lambdas/ai/grounding_gate_params.py   Q1 no. Returns kwargs. The verdict is
+                                        `grounded_generation.grounding_findings`'s,
+                                        and the wiring is already gated by the census
+                                        row `test_grounding_wiring_1967.py`.
+  lambdas/ai/quality_gate_contract.py   Q1 no. Owns the event PAYLOAD the coach
+                                        pipeline sends; decides nothing.
+  lambdas/common/item_size_guard.py     Q1 no. `safe_put_item` truncates and writes on
+                                        every path — "never raises" is in its
+                                        docstring and true of every branch. A
+                                        mitigation, not a gate.
+  lambdas/experiment/experiment_gates.py Q1 no. A threshold registry; each engine makes
+                                        its own arming decision from these numbers, and
+                                        `correlation_gates()` et al. return the
+                                        thresholds plus the caller's own n.
+  tests/conformance_guard_lib.py        Q1 yes, Q2 COVERED — `test_conformance_guard_2844.py`
+                                        is already a structural-test row and its failure
+                                        IS this library's verdict.
+  tests/truth_baseline_audit.py         Q1 yes, Q2 COVERED — `gate_finding` decides what
+                                        the reader-truth sweep fails on, and that sweep
+                                        is the census row `visual-qa / Run visual +
+                                        AI-vision QA sweep`, which is PROVEN can-fail.
+
+The asymmetry between the two `*_guard_lib.py` peers is the point, not an oversight:
+one has a covering row and one does not, and Q2 is the only thing that separates them.
+
 UNPROVEN vs UNPROVABLE — the distinction #2578's denominator needs
 -----------------------------------------------------------------
   unproven    the gate CAN fail; nobody has watched it fail on purpose yet. Real

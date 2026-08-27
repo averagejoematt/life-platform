@@ -217,6 +217,22 @@ jobs:
       # test_check_is_clean_on_repo_head`. Measured twice on 2026-08-27: `51f2f53f`
       # (#3220 moved the census 560->551) and `5081953404` (#3222 moved it 551->552),
       # each redding main until a human pushed a manual reconcile.
+      # #2578 — THE REST OF THE LEDGER, AUDITED RATHER THAN ASSUMED. #3234 fixed the one
+      # fact that needed a package here; the obvious next question is which OTHER
+      # sync_doc_metadata-owned literal has the same shape. Measured 2026-08-27 by running
+      # every discoverer twice — once normally, once behind a `sys.meta_path` finder that
+      # RAISES ModuleNotFoundError for anything outside `sys.stdlib_module_names` plus what
+      # this job installs — and diffing the sixteen values. Verdict: `gate_census_count` is
+      # the ONLY one with a third-party dependency. The other fifteen (tool_count,
+      # lambda_count, alarm_count, cdk_stacks, endpoint_count, module_count,
+      # tool_module_count, test_count, adr_count, version, adr_max, the restart page/
+      # endpoint pair, hypothesis_cadence, experiment_genesis, experiment_cycle) are pure
+      # `ast`/`re`/`pathlib` over the checked-out tree and returned byte-identical values
+      # with every non-stdlib import blocked. `boto3` is ATTEMPTED somewhere in the import
+      # closure and its absence changed nothing. The negative control was verified to
+      # actually fail before the result was trusted: `import boto3` raised under the
+      # blocker, and `import yaml` raised in the arm where PyYAML was withheld — which is
+      # the arm that reproduces #3234 (census -> None, reason printed).
       - name: Install census dependency (PyYAML)
         run: |
           PINS=$(python3 scripts/ci_pins.py pyyaml)
@@ -336,6 +352,52 @@ jobs:
           done
 
           echo "build_sha=$BUILD_SHA" >> "$GITHUB_OUTPUT"
+
+      # #2578 — THE JOB MUST NOT REPORT SUCCESS ON A TREE IT LEFT DRIFTED.
+      #
+      # Everything above verifies the COMMIT (whitelist-clean, pushed). Nothing above
+      # verifies that the generators could actually DO anything. That gap is what #3234
+      # fell through twice on 2026-08-27: a fact that could not be derived was skipped
+      # honestly (correct, #3156), the generators then left the tree byte-identical,
+      # `DIRTY` was empty, this job printed "✅ derived artifacts already match config
+      # truth" and went green — and `test / Unit Tests` IN THE SAME RUN failed on the
+      # literal drift the job had just declined to fix. Main went red twice with a green
+      # reconcile job sitting above it. Installing the missing dep fixed that instance; it
+      # gave the job no way to notice the next one.
+      #
+      # WHAT THIS IS NOT: it is NOT `sync_doc_metadata --check`. That is a DOC GATE, and a
+      # doc gate in the deploy pipeline is #1908's one-way trap — it fails on a code push,
+      # its remediation is by definition a docs edit, `docs/**` is not in this workflow's
+      # `paths:` filter, so the fix cannot re-run the workflow it fixed; check_main_green
+      # reads CI/CD only, so main keeps reporting the stale failure until a manual
+      # `workflow_dispatch` that also runs Plan -> Deploy. Three occurrences in three days
+      # (#1900/#1906/#1914), and once more at this session's boot. `docs-ci.yml` is the
+      # gates' single home, already runs `--check` as a blocking gate, and already triggers
+      # on BOTH halves of the coupling — the drift verdict is already where a docs-only fix
+      # can clear it, and it stays there.
+      #
+      # WHAT THIS IS: a self-check on the job's own capability. Not "does the committed
+      # tree match derived truth" (docs) but "could this job derive the facts it owns at
+      # all" (environment). It reads no doc and compares no literal. Its only two failure
+      # modes are a MISSING DEPENDENCY in this lane and an INCOMPLETE census sweep — fixed
+      # under .github/workflows/**, deploy/**, scripts/**, tests/**, every one of them
+      # inside this workflow's paths filter. The failing push's own remediation re-triggers
+      # the job and clears it, so #1908's trap structurally cannot form here.
+      #
+      # Plain idempotence (`--apply` twice, assert no diff) was considered and does NOT
+      # work: with the dep absent the generator SKIPS its rule, so both runs leave the tree
+      # identical and idempotence is green while the fact is stale. It cannot tell
+      # "converged" from "converged because I declined to compute anything" — and the
+      # declining is the defect. See the script's docstring.
+      #
+      # KNOWN AND INTENDED CONSEQUENCE: every downstream job carries `needs: reconcile`, so
+      # this failing stops the deploy pipeline. That is correct for THIS failure class —
+      # "my generators cannot run" means the reconciled tree is unverified, and
+      # `lambdas/web/platform_counts.py` is runtime code that ships in the bundle. It is
+      # also safe, because this class is always cleared by a code push.
+      - name: Reconcile self-check — every fact this job owns must be DERIVABLE here (#2578)
+        if: github.event_name == 'push'
+        run: python3 deploy/verify_doc_facts_derivable.py
 
   # ════════════════════════════════════════════════════════════════
   # Job 1: Lint + Syntax Check

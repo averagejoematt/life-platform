@@ -102,13 +102,16 @@ def discover_sentinel_gates(
     main_rel = "deploy/drift_sentinel.py"
     main_text = read_fn(deploy_dir / "drift_sentinel.py")
     if not main_text:
+        # #2578: `skipped_reason` travels in the counters so `build_census()` can report
+        # an INCOMPLETE sweep rather than a gate list that is silently short by this
+        # family's n — see gate_census_structural.py for the measured instance.
         log_fn("deploy/drift_sentinel.py unreadable — sentinel family SKIPPED (n unknown)")
-        return [], {"importable": 0}
+        return [], {"importable": 0, "skipped_reason": "deploy/drift_sentinel.py unreadable"}
     try:
         main_tree = ast.parse(main_text)
-    except SyntaxError:
+    except SyntaxError as exc:
         log_fn("deploy/drift_sentinel.py did not parse — sentinel family SKIPPED (n unknown)")
-        return [], {"importable": 0}
+        return [], {"importable": 0, "skipped_reason": f"deploy/drift_sentinel.py did not parse (SyntaxError: {exc})"}
 
     def _registered(name: str) -> bool:
         # "Registered" = referenced somewhere beyond its own def/import line in

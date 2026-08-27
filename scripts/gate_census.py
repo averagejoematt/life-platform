@@ -1037,7 +1037,19 @@ def build_census(root: Path | None = None, families: Iterable[str] = FAMILIES) -
     )
     unattached_attempts = sorted(set(ATTEMPTED_UNPROVEN) - {g.id for g in gates}) if full_run else []
 
+    # #2578 — a family that COULD NOT RUN is an unknown n, not zero gates. Both split
+    # families (structural, sentinel) already skipped themselves on an unusable input and
+    # said so in the log; a log line is not a value, so `len(gates)` came back short with
+    # nothing in the structure to say so, and `deploy/sync_census_fact.py` handed that
+    # short number to the doc-sync layer as a measurement. Promoted here into one list so
+    # a consumer can REFUSE an incomplete sweep — same posture as #3156's underivable
+    # census, one failure mode over: never a confident number derived from a partial run.
+    families_skipped = [
+        {"family": name, "reason": c["skipped_reason"]} for name, c in counters.items() if isinstance(c, dict) and c.get("skipped_reason")
+    ]
+
     return {
+        "families_skipped": families_skipped,
         # #3220: name-matched, no enforcement path. NOT in `gates`, so not in the
         # ratcheted total and not in #2578's unproven column — but carried here by
         # path so a guard that LOSES its enforcement path is REPORTED, never

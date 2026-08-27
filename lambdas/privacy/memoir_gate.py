@@ -1,3 +1,8 @@
+# gate-entrypoint: ADR-104's memoir-specific "don't dodge your own record" verdict
+# (#553). `cites_a_miss` returns `(ok, why)`; `coach_memoir_lambda.gate_check` folds it
+# into a fail-closed publish decision — a memoir that fails the check twice is DROPPED,
+# never shipped. The blocking is the caller's, the verdict is computed here, and no
+# other census row reports it (#2578 adjudication of #3220's ten name-only rows).
 """memoir_gate.py — ADR-104 deterministic post-check specific to coach memoirs (#553).
 
 A coach memoir is a first-person retrospective over the coach's own quarterly
