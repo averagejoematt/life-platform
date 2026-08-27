@@ -230,9 +230,12 @@ _FEATURE_CUTOFF = {
     # at ~13x the Lambda copy's unit and ~4x the vision gate — the opposite of
     # where the images-are-expensive intuition pointed. "Bounded" still holds (the
     # per-run figure is stable to the cent across runs); the DAILY total is
-    # merge-cadence-driven and was $0.90-$3.10/day over 2026-08-23..26. Two units
-    # this table does NOT price: the Sunday full-surface --ai-qa pass
-    # (visual-qa.yml, no tier cap) and the daily standalone --reader-truth fire.
+    # merge-cadence-driven — $0.90-$2.84/day over the only 3 complete UTC days the
+    # CallerClass dimension has existed for (2026-08-24..26, mean $1.63, sd $1.06),
+    # with 08-27 already at $3.10 partial, and $1.04/day averaged over the cost
+    # governor's own trailing-7d window. Two units this table does NOT price: the
+    # Sunday full-surface --ai-qa pass (visual-qa.yml, no tier cap) and the daily
+    # standalone --reader-truth fire.
     # At cutoff 3 they stop precisely when bedrock_client stops everything — "they
     # run whenever Bedrock runs at all" — and the pause is then reported, not
     # inferred: SKIPPED-BY-BUDGET in the run output, the CI job summary + a
