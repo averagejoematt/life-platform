@@ -17,7 +17,7 @@ This codebase labels work with short tag-codes in **commits, code comments, `doc
 |---|---|
 | **SIMP-1 / SIMP-2** | Ingestion-framework initiative — shared extract/validate/write for data-source Lambdas (adopt for new; existing exempt). ADR-056/060. |
 | **COST-OPT-1** | Secret caching (15-min Lambda TTL → ~90% fewer Secrets Manager calls). |
-| **COST-OPT-2** | Prompt caching (cached system blocks, ~90% discount) + model tiering. ADR-049. |
+| **COST-OPT-2** | Prompt caching (cached system blocks, ~90% discount) + model tiering. ADR-049. **A `cache_control` block is not evidence of caching** — below the model's minimum cacheable prefix (Haiku 4.5: 4,096 tok) the marker is silently ignored. Floors + per-caller decisions: `lambdas/ai/prompt_cache.py`; live proof: `PromptCacheNoOp`. ADR-049 amendment 2026-08-27 (#3085). |
 | **COST-A / COST-B** | Cost-cleanup sweeps — `COST-A` CloudWatch-alarm consolidation; `COST-B` Secrets-Manager consolidation. |
 | **IC-# (e.g. IC-3)** | "Intelligence" AI passes — `IC-3` is the chain-of-thought analysis pass (Haiku) run before coaching output. |
 

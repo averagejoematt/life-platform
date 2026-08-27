@@ -172,6 +172,14 @@ def _call_haiku(system, user_message, max_tokens=QUALITY_GATE_MAX_TOKENS, temper
         "messages": [{"role": "user", "content": user_message}],
     }
     if system:
+        # #3085: this `cache_control` is a NO-OP and that is the measured decision, not an
+        # oversight — QUALITY_GATE_SYSTEM_PROMPT is 814 tok against Haiku 4.5's 4,096 floor,
+        # and the largest legitimate prefix available (hoisting the whole shared standard in)
+        # is 2,238 tok, still 55% of the way. Closing that gap means padding a quality-JUDGE
+        # prompt with ~1,858 tok of filler to win $0.29/mo across both coach callers. Left on
+        # deliberately: an ignored marker costs nothing and engages for free if the prompt ever
+        # grows on its merits. See ai.prompt_cache.CACHING_DECISIONS; the live proof that it is
+        # still a no-op is the `PromptCacheNoOp` metric (#2888), not this line.
         body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
 
     payload = json.dumps(body).encode()

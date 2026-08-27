@@ -78,7 +78,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-046 | S3 Prefix Separation: Static vs Generated Content | Active | 2026-04-05 |
 | ADR-047 | Coach Intelligence Architecture: Stateless Prompts → Stateful Agents | Active | 2026-04-06 |
 | ADR-048 | Observatory Integration: Coach Intelligence Replaces Expert Analyzer | Active | 2026-04-06 |
-| ADR-049 | COST-OPT-2: Prompt Caching + Strategic Model Downgrades | Active | 2026-04-09 |
+| ADR-049 | COST-OPT-2: Prompt Caching + Strategic Model Downgrades (amended 2026-08-27, #3085 — a `cache_control` block is not evidence of caching; sub-floor markers are silently ignored) | Active | 2026-04-09 |
 | ADR-050 | TD-19: UTC as the platform-wide DDB partition convention | Active (Phase 2 fix-forward shipped… | 2026-05-03 |
 | ADR-051 | WR-48: Stale-Source Alerts + Anthropic Canary (observability hardening) | Active (shipped 2026-05-03 v6.8.8 +… | 2026-05-03 |
 | ADR-052 | Two-tier alerting: urgent SNS + daily-batched digest | Active (shipped 2026-05-16, PR1 of the… | 2026-05-16 |
@@ -1192,6 +1192,23 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 **Files changed:** `retry_utils.py`, `ai_calls.py`, `ai_expert_analyzer_lambda.py`, `coach_narrative_orchestrator.py`, `coach_ensemble_digest.py`, `coach_state_updater.py`, `coach_quality_gate.py`, `coach_history_summarizer.py`, `journal_enrichment_lambda.py`, `hypothesis_engine_lambda.py`, `challenge_generator_lambda.py`, `field_notes_lambda.py`, `site_api_lambda.py` (AI_UNAVAILABLE fix), `constants.py` (layer v41).
 
 **Projected cost impact:** $17-20/month → $8-12/month (40-60% reduction). Shared layer v41 deployed.
+
+**Amendment 2026-08-27 (#3085) — a `cache_control` block is not evidence of caching, and reasoning #1 above is false as written.**
+
+"Prompt caching is free money… No downside" is only true *above the model's minimum cacheable prefix*. Below it the API accepts the marker and silently ignores it: no error, no warning, no beta-header complaint — `cache_read_input_tokens` just stays 0 forever. Phase 1 above wrapped "all 12 API call sites" and then reported success from the presence of the wrapper, which is the defect this amendment names. **The wrapper is the claim; `AnthropicCacheReadTokens` is the evidence.** #2888 built the floor registry (`lambdas/ai/prompt_cache.py`) and the `PromptCacheNoOp` dead-man; #3085 adds the per-caller decision register (`prompt_cache.CACHING_DECISIONS`) so a call site that carries `cache_control` says which of the two it is.
+
+The floor is also the trap Phase 2 walked into. **Haiku 4.5 requires a 4,096-token prefix — the highest floor of any model the platform runs, 4x Sonnet 4.6's 1,024.** Phase 2 routed structured tasks to Haiku *because it is cheap per token*; the unstated consequence is that the platform's cheapest tier is also the hardest to cache, so the two optimizations partly cancel. (The floors are not monotonic across generations and are not platform-specific — they apply on Bedrock exactly as on the first-party API.)
+
+**Measured decision for the two coach callers (#3085).** System-prompt sizes measured on the wire via Bedrock `CountTokens` against `anthropic.claude-haiku-4-5-20251001-v1:0`, differencing a request with the system block against the same request without it — not estimated:
+
+| caller | system prompt | floor | growth needed | 30d calls |
+|---|---|---|---|---|
+| `coach-quality-gate` | **814 tok** | 4,096 | 5.03x | 435 |
+| `coach-state-updater` | **1,783 tok** | 4,096 | 2.30x | 290 |
+
+**Both DECLINED. Recorded, not deferred.** Hoisting every genuinely run-invariant block that exists — the whole of `config/coaches/_shared_standard.json` — lifts the quality gate only to 2,238 tok, 55% of the floor; the remaining ~1,858 tok would be pure padding inside a quality-*judge* prompt, which ADR-104/105 make an active quality cost, not a neutral one. `coach-state-updater` has no such block left at all (its user turn is the per-coach narrative and the metric allow-list is already in the system prompt). And the prize does not fund it: at Bedrock Haiku rates ($1.00/$0.10/$1.25 per 1M in/cache-read/cache-write), padding both to the floor saves **$0.29/month**, and the ceiling if the floor did not exist at all is **$0.69/month** — 0.46% of the $150 ADR-133 ceiling. Revisit only if a model's floor drops or a prompt grows on its own merits; the register's test fires if either happens.
+
+The `cache_control` markers are deliberately **left in place** at both call sites — an ignored marker costs nothing, and it engages for free if the prefix ever clears the floor. What changed is that both sites now say so.
 
 ---
 
