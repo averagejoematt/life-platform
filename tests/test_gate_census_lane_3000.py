@@ -96,9 +96,6 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # census report; they are UNPROVABLE, not unproven, and do not belong in #2578's
 # denominator. Re-admitting one is a `# gate-entrypoint:` marker in that file.
 #
-# This ceiling is MEANT to move with the real inventory (unlike the module-size
-# ratchet, whose numbers may never rise). Lowering it after a real measurement is
-# always welcome; raising it needs the reason in the same PR.
 #
 # 2026-08-26 (#3222), 551 -> 552. TOTAL only. ONE gate added:
 # `tests/test_fixture_frame_pairing_3222.py`, the fixture half of the PT-day contract.
@@ -116,7 +113,52 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 #     `datetime.now(timezone.utc).date()` reds it in a `pacific_today()` handler's test
 #     and is silent in a `utc-exempt(#2811)` one). So UNPROVEN measures 525 — exactly
 #     where #3220 left it — and this ceiling does not move at all.
-BASELINE_TOTAL_GATES = 552
+#
+# RAISED 2026-08-27 (#3213), total 552 -> 554; UNPROVEN UNCHANGED at 541 (measured
+# 527, so the ceiling did not need to move and was not moved — confirmed, not assumed).
+# Genuine inventory growth, not a re-baseline: #3213 adds the scheduled-workflow
+# cadence watch, and its two gates were adjudicated ONE BY ONE rather than absorbed
+# into a total. Measured by diffing the `--json` id sets against clean `main` at
+# a68089414 (which measures 552, agreeing with its own committed ceiling), on a tree
+# rebased onto it — exactly 2 ADDED, 0 REMOVED:
+#
+#   ci::cron-freshness.yml::cadence::3          the CI step that runs the watcher.
+#   guard::scripts/check_cron_freshness.py      the guard entrypoint. Carries the
+#     syntactic flag `exempt-by-incompleteness` — the #2619 shape, "the exemption
+#     predicate is satisfied by the defect". ADJUDICATED AND CLOSED, not waved off:
+#     it fires on `evaluate()`'s `if not row.get("watched"): continue`, which does
+#     skip a row whose ruling is MISSING as well as one ruled unwatched. That gap is
+#     covered by a second, independent path — `unruled_workflows()` reports the
+#     unruled row and `render()` reds on it — and
+#     `tests/test_cron_freshness_3213.py::test_i_registry_drift_alone_reds_the_run`
+#     pins exactly that, so an unruled workflow cannot pass through the skip
+#     unreported. A correct lead on a real pattern, closed by the design rather than
+#     by the flag being wrong.
+#
+# Both stay `unproven` for the census's purposes (no PROVEN_CAN_FAIL entry is claimed
+# here), which is why only the total moves.
+#
+# MEASURE ON A RESOLVED TREE — a mid-rebase reading of this number is WRONG, and it
+# is wrong in the direction that makes you raise the ceiling too far. Measured
+# 2026-08-27 while this very file sat unmerged (`UU`): the census read 554 -> 558.
+# `gate_census._tracked_files` derives its corpus from git's tracked-path listing,
+# which emits an unmerged path once PER STAGE — three copies of this file instead of
+# one — and this file carries two module-level names the registry family expands
+# entry-by-entry (`BASELINE_TOTAL_GATES` and `BASELINE_UNPROVEN_GATES` both match
+# `.*_GATES`). Two spurious copies x two constants = exactly the +4 observed. Resolve
+# the conflict, `git rebase --continue`, and only then run the census; a clean
+# `git status` is the precondition for trusting any number out of it.
+#
+# (Second-order, learned the same way: do not spell git's tracked-path subcommand out
+# in this file. `tests/premerge_derivation.py` treats that literal as one of its three
+# tree-sweep idioms, so writing it in a COMMENT reclassified this file into the
+# structural family and added a phantom gate — 554 -> 555, prose alone. Same shape as
+# the name-matching #3220 removed, arriving through documentation instead of a filename.)
+#
+# This ceiling is MEANT to move with the real inventory (unlike the module-size
+# ratchet, whose numbers may never rise). Lowering it after a real measurement is
+# always welcome; raising it needs the reason in the same PR.
+BASELINE_TOTAL_GATES = 554
 BASELINE_UNPROVEN_GATES = 541
 
 

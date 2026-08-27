@@ -250,6 +250,15 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps .claude/commands + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
+        # #3213: the scheduled-workflow cadence registry. Its verdict is pure repo shape
+        # (every `cron:` in .github/workflows/ carries a watched/unwatched ruling, no
+        # ruling points at a workflow that lost its cron, and the watcher itself never
+        # grows the `schedule:` trigger it watches). Reads .github/workflows/ by listdir
+        # rather than sweeping the source tree, so premerge_derivation cannot discover it
+        # — hand-listed, same shape as test_operating_calendar_2832.py above. Pre-merge
+        # because the PR that ADDS a scheduled workflow is the only moment its ruling is
+        # a decision rather than an archaeology exercise. 36 tests in 0.8s.
+        "test_cron_freshness_3213.py",
         # #2986/#2838: the generic re-stamp rule, derived from sync_doc_metadata.RULES. Its
         # verdict is pure repo shape (0.5s), and the change that can break it — a new stamped
         # literal, or an edit to deploy/sync_doc_metadata.py — is exactly a PR's own diff, so
