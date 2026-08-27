@@ -28,7 +28,7 @@ _SKILL = str(_skill("qa"))
 
 
 def _skill_text():
-    assert os.path.exists(_SKILL), ".claude/commands/qa.md missing — the /qa skill is gone"
+    assert os.path.exists(_SKILL), ".claude/skills/qa/SKILL.md missing — the /qa skill is gone"
     with open(_SKILL, encoding="utf-8") as f:
         return f.read()
 

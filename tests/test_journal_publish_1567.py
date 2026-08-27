@@ -1,6 +1,6 @@
 """#1567 — /journal-interview publish: interview → approved public essay.
 
-The mode itself is a claude-workflow (`.claude/commands/journal-interview.md` step 6);
+The mode itself is a claude-workflow (`.claude/skills/journal-interview/SKILL.md` step 6);
 this file pins the code surface it depends on so the contract can't silently rot:
 
   - the generator carries + renders the ``provenance`` field (AC4: "composed from a

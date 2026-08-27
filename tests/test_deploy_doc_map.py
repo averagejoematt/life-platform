@@ -2,7 +2,7 @@
 tests/test_deploy_doc_map.py — the /deploy skill's function→source table must be
 generator output from ci/lambda_map.json (#2005, devex-1).
 
-History: the table in .claude/commands/deploy.md was hand-typed and drifted — a dead
+History: the table in .claude/skills/deploy/SKILL.md was hand-typed and drifted — a dead
 function (apple-health-ingestion), a wrong source path (weather_handler.py), and 43
 live functions missing entirely. This gate asserts the doc block is byte-identical to
 what deploy/sync_deploy_doc_map.py renders from the map, so ANY map change (function

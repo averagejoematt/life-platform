@@ -15,7 +15,7 @@ THE FIX
   `handovers/HANDOVER_LATEST.md`, and exits 1 naming each missing one — generalising what
   check_proportionality_ledger.py already does for `**Ledger:**`.
 
-  The expected markers are DERIVED FROM `.claude/commands/wrap.md`, never hand-listed
+  The expected markers are DERIVED FROM `.claude/skills/wrap/SKILL.md`, never hand-listed
   here: each wrap gate states its contract with the house phrase "carries one line
   (either way)" / "must carry one line", immediately followed by the backticked
   `**Marker:**` token. We parse exactly that. A hand-list would drift the moment a
@@ -26,7 +26,7 @@ THE FIX
 USAGE
   python3 scripts/check_handover_lines.py [HANDOVER_PATH] [--wrap WRAP_PATH]
     HANDOVER_PATH defaults to handovers/HANDOVER_LATEST.md;
-    WRAP_PATH defaults to .claude/commands/wrap.md (test hook).
+    WRAP_PATH defaults to .claude/skills/wrap/SKILL.md (test hook).
   Exit 0: every derived marker line present. Exit 1: one or more missing (each named).
   Exit 2: the derivation itself regressed (wrap.md unreadable or too few markers found).
 """

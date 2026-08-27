@@ -3,7 +3,7 @@
 deploy/sync_deploy_doc_map.py — regenerate the /deploy skill's function→source table
 from ci/lambda_map.json (#2005, devex-1).
 
-The table in .claude/commands/deploy.md was hand-maintained and drifted from ground
+The table in .claude/skills/deploy/SKILL.md was hand-maintained and drifted from ground
 truth (a dead function, a wrong source path, 43 live functions missing). Per the
 repo's own meta-rule ("run the command, never quote a number"), the table is now
 GENERATOR OUTPUT between markers — derived from ci/lambda_map.json, the same map CI

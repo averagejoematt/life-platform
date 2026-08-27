@@ -3,7 +3,7 @@
 
 THE PROBLEM
   Nothing owned "an alarm red >72h must cite an incident row or issue #". The #1329
-  standing-alarms step in `.claude/commands/wrap.md` existed but was scoped to
+  standing-alarms step in `.claude/skills/wrap/SKILL.md` existed but was scoped to
   freshness/staleness + secret-rotation alarms and was advisory (a note in
   next-picks, no fail condition, no `describe-alarms` enumeration). At the 2026-07-28
   /fullreview, 6 alarms were simultaneously red and the session ledger recorded

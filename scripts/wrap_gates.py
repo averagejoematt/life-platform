@@ -231,7 +231,7 @@ def main(argv=None) -> int:
 
     if failures:
         print(f"{phase.upper()} FAIL — {len(failures)} gate(s) red: " + ", ".join(f"{g.name} (step ({g.step}))" for g in failures))
-        print("Each step in .claude/commands/wrap.md documents its own remediation; fix and re-run this batch.")
+        print("Each step in .claude/skills/wrap/SKILL.md documents its own remediation; fix and re-run this batch.")
         return 1
     print(f"{phase.upper()} OK — all {len(results)} gates passed.")
     return 0

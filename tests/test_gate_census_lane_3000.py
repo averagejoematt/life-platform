@@ -3,7 +3,7 @@
 Epic #2578's fourth acceptance box: "a recurring check keeps the inventory honest, so a
 newly-added gate cannot enter the platform unverified." Measured 2026-08-22: `gate_census`
 matched zero workflow files (`grep -rn "gate_census" .github/workflows/*.yml
-.claude/commands/*.md` — nothing). `tests/test_gate_census_2578.py` mutation-proves the
+.claude/skills/*/SKILL.md` — nothing). `tests/test_gate_census_2578.py` mutation-proves the
 census's EXTRACTORS against synthetic fixtures; nothing anywhere ran the census against
 the REAL repo and asked whether a gate had entered with no verdict. This file is that ask.
 

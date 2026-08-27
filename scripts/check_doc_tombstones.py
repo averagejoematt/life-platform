@@ -15,7 +15,7 @@ SCOPE:
   docs/content/, docs/design-review/, docs/engines/, plus README.md, CLAUDE.md,
   Makefile (#1323 — the Makefile is a second, un-audited entry-point system that
   can route an operator onto a retired script exactly like a stale doc can),
-  .claude/commands/*.md, deploy/*.md (#1322 — the deploy directory's own runbooks
+  .claude/skills/*/SKILL.md, deploy/*.md (#1322 — the deploy directory's own runbooks
   steered operators onto the retired boot-broken manual MCP zip; MANIFEST.md and
   V2_ROLLBACK.md are exempt as dated/deprecated records).
   ALSO scans SOURCE docstrings/comments: lambdas/**/*.py + mcp/**/*.py (#781 taught
