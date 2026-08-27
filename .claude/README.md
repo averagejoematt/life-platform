@@ -15,7 +15,7 @@ Designed so an agent can answer "why" without guessing:
 - **`handovers/`** — the live end-of-session hand-off (`HANDOVER_LATEST.md`) so the next session resumes with full context. Prior sessions live on the **`session-archive`** branch (#1650) — `git show origin/session-archive:handovers/<name>.md`.
 
 **3. Skills — [`.claude/skills/`](skills/)**
-**23 skills** the agent invokes by name, each `‹name›/SKILL.md` with YAML frontmatter
+**24 skills** the agent invokes by name, each `‹name›/SKILL.md` with YAML frontmatter
 (`description`, `argument-hint`, `allowed-tools`) so a session can pick the right one
 without being told. The count is derived from the registry, never hand-listed — this
 paragraph itself used to name two of them. A sample rather than an inventory:
@@ -38,6 +38,15 @@ findings against the ADR-099 contract — exact score-line grammar, class-not-sy
 stop re-improvising briefs from memory prose (#796).
 
 **4. Automation the agent relies on**
+- **Session hooks** (`.claude/settings.json` → `scripts/hooks/`) — enforcement at
+  *tool-use* time, which the git hooks below cannot reach because they run at commit time.
+  A `SessionStart` pre-flight prints main's real state, any waiting deploy lease and
+  worktree hygiene (three things sessions otherwise guess); a `PreToolUse` guard flags a
+  merge with no named-check assertion, a deploy from a worktree, and a force-push to main;
+  a `PostToolUse` check records each push and, once runs have had time to appear, reports
+  a sha that minted **zero** — the swallowed-push class. All **advisory** by default:
+  they warn and exit 0 until an operator sets `CLAUDE_HOOK_MODE=block`. Every one fails
+  open on a bad payload, because a hook that can crash can halt a session.
 - **Doc-sync pre-commit hook** (`scripts/install_hooks.sh` → `deploy/sync_doc_metadata.py`) — auto-updates doc headers (tool/Lambda/secret/alarm counts, version) on every commit, so docs can't silently drift from code.
 - **Self-healing remediation agent** (`.github/workflows/remediation-agent.yml`, ADR-064/065) — Claude on a schedule via GitHub Actions + Bedrock: triages alarms/CI/DLQ, auto-fixes the provably-safe class behind a deterministic merge gate, opens PRs for the rest. Read-only AWS role; the gate (not the model) holds merge authority.
 - **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 76 tools that let Claude query the live platform data directly during a session.
