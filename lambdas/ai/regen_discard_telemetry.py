@@ -1,6 +1,6 @@
 """regen_discard_telemetry.py — #3086: observability for grounded_generation.regen_once's
-three silent-discard arms (transport/unexpected exception on the regen call, an empty
-regen response, and a rewrite that isn't strictly better than the original).
+silent-discard arms (transport/unexpected exception on the regen call, an empty regen
+response, and — since #3217, split in two — a rewrite the keep predicate rejected).
 
 Split out of grounded_generation.py rather than inlined there for two reasons: (1) that
 module's own docstring commits it to "pure functions, no AWS, no HTTP" — a CloudWatch
@@ -34,7 +34,13 @@ def log_discard(arm: str, surface: str, findings_count: int, *, reason: str = ""
     """One ERROR line + one CloudWatch count for a billed-but-discarded regeneration.
 
     arm            -- which regen_once discard path fired: "transport_error",
-                       "unexpected_error", "empty_response", or "not_strictly_better".
+                       "unexpected_error", "empty_response", "not_strictly_better",
+                       or (since #3217) "figure_grounding_introduced" — the rewrite
+                       traded one invented figure for another. The last two are the
+                       two halves of the old single not-strictly-better arm, split so
+                       the log names WHICH predicate dropped the rewrite; their names
+                       are `ai/regen_keep_predicate.py`'s DROP_* constants (named DROP_, not DISCARD_,
+                       for the CodeQL reason that module's docstring records).
     surface        -- caller identity, same convention as ai_calls._ground_legacy_output's
                        `label` param (the one caller that already logged this pre-#3086).
     findings_count -- len(findings) still outstanding on the text regen_once kept.

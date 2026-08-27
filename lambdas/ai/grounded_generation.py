@@ -18,10 +18,16 @@ pieces that previously lived apart:
                          "2026-07-08" is invisible to the number gate (2026/7/8 are
                          all benign), so an optional date allow-list catches an
                          invented ISO/long-form date the number gate cannot see.
-  3. Regen-once        — regen_once() extracts the duplicated keep-if-strictly-
-                         improved harness (ai_expert_analyzer / field_notes) so
-                         every surface corrects the same way: one rewrite,
-                         kept only if findings strictly decrease, never worse.
+  3. Regen-once        — regen_once() extracts the duplicated keep-if-improved
+                         harness (ai_expert_analyzer / field_notes) so every
+                         surface corrects the same way: one rewrite, kept only
+                         if it is better, never worse. WHICH of the two texts is
+                         better is ai/regen_keep_predicate.py (#3217) — findings
+                         strictly decrease, OR the rewrite strictly removes a
+                         figure-grounding finding (an invented number/date)
+                         without introducing one. The second arm exists because
+                         the first is a composite over a dozen heterogeneous
+                         classes, and a composite must not veto a correctness fix.
   4. Cycle-freshness   — baseline_freshness_findings() (#1691, epic #1687) catches
                          the "reset-window stale-baseline" class the DATA-grounding
                          gates above cannot see: a brief that cites a stale STARTING
@@ -88,6 +94,14 @@ try:
     from ai import regen_discard_telemetry as _regen_telemetry
 except ImportError:  # pragma: no cover — flat/layer bundle layout
     import regen_discard_telemetry as _regen_telemetry  # type: ignore[no-redef]
+
+# 8. The regen keep/discard predicate (#3217) lives in ai/regen_keep_predicate.py — the
+# decision is a registry of finding classes plus a multiset comparison, and it needs to be
+# exercisable on adversarial inputs without a model call in the way.
+try:
+    from ai import regen_keep_predicate as _keep_predicate
+except ImportError:  # pragma: no cover — flat/layer bundle layout
+    import regen_keep_predicate as _keep_predicate  # type: ignore[no-redef]
 
 # 5. Behavioral-log (#1699) moved to ai/behavior_logs.py with #2056, for the same §2
 # ceiling reason — and because deriving its per-generation-date availability map is real
@@ -843,13 +857,23 @@ def correction_prompt(findings: list) -> str:
 
 
 def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown"):
-    """One corrective rewrite, kept only if strictly better. Never regresses.
+    """One corrective rewrite, kept when it is better. Never regresses.
 
     findings_fn(text) -> list of findings (e.g. a grounding_findings closure).
     regen_fn(correction: str) -> str — the caller's single regeneration call
     (model, tokens, prompt assembly all stay the caller's business).
     surface -- caller identity for discard telemetry (#3086); same convention
     as ai_calls._ground_legacy_output's `label` param.
+
+    "Better" is `regen_keep_predicate.keep_rewrite` — since #3217 that is two
+    arms, not one: the original strictly-fewer-findings count, PLUS a dispositive
+    arm for a rewrite that strictly REMOVES a figure-grounding finding (an
+    invented number/date) without introducing one. The second arm exists because
+    the first is a composite over a dozen heterogeneous classes, and a composite
+    vetoing a correctness fix is exactly how the 2026-08-26 `nutrition_coach`
+    draft reached the blocking gate still carrying `326.3`. The keep/discard arm
+    is named in the telemetry either way, so a dropped rewrite says WHICH
+    predicate dropped it.
 
     Returns (best_text, findings_for_best_text, corrected: bool).
     """
@@ -868,7 +892,14 @@ def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown"):
         _regen_telemetry.log_discard("empty_response", surface, len(findings))
         return text, findings, False
     fixed_findings = findings_fn(fixed)
-    if len(fixed_findings) < len(findings):
+    keep, arm = _keep_predicate.keep_rewrite(findings, fixed_findings)
+    # Counts only — never a finding's detail text. See regen_keep_predicate's "Log hygiene".
+    note = _keep_predicate.describe_delta(findings, fixed_findings)
+    if keep:
+        if arm == _keep_predicate.KEEP_FIGURE_REMOVED:
+            # #3217: the arm that did NOT exist before. Say so — this is the case that
+            # was previously a silent discard and reached the gate with a bad figure.
+            print("[REGEN_KEPT] arm=%s surface=%s %s" % (arm, surface, note))
         return fixed, fixed_findings, True
-    _regen_telemetry.log_discard("not_strictly_better", surface, len(findings))
+    _regen_telemetry.log_discard(arm, surface, len(findings), reason=note)
     return text, findings, False
