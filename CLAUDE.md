@@ -208,32 +208,45 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-27 (Opus 5, **Session G**, ~3h) — the `session-g-cost-cliff-and-class-fixes.md`
-boot prompt. AUTONOMOUS with merge+deploy authority, ALL-OPUS, seven lanes; Fable untouched, so #3042 and
-#2849 were out of scope. **5 closed** (#3139, #3204, #2888, **#2798 — an EPIC**, #3079), **8 PRs merged**,
-**ZERO standalone filings** (findings folded as epic checkboxes: #2799 ×5, #2578 ×2 *closed*, #2798 ×1,
-#2801 ×1). **Open 47 → 42, net −5** (#3237 was machine-filed AND machine-closed within the session). **The spine epic #2801
-was NOT closed, and that is the session's most important result:** every child closed and every `Done when`
-box verified true (the AWS backstop really is at $150; the EMF ledger really exists, 57 tests) — yet the
-Outcome fails. Live SSM shows projected **$175.18** against a ceiling that **auto-reverts $200 → $150 on
-2026-09-01**, and *every* realistic September scenario lands at **tier 3** (the $145.50 threshold); the one
-that does not requires deleting all CI+dev AI spend and clears by **24 cents**. Cause: **CI AI spend is
-1.92× production** ($6.78/day vs $3.53) — a class that only became visible on 08-24 (#2892) and only
-attributable today (#3240 found **46% of Bedrock spend booked to the literal string `unknown`**).
-**Judged by child count this was a closure; judged by the Outcome it is a phantom.** Session F's through-line
-continued a layer deeper — **instruments whose stated *reason* is false while their conclusion is right**:
-the D-01 caching note instructs the next reader to re-enable on a condition that is now measurably met, which
-would ship a no-op (#3246); the deploy-wedge cron asserts a 17-minute safety bound that has held **1 of 99**
-measured intervals, its declared `*/15` delivered **0 of 99**; and **a site auto-rollback reverted Session F's
-own build beat over a DynamoDB-served defect it was structurally incapable of fixing, reporting success
-throughout** — fixed at the trigger by #3243 without weakening the tier-2 pause. Four lanes falsified their
-issue's premise (#2888's biggest bucket is uncacheable-in-principle CI *images*; #3139's inversion does not
-exist, `I > 14.29·O`, 10 of 12 fail *impossibly*; #2835 is six emails not seven; #3079's "two" sites are
-three). **Three deploys verified by content** — `sensor_absence.py` at 8,759 bytes with its caller wired in
-all three bundles. Gotchas: **main was red at boot while F's handover said green**, and #1908's paths-filter
-trap meant the docs-only fix could not clear it — a lane then reintroduced that trap and #1908's guard caught
-it; **two stale deploy leases rejected**, the second *older* than live code; **my own negative control passed
-vacuously** (the rule I had put in all seven briefs); a concurrent session held 5 unpushed commits in the
-primary clone, so all driver git work moved to an isolated worktree. **Next:** #2801 before Sept 1 · #2883 ·
-#2978 · #2835 · #2999/#2848 (promoted this wrap) · owner batch 18 items, headed by the cliff. Full narrative:
+**Verified:** 2026-08-27 (Opus 5, **Session H**, autonomous with merge+deploy authority, ALL-OPUS —
+`~/.claude/plans/dreamy-painting-glacier.md` Part B). **Main GREEN.** A second session held
+`skills-corpus-governable-phase1` in the primary clone throughout; **all driver git work ran from a
+detached worktree at `origin/main`** and PR #3245 was never touched. **6 PRs merged** (#3248, #3249,
+#3253, #3256, #3259, #3263), **3 closed with verdicts** (#2999, #3254, #3237), **12 filed**. **Open
+42 → 51: net +9 — the deliberately correct outcome**, since the non-Fable queue was exhausted and
+the refill adds before it subtracts; nothing was suppressed to protect the number. Part A's four
+owner decisions were not supplied, so #2801/#2833/#3083/#2834 were **parked, not worked**.
+**The through-line: the platform's own written claims about itself drift faster than its code.**
+Found nine times. **Lane 1's premise was inverted** — the plan said the 09-01 ceiling rollover would
+red on eight docs; it reds on **two**, and the other six are *structurally invisible* (`BUDGET_NEAR`
+needs a ceiling word within 20 chars). Measured by standing the real scanners at 2026-09-02: **14
+unframed occurrences, 2 caught**. The risk was **silence, not noise** — undiscoverable by the diff
+read the plan asked for. Fixed by a **derivation**: `retired_figures()` forbids the expired pair
+rather than merely un-allowing it, inert while the window runs (a dead-man), proved 12 → 0 with a
+negative control that actually reds. **Lane 2 found BOTH sides of a contradiction wrong in opposite
+directions** — #2801's "$6.78/day" is a **7-day sum** (real ~$1.04/day, so the CI lever is
+**~$31–60/mo, down from the ~$203/mo the epic assumed**), and `budget_guard`'s "pennies per run" priced the *nightly Lambda*
+copy while labelling the *CI* copy (~24¢, ~13x); the **prose** gate is 4x the vision gate. **#2883's
+title asks for an alarm that already exists** and is lit 21/21; its "closing at ~0.02/day" claim
+dies on OLS — slope **-0.0056/day, 95% CI [-0.0152, +0.0040]**, an interval that **includes
+non-decreasing**. **`fullreview-delta` names a ritual the skill does not implement**, so the
+calendar was **NOT stamped** — a bounded two-lens sweep ran instead and is not a delta. **The
+sanctioned Roadmap refill cannot refill this queue**: all 12 startable candidates are `model:fable`,
+so a promotion would green `now_liveness` while adding zero startable work; #3256 now **refuses**
+that and prints `NO REMEDY IN THE CORPUS`. **The site auto-rollback reported `success` on a defect
+it cannot reach** (stored artifact in DynamoDB, verified still live). **A citation chain cited two
+closed issues** while asserting a finding had "no recurrence since" — the same fingerprint is in the
+log inside 72h. **The reader-truth judge emits findings its own note retracts** ("No flag warranted
+on reconsideration") and the pipeline counts them. One plan finding was a **false positive**
+(`broadcast_sensitivity` is deliberately unregistered, documented in-file) and was rejected publicly
+on #2799 rather than filed. Verified-with-positive-controls filings: **#3260** (`slo-ai-coaching-success`
+is dimensionless and slept through **191 real failures in one day**), **#3261** (two live OG cards
+publish 116/59/$13 against 76/104/$146 — and discard the correct values they already loaded),
+**#3262**, **#3257**, **#3258**. Gotchas: **`gh run list --commit <short-sha>` returns `[]` falsely**
+(use the API at the full 40-char sha); **piped exit codes lied twice**; **my own three filings broke
+the hygiene gate** (1 → 5 violations) and it caught all four; and **labelling #2978 `blocked:date`
+honestly fired a blocking gate** — the hygiene system punishes accurate blockage-reporting. One
+fleet deploy (`5e392255`) **verified by content**, two leases **rejected**, neither left waiting.
+**Next:** #3260 · #3261 (both S, both verified) · #3250 · #3264 · #2999's residual on #2578 · the
+owner batch, led by the **September 1 ceiling cliff, now 4 days out**. Full narrative:
 `handovers/HANDOVER_LATEST.md`.
