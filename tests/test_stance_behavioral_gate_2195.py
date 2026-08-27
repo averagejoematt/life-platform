@@ -55,36 +55,45 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# The summarizer stamps a stance's as_of from the UTC wall clock (chs `today =
-# datetime.now(timezone.utc)`), and behavior_logs treats a presence signal older
+# The summarizer stamps a stance's as_of from the PACIFIC day (`_generate_stance`:
+# `today = pacific_today()`, #2811), and behavior_logs treats a presence signal older
 # than the target day as answering NOTHING. So these fixture days must TRACK the
 # clock — the original dated literals were a #2376-class midnight bomb, and they
 # detonated at 2026-08-10T00:00Z (genesis midnight), reddening main.
-from datetime import datetime, timedelta, timezone  # noqa: E402
+#
+# #3222: they must also track it in the summarizer's OWN frame. This block used to read
+# `datetime.now(timezone.utc)` and say so in a comment that had gone stale — #2811 moved
+# `_generate_stance` to Pacific underneath it. These tests drive `_apply_grounding_gate`
+# directly with a hand-built stance, so the days only ever meet each other and the UTC
+# form stayed green; the moment a test drives `_generate_stance` (which stamps as_of in
+# Pacific) the two frames disagree for the seven evening hours a day. Fixed at the
+# fixture, not left as a trap, and the helper called is the handler's own.
+from datetime import timedelta  # noqa: E402
 
 import coach_history_summarizer as chs  # noqa: E402
 from ai import behavior_logs as bl  # noqa: E402
+from common.pacific_time import pacific_now, pacific_today  # noqa: E402
 
 # CALL-TIME derivation, not module globals: a module-level `_NOW` is the #2223
 # class this repo's wallclock-globals guard exists for (collection before
 # midnight + execution after = desync). Each helper reads the clock when the
-# test actually runs, in the same UTC frame the summarizer stamps as_of with.
+# test actually runs, in the same Pacific frame the summarizer stamps as_of with.
 
 
 def _gen_day() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return pacific_today()
 
 
 def _stale_log_day() -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%d")
+    return (pacific_now() - timedelta(days=2)).strftime("%Y-%m-%d")
 
 
 def _yesterday() -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    return (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 def _window_start() -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y-%m-%d")
+    return (pacific_now() - timedelta(days=6)).strftime("%Y-%m-%d")
 
 
 def _signal(**channels):

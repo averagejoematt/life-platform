@@ -1009,9 +1009,17 @@ def test_the_character_sheet_falls_back_to_yesterday_when_today_has_not_computed
     ai = _ai()
     monkeypatch.setattr(ai, "_latest_item", lambda s: None)
     monkeypatch.setattr(ai, "_ask_fetch_computed_reads", lambda: {})
-    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    from datetime import timedelta as _td
 
-    yday = (_dt.now(_tz.utc) - _td(days=1)).strftime("%Y-%m-%d")
+    from common.pacific_time import pacific_now
+
+    # #3222: the handler's own clock. `site_api_ai_context._ask_fetch_context` builds
+    # `today_str`/`yesterday_str` from `datetime.now(PT)` (#2414) and probes today FIRST.
+    # A UTC-derived "yesterday" equals the handler's *today* every evening 17:00 PT →
+    # midnight, so between those hours the fake table answered the today probe and this
+    # test proved the fallback was reached without the fallback ever running — a check
+    # that cannot fail for the reason it exists.
+    yday = (pacific_now() - _td(days=1)).strftime("%Y-%m-%d")
 
     class _Sheet(FakeDdbTable):
         def get_item(self, Key=None, **_k):

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
@@ -96,7 +95,11 @@ def test_an_open_ended_trip_is_still_running_today(monkeypatch):
     """A trip logged without a return date must read as ongoing, not as a
     zero-length trip that already ended."""
     monkeypatch.setattr(tl, "table", FakeDdbTable(rows=[_trip("2026-01-01", None)]))
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #3222: `_is_traveling`'s day domain is Pacific end to end (its own default is
+    # `pacific_today()`, #2817) — the sibling test below was fixed then and this one was
+    # not, leaving one UTC day in a Pacific-framed file. Benign here only because the
+    # trip is open-ended; the frame is still wrong, so it reads the handler's clock.
+    today = pacific_today()
     assert tl._is_traveling(today) is not None
 
 

@@ -374,6 +374,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_food_delivery_streak_freshness_2235.py",
         "test_gradability_liveness_cross_phase_2023.py",
         "test_intake_privacy_contract.py",
+        "test_fixture_frame_pairing_3222.py",  # #3222: the fixture half of the PT-day contract — repo-shape sweep of tests/ x lambdas/+mcp/, same lane as its two siblings below
         "test_invoke_site_census_2390.py",
         "test_iso_week_pairing_2256.py",
         "test_lambda_handlers.py",
