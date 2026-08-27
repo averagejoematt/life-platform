@@ -1,177 +1,198 @@
-# Handover — 2026-08-26 (Opus 5, autonomous ~5h): Session D — the harvest that falsified its own theory, and four guards weaker than they claimed
+# Handover — 2026-08-26/27 (Opus 5, autonomous ~3h): Session E — five closed, seven filed, and a red main inherited from yesterday's own timezone fix
 
-**Session:** Opus 5. Drove: *"Boot Session D of the self-sustaining push"*
-(`~/.claude/plans/glinting-gleaning-galago.md` — D0 boot + the clock-aware harvest with
-the 17:00Z brief as a HARD checkpoint, then #3199 as the first lane, then the D2 drain
-lanes; 2026-08-24 amendment governance: severity-weighted metrics, discovery-source tags,
-closure-only drain). AUTONOMOUS with merge+deploy authority; implementation via 5
-sonnet/opus worktree agents (driver = judgment, merges, deploys, verdicts, 3 lease
-disposals). Fable untouched — banked for #2849 until after the #3042 re-grade (standing
-owner call, fourth session running). Owner returned at wrap time; wrap run together per
-the boot instruction. Previous handover archived as
-`HANDOVER_2026-08-25_session-c-landing.md` on `session-archive`.
+**Session:** Opus 5. Drove: *"Boot Session E of the self-sustaining push"*
+(`~/.claude/plans/dynamic-imagining-prism.md` — E0 boot + the #3187 freebie, then #3207,
+then #3202 experiment-first, then #2811). AUTONOMOUS with merge+deploy authority.
+ALL-OPUS — driver and all four implementation agents. Fable untouched (week's credits),
+so #3042 and #2849 were out of scope by definition. Owner returned mid-session; the
+efficacy review and the Session F plan were produced with them, and the wrap was run on
+their instruction. Previous handover archived as
+`HANDOVER_2026-08-26_session-d-harvest.md` on `session-archive`.
 
-## The score (severity-weighted, per the amendment)
+## The score — honest, and it is not flattering
 
-- **5 issues CLOSED with verdicts**: **#3199** (P3 — both judge-demotion rules, ledger
-  emptied), **#2847** (**epic-scale** — the producer/consumer contract framework; box 2
-  wired into the #2845 model, not re-scoped), **#3200** (P3 — the classified verdict),
-  **#3208** (P2 — the day-counter demotion made structural), **#3209** (P2 — the
-  classifier's log source).
-- **6 PRs merged**: #3201 (#3199 rules), #3203 (#2847 box 2), #3205 (#3200 classifier),
-  #3210 (#3208 structural predicate), #3211 (#3209 log source), #3206 (#2798 PT-day slice).
-- **5 filed**, all incident/observation-tagged: #3202, #3204, #3207, #3208, #3209 — two of
-  which were fixed and closed the same session. **Net +1 open** (5 closed, 5 filed, 1
-  promoted from Later). The count is honest, not flattering: this session found more than
-  it drained, and every filing is a defect that was already live and unowned.
-- **Fleet deployed**: `deploy_fleet.sh` at 5ecc3a1f — **105 updated / 0 skipped / 0
-  failed**, ancestry postflight sha-verified. Spot-checked beyond the summary: the live
-  qa-smoke bundle carries both new demotion rules, the MCP bundle carries the PT pair fix.
-- **Main GREEN end-to-end** at 5ecc3a1f (run 33008802041): reconcile, lint,
-  deploy-critical, unit tests, plan, deploy, smoke, post-deploy integration, **and Visual +
-  AI-vision QA** all green — the first CI visual-qa pass since #3208's fix.
+- **5 issues CLOSED with verdicts**: **#3187** (P3 — the dispatched sweep, auto-closed
+  green), **#3212** (P3 — the main-green discriminator, filed AND closed this session),
+  **#3207** (P3 — the posture pending-marker), **#2811** (P3 — the fleet UTC-day ratchet,
+  9→14 packages), **#3202** (P2 — the coach grounding hold).
+- **6 PRs merged**: #3216 (#3212), #3214 (#3207), #3218 (#2811), #3215 (#3202), #3223
+  (the red-main fixture fix), all squash-merged with their own `wait_pr_green` verdict.
+- **7 filed**: #3212 (closed same session), #3213, #3217, #3219, #3220, #3221, #3222.
+- **Net +2 open.** `Now` started at 10 and ended at 10. **Two consecutive sessions have
+  run the treadmill the 2026-08-24 amendment exists to stop** (D was +1). The work was
+  good; the bookkeeping was not. That is the finding, and Session F's plan is built on it.
+- **Fleet deployed** at `81662a9d` — CI's Deploy job took the *"Fleet deploy (shared
+  module changed)"* path itself, so the planned manual `deploy_fleet.sh` would have been a
+  redundant concurrent deploy. Caught by reading the job's steps rather than assuming.
+- **Deploy verified beyond the sha**: ancestry postflight `deployed sha == shipping sha`
+  on `coach-quality-gate`, `daily-brief`, `coach-narrative-orchestrator`,
+  `coach-state-updater`, `permanence`, `data-reconciliation`; bundle contents spot-checked
+  — `daily-brief` carries the new `ai/coach_brief_retention.py`, the renamed-away
+  `coach_gate_retention.py` is absent, and both bundles carry the `n < expected_day`
+  narrowing.
 
-## The harvest falsified its own theory (D0 — the session's most valuable hour)
+## #3202 falsified its own plan's hypothesis — the session's best hour
 
-The 17:00Z brief was a dated wire box, and it disproved the diagnosis it was meant to
-confirm. **Truncation is genuinely dead** — 0 `TRUNCATED` WARNs in the brief (was 13–14),
-no datapoint in the brief's hour, narratives generating full-length inside the raised cap,
-gate pass-rate **1/7 (08-24, 08-25) → 5/7**. **But 2 of 7 coaches still hold**:
-`nutrition_coach` and `mind_coach` fail BOTH attempts at score 28 /
-`number_grounding=ungrounded` on full untruncated text. The truncation was real, its fix
-was correct, and it was **masking a second defect** (#3202).
+The plan named the allow-list/rounding story as primary suspect. The wire said
+**`['stale_phase']`**, not `fabricated_number`. Root cause: `stale_phase` was never a
+self-location check — it was a **"Day N" token ban**. It flagged every `\bday\s+(\d+)\b`
+where `n != expected_day` with **no framing requirement**, while its sibling
+`stale_baseline` requires framing within `proximity`, and both the module docstring and
+`grounding_gate_params.py` called the class framing-scoped.
 
-The chain is fully measured and non-obvious: **Dr. Marcus Webb IS the nutrition coach** —
-so the gate holding his narrative is why the stale "321.0 lb" never regenerates, why
-qa-smoke `cross_surface:weight` stays red, and why `qa-smoke-failures` stays lit. A coach
-persona name is the join key between an AI-quality symptom and a data-truth alarm. The
-alarm's dated window was therefore closed **early, on measurement**, rather than left to
-expire 08-27T19:00Z on a premise already disproved.
+**That is the non-convergence.** mind_coach attempt 2 said *"you're at Day 10"* — the
+correct day — and was held for the clause *"matters more at Day 10 than it did at Day 1"*.
+The rewrite loop was being asked to satisfy an unsatisfiable rule. Run on the wire, not a
+fixture: the real held drafts were recovered from DDB `EVALRET#coach_brief` and their
+lengths match the `text_length=` log lines exactly.
 
-## The four guards that were weaker than they claimed
+**Then the first fix opened a new blind spot, found by probing rather than reading.** The
+initial exclusion cleared every other Day token as soon as the correct day appeared
+anywhere, so `"You're at Day 10 … We're now on Day 12"` came back **CLEAN** while the same
+wrong claim alone fired. A self-contradicting narrative is exactly what an LLM produces,
+and the test suite *pinned that behaviour as intended*. Narrowed structurally to
+`n < expected_day` — nothing can refer forward to a day that has not happened.
 
-1. **#3200 shipped verdict-closed and never fired.** Dogfooded on this session's own queue
-   an hour after merging: `VERDICT FAIL` (exit 1) where it should have said
-   `GREEN-WITH-RECONCILE-OWNED-RED` (exit 4). One of six fail-closed branches —
-   `gh run view --job --log` returns a log omitting the failing step for some jobs and not
-   others (job 98275389042, the one #3200 was built against, DOES include it). Fixed
-   (#3209), live-proved at `TRUE_EXIT=4` from merged main, then dogfooded for real: #3206
-   was merged ON that verdict.
-2. **The phrase-matched suppressor class fired a third time and gated main** (#3208) —
-   hours after #3199 fixed two instances of it in the same file. Same finding demoted on a
-   live re-run; only the oracle's wording differed.
-3. **The #2811 ratchet is blind to 2 of 3 real mutations** — a `[:10]` slice of a *function
-   call* and of a *vendor* instant. A ratchet-only #2798 fix would have shipped green with
-   the producer/consumer pair still split.
-4. **`test_platform_model_drift.py` is a byte-diff vs fresh regeneration** and structurally
-   cannot catch a projection that regenerates *faithfully into something wrong* — found and
-   closed inside #2847 box 2.
+## The other four lanes
 
-Three of the four were found by *exercising* something (dogfooding, a live re-run, a
-mutation), not by reading it. None would have surfaced from a green dashboard.
+- **#2811** — the matcher-blindness finding changed the answer, exactly as the plan warned
+  it would. Extending the matcher found a **23rd** site in `lambdas/reading/`, a package
+  #2817 *and* #2798 had each certified at zero. Both certifications were true of the
+  matcher and false of the code. The defect sits under a `#2798` comment describing the
+  very bug the line reintroduces (`date = date or pacific_date_of(now) or now[:10]`). The
+  agent also refused the over-reach: it measured 117 `[:10]` slices, found most legitimate,
+  declined a ban needing ~100 exemptions, and pinned that measurement as a test.
+- **#3207** — the wedge is stopped **at the writer**, live-proved: `--apply` exits 2 with
+  nothing written against real GitHub state, and `--check` flipped from `DRIFT … run with
+  --apply` (exit 1) to `pending` (exit 0). An unplanned hardening rode along: the
+  "cannot read repo secrets" branch used to WARN and proceed on trust.
+- **#3212** — filed at boot from a false-positive I chased, closed 40 minutes later.
+  `main()` printed the #2762 swallow verdict without ever consulting #2826's
+  `classify_zero_run_head()`, which existed, was tested, and was wired only to the
+  scheduled consumer. Pre-fix, a genuine swallow and a path-filter skip produced
+  **byte-identical output**. Dogfooded on merged main within minutes — and hit the
+  `bot-push-no-dispatch` arm, a *different* branch than it was built for.
+- **#3187** — free: the standalone sweep's cron never fired today, so I dispatched it; it
+  went green and auto-closed.
 
-## Incidents & gotchas (the night's texture)
+## Main went RED, and it was Session D's own timezone fix
 
-- **A near-miss worth the row**: the remediation sweep advised `apply_branch_protection.py
-  --apply` to "restore" the `main-required-fast-lane` ruleset. It was never applied — it is
-  desired posture gated on D0.6's PAT, and applying it would fail every post-merge reconcile
-  push against its own required-checks rule. Caught by reading `MANAGED_WHERE_LEDGER.md`
-  first (#3207).
-- **#3111's own recurrence condition fired the next day**, with a different shape: CGM
-  glucose stopped after 08-24 (HAE rows arrive carrying zero `blood_glucose_*`; raw S3 has
-  nothing for 08-25/26). Raw write-times show CGM lands in **~48h catch-up batches**, so
-  the "near-real-time" source model may itself be wrong — dated fork on #3204.
-- **Two PT-day defects were live, not schedule-masked**: `permanence_lambda` (06:00Z =
-  23:00 PT prior day) stamped the public `continuity.json` with **tomorrow's** Pacific date
-  nightly and inflated `days_silent` *toward* firing the dead-man early; 2 of 5
-  `pipeline_health_check` runs wrote rows keyed to tomorrow. Both fixed and deployed.
-- **1 push event-swallowed** (#3201, zero check-runs, recovered by close/reopen — 5th of
-  the program). A reconcile commit showing zero runs is **expected, not a swallow**:
-  `GITHUB_TOKEN` pushes never trigger workflows (GitHub loop-prevention).
-- **Plan correction**: the drift sentinel is **Monday-gated**, so both first-runs the plan
-  expected today (#3178 cadence, #3191 TTL-parity) actually land Monday 2026-08-31.
-- 3 leases disposed: 1 approved (the tip, as an idempotent re-apply whose smoke/visual-qa
-  double as verification), 2 rejected with decode — including one stale sha whose approval
-  would have re-applied an older tree over the fleet just deployed.
+Three tests failed on `81662a9d`. **The code was right; the fixtures were on the wrong
+clock.** #3206 (`5ecc3a1f`, Session D) moved `permanence_lambda` and
+`data_reconciliation_lambda` to `pacific_today()`; their fixtures stayed on
+`datetime.now(timezone.utc).date()`. Between **17:00 PT and PT midnight** the UTC date has
+rolled and the Pacific one has not, so every expectation sat one day ahead of the handler.
+
+**It shipped green because #3206's CI ran ~13:00 PT — outside its own failure window.**
+Tonight's run is the first to cross 00:00Z since, and it went red 24 hours later on
+unrelated work. A time-dependent gate exercised only outside its failure window is not a
+gate. `_days_ago`'s docstring explains at length why a hard-coded date is a time bomb, then
+reads the wrong clock — the same bomb with a shorter fuse. Fixed in #3223; the 14-file
+sweep and the guard stay open on #3222, which **deliberately does not carry `Fixes`**.
+
+## Incidents & gotchas
+
+- **Five GitHub event swallows** (vs. five in the entire program before tonight), all
+  confirmed by timeline: zero runs at the head sha, runs minted 2–70s after a close/reopen.
+  An implementer talked itself out of a *correct* swallow call on bad reasoning — that
+  `head_sha` queries cannot see `pull_request` runs. Measured false: the query returns
+  5/10/5 on those shas. #3103 forbids the **short** sha, not the full one. Pinned on #3219
+  so the folklore does not outlive the night.
+- **Budget tier escalated to 2 at 17:00 PT** — ADR-125 band 2 pauses reader narratives
+  including `coach_narrative`. MTD $146.07/26d projects ~$174 vs August's temporary $200
+  ceiling = 87.1%, driven by the 08-23 diligence spike ($11.15) and 08-24 ($6.98); the last
+  two days were $3.98 and $2.63. **Not overridden** — the guard computed correctly.
+- **Three deploy leases disposed**, all rejected as superseded ancestors of main
+  (`e7935492`, `03623584`, `70d6eef9`); the newest `81662a9d` approved. Approving any
+  older one would have deployed a tree behind main — the stale-sha class from Session D.
+- **My shell silently persisted into an agent worktree** between calls, and once made me
+  read `check_main_green.py`'s *pre-fix* output minutes after merging the fix. Caught
+  because I had also piped through `head`, so the exit code was `head`'s — the same
+  piped-exit trap an implementer hit independently on #3218.
+- **`wait_pr_green` timed out once** at 1800s with only the unit suite outstanding; the
+  restart passed in 97s. Not a failure — CI contention.
 
 ## Gate lines
 
-**Build beat:** 2026-08-26-the-tools-that-lied
-**Docs:** `docs/INCIDENT_LOG.md` (+4 rows, Patterns regenerated 181/146) ·
-`docs/alarm_citations.json` (qa-smoke re-cited to #3202 + #3204 on measured evidence, the
-dated window closed EARLY rather than expiring) · `docs/PROPORTIONALITY.md` (merge-train row
-amended with the #3200 classified verdict + the #3209 re-prove-live obligation) ·
-`deploy/sync_doc_metadata.py --apply` (1 literal across 21 docs)
-**Decisions:** none needed — no new architecture/data/deploy posture; the night executed the
-D-plan's phases and every disposition lives in an issue verdict, a PR body or the ledger
-**Main:** green (5ecc3a1f) — run 33008802041 green end-to-end incl. visual-qa; HEAD 742133e0
-is a bot reconcile commit whose `GITHUB_TOKEN` push mints no workflows by GitHub's own
-loop-prevention rule (documented behaviour, NOT the #2762 swallow shape), so it carries no
-verdict of its own; this wrap commit is a real push and earns HEAD one — `--decoded`
-**Incidents:** 4 rows added — the falsified wire box (#3202) · #3200 shipping
-non-functional, caught by dogfooding (#3209) · the third phrase-matched suppressor gating
-main (#3208) · the reconcile-wedge near-miss (#3207)
+**Build beat:** 2026-08-26-the-day-n-token-ban
+**Docs:** `docs/alarm_citations.json` (qa-smoke-failures re-pointed off the now-closed
+3202 onto #3204 + #3083, with the tier-2 blocker named) · `docs/INCIDENT_LOG.md` (+3 rows)
+· `deploy/sync_doc_metadata.py --apply`
+**Decisions:** none filed — the three owner calls taken at plan time (new filings default
+to `Later`; batch S-effort disjoint-file fixes into one PR; override the budget tier to
+unblock #3202) are session governance and live in
+`~/.claude/plans/purring-doodling-boot.md`. If they hold past Session F they earn an
+ADR-099 amendment rather than a plan file — this session *measured* that the 2026-08-24
+amendment has zero tracked-doc presence, and these three would inherit the same gap
+**Main:** green (678a0598) — CI/CD run of the #3223 fixture fix; the preceding red at
+`81662a9d` was the #3206-inherited UTC-fixture bug, fixed and merged this session
+**Incidents:** 3 rows added — the five-swallow cluster · the budget tier-2 escalation ·
+main red ~1.5h on the inherited UTC-fixture clock
 **Stash/hooks:** clean
-**Closures:** #3199, #2847, #3200, #3208, #3209 all commented (contract-shape
-Shipped/Outcome verdicts; #2847's carries per-box evidence and the driver's own mutation
-proof)
-**Backlog:** Now live at 3 `type:story` — promoted **#2811** (Later → Now) by stored ADR-099
-rank (1.00, top of Later, and the exact ratchet #3206 extended tonight; score line synced,
-rationale + the matcher-blindness finding posted on the issue). Refill from `Next` was
-impossible without overriding a standing owner decision: `Next` holds exactly one story,
-#2849, banked until the #3042 re-grade. Later sweep: no stale issues.
-**Alarms:** 4 lit, all cited — `qa-smoke-failures` (re-cited today to #3202 + #3204) ·
-`cost-metric-drift-sustained` (#2883, owner batch) · `ai-tokens-platform-daily-total` and
-`prediction-gradable-share-low` both fired today (<72h, no citation due yet; the latter is
-expected-by-design per its own CDK comment and self-clears as `_retire_ungradeable` runs)
-**CI warnings:** 1 — `[Smoke test] 2 content-truth failure(s)`, deliberately NOT gating
-(#1921). Both already have owners filed this session: `cross_surface:weight` → **#3202**
-(Webb held by the grounding gate) and `reader_truth:plausibility` on `/api/glucose` →
-**#3204** (CGM stopped 08-24). No new issue needed; `--decoded`
-**Ledger:** merge-train row amended (#3200 classified verdict + the #3209 obligation to
-re-prove it live after any log-source change, because a fail-closed path's failure is
-invisible) — no wholly new standing subsystem shipped; the pair-contract, pair-seam and
-merge-train rows already cover tonight's machinery
+**Closures:** #3187, #3212, #3207, #2811, #3202 all commented with contract-shape
+Shipped/Outcome verdicts; #3202's last acceptance box left **unchecked** on purpose
+**Backlog:** `Now` live at 3 stories (promoted **#3065** by stored rank, 1.00 — top
+actionable `Later` **story**; `Next` holds only #2849, banked by standing owner call, so
+refill from `Next` was impossible without overriding it). Later sweep: no stale issues.
+Note: `Now` holds **9** actionable work items but only 3 are `type:story`, and
+`now_liveness` counts stories only — the queue read "not live" while genuinely full
+**Alarms:** 5 lit, all cited — `qa-smoke-failures` re-pointed today (its old citation
+named an issue this session closed, #2996's rule) · `cost-metric-drift-sustained` (#2883)
+· `ai-tokens-platform-daily-total` · `prediction-gradable-share-low` ·
+**`life-platform-budget-tier-escalation` (NEW today, 17:00 PT)**
+**CI warnings:** 1 — the unit suite ran **1994s vs its 1950s budget** on the green
+`678a0598`. Filed **#3224** to `Later`, framed as the CLASS rather than the instance: this
+is the fifth occurrence (157s → 294s → 688s → 830s → 1507s/#3106 → 1994s, now 12.7x the
+original wall clock) and every prior one was answered by raising the budget. #3106, the
+direct predecessor, is CLOSED, so there was no open owner to fold into per CONVENTIONS §10.
+Honest attribution: this session's own PRs added ~12 tests, so the 44s overshoot is
+unremarkable alone — the trend between instances is the finding
+**Ledger:** none — no standing machinery shipped; all five closures extend existing
+subsystems (the #2826 discriminator, the drift sentinel, the #2414 matcher, the ADR-104
+grounding gate) rather than adding a new one
 
-## Owner batch (15 items — 12 carried + 3 new)
+## Owner batch (16 items — 13 carried + 3 new)
 
-1. RECONCILE_PUSH_TOKEN PAT (D0.6 — also why wrap-time reconciles are driver-manual, and
-   now also #3207's unblock) · 2. DEPLOY_GATE_JANITOR_TOKEN (#3021) ·
-3. respiratory_rate/disturbance_count consent (#3045) · 4. Notion secret deletion (#2890) ·
-5. #2961 cdk-import approval · 6. #2834 IAM posture · 7. **#3083 quality-gate fail-open vs
-   hold — now has its cleanest evidence ever** (truncation confound removed; the gate is
-   correctly holding 2 of 7 coaches on ungrounded numbers) · 8. DIL-027 restore-drill
-   appointment · 9. S3 Batch Replication backfill click (~$0.49) · 10. **#3042 re-grade**
-   (`python3 scripts/diligence_verify.py --strict` + `docs/reviews/REGRADE_BRIEF_2026-08-25.md`) ·
-11. Whoop re-auth if still pending · 12. #2883 box-4 call ·
-13. **NEW — #3204: did your CGM sensor end on 08-24, or did the Stelo→HealthKit→HAE glucose
-   leg break?** Platform state cannot distinguish them and the two have opposite fixes ·
-14. **NEW — #3202** is reader-visible: two coach narratives are dark every cycle ·
-15. **NEW — #3207** needs the D0.6 PAT decision to unblock cleanly.
+1. RECONCILE_PUSH_TOKEN PAT (D0.6 — also #3207's clean unblock) · 2.
+DEPLOY_GATE_JANITOR_TOKEN (#3021) · 3. respiratory_rate/disturbance_count consent (#3045) ·
+4. Notion secret deletion (#2890) · 5. #2961 cdk-import approval · 6. #2834 IAM posture ·
+7. **#3083 quality-gate fail-open vs hold — now the POLICY owner for the weight alarm leg**
+· 8. DIL-027 restore-drill appointment · 9. S3 Batch Replication backfill click (~$0.49) ·
+10. **#3042 re-grade** · 11. Whoop re-auth if pending · 12. #2883 box-4 call ·
+13. **#3204: did your CGM sensor end on 08-24, or did the Stelo→HealthKit→HAE leg break?**
+· 14. **NEW — the budget-tier override window.** You chose to override to unblock #3202.
+`cost_governor` runs `cron(0 0/8 * * ? *)`, so a value set now is rewritten at 08:00Z and
+16:00Z; **the only effective window is 16:00–17:00Z**, after the last governor run and
+before the brief. Not set tonight for that reason · 15. **NEW — the September 1 cliff.**
+The ceiling auto-reverts $200 → $150. At the recent $3–4/day it is comfortable; at the
+MTD $5.62/day average it lands near tier 3 early in the month · 16. **NEW — governance
+lives in plan files.** The 2026-08-24 amendment has zero presence in `docs/`,
+`.claude/` or `CLAUDE.md`; tonight's three decisions are heading the same way
 
 ## Residuals / next picks
 
-- **#3202** (P2) — the coach-v2 grounding residual: root-cause the ungrounded numbers AND
-  log `number_grounding_violations[].detail` so a hold is diagnosable from CloudWatch.
-  Top actionable pick.
-- **#3204** (P2) — CGM: determine cadence-vs-stop from the raw layer first (the fork is
-  dated below), then either fix the source model or label the absence per ADR-104.
-- **#3207** (P3) — `github_posture.json` needs a machine-readable "declared, not yet
-  applied, blocked on X".
-- **#2811** (P3, promoted tonight) — extend the ratchet, and absorb the finding that its
-  AST matcher is blind to function-call and vendor-instant slices.
-- **#2798** — deliberately NOT closed on #3206: the epic's `lambdas/web/` box stays open on
-  #2414's stricter zero surface. Auto-closing would be the false green the epic exists to
-  prevent.
-- **#3187** (P3) — auto-closes on the next green standalone visual-qa sweep (~20:37Z daily);
-  #3208's fix is what should let it pass.
-- **Dated observations (not-work — each has a date, no action until it matures):**
-  **2026-08-27T19:00Z** — re-check `raw/matthew/cgm_readings/2026/08/`: a new batch
-  backfilling 08-25/26 means #3204 is a cadence-model defect, no new object means a genuine
-  stop · **2026-08-31 (Monday)** — #3178's sentinel cadence proof and #3191's first live
-  TTL-parity sweep, both Monday-gated · **~08-29** — `ai-tokens-platform-daily-total` and
-  `prediction-gradable-share-low` cross 72h and need citations if still lit · **~09-24** —
-  #2978's shape-(a) 30-day re-measure · next billing cycle — #2888's CE usage-type delta ·
-  **2026-10-15** — WAF revisit · **2026-09-22** — legacy unsubscribe sunset.
-- **#2849** — the resident-operator Fable session stays banked until after the #3042
-  re-grade (standing owner call, unchanged; it is the ONLY story on `Next`).
+Session F's plan is written and owner-approved: `~/.claude/plans/purring-doodling-boot.md`.
+
+- **#3221 + #3219 + #3220** — batch into ONE PR (three disjoint files, all S-effort): 3
+  closures for 1 CI cycle. Owner-approved batching decision.
+- **#3204** — the dated fork matured 2026-08-27T19:00Z; read
+  `raw/matthew/cgm_readings/2026/08/` before designing anything. Consider `prio:P0`: a
+  live data outage currently sorts *below* watcher ergonomics because Effort is the
+  denominator.
+- **#3217** — `regen_once` discards a rewrite that FIXES a fabricated number when it does
+  not also score strictly better; a correctness defect vetoed by a quality score.
+- **#3222** — the 14-file frame ruling + the re-entry guard (boxes 4–6 open).
+- **#3202's last box** — both coaches publishing is **unproven**; everything so far is
+  offline replay plus bundle verification. Needs a real 17:00Z brief with tier < 2.
+- **Dated observations (not-work — no action until they mature):**
+  **2026-08-27T19:00Z** — #3204's raw-layer read · **2026-08-31 (Monday)** — #3178's
+  sentinel cadence proof and #3191's TTL-parity sweep · **~08-29** —
+  `ai-tokens-platform-daily-total` and `prediction-gradable-share-low` cross 72h ·
+  **2026-09-01** — the $200 → $150 ceiling revert · **~09-24** — #2978's 30-day re-measure
+  · **2026-10-15** — WAF revisit · **2026-09-22** — legacy unsubscribe sunset.
+- **not-work — `verify_bundle_ancestry.sh` fail-open**: it reports *"could not read the
+  deployed code location — unverified, allowing"* and exits clean on a function name that
+  does not exist. My names were wrong, so this was not a real miss, and it says
+  "unverified" honestly rather than claiming success — but a renamed function would pass
+  the check that confirms a deploy landed. Noted rather than filed, per tonight's
+  filing-brake decision.

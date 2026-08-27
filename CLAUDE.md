@@ -208,26 +208,32 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-26 (Opus 5, autonomous ~5h — *"Boot Session D"* of
-`~/.claude/plans/glinting-gleaning-galago.md`; wrap run with the owner). **Main GREEN
-end-to-end** (run 33008802041 @ 5ecc3a1f: reconcile/lint/deploy-critical/unit/plan/deploy/
-smoke/integration **and visual-qa** all green — the first visual-qa pass since #3208).
-**Fleet deployed 105/0/0**, ancestry postflight sha-verified; qa-smoke and MCP bundles
-spot-checked for the shipped code. **5 closed with verdicts** (#3199, **#2847** the
-pair-contract epic, #3200, #3208, #3209), **6 PRs merged**, 5 filed — **net +1 open**,
-honest not flattering: the night found more than it drained and every filing was already
-live and unowned. **The 17:00Z harvest FALSIFIED its own theory:** truncation is dead
-(13-14 WARNs/brief -> 0, pass rate 1/7 -> 5/7) **and 2 of 7 coaches still hold** at score
-28/ungrounded on full text (#3202) — Webb IS nutrition_coach, so that hold is why the stale
-weight, the red `cross_surface:weight` and the lit alarm persist; the dated citation was
-closed EARLY on measurement. **Four guards proved weaker than they claimed:** #3200 shipped
-verdict-closed and **never fired** (caught by dogfooding it within the hour, #3209,
-live-proved exit 4); the phrase-matched suppressor class gated main a third time (#3208);
-the #2811 ratchet is blind to 2 of 3 real mutations; the model-drift test cannot catch a
-faithful regeneration of something wrong. Also: CGM stopped 08-24 and #3111's own recurrence
-check fired (#3204); a remediation advisory would have wedged the reconcile push (#3207).
-**Next:** #3202 (top actionable) · #3204's dated raw-layer fork expires 08-27T19:00Z ·
-#3178/#3191 first-runs are **Monday-gated** (08-31, not Wednesday) · owner batch 15 items
-(incl. the #3042 re-grade and "did your CGM sensor end?") · #2849 Fable session stays banked
-until after the re-grade. Full narrative: `handovers/HANDOVER_LATEST.md`.
-
+**Verified:** 2026-08-27 (Opus 5, autonomous ~3h — *"Boot Session E"* of
+`~/.claude/plans/dynamic-imagining-prism.md`; efficacy review + Session F plan produced
+with the owner, wrap run on their instruction). **Main GREEN at 678a0598.** All-Opus,
+Fable untouched. **5 closed with verdicts** (#3187, **#3212** filed-and-closed same
+session, #3207, **#2811**, **#3202**), **6 PRs merged**, fleet deployed at `81662a9d` —
+CI's Deploy job took the *"Fleet deploy (shared module changed)"* path itself, so the
+planned manual `deploy_fleet.sh` would have been a redundant concurrent deploy; ancestry
+postflight sha-verified on 6 functions and bundle contents spot-checked. **But 7 were
+filed, so `Now` started at 10 and ended at 10 — net +2, the second consecutive treadmill
+session.** That is the headline finding, and Session F's owner-approved plan
+(`~/.claude/plans/purring-doodling-boot.md`) is built on it: new filings default to
+`Later`, S-effort disjoint-file fixes batch into ONE PR, and boot pre-flights the gates
+that will fire on each lane (3 of 4 rework cycles tonight were foreseeable —
+`COACH_STANCE.md` was printed at 0d headroom in the boot output an hour before it redded
+#3215). **#3202 falsified its own hypothesis on the wire**: the hold was `stale_phase`, a
+matcher that banned every "Day N" token while its docstring claimed framing-scope — the
+coach was held for citing the *correct* day in a comparative clause. Its first fix opened a
+new blind spot the tests pinned as intended; narrowed to `n < expected_day`. **#2811's
+matcher extension found a 23rd site in a package two prior slices certified at zero.**
+**Main went red on Session D's own timezone fix** — #3206 moved two handlers to
+`pacific_today()` while their fixtures stayed UTC, failing 7 hours of every 24; #3206's CI
+ran outside its own failure window, so it shipped green and broke 24h later on unrelated
+work (#3223 fixes it; the 14-file sweep stays open on #3222, deliberately not `Fixes`).
+**5 GitHub event swallows** (vs 5 in the whole program before tonight) and **budget tier
+escalated to 2 at 17:00 PT**, which pauses coach narratives — so #3202's last acceptance
+box is unproven until a brief runs with tier < 2; the only effective override window is
+16:00–17:00Z (`cost_governor` runs `cron(0 0/8 * * ? *)`). **Next:** the #3221+#3219+#3220
+batch · #3204's raw-layer read (matured 08-27T19:00Z) · #3217 · #3222's sweep · owner batch
+16 items. Full narrative: `handovers/HANDOVER_LATEST.md`.

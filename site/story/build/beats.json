@@ -3243,6 +3243,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3203"
         }
       ]
+    },
+    {
+      "id": "2026-08-26-the-day-n-token-ban",
+      "date": "2026-08-26",
+      "title": "Two coaches went quiet for citing the right day",
+      "shipped": "Five fixes, all merged and deployed across the fleet. The headline one un-silences two of the eight coaches. For three cycles the nutrition and mind coaches had written their daily notes and had them held back by an automated honesty check — the one that refuses to publish a number the underlying data cannot vouch for. The check was right to exist and wrong about these two: it was flagging the phrase \"Day N\" anywhere in the text, so a sentence like \"that matters more at Day 10 than it did at Day 1\" tripped it, even though Day 10 was the correct day and Day 1 was plainly a backward glance. It now asks whether the narrative is claiming to BE on that day, rather than banning the words. Also shipped: the timezone correction reached five more code packages, a settings file learned to say \"declared but deliberately not applied yet\" instead of reading as a critical fault three times a week, and a merge-safety check stopped calling every ordinary docs commit a lost push.",
+      "why_it_mattered": "A coach whose note is withheld looks identical, from the outside, to a coach with nothing to say. That is the worst possible failure for a system whose whole claim is that it will tell you the truth including when the truth is dull. The check was doing its job — the numbers in those notes genuinely could not be vouched for by the rule as written — but the rule was wrong, so the honest machinery produced a dishonest silence. Fixing the rule rather than loosening the check is the whole point: a deterministic honesty finding still cannot be overruled by a language model, and that stayed untouched.",
+      "gotcha": "The diagnosis came from replaying the actual withheld drafts, recovered from storage, rather than reasoning about what probably went wrong. The plan going in named a different and very plausible culprit — a missing number in the allow-list — and the replay falsified it in about ten minutes. Then the first fix quietly opened a new hole: it excused every other day mentioned once the correct day appeared anywhere, so a note saying \"you're at Day 10\" and then \"we're now on Day 12\" passed clean. That was found by poking at the fix rather than reading it, and the test suite had already pinned the too-broad behaviour as intended.",
+      "honest_miss": "Nobody has seen the fix work in production yet. Everything verified so far is a replay of yesterday's drafts plus a check that the right code is inside the deployed bundles. The real proof is the next daily brief — and it cannot happen yet, because a separate spending guard moved up a tier the same evening and that tier deliberately pauses coach commentary. So the acceptance box stays unticked. Separately, this session closed five issues and opened seven: the backlog ended exactly where it started, which is a worse result than the individual fixes suggest.",
+      "prs": [
+        {
+          "label": "PR #3215",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3215"
+        },
+        {
+          "label": "PR #3218",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3218"
+        },
+        {
+          "label": "PR #3214",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3214"
+        },
+        {
+          "label": "PR #3216",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3216"
+        },
+        {
+          "label": "PR #3223",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3223"
+        }
+      ]
     }
   ]
 }
