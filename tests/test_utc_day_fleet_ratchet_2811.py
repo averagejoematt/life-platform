@@ -794,3 +794,142 @@ def test_the_ratchet_refuses_growth_and_stale_entries():
     assert [r for r, cap in {"lambdas/x.py": 3}.items() if counts.get(r, 0) > cap] == []
     # drained to zero: the entry must be pruned
     assert [r for r in {"lambdas/y.py": 4} if {}.get(r, 0) == 0] == ["lambdas/y.py"]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #2817 — THE ANCHOR FACE. A day string parsed back into the WRONG frame.
+#
+# THE BLIND SPOT, MEASURED. Every face above bottoms out in `_subtree_dirty`, which
+# asks "is there a CLOCK in this subtree?". `datetime.strptime(day_str, "%Y-%m-%d")`
+# is not a clock — it is the INVERSE of one — so the shape
+#
+#     datetime.strptime(<a DATE# day>, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+#
+# is structurally unreachable by all of them. That matters because `DATE#` keys name
+# PACIFIC days: anchoring one at UTC midnight puts the day's start 7h/8h before the
+# day began, and any arithmetic against an INSTANT then carries that error.
+#
+# #2817 found it in `freshness_checker_lambda.py`, in the staleness math its own
+# acceptance box names, in a package BOTH matchers had certified at zero — the #2811
+# lesson repeating exactly ("a certification true of the matcher and false of the
+# code"). #3196's sweep had moved `now` to `pacific_now()` and left the other operand
+# in UTC, so the frame mismatch was introduced BY the fix for the frame mismatch.
+# `tests/test_pt_evening_email_frame_2817.py` drives the behaviour at a PT evening.
+#
+# WHY THIS IS A SCOPED RESIDUE AND NOT A FLEET BAN — the #2811 `[:10]` precedent.
+# Measured across `lambdas/` + `mcp/`: 16 sites carry this shape, and the MAJORITY are
+# correct. Three spellings are legitimately frame-free:
+#   * an RSS `pubDate` render (`...replace(tzinfo=utc).strftime("%a, %d %b %Y 15:00:00 GMT")`)
+#     — the tzinfo never reaches arithmetic; only Y/M/D/weekday pass through;
+#   * `.date()` on both operands before subtracting (`site_api_status`, and this
+#     module's own `compute_datatype_liveness`) — the tzinfo cannot survive `.date()`;
+#   * a vendor's UTC-epoch API window bound (`strava`, `withings`, `todoist`).
+# A ban would need ~10 exemptions out of 16. A rule needing that many exemptions is a
+# rule nobody reads (#2811 declined the blanket `[:10]` ban on the same arithmetic),
+# so the face is frozen where #2817 ruled every site — `lambdas/emails/` — and the
+# rest is reported as a known blind spot rather than silently called clean.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Repo-relative file -> the day-anchor sites RULED genuinely frame-free by #2817.
+# Shrink-only, like `_UTC_DAY_RESIDUE`, and every entry carries its ruling.
+_EMAILS_DAY_ANCHOR_RULINGS: dict[str, int] = {
+    # `_rfc822()` — an RSS pubDate whose output hardcodes its own clock time
+    # ("%a, %d %b %Y 15:00:00 GMT"). The tzinfo is a no-op: nothing but the date
+    # components and the weekday name survive into the string.
+    "lambdas/emails/chronicle_podcast_lambda.py": 1,
+    "lambdas/emails/daily_debrief_lambda.py": 1,
+    # :362 is the same `_rfc822` no-op. :1323 is `_hold_age_days`, which slices the
+    # UTC DAY off a UTC instant and subtracts it from a UTC now — both sides one
+    # frame, and the result is a DURATION (hold age in days vs HOLD_RETRY_HOURS),
+    # never a Pacific day selection. It quantises to midnight, which shortens the
+    # human review window by up to a day; that is a precision nit, not this class.
+    "lambdas/emails/coach_panel_podcast_lambda.py": 2,
+    # `write_anomaly_record` anchors the record's own day only to derive a 90-day
+    # TTL epoch. An expiry is not a day selection and no reader compares it to a
+    # Pacific day; a 7h shift on a 90-day investigative TTL is immaterial.
+    "lambdas/emails/anomaly_detector_lambda.py": 1,
+}
+
+
+def _day_string_anchored_in_utc(source: str, filename: str = "<source>") -> list[str]:
+    """`datetime.strptime(<x>, "%Y-%m-%d").replace(tzinfo=timezone.utc)` — a day string
+    parsed back into UTC. Day-only format on purpose: a `%H`-carrying format is
+    parsing a real instant, where a UTC anchor is the honest reading."""
+    findings: list[str] = []
+    lines = source.splitlines()
+    for node in ast.walk(ast.parse(source, filename=filename)):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "replace"):
+            continue
+        tz = next((kw.value for kw in node.keywords if kw.arg == "tzinfo"), None)
+        if tz is None or ast.unparse(tz) not in ("timezone.utc", "utc", "dt_timezone.utc"):
+            continue
+        inner = node.func.value
+        if not (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute) and inner.func.attr == "strptime"):
+            continue
+        if not (len(inner.args) > 1 and isinstance(inner.args[1], ast.Constant) and _is_day_only_fmt(inner.args[1].value)):
+            continue
+        if any(_EXEMPT_MARKER in lines[ln - 1] for ln in range(max(1, node.lineno - 3), node.lineno + 1) if ln <= len(lines)):
+            continue
+        findings.append(f"{filename}:{node.lineno}: {ast.unparse(node)}")
+    return findings
+
+
+def _measure_email_day_anchors() -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for path in sorted((ROOT / "lambdas" / "emails").rglob("*.py")):
+        if any(m in str(path) for m in _SKIP_PATH_MARKERS):
+            continue
+        rel = str(path.relative_to(ROOT))
+        hits = _day_string_anchored_in_utc(path.read_text(encoding="utf-8"), filename=rel)
+        if hits:
+            counts[rel] = len(hits)
+    return counts
+
+
+def test_the_freshness_checker_anchors_its_day_in_the_frame_that_names_it():
+    """#2817's fix, pinned at the shape level. The behaviour is pinned separately in
+    `tests/test_pt_evening_email_frame_2817.py`; this is the cheap structural half, so
+    a revert shows up even if the behavioural suite is skipped."""
+    rel = "lambdas/emails/freshness_checker_lambda.py"
+    src = (ROOT / rel).read_text(encoding="utf-8")
+    assert _day_string_anchored_in_utc(src, filename=rel) == [], (
+        "freshness_checker parsed a `DATE#` day (a PACIFIC calendar day) back into UTC and "
+        "compared it against `pacific_now()`, inflating every age by the Pacific offset. "
+        "Use `.replace(tzinfo=PACIFIC)`, or reduce BOTH operands to `.date()`."
+    )
+    assert "tzinfo=PACIFIC" in src, f"{rel} lost the Pacific anchor #2817 gave it"
+
+
+def test_the_email_day_anchor_rulings_are_exact_and_shrink_only():
+    """Every remaining site in `lambdas/emails/` was READ and RULED, and the count is
+    exact — so a new one reds here instead of hiding among the legitimate ones, and a
+    file that drops to zero must be pruned rather than left licensing a regrowth."""
+    counts = _measure_email_day_anchors()
+    assert counts == _EMAILS_DAY_ANCHOR_RULINGS, (
+        "The #2817 day-anchor rulings for lambdas/emails/ no longer match the tree.\n"
+        "A NEW site needs a ruling written beside it (is the frame reached by arithmetic, "
+        "or is it a no-op render / a same-frame duration?); a REMOVED one needs its entry "
+        "pruned.\n"
+        f"measured: {counts}\n  ruled: {_EMAILS_DAY_ANCHOR_RULINGS}"
+    )
+
+
+def test_the_anchor_face_fires_on_a_planted_site_in_a_real_email_module():
+    """The mutation proof. Planted in the REAL text of the file #2817 fixed, so a
+    matcher that silently stopped matching cannot report green forever."""
+    rel = "lambdas/emails/freshness_checker_lambda.py"
+    src = (ROOT / rel).read_text(encoding="utf-8")
+    planted = src + '\n\n_PLANTED = datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=timezone.utc)\n'
+    assert len(_day_string_anchored_in_utc(planted, filename=rel)) == 1, "the anchor face would not fire on a reintroduced site"
+
+
+def test_the_anchor_face_leaves_instants_and_named_frames_alone():
+    """The judgment half — an over-firing guard gets muted. A `%H`-carrying format is a
+    real instant (a UTC anchor is honest there), and the Pacific anchor is the fix."""
+    for src in (
+        'x = datetime.strptime(s, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)\n',
+        'x = datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=PACIFIC)\n',
+        'x = datetime.strptime(s, "%Y-%m-%d").date()\n',
+        '# utc-exempt(#2817): a vendor UTC-epoch window bound\nx = datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)\n',
+    ):
+        assert _day_string_anchored_in_utc(src) == [], f"false positive: {src!r}"
