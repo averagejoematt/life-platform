@@ -113,10 +113,22 @@ def _is_timezone_utc(node) -> bool:
     return isinstance(node, ast.Name) and node.id == "utc"
 
 
-def _import_aliases(tree: ast.AST) -> dict:
-    """Map a local alias name to its canonical `datetime`/`date` name (#2812).
+# The value `_import_aliases` binds a local name to when that name refers to the
+# `datetime` MODULE (`import datetime` / `import datetime as dt`) rather than to one
+# of the classes inside it. A sentinel rather than the string "datetime" because the
+# two must not be confused: `datetime.utcnow()` is a clock when `datetime` is the
+# CLASS and an AttributeError when it is the MODULE.
+_DATETIME_MODULE = "<module:datetime>"
 
-    THE FIX. The repo idiom ``from datetime import date as _date`` (15 files
+# Reserved key prefix under which a module binding is ALSO recorded. Not a legal
+# Python identifier, so it can never shadow a real local alias.
+_MODULE_KEY_PREFIX = "module:"
+
+
+def _import_aliases(tree: ast.AST) -> dict:
+    """Map a local name to its canonical `datetime`/`date` name, or to `_DATETIME_MODULE`.
+
+    #2812's half. The repo idiom ``from datetime import date as _date`` (15 files
     across lambdas/+mcp/) makes a naive-clock call site's AST owner literally
     ``_date`` — the matchers below used to compare that owner against the
     string ``"date"``/``"datetime"`` directly, so the alias made the call
@@ -124,8 +136,32 @@ def _import_aliases(tree: ast.AST) -> dict:
     resolve `date`/`datetime` aliases to their canonical name; every matcher
     then looks up the receiver through this map before comparing, so
     ``_date.today()`` is treated exactly like ``date.today()``.
+
+    #2798's half — THE FULLY-QUALIFIED FORM. ``import datetime`` (5 files in the
+    scanned packages, `import datetime as _dt` being the house spelling) puts the
+    class one attribute deeper: the receiver of ``datetime.date.today()`` is an
+    ``ast.Attribute``, not an ``ast.Name``, so ``_owner_name`` returned None and
+    BOTH guards walked past it. Two of the six ordinary ways to derive a day were
+    therefore unreachable — measured 2026-08-27 with a planted site in a real
+    scanned file, which the ratchet did not red. So plain ``Import`` of the module
+    is recorded here too, and ``_owner_name`` resolves the extra hop.
+
+    A module binding is recorded TWICE — under the local name, and under the
+    reserved ``module:<name>`` key. The reserved key is not a legal Python
+    identifier, so it can never collide with a real alias; it exists because
+    ``import datetime`` and ``from datetime import datetime`` can BOTH appear in
+    one file (the bare name then means whichever ran last), and a guard that had
+    to pick one reading would go blind on the other. Both readings match: a guard
+    over-approximates, and `utc-exempt(#NNNN)` is the valve.
     """
     aliases: dict = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "datetime":
+                    local = alias.asname or "datetime"
+                    aliases[local] = _DATETIME_MODULE
+                    aliases[_MODULE_KEY_PREFIX + local] = _DATETIME_MODULE
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module == "datetime":
             for alias in node.names:
@@ -134,12 +170,35 @@ def _import_aliases(tree: ast.AST) -> dict:
     return aliases
 
 
+def _binds_datetime_module(name: str, aliases: dict) -> bool:
+    """True if the local name `name` can refer to the `datetime` MODULE.
+
+    The unbound fallback (`name == "datetime"`) is what keeps the synthetic
+    snippets in both guards' own test bodies working: they exercise the matcher
+    on bare source with no import line at all, exactly as `_owner_name` has always
+    defaulted an unresolved `ast.Name` to itself.
+    """
+    if aliases.get(_MODULE_KEY_PREFIX + name) == _DATETIME_MODULE:
+        return True
+    return name not in aliases and name == "datetime"
+
+
 def _owner_name(node, aliases: dict):
     """The alias-resolved canonical owner of a `<node>.attr(...)` receiver, or
-    None if the receiver isn't a plain name (e.g. a call or subscript)."""
-    if not isinstance(node, ast.Name):
-        return None
-    return aliases.get(node.id, node.id)
+    None if the receiver isn't a datetime class reference.
+
+    Two spellings resolve: a plain name (``date`` / ``datetime`` / an alias of
+    either) and the fully-qualified ``<datetime-module>.date`` /
+    ``<datetime-module>.datetime`` attribute chain (#2798). A name bound to the
+    MODULE resolves to None on its own — ``dt.utcnow()`` is not a clock — so the
+    receiver has to spell the class out to be read as one.
+    """
+    if isinstance(node, ast.Name):
+        canonical = aliases.get(node.id, node.id)
+        return None if canonical == _DATETIME_MODULE else canonical
+    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.attr in ("date", "datetime"):
+        return node.attr if _binds_datetime_module(node.value.id, aliases) else None
+    return None
 
 
 def _is_utc_anchored_now(node, aliases: dict) -> bool:
@@ -516,6 +575,99 @@ def test_fires_on_the_aliased_datetime_import_shape():
     assert len(naive_utc_today_sites(src)) == 1
     src2 = "from datetime import datetime as _dt, timezone as _tz\ntoday = _dt.now(_tz.utc).strftime('%Y-%m-%d')\n"
     assert len(naive_utc_today_sites(src2)) == 1
+
+
+def test_fires_on_the_fully_qualified_module_import_shape():
+    """#2798's closing box — THE TWO SHAPES BOTH GUARDS COULD NOT SEE.
+
+    Measured 2026-08-27 by probing this matcher with the six ordinary ways to
+    derive a calendar day. Four fired. Two did not, and both were the plain
+    ``import datetime`` module form, where the class sits one attribute deeper
+    than ``_owner_name`` looked:
+
+        A  import datetime  ->  datetime.datetime.utcnow().strftime('%Y-%m-%d')
+        D  import datetime  ->  datetime.date.today()
+
+    Neither is exotic; ``import datetime as _dt`` is the house spelling in five
+    files inside the #2811 scanned packages. #2812 taught the matcher the
+    ``from datetime import date as _date`` alias and stopped there, so the
+    fully-qualified chain walked past BOTH this guard's zero and #2811's ratchet
+    for two further slices. The blindness was found by a control that came back
+    empty and was nearly published as "the surface is clean" — a shape the
+    matcher cannot see returns exactly what a clean tree returns.
+
+    Asserted as a SYMMETRY against the unqualified twin of each spelling rather than
+    against a hardcoded count. The two are the same program written two ways, so the
+    guard owes them the same verdict — and pinning the pair means the day this matcher's
+    verdict on `datetime.utcnow().strftime(...)` legitimately changes (it currently
+    yields two findings: the naive clock AND its day rendering), this test moves with it
+    instead of freezing yesterday's number.
+    """
+    for qualified, plain, why in (
+        (
+            "import datetime\nday = datetime.datetime.utcnow().strftime('%Y-%m-%d')\n",
+            "from datetime import datetime\nday = datetime.utcnow().strftime('%Y-%m-%d')\n",
+            "shape A, plain module name",
+        ),
+        (
+            "import datetime\nday = datetime.date.today()\n",
+            "from datetime import date\nday = date.today()\n",
+            "shape D, plain module name",
+        ),
+        (
+            "import datetime as dt\nday = dt.datetime.utcnow().strftime('%Y-%m-%d')\n",
+            "from datetime import datetime\nday = datetime.utcnow().strftime('%Y-%m-%d')\n",
+            "shape A, aliased module",
+        ),
+        (
+            "import datetime as _dt\nday = _dt.date.today()\n",
+            "from datetime import date\nday = date.today()\n",
+            "shape D, the house alias",
+        ),
+        (
+            "import datetime as _dt\nday = _dt.datetime.today()\n",
+            "from datetime import datetime\nday = datetime.today()\n",
+            "datetime.today() through the module",
+        ),
+        (
+            "import datetime\nday = datetime.datetime.now(datetime.timezone.utc).date()\n",
+            "from datetime import datetime, timezone\nday = datetime.now(timezone.utc).date()\n",
+            "qualified tz-aware now",
+        ),
+        (
+            "from datetime import datetime\nimport datetime\nday = datetime.date.today()\n",
+            "from datetime import date\nday = date.today()\n",
+            "BOTH spellings in one file — the bare name means whichever ran last, so both readings must match",
+        ),
+    ):
+        n_plain = len(naive_utc_today_sites(plain))
+        assert n_plain >= 1, f"the unqualified control itself does not fire — this test proves nothing: {plain!r}"
+        assert len(naive_utc_today_sites(qualified)) == n_plain, f"still blind to {why}: {qualified!r}"
+
+
+def test_the_module_form_does_not_over_fire():
+    """The precision half. Resolving one more attribute hop must not turn every
+    ``<something>.date.today()`` into a finding, and the escape hatches have to keep
+    working through the qualified spelling — otherwise the fix buys the two shapes
+    at the price of a muted guard."""
+    for src, why in (
+        ("import foo\nday = foo.date.today()\n", "an unrelated module that happens to expose `date`"),
+        ("day = other.datetime.utcnow().strftime('%Y-%m-%d')\n", "an unimported, unrelated receiver"),
+        (
+            "import datetime as _dt\nfrom web.site_api_common import PT\nday = _dt.datetime.now(_dt.timezone.utc).astimezone(PT).strftime('%Y-%m-%d')\n",
+            "the astimezone escape hatch, spelled through the module",
+        ),
+        (
+            "import datetime as _dt\nfrom web.site_api_common import PT\nday = _dt.datetime.now(PT).strftime('%Y-%m-%d')\n",
+            "the PT idiom, spelled through the module",
+        ),
+        (
+            "import datetime as _dt\n# utc-exempt(#2414): a UTC-keyed partition bound\nday = _dt.date.today()\n",
+            "the written-down exemption still suppresses the qualified form",
+        ),
+        ("import datetime as _dt\nn = _dt.date.fromisoformat('2026-08-27')\n", "a parse, not a clock"),
+    ):
+        assert naive_utc_today_sites(src) == [], f"false positive on {why}: {src!r}"
 
 
 def test_aliased_pt_idiom_is_still_clean():

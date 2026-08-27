@@ -121,6 +121,26 @@ in prose and shipped without closing it. Closing it (`_clock_returning_functions
 consecutive slices had certified at zero, on the very line whose comment describes the
 frame it was violating. The instrument was the last thing anyone had audited.
 
+**#2798's LAST BOX: THE MATCHER COULD NOT SEE `import datetime`.**
+The 2026-08-27 audit probed `utc_day_semantics_sites` with the six ordinary ways to
+derive a calendar day. FOUR fired. TWO did not — and both were the plain
+`import datetime` module form, where the class sits one attribute deeper than
+`_owner_name` looked (`datetime.datetime.utcnow().strftime("%Y-%m-%d")` and
+`datetime.date.today()`). #2812 taught the matcher the `from datetime import date as
+_date` alias and stopped there; the fully-qualified chain walked past this ratchet AND
+#2414's stricter zero for two further slices, and every planted-site proof above uses a
+`from datetime import ...` spelling, so none of them could have caught it — the exact
+shape of the CALL-slice blindness one paragraph up, repeating.
+
+It was found by a control that came back EMPTY and was nearly published as "the surface
+is clean": a shape the matcher cannot see returns precisely what a clean tree returns.
+The fix is in the #2414 module's `_import_aliases` / `_owner_name` (one implementation,
+two consumers). `test_a_planted_fully_qualified_site_reds_the_guard` pins both shapes
+against the real text of a scanned file, and the fleet + #2414 surfaces were re-measured
+with the fix in place: still ZERO. No live site was hiding behind the blindness — the
+ban that keeps the surface at zero simply could not see one of the two commonest ways to
+break it, which is a ratchet-integrity defect rather than an outage.
+
 The vendor-instant face (`w["start_time"][:10]`) is deliberately still OUT of reach, and
 that is a measurement rather than an omission — see
 `test_a_blanket_ten_char_slice_ban_would_be_unlivable_and_is_deliberately_not_the_rule`.
@@ -764,6 +784,49 @@ def test_a_planted_site_reds_the_guard_in_the_2811_closing_packages_too():
             src + "\n\ndef _planted_now():\n    return datetime.now(timezone.utc).isoformat()\n\n\n_PLANTED = _planted_now()[:10]\n"
         )
         assert len(utc_day_semantics_sites(call_planted, filename=rel)) == 1, f"the CALL-slice face would not fire on {rel}"
+
+
+def test_a_planted_fully_qualified_site_reds_the_guard():
+    """#2798's LAST BOX — the mutation proof for the two shapes this ratchet could not see.
+
+    THE MEASUREMENT, 2026-08-27. `utc_day_semantics_sites` was probed with the six
+    ordinary ways to derive a calendar day. Four fired. The two that did not were both
+    the plain `import datetime` module form:
+
+        A  import datetime  ->  datetime.datetime.utcnow().strftime('%Y-%m-%d')   BLIND
+        D  import datetime  ->  datetime.date.today()                             BLIND
+
+    Every planted-site proof above plants a `from datetime import ...` spelling, so none
+    of them could have caught it — the same way all three pre-#2811 proofs planted the
+    same `strftime` shape and missed the CALL-slice face. The fix is in `_import_aliases`
+    / `_owner_name` in the #2414 module (one implementation, two consumers, per this
+    file's header): plain `Import` of the module is recorded, and the fully-qualified
+    `<module>.date` / `<module>.datetime` receiver resolves to its class.
+
+    Planted in the REAL text of a scanned file rather than a snippet, so the assertion
+    is about what the ratchet would do to `main`, not about what a matcher does to a
+    sketch. Before the fix every case here returned 0 — a green run on a planted defect,
+    which is what a decoration looks like.
+
+    `import datetime as _dt` is the house spelling for this form (five files in the
+    scanned packages), so it is planted as well as the bare `import datetime`.
+    """
+    rel = "lambdas/compute/hypothesis_engine_lambda.py"
+    assert rel not in _UTC_DAY_RESIDUE
+    assert rel in {str(p.relative_to(ROOT)) for p in _surface_files()}, f"{rel} is not on the scanned surface"
+    src = (ROOT / rel).read_text(encoding="utf-8")
+    assert utc_day_semantics_sites(src, filename=rel) == [], "precondition: the file is clean today"
+    for tail, why in (
+        ("\n\nimport datetime\n_PLANTED = datetime.datetime.utcnow().strftime('%Y-%m-%d')\n", "shape A, bare module name"),
+        ("\n\nimport datetime\n_PLANTED = datetime.date.today()\n", "shape D, bare module name"),
+        ("\n\nimport datetime as _dt\n_PLANTED = _dt.datetime.utcnow().strftime('%Y-%m-%d')\n", "shape A, the house alias"),
+        ("\n\nimport datetime as _dt\n_PLANTED = _dt.date.today()\n", "shape D, the house alias"),
+    ):
+        assert len(utc_day_semantics_sites(src + tail, filename=rel)) == 1, (
+            f"the ratchet would NOT red on a planted {why} — the fully-qualified `import datetime` "
+            "form is invisible again. A day derivation the matcher cannot see returns exactly what "
+            "a clean tree returns, so this file's zero would be a claim rather than a measurement."
+        )
 
 
 def test_the_residue_files_are_frozen_not_forgotten():

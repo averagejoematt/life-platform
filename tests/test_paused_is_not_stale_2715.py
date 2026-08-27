@@ -58,7 +58,6 @@ stale pause declaration suppressed real-outage detection for weeks.
 
 from __future__ import annotations
 
-import datetime as _dt
 import os
 import sys
 
@@ -75,6 +74,7 @@ os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 
 import pytest  # noqa: E402
+from common.pacific_time import pacific_today  # noqa: E402
 from ingestion.source_registry import SOURCE_REGISTRY, mcp_sources  # noqa: E402
 from ingestion.source_state import DECLARED_PAUSED_SOURCES, is_paused, resolve_source_state  # noqa: E402
 
@@ -89,8 +89,16 @@ def _fresh_today() -> str:
     here aged past whoop's staleness threshold two days after this file was written and
     redded main at the cycle-14 reset. Sampled at CALL time (not a module global) so a
     run crossing a day boundary between collection and execution can't desync (#2223).
-    The resolve_source_state tests keep pinned dates because they pass their own `today`."""
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
+    The resolve_source_state tests keep pinned dates because they pass their own `today`.
+
+    PACIFIC, not UTC (#2798). The handler ages rows against `pacific_now().date()`
+    (`mcp/tools_labs.py`), so a UTC "today" here builds a row dated TOMORROW in the
+    handler's frame for the seven hours between 17:00 PT and midnight — the #3222
+    fixture-frame class, and the #3206 shape (a time-dependent assertion that is only
+    true outside its own window). It sat here invisible because the fully-qualified
+    `import datetime` spelling below was a blind spot in the shared matcher until #2798
+    closed it."""
+    return pacific_today()
 
 
 REGISTRY_PAUSED = sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("paused"))
