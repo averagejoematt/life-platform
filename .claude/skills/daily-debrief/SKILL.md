@@ -70,7 +70,7 @@ review today's actual session before looking ahead at all.
 - `get_workout_detail` for today's session(s) — read the real exercise list and notes,
   not just the volume rollup (`get_muscle_volume` hides Pallof/carries under "Other" and
   can misreport core as 0 — don't trust it alone for what was actually trained).
-- `get_exercise_notes` (or `get_workout_detail` notes until that tool exists) — the
+- `get_exercise_notes` — the
   number says how hard; the note says why ("that RPE9 was shins not calves", "grip gave
   out first"). A note can correct a number's interpretation but never silently overwrites
   the logged number.

@@ -75,6 +75,8 @@ PUSH_TRIGGER_GLOBS = (
     "docs/**",
     "README.md",
     "CLAUDE.md",
+    "scripts/skill_lint.py",
+    "scripts/skill_registry.py",
     ".claude/skills/**",
     ".claude/agents/**",
     ".claude/README.md",

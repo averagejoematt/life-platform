@@ -68,6 +68,8 @@ on:
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
       - 'scripts/operating_calendar.py'   # #2832 — the calendar doc derives from its registry
+      - 'scripts/skill_lint.py'            # the skill-corpus contract gate
+      - 'scripts/skill_registry.py'        # the registry it and every consumer derive from
       - 'scripts/gate_census.py'           # #3000 — docs/PROPORTIONALITY.md's gate_census_count fact
       - 'scripts/gate_census_precision.py'  # #3000 — gate_census.py's error-bar sibling module
       # The code half — a source change can invalidate a doc (#1908).
@@ -111,6 +113,8 @@ on:
       - 'scripts/generate_adr_index.py'
       - 'scripts/generate_mcp_tool_catalog.py'
       - 'scripts/operating_calendar.py'   # #2832 — the calendar doc derives from its registry
+      - 'scripts/skill_lint.py'            # the skill-corpus contract gate
+      - 'scripts/skill_registry.py'        # the registry it and every consumer derive from
       - 'scripts/gate_census.py'           # #3000 — docs/PROPORTIONALITY.md's gate_census_count fact
       - 'scripts/gate_census_precision.py'  # #3000 — gate_census.py's error-bar sibling module
       # The code half — a source change can invalidate a doc (#1908).
@@ -226,6 +230,21 @@ jobs:
       - name: Operating calendar current (#2832)
         if: always()
         run: python3 scripts/operating_calendar.py --check
+
+      # The skill/agent corpus contract. Runs OFFLINE so the verdict is identical here,
+      # on a laptop and in a git hook — and needs no third-party import, so it cannot be
+      # made dark by a missing package the way gate_census was for months (#3234).
+      - name: Skill corpus contract (skill_lint)
+        if: always()
+        run: python3 scripts/skill_lint.py --offline
+
+      # The mutation proof. A gate nobody has watched fail is not yet a gate
+      # (docs/CONVENTIONS.md §9): this plants a stripped description, a dead reference and
+      # an ellipsis path, asserts skill_lint FAILS on each, then asserts the restored tree
+      # is clean. Kept out of pytest because it mutates a tracked file in place.
+      - name: Skill corpus gate can fail (mutation proof)
+        if: always()
+        run: python3 scripts/skill_lint.py --self-test
 
       - name: System model + dependency graph current
         if: always()

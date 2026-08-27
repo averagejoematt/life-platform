@@ -182,12 +182,12 @@ Report, in order:
   depends on; `scripts/design_sync_capture.py` (#1467) is the live reference-capture
   refresh that runs right after it; `docs/design/DESIGN_PARTNER_BRIEF.md` (#1464) is the
   contract file this command ships as root `BRIEF.md`;
-  `.claude/commands/design-implement.md` (#1465) is the pull-path mirror of this command.
+  `.claude/skills/design-implement/SKILL.md` (#1465) is the pull-path mirror of this command.
 - **Documented assumption, unverified in this session:** the exact parameter names/shapes
   of `list_projects`/`list_files`/`get_file`/`finalize_plan`/`write_files`/`delete_files`
   (e.g. whether `list_files` is natively recursive, whether `write_files` takes a batch or
   one call per file, whether binary payloads are a distinct `write_files` variant or the
-  same call with a base64 flag) are inferred from `.claude/commands/design-implement.md`'s
+  same call with a base64 flag) are inferred from `.claude/skills/design-implement/SKILL.md`'s
   description of the same tool surface, not from an actual invocation — this command was
   authored without the DesignSync tool connected. Whoever runs `/design-sync` for real
   should reconcile Phases 2–4 against the tool's actual schema and correct this file if
