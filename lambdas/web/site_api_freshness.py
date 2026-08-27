@@ -112,6 +112,11 @@ def source_freshness(*, _g) -> dict:
     cross-cycle provenance (`carried` + `carried_from_cycle`) and the payload carries
     the experiment anchor, so a Day-1 board can label a 110-day-old chip "carried
     from attempt 7" instead of rendering an unexplained ghost.
+
+    #2798: `last_update` is a stored DATE# day key, NOT a Pacific calendar day. The
+    payload therefore states its own frame — `pacific_today` board-wide, plus a
+    per-row `last_update_ahead_of_pt` / `last_update_frame` stamp. See the frame block
+    in the loop below for the full ruling; nothing here is clamped.
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
     EXPERIMENT_START = _g["EXPERIMENT_START"]
@@ -122,6 +127,17 @@ def source_freshness(*, _g) -> dict:
     _MANUAL_CAPTURE = _g["_MANUAL_CAPTURE"]
     _days_dark = _g["_days_dark"]
     now = datetime.now(timezone.utc)
+    # #2798: both calendars, taken from the SAME instant so they can never skew against
+    # each other. `pt_today` is the reader-facing day — this page is Pacific-framed
+    # (feedback_site_pacific_time; the PT-today guard since #2506, the gate clock since
+    # #2675) — and it is computed server-side because the front-end cannot: a reader in
+    # Tokyo has a different "today", and the site's frame is Pacific by decree, not by
+    # viewer locale.
+    pt_today = now.astimezone(PT).strftime("%Y-%m-%d")
+    # utc-exempt(#2798): NOT a reader "today" — never rendered as a date. Used only to
+    # PROVE that a stored day key sitting ahead of PT-today is tracking the UTC calendar
+    # (see the frame block below), so the frame label is derived rather than asserted.
+    utc_today = now.strftime("%Y-%m-%d")
     sources = []
     summary = {"fresh": 0, "stale": 0, "paused": 0, "total": 0}
     try:
@@ -183,6 +199,36 @@ def source_freshness(*, _g) -> dict:
             entry["manual"] = True
             if status in ("stale", "behavioral-stale"):
                 entry["days_dark"] = _days_dark(last_update, now)
+        # #2798 (epic) — THE FRAME, stamped per row.
+        #
+        # THE RULING: `last_update` is a stored DATE# day key and for the near-real-time
+        # sources that key is a **UTC** calendar day, deliberately and by audit. TD-19
+        # Phase 2 (2026-05-03, docs/audits/TD-19_DATE_PARTITION_AUDIT.md) changed
+        # health_auto_export_lambda.parse_date_str to convert the device's source-tz
+        # timestamp to UTC *before* extracting the day, precisely so every source shares
+        # one partition frame and cross-source aggregation stops undercounting. The key
+        # is right. What was wrong is presenting it unqualified on a Pacific page.
+        #
+        # UTC rolls over at 17:00 PT, so between 17:00 PT and PT-midnight a source that
+        # has just delivered serves tomorrow's calendar date to a reader whose own page
+        # header says that day has not happened yet. The armed reader-truth judge caught
+        # exactly that on post-deploy run 33040437876 ("LAST UPDATE 2026-08-27 6h but
+        # today is 2026-08-26. This is a future date") and gated CI on it — real for 7
+        # hours a day, invisible for the other 17, the same shape as #3206/#3222 one
+        # layer out.
+        #
+        # THE VALUE IS NOT CLAMPED. Clamping a legitimately-UTC day would hide a record
+        # that genuinely exists — a worse failure than the bug, and the reason this is a
+        # label rather than a max(). The label is DERIVED at request time, never asserted
+        # from a table: a row is stamped frame="utc" only when its stored day IS the
+        # current UTC calendar day, which is itself the proof that this key tracks UTC.
+        # A date further ahead than UTC-today is a genuine anomaly (bad payload, bad
+        # backfill), earns NO frame label, and the front-end flags it loudly instead of
+        # explaining it away as a timezone artifact.
+        if last_update and last_update > pt_today:
+            entry["last_update_ahead_of_pt"] = True
+            if last_update == utc_today:
+                entry["last_update_frame"] = "utc"
         # #1371: explicit cross-cycle provenance — the newest record predates the
         # current genesis, so its age is carried history, not a live-cycle outage.
         if last_update and last_update < EXPERIMENT_START:
@@ -239,6 +285,10 @@ def source_freshness(*, _g) -> dict:
             "summary": summary,
             # #1371: the anchor the front-end labels provenance against.
             "experiment": {"genesis": EXPERIMENT_START, "cycle": current_cycle},
+            # #2798: the page's OWN calendar day, on the Pacific clock. Every consumer
+            # that renders a `last_update` date now has the frame to render it against
+            # without guessing from the browser's timezone.
+            "pacific_today": pt_today,
         },
         cache_seconds=300,
     )
