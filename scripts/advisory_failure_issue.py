@@ -30,6 +30,27 @@ Error posture: in file mode an API failure exits 1 (the run is already red —
 the annotation shows filing failed rather than faking success); in recover
 mode it warns and exits 0 (a filing hiccup must never red a green advisory
 run — that would recreate the class this fixes).
+
+THE BODY DELIBERATELY DOES **NOT** CARRY THE ADR-099 FILING SHAPE (#3065,
+decided 2026-08-26). #3064 survived to a wrap and red the blocking hygiene
+gate, so the fix had two candidate homes. Design (b) — teach THIS module to
+emit `type:*`/`model:*`/`prio:*`/a milestone/a `**Score:**` line/an `**Epic:**`
+line — was **rejected**: it would mint a fabricated score and milestone for a
+row a machine closes within hours, feeding `backlog_next.py`'s ranked corpus
+and inflating `check_backlog_hygiene.rule_now_liveness`'s "is the queue alive"
+count with ops trackers. Design (a) shipped instead: the linter carves this
+exact set out (`check_backlog_hygiene.is_tracker`) and holds it to a narrower
+tracker contract. The full argument is in that module's docstring.
+
+Two consequences for anyone editing `build_issue_body` below:
+  * KEEP the `**Close policy:**` block. `rule_tracker_close_policy` requires it —
+    the carve-out is granted BECAUSE the lifecycle is stated in the body, and a
+    tracker with neither the backlog contract nor a close policy is an issue with
+    no contract at all.
+  * KEEP the `MARKER_LABEL` label and the `issue_marker()` comment together. They
+    are this module's dedup/ownership pair AND the first two thirds of the
+    linter's carve-out predicate; dropping either sends these issues back through
+    the full ADR-099 contract and reds the next wrap.
 """
 
 import argparse
