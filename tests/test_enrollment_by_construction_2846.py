@@ -51,6 +51,7 @@ LAMBDA_MAP = os.path.join(ROOT, "ci", "lambda_map.json")
 if os.path.join(ROOT, "cdk") not in sys.path:
     sys.path.insert(0, os.path.join(ROOT, "cdk"))
 
+from common.pacific_time import pacific_today  # noqa: E402  (tests/conftest.py puts lambdas/ on sys.path)
 from lambda_enrollment_ledger import (  # noqa: E402
     ALARM_STORY,
     DEPLOY_REGISTRATION,
@@ -233,7 +234,13 @@ def test_alarm_story_ledger_has_no_dead_entries() -> None:
 )
 def test_ledger_entries_are_dated_and_argued(ledger_name: str, ledger: dict) -> None:
     """G4 — an exemption without an argument is a silence with a comment on it."""
-    today = dt.date.today()
+    # PACIFIC, not the runner-local naive clock (#2798). The ledger's grant dates are
+    # Pacific calendar days (the platform's day boundary), and `dt.date.today()` is
+    # whatever frame the runner happens to be in — UTC in CI. Between 17:00 PT and
+    # midnight that "today" is already TOMORROW in Pacific, so the future-grant check
+    # below silently accepts a date it exists to reject. Invisible until #2798 taught the
+    # shared matcher the fully-qualified `import datetime` spelling.
+    today = dt.date.fromisoformat(pacific_today())
     problems: list[str] = []
     for key, value in sorted(ledger.items()):
         if not (isinstance(value, tuple) and len(value) == 2):
