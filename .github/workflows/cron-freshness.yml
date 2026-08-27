@@ -96,14 +96,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # setup-python via the shared composite (#1655). No `aws-role`, so the OIDC half
+      # is skipped entirely — this job touches no AWS and the token stays narrow.
+      - uses: ./.github/actions/setup-ci
+
       # PyYAML parses each workflow's own `on.schedule[].cron` — the cadence is DERIVED
-      # from those lines, never hand-typed (#3213 box 1). Version READ from
-      # requirements-dev.txt, never copied here (CQ-01, #2609). A missing PyYAML makes
-      # the script exit 2 ("DARK"), never 0 — an unparseable board is not a clean one.
-      - name: Install PyYAML (pinned from requirements-dev.txt)
+      # from those lines, never hand-typed (#3213 box 1). setup-ci installs no packages,
+      # so without this the script dies on import. A missing PyYAML makes it exit 2
+      # ("DARK"), never 0 — an unparseable board is not a clean one.
+      - name: Install PyYAML
         run: |
           PINS=$(python3 scripts/ci_pins.py pyyaml)   # versions from requirements-dev.txt (CQ-01, #2609)
-          pip install $PINS
+          pip install --quiet $PINS
 
       - name: Scheduled-workflow cadence watch
         env:
