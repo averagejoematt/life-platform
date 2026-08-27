@@ -17,6 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+sys.path.insert(0, str(ROOT / "tests"))
+import repo_scan_cache  # noqa: E402
+
 
 def _run(script, *args):
     return subprocess.run([sys.executable, str(ROOT / script), *args], capture_output=True, text=True)
@@ -302,7 +305,11 @@ def test_adr_index_live_tree_has_no_unmarked_supersessions():
 
 
 def test_doc_facts_clean():
-    r = _run("scripts/check_doc_facts.py")
+    # #3224: third caller of the identical unmutated-tree scan (with
+    # test_doc_facts_ops_1957.py / _2003.py) — shared spawn, unchanged assertion.
+    # NB test_verified_advisory_is_warn_only below deliberately does NOT share it: it
+    # runs the same script under CHECK_DOC_FACTS_TODAY=2036-01-01, a different key.
+    r = repo_scan_cache.run_repo_scan("scripts/check_doc_facts.py")
     assert r.returncode == 0, r.stdout + r.stderr
 
 

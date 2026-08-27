@@ -49,7 +49,15 @@ WHAT IT DOES:
       `--duration-budget-seconds` (default 1950s / 32.5min, derived #3106 —
       see ci-test.yml's comment for the measure-first derivation) — the same
       self-reminding-ratchet shape as (1), applied to suite cost instead of
-      coverage.
+      coverage. #3224 (2026-08-27) broke the raise-every-time habit: the budget
+      is UNCHANGED at 1950 and the breach was paid for by shedding duplicated
+      whole-repo scans instead. `tests/test_duration_budget_ratchet.py` now
+      carries a HARD_CEILING_SECONDS a raise may not pass, plus the full class
+      record (attribution, method, and the trend across all six instances).
+      NB the measured number is NOISY — three pre-merge runs of an essentially
+      identical suite on 2026-08-27 spread 962s-1311s — so treat a single
+      over-budget run as a prompt to measure per-test cost, not as proof of
+      growth.
   (3) MEASURED-coverage high-water ratchet (#1658, added 2026-08-06): the hole
       the other two leave open. `--cov-fail-under` is deliberately set a few
       points BELOW measured coverage so normal fluctuation doesn't red main —
@@ -157,10 +165,12 @@ def evaluate_duration(measured_seconds: Optional[float], budget_seconds: float) 
     if measured_seconds > budget_seconds:
         return (
             f"Unit Tests job took {measured_seconds:.0f}s, over the {budget_seconds:.0f}s budget "
-            f"({measured_seconds - budget_seconds:.0f}s over). Suite wall-clock has climbed before "
-            f"(157s -> 294s -> 688s avg -> 830s avg, #1349/#1966/#2152) — this run's /wrap must triage it "
-            f"(scripts/check_ci_warnings.py, step (e11)): investigate slow tests, or raise the budget "
-            f"deliberately again with the same measure-first rationale."
+            f"({measured_seconds - budget_seconds:.0f}s over). This is a RECURRING class: 157s -> 294s -> 688s -> "
+            f"830s -> 1507s -> 1994s, answered by a budget raise every time up to #3106 "
+            f"(#1349/#1966/#2152/#3025/#3106/#3224). This run's /wrap must triage it (scripts/check_ci_warnings.py, "
+            f"step (e11)). START FROM #3224's measurement, do not re-derive a raise: the dominant term is duplicated "
+            f"whole-repo scans, not test count, so shed first (tests/repo_scan_cache.py is the worked example) and "
+            f"read the class record + hard ceiling in tests/test_duration_budget_ratchet.py before touching the number."
         )
     return None
 
