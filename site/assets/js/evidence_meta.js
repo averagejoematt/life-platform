@@ -325,8 +325,18 @@ export function renderPipeline(d) {
     const freshAttrs = (s.last_update_ts && s.stale_hours != null)
       ? ` data-fresh-ts="${esc(s.last_update_ts)}" data-fresh-window="${Math.round(Number(s.stale_hours) * 3600)}"`
       : "";
+    // #2798: state the FRAME where the date is shown. last_update is a stored DATE# day
+    // key — a UTC calendar day for the near-real-time sources (TD-19 Phase 2) — and UTC
+    // rolls over at 5pm Pacific, so between 5pm and midnight PT a source that has just
+    // delivered reads one day ahead of this Pacific-framed page. The server proves the
+    // frame per row and hands us the Pacific day; the client must NOT re-derive either
+    // from the browser clock, which is not Pacific for most readers. An ahead-of-PT date
+    // with no proven UTC frame is a real anomaly and is flagged, never explained away.
+    const frame = s.last_update_frame === "utc" ? ` <span class="rd-unit">UTC</span>` : "";
+    const ahead = (s.last_update_ahead_of_pt && s.last_update_frame !== "utc")
+      ? ` <span class="rd-badge">ahead of today</span>` : "";
     return `<p class="provenance${s.status !== "fresh" ? " pv-stale" : ""}"><span class="fr-dot"${freshAttrs} aria-hidden="true"></span>` +
-      `<span class="pv-src">${esc(s.last_update || "—")}</span>${s.age_hours != null ? ` <span class="rd-unit">${Math.round(s.age_hours)}h</span>` : ""}</p>`;
+      `<span class="pv-src">${esc(s.last_update || "—")}</span>${frame}${ahead}${s.age_hours != null ? ` <span class="rd-unit">${Math.round(s.age_hours)}h</span>` : ""}</p>`;
   };
   // #746: honest degraded stamp for a manual source (HAE / Notion / MCP) gone
   // quiet past its threshold — "manual source dark N days", the same behavioral-
@@ -372,6 +382,14 @@ export function renderPipeline(d) {
   const carriedNote = (d.experiment && src.some((s) => s.carried))
     ? ` carried = the newest record predates this cycle's genesis (${esc(d.experiment.genesis || "")}) — history from an earlier attempt, not a live outage.`
     : "";
+  // #2798: the frame, explained in-page the moment it can be seen. Without this a reader
+  // between 5pm and midnight Pacific sees a "last update" one day ahead of the date this
+  // page says it is, with nothing on the page accounting for it — which is what the
+  // reader-truth judge (correctly) read as a future date. Shown only when a row is
+  // actually ahead, so the other 17 hours of the day carry no extra copy.
+  const frameNote = src.some((s) => s.last_update_ahead_of_pt)
+    ? ` Day keys are stored in UTC, which rolls over at 5pm Pacific — so between 5pm and midnight Pacific a source that has just delivered reads one UTC day ahead of this page's Pacific date${d.pacific_today ? ` (${esc(d.pacific_today)})` : ""}. The hours-since figure is a duration and is unaffected.`
+    : "";
   return figs([fig(sm.fresh ?? "—", "flowing"), fig(sm.paused ?? "—", "paused"), fig(sm.total ?? src.length, "live-monitored")]) + secs +
-    `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made, dark Nd = a manual source quiet that many days.${carriedNote}</p>`;
+    `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made, dark Nd = a manual source quiet that many days.${carriedNote}${frameNote}</p>`;
 }
