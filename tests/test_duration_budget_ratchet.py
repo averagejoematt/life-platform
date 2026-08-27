@@ -74,10 +74,11 @@ profiled run) to ONE addition landed between the two shas: #3126/#3156 put
 `gate_census.build_census()` — 1,189,573 `re.Pattern.search` calls over the whole tree
 — on `sync_doc_metadata`'s auto-discovery path, which `check_doc_facts.py` runs.
 
-That census is not paid once. Instrumenting `discover_gate_census_count` and running
-the full local suite (2026-08-27) recorded **13+ complete census builds against the
-same unmutated repo root, mean 8.06s, 104.8s total** — a cost that did not exist at
-all when #3106 measured 1507s.
+That census is not paid once. Instrumenting `discover_gate_census_count` with a
+counter and running the FULL local suite on a clean 10315b618 worktree (2026-08-27,
+22,336 collected, 970.20s) recorded **19 complete census builds, every one against the
+same unmutated repo root, mean 8.07s — 153.3s, or 15.8% of the entire local suite
+wall clock**. None of that cost existed when #3106 measured 1507s.
 
 WHAT THE SHED MEASURED (local, `pytest --durations=20 -p no:randomly` over the seven
 files that hold the repo-scan family, before vs after, same machine):
