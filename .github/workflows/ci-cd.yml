@@ -378,6 +378,15 @@ jobs:
       # command hands its exit status to whatever ran last, which is the swallow idiom
       # the gate census flags (`_SWALLOW`) and the one this repo has been bitten by.
       # Runs on push only — the reconcile step no-ops on every other event.
+      #
+      # KNOWN AND INTENDED CONSEQUENCE: every downstream job carries `needs: reconcile`,
+      # so this step failing now stops the deploy pipeline. `test / Unit Tests` failing on
+      # the same drift did NOT — `plan` needs `test-critical`, not `test` — so this is a
+      # real widening, and it is the correct one: the drift `--check` reports includes
+      # `lambdas/web/platform_counts.py`, which is RUNTIME CODE that ships in the bundle
+      # and is served by site-api. Deploying a tree whose generated single-writer counter
+      # module disagrees with config truth is the thing worth refusing, and a reconcile
+      # job that could not do its job is exactly when to refuse it.
       - name: Reconcile verdict — the tree this job leaves must be literal-clean (#2578)
         if: github.event_name == 'push'
         run: |
