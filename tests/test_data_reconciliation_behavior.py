@@ -42,6 +42,7 @@ import json  # noqa: E402
 import re  # noqa: E402
 
 import pytest  # noqa: E402
+from common.pacific_time import pacific_today  # noqa: E402  — the handler's own clock; see _all_seven
 from ingestion.source_registry import reconciliation_sources  # noqa: E402
 from operational import data_reconciliation_lambda as dr  # noqa: E402
 
@@ -314,9 +315,20 @@ def handler_env(monkeypatch):
 
 
 def _all_seven(anchor_days=7):
+    """The coverage window the handler will ask for, on the HANDLER's clock.
+
+    `data_reconciliation_lambda` bounds its window with `pacific_today()`
+    (#2798/#3206). Deriving these days from `datetime.now(timezone.utc).date()`
+    instead put every expected DATE# key one day ahead of the handler between
+    17:00 PT and PT midnight — the 7-hour window where the UTC date has rolled
+    and the Pacific one has not. The set then missed the handler's oldest day
+    and carried a day it never asks for, so a whole week read as YELLOW and the
+    archive key was off by one. #3206's CI ran outside that window and was
+    green; the first main run to cross 00:00Z after it went red.
+    """
     import datetime as _dt
 
-    today = _dt.datetime.now(_dt.timezone.utc).date()
+    today = _dt.date.fromisoformat(pacific_today())
     return {(today - _dt.timedelta(days=i)).isoformat() for i in range(anchor_days, 0, -1)}
 
 
@@ -349,7 +361,12 @@ def test_handler_checks_the_last_seven_completed_days_never_today(handler_env):
     dr.lambda_handler({"dry_run": True}, None)
     week_label = json.loads(dr.lambda_handler({"dry_run": True}, None)["body"])["week"]
     start, end = week_label.split(" → ")
-    today = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
+    # The handler's clock, not UTC (#2798/#3206). With UTC this assertion goes
+    # SLACK between 17:00 PT and PT midnight: `end` is the handler's Pacific
+    # yesterday, so comparing it against an already-rolled UTC today would still
+    # pass even if the handler had wrongly included its own today. Comparing on
+    # the same frame is what makes this a real exclusion check.
+    today = pacific_today()
     assert end < today, "ingestion may still be running today; today is deliberately excluded"
     assert (_dt.date.fromisoformat(end) - _dt.date.fromisoformat(start)).days == 6
 
