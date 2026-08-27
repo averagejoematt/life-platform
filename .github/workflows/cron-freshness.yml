@@ -1,0 +1,99 @@
+name: Cron freshness
+
+# #3213 (epic #2799) — the dead-man for GitHub's cron SCHEDULER.
+#
+# The advisory-watcher machinery (#1447) is armed on the RESULT of a run: it files on a
+# failure and auto-closes "on the next green run of this workflow". A cron that never
+# fires produces no result, so the filer never files, the tracker issue never opens or
+# re-comments, and the surface is silently unwatched. Measured at Session E boot
+# (2026-08-26T22:09Z): `Visual QA (standalone)` had no run at all that day, ~1.5h past
+# due, and nothing anywhere said so.
+#
+# WHY THIS WORKFLOW HAS NO `schedule:` TRIGGER — THE WHOLE POINT (#3213 box 2)
+# ────────────────────────────────────────────────────────────────────────────
+# A watcher that shares the missing trigger cannot detect its own absence. GitHub
+# silences cron as a CLASS, in two documented ways: scheduled runs "may be delayed or
+# dropped during periods of high load", and scheduled workflows are AUTO-DISABLED after
+# 60 days of repository inactivity. Either event takes out every cron in the repo at
+# once — including a watcher sitting on `schedule`, which would then go dark in exactly
+# the same instant as the eight workflows it is supposed to be reporting on.
+#
+# `push` is delivered by the repository-event path, not the cron scheduler. The
+# inactivity auto-disable in particular CANNOT reach it, because a push IS the activity
+# whose absence triggers that disable.
+#
+# tests/test_cron_freshness_3213.py::test_b2_the_watcher_is_not_itself_on_a_schedule
+# reds if anyone adds a `schedule:` here, and its mutation twin proves that detector can
+# actually see one.
+#
+# THE RESIDUALS, STATED (a bounded gap beats a hidden one)
+#   1. A push to main can mint zero workflow runs — the event-swallow class (#2662).
+#      Costs one push, not the outage: this check holds no state between runs, so the
+#      next push re-evaluates from scratch.
+#   2. No push to main for longer than a watched deadline means no report. Bounded by
+#      main's normal push rate (several a day) plus `workflow_dispatch` and the script's
+#      own CLI at session boot. A repo dormant that long is one where GitHub is
+#      auto-disabling the crons anyway and there is no live surface to protect.
+#
+# NO `paths:` FILTER, DELIBERATELY. The subject is the state of GitHub's scheduler, not
+# the content of the push. Filtering on paths would mean a week of site-only commits
+# leaves the check unrun — reintroducing this issue's own failure mode through the side
+# door.
+#
+# LOUDNESS: on a detection the job FAILS, and the last step files ONE deduped tracked
+# issue via the same `.github/actions/advisory-failure-issue` composite every other
+# advisory workflow uses — under its OWN slug, so it can never comment on or close a
+# watched workflow's auto-filed issue. It auto-closes on the next clean run.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # manual sweep / after a suspected cron outage
+
+permissions:
+  contents: read
+  actions: read # reading another workflow's run history
+  issues: write # the #1447 advisory filer
+
+concurrency:
+  group: cron-freshness
+  cancel-in-progress: true
+
+jobs:
+  cadence:
+    name: Scheduled-workflow cadence watch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # PyYAML parses each workflow's own `on.schedule[].cron` — the cadence is DERIVED
+      # from those lines, never hand-typed (#3213 box 1). Version READ from
+      # requirements-dev.txt, never copied here (CQ-01, #2609). A missing PyYAML makes
+      # the script exit 2 ("DARK"), never 0 — an unparseable board is not a clean one.
+      - name: Install PyYAML (pinned from requirements-dev.txt)
+        run: python3 -m pip install --quiet "$(grep -iE '^pyyaml==' requirements-dev.txt)"
+
+      - name: Scheduled-workflow cadence watch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Unpiped on purpose: a pipe would hand the step tail's exit status and the
+        # gate could not fail (the #3103 class, and CONVENTIONS.md §4's piped-step trap).
+        run: python3 scripts/check_cron_freshness.py
+
+      - name: File or resolve the advisory issue
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: cron-freshness
+          workflow-name: Cron freshness
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            One or more scheduled workflows ruled `watched` in
+            scripts/scheduled_workflow_registry.py has no `event: schedule` run inside
+            its derived cadence + grace window — or the registry has drifted from
+            .github/workflows/. This is an ABSENCE, not a failure: the #1447 advisory
+            filer is armed on a run's result and has nothing to be armed on, so the
+            affected surface is unwatched while its tracker issue reads as healthy.
+            Run `python3 scripts/check_cron_freshness.py` for the per-workflow decode.
