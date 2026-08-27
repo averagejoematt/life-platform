@@ -235,8 +235,8 @@ real defect, a Pacific day anchored at UTC midnight that sent a live inflated SN
 growth is 79.7% existing tests slowing, closed **without a budget raise**, a first in five
 instances). Gotchas: a deploy lease **stranded 7.5h** whose approval would have rolled back two
 live-deployed fixes; #3222 **falsely auto-closed** by a shared-scratchpad path collision, not a
-mistyped number; **#3231 shipped half-broken with all 12 tests green** (a perf fix has no failing
-test). **Zero event swallows** vs five in Session E. **Next:** #3204 (its lane never reported) ·
+mistyped number; **#3231 shipped half-broken with every one of its own tests green** (a perf fix has
+no failing test). **Zero event swallows** vs five in Session E. **Next:** #3204 (its lane never reported) ·
 #2883 · #2888 · #2835/#3079 (promoted this wrap) · #2578's three new checkboxes · owner batch 16
 items, now including two tokens measured load-bearing tonight. Full narrative:
 `handovers/HANDOVER_LATEST.md`.
