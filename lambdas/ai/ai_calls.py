@@ -187,13 +187,39 @@ def daily_brief_shared_system(
     """Phase 3.8 (2026-05-16): build a stable system block reused across the 4
     daily-brief AI calls (BoD, training+nutrition, journal, TL;DR).
 
-    NOTE (D-01, 2026-06-05): prompt caching is intentionally DISABLED on the 4
-    daily-brief calls (cache_system=False). Bedrock cross-region inference routes
-    each call to a region-local cache, so a once/day brief never gets a cache HIT
-    — measured 0 reads / 10K writes per 14d, i.e. pure write-premium waste. Do NOT
-    re-enable caching here without re-measuring CacheRead>0. (The high-frequency
-    coach-narrative-orchestrator path DOES hit, and keeps caching on.) This shared
-    block is still built once and reused across the 4 calls for consistency.
+    NOTE (D-01, 2026-06-05; mechanism CORRECTED 2026-08-27 per #2888): prompt
+    caching stays intentionally DISABLED on the 4 daily-brief calls
+    (cache_system=False). The conclusion holds. The originally stated REASON does
+    not, and it was actively misleading — read this before acting on it.
+
+      Original reason: "Bedrock cross-region inference routes each call to a
+      region-local cache, so a once/day brief never gets a cache HIT", with the
+      re-entry condition "do NOT re-enable without re-measuring CacheRead>0".
+
+      That mechanism is FALSIFIED. Measured 2026-08-27 on this same function under
+      the same cross-region inference profile: AnthropicCacheReadTokens{daily-brief}
+      = 38,872 (08-25) and 22,068 (08-26) against writes of 26,933 / 27,097 — reads
+      EXCEED writes, via in-invocation reuse across the brief's calls (#3138).
+      Cross-region inference does not prevent an in-invocation hit, and the stated
+      re-entry condition is therefore already SATISFIED.
+
+      The real obstruction is PREFIX SIZE, which the original note never mentioned:
+      this block measures ~784 estimated tokens (prompt_cache.estimate_tokens, which
+      that module labels advisory, not a wire CountTokens) against Sonnet's 1,024
+      token cache floor. Below the floor a cache_control marker is silently ignored
+      — no error, cache_read_input_tokens simply stays 0 (see lambdas/ai/prompt_cache.py
+      and ADR-049's 2026-08-27 amendment). Re-enabling here today would buy a
+      write premium and nothing else.
+
+      CORRECTED re-entry condition: re-enable only if this block's stable prefix
+      measures at or above the caching floor for the model actually in use
+      (prompt_cache.cache_floor()), verified on the wire rather than estimated —
+      NOT merely because CacheRead>0 somewhere on this function. Even if it
+      cleared, #2888 priced the whole prize at ~$0.8-1.1/mo.
+
+    (The high-frequency coach-narrative-orchestrator path DOES hit, and keeps
+    caching on.) This shared block is still built once and reused across the 4
+    calls for consistency.
     """
     # #1086: the ONE shared experiment-phase block (journey + pre-start state +
     # audience + cannot-exist-yet guardrail) replaces the journey-only block.
