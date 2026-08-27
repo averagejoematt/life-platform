@@ -22,6 +22,8 @@ Key facts:
 This module is bundled into every function's deploy package (#781 retired the shared Lambda layer).
 """
 
+import contextlib
+import contextvars
 import json
 import os
 
@@ -65,6 +67,79 @@ _BEDROCK = None
 # a telemetry error must never surface to an AI caller.
 _CW_NAMESPACE = "LifePlatform/AI"
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
+
+# ── Feature attribution outside Lambda (#2888) ──────────────────────────────
+# `_LAMBDA_NAME` above is the whole of the per-feature attribution, and outside a
+# Lambda container it is the literal string "unknown". Measured 2026-08-27,
+# `LifePlatform/AI` trailing 30d: `unknown` is the **largest single row in the
+# ranking** — 17.9M input tokens, $33.19, 46% of all self-reported AI spend, more
+# than daily-brief and the entire coach pipeline combined. #2888 asks for "the top
+# three features by uncached input"; the actual #1 has no name, so the ranking is
+# unusable exactly where it matters most, and PR #3138 skipped that row for that
+# reason and worked #2 downward.
+#
+# Every byte of it is the two AI CI gates, both of which run inside ONE process
+# (`tests/visual_qa.py --ai-qa --reader-truth`), so `sys.argv[0]` cannot separate
+# them either — the split has to come from the code that owns each pass.
+#
+# The rules, in the same discipline as `caller_class()` below:
+#   • The Lambda runtime's own variable ALWAYS wins. Nothing a caller sets can
+#     move spend out of the function that actually incurred it, so this cannot be
+#     used to hide a Lambda's cost under a gate's name.
+#   • Outside Lambda, an ALLOWLISTED label applies. The allowlist is the point:
+#     a CloudWatch custom metric is ~$0.30/metric/month and this dimension carries
+#     six metric names, so an unbounded label (argv, a free-form string) would add
+#     recurring cost to a cost-reduction change. An unrecognised label is ignored.
+#   • The residual is still "unknown", deliberately — the historical series stays
+#     continuous, and a SHRINKING `unknown` is itself the proof the attribution
+#     landed. It is a residual bucket, not an error state.
+ATTRIBUTABLE_FEATURES: frozenset = frozenset(
+    {
+        # tests/visual_ai_qa.py — the Claude-vision judge. Screenshot IMAGE input
+        # (up to 1,568 visual tokens per tile, #3067) dominates its bill and is
+        # structurally uncacheable: every capture differs on every run.
+        "visual-ai-qa",
+        # lambdas/operational/reader_truth_qa.py run from CI rather than from the
+        # qa-smoke Lambda. In the Lambda this label never applies — the runtime
+        # variable wins and the row stays `life-platform-qa-smoke`, so the CI copy
+        # and the nightly Lambda copy of the SAME gate stop being summed together.
+        "reader-truth-qa",
+    }
+)
+
+_FEATURE = contextvars.ContextVar("bedrock_feature", default="")
+
+
+@contextlib.contextmanager
+def attributed_to(feature: str):
+    """Attribute Bedrock spend inside this block to `feature` (#2888).
+
+    A no-op inside a Lambda container (the runtime's own function name wins) and
+    a no-op for any label outside `ATTRIBUTABLE_FEATURES`. Context-local, so two
+    passes in one process — which is exactly what `tests/visual_qa.py` runs — are
+    attributed separately without either of them touching the ~40 call sites.
+    """
+    token = _FEATURE.set(feature or "")
+    try:
+        yield
+    finally:
+        _FEATURE.reset(token)
+
+
+def feature_name() -> str:
+    """The `LambdaFunction` dimension value for the call being metered.
+
+    Lambda runtime name → allowlisted context label → `"unknown"`. See the block
+    comment above for why each step is in that order. Reads the environment live
+    (not the module-level `_LAMBDA_NAME` snapshot) so the precedence rule is
+    testable without reimporting the module.
+    """
+    lam = (os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or "").strip()
+    if lam:
+        return lam
+    label = _FEATURE.get()
+    return label if label in ATTRIBUTABLE_FEATURES else "unknown"
+
 
 # ── Caller-class attribution (#2892) ────────────────────────────────────────
 # The governor's month-end projection extrapolates a trailing daily rate over the
@@ -215,7 +290,7 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
         if not (in_tok or out_tok or cache_read or cache_write):
             return
         cost = estimate_cost_usd(usage, model_id)
-        fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        fn_dim = [{"Name": "LambdaFunction", "Value": feature_name()}]
         class_dim = [{"Name": CALLER_CLASS_DIMENSION, "Value": caller_class()}]
         md = [
             {"MetricName": "AnthropicInputTokens", "Dimensions": fn_dim, "Value": in_tok, "Unit": "Count"},
@@ -324,7 +399,7 @@ def _note_truncation(parsed: dict, bedrock_body: dict, model_id: str) -> None:
         cap = int(bedrock_body.get("max_tokens") or 0)
         out_tok = int(usage.get("output_tokens", 0) or 0)
         cost = estimate_cost_usd(usage, model_id)
-        fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        fn_dim = [{"Name": "LambdaFunction", "Value": feature_name()}]
         _cw().put_metric_data(
             Namespace=_CW_NAMESPACE,
             MetricData=[
@@ -380,7 +455,7 @@ def _note_cache_noop(parsed: dict, bedrock_body: dict, model_id: str) -> None:
         cache_write = int(usage.get("cache_creation_input_tokens", 0) or 0)
         if cache_read or cache_write:
             return  # caching engaged (write on a first call, read thereafter)
-        fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        fn_dim = [{"Name": "LambdaFunction", "Value": feature_name()}]
         _cw().put_metric_data(
             Namespace=_CW_NAMESPACE,
             MetricData=[
