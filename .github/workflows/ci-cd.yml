@@ -200,6 +200,28 @@ jobs:
       # setup-python (v7.0.0, no cache) via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci
 
+      # #3156's SECOND HOME. That issue fixed docs-ci.yml, which had the identical
+      # need, and this job was missed. `run_generators` below calls
+      # `sync_doc_metadata.py --apply`, which calls `deploy/sync_census_fact.py`'s
+      # `discover_gate_census_count()`, which imports `scripts/gate_census.py`'s
+      # `discover_ci_gates()` — and that needs PyYAML to parse `.github/workflows/**`
+      # for docs/PROPORTIONALITY.md's gate_census_count fact. The shared `setup-ci`
+      # composite installs NO packages, so this job could never derive the census.
+      #
+      # It failed HONESTLY rather than silently — post-#3156, an underivable census
+      # outside `--check` is SKIPPED with a printed reason and the doc is left
+      # untouched. But the skip means the reconcile commit cannot carry the
+      # gate_census_count update, so `docs/PROPORTIONALITY.md` stays stale, this job
+      # reports success, and then `test / Unit Tests` IN THE SAME RUN — which does
+      # have the dep — fails on `test_sync_doc_metadata_check.py::
+      # test_check_is_clean_on_repo_head`. Measured twice on 2026-08-27: `51f2f53f`
+      # (#3220 moved the census 560->551) and `5081953404` (#3222 moved it 551->552),
+      # each redding main until a human pushed a manual reconcile.
+      - name: Install census dependency (PyYAML)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pyyaml)
+          pip install --quiet $PINS
+
       - name: Regenerate derived artifacts; commit + push if (and only if) whitelist-clean
         id: reconcile
         env:
