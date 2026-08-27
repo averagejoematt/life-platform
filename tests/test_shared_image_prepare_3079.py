@@ -26,6 +26,7 @@ Two layers here, deliberately:
 import ast
 import base64
 import os
+import subprocess
 import sys
 
 import pytest
@@ -182,10 +183,30 @@ _SCAN_DIRS = ("lambdas", "tests", "scripts", "mcp", "deploy", "cdk")
 _SKIP_PARTS = {"__pycache__", "node_modules", "cdk.out", ".venv", "site-packages"}
 
 
+def _is_untracked_build_dir(path):
+    """True for a directory git will not track — local build output, not source.
+
+    `_SKIP_PARTS` is a NAME list, which is an instance guard: `cdk/_bundle_staging/` and
+    `cdk/_mcp_staging/` are gitignored staging copies produced by any local deploy, and
+    neither is on it, so this sweep reported two phantom unregistered sites on every
+    machine that had ever run a deploy — while passing in CI, which has no staging dirs.
+    A test that fails only locally trains people to ignore it. Structural instead of
+    name-matched: ask git whether the directory is content at all.
+    """
+    try:
+        return subprocess.run(["git", "check-ignore", "-q", path], cwd=_ROOT, capture_output=True, timeout=10).returncode == 0
+    except Exception:
+        return False  # fail OPEN: a missing git must not silently shrink the sweep
+
+
 def _python_files(root=_ROOT):
     for top in _SCAN_DIRS:
         for dirpath, dirnames, filenames in os.walk(os.path.join(root, top)):
-            dirnames[:] = [d for d in dirnames if d not in _SKIP_PARTS and not d.startswith(".")]
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if d not in _SKIP_PARTS and not d.startswith(".") and not _is_untracked_build_dir(os.path.join(dirpath, d))
+            ]
             for fn in filenames:
                 if fn.endswith(".py"):
                     yield os.path.join(dirpath, fn)

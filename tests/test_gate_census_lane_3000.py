@@ -215,7 +215,16 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 #
 # Measured with the file TRACKED, per the warning three paragraphs up — it read 560 as an
 # untracked file and 561 once committed. That warning earned its keep on this PR.
-BASELINE_TOTAL_GATES = 561
+# 561 -> 562 (2026-08-27): ONE real gate, `guard::scripts/hooks/guard_bash.py` — the
+# PreToolUse hook that flags a merge with no named-check assertion, a deploy from a
+# worktree, and a force-push to main. Verified as a genuine addition rather than the
+# prose-phantom this comment warns about: the census gate-id sets were diffed before and
+# after, and that id is the only member added. Registering
+# `tests/test_skill_contract.py` in _PREMERGE_EXTRA_FILES also mints a gate, so the
+# measurement was taken with every new file `git add`ed — an untracked guard measures as
+# absent. Unproven fell 541 -> 534 over the same window (#3242's adjudication); that
+# ceiling is left where its owner set it.
+BASELINE_TOTAL_GATES = 562
 BASELINE_UNPROVEN_GATES = 541
 
 

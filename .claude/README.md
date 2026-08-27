@@ -15,7 +15,7 @@ Designed so an agent can answer "why" without guessing:
 - **`handovers/`** — the live end-of-session hand-off (`HANDOVER_LATEST.md`) so the next session resumes with full context. Prior sessions live on the **`session-archive`** branch (#1650) — `git show origin/session-archive:handovers/<name>.md`.
 
 **3. Skills — [`.claude/skills/`](skills/)**
-**24 skills** the agent invokes by name, each `‹name›/SKILL.md` with YAML frontmatter
+**28 skills** the agent invokes by name, each `‹name›/SKILL.md` with YAML frontmatter
 (`description`, `argument-hint`, `allowed-tools`) so a session can pick the right one
 without being told. The count is derived from the registry, never hand-listed — this
 paragraph itself used to name two of them. A sample rather than an inventory:

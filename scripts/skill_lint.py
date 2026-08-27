@@ -325,19 +325,30 @@ def check_pointers(rel: str, body: str, cache: dict[str, str | None], online: bo
 
 
 def has_contract_test(name: str) -> bool:
-    """A contract test is any tests/ file that names this skill's prompt path."""
+    """A contract test names this skill's prompt file, or resolves it BY NAME.
+
+    Deliberately strict. A looser version — "any test that imports the registry and
+    mentions the name" — counted `tests/test_operating_calendar_2832.py` as a contract
+    test for five skills, because the cadence registry quotes their names. That test
+    asserts the file EXISTS; it says nothing about what the skill must contain. Accepting
+    it would have shrunk the ratchet by five without a single new assertion, which is
+    laundering debt rather than paying it, and a ratchet that can be satisfied by a
+    technicality is not a ratchet.
+
+    So: reference the prompt path, or call `require_skill("<name>")` with the literal.
+    """
     reg = _registry()
     p = reg.skill_path(name)
     if p is None:
         return False
-    needle = f'require_skill("{name}")'
-    alt = reg.rel(p)
+    rel_path = reg.rel(p)
+    calls = (f'require_skill("{name}")', f"require_skill('{name}')")
     for f in (ROOT / "tests").glob("*.py"):
         try:
             src = f.read_text(encoding="utf-8")
         except Exception:
             continue
-        if needle in src or alt in src:
+        if rel_path in src or any(c in src for c in calls):
             return True
     return False
 
