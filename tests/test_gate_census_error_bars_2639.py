@@ -61,6 +61,9 @@ import pytest  # noqa: E402
 pytest.importorskip("yaml", reason="gate_census's CI-family walk needs PyYAML; the full Unit Tests lane has it")
 
 gate_census = importlib.import_module("gate_census")
+# The samples live in gate_census_precision (#2639's own extraction); gate_census
+# re-exports FLAG_PRECISION but not the superseded PRIOR_FLAG_PRECISION (#2999).
+gate_census_precision = importlib.import_module("gate_census_precision")
 
 CENSUS = gate_census.build_census(pathlib.Path(_REPO))
 CI_COUNTERS = (CENSUS.get("counters") or {}).get("ci") or {}
@@ -204,15 +207,23 @@ def test_the_json_output_carries_the_counters():
 
 
 def test_the_flag_precision_registry_records_the_owners_sample():
-    """The 13-of-38 and 10-of-27 numbers from the issue's third comment, verbatim —
-    a hand-adjudicated measurement, not something the detector computes itself."""
+    """RE-SAMPLED 2026-08-27 (#2999 box 2). The 2026-08-16 draw (13-of-38, 10-of-27) was
+    taken at populations that had since grown to 54 and 40, and `_render_error_bars` had
+    been printing its own DRIFT warning against it for eleven days. Both draws are pinned:
+    the current one because it is what the report claims, and the prior one because a
+    re-sample that discards the number it replaced hides whether the estimate moved."""
     vacuous = gate_census.FLAG_PRECISION["vacuous-empty"]
-    assert (vacuous.n_flagged, vacuous.n_sampled, vacuous.n_fp, vacuous.n_tp) == (38, 13, 11, 2)
+    assert (vacuous.n_flagged, vacuous.n_sampled, vacuous.n_fp, vacuous.n_tp) == (54, 18, 14, 4)
 
     incomplete = gate_census.FLAG_PRECISION["exempt-by-incompleteness"]
-    assert (incomplete.n_flagged, incomplete.n_sampled, incomplete.n_fp, incomplete.n_tp) == (27, 10, 9, 1)
+    assert (incomplete.n_flagged, incomplete.n_sampled, incomplete.n_fp, incomplete.n_tp) == (40, 14, 11, 3)
 
-    for sample in gate_census.FLAG_PRECISION.values():
+    prior_vacuous = gate_census_precision.PRIOR_FLAG_PRECISION["vacuous-empty"]
+    assert (prior_vacuous.n_flagged, prior_vacuous.n_sampled, prior_vacuous.n_fp, prior_vacuous.n_tp) == (38, 13, 11, 2)
+    prior_incomplete = gate_census_precision.PRIOR_FLAG_PRECISION["exempt-by-incompleteness"]
+    assert (prior_incomplete.n_flagged, prior_incomplete.n_sampled, prior_incomplete.n_fp, prior_incomplete.n_tp) == (27, 10, 9, 1)
+
+    for sample in list(gate_census.FLAG_PRECISION.values()) + list(gate_census_precision.PRIOR_FLAG_PRECISION.values()):
         assert sample.n_fp + sample.n_tp == sample.n_sampled, "FP + TP must account for the whole sample"
         assert sample.n_sampled <= sample.n_flagged
 
@@ -233,13 +244,21 @@ def test_the_wilson_helper_matches_the_hand_computed_table(k, n, expected_lo, ex
 
 
 def test_the_report_prints_the_measured_fp_proportions_for_both_flags():
-    """Acceptance box 3, wired into the report a human actually reads."""
-    report = gate_census.render_report(CENSUS)
-    assert "vacuous-empty" in report and "85%" in report
-    assert "exempt-by-incompleteness" in report and "90%" in report
+    """Acceptance box 3, wired into the report a human actually reads.
+
+    Asserted on the ERROR-BAR SECTION, not the whole report: the old form searched the
+    full string for "85%", which any proof's prose could satisfy by accident — and after
+    the 2026-08-27 re-sample it kept passing on the superseded prior-draw line while the
+    current proportion had moved to 78%. A percentage that matches somewhere in a
+    900-line report is not evidence the report printed it here."""
+    section = gate_census._render_error_bars(CENSUS)
+    assert "vacuous-empty" in section and "78%" in section
+    assert "exempt-by-incompleteness" in section and "79%" in section
     # the Wilson interval bounds, rendered to the nearest percent
-    assert "58%-96%" in report
-    assert "60%-98%" in report
+    assert "55%-91%" in section
+    assert "52%-92%" in section
+    # the superseded draw is still shown, so the movement is visible rather than replaced
+    assert "prior draw 2026-08-16" in section and "85%" in section and "90%" in section
 
 
 def test_the_report_still_calls_flag_counts_an_upper_bound():
@@ -250,32 +269,47 @@ def test_the_report_still_calls_flag_counts_an_upper_bound():
 
 
 def test_no_drift_note_when_live_count_matches_the_recorded_sample():
-    """Current state (2026-08-16): the live census still finds exactly 38 vacuous-empty
-    and 27 exempt-by-incompleteness hits, so no drift note should print against CENSUS."""
-    report = gate_census.render_report(CENSUS)
+    """Both samples were re-drawn at the live populations on 2026-08-27 (#2999), so no
+    drift note should print — and this is the FIRST time this branch has ever run.
+
+    It was written on 2026-08-16 against the whole `render_report` string and the live
+    counts had drifted the same week, so only the `else` arm was ever taken. The `if` arm
+    would have failed on a substring collision the moment it was reached:
+    `gate_census_proofs`'s check_cfn_drift record contains the literal
+    `StackDriftStatus=DRIFTED`, so "DRIFT" is in the full report whatever the samples say.
+    The `# pragma: no cover` note sat on the arm that DID run. Scoped to the error-bar
+    section, which is the only place the note can legitimately appear."""
+    error_bars = gate_census._render_error_bars(CENSUS)
     vacuous_live = gate_census._live_flag_count(CENSUS, "vacuous-empty")
     incomplete_live = gate_census._live_flag_count(CENSUS, "exempt-by-incompleteness")
     if vacuous_live == gate_census.FLAG_PRECISION["vacuous-empty"].n_flagged and incomplete_live == (
         gate_census.FLAG_PRECISION["exempt-by-incompleteness"].n_flagged
     ):
-        assert "DRIFT" not in report
-    else:  # pragma: no cover - only exercised once the live corpus has actually moved
-        assert "DRIFT" in report
+        assert "DRIFT" not in error_bars
+    else:  # the corpus has moved since the last draw — the note is the whole point
+        assert "DRIFT" in error_bars
 
 
 def test_drift_note_fires_on_a_synthetic_census_when_the_live_count_has_moved():
     """Independently testable without waiting for the real corpus to drift — a hand-built
-    census whose live `vacuous-empty` count no longer matches the recorded sample's 38
-    must produce a visible note, mirroring `PROVEN_CAN_FAIL`'s stale-name refusal."""
+    census whose live `vacuous-empty` count no longer matches the recorded sample
+    must produce a visible note, mirroring `PROVEN_CAN_FAIL`'s stale-name refusal.
+
+    The matching arm is DERIVED from the recorded sample rather than typed, so a future
+    re-sample cannot leave this test asserting against a number that moved (which is what
+    happened to it on 2026-08-27: the hardcoded 27 became a drift the moment the
+    exempt-by-incompleteness population was re-drawn at 40)."""
+    n_match = gate_census.FLAG_PRECISION["exempt-by-incompleteness"].n_flagged
     synthetic = {
-        "gates": [{"risk_flags": ["vacuous-empty"]} for _ in range(5)] + [{"risk_flags": ["exempt-by-incompleteness"]} for _ in range(27)],
+        "gates": [{"risk_flags": ["vacuous-empty"]} for _ in range(5)]
+        + [{"risk_flags": ["exempt-by-incompleteness"]} for _ in range(n_match)],
         "counters": {"ci": {"steps_nongate": 1, "by_enforcement_only": 1, "by_verb_only": 1, "by_both": 1}},
     }
     report = gate_census._render_error_bars(synthetic)
     assert "DRIFT" in report
     assert "live count is now 5" in report
     # the flag that DID match its recorded population must not also be flagged
-    assert "live count is now 27" not in report
+    assert f"live count is now {n_match}" not in report
 
 
 def test_live_flag_count_counts_gates_carrying_the_flag():
