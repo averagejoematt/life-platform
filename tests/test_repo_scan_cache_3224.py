@@ -12,6 +12,7 @@ coverage-instrumented lane, and THREE tests asserted it against the identical
 unmutated tree.
 """
 
+import ast
 import subprocess
 import sys
 from pathlib import Path
@@ -25,12 +26,19 @@ import repo_scan_cache  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _clean_cache():
-    """Each test starts from an empty cache and leaves one behind, so this file can
-    never depend on — or poison — another test's memoized scans."""
-    repo_scan_cache.cache_clear()
-    yield
-    repo_scan_cache.cache_clear()
+def _private_cache(monkeypatch):
+    """Each test gets its OWN empty memo table, and monkeypatch restores the shared
+    one afterwards.
+
+    The first version of this fixture called `repo_scan_cache.cache_clear()` on the
+    SHARED table instead — a live defect, caught by PR #3231's own CI `--durations`
+    block and by nothing else. This file sorts between `test_doc_facts_ops_*.py` and
+    `test_wiki_checkers.py`, so clearing here threw away a scan already paid for:
+    `test_wiki_checkers.py::test_doc_facts_clean` re-spawned at 21.59s and half of
+    #3224's saving silently evaporated while all 12 tests below stayed green. Swap,
+    never clear.
+    """
+    monkeypatch.setattr(repo_scan_cache, "_run_once", repo_scan_cache.new_cache())
 
 
 def _counting_run(counter):
@@ -165,6 +173,28 @@ def test_i_the_advisory_run_is_deliberately_not_shared():
     assert 'run_repo_scan("scripts/check_doc_facts.py")' not in advisory, (
         "the decade-stale-clock advisory run was routed onto the plain scan's cache key — it would then "
         "assert against output produced by a different clock"
+    )
+
+
+def test_k_this_files_own_fixture_must_never_clear_the_SHARED_cache():
+    """The regression guard for the defect this file itself shipped on #3231's first
+    CI run. An autouse `cache_clear()` here is invisible — every test still passes and
+    the only symptom is a ~21.6s scan reappearing in a `--durations` block nobody
+    reads. Structural, because that is the only layer at which it is visible at all."""
+    src = (_REPO / "tests" / "test_repo_scan_cache_3224.py").read_text(encoding="utf-8")
+    fn = next(
+        (n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == "_private_cache"),
+        None,
+    )
+    assert fn is not None, "the autouse fixture `_private_cache` is gone (#3224)"
+    # AST, not a substring sweep — this file's own docstrings quote `cache_clear()`
+    # while explaining the incident, and a text match would flag the explanation.
+    called = {node.func.attr for node in ast.walk(fn) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)}
+    assert "new_cache" in called, "the autouse fixture no longer swaps in a private memo table (#3224)"
+    assert "cache_clear" not in called, (
+        "the autouse fixture clears the SHARED cache — it runs between "
+        "tests/test_doc_facts_ops_*.py and tests/test_wiki_checkers.py and will silently "
+        "re-spawn a whole-repo scan the suite already paid for (#3224)"
     )
 
 
