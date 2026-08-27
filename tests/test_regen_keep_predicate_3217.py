@@ -89,10 +89,10 @@ def test_removing_the_fabricated_number_is_kept_even_when_the_total_grows():
     assert not (len(after) < len(before))
 
     assert "fabricated_number" not in _types(after), "the rewrite must actually fix the figure"
-    keep, arm, note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is True, "a rewrite that removes an invented figure must be kept"
     assert arm == rkp.KEEP_FIGURE_REMOVED
-    assert "figures 1->0" in note
+    assert rkp.describe_delta(before, after) == "figures 1->0 total 1->3"
 
 
 def test_regen_once_end_to_end_keeps_the_figure_fixing_rewrite():
@@ -125,7 +125,7 @@ def test_rewrite_that_removes_nothing_and_scores_worse_is_discarded():
     assert 326.3 in [f.get("claimed") for f in after], "fixture must not fix anything"
     assert len(after) > len(before)
 
-    keep, arm, _note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is False
     assert arm == rkp.DISCARD_FIGURE_INTRODUCED
 
@@ -133,7 +133,7 @@ def test_rewrite_that_removes_nothing_and_scores_worse_is_discarded():
 def test_identical_rewrite_is_discarded():
     """The no-op case: a 'rewrite' that changed nothing must never be kept."""
     before = after = _findings(DRAFT)
-    keep, arm, _note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is False and arm == rkp.DISCARD_NOT_BETTER
 
 
@@ -144,7 +144,7 @@ def test_more_framing_findings_alone_never_keeps_a_rewrite():
     worse = clean + " That is a hit. I was right about the direction."
     before, after = _findings(clean), _findings(worse)
     assert before == [] and len(after) >= 1
-    keep, arm, _note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is False and arm == rkp.DISCARD_NOT_BETTER
 
 
@@ -164,7 +164,7 @@ def test_removing_one_figure_while_introducing_another_is_discarded():
     assert [f["claimed"] for f in before] == [326.3]
     assert [f["claimed"] for f in after] == [312.8], "the swap must be a genuine removes-one/adds-one"
 
-    keep, arm, _note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is False, "trading one invented figure for another is not a correctness improvement"
     assert arm == rkp.DISCARD_FIGURE_INTRODUCED
 
@@ -174,7 +174,7 @@ def test_swap_across_figure_classes_is_also_discarded():
     Both are FIGURE classes, so the sub-multiset test must catch it."""
     before = [{"type": "fabricated_number", "claimed": 326.3, "detail": "..."}]
     after = [{"type": "fabricated_date", "claimed": "2026-01-02", "detail": "..."}]
-    keep, arm, _note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is False and arm == rkp.DISCARD_FIGURE_INTRODUCED
 
 
@@ -182,7 +182,7 @@ def test_a_figure_removed_and_a_framing_finding_added_is_kept():
     """The deliberate asymmetry, stated as a test so a future reader sees it was chosen."""
     before = [{"type": "fabricated_number", "claimed": 326.3, "detail": "..."}]
     after = [{"type": "stale_phase", "detail": "..."}, {"type": "ungrounded_behavioral", "detail": "..."}]
-    keep, arm, _note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is True and arm == rkp.KEEP_FIGURE_REMOVED
 
 
@@ -192,7 +192,7 @@ def test_a_figure_removed_and_a_framing_finding_added_is_kept():
 def test_strictly_fewer_still_fires_and_is_named_as_the_old_arm():
     before = [{"type": "stale_phase", "detail": "a"}, {"type": "stale_phase", "detail": "b"}]
     after = [{"type": "stale_phase", "detail": "a"}]
-    keep, arm, _note = rkp.keep_rewrite(before, after)
+    keep, arm = rkp.keep_rewrite(before, after)
     assert keep is True and arm == rkp.KEEP_STRICTLY_FEWER
 
 
@@ -217,7 +217,7 @@ def test_the_new_arm_is_purely_ADDITIVE_over_the_old_predicate():
     checked = 0
     for before in combos:
         for after in combos:
-            keep, arm, _n = rkp.keep_rewrite(before, after)
+            keep, arm = rkp.keep_rewrite(before, after)
             if len(after) < len(before):
                 assert keep is True and arm == rkp.KEEP_STRICTLY_FEWER, f"regressed an old keep: {before} -> {after}"
                 checked += 1
@@ -272,9 +272,48 @@ def test_every_figure_type_is_a_type_the_grounder_can_actually_emit():
 
 
 def test_malformed_findings_never_raise():
-    assert rkp.keep_rewrite(None, None) == (False, rkp.DISCARD_NOT_BETTER, "figures 0->0 total 0->0")
+    assert rkp.keep_rewrite(None, None) == (False, rkp.DISCARD_NOT_BETTER)
+    assert rkp.describe_delta(None, None) == "figures 0->0 total 0->0"
     # Non-dict entries still COUNT toward the composite (they are findings the caller
     # produced); they simply contribute nothing to the figure census.
     junk_before = ["not a dict", 7]
     junk_after = [{"type": "fabricated_number", "claimed": 1.0}, "still not a dict"]
-    assert rkp.keep_rewrite(junk_before, junk_after) == (False, rkp.DISCARD_FIGURE_INTRODUCED, "figures 0->1 total 2->2")
+    assert rkp.keep_rewrite(junk_before, junk_after) == (False, rkp.DISCARD_FIGURE_INTRODUCED)
+    assert rkp.describe_delta(junk_before, junk_after) == "figures 0->1 total 2->2"
+
+
+# ── log hygiene: no draft text may reach a log line ───────────────────────────────────
+
+
+def test_nothing_a_caller_logs_can_carry_finding_TEXT():
+    """CodeQL flagged the first cut of this module `py/clear-text-logging-sensitive-data`
+    (high): a census string built over a findings-derived container carried the taint into
+    `regen_discard_telemetry.logger.error`. A findings list is derived from an AI draft
+    about Matthew's health, so that hazard is real, not notional.
+
+    Both loggable values are now content-free by construction: the arm is one of four
+    module constants, and the census is four integers. Pinned with a distinctive marker
+    planted in every text-bearing field of the findings."""
+    marker = "MATTHEW-PRIVATE-NARRATIVE-MARKER"
+    before = [{"type": "fabricated_number", "claimed": f"326.3 {marker}", "detail": marker, "excerpt": marker}]
+    after = [{"type": "stale_phase", "detail": marker, "claim": marker}]
+
+    _keep, arm = rkp.keep_rewrite(before, after)
+    note = rkp.describe_delta(before, after)
+
+    assert marker not in arm and marker not in note
+    assert arm in {rkp.KEEP_STRICTLY_FEWER, rkp.KEEP_FIGURE_REMOVED, rkp.DISCARD_FIGURE_INTRODUCED, rkp.DISCARD_NOT_BETTER}
+    assert note == "figures 1->0 total 1->1"
+
+
+def test_the_discard_log_line_carries_no_finding_text_end_to_end():
+    marker = "MATTHEW-PRIVATE-NARRATIVE-MARKER"
+
+    def _marked(_t):
+        return [{"type": "fabricated_number", "claimed": 1.0, "detail": marker}]
+
+    with mock.patch.object(gg._regen_telemetry, "log_discard") as m:
+        gg.regen_once("draft " + marker, _marked, lambda _c: "rewrite " + marker, surface="test_3217_hygiene")
+    args, kwargs = m.call_args
+    assert marker not in " ".join(str(a) for a in args)
+    assert marker not in " ".join(f"{k}={v}" for k, v in kwargs.items())

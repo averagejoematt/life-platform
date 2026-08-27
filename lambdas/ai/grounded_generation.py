@@ -892,12 +892,14 @@ def regen_once(text: str, findings_fn, regen_fn, surface: str = "unknown"):
         _regen_telemetry.log_discard("empty_response", surface, len(findings))
         return text, findings, False
     fixed_findings = findings_fn(fixed)
-    keep, arm, note = _keep_predicate.keep_rewrite(findings, fixed_findings)
+    keep, arm = _keep_predicate.keep_rewrite(findings, fixed_findings)
+    # Counts only — never a finding's detail text. See regen_keep_predicate's "Log hygiene".
+    note = _keep_predicate.describe_delta(findings, fixed_findings)
     if keep:
         if arm == _keep_predicate.KEEP_FIGURE_REMOVED:
             # #3217: the arm that did NOT exist before. Say so — this is the case that
             # was previously a silent discard and reached the gate with a bad figure.
-            print(f"[REGEN_KEPT] arm={arm} surface={surface} {note}")
+            print("[REGEN_KEPT] arm=%s surface=%s %s" % (arm, surface, note))
         return fixed, fixed_findings, True
     _regen_telemetry.log_discard(arm, surface, len(findings), reason=note)
     return text, findings, False

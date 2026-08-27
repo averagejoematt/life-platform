@@ -54,6 +54,16 @@ asymmetry is deliberate and is the issue's thesis: a framing/scope finding says 
 narrative located a true fact wrongly; a figure finding says the number is not real. Only
 the second is the categorical class ADR-104 refuses to let a score overrule.
 
+## Log hygiene
+
+`keep_rewrite` returns only a bool and one of four module-constant arm names, and the
+census `describe_delta` renders is four INTEGERS. Nothing derived from a finding's text
+can reach a log line through either. That is not fastidiousness: a findings list is
+derived from an AI draft about Matthew's health, and CodeQL's
+`py/clear-text-logging-sensitive-data` flagged the first cut of this module (high) where a
+census string built over a findings-derived container carried the taint into
+`regen_discard_telemetry.logger.error`.
+
 Pure functions — no AWS, no HTTP, no I/O. Fail-soft on malformed findings (a non-dict
 entry is ignored rather than raising into a generation path).
 """
@@ -117,25 +127,61 @@ def figure_census(findings: Optional[Iterable[Any]]) -> "Counter[str]":
     return census
 
 
-def keep_rewrite(before: Optional[List[Any]], after: Optional[List[Any]]) -> Tuple[bool, str, str]:
-    """Decide whether `regen_once` keeps the rewrite. Returns ``(keep, arm, note)``.
+def figure_count(findings: Optional[Iterable[Any]]) -> int:
+    """How many FIGURE-class findings, as a plain accumulated int.
+
+    Deliberately NOT ``sum(figure_census(...).values())``: this number is the only thing
+    about a finding that is ever allowed to reach a log line, and it must be impossible
+    for narrative text to ride along with it. A findings list is derived from an AI draft
+    about Matthew's health — logging any part of one in clear text is a real hazard, not a
+    hypothetical, and CodeQL's `py/clear-text-logging-sensitive-data` flagged exactly that
+    on the first cut of this module (a census string built with `sum()` over a
+    findings-derived container carried the taint all the way to `logger.error`). An integer
+    accumulated in a local cannot. See `describe_delta` below.
+    """
+    n = 0
+    for f in findings or []:
+        if isinstance(f, dict) and f.get("type") in FIGURE_TYPES:
+            n += 1
+    return n
+
+
+def describe_delta(before: Optional[List[Any]], after: Optional[List[Any]]) -> str:
+    """The compact census for the log line: FOUR INTEGERS and nothing else.
+
+    Built with `%d` over `int` values on purpose — no f-string over finding-derived
+    objects, no excerpt, no detail text. The observability #3217 asks for is "which
+    predicate dropped it and by how much", which needs counts, not content.
+    """
+    return "figures %d->%d total %d->%d" % (
+        figure_count(before),
+        figure_count(after),
+        len(before or []),
+        len(after or []),
+    )
+
+
+def keep_rewrite(before: Optional[List[Any]], after: Optional[List[Any]]) -> Tuple[bool, str]:
+    """Decide whether `regen_once` keeps the rewrite. Returns ``(keep, arm)``.
 
     `before` -- findings on the original draft. `after` -- findings on the rewrite.
-    `note` is a compact human-readable census for the discard log line.
+
+    The arm is one of the four module constants above — never a value derived from a
+    finding, so nothing a caller logs from this return can carry draft text. The
+    human-readable census is `describe_delta`, computed separately and only from counts.
     """
     n_before = len(before or [])
     n_after = len(after or [])
     fig_before = figure_census(before)
     fig_after = figure_census(after)
     introduced = fig_after - fig_before  # positive counts only: what the rewrite ADDED
-    note = f"figures {sum(fig_before.values())}->{sum(fig_after.values())} total {n_before}->{n_after}"
 
     if n_after < n_before:
-        return True, KEEP_STRICTLY_FEWER, note
+        return True, KEEP_STRICTLY_FEWER
     # #3217: dispositive. A strict sub-multiset means it removed a figure finding and
     # introduced none — kept regardless of what the composite total did.
     if not introduced and fig_after != fig_before:
-        return True, KEEP_FIGURE_REMOVED, note
+        return True, KEEP_FIGURE_REMOVED
     if introduced:
-        return False, DISCARD_FIGURE_INTRODUCED, note
-    return False, DISCARD_NOT_BETTER, note
+        return False, DISCARD_FIGURE_INTRODUCED
+    return False, DISCARD_NOT_BETTER
