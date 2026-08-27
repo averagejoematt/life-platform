@@ -139,24 +139,33 @@ Claude Code's cross-session memory for this project lives at:
 ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/
 ```
 
-It is **per-machine and NOT in git**. Contents (as of 2026-07-10: `MEMORY.md` + ~104
-topic files):
+It is **per-machine and NOT in git**. The file counts drift constantly, so read them
+rather than quoting them (`ls <dir> | wc -l`, `ls <dir>/reference_*.md | wc -l`). The
+four families:
 
 - **`MEMORY.md`** — the index: a categorized map of every topic file with a one-line
-  summary each. Read this first; it is the table of contents.
-- **`project_*.md`** (~64) — program/feature state: what shipped, what's pending, the
+  summary each. Read this first; it is the table of contents. Its `Review Discipline`
+  section is split out into `INDEX_review_discipline.md`.
+- **`project_*.md`** — program/feature state: what shipped, what's pending, the
   per-program narrative (e.g. experiment resets, the coach-portraits program).
-- **`reference_*.md`** (~23) — incident write-ups behind the rules in
-  `docs/CONVENTIONS.md`: the full story of each deploy/CI/git trap.
-- **`feedback_*.md`** (~16) — Matthew's working-style preferences and standing
-  authorization boundaries (e.g. "I run deploys", heartbeat progress).
-- **`security_*.md`** (1) — security incident detail kept out of the public repo.
+- **`reference_*.md`** — incident write-ups behind the repo's rules: the full story of
+  each trap. The **rules** live in `docs/CONVENTIONS.md` (deploy/CI/git) and
+  `docs/OPERATING_DISCIPLINE.md` (adjudicating work, driving a session); these files
+  carry the narrative that page deliberately does not.
+- **`feedback_*.md`** — Matthew's working-style preferences and standing authorization
+  boundaries (e.g. "I run deploys", heartbeat progress).
+- **`security_*.md`** — security incident detail kept out of the public repo.
 
 **The risk, plainly:** everything else on this page has at least one durable home
 (git, DynamoDB with PITR, GitHub). This directory exists on one laptop. If the laptop
-dies, the incident narratives and preference memory die with it — the rules survive in
-`docs/CONVENTIONS.md`, but the *why* behind them doesn't. Recommended operator habit —
-back it up to the private S3 bucket:
+dies, the incident narratives and preference memory die with it — the *rules* survive in
+`docs/CONVENTIONS.md` and `docs/OPERATING_DISCIPLINE.md`, but the *why* behind them does
+not. **#2848 audited the review-discipline half of this corpus on 2026-08-27** (154
+entries, classified one by one — the record is `docs/OPERATING_DISCIPLINE.md` Appendix A)
+and migrated the durable rules that had no repo home. What that audit did **not** move,
+and what a successor consequently still cannot learn from this repo, is listed in that
+page's §6 — including the standing deploy-authorization boundary, which lives only in
+`feedback_*` memory. Recommended operator habit — back it up to the private S3 bucket:
 
 ```bash
 aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/ \

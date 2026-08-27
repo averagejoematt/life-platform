@@ -10,6 +10,11 @@ copy while another stays stale (the failure mode that motivated this page: a dur
 fact — the version of the since-retired shared layer — drifted because it was
 hand-written in prose in two places instead of read from one source).
 
+**Scope.** This page owns the **deploy / CI / git** reflexes. The reflexes for *running
+the work* — verifying a finding, closing an issue, judging an epic, driving concurrent
+lanes, reading a record — are `docs/OPERATING_DISCIPLINE.md` (#2848). The architecture
+primitives are `docs/CHARTER.md`. One rule, one page.
+
 **The meta-rule:** a fact that drifts (a version, a count) never appears here as a
 hand-typed literal — only as the command that discovers it, or a value a tool keeps in
 sync. See [Facts that drift](#facts-that-drift-run-the-command-never-quote-a-number).
