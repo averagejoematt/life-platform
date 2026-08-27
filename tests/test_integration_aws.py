@@ -1041,18 +1041,24 @@ def test_i16_recent_ingest_records_exist():
     behavioral/paused exclusions are all read from
     `lambdas/ingestion/source_registry.py`.
     """
-    from datetime import datetime, timezone
+    from datetime import date, datetime, timezone
 
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
+    # #3222: EXPERIMENT_START_DATE names a PACIFIC calendar day, so "have we reached
+    # genesis yet" is a Pacific question — a UTC `today` declares genesis reached seven
+    # hours early every evening. `now` below stays UTC on purpose: it feeds an age-in-hours
+    # instant computation, not a day comparison.
     from common.constants import EXPERIMENT_START_DATE
+    from common.pacific_time import pacific_today
     from ingestion import source_registry as reg
 
     genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
     now = datetime.now(timezone.utc)
-    if now.date() < genesis:
-        pytest.skip(f"I16 SKIP: pre-genesis (today={now.date()}, genesis={genesis})")
+    today_pt = date.fromisoformat(pacific_today())
+    if today_pt < genesis:
+        pytest.skip(f"I16 SKIP: pre-genesis (today={today_pt}, genesis={genesis})")
 
     # Infrastructure sources only: monitored, not paused, not behavioral. A
     # behavioral source's staleness is a logging lapse and never pages (see the
@@ -1116,15 +1122,20 @@ def test_i17_character_sheet_recent_record():
     routinely 1-2 days old (offset 2 before the run lands, offset 1 after). Window is 3
     days to match that cadence rather than flaking every morning before 16:30 UTC.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import date, datetime, timedelta
 
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
     from common.constants import EXPERIMENT_START_DATE
 
+    # #3222: `character_sheet` rows are keyed `DATE#{pacific day}` and genesis is a
+    # Pacific day, so both the skip and the offsets below have to be asked in that frame.
+    # A UTC `today` spent the 17:00-PT-to-midnight window probing tomorrow-Pacific first.
+    from common.pacific_time import pacific_today
+
     genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
-    today = datetime.now(timezone.utc).date()
+    today = date.fromisoformat(pacific_today())
     if today < genesis:
         pytest.skip(f"I17 SKIP: pre-genesis (today={today})")
 
@@ -1165,15 +1176,19 @@ def test_i17_character_sheet_recent_record():
 @pytest.mark.integration
 def test_i18_daily_brief_recently_invoked():
     """I18: daily-brief Lambda has been invoked successfully in the past 48h."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import date, datetime, timedelta, timezone
 
     boto3 = _get_boto3()
 
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
     from common.constants import EXPERIMENT_START_DATE
 
+    # #3222: the genesis comparison is a Pacific-day question (the CloudWatch window
+    # below is a real UTC instant range and stays UTC).
+    from common.pacific_time import pacific_today
+
     genesis = datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()
-    today = datetime.now(timezone.utc).date()
+    today = date.fromisoformat(pacific_today())
     if today < genesis:
         pytest.skip(f"I18 SKIP: pre-genesis (today={today})")
 

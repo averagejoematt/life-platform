@@ -51,6 +51,7 @@ os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 
 import pytest  # noqa: E402
+from common.pacific_time import pacific_today  # noqa: E402  # #3222: the frame tools_labs ages against
 from ingestion import source_state as ss  # noqa: E402
 from ingestion.source_registry import DEFAULT_STALE_HOURS, SOURCE_REGISTRY  # noqa: E402
 
@@ -131,18 +132,14 @@ class _FreshnessTable:
         return {}
 
 
-def _today() -> str:
-    import datetime as _dt
-
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
-
-
 def test_withings_status_and_source_state_agree_at_5_days_against_a_7_day_threshold(monkeypatch):
     """The live repro from the issue: withings 5 days old against its 168h/7d registry
     threshold must read 'fresh'/'live' on BOTH fields — never 'fresh' + 'stale' in the
     same row. Ages relative to the real wall clock (the tool has no injectable seam),
     matching the established pattern in test_paused_is_not_stale_2715.py."""
-    last_date = (date.today() - timedelta(days=5)).isoformat()
+    # #3222: `date.today()` is the RUNNER's naive clock — Pacific on a laptop, UTC in CI.
+    # The tool ages rows against `pacific_now().date()`, so the fixture reads that frame.
+    last_date = (date.fromisoformat(pacific_today()) - timedelta(days=5)).isoformat()
     t = _FreshnessTable({"withings": [{"pk": "USER#matthew#SOURCE#withings", "sk": f"DATE#{last_date}", "date": last_date}]})
     monkeypatch.setattr(tools_labs, "table", t)
     out = tools_labs.tool_get_freshness_status({"sources": ["withings"]})
@@ -154,7 +151,7 @@ def test_withings_status_and_source_state_agree_at_5_days_against_a_7_day_thresh
 
 def test_notion_at_6_days_against_its_14_day_threshold_also_agrees(monkeypatch):
     """The issue's second named example: notion 6d old vs 336h/14d threshold."""
-    last_date = (date.today() - timedelta(days=6)).isoformat()
+    last_date = (date.fromisoformat(pacific_today()) - timedelta(days=6)).isoformat()
     t = _FreshnessTable({"notion": [{"pk": "USER#matthew#SOURCE#notion", "sk": f"DATE#{last_date}", "date": last_date}]})
     monkeypatch.setattr(tools_labs, "table", t)
     out = tools_labs.tool_get_freshness_status({"sources": ["notion"]})

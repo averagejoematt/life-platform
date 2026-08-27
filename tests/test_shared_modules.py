@@ -19,7 +19,7 @@ import logging
 import os
 import sys
 import traceback
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock
 
@@ -388,6 +388,7 @@ from common.digest_utils import (
     fmt_num,
     safe_float,
 )
+from common.pacific_time import pacific_now  # #3222: the frame digest_utils' Banister loop reads
 
 
 def test_d2f_decimal():
@@ -521,7 +522,11 @@ def test_banister_zero_input():
 
 
 def test_banister_with_training():
-    today = datetime.now(timezone.utc).date()
+    # #3222: `compute_banister_from_dict` walks backwards from `pacific_now().date()`
+    # over Pacific-keyed DATE# days (#2811). Seeding the dict from a UTC "today" put the
+    # newest row on tomorrow-Pacific every evening 17:00 PT → midnight, so the decay
+    # loop's first step read a day this fixture never wrote. Same helper the handler calls.
+    today = pacific_now().date()
     strava = {}
     for i in range(30):
         d = (today - timedelta(days=i)).isoformat()
