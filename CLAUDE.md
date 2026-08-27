@@ -208,32 +208,35 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-27 (Opus 5, autonomous ~3h — *"Boot Session E"* of
-`~/.claude/plans/dynamic-imagining-prism.md`; efficacy review + Session F plan produced
-with the owner, wrap run on their instruction). **Main GREEN at 678a0598.** All-Opus,
-Fable untouched. **5 closed with verdicts** (#3187, **#3212** filed-and-closed same
-session, #3207, **#2811**, **#3202**), **6 PRs merged**, fleet deployed at `81662a9d` —
-CI's Deploy job took the *"Fleet deploy (shared module changed)"* path itself, so the
-planned manual `deploy_fleet.sh` would have been a redundant concurrent deploy; ancestry
-postflight sha-verified on 6 functions and bundle contents spot-checked. **But 7 were
-filed, so `Now` started at 10 and ended at 10 — net +2, the second consecutive treadmill
-session.** That is the headline finding, and Session F's owner-approved plan
-(`~/.claude/plans/purring-doodling-boot.md`) is built on it: new filings default to
-`Later`, S-effort disjoint-file fixes batch into ONE PR, and boot pre-flights the gates
-that will fire on each lane (3 of 4 rework cycles tonight were foreseeable —
-`COACH_STANCE.md` was printed at 0d headroom in the boot output an hour before it redded
-#3215). **#3202 falsified its own hypothesis on the wire**: the hold was `stale_phase`, a
-matcher that banned every "Day N" token while its docstring claimed framing-scope — the
-coach was held for citing the *correct* day in a comparative clause. Its first fix opened a
-new blind spot the tests pinned as intended; narrowed to `n < expected_day`. **#2811's
-matcher extension found a 23rd site in a package two prior slices certified at zero.**
-**Main went red on Session D's own timezone fix** — #3206 moved two handlers to
-`pacific_today()` while their fixtures stayed UTC, failing 7 hours of every 24; #3206's CI
-ran outside its own failure window, so it shipped green and broke 24h later on unrelated
-work (#3223 fixes it; the 14-file sweep stays open on #3222, deliberately not `Fixes`).
-**5 GitHub event swallows** (vs 5 in the whole program before tonight) and **budget tier
-escalated to 2 at 17:00 PT**, which pauses coach narratives — so #3202's last acceptance
-box is unproven until a brief runs with tier < 2; the only effective override window is
-16:00–17:00Z (`cost_governor` runs `cron(0 0/8 * * ? *)`). **Next:** the #3221+#3219+#3220
-batch · #3204's raw-layer read (matured 08-27T19:00Z) · #3217 · #3222's sweep · owner batch
-16 items. Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-27 (Opus 5, **autonomous 9h overnight**, owner asleep — the OVERNIGHT
+boot prompt of `~/.claude/plans/purring-doodling-boot.md`). **Main GREEN at c78730ae.** All-Opus,
+Fable untouched. **11 closed with verdicts** (#2961, #3217, #3221, #3219, #3220, #3085, #3222,
+#3224, #2817, #3065, #3213), **12 PRs merged**, **ZERO standalone issues filed** — six findings
+folded onto existing epics as §10 checkboxes (#2799 ×1, #2578 ×3, #2798 ×2). **Open 58 → 47: net
+−11**, ending the two-session treadmill (D +1, E +2). The batch rule alone closed three issues in
+one CI cycle (#3228). Three deploys, each verified by **content** not sha — the fleet bundle was
+unzipped and grepped to confirm `regen_keep_predicate.py` present AND its caller wired. **The
+session's through-line was instruments that report success without doing their job**, found five
+times independently: the gate census counted **ten libraries as gates** on a filename substring
+(560→551 — #2578's own denominator, wrong by ten); the engine-doc gate compares **dates, not
+content**, and `COACH_STANCE.md` had **18 of 27 citations wrong** while its stamp claimed it had
+re-checked a line that is blank; `TruncatedResponses` has never fired for the function it guards;
+the auto-reconcile job reported `success` while leaving the tree drifted **twice, redding main both
+times**; and my own negative control passed vacuously (`find_module`, removed in 3.12). **#3234 is
+the best find** — the reconcile job could never derive the census fact because `setup-ci` installs
+no packages and `gate_census` needs PyYAML: **#3156's second home**, missed when that issue fixed
+`docs-ci.yml`. Proved with a control, and **proven live within the hour** (`1d5513b9c` cleared drift
+unaided). My first diagnosis of it was wrong and the correction is posted publicly on #2578. **A
+gate caught a live reader-facing bug nobody was looking for** — `/api/source_freshness` served a
+**future date** for 7h a day; #3232 ruled the frame before touching the display and refused to
+clamp. **Three lanes falsified the premise of the issue they were sent to fix** (#3217's "composite
+score" does not exist; #2817's 57 sites were already swept by #3196 — which *introduced* the one
+real defect, a Pacific day anchored at UTC midnight that sent a live inflated SNS alert; #3224's
+growth is 79.7% existing tests slowing, closed **without a budget raise**, a first in five
+instances). Gotchas: a deploy lease **stranded 7.5h** whose approval would have rolled back two
+live-deployed fixes; #3222 **falsely auto-closed** by a shared-scratchpad path collision, not a
+mistyped number; **#3231 shipped half-broken with all 12 tests green** (a perf fix has no failing
+test). **Zero event swallows** vs five in Session E. **Next:** #3204 (its lane never reported) ·
+#2883 · #2888 · #2835/#3079 (promoted this wrap) · #2578's three new checkboxes · owner batch 16
+items, now including two tokens measured load-bearing tonight. Full narrative:
+`handovers/HANDOVER_LATEST.md`.
