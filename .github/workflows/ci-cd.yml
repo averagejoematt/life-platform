@@ -356,46 +356,48 @@ jobs:
       # #2578 — THE JOB MUST NOT REPORT SUCCESS ON A TREE IT LEFT DRIFTED.
       #
       # Everything above verifies the COMMIT (whitelist-clean, pushed). Nothing above
-      # verifies the RESULT. That gap is what #3234 fell through twice on 2026-08-27:
-      # a fact that could not be derived was skipped honestly, the generators then left
-      # the tree byte-identical, `DIRTY` was empty, this job printed "✅ derived
-      # artifacts already match config truth" and went green — and `test / Unit Tests`
-      # IN THE SAME RUN failed on the literal drift the job had just declined to fix.
-      # Main went red twice with a green reconcile job sitting above it. Installing the
-      # missing dep fixed that instance; it did not give the job a way to notice the
-      # NEXT one, and any other fact whose discoverer can return None has the identical
-      # shape (deploy/sync_census_fact.py's `families_skipped` refusal is the second
-      # such shape, found while writing this step).
+      # verifies that the generators could actually DO anything. That gap is what #3234
+      # fell through twice on 2026-08-27: a fact that could not be derived was skipped
+      # honestly (correct, #3156), the generators then left the tree byte-identical,
+      # `DIRTY` was empty, this job printed "✅ derived artifacts already match config
+      # truth" and went green — and `test / Unit Tests` IN THE SAME RUN failed on the
+      # literal drift the job had just declined to fix. Main went red twice with a green
+      # reconcile job sitting above it. Installing the missing dep fixed that instance; it
+      # gave the job no way to notice the next one.
       #
-      # The verdict is `--check`, on the tree this job is leaving behind. That is not a
-      # new opinion: `tests/test_sync_doc_metadata_check.py::test_check_is_clean_on_repo_head`
-      # already asserts exactly this, on exactly this tree, one job later — so this step
-      # adds NO false-positive surface. All it changes is WHERE the failure surfaces and
-      # what it says: here, naming reconcile, instead of two jobs later as a mystery unit
-      # test on someone else's commit.
+      # WHAT THIS IS NOT: it is NOT `sync_doc_metadata --check`. That is a DOC GATE, and a
+      # doc gate in the deploy pipeline is #1908's one-way trap — it fails on a code push,
+      # its remediation is by definition a docs edit, `docs/**` is not in this workflow's
+      # `paths:` filter, so the fix cannot re-run the workflow it fixed; check_main_green
+      # reads CI/CD only, so main keeps reporting the stale failure until a manual
+      # `workflow_dispatch` that also runs Plan -> Deploy. Three occurrences in three days
+      # (#1900/#1906/#1914), and once more at this session's boot. `docs-ci.yml` is the
+      # gates' single home, already runs `--check` as a blocking gate, and already triggers
+      # on BOTH halves of the coupling — the drift verdict is already where a docs-only fix
+      # can clear it, and it stays there.
       #
-      # Deliberately a separate step, not a line appended to the one above: a compound
-      # command hands its exit status to whatever ran last, which is the swallow idiom
-      # the gate census flags (`_SWALLOW`) and the one this repo has been bitten by.
-      # Runs on push only — the reconcile step no-ops on every other event.
+      # WHAT THIS IS: a self-check on the job's own capability. Not "does the committed
+      # tree match derived truth" (docs) but "could this job derive the facts it owns at
+      # all" (environment). It reads no doc and compares no literal. Its only two failure
+      # modes are a MISSING DEPENDENCY in this lane and an INCOMPLETE census sweep — fixed
+      # under .github/workflows/**, deploy/**, scripts/**, tests/**, every one of them
+      # inside this workflow's paths filter. The failing push's own remediation re-triggers
+      # the job and clears it, so #1908's trap structurally cannot form here.
       #
-      # KNOWN AND INTENDED CONSEQUENCE: every downstream job carries `needs: reconcile`,
-      # so this step failing now stops the deploy pipeline. `test / Unit Tests` failing on
-      # the same drift did NOT — `plan` needs `test-critical`, not `test` — so this is a
-      # real widening, and it is the correct one: the drift `--check` reports includes
-      # `lambdas/web/platform_counts.py`, which is RUNTIME CODE that ships in the bundle
-      # and is served by site-api. Deploying a tree whose generated single-writer counter
-      # module disagrees with config truth is the thing worth refusing, and a reconcile
-      # job that could not do its job is exactly when to refuse it.
-      - name: Reconcile verdict — the tree this job leaves must be literal-clean (#2578)
+      # Plain idempotence (`--apply` twice, assert no diff) was considered and does NOT
+      # work: with the dep absent the generator SKIPS its rule, so both runs leave the tree
+      # identical and idempotence is green while the fact is stale. It cannot tell
+      # "converged" from "converged because I declined to compute anything" — and the
+      # declining is the defect. See the script's docstring.
+      #
+      # KNOWN AND INTENDED CONSEQUENCE: every downstream job carries `needs: reconcile`, so
+      # this failing stops the deploy pipeline. That is correct for THIS failure class —
+      # "my generators cannot run" means the reconciled tree is unverified, and
+      # `lambdas/web/platform_counts.py` is runtime code that ships in the bundle. It is
+      # also safe, because this class is always cleared by a code push.
+      - name: Reconcile self-check — every fact this job owns must be DERIVABLE here (#2578)
         if: github.event_name == 'push'
-        run: |
-          set -euo pipefail
-          if ! python3 deploy/sync_doc_metadata.py --check; then
-            echo "::error::reconcile left the tree DRIFTED. The generators ran (and any commit above was pushed), but 'python3 deploy/sync_doc_metadata.py --check' is still non-zero on the result — so this job would have reported success while 'test / Unit Tests' failed on the same tree later in this run (#3234, twice on 2026-08-27). Read the --check output above: a literal it could not DERIVE is skipped with a printed reason (that skip is correct, #3156 — the missing piece is usually a dependency this job's environment lacks; the shared setup-ci composite installs no packages, so add the pin here the way 'Install census dependency (PyYAML)' does). A literal it derived and could not WRITE is a generator/RULES bug. Either way the fix belongs in this job, not in a manual push to main."
-            exit 1
-          fi
-          echo "✅ sync_doc_metadata --check is clean on the reconciled tree"
+        run: python3 deploy/verify_doc_facts_derivable.py
 
   # ════════════════════════════════════════════════════════════════
   # Job 1: Lint + Syntax Check
