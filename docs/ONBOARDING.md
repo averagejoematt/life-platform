@@ -253,6 +253,39 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 
 ---
 
+## Cold Start — operating with no session memory
+
+The section above onboards someone who wants to *understand* the platform. This one is
+for someone — human or a fresh Claude session with no personal memory — who has to
+**operate** it today: pick work, change it, land it, and know what they are not allowed
+to do. Every artifact named here is in this repo. Read them in this order; each one
+answers the question in the middle column and nothing else has to be remembered.
+
+| Read | It answers | Notes |
+|---|---|---|
+| `CLAUDE.md` | What is this, what are the hard conventions, what did the last session do | The session-status block at the bottom is ephemeral — last session's summary, replaced each wrap |
+| `handovers/HANDOVER_LATEST.md` | Where were we; what is in flight, deployed, or waiting on a human | The only handover on `main`; history is on the `session-archive` branch |
+| `docs/CHARTER.md` | The five architecture primitives and the paved roads | Boot from this, not from re-reading prose docs |
+| `docs/CONVENTIONS.md` | Deploy, CI gates, merge/git mechanics, doc-sync literals, rollback | Read before touching anything that deploys. §9 is the defect-class → owning-gate index |
+| `docs/OPERATING_DISCIPLINE.md` | How work is adjudicated and a session is driven: verifying a finding, closing an issue, judging an epic, concurrency, watchers | §6 is the honest list of what this repo still cannot tell you |
+| `docs/CONTINUITY.md` | Every state surface that is not in `docs/` — the session log, DynamoDB platform memory, the laptop-only assets, the S3 runtime config | Read this before assuming the repo is the whole system |
+| `scripts/backlog_next.py` | What to work on — the open corpus ranked by each issue's stored ADR-099 score | Run it; the backlog is GitHub Issues, not a file |
+| `scripts/blast_radius.py` | What a change touches, and what feeds a module | Query it (`--touches` / `--feeds`) instead of re-deriving from prose |
+| `docs/QUICKSTART.md` | AWS auth, running tests, deploying a Lambda, rolling back | Commands, not concepts |
+| `CONTRIBUTING.md` | Hooks, branch/PR/commit conventions, the local check set | Run `bash scripts/install_hooks.sh` once after cloning |
+| `deploy/agent_commit.sh` | How to commit without carrying generated doc-sync literals onto a branch | Name paths explicitly; read its output, never pipe it |
+| `deploy/wait_pr_green.sh` | Whether a PR's checks are genuinely green | The only sanctioned watcher; it asserts the expected checks by name and never merges |
+| `.claude/agents/finding-verifier.md` | How to second-pass a review finding before acting on it | ~50% of first-pass findings are false positives |
+| `.claude/agents/worktree-implementer.md` | One issue → one worktree → one open PR, with the collision classes baked in | Worktrees live outside the repo checkout |
+| `docs/DECISIONS.md` | Why anything is the way it is, and whether a decision was later amended | Always read to the end of an ADR, then look for a dated amendment |
+
+Two artifacts a fresh session will look for and **not** find in the repo: a statement of
+who may run a production deploy, and a description of the multi-lane concurrency pattern.
+Both are named in `docs/OPERATING_DISCIPLINE.md` §6 as open gaps rather than quietly
+assumed.
+
+---
+
 ## Read These Next
 
 1. `docs/QUICKSTART.md` — set up AWS, run tests, deploy a Lambda, check daily-brief output, roll back
