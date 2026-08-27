@@ -208,35 +208,32 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-27 (Opus 5, **autonomous 9h overnight**, owner asleep — the OVERNIGHT
-boot prompt of `~/.claude/plans/purring-doodling-boot.md`). **Main GREEN at c78730ae.** All-Opus,
-Fable untouched. **11 closed with verdicts** (#2961, #3217, #3221, #3219, #3220, #3085, #3222,
-#3224, #2817, #3065, #3213), **12 PRs merged**, **ZERO standalone issues filed** — six findings
-folded onto existing epics as §10 checkboxes (#2799 ×1, #2578 ×3, #2798 ×2). **Open 58 → 47: net
-−11**, ending the two-session treadmill (D +1, E +2). The batch rule alone closed three issues in
-one CI cycle (#3228). Three deploys, each verified by **content** not sha — the fleet bundle was
-unzipped and grepped to confirm `regen_keep_predicate.py` present AND its caller wired. **The
-session's through-line was instruments that report success without doing their job**, found five
-times independently: the gate census counted **ten libraries as gates** on a filename substring
-(560→551 — #2578's own denominator, wrong by ten); the engine-doc gate compares **dates, not
-content**, and `COACH_STANCE.md` had **18 of 27 citations wrong** while its stamp claimed it had
-re-checked a line that is blank; `TruncatedResponses` has never fired for the function it guards;
-the auto-reconcile job reported `success` while leaving the tree drifted **twice, redding main both
-times**; and my own negative control passed vacuously (`find_module`, removed in 3.12). **#3234 is
-the best find** — the reconcile job could never derive the census fact because `setup-ci` installs
-no packages and `gate_census` needs PyYAML: **#3156's second home**, missed when that issue fixed
-`docs-ci.yml`. Proved with a control, and **proven live within the hour** (`1d5513b9c` cleared drift
-unaided). My first diagnosis of it was wrong and the correction is posted publicly on #2578. **A
-gate caught a live reader-facing bug nobody was looking for** — `/api/source_freshness` served a
-**future date** for 7h a day; #3232 ruled the frame before touching the display and refused to
-clamp. **Three lanes falsified the premise of the issue they were sent to fix** (#3217's "composite
-score" does not exist; #2817's 57 sites were already swept by #3196 — which *introduced* the one
-real defect, a Pacific day anchored at UTC midnight that sent a live inflated SNS alert; #3224's
-growth is 79.7% existing tests slowing, closed **without a budget raise**, a first in five
-instances). Gotchas: a deploy lease **stranded 7.5h** whose approval would have rolled back two
-live-deployed fixes; #3222 **falsely auto-closed** by a shared-scratchpad path collision, not a
-mistyped number; **#3231 shipped half-broken with every one of its own tests green** (a perf fix has
-no failing test). **Zero event swallows** vs five in Session E. **Next:** #3204 (its lane never reported) ·
-#2883 · #2888 · #2835/#3079 (promoted this wrap) · #2578's three new checkboxes · owner batch 16
-items, now including two tokens measured load-bearing tonight. Full narrative:
+**Verified:** 2026-08-27 (Opus 5, **Session G**, ~3h) — the `session-g-cost-cliff-and-class-fixes.md`
+boot prompt. AUTONOMOUS with merge+deploy authority, ALL-OPUS, seven lanes; Fable untouched, so #3042 and
+#2849 were out of scope. **5 closed** (#3139, #3204, #2888, **#2798 — an EPIC**, #3079), **8 PRs merged**,
+**ZERO standalone filings** (findings folded as epic checkboxes: #2799 ×5, #2578 ×2 *closed*, #2798 ×1,
+#2801 ×1). **Open 47 → 43, net −4**, counting the machine-filed #3237 against me. **The spine epic #2801
+was NOT closed, and that is the session's most important result:** every child closed and every `Done when`
+box verified true (the AWS backstop really is at $150; the EMF ledger really exists, 57 tests) — yet the
+Outcome fails. Live SSM shows projected **$175.18** against a ceiling that **auto-reverts $200 → $150 on
+2026-09-01**, and *every* realistic September scenario lands at **tier 3** (the $145.50 threshold); the one
+that does not requires deleting all CI+dev AI spend and clears by **24 cents**. Cause: **CI AI spend is
+1.92× production** ($6.78/day vs $3.53) — a class that only became visible on 08-24 (#2892) and only
+attributable today (#3240 found **46% of Bedrock spend booked to the literal string `unknown`**).
+**Judged by child count this was a closure; judged by the Outcome it is a phantom.** Session F's through-line
+continued a layer deeper — **instruments whose stated *reason* is false while their conclusion is right**:
+the D-01 caching note instructs the next reader to re-enable on a condition that is now measurably met, which
+would ship a no-op (#3246); the deploy-wedge cron asserts a 17-minute safety bound that has held **1 of 99**
+measured intervals, its declared `*/15` delivered **0 of 99**; and **a site auto-rollback reverted Session F's
+own build beat over a DynamoDB-served defect it was structurally incapable of fixing, reporting success
+throughout** — fixed at the trigger by #3243 without weakening the tier-2 pause. Four lanes falsified their
+issue's premise (#2888's biggest bucket is uncacheable-in-principle CI *images*; #3139's inversion does not
+exist, `I > 14.29·O`, 10 of 12 fail *impossibly*; #2835 is six emails not seven; #3079's "two" sites are
+three). **Three deploys verified by content** — `sensor_absence.py` at 8,759 bytes with its caller wired in
+all three bundles. Gotchas: **main was red at boot while F's handover said green**, and #1908's paths-filter
+trap meant the docs-only fix could not clear it — a lane then reintroduced that trap and #1908's guard caught
+it; **two stale deploy leases rejected**, the second *older* than live code; **my own negative control passed
+vacuously** (the rule I had put in all seven briefs); a concurrent session held 5 unpushed commits in the
+primary clone, so all driver git work moved to an isolated worktree. **Next:** #2801 before Sept 1 · #2883 ·
+#2978 · #2835 · #2999/#2848 (promoted this wrap) · owner batch 18 items, headed by the cliff. Full narrative:
 `handovers/HANDOVER_LATEST.md`.
