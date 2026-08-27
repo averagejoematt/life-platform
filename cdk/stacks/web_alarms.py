@@ -41,20 +41,48 @@ even that script and duplicates its metric/threshold exactly with no action at a
     email-subscriber-errors           CDK-owned; the one `.add_alarm_action()` below.
                                        Live-verified routed 2026-08-21.
 
-  DEFER adoption → #2961 (needs `cdk import`, not a CREATE — declaring an alarm here
-  with an existing physical name fails CloudFormation early validation and blocks the
-  whole stack deploy; `cdk synth` cannot catch it because synth never reads live state):
-    life-platform-dash-5xx-rate       already routed live — deferral costs nothing
-    life-platform-dash-total-errors   already routed live. NOTE: its live dimension is
-                                       DistributionId=E3S424OXQZ8NBE — the MAIN
+  DO NOT ADOPT (#2961 RESOLVED 2026-08-27 — this is a settled decision, not a to-do.
+  Full evidence, the re-derivation commands and the reopen condition are in
+  docs/reviews/CLOUDWATCH_AUDIT_2026-07.md §9a; do not re-attempt the import from this
+  file. The original blocker still applies underneath: declaring an alarm here with an
+  existing physical name fails CloudFormation early validation and blocks the whole
+  stack deploy, and `cdk synth` cannot catch it because synth never reads live state):
+    life-platform-dash-5xx-rate       DECIDED NOT TO ADOPT. Already routed live to
+                                       life-platform-alerts-us-east-1 (re-verified
+                                       2026-08-27). Adoption buys a naming-only benefit
+                                       and costs a production CloudFormation mutation on
+                                       LifePlatformWeb — the stack whose breakage blocks
+                                       the entire web deploy path (PR #2913). Reopen only
+                                       if this alarm needs a functional change anyway.
+    life-platform-dash-total-errors   DECIDED NOT TO ADOPT, same trade. Its live dimension
+                                       is DistributionId=E3S424OXQZ8NBE — the MAIN
                                        averagejoematt.com distribution, not dash's
-                                       EM5NPX6NJN095, despite the "dash" name. Tracked
-                                       as #2963; the import (#2961) must coordinate so
-                                       adoption imports the corrected meaning, not the
-                                       lie.
-    life-platform-cf-auth-errors      the ONLY genuinely silent one (Lambda@Edge auth
-                                       failures lock dash/blog out with no alert) —
-                                       #2961 does it first.
+                                       EM5NPX6NJN095, despite the "dash" name (#2963).
+                                       Answered: the NAME is the lie, not the dimension —
+                                       main-site total-error coverage is worth keeping and
+                                       dash already has dash-5xx-rate. Rename is
+                                       RECOMMENDED, not executed: renaming a CloudWatch
+                                       alarm is a delete-and-recreate that discards alarm
+                                       history.
+    life-platform-cf-auth-errors      RETIRE, not adopt — routed to the owner batch
+                                       alongside the #2962 deletes. It watches AWS/Lambda
+                                       Errors on FunctionName=life-platform-cf-auth, and
+                                       that function — though it still exists and is
+                                       Active — is associated with ZERO Lambda@Edge cache
+                                       behaviours on all four distributions in the account
+                                       (counted 2026-08-27 across DefaultCacheBehavior +
+                                       every CacheBehaviors.Items entry). No cf-auth
+                                       dimension exists in list-metrics in either region,
+                                       and the alarm's StateReasonData has been frozen at
+                                       2026-03-15 with recentDatapoints:[] for five
+                                       months. So the #2829/#2961 framing — "the ONLY
+                                       genuinely silent one; Lambda@Edge auth failures
+                                       lock dash/blog out with no alert" — was FALSE:
+                                       there is no Lambda@Edge in any request path.
+                                       Routing it would ship a permanent OK that reads as
+                                       coverage and is not, and adopting it here would
+                                       make that false green load-bearing IaC (#3200
+                                       class). Owner command recorded in §9a.
 
   RETIRE → #2962 (decision recorded; NOT executed here — deleting a live alarm is an AWS
   mutation, out of scope for a read-only worktree; the exact owner-run
@@ -133,8 +161,7 @@ def add_web_alarms(scope: Construct, subscriber_alarm: cloudwatch.Alarm, og_imag
     if og_image_alarm is not None:
         og_image_alarm.add_alarm_action(cw_actions.SnsAction(topic))
 
-    # ADOPT — CloudFront 5xx rate on the dash distribution. Codified from live config.
-    # ── The three orphan adoptions are DEFERRED (#2829, rescoped 2026-08-20) ──
+    # ── The three orphan adoptions are CLOSED: DO NOT ADOPT (#2961, resolved 2026-08-27) ──
     #
     # `life-platform-dash-5xx-rate`, `life-platform-dash-total-errors` and
     # `life-platform-cf-auth-errors` already EXIST in us-east-1, created outside CDK.
@@ -150,11 +177,18 @@ def add_web_alarms(scope: Construct, subscriber_alarm: cloudwatch.Alarm, og_imag
     # crucially, a green `cdk synth` cannot catch this, because synth renders a template
     # from source and never consults live AWS state.
     #
-    # Deferring costs almost nothing: measured live, `dash-5xx-rate` and
-    # `dash-total-errors` ALREADY route to this topic. Only `cf-auth-errors` is genuinely
-    # silent, and it is tracked on #2829 along with the `cdk import` decision. The issue's
-    # "5 of 6 alarms are IaC orphans" is true; the implied "so they fire into the void" is
-    # not — only 2 of 6 have no AlarmActions.
+    # #2961 carried an owner authorization to run that import; its read-only pre-flight
+    # falsified the lead item's premise and it was stopped before any AWS mutation. The
+    # settled dispositions are in this module's docstring, and the evidence + the
+    # re-derivation commands + the reopen condition are in
+    # docs/reviews/CLOUDWATCH_AUDIT_2026-07.md §9a. In short: `cf-auth-errors` is on a
+    # DETACHED function and must be retired (owner batch), not adopted — routing it would
+    # ship a permanent false OK; and the two `dash-*` alarms already route correctly, so
+    # adoption is a naming-only benefit not worth a production CloudFormation mutation on
+    # the stack that gates the whole web deploy path.
+    #
+    # This is a decision, not a deferral. Do not re-add these as constructs; the pin in
+    # tests/test_web_alarms_2829.py is now permanent, not provisional.
 
     # life-platform-cost-alert and life-platform-ai-cost-soft-alarm are deliberately
     # NOT constructed here — see the module docstring's RETIRE disposition. Adopting an

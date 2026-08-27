@@ -245,9 +245,9 @@ audit must either cover us-east-1 or extend this table.**
 | alarm | CDK-owned? | AlarmActions (live) | disposition |
 |---|---|---|---|
 | `email-subscriber-errors` | **YES** (`web_stack.py` → `web_alarms.py`) | `life-platform-alerts-us-east-1` | **ROUTED — fixed.** The #2829 title bug: OBS-07 defined it with `AlarmActions=[]`, so silent subscriber-conversion failures alerted no one. Routed by PR #2913 + the 2026-08-20 rescope; action live since 2026-08-20 19:09 PT |
-| `life-platform-cf-auth-errors` | no (orphan) | **NONE — still silent** | **DEFER-ADOPT → #2961** (do first — the only remaining silent one) |
-| `life-platform-dash-5xx-rate` | no (orphan) | `life-platform-alerts-us-east-1` | **DEFER-ADOPT → #2961** (already routed; adoption is IaC hygiene) |
-| `life-platform-dash-total-errors` | no (orphan) | `life-platform-alerts-us-east-1` | **DEFER-ADOPT → #2961**; NB it watches the MAIN distribution (`E3S424OXQZ8NBE`), not dash's (`EM5NPX6NJN095`), despite its name → **#2963** |
+| `life-platform-cf-auth-errors` | no (orphan) | **NONE — still silent** | **RETIRE → owner batch** (#2961 resolved 2026-08-27). Not adopted: the function is detached from every distribution, so this alarm's metric can never receive a datapoint. Routing it would ship a permanent false `OK`. Evidence + the exact delete command in §9a |
+| `life-platform-dash-5xx-rate` | no (orphan) | `life-platform-alerts-us-east-1` | **DECIDED NOT TO ADOPT** (#2961 resolved 2026-08-27) — already routed; adoption buys a naming-only benefit at the price of a production CFN mutation on `LifePlatformWeb`. Reasoning in §9a |
+| `life-platform-dash-total-errors` | no (orphan) | `life-platform-alerts-us-east-1` | **DECIDED NOT TO ADOPT** (#2961 resolved 2026-08-27). NB it watches the MAIN distribution (`E3S424OXQZ8NBE`), not dash's (`EM5NPX6NJN095`), despite its name → **#2963**, answered in §9a: the **name** is the lie, not the dimension — keep the dimension, rename recommended (not executed) |
 | `life-platform-cost-alert` | no (orphan) | NONE | **RETIRE → #2962** (duplicate $5 AWS/Billing alarm, superseded by ADR-133 budget + cost_governor tiers; deletion is an owner AWS mutation) |
 | `life-platform-ai-cost-soft-alarm` | no (orphan) | `life-platform-billing-alerts` | **RETIRE → #2962** (exact duplicate of cost-alert, routed to a second billing topic) |
 
@@ -258,7 +258,110 @@ action-less by its own comment because no us-east-1 topic existed yet), and
 `deploy/archive/20260314/create_ai_cost_alarm.sh` (ai-cost-soft-alarm + the second
 billing topic).
 
-### Two lessons this region taught (both cost a blocked deploy to learn)
+### 9a. #2961 resolved — the adoption was authorized, attempted, and stopped on a falsified premise (2026-08-27)
+
+#2961 carried an explicit **owner authorization** (2026-08-27T02:15Z on the issue) to run
+the `cdk import` non-interactively, overriding `docs/DECISIONS.md`'s ADR-081 "owner-run,
+in-the-loop step" ruling — scoped to that issue and that operation only. Safeguard 3 made
+`cf-auth-errors` the lead ("land it, verify, then decide whether the other two are worth
+continuing"); safeguard 5 was **stop on the first surprise**.
+
+Read-only pre-flight found the surprise. **No `cdk import` was run, no changeset created,
+nothing in AWS mutated.** This subsection records the measurements and the three decisions
+so no future session re-derives them.
+
+#### The measurement that killed the lead item
+
+`life-platform-cf-auth-errors` watches `AWS/Lambda` `Errors` on
+`FunctionName=life-platform-cf-auth` (us-east-1). The function **exists and is `Active`**
+(versions 1 and 2 published; `$LATEST` last modified 2026-04-24) — which is why a
+describe-alarms-only pass reads it as healthy coverage. But it is **associated with zero
+Lambda@Edge cache behaviours on every distribution in the account.** Counted across
+`DefaultCacheBehavior.LambdaFunctionAssociations` **plus every entry in
+`CacheBehaviors.Items`**, for all four distributions the account has:
+
+| distribution | domain | Lambda@Edge associations |
+|---|---|---:|
+| `EM5NPX6NJN095` | dash.averagejoematt.com | **0** |
+| `E1JOC1V6E6DDYI` | blog.averagejoematt.com | **0** |
+| `ETTJ44FT0Z4GO` | buddy.averagejoematt.com | **0** |
+| `E3S424OXQZ8NBE` | averagejoematt.com | **0** (default behaviour + all 22 ordered behaviours) |
+
+Re-derive without redoing the reasoning — `list-distributions` first to confirm the account
+still has exactly these four, then per id:
+
+```bash
+aws cloudfront list-distributions \
+  --query "DistributionList.Items[].[Id,Aliases.Items[0]]" --output text
+aws cloudfront get-distribution-config --id <ID> --query \
+  "DistributionConfig.[DefaultCacheBehavior.LambdaFunctionAssociations.Quantity, \
+   CacheBehaviors.Items[].LambdaFunctionAssociations.Quantity]" --output json
+```
+
+Two corroborations, both consistent: **no CloudWatch metric carrying a `cf-auth` dimension
+exists** in us-east-1 or us-west-2 (full `AWS/Lambda` namespace listing, 26 metrics in
+us-east-1), and the alarm's own `StateReasonData` is frozen at `2026-03-15T02:35:20Z` with
+`recentDatapoints: []` — it has not re-evaluated in five months, because there is nothing
+to evaluate. The function was detached at some point after version 2 (2026-05-09).
+
+**So #2961's stated benefit — "Lambda@Edge auth failures lock dash/blog out with no alert"
+— is false.** There is no Lambda@Edge in any request path.
+
+#### Decision 1 — `cf-auth-errors`: RETIRE, do not adopt (owner batch)
+
+Adopting *and routing* an alarm whose metric can never receive a datapoint produces a
+permanent `OK` that reads as coverage and is not — and adoption would make that false green
+**load-bearing IaC**. That is the #3200 class: a broken instrument looks exactly like a
+working one. The acceptance as written would have made the estate worse, not better.
+
+The real options were reattach the function (a product decision nobody has asked for) or
+delete the alarm. Deletion is a production AWS mutation of the **same class as the #2962 leg
+already folded into #2961 and already routed to the owner batch**, so it joins it there
+rather than being executed unattended by a session:
+
+```bash
+aws cloudwatch delete-alarms --region us-east-1 --alarm-names life-platform-cf-auth-errors
+```
+
+#### Decision 2 — `dash-5xx-rate` / `dash-total-errors`: DECIDED NOT TO ADOPT
+
+This is #2961 acceptance box 2's explicitly sanctioned branch ("or the decision not to adopt
+them recorded in the §9 audit table"). Safeguard 3's gate never opened — the lead never
+landed — so "then decide whether the other two are worth continuing" resolves to a decision,
+not a continuation.
+
+- Both **already route correctly** to `life-platform-alerts-us-east-1` (state OK,
+  re-verified live 2026-08-27). `dash-5xx-rate` = `AWS/CloudFront 5xxErrorRate` on
+  `EM5NPX6NJN095`; `dash-total-errors` = `AWS/CloudFront TotalErrorRate` on `E3S424OXQZ8NBE`.
+- The benefit is, in #2961's own words, **"an import dance for a naming-only benefit."**
+- The cost is a production CloudFormation mutation on `LifePlatformWeb` — the stack that
+  already broke once (PR #2913) and whose breakage blocks the entire web deploy path.
+
+Trading real risk to a shared deploy path for a naming-only benefit is not a good trade.
+**Reopen this only if the payoff changes** — e.g. if one of these alarms needs a threshold or
+action change, do the import then, when there is a functional reason to touch the stack.
+
+#### Decision 3 — `dash-total-errors` naming (#2963, folded): keep the dimension, fix the name
+
+Confirmed live: it carries `DistributionId=E3S424OXQZ8NBE` — the main site — despite the
+"dash" name. Main-site total-error coverage is worth having, and dash already has
+`dash-5xx-rate`. So the **name is the lie, not the dimension**: the recommendation is
+`life-platform-site-total-errors` (or similar), keeping the dimension as-is.
+
+**Recorded, not executed.** Renaming a CloudWatch alarm is a delete-and-recreate — it
+discards alarm history and opens a coverage gap for the window. That cost is not worth
+paying for a name alone, and it is the same owner-mutation class as decision 1, so it waits
+for a batch where the alarm is being changed anyway.
+
+#### What the authorization bought
+
+The override was used as intended: it paid for a careful pre-flight that the previous "skip
+it" recommendation would not have produced, and that pre-flight found the operation's
+headline benefit did not exist. That is safeguard 5 working, not the authorization being
+declined. The ruling it overrode is untouched and still stands — see `docs/DECISIONS.md`
+ADR-081 "Adoption mechanics."
+
+### Three lessons this region taught (the first two cost a blocked deploy to learn)
 
 1. **Adoption needs `cdk import`, not a CREATE.** PR #2913 declared the three orphans
    in `web_alarms.py` with their existing physical names; CloudFormation pre-validates
@@ -273,3 +376,13 @@ billing topic).
    subscriber alarm, now fixed, and cf-auth-errors). Conflating the two inflates
    urgency and buries the genuinely silent alarm in hygiene work. Audit tables must
    carry the *measured* `AlarmActions` column, not infer it from IaC status.
+3. **A routed alarm on a detached resource is worse than an unrouted one** (#2961,
+   2026-08-27). `cf-auth-errors` looked like the highest-value item in the whole section —
+   the one genuinely silent alarm — and it was the one that should never have been adopted.
+   Neither `describe-alarms` nor `get-function` can tell you an alarm is dead: the alarm is
+   well-formed and the function is `Active`. Only the *association* count is decisive.
+   Generalised: **before routing or adopting any alarm, verify its metric has received a
+   datapoint** (`list-metrics` for the dimension, and non-empty `recentDatapoints` in
+   `StateReasonData`). An alarm that cannot fire, once routed, is a permanent `OK` that reads
+   as coverage — the #3200 class, where a broken instrument is indistinguishable from a
+   working one, and adoption into IaC makes the false green load-bearing.

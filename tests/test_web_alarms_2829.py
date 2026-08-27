@@ -125,22 +125,64 @@ def test_every_web_alarms_construct_has_an_action():
     not on a hand-maintained name list."""
     func = _find_func(_tree(WEB_ALARMS), "add_web_alarms")
     status = _alarm_action_status(func.body)
-    # The three orphan adoptions were REMOVED on 2026-08-20 (see the module docstring):
-    # CloudFormation pre-validates a CREATE against existing names and they all exist, so
-    # they blocked the entire LifePlatformWeb deploy. Adoption needs `cdk import`, tracked
-    # on #2829. So zero locally-constructed alarms is the CORRECT state right now — but the
-    # rule still binds the moment one returns.
+    # The three orphan adoptions were REMOVED on 2026-08-20 (see the module docstring) because
+    # CloudFormation pre-validates a CREATE against existing names and they all exist, so they
+    # blocked the entire LifePlatformWeb deploy. #2961 then RESOLVED the open question against
+    # adopting them at all (2026-08-27 — see MUST_NOT_BE_CONSTRUCTED below). So zero
+    # locally-constructed alarms is the correct PERMANENT state — but the rule below still
+    # binds the moment any alarm is constructed here.
     unrouted = [name for name, has_action in status.items() if not has_action]
     assert not unrouted, f"web_alarms.py alarm(s) with no .add_alarm_action(...): {unrouted}"
 
     # …and because "zero constructs" would make the above vacuous, pin what the module
-    # ACTUALLY does now: route the alarm web_stack.py hands in. That is the #2829 title bug
-    # (`email-subscriber-errors` fired into the void) and the only part that ships today.
+    # ACTUALLY does: route the alarms web_stack.py hands in. That is the #2829 title bug
+    # (`email-subscriber-errors` fired into the void) and the only part that ships.
     src = open(WEB_ALARMS, encoding="utf-8").read()
     assert "subscriber_alarm.add_alarm_action(" in src, (
         "web_alarms.py no longer routes the handed-in subscriber alarm — that is the one "
-        "thing #2829 actually fixes, and with the adoptions deferred it is all this module does."
+        "thing #2829 actually fixes, and with no adoptions it is the core of what this module does."
     )
+
+
+# The us-east-1 orphans that must NEVER be declared as constructs in web_alarms.py, each
+# with the reason it stays out. #2961 RESOLVED this on 2026-08-27 — the adoption was
+# authorized by the owner, pre-flighted read-only, and stopped on a falsified premise. So
+# this pin is now PERMANENT, not "pending #2961": it records a decision, not a to-do.
+# Full evidence, the re-derivation commands and the reopen condition live in
+# docs/reviews/CLOUDWATCH_AUDIT_2026-07.md §9a.
+#
+# Two independent reasons hold each name out, and BOTH must be answered before any of them
+# is added back:
+#   (1) mechanical — the physical alarm already exists, so declaring it makes CloudFormation
+#       attempt a CREATE, which fails early validation and blocks the ENTIRE LifePlatformWeb
+#       deploy (2026-08-20, surfaced by #1221's deploy). `cdk synth` cannot catch this: synth
+#       renders a template from source and never consults live AWS state.
+#   (2) substantive — the per-alarm reason below.
+MUST_NOT_BE_CONSTRUCTED = {
+    "life-platform-dash-5xx-rate": (
+        "DECIDED NOT TO ADOPT (#2961, 2026-08-27): it already routes correctly to "
+        "life-platform-alerts-us-east-1, so adoption is a naming-only benefit bought with a "
+        "production CloudFormation mutation on LifePlatformWeb — the stack whose breakage "
+        "blocks the entire web deploy path (PR #2913). Reopen only if the alarm needs a "
+        "functional change anyway."
+    ),
+    "life-platform-dash-total-errors": (
+        "DECIDED NOT TO ADOPT (#2961, 2026-08-27): same trade as dash-5xx-rate. Its "
+        "DistributionId dimension (E3S424OXQZ8NBE, the main site) is CORRECT — the 'dash' "
+        "NAME is the lie (#2963). A rename is recommended but not executed, because renaming "
+        "a CloudWatch alarm is a delete-and-recreate that discards alarm history."
+    ),
+    "life-platform-cf-auth-errors": (
+        "RETIRE, DO NOT ADOPT (#2961, 2026-08-27): life-platform-cf-auth is associated with "
+        "ZERO Lambda@Edge cache behaviours on all four distributions in the account, so this "
+        "alarm's metric can never receive a datapoint (no cf-auth dimension in list-metrics "
+        "in either region; StateReasonData frozen at 2026-03-15 with recentDatapoints:[]). "
+        "The function still EXISTS and is Active, which is why describe-alarms reads it as "
+        "healthy. Adopting AND routing it would ship a permanent OK that reads as coverage "
+        "and is not, and would make that false green load-bearing IaC (#3200 class). The "
+        "disposition is an owner-batch `aws cloudwatch delete-alarms`."
+    ),
+}
 
 
 def test_web_alarms_adopts_exactly_the_expected_names():
@@ -150,24 +192,43 @@ def test_web_alarms_adopts_exactly_the_expected_names():
     constructed here (RETIRE disposition, see web_alarms.py's module docstring) —
     asserted absent so a later PR can't quietly half-adopt them without updating this
     pin.
+
+    The three MUST_NOT_BE_CONSTRUCTED names are asserted absent with a per-name reason, so
+    a failure tells the next author WHY the alarm is out rather than just that a pin
+    tripped. This is the permanent state as of #2961's resolution — not a placeholder
+    waiting on an import.
     """
     func = _find_func(_tree(WEB_ALARMS), "add_web_alarms")
     status = _alarm_action_status(func.body)
-    # Rescoped 2026-08-20: the adoption set is EMPTY until #2829 resolves create-vs-import.
-    # These three are asserted ABSENT precisely because re-adding one without `cdk import`
-    # re-breaks every LifePlatformWeb deploy — including #1221's, which is what surfaced it.
-    collide_on_create = {
-        "life-platform-dash-5xx-rate",
-        "life-platform-dash-total-errors",
-        "life-platform-cf-auth-errors",
-    }
-    readded = collide_on_create & set(status)
-    assert not readded, (
-        f"{sorted(readded)} re-added as a CREATE. These alarms already exist in us-east-1, so "
-        "CloudFormation fails early validation and the whole stack deploy is blocked. Adopt them "
-        "with `cdk import`, not by declaring them — and note `cdk synth` cannot catch this."
+    readded = sorted(set(MUST_NOT_BE_CONSTRUCTED) & set(status))
+    assert not readded, "alarm(s) re-added as a CREATE in web_alarms.py:\n" + "\n".join(
+        f"  - {name}: {MUST_NOT_BE_CONSTRUCTED[name]}" for name in readded
     )
     assert all(status.values()), "every alarm constructed here must be routed"
+
+
+def test_the_do_not_adopt_decision_is_recorded_where_a_reader_will_find_it():
+    """The pin above is only honest if the reasoning it points at still exists. #2961's
+    resolution is recorded in the §9a audit subsection and summarised in web_alarms.py's
+    own docstring; if either is deleted, the pin degrades into an unexplained rule and the
+    next author's most likely move is to re-attempt the import that was already ruled out.
+    """
+    doc = os.path.join(ROOT, "docs", "reviews", "CLOUDWATCH_AUDIT_2026-07.md")
+    with open(doc, encoding="utf-8") as f:
+        audit = f.read()
+    assert "### 9a." in audit, "the #2961 resolution subsection (§9a) was removed from the ADR-116 audit doc"
+    assert "delete-alarms --region us-east-1 --alarm-names life-platform-cf-auth-errors" in audit, (
+        "§9a lost the exact owner-batch retire command for life-platform-cf-auth-errors — that "
+        "command IS the recorded disposition; without it the decision is unactionable."
+    )
+
+    src = open(WEB_ALARMS, encoding="utf-8").read()
+    assert "#2961" in src, "web_alarms.py no longer cites #2961 — a reader lands on the deferral history with no resolution"
+    assert "DEFER adoption" not in src, (
+        "web_alarms.py still describes the three orphans as a DEFERRED adoption. #2961 RESOLVED "
+        "this on 2026-08-27 (decide-not-to-adopt + retire cf-auth-errors); leaving the deferral "
+        "language reads as an open to-do and invites the import that was already ruled out."
+    )
 
 
 def test_alerts_topic_is_imported_not_created():
