@@ -54,6 +54,7 @@ amended by #1927) with an honest printed/warned skip, never silent green.
 """
 
 import base64
+import contextlib
 import functools
 import io
 import json
@@ -201,6 +202,42 @@ def _import_bedrock():
     except Exception as e:  # pragma: no cover
         print(f"  ⚠ AI-QA unavailable — could not import bedrock_client: {e}")
         return None
+
+
+@contextlib.contextmanager
+def _attributed(bedrock, feature):
+    """`bedrock.attributed_to(feature)` where available, else a null context.
+
+    `bedrock` is whatever `_import_bedrock()` returned or whatever a test injected,
+    so the helper cannot assume the symbol exists. The degradation is safe rather
+    than silent: the ONE thing that must not happen — the label going missing on
+    the real client — is pinned by `test_ci_gate_call_sites_are_actually_wired`
+    plus `test_metric_emit_uses_the_resolved_feature_name`, which exercise the
+    real `bedrock_client`.
+    """
+    ctx = getattr(bedrock, "attributed_to", None)
+    if ctx is None:
+        yield
+        return
+    with ctx(feature):
+        yield
+
+
+def _attributed_invoke(bedrock, feature):
+    """`bedrock.invoke` with every call inside it metered as `feature` (#2888).
+
+    `reader_truth_qa` is stdlib-only by contract (it is imported by the qa-smoke
+    Lambda AND by this harness) and takes its `invoke` injected, so the label has
+    to be applied on the injected callable rather than inside the rubric module.
+    Inside the qa-smoke Lambda nothing changes: the runtime's own function name
+    outranks the label, so that copy stays `life-platform-qa-smoke`.
+    """
+
+    def _invoke(body, **kwargs):
+        with _attributed(bedrock, feature):
+            return bedrock.invoke(body, **kwargs)
+
+    return _invoke
 
 
 def _png_dims(data):
@@ -453,7 +490,13 @@ def _assess_page(bedrock, name, path, shots):
         prompt += "\n\n" + _TILED_NOTE
     content.append({"type": "text", "text": prompt})
     body = {"messages": [{"role": "user", "content": content}], "max_tokens": 700}
-    resp = bedrock.invoke(body, model_name=_VISION_MODEL)
+    # #2888 — name this spend. Outside Lambda the cost chokepoint's LambdaFunction
+    # dimension is the literal "unknown", and that bucket is the LARGEST row in the
+    # per-feature ranking (17.9M input tok / $33.19 trailing 30d, measured
+    # 2026-08-27). This gate and the reader-truth gate run in the same process, so
+    # only the owning code can split them.
+    with _attributed(bedrock, "visual-ai-qa"):
+        resp = bedrock.invoke(body, model_name=_VISION_MODEL)
     text = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
     return _parse_verdict(text)
 
@@ -749,7 +792,8 @@ def assess_reader_truth(results, today_iso=None):
         print("  ⚠ Reader-truth QA: no prose captures found — run visual_qa.py with --reader-truth")
         return {"status": "no_surfaces"}
 
-    findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock.invoke, today_iso=today_iso)
+    truth_invoke = _attributed_invoke(bedrock, "reader-truth-qa")
+    findings, errors = reader_truth_qa.assess_prose(surfaces, truth_invoke, today_iso=today_iso)
     for err in errors:
         print(f"  ⚠ Reader-truth batch error (fail-soft): {err}")
 
@@ -784,7 +828,7 @@ def assess_reader_truth(results, today_iso=None):
     reproduced_ids = set()
     if would_gate:
         surfaces_by_path = {s["path"]: s for s in surfaces}
-        confirmed, _unconfirmed, conf_note = _confirm_new_truth_highs(would_gate, surfaces_by_path, bedrock.invoke, today_iso)
+        confirmed, _unconfirmed, conf_note = _confirm_new_truth_highs(would_gate, surfaces_by_path, truth_invoke, today_iso)
         reproduced_ids = {_truth_finding_key(f) for f in confirmed}
         if conf_note:
             print(f"  ⟳ reader-truth confirm (#3102): {conf_note}")
