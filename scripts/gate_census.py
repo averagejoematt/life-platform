@@ -349,6 +349,38 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
         scope="",
         proved_on="2026-08-13",
     ),
+    # ── #3079: ONE screenshot -> vision-judge prepare path, proved on the wire ────
+    "structural::test_shared_image_prepare_3079.py": Proof(
+        gate_name="test_shared_image_prepare_3079.py",
+        command="python3 -m pytest tests/test_shared_image_prepare_3079.py -q",
+        mutation=(
+            "the pre-#3079 defect restored verbatim in scripts/fresh_eyes_discovery.py — "
+            "`_image_blocks` reverted from a delegation to `visual_ai_qa._image_blocks` back to "
+            "the raw `base64.b64encode(open(path,'rb').read())` block it shipped with, i.e. a "
+            "full-page capture sent to the judge with no downscale and no tiling."
+        ),
+        observed=(
+            "exit 1, 6 failed / 2 passed — the three wire assertions "
+            "(`test_ultra_tall_discovery_capture_reaches_the_judge_tiled_and_legible`, "
+            "`test_discovery_tiles_cover_the_whole_page_not_just_the_top`, "
+            "`test_unpreparable_capture_is_named_and_never_a_silent_clean_read`) and the three "
+            "census assertions (`test_exactly_one_..._implementation`, "
+            "`test_the_census_actually_detects_a_new_copy`, "
+            "`test_fresh_eyes_has_no_private_image_block_left`) all FAILED. "
+            "Baseline 8 passed; reverted 8 passed."
+        ),
+        scope=(
+            "The wire half is measured off the Bedrock body a recording fake captures, not off the "
+            "existence of a resize helper — a prepare path that exists but is never reached is the "
+            "#2578 failure this gate is for. The census half matches the WIRE SHAPE "
+            '(`{"type": "image"}` by AST), not a function name, so a copy renamed on arrival is '
+            "still caught; its own negative control plants a copy in a synthetic tmp tree, and a "
+            "separate assertion pins that the real sweep reaches each scanned directory. "
+            "NOT covered: whether the judge's verdict is correct — only that it grades a legible "
+            "image; and non-PNG capture formats, which the harness does not produce."
+        ),
+        proved_on="2026-08-27",
+    ),
     # ── #3222: the fixture half of the PT-day contract, proved in BOTH directions ─
     "structural::test_fixture_frame_pairing_3222.py": Proof(
         gate_name="test_fixture_frame_pairing_3222.py",

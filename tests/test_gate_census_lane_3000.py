@@ -205,7 +205,17 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # BASELINE_UNPROVEN_GATES is deliberately NOT moved — all six arrive unproven, taking the
 # live count 527 -> 533, still under the committed 541. Six new rows of real #2578 work;
 # none of them is a verdict this PR claims to have watched fail.
-BASELINE_TOTAL_GATES = 560
+#
+# 560 -> 561: #3079's `structural::test_shared_image_prepare_3079.py` — the AST census that
+# keeps ONE screenshot -> vision-judge prepare path (the fresh-eyes pass had a second,
+# undownscaled copy). It arrives PROVEN, not unproven: the mutation is recorded in
+# gate_census.PROVEN_CAN_FAIL (the pre-#3079 raw-base64 body restored verbatim -> exit 1,
+# 6 of 8 failed; baseline 8 passed, reverted 8 passed). So the live unproven count goes
+# 533 -> 533, not 534, and BASELINE_UNPROVEN_GATES stays where the entry above left it.
+#
+# Measured with the file TRACKED, per the warning three paragraphs up — it read 560 as an
+# untracked file and 561 once committed. That warning earned its keep on this PR.
+BASELINE_TOTAL_GATES = 561
 BASELINE_UNPROVEN_GATES = 541
 
 

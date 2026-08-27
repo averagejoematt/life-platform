@@ -130,12 +130,33 @@ def _import_bedrock():
         return None
 
 
-def _image_block(path):
-    import base64
+# Pages whose capture could not be prepared into anything the judge can read.
+# Populated by vision_read, drained by main(), which exits non-zero rather than
+# reporting a board built from doors nobody actually looked at (#3079/#2973).
+UNREAD_PAGES: list = []
 
-    with open(path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
-    return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
+
+def _image_blocks(path):
+    """Judge-legible content block(s) for one capture — THE shared prepare path.
+
+    Until #3079 this module carried its own `_image_block`, which base64'd the
+    capture straight off disk with no downscale of any kind: a 1440x17271
+    full-page door reached the model at ~9% scale with every glyph illegible
+    (the #3067 class — the judge then grades the degraded input, not the page),
+    and an oversized payload could be rejected outright by Bedrock (the #2973
+    class). It now delegates to tests/visual_ai_qa.py's `_image_blocks`, which
+    is the same code the gating visual-qa job uses: in-bound captures are sent
+    unchanged as one image, taller ones are sliced into labelled overlapping
+    full-width tiles covering the whole page.
+
+    There is exactly ONE image-block construction site for the
+    screenshot -> vision-judge path; a second copy reds
+    tests/test_shared_image_prepare_3079.py. Raises RuntimeError with a NAMED
+    reason when no legible payload exists — never a silent degrade.
+    """
+    import visual_ai_qa  # tests/ is already on sys.path (see the insert above)
+
+    return visual_ai_qa._image_blocks(path)
 
 
 # ── screenshot capture (reuses tests/visual_qa.py) ──────────────────────────
@@ -202,7 +223,15 @@ def vision_read(bedrock, page_name, path, screenshot_path, viewport, model_name=
     prompt = _VISION_PROMPT.format(
         page=page_name, path=path, viewport=viewport, audiences=audiences_text, audience_keys=", ".join(AUDIENCES)
     )
-    body = {"messages": [{"role": "user", "content": [_image_block(screenshot_path), {"type": "text", "text": prompt}]}], "max_tokens": 800}
+    try:
+        blocks = _image_blocks(screenshot_path)
+    except Exception as e:
+        # #3079/#2973: a capture the judge cannot be handed legibly is NOT a clean
+        # "no findings" — an unread door must be named, and main() exits non-zero.
+        UNREAD_PAGES.append(f"{page_name} ({viewport}) — {e}")
+        print(f"[FAIL] fresh-eyes could not prepare {page_name} ({viewport}) for the judge — page UNREAD: {e}")
+        return []
+    body = {"messages": [{"role": "user", "content": [*blocks, {"type": "text", "text": prompt}]}], "max_tokens": 800}
     try:
         resp = bedrock.invoke(body, model_name=model_name)
     except Exception as e:
@@ -442,6 +471,7 @@ def main():
         return 0
 
     pages = capture_screenshots(args.screenshot_dir)
+    UNREAD_PAGES.clear()
     vision_results = []
     for p in pages:
         for shot in p.get("screenshots", []):
@@ -457,6 +487,13 @@ def main():
 
     audit_log(ranked, board)
     email_board(board)
+    if UNREAD_PAGES:
+        # #3079: the board is real but its coverage is not what it claims — say so
+        # in the exit code rather than letting an unread door read as a clean door.
+        print(f"[FAIL] {len(UNREAD_PAGES)} capture(s) never reached the judge:")
+        for u in UNREAD_PAGES:
+            print(f"  - {u}")
+        return 1
     return 0
 
 
