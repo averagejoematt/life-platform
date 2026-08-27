@@ -349,6 +349,40 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
         scope="",
         proved_on="2026-08-13",
     ),
+    # ── #3222: the fixture half of the PT-day contract, proved in BOTH directions ─
+    "structural::test_fixture_frame_pairing_3222.py": Proof(
+        gate_name="test_fixture_frame_pairing_3222.py",
+        command="python3 -m pytest tests/test_fixture_frame_pairing_3222.py -q -p no:randomly",
+        mutation=(
+            "the SAME planted function — `def _planted_utc_today(): return "
+            "datetime.now(timezone.utc).date()` — appended to two real test files, one at a "
+            "time, restored from a byte copy so the proof works on a dirty tree: (a) "
+            "tests/test_permanence_lambda_1400.py, whose handler reads `pacific_today()` and "
+            "which is one of the two files #3206 redded main with; (b) "
+            "tests/test_whoop_reconcile.py, whose handler's UTC day is declared "
+            "`utc-exempt(#2811)` (it bounds a UTC ISO window sent to Whoop's own API)."
+        ),
+        observed=(
+            "(a) exit 1, 3 failed / 13 passed — `test_no_pt_paired_utc_today_outside_the_residue`, "
+            "`test_the_two_files_that_redded_main_stay_at_zero` and "
+            "`test_a_planted_site_reds_the_guard_in_a_real_file` all FAILED. "
+            "(b) exit 0, 16 passed — the identical plant against a genuinely-UTC handler is "
+            "SILENT, which is the half that keeps the guard from breaking correct tests. "
+            "Baseline 16 passed; reverted 16 passed."
+        ),
+        scope=(
+            "Two boundaries, both measured rather than assumed and both stated in the file's own "
+            "header. (1) OFFSET ZERO ONLY: a UTC day carrying arithmetic (`now - timedelta(days=5)`) "
+            "is not flagged — 19 of the 44 PT-paired sites in tests/ are relative fixture rows that "
+            "stay self-consistent because both ends of the comparison move together. (2) DIRECT "
+            "PT READ ONLY: a handler that delegates its day (site_api_vitals takes `_experiment_date` "
+            "from site_api_common) does not pair, so a test naming only the delegate is invisible. "
+            "Widening to a one-hop import closure was measured and rejected — it adds 17 sites of "
+            "which 12 are in files ruled CORRECT. `test_the_one_hop_blind_spot_stays_measured` pins "
+            "the 5-file closure set instead, so a sixth entrant reds this gate and gets ruled."
+        ),
+        proved_on="2026-08-26",
+    ),
     # ── #2938: the gate that was PROVEN unable to fail, then repaired ────────────
     # This is the first entry recorded from a LIVE PRODUCTION OBSERVATION rather than a
     # deliberately planted mutation — the defect was already running when it was found.

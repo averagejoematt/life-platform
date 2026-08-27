@@ -99,7 +99,24 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # This ceiling is MEANT to move with the real inventory (unlike the module-size
 # ratchet, whose numbers may never rise). Lowering it after a real measurement is
 # always welcome; raising it needs the reason in the same PR.
-BASELINE_TOTAL_GATES = 551
+#
+# 2026-08-26 (#3222), 551 -> 552. TOTAL only. ONE gate added:
+# `tests/test_fixture_frame_pairing_3222.py`, the fixture half of the PT-day contract.
+# RE-DERIVED after #3220 landed, not incremented off the old 560 — this branch was
+# written against the pre-#3220 classifier and its first number (561) is dead. Measured
+# on the rebased tree with `python3 scripts/gate_census.py --json`: total 552, proven 24,
+# unproven 525, unprovable 10. Two things worth recording because #3220 changed the rules
+# underneath this gate:
+#   * It still ENTERS the inventory under the structural classifier — it is not a
+#     name-only match. `gate_census_enforcement.enforcement_evidence()` on the file
+#     returns ['assert-statement', 'bool-verdict-api'], so it is admitted on what it
+#     does, not on what it is called.
+#   * It lands PROVEN, not unproven: it is registered in `PROVEN_CAN_FAIL` in
+#     `scripts/gate_census.py` with a real two-direction mutation (the same planted
+#     `datetime.now(timezone.utc).date()` reds it in a `pacific_today()` handler's test
+#     and is silent in a `utc-exempt(#2811)` one). So UNPROVEN measures 525 — exactly
+#     where #3220 left it — and this ceiling does not move at all.
+BASELINE_TOTAL_GATES = 552
 BASELINE_UNPROVEN_GATES = 541
 
 
