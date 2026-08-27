@@ -275,6 +275,22 @@ jobs:
         #      the same ~23% above-observed-max headroom #1966/#2152/#3025
         #      each used (1580 * 1.23 ≈ 1943s), the budget moved 1500 -> 1950
         #      (~49% above the 10-run average, ~23% above the observed max).
+        #      #3224 (2026-08-27) IS THE FIRST INSTANCE OF THIS CLASS NOT
+        #      ANSWERED BY A RAISE, and the number below is deliberately
+        #      UNCHANGED at 1950 despite a 1994s breach on green main
+        #      (678a0598, run 33030125667). Reading the two runs' own
+        #      --durations blocks against each other showed the growth is NOT
+        #      mostly new tests: +1,120 tests (+5.3%) but +482s (+32.9%), i.e.
+        #      mean cost per test rose 26.2%. The dominant term is duplicated
+        #      whole-repo scans — `check_doc_facts.py` went 7.29s -> 15.41s
+        #      between the two shas (reproduced locally at both), 8.09s of the
+        #      new cost being the gate census #3126/#3156 put on the
+        #      auto-discovery path, and THREE tests ran that identical scan.
+        #      The breach was paid for by sharing those spawns
+        #      (tests/repo_scan_cache.py) instead of by moving this literal.
+        #      Read tests/test_duration_budget_ratchet.py's docstring — it now
+        #      holds the whole class record plus a HARD_CEILING_SECONDS the
+        #      budget may not be raised past — BEFORE editing this number.
         #  (3) #1658: the MEASURED-coverage high-water ratchet — the only check
         #      here that can red the build. `--cov-fail-under` above is set a few
         #      points BELOW measured on purpose (anti-flap headroom), and until

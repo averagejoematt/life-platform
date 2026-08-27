@@ -15,11 +15,15 @@ tests/test_doc_facts_ops_1957.py:
 """
 
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
 
 _REPO = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(_REPO / "tests"))
+import repo_scan_cache  # noqa: E402
 
 
 def _load(rel, name):
@@ -163,7 +167,8 @@ def test_scheduled_count_clean_on_real_docs(ops, facts):
 
 # ── the whole gate still exits 0 on the real tree ────────────────────────────
 def test_gate_passes_on_the_repo():
-    import subprocess
-
-    r = subprocess.run(["python3", "scripts/check_doc_facts.py"], cwd=_REPO, capture_output=True, text=True)
+    # #3224: shared with test_doc_facts_ops_1957.py and test_wiki_checkers.py — same
+    # command, same unmutated tree, so the suite spawns it once instead of three times
+    # (15.4s each locally / ~27.5s each on the coverage lane). See tests/repo_scan_cache.py.
+    r = repo_scan_cache.run_repo_scan("scripts/check_doc_facts.py")
     assert r.returncode == 0, r.stdout + r.stderr

@@ -15,11 +15,15 @@ Each class gets three tests:
 
 import datetime as dt
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
 
 _REPO = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(_REPO / "tests"))
+import repo_scan_cache  # noqa: E402
 
 
 def _load(rel, name):
@@ -246,7 +250,10 @@ def test_secret_inventory_clean_on_real_docs(ops):
 
 # ── the whole gate still exits 0 on the real tree ────────────────────────────
 def test_gate_passes_on_the_repo():
-    import subprocess
-
-    r = subprocess.run(["python3", "scripts/check_doc_facts.py"], cwd=_REPO, capture_output=True, text=True)
+    # #3224: the SAME byte-identical scan of the SAME unmutated tree is asserted by
+    # three tests (here, test_doc_facts_ops_2003.py, test_wiki_checkers.py) and cost
+    # 15.4s of local wall-clock EACH — 8.1s of it the gate census #3126/#3156 put on
+    # the auto-discovery path. Routed through the shared per-process cache so the
+    # suite pays for it once. The assertion is unchanged; only the spawn is shared.
+    r = repo_scan_cache.run_repo_scan("scripts/check_doc_facts.py")
     assert r.returncode == 0, r.stdout + r.stderr

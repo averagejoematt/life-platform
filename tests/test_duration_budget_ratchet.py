@@ -27,10 +27,111 @@ This guard mirrors tests/test_coverage_floor_ratchet.py's shape exactly:
   together in one reviewable PR (this test then passes at the new value); a
   one-line drift in just the workflow (or just the script default) reds this test
   instead of silently diverging from what's actually enforced.
+
+#3224 (2026-08-27) ADDED A FOURTH LITERAL — `HARD_CEILING_SECONDS` — because
+"agreement-only" turned out to be the defect. See the class record below.
+
+═══════════════════════════════════════════════════════════════════════════════
+THE CLASS, IN ONE PLACE (#1349 → #1966 → #2152 → #3025 → #3106 → #3224)
+═══════════════════════════════════════════════════════════════════════════════
+Every instance of this class has been answered by re-deriving the budget UPWARD, and
+the trend line between instances has been steeper than the raises:
+
+  issue   date        measured    budget moved to   response
+  #1349   (origin)     157s        —                the gate itself
+  #1966   2026-08-04   688s avg    480 →  900       raise
+  #2152   2026-08-06   830s avg    900 → 1200       raise
+  #3025   2026-08-23  1394s       1200 → 1500       raise (+ 1 pathological test fixed)
+  #3106   2026-08-24  1507s       1500 → 1950       raise
+  #3224   2026-08-27  1994s       1950 → 1950       SHED — the first non-raise
+
+WHAT #3224 MEASURED (method named, so the next instance can repeat it rather than
+re-derive from scratch). Two green-main "test / Unit Tests" runs, read from the
+Actions API — 32762278235 @ 9331995b (the run that filed #3106) and 33030125667 @
+678a0598 (the run that filed #3224):
+
+  * tests collected   21,146 → 22,266   (+1,120, +5.3%)
+  * pytest wall clock 1465.46s → 1947.68s (+482.22s, +32.9%)
+  * mean cost/test    0.0693s → 0.0875s   (+26.2%)
+
+So the suite did not mostly get bigger — it got MORE EXPENSIVE PER TEST. Decomposing
+the +482s: new tests priced at the old mean explain 77.6s (16.1%); existing tests
+getting slower explain 384.2s (79.7%); the interaction term 20.3s (4.2%).
+
+The `--durations=25` blocks of those same two runs name the mechanism. Four tests
+roughly DOUBLED while the repo grew only 3.1% in tracked files:
+
+  test_doc_facts_ops_1957::test_gate_passes_on_the_repo   13.10s → 27.95s
+  test_wiki_checkers::test_verified_advisory_is_warn_only 12.88s → 27.57s
+  test_doc_facts_ops_2003::test_gate_passes_on_the_repo   12.86s → 27.54s
+  test_wiki_checkers::test_doc_facts_clean                13.27s → 27.14s
+
+Reproduced locally at both shas (same machine, `time python3
+scripts/check_doc_facts.py`, worktrees at each sha): **7.29s at 9331995b, 15.41s at
+10315b618** — the script did not get twice as careful, it acquired one more whole-repo
+scan. `cProfile` on the same command attributes 47% of it (8.09s of a 17.17s
+profiled run) to ONE addition landed between the two shas: #3126/#3156 put
+`gate_census.build_census()` — 1,189,573 `re.Pattern.search` calls over the whole tree
+— on `sync_doc_metadata`'s auto-discovery path, which `check_doc_facts.py` runs.
+
+That census is not paid once. Instrumenting `discover_gate_census_count` with a
+counter and running the FULL local suite on a clean 10315b618 worktree (2026-08-27,
+22,336 collected, 970.20s) recorded **19 complete census builds, every one against the
+same unmutated repo root, mean 8.07s — 153.3s, or 15.8% of the entire local suite
+wall clock**. None of that cost existed when #3106 measured 1507s.
+
+WHAT THE SHED MEASURED (local, `pytest --durations=20 -p no:randomly` over the seven
+files that hold the repo-scan family, before vs after, same machine):
+
+  before  129 tests in 163.76s   1957 / 2003 / wiki all near 15.5s in the top-20
+  after   129 tests in 135.41s   -28.35s (-17.3%); 2003 and wiki::test_doc_facts_clean
+                                 leave the top-20 entirely (they are now cache hits)
+
+THE CLASS IS THEREFORE NOT "we keep adding tests". It is:
+
+    suite cost = (number of tests that shell out to a shared repo scanner)
+                 x (cost of one whole-repo scan)
+
+Both factors grow with the repo, so the curve is superlinear and a fixed-percentage
+headroom raise is consumed faster every time — which is exactly the observed history.
+One check added to a shared scanner is multiplied into CI by the size of its caller
+set. THAT is why five raises produced a sixth instance.
+
+THE DECISION FOR THE CLASS (not the instance):
+  1. SHED the multiplier where it is pure duplication. `tests/repo_scan_cache.py`
+     memoizes a scan of the UNMUTATED tree for the lifetime of one pytest process;
+     the three tests that ran the byte-identical `check_doc_facts.py` now share one
+     spawn. `tests/test_repo_scan_cache_3224.py` pins both directions (it really
+     collapses duplicates; it never collapses two scans that differ) and guards the
+     three call sites structurally, because a silent cache miss would look exactly
+     like a working cache.
+  2. DO NOT RAISE for this instance. 1950 stays. If the shed leaves green main still
+     over budget, the warning is supposed to keep firing — that is the instrument
+     working, not a reason to move the number.
+  3. CAP THE ESCAPE HATCH. `HARD_CEILING_SECONDS` below is a wall, in the exact shape
+     `tests/test_module_size_guard.py` already runs against module size in this repo
+     (HARD_CEILING + a baseline that only ratchets down — standing record 6
+     collisions, 0 raises). A budget above the ceiling FAILS this file. At 1950 there
+     are 150s (7.7%) of room left, so AT MOST ONE more raise exists before shedding
+     becomes the only legal answer — a checkable statement, not "we'll watch it".
+
+WHAT THE NEXT INSTANCE SHOULD MEASURE FIRST — cost per test, not wall clock. Wall
+clock rises with honest growth and therefore always argues for a raise; cost-per-test
+does not, and it is what actually moved here (+26.2%). Note also that raw CI wall
+clock is a NOISY instrument: three pre-merge full-suite runs on 2026-08-27 over an
+essentially identical suite (22,168-22,214 tests) measured 962.58s / 1074.24s /
+1310.61s — a 36% spread with no code difference, and the SLOWEST of the three ran
+alone while the fastest ran alongside three other PRs. Cross-PR contention is a
+queueing effect on GitHub-hosted runners, not a job-duration one; do not attribute
+growth to it.
 """
 
 import os
 import re
+import subprocess
+import sys
+
+import pytest
 
 # ── THE BUDGET. Bump alongside the two literals below in the SAME PR. ────────
 # #1966 (2026-08-04): raised 480 -> 900 after 6 sampled green-main runs measured
@@ -68,12 +169,49 @@ import re
 # observed max) — enough headroom to absorb the next few weeks of this session's
 # growth curve without flapping on every green run, while a genuine regression
 # still trips it.
+# #3224 (2026-08-27): NOT RAISED. 1994s measured against this 1950s budget — the fifth
+# instance of the class — was answered by removing two redundant whole-repo scans
+# (tests/repo_scan_cache.py) instead of by a fifth re-derivation. See the class record
+# in this file's docstring for the attribution and the method.
 BUDGET_SECONDS = 1950
+
+# ── THE WALL (#3224). A raise past this FAILS. Shed instead. ─────────────────
+# 2100s = 35 minutes = `timeout-minutes` on pr-checks.yml's `full-suite` job, the
+# longest any lane in this repo is permitted to run, and the one every PR waits on.
+# The rule it encodes: no lane may be BUDGETED past the longest wall any lane is
+# allowed to RUN. Raising the pre-merge timeout to escape is possible but it is a
+# different, visible decision that slows every PR — and
+# test_hard_ceiling_tracks_the_premerge_full_suite_timeout below forces that PR to
+# edit this constant in the same diff rather than letting the ceiling drift upward on
+# its own. Same idiom as tests/test_module_size_guard.py's HARD_CEILING.
+HARD_CEILING_SECONDS = 2100
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 _SCRIPT = os.path.join(_REPO, "scripts", "coverage_gap_warn.py")
 _CI_TEST = os.path.join(_REPO, ".github", "workflows", "ci-test.yml")
+_PR_CHECKS_YML = os.path.join(_REPO, ".github", "workflows", "pr-checks.yml")
+
+
+def _premerge_full_suite_timeout_minutes():
+    """`timeout-minutes` of pr-checks.yml's `full-suite` job, read from the workflow.
+
+    Deliberately dependency-free (no PyYAML): #3156's incident was a doc gate that
+    degraded to a frozen constant in an environment without yaml installed, and a
+    ceiling that silently skips is a ceiling that cannot fail. A missing job or a
+    missing key is an assertion failure here, never a skip.
+    """
+    with open(_PR_CHECKS_YML, encoding="utf-8") as fh:
+        lines = fh.read().splitlines()
+    start = next((i for i, ln in enumerate(lines) if re.match(r"^  full-suite:\s*$", ln)), None)
+    assert start is not None, "pr-checks.yml no longer defines a `full-suite:` job — the ceiling's anchor is gone"
+    for ln in lines[start + 1 :]:
+        if re.match(r"^  \S", ln):  # next job key at the same indent
+            break
+        m = re.match(r"^    timeout-minutes:\s*(\d+)\s*$", ln)
+        if m:
+            return int(m.group(1))
+    raise AssertionError("pr-checks.yml's `full-suite` job has no timeout-minutes — the suite has no wall at all")
 
 
 def _script_default():
@@ -117,3 +255,107 @@ def test_all_three_budget_literals_agree():
         f"duration-budget literals disagree: script default={script_default:.0f}, "
         f"ci-test.yml={ci_value}, committed={BUDGET_SECONDS}. Keep all three in lockstep."
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #3224 — THE WALL. Agreement alone let the budget be re-derived upward forever
+# (5 raises, 157s -> 1994s, 12.7x). These three make the sixth raise a decision
+# somebody has to argue for rather than a one-line edit.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_budget_may_not_exceed_the_hard_ceiling():
+    """THE #3224 gate. Read the class record in this file's docstring before touching
+    HARD_CEILING_SECONDS: the answer to a breach is to shed a repeated whole-repo scan
+    (tests/repo_scan_cache.py is the worked example), not to move the wall."""
+    assert BUDGET_SECONDS <= HARD_CEILING_SECONDS, (
+        f"the suite-duration budget ({BUDGET_SECONDS}s) is above the {HARD_CEILING_SECONDS}s hard ceiling. "
+        "This is the sixth instance of the class #1349/#1966/#2152/#3025/#3106/#3224 track, and a raise is "
+        "no longer the permitted answer — shed the cost (see the class record in this file's docstring: the "
+        "dominant term is duplicated whole-repo scans, not test count) or make raising the ceiling its own "
+        "argued PR."
+    )
+
+
+def test_hard_ceiling_tracks_the_premerge_full_suite_timeout():
+    """The ceiling is not a taste number — it is the longest wall any lane in this repo
+    is allowed to run (pr-checks.yml `full-suite`'s own timeout). Raising that timeout
+    must therefore also be a deliberate edit HERE, in the same PR, rather than quietly
+    widening the room the budget has to grow into."""
+    minutes = _premerge_full_suite_timeout_minutes()
+    assert HARD_CEILING_SECONDS == minutes * 60, (
+        f"HARD_CEILING_SECONDS={HARD_CEILING_SECONDS} no longer equals pr-checks.yml's full-suite "
+        f"timeout-minutes ({minutes} -> {minutes * 60}s). If the pre-merge wall genuinely moved, move this "
+        "constant with it in the same PR and say why in the class record above."
+    )
+
+
+def test_the_ceiling_can_actually_fail(monkeypatch):
+    """Mutation proof — this repo's most-repeated defect is a check that cannot fail.
+    Plants an over-ceiling budget and re-runs the REAL gate function (not a restatement
+    of its comparison), then proves it is quiet exactly at the wall."""
+    mod = sys.modules[__name__]
+
+    monkeypatch.setattr(mod, "BUDGET_SECONDS", HARD_CEILING_SECONDS + 1)
+    with pytest.raises(AssertionError, match="hard ceiling"):
+        test_budget_may_not_exceed_the_hard_ceiling()
+
+    monkeypatch.setattr(mod, "BUDGET_SECONDS", HARD_CEILING_SECONDS)
+    test_budget_may_not_exceed_the_hard_ceiling()  # at the wall is legal; over it is not
+
+
+def test_the_ceiling_reader_fails_loudly_rather_than_defaulting(monkeypatch):
+    """A ceiling derived from a file that vanished must red, never fall back to a
+    number nothing measured (#3156's class, applied here)."""
+    monkeypatch.setattr(sys.modules[__name__], "_PR_CHECKS_YML", os.path.join(_REPO, ".github", "workflows", "does-not-exist.yml"))
+    with pytest.raises((AssertionError, OSError)):
+        _premerge_full_suite_timeout_minutes()
+
+
+def test_the_shipped_budget_still_fires_the_warning_on_the_wire(tmp_path):
+    """The budget number is only an instrument if the warner actually trips AT IT.
+    Runs scripts/coverage_gap_warn.py end-to-end at BUDGET_SECONDS+1 and BUDGET_SECONDS-1
+    — a budget raised so high it can never fire is the same defect as no gate at all.
+    (tests/test_coverage_gap_warn.py proves the mechanism against a synthetic 480s
+    budget; this proves it against the value CI actually ships.)"""
+    xml = tmp_path / "coverage.xml"
+    xml.write_text('<?xml version="1.0" ?><coverage line-rate="0.8332"></coverage>', encoding="utf-8")
+
+    over = subprocess.run(
+        [
+            sys.executable,
+            _SCRIPT,
+            "--coverage-xml",
+            str(xml),
+            "--floor",
+            "74",
+            "--duration-seconds",
+            str(BUDGET_SECONDS + 1),
+            "--duration-budget-seconds",
+            str(BUDGET_SECONDS),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert (
+        "::warning title=Unit Tests job is over its duration budget::" in over.stdout
+    ), f"the shipped {BUDGET_SECONDS}s budget did not warn one second over it:\n{over.stdout}{over.stderr}"
+    assert f"over the {BUDGET_SECONDS}s budget" in over.stdout
+
+    under = subprocess.run(
+        [
+            sys.executable,
+            _SCRIPT,
+            "--coverage-xml",
+            str(xml),
+            "--floor",
+            "74",
+            "--duration-seconds",
+            str(BUDGET_SECONDS - 1),
+            "--duration-budget-seconds",
+            str(BUDGET_SECONDS),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert "over the" not in under.stdout, f"the duration warning fires below budget — it would be noise, not signal:\n{under.stdout}"
