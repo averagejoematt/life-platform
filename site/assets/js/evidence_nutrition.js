@@ -466,7 +466,20 @@ export async function renderGlucose(d) {
     return ghost + sec("Glucose trend", lineChart(trend, { valueKey: "value", label: "Glucose", emptyMsg: "The glucose curve fills once a CGM sensor is active." })) + mealSec +
       note("Correlative — how specific meals moved glucose. Not diagnostic.");
   }
-  const head = figs([cur && cur.avg != null && fig(fmt(cur.avg), "avg mg/dL"), cur && cur.tir != null && fig(cur.tir + "%", "time in range")]);
+  // #3204: these bound `cur.avg` / `cur.tir`, but /api/glucose has always published
+  // `avg_mg_dl` / `time_in_range_pct`. The head figures therefore rendered nothing —
+  // which is why the two days of post-sensor-end stale numbers never reached a
+  // reader. That was a key mismatch, not a check: a future rename would have
+  // restored the lie with nothing to catch it. The keys are now the endpoint's real
+  // ones, and the honesty is deliberate — the endpoint nulls its day scalars once
+  // the sensor is dark, so this row is empty for a stated reason, and `sensor.note`
+  // says which reason. Pinned by tests/js/evidence_glucose_absence_3204.test.mjs.
+  const sensor = cur && cur.sensor;
+  const darkNote = sensor && sensor.status === "stale" && sensor.note ? note(sensor.note) : "";
+  const head = figs([
+    cur && cur.avg_mg_dl != null && fig(fmt(cur.avg_mg_dl), "avg mg/dL"),
+    cur && cur.time_in_range_pct != null && fig(cur.time_in_range_pct + "%", "time in range"),
+  ]);
   const trendChart = sec("Glucose trend", lineChart(trend, { valueKey: "value", label: "Glucose", emptyMsg: "The glucose curve fills once a CGM sensor is active." }));
-  return (head.includes("fig-v") ? head : "") + trendChart + mealSec + note("Correlative — how specific meals moved glucose. Not diagnostic.");
+  return (head.includes("fig-v") ? head : "") + darkNote + trendChart + mealSec + note("Correlative — how specific meals moved glucose. Not diagnostic.");
 }

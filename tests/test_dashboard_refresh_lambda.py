@@ -1130,3 +1130,80 @@ def test_lambda_handler_reraises_so_the_schedule_records_a_failure(monkeypatch, 
     monkeypatch.setattr(drl, "load_profile", _boom)
     with pytest.raises(RuntimeError, match="profile read exploded"):
         drl.lambda_handler({}, None)
+
+
+# ── #3204: a CGM session that ended must not live on in an undated artifact ───
+#
+# `dashboard/data.json` carries no date of its own, so a number it retains is not
+# merely old — it is undatable, and nothing in the document can ever expire it.
+# Two defects combined to make it the platform's longest-lived stale reading when
+# the Dexcom Stelo session ended on 2026-08-24:
+#   (a) `glucose_src = apple_today or apple` picked the ROW, not the READING. The
+#       apple_health partition kept writing daily rows for steps and water, so
+#       today's glucose-free row was truthy and SHADOWED yesterday's real reading.
+#   (b) every write was `if value:` with no `else`, so a value once written could
+#       never be removed.
+# The intraday `if value:` retention itself is deliberate and is NOT the bug — this
+# lambda merges into the morning brief's doc at 2 PM and 6 PM, and a partial day
+# that has not yet computed an average must not blank the morning's. The tests
+# above pin that. What follows pins the two things that were wrong.
+
+
+def test_a_glucose_free_row_does_not_shadow_a_real_reading_from_the_day_before(monkeypatch, s3, frozen_now):
+    """Defect (a), on the shape that caused it: today's row exists and is truthy —
+    steps and water landed — but carries no `blood_glucose_*` attribute at all.
+
+    Pre-fix this row won `apple_today or apple` and contributed nothing, so the
+    document silently fell back on whatever was already in it. Now the newest row
+    that actually CARRIES glucose is selected, and yesterday's real reading wins.
+    """
+    dates = {
+        ("apple_health", YESTERDAY): {"blood_glucose_avg": 118.0, "time_in_range_pct": 77.0},
+        ("apple_health", "2026-06-17"): {"steps": 8412, "water_intake_ml": 1900},
+    }
+    _install_dashboard_doubles(monkeypatch, s3, dates=dates)
+    drl.refresh_dashboard(DASHBOARD_PROFILE, YESTERDAY, TODAY)
+
+    doc = s3.written(DASH_KEY)
+    assert doc["glucose"]["avg"] == 118.0, "the glucose-free row must not shadow the reading behind it"
+    assert doc["glucose"]["tir_pct"] == 77.0
+    assert doc["glucose"]["as_of"] == YESTERDAY, "and the value must now say which day it is from"
+
+
+def test_a_dark_sensor_clears_the_retained_glucose_block_instead_of_keeping_it(monkeypatch, s3, frozen_now):
+    """Defect (b) — the one that never decayed.
+
+    No apple_health row carries glucose at all (the sensor ended days ago), while
+    the stored document still holds the last good numbers. Pre-fix every field
+    survived untouched, forever, undated. The must-fail control is that EXISTING_
+    DASHBOARD's glucose values are gone: asserting merely that keys exist would
+    have passed against the bug.
+    """
+    _install_dashboard_doubles(monkeypatch, s3, dates={})
+    assert EXISTING_DASHBOARD["glucose"].get(
+        "avg"
+    ), "fixture guard: the stored doc must start with a retained value, or this proves nothing"
+
+    drl.refresh_dashboard(DASHBOARD_PROFILE, YESTERDAY, TODAY)
+
+    doc = s3.written(DASH_KEY)
+    assert doc["glucose"]["avg"] is None, "a dead reading must be cleared, not retained"
+    assert doc["glucose"]["tir_pct"] is None
+    assert doc["glucose"]["variability"] is None
+    assert doc["glucose"]["fasting_proxy"] is None
+    assert doc["glucose"]["as_of"] is None
+    assert "glucose" in doc, "absence is STATED — the section stays, as nulls, rather than vanishing"
+
+
+def test_a_reading_older_than_the_registry_reader_bar_is_not_republished(monkeypatch, s3, frozen_now):
+    """The bar is the registry's, not a number invented here: `reader_surface.
+    max_days_behind` = 1 for CGM. A reading from two days back is outside it even
+    though a row for that day exists and carries real glucose."""
+    two_days_back = "2026-06-15"
+    monkeypatch.setattr(drl, "fetch_date", _make_fetch_date({("apple_health", two_days_back): {"blood_glucose_avg": 118.0}}))
+    monkeypatch.setattr(drl, "fetch_range", _make_fetch_range(_dashboard_rows()))
+    monkeypatch.setattr(drl, "training_load", _FakeTrainingLoad())
+    s3.objects[DASH_KEY] = json.dumps(EXISTING_DASHBOARD)
+
+    drl.refresh_dashboard(DASHBOARD_PROFILE, YESTERDAY, TODAY)
+    assert s3.written(DASH_KEY)["glucose"]["avg"] is None

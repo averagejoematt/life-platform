@@ -35,6 +35,7 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from health.sensor_absence import absence_verdict, is_stale
 
 from web.site_api_common import (
     PT,
@@ -195,25 +196,57 @@ def glucose(*, _g) -> dict:
             "tir": round(float(best_r.get("blood_glucose_time_in_range_pct", 0)), 1),
         }
 
+    # #3204 — ADR-104: is `latest` still TODAY's reading, or did the sensor session end?
+    # `apple_health` stays fresh on steps/water when the CGM stops, so partition
+    # freshness proves nothing here. The bar is the registry's `reader_surface` facet
+    # (source_registry: cgm -> max_days_behind 1), not a number invented at this call
+    # site, so the label a reader sees and the operator-side liveness view agree.
+    as_of = latest.get("sk", "").replace("DATE#", "")
+    sensor = absence_verdict("cgm", as_of or None, today)
+    dark = is_stale(sensor)
+
+    # When the sensor is dark, the day-scalar fields are the ones that lie: they are
+    # named as the current reading and there is no current reading. They go null and
+    # the numbers move, DATED, to `last_reading` — so a consumer binding `avg_mg_dl`
+    # gets absence rather than a stale figure, and no future key rename can restore
+    # the lie. `as_of_date` goes null with them: it stamps the currency of THIS
+    # object's values, and with those values absent there is nothing to stamp (the
+    # dark window is fully described by `sensor`). The window aggregates below are
+    # untouched — they are honestly window-named and a 30-day mean is still a 30-day
+    # mean once the sensor stops. `glucose_trend` is likewise per-point dated.
+    last_reading = {
+        "date": as_of or None,
+        "avg_mg_dl": round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None,
+        "std_dev": round(float(latest.get("blood_glucose_std_dev", 0)), 1) if latest.get("blood_glucose_std_dev") else None,
+        "time_in_range_pct": round(tir_today, 1),
+    }
+
+    def _cur(value):
+        """A day-scalar: the value while the sensor is live, absence once it is dark."""
+        return None if dark else value
+
     return _ok(
         {
             "glucose": {
-                "avg_mg_dl": round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None,
-                "std_dev": round(float(latest.get("blood_glucose_std_dev", 0)), 1) if latest.get("blood_glucose_std_dev") else None,
-                "time_in_range_pct": round(tir_today, 1),
-                "time_in_optimal_pct": (
+                "avg_mg_dl": _cur(round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None),
+                "std_dev": _cur(round(float(latest.get("blood_glucose_std_dev", 0)), 1) if latest.get("blood_glucose_std_dev") else None),
+                "time_in_range_pct": _cur(round(tir_today, 1)),
+                "time_in_optimal_pct": _cur(
                     round(float(latest.get("blood_glucose_time_in_optimal_pct", 0)), 1)
                     if latest.get("blood_glucose_time_in_optimal_pct")
                     else None
                 ),
-                "time_above_140_pct": (
+                "time_above_140_pct": _cur(
                     round(float(latest.get("blood_glucose_time_above_140_pct", 0)), 1)
                     if latest.get("blood_glucose_time_above_140_pct")
                     else None
                 ),
                 "cgm_source": latest.get("cgm_source", "unknown"),
-                "tir_status": tir_status,
-                "variability_status": variability_status,
+                # A *_status verdict is a judgement ON a current reading ("excellent"
+                # time-in-range). With no current reading there is no verdict to render
+                # — absence, not a grade earned days ago (ADR-104).
+                "tir_status": _cur(tir_status),
+                "variability_status": _cur(variability_status),
                 # #1917: truthful-or-absent — these are MEANS, so a genesis-clamped
                 # window makes "30d" a false name, not merely an understatement.
                 # The real values ship under window-generic names beside their span.
@@ -227,7 +260,9 @@ def glucose(*, _g) -> dict:
                 "30d_avg_optimal": avg(opt_vals) if _w30["full"] else None,
                 "30d_avg_std": avg(std_vals) if _w30["full"] else None,
                 "days_tracked": len(cgm_days),
-                "as_of_date": latest.get("sk", "").replace("DATE#", ""),
+                "as_of_date": None if dark else (as_of or None),
+                "sensor": sensor,
+                "last_reading": last_reading,
                 "best_day": best_day,
                 "worst_day": worst_day,
             },

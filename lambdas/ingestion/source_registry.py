@@ -218,10 +218,22 @@ DEFAULT_STALE_HOURS = 48
 #                  partition-level "fresh" can hide a months-dark sensor (D-4/#468).
 #                  Migrated here from freshness_checker by #746 so every source
 #                  threshold lives in this one registry. Each: {key, label, fields
-#                  (any-of presence signals), stale_days, manual}. `manual` marks
-#                  the streams Matthew captures by hand (CGM/water/BP/State of Mind)
-#                  vs the passive device streams (steps/workouts) — only the manual
-#                  ones are nudge-eligible. Read by hae_datatype_thresholds().
+#                  (any-of presence signals), stale_days, manual[, reader_surface]}.
+#                  `manual` marks the streams Matthew captures by hand (CGM/water/
+#                  BP/State of Mind) vs the passive device streams (steps/workouts)
+#                  — only the manual ones are nudge-eligible. Read by
+#                  hae_datatype_thresholds().
+#                  `reader_surface` (#3204) is a SECOND, tighter threshold answering
+#                  a DIFFERENT question. `stale_days` asks "has the capture habit
+#                  lapsed?" — behavioural, deliberately lenient, it narrates and
+#                  never pages. A sub-datatype that is ALSO published as
+#                  current-looking daily statistics on a public endpoint has a
+#                  reader-truth question too: "is the number this endpoint prints
+#                  actually today's?" {endpoint, max_days_behind} answers that one,
+#                  and BOTH the endpoint's ADR-104 absence label and the operator
+#                  check derive from this single number, so the published label and
+#                  the alert can never disagree (#2003: read the registry).
+#                  Read by hae_reader_surfaces().
 # Annotated explicitly: splicing in the closed-social section (#1677) otherwise widens
 # the inferred value type to `object` and reds every facet helper under mypy.
 SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
@@ -459,12 +471,22 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "hae_datatypes": [
             # CGM: a sensor session runs continuously for ~10-14d then needs a new
             # sensor applied — 3d dark means the session lapsed and none was reapplied.
+            # #3204: CGM is the one HAE sub-datatype ALSO published as a current-looking
+            # daily stat block (/api/glucose: avg_mg_dl, time-in-range, as_of_date). When
+            # the 2026-08-24 sensor session ended, the partition stayed fresh on steps and
+            # water, this 3d behavioural bar had not yet tripped, and the endpoint served
+            # 08-24's numbers for two more days — caught only by the nightly reader-truth
+            # oracle. `max_days_behind: 1` is that oracle's own bar for a near-real-time
+            # source (phase_plausibility.NEAR_REAL_TIME_ASOF_MAX_LAG_DAYS), promoted to a
+            # first-class registry fact so the endpoint's absence label and the operator's
+            # liveness view read ONE number.
             {
                 "key": "cgm",
                 "label": "CGM (glucose)",
                 "fields": ["blood_glucose_avg", "blood_glucose_readings_count"],
                 "stale_days": 3,
                 "manual": True,
+                "reader_surface": {"endpoint": "/api/glucose", "max_days_behind": 1},
             },
             # BP: spot-checked, not daily — a fortnight is a lenient "haven't cuffed in a while".
             {
@@ -1365,6 +1387,30 @@ def hae_datatype_thresholds() -> list:
     registry. Each: {key, label, fields, stale_days, manual}. The checker's
     HAE_DATATYPES aliases this; compute_datatype_liveness reads it."""
     return [dict(d) for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", []))]
+
+
+def hae_reader_surfaces() -> dict:
+    """The HAE sub-datatypes that are ALSO published as current-looking statistics on
+    a reader endpoint, keyed by datatype key (#3204).
+
+    Each value is the datatype's `reader_surface` facet widened with its `label` and
+    behavioural `stale_days`, so a caller ruling on published currency never has to
+    re-open the registry to phrase the verdict::
+
+        {"cgm": {"endpoint": "/api/glucose", "max_days_behind": 1,
+                 "label": "CGM (glucose)", "stale_days": 3}}
+
+    A datatype with no `reader_surface` facet is absent from this map by
+    construction: it is captured and narrated, but nothing publishes it as today's
+    number, so it has no reader-truth bar to hold. `lambdas/health/sensor_absence.py`
+    is the ONE consumer that turns these into an ADR-104 verdict."""
+    out: dict[str, dict[str, Any]] = {}
+    for d in cast("list[dict[str, Any]]", SOURCE_REGISTRY["apple_health"].get("hae_datatypes", [])):
+        rs = d.get("reader_surface")
+        if not rs:
+            continue
+        out[d["key"]] = {**rs, "label": d["label"], "stale_days": d.get("stale_days")}
+    return out
 
 
 def manual_hae_datatype_keys() -> set:
