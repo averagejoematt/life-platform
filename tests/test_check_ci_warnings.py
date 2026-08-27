@@ -25,6 +25,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import check_ci_warnings as ccw  # noqa: E402
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -201,7 +202,7 @@ def test_fetch_warnings_for_sha_degrades_on_any_exception(monkeypatch):
 
 
 def test_wrap_skill_wires_the_gate():
-    with open(os.path.join(REPO, ".claude", "commands", "wrap.md"), encoding="utf-8") as f:
+    with open(_skill("wrap"), encoding="utf-8") as f:
         wrap = f.read()
     assert "check_ci_warnings.py" in wrap
     assert "**CI warnings:**" in wrap

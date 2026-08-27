@@ -20,9 +20,11 @@ hand-listed endpoints, no dial) before the rewrite.
 import os
 import re
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
-_SKILL = os.path.join(_REPO, ".claude", "commands", "qa.md")
+_SKILL = str(_skill("qa"))
 
 
 def _skill_text():

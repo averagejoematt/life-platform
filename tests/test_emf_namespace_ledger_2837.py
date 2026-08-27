@@ -58,6 +58,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 import emf_namespace_discovery as disc  # noqa: E402
 import emf_namespace_ledger as ledger  # noqa: E402
 import emf_series_census as census  # noqa: E402
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 PRODUCERS = disc.discover_producers()
 CONSUMERS = disc.discover_consumers()
@@ -438,7 +439,7 @@ def test_dedupe_proposes_nothing_for_the_per_lambda_alarms_2891_targeted():
 
 def test_the_cost_close_ritual_runs_the_census():
     """The monthly series-count line is an acceptance box; a ritual can drop a step silently."""
-    text = open(os.path.join(_REPO, ".claude", "commands", "cost-diligence.md"), encoding="utf-8").read()
+    text = open(_skill("cost-diligence"), encoding="utf-8").read()
     assert (
         "deploy/emf_series_census.py" in text
     ), "the cost-diligence ritual must invoke the census — otherwise the ledger is a one-time snapshot"

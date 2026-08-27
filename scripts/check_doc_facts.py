@@ -957,9 +957,25 @@ def _cost_tracker_hits(doc_path: Path, today=None) -> list[str]:
     return hits
 
 
+def _skill_registry():
+    """The ONE registry for Claude Code skills + agents (scripts/skill_registry.py)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_skill_registry", Path(__file__).resolve().parent / "skill_registry.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def _scan_files() -> list[Path]:
-    cands = [ROOT / "README.md", ROOT / "CLAUDE.md"]
-    cands += sorted((ROOT / ".claude" / "commands").glob("*.md"))
+    # The prompt surface comes from the ONE registry (scripts/skill_registry.py), which
+    # returns skills AND agents in whatever layout they are in. Before #skills-registry
+    # this line was a `.claude/commands/*.md` glob, which silently omitted
+    # `.claude/agents/*.md` and `.claude/README.md` entirely — so an agent prompt or the
+    # public "how this is built" doc could carry a stale number indefinitely. That is how
+    # .claude/README.md kept claiming a $75/mo ceiling months after it became $150.
+    cands = [ROOT / "README.md", ROOT / "CLAUDE.md", ROOT / ".claude" / "README.md"]
+    cands += _skill_registry().prompt_files()
     cands += sorted((ROOT / "docs").rglob("*.md"))
     out = []
     for p in cands:

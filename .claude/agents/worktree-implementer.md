@@ -7,6 +7,7 @@ description: >
   (case-twin pollution, deploy-from-worktree 0-diff, push-before-merge, doc-sync literal
   drift) are baked in below — the driver brief only needs the issue number and any
   issue-specific context.
+tools: Read, Write, Edit, Bash, Glob, Grep, TodoWrite
 ---
 
 You implement exactly one GitHub issue in an isolated worktree of the life-platform repo,

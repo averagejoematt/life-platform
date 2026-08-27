@@ -17,7 +17,7 @@
 | **Per-script reference** (what each `deploy/*.sh` does, flags, the run-from-repo-root rule) | [`deploy/README.md`](../deploy/README.md) |
 | **Deploy a single Lambda / fleet / MCP / site-api** | `deploy/deploy_lambda.sh` · `deploy/deploy_fleet.sh` · (MCP is just `deploy_lambda.sh life-platform-mcp` since #781) · `deploy/deploy_site_api.sh` — all documented in [`deploy/README.md`](../deploy/README.md) |
 | **Deploy the static site** | Merge to main — `site-deploy.yml` deploys automatically (#750). Attended fallback: `bash deploy/sync_site_to_s3.sh`. Details: [`SITE_UPLEVEL_PLAYBOOK.md`](SITE_UPLEVEL_PLAYBOOK.md) |
-| **CDK / infra changes** | `bash deploy/cdk_deploy.sh <StackName>` (the guarded path — [`CONVENTIONS.md` §6](CONVENTIONS.md)); site-api ownership split rules in `.claude/commands/deploy.md` (#793/#794) |
+| **CDK / infra changes** | `bash deploy/cdk_deploy.sh <StackName>` (the guarded path — [`CONVENTIONS.md` §6](CONVENTIONS.md)); site-api ownership split rules in `.claude/skills/deploy/SKILL.md` (#793/#794) |
 | **Roll back** (Lambda, site, CDK) | [`QUICKSTART.md`](QUICKSTART.md) rollback section + `deploy/rollback_lambda.sh` / `deploy/rollback_site.sh` |
 | **CI/CD pipeline shape** (gates, approval, smoke, auto-rollback) | [`CONVENTIONS.md` §4](CONVENTIONS.md) + `.github/workflows/ci-cd.yml` |
 | **Emergency / disaster scenarios** | [`RUNBOOK.md`](RUNBOOK.md) + [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md) |

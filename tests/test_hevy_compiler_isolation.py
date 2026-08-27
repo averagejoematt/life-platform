@@ -48,9 +48,22 @@ _KEY = "exercise_template_id"
 _SKIP_DIRS = {".git", ".claude", "__pycache__", "cdk", "cdk.out", "deploy", "docs", "site", "node_modules"}
 
 
+def _is_worktree_root(path: str) -> bool:
+    """True if `path` is a git worktree checkout (it carries its own `.git`).
+
+    #953 named ONE worktree location (`.claude/worktrees/`) and skipped it by name.
+    That is an instance guard: a second in-repo worktree root (`.worktrees/`, which is
+    gitignored and so invisible to `git ls-files`) reproduced the identical failure —
+    ten offenders from `.worktrees/issue-3108-…` — while the by-name skip read as
+    coverage. Structural test instead of a name list: any directory holding its own
+    `.git` is somebody else's checkout, wherever it lives and whatever it is called.
+    """
+    return os.path.exists(os.path.join(path, ".git"))
+
+
 def _iter_py_files():
     for root, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not _is_worktree_root(os.path.join(root, d))]
         for fn in files:
             if fn.endswith(".py"):
                 yield os.path.join(root, fn)

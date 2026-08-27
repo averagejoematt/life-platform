@@ -671,12 +671,12 @@ def _apply_auto_discovered(facts: dict) -> dict:
             )
         facts["experiment_cycle"] = experiment_cycle
 
-    # Recompute derived facts
     facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
     facts["secrets_cost_note"] = (
         f"{facts['secret_count']} active secrets × $0.40/secret/month "
         f"(live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md)"
     )
+    __import__("sync_skill_facts").apply(facts, RULES, ROOT)  # skill/agent corpus size, module-size ceiling
     return __import__("sync_census_fact").apply(facts, RULES, ROOT) or facts  # #3000, module-size ceiling
 
 

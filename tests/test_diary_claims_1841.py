@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.join(_ROOT, "lambdas", "coach"))
 from experiment import measurable_metrics as mm  # noqa: E402
 from privacy import diary_claims as dc  # noqa: E402
 from site_api_family import family_source  # noqa: E402  # #1654: guard the SET, not the instance
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 SESSION_DATE = "2026-07-26"
 SOURCE_SK = "DATE#2026-07-26#journal#video_diary#a1b2c3d4e5f6"
@@ -440,7 +441,7 @@ class TestRegistration:
     def test_vlog_command_wires_both_ends_of_the_loop(self):
         """AC1 + AC3 live in the command file — the close that offers claims and the
         step-0 priming that calls them back."""
-        src = open(os.path.join(_ROOT, ".claude", "commands", "vlog.md")).read()
+        src = open(_skill("vlog")).read()
         step0, close = src.split("### 3. Close = route the takeaways")
         assert "manage_diary_claims" in step0, "step 0 must surface claims due for grading (AC3)"
         assert "due" in step0

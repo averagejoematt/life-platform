@@ -20,6 +20,8 @@ import importlib.util
 import os
 import sys
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
@@ -106,7 +108,7 @@ def test_gate_verdict_none_when_nothing_finished():
 def test_wrap_skill_wires_the_gate():
     """The /wrap driver must actually run the gate — a script nobody invokes is
     not a gate."""
-    with open(os.path.join(_REPO, ".claude", "commands", "wrap.md")) as f:
+    with open(_skill("wrap")) as f:
         wrap = f.read()
     assert "check_main_green.py" in wrap
     assert "**Main:**" in wrap

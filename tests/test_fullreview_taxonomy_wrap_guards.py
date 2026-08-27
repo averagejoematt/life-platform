@@ -13,6 +13,8 @@ The memory dir lives outside the repo, so CI can only assert the gate step exist
 import importlib.util
 from pathlib import Path
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -39,7 +41,7 @@ def test_elena_is_experiment_scoped_matching_the_comment():
 
 # ── #1259: the /wrap skill carries the memory orphan/broken-link gate ──────────
 def test_wrap_skill_has_orphan_gate():
-    wrap = (ROOT / ".claude" / "commands" / "wrap.md").read_text(encoding="utf-8")
+    wrap = _skill("wrap").read_text(encoding="utf-8")
     assert "ORPHAN:" in wrap, "#1259: the /wrap memory orphan gate is missing"
     # it must match the basename (not the raw .md), or it false-flags [[wikilink]] refs
     assert 'base="${f%.md}"' in wrap, "#1259: the orphan gate must match the basename to avoid wikilink false-positives"

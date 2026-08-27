@@ -18,9 +18,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "deploy" / "sync_deploy_doc_map.py"
-DOC = REPO_ROOT / ".claude" / "commands" / "deploy.md"
+DOC = _skill("deploy")
 MAP = REPO_ROOT / "ci" / "lambda_map.json"
 
 spec = importlib.util.spec_from_file_location("sync_deploy_doc_map", SCRIPT)

@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.join(_ROOT, "lambdas", "ingestion"))
 sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 
 from privacy import diary_publish as dp  # noqa: E402
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 NOW = "2026-07-27T18:00:00+00:00"
 NOTION_URL = "https://www.notion.so/Video-Diary-retro-2026-07-26-1f2e3d4c5b6a7988990a1b2c3d4e5f60"
@@ -437,7 +438,7 @@ class TestGoodhartGuardrail:
             assert purpose in doc, f"{purpose} missing from the must-never list"
 
     def test_the_vlog_skill_references_the_rule(self):
-        with open(os.path.join(_ROOT, ".claude", "commands", "vlog.md"), encoding="utf-8") as fh:
+        with open(_skill("vlog"), encoding="utf-8") as fh:
             skill = fh.read()
         assert "docs/content/DIARY_STUDIO_KIT.md" in skill
         assert "Goodhart" in skill

@@ -75,7 +75,9 @@ PUSH_TRIGGER_GLOBS = (
     "docs/**",
     "README.md",
     "CLAUDE.md",
-    ".claude/commands/**",
+    ".claude/skills/**",
+    ".claude/agents/**",
+    ".claude/README.md",
     "deploy/sync_doc_metadata.py",
     "deploy/sync_census_fact.py",  # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
     "deploy/doc_restamp_guard.py",  # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to

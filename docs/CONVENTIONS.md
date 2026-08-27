@@ -961,7 +961,7 @@ would catch THIS class of defect?" in one glance. This table is a routing index,
 restatement: each row is a one-line pointer to the section/file that owns the rule —
 read that section for the incident narrative and the exact mechanics.
 
-**Wrap gates** (session-close, `.claude/commands/wrap.md` — run every `/wrap`; since
+**Wrap gates** (session-close, `.claude/skills/wrap/SKILL.md` — run every `/wrap`; since
 #3007 the battery runs as ONE batched pass — `scripts/wrap_gates.py` gathers the
 non-handover-reading gates in parallel before the handover is written, and
 `scripts/wrap_gates.py --verify` runs the handover-reading gates before the wrap
@@ -969,18 +969,18 @@ commit — the step letters below stay the per-gate contract anchors):
 
 | Defect class | Owning gate | Where |
 |---|---|---|
-| Session shipped+deployed work with no public dispatch | Build-beat gate (#736), step (d) | `.claude/commands/wrap.md` step (d) |
-| A shipped change invalidated a wiki page and nobody updated it | Doc-impact sweep, step (e) | `.claude/commands/wrap.md` step (e); mechanics in §8 above |
-| A governance-consequential decision landed with no ADR | Decisions gate (#1343), step (e) | `.claude/commands/wrap.md` step (e) |
+| Session shipped+deployed work with no public dispatch | Build-beat gate (#736), step (d) | `.claude/skills/wrap/SKILL.md` step (d) |
+| A shipped change invalidated a wiki page and nobody updated it | Doc-impact sweep, step (e) | `.claude/skills/wrap/SKILL.md` step (e); mechanics in §8 above |
+| A governance-consequential decision landed with no ADR | Decisions gate (#1343), step (e) | `.claude/skills/wrap/SKILL.md` step (e) |
 | A status block claims "main GREEN" without reading the badge | Green-main gate (#1327), step (e2) | `scripts/check_main_green.py` |
 | A deploy parks forever behind a phantom concurrency entry while its run reads "waiting for approval" | Deploy-wedge detector (#2052), folded into step (e2) | `scripts/check_deploy_wedge.py`; §4d above |
-| An incident-class event (rollback, main red >1h, data gap, budget-tier event) went unlogged | Incident gate (#1332), step (e3) | `docs/INCIDENT_LOG.md` + `.claude/commands/wrap.md` step (e3) |
+| An incident-class event (rollback, main red >1h, data gap, budget-tier event) went unlogged | Incident gate (#1332), step (e3) | `docs/INCIDENT_LOG.md` + `.claude/skills/wrap/SKILL.md` step (e3) |
 | A handover residual/next-picks bullet names real work with no issue number | Residual-queue gate (#1340), step (e4) | `scripts/check_residual_queue.py` |
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
 | A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes, epic link, or a `model:*`/`type:*`/`area:*`/`prio:*` label) | Filing-contract linter (#1867/#1870), step (e7) — blocking by default since #1872, which absorbed and deleted the older #1349 `model:*`-only gate | `scripts/check_backlog_hygiene.py` |
-| An issue closed this session leaves no outcome verdict (53 of the last 60 closures had zero comments) | Closure-comment gate (#1870), step (e8) | `.claude/commands/wrap.md` step (e8); contract in ADR-099's amendment ¶3 |
-| `Now` sits at zero actionable stories, or a `Later` issue ages past 60d with nobody calling promote-or-close | Now-refill + `Later` sweep (#1870), step (e9) | `scripts/backlog_next.py`; `.claude/commands/wrap.md` step (e9) |
-| A memory topic file exists un-indexed from `MEMORY.md`/`project_shipped_archive.md` | Orphan/broken-link gate (#1259), step (c) | inline bash loop, `.claude/commands/wrap.md` step (c) |
+| An issue closed this session leaves no outcome verdict (53 of the last 60 closures had zero comments) | Closure-comment gate (#1870), step (e8) | `.claude/skills/wrap/SKILL.md` step (e8); contract in ADR-099's amendment ¶3 |
+| `Now` sits at zero actionable stories, or a `Later` issue ages past 60d with nobody calling promote-or-close | Now-refill + `Later` sweep (#1870), step (e9) | `scripts/backlog_next.py`; `.claude/skills/wrap/SKILL.md` step (e9) |
+| A memory topic file exists un-indexed from `MEMORY.md`/`project_shipped_archive.md` | Orphan/broken-link gate (#1259), step (c) | inline bash loop, `.claude/skills/wrap/SKILL.md` step (c) |
 | A `MEMORY.md` index correction didn't carry through to the topic file's body | Body-follows-index gate (#1342), step (c) | `scripts/check_memory_body_facts.py` |
 | A CloudWatch alarm sits in ALARM >72h with no citation, normalizing among the chronic reds | Alarm-citation gate (#1959), step (e10) | `scripts/check_alarm_citations.py`; `docs/alarm_citations.json` |
 | A CloudWatch alarm fires and clears between wraps — invisible to current-state duration by construction (a 24h-window alarm can flap with 1–3 min dwells; measured 35 cycles off one planted datapoint) | Fired-and-cleared flap detector folded into the alarm-citation gate (#2912), step (e10) — reads `describe-alarm-history` transitions over the same 72h window; a transition count is the honest signal, current-state duration is not (ADR-104) | `scripts/check_alarm_citations.py::flapped_uncited`; `docs/alarm_citations.json` |

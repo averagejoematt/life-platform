@@ -55,6 +55,23 @@ for _p in (os.path.join(_REPO, "tests"), _HERE, os.path.join(_REPO, "lambdas"), 
 
 import qa_manifest  # noqa: E402
 
+
+def _skill_registry():
+    """The ONE registry for Claude Code skills + agents (scripts/skill_registry.py)."""
+    import importlib.util
+    import os as _os
+
+    _here = _os.path.dirname(_os.path.abspath(__file__))
+    _cands = [_os.path.join(_here, "skill_registry.py"), _os.path.join(_here, "..", "scripts", "skill_registry.py")]
+    for _p in _cands:
+        if _os.path.isfile(_p):
+            spec = importlib.util.spec_from_file_location("_skill_registry", _p)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise FileNotFoundError("scripts/skill_registry.py not found")
+
+
 QA_LEVEL_PARAM = "/life-platform/qa-level"
 BUDGET_TIER_PARAM = "/life-platform/budget-tier"
 
@@ -65,7 +82,7 @@ CONSUMER_CONTRACT = {
     os.path.join(_REPO, "deploy", "smoke_test_site.sh"): "qa_manifest",
     os.path.join(_REPO, "deploy", "restart_verify_rendered.py"): "qa_manifest",
     os.path.join(_REPO, "tests", "site_review_bindings.py"): "qa_manifest",
-    os.path.join(_REPO, ".claude", "commands", "qa.md"): "qa_manifest",
+    str(_skill_registry().require_skill("qa")): "qa_manifest",
 }
 
 # QA workflow inventory surface (which files to characterize, not what they mean —

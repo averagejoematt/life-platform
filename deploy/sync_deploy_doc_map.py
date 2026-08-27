@@ -23,9 +23,26 @@ import json
 import sys
 from pathlib import Path
 
+
+def _skill_registry():
+    """The ONE registry for Claude Code skills + agents (scripts/skill_registry.py)."""
+    import importlib.util
+    import os as _os
+
+    _here = _os.path.dirname(_os.path.abspath(__file__))
+    _cands = [_os.path.join(_here, "skill_registry.py"), _os.path.join(_here, "..", "scripts", "skill_registry.py")]
+    for _p in _cands:
+        if _os.path.isfile(_p):
+            spec = importlib.util.spec_from_file_location("_skill_registry", _p)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise FileNotFoundError("scripts/skill_registry.py not found")
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MAP = REPO_ROOT / "ci" / "lambda_map.json"
-DEFAULT_DOC = REPO_ROOT / ".claude" / "commands" / "deploy.md"
+DEFAULT_DOC = _skill_registry().require_skill("deploy")
 
 BEGIN_MARKER = "<!-- BEGIN GENERATED: deploy-doc-map -->"
 END_MARKER = "<!-- END GENERATED: deploy-doc-map -->"

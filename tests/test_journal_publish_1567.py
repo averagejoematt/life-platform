@@ -24,9 +24,10 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
 import content_policy_scan as cps  # noqa: E402
 import v4_build_journal as j  # noqa: E402
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 BLOG_PATH = os.path.join(_REPO, "site", "journal", "blog.json")
-COMMAND_DOC = os.path.join(_REPO, ".claude", "commands", "journal-interview.md")
+COMMAND_DOC = str(_skill("journal-interview"))
 
 PROVENANCE = "composed from a 2026-07-25 interview, approved by Matthew"
 

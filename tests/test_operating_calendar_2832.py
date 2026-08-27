@@ -14,7 +14,7 @@ Three layers, matching the charter primitives the calendar is built from:
     never-ran ritual past its anchor window, and via the CLI exit code. A gate that
     was never watched failing is a green light wired to nothing (#2578).
 
-Repo-shape sweep (reads .claude/commands + docs/reviews) → classified pre-merge in
+Repo-shape sweep (reads the skill registry + docs/reviews) → classified pre-merge in
 tests/conftest.py's _PREMERGE_EXTRA_FILES, per the #2372 contract.
 """
 
@@ -38,6 +38,15 @@ def _load():
 
 
 oc = _load()
+
+
+def _registry():
+    path = os.path.join(REPO, "scripts", "skill_registry.py")
+    spec = importlib.util.spec_from_file_location("_skill_registry", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
 
 # Rituals with run history at adoption — their probes MUST resolve. If one goes None,
 # the artifact naming drifted and every future "last run" silently becomes "never":
@@ -64,8 +73,9 @@ def test_entry_well_formed(name):
     else:
         assert os.path.isfile(abs_target), f"{name}: probe file {target} does not exist"
     if e["skill"]:
-        skill_path = os.path.join(REPO, ".claude", "commands", e["skill"] + ".md")
-        assert os.path.isfile(skill_path), f"{name}: skill {e['skill']} has no command file"
+        # Resolved through the ONE registry, so this assertion survives a layout change
+        # (.claude/commands/<n>.md -> .claude/skills/<n>/SKILL.md) instead of pinning one.
+        assert _registry().skill_path(e["skill"]) is not None, f"{name}: skill {e['skill']} has no prompt file"
 
 
 @pytest.mark.parametrize("name", sorted(oc.EXEMPT))

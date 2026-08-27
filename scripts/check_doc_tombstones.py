@@ -51,6 +51,23 @@ import re
 import sys
 from pathlib import Path
 
+
+def _skill_registry():
+    """The ONE registry for Claude Code skills + agents (scripts/skill_registry.py)."""
+    import importlib.util
+    import os as _os
+
+    _here = _os.path.dirname(_os.path.abspath(__file__))
+    _cands = [_os.path.join(_here, "skill_registry.py"), _os.path.join(_here, "..", "scripts", "skill_registry.py")]
+    for _p in _cands:
+        if _os.path.isfile(_p):
+            spec = importlib.util.spec_from_file_location("_skill_registry", _p)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise FileNotFoundError("scripts/skill_registry.py not found")
+
+
 ROOT = Path(__file__).resolve().parent.parent
 RULES_FILE = ROOT / "docs" / "_lint" / "tombstones.txt"
 
@@ -154,7 +171,7 @@ def _scan_files(include_exempt: bool) -> list[Path]:
     candidates += sorted((ROOT / "deploy").glob("*.md"))  # #1322: the whole live deploy-doc surface, not just README
     candidates += sorted((ROOT / "deploy").glob("*.sh"))  # #2007: the operator-facing deploy SCRIPTS, not just docs
     candidates += sorted((ROOT / ".github" / "workflows").glob("*.yml"))  # #2007: the pipeline's own prose comments
-    candidates += sorted((ROOT / ".claude" / "commands").glob("*.md"))
+    candidates += _skill_registry().prompt_files()  # skills AND agents, layout-agnostic
     candidates += sorted((ROOT / "docs").rglob("*.md"))
     for d in SOURCE_DIRS:
         candidates += sorted((ROOT / d).rglob("*.py"))

@@ -38,9 +38,26 @@ import os
 import re
 import sys
 
+
+def _skill_registry():
+    """The ONE registry for Claude Code skills + agents (scripts/skill_registry.py)."""
+    import importlib.util
+    import os as _os
+
+    _here = _os.path.dirname(_os.path.abspath(__file__))
+    _cands = [_os.path.join(_here, "skill_registry.py"), _os.path.join(_here, "..", "scripts", "skill_registry.py")]
+    for _p in _cands:
+        if _os.path.isfile(_p):
+            spec = importlib.util.spec_from_file_location("_skill_registry", _p)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise FileNotFoundError("scripts/skill_registry.py not found")
+
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-MODE_FILE = os.path.join(REPO, ".claude", "commands", "vlog.md")
+MODE_FILE = str(_skill_registry().require_skill("vlog"))
 
 KIT_BUCKET = "matthew-life-platform"
 KIT_KEY = "config/studio/VLOG_STUDIO_KIT.md"

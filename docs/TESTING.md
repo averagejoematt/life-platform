@@ -309,7 +309,7 @@ Then `pre-commit install`.
 **Baseline set:** 2026-07-18, by the QA & Testing Strategy review (`review:qa-strategy-2026-07-18`
 label; epic [#1425](https://github.com/averagejoematt/life-platform/issues/1425), a three-agent
 survey with every finding verified against the repo). This is the **durable record** — the
-`/sdlc-review` quarterly checklist step (below, and in `.claude/commands/sdlc-review.md`)
+`/sdlc-review` quarterly checklist step (below, and in `.claude/skills/sdlc-review/SKILL.md`)
 re-grades against it and overwrites the "Current" column each run so the next re-grade always
 diffs against the *previous* run, not perpetually against 2026-07-18.
 

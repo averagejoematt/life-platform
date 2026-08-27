@@ -11,7 +11,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
   - `docs/SITE_MAP_AND_INTENT.md` — **what each page is for** and why it matters to the platform (one scannable registry)
   - `docs/DESIGN_SYSTEM_V5.md` — the **standards**: type triad, tokens, `.prose`, the page kit, the motion/interaction layer, the "earned glow / no gloss" rule
   - `docs/SITE_UPLEVEL_PLAYBOOK.md` — **how to change it well**: render-sweep→fix→verify loop + the hard-won gotchas (stored-artifact regen, CloudFront viewer-path, CDK-bundled lambdas)
-  - `/uplevel` (`.claude/commands/uplevel.md`) — the **session driver**: fresh-eyes survey → rank against the north star → ship the flagship slice end-to-end (use `/uplevel <lane or idea>` to direct it)
+  - `/uplevel` (`.claude/skills/uplevel/SKILL.md`) — the **session driver**: fresh-eyes survey → rank against the north star → ship the flagship slice end-to-end (use `/uplevel <lane or idea>` to direct it)
 - `docs/README.md` — **the full doc index** (everything in `docs/`, categorized)
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
@@ -73,7 +73,7 @@ python3 mcp_bridge.py
    - **Compute Lambdas** (5) — `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute` run daily before the 17:00 UTC brief; `hypothesis-engine` runs weekly (Sun 19:00 UTC); all store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 17:00 UTC (10 AM PDT) reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
-   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with ~134 endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`, `/api/vacation_fund`. **Multi-module package** (`web/*.py`): code deploys via `deploy_site_api.sh` (the full-tree bundle, never single-file); infra (role/env/alarms) is CDK-owned in `serve_stack.py` (`LifePlatformServe` — split from Operational by #793 via `cdk refactor` so ops holds can't freeze the serving path; ownership rules per #794 — see `.claude/commands/deploy.md`).
+   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with ~134 endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`, `/api/vacation_fund`. **Multi-module package** (`web/*.py`): code deploys via `deploy_site_api.sh` (the full-tree bundle, never single-file); infra (role/env/alarms) is CDK-owned in `serve_stack.py` (`LifePlatformServe` — split from Operational by #793 via `cdk refactor` so ops holds can't freeze the serving path; ownership rules per #794 — see `.claude/skills/deploy/SKILL.md`).
 
 ## Key Technical Conventions
 

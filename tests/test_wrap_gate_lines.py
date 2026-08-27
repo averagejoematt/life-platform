@@ -14,8 +14,10 @@ import importlib.util
 import sys
 from pathlib import Path
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 ROOT = Path(__file__).resolve().parent.parent
-WRAP = ROOT / ".claude" / "commands" / "wrap.md"
+WRAP = _skill("wrap")
 sys.path.insert(0, str(ROOT / "scripts"))
 
 
