@@ -156,10 +156,12 @@ weight leg restated) · `docs/DECISIONS.md` (ADR-049 amendment 2026-08-27, via #
 **Decisions:** none needed — ADR-049's amendment was filed inside #3238 by its own lane; the two
 governance-shaped calls this session (keep #2801 open against a completed box set; close #2888 on a
 falsified premise) are recorded as verdicts on the issues themselves, where the evidence lives
-**Main:** red — the latest **completed** CI/CD run on main is the pre-boot `84052622`, which failed on
-the `check_doc_facts` prose line I fixed at `25205ce5`; because `docs/**` is outside ci-cd's `paths:`
-filter that docs-only fix could not re-run it (the #1908 trap). Newer runs at `6a6ef3a1f` and
-`3eff37e6` were **in flight** at wrap time with the production lease approved, not stranded
+**Main:** green (`6a6ef3a1`) — but it was **RED at boot while Session F's handover declared it green**, and
+the stale red was unclearable by its own fix: all 10 full-suite failures traced to one wrap-prose line, and
+because `docs/**` sits outside ci-cd's `paths:` filter the docs-only remedy at `25205ce5` could not re-run
+CI/CD (**#1908's trap, live**). Cleared when `6a6ef3a1f` completed success during this wrap; all three
+production leases actioned — two rejected as stale (the second *older* than code already deployed), one
+approved, and a fourth at `3eff37e6` approved at 0.4h rather than left to strand
 **Incidents:** 4 rows added — the site auto-rollback that reverted F's build beat for a DynamoDB-sourced
 defect it could not fix · main red at boot on two Session-F doc residuals, invisible to re-run by the
 #1908 trap · two production deploy leases rejected as stale, one of which would have regressed live
