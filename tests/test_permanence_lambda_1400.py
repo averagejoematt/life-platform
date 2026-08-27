@@ -16,7 +16,7 @@ import io
 import json
 import os
 import sys
-from datetime import timedelta, timezone
+from datetime import date, timedelta
 
 import pytest
 
@@ -24,6 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if os.path.join(ROOT, "lambdas") not in sys.path:
     sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
+from common.pacific_time import pacific_today  # noqa: E402  — the handler's own clock; see _days_ago
 from operational import (
     continuity_watch as watch,  # noqa: E402
     permanence_lambda as pl,  # noqa: E402
@@ -63,15 +64,24 @@ class _FakeS3:
 
 
 def _days_ago(n: int) -> str:
-    """A date relative to *now*, never a literal.
+    """A date relative to *now*, never a literal, on the HANDLER's clock.
 
     Deliberate: a hard-coded 2026-08-10 in a silence test is a time bomb — it
     reads as `active` today and as `triggered` in three months, and the failure
     lands on whoever is unlucky rather than whoever changed something.
-    """
-    from datetime import datetime
 
-    return (datetime.now(timezone.utc).date() - timedelta(days=n)).isoformat()
+    The frame is load-bearing too, and reading it from the wrong clock is the
+    same bomb with a shorter fuse. `permanence_lambda` counts the silence ladder
+    against `pacific_today()` (#2798/#3206). This helper used
+    `datetime.now(timezone.utc).date()`, so between 17:00 PT and PT midnight —
+    when the UTC date has rolled and the Pacific date has not — every expectation
+    here sat one day ahead of the handler and `days_silent` came back one short.
+    That window is 7 of every 24 hours; #3206's own CI ran outside it and went
+    green, and the first main run to cross 00:00Z after it went red.
+
+    So: compute through the handler's own helper, per the standing rule.
+    """
+    return (date.fromisoformat(pacific_today()) - timedelta(days=n)).isoformat()
 
 
 class _FakeTable:
