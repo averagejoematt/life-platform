@@ -39,7 +39,8 @@ def log_discard(arm: str, surface: str, findings_count: int, *, reason: str = ""
                        traded one invented figure for another. The last two are the
                        two halves of the old single not-strictly-better arm, split so
                        the log names WHICH predicate dropped the rewrite; their names
-                       are `ai/regen_keep_predicate.py`'s DISCARD_* constants.
+                       are `ai/regen_keep_predicate.py`'s DROP_* constants (named DROP_, not DISCARD_,
+                       for the CodeQL reason that module's docstring records).
     surface        -- caller identity, same convention as ai_calls._ground_legacy_output's
                        `label` param (the one caller that already logged this pre-#3086).
     findings_count -- len(findings) still outstanding on the text regen_once kept.

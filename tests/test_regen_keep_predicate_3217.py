@@ -127,14 +127,14 @@ def test_rewrite_that_removes_nothing_and_scores_worse_is_discarded():
 
     keep, arm = rkp.keep_rewrite(before, after)
     assert keep is False
-    assert arm == rkp.DISCARD_FIGURE_INTRODUCED
+    assert arm == rkp.DROP_FIGURE_INTRODUCED
 
 
 def test_identical_rewrite_is_discarded():
     """The no-op case: a 'rewrite' that changed nothing must never be kept."""
     before = after = _findings(DRAFT)
     keep, arm = rkp.keep_rewrite(before, after)
-    assert keep is False and arm == rkp.DISCARD_NOT_BETTER
+    assert keep is False and arm == rkp.DROP_NOT_BETTER
 
 
 def test_more_framing_findings_alone_never_keeps_a_rewrite():
@@ -145,7 +145,7 @@ def test_more_framing_findings_alone_never_keeps_a_rewrite():
     before, after = _findings(clean), _findings(worse)
     assert before == [] and len(after) >= 1
     keep, arm = rkp.keep_rewrite(before, after)
-    assert keep is False and arm == rkp.DISCARD_NOT_BETTER
+    assert keep is False and arm == rkp.DROP_NOT_BETTER
 
 
 # ── the ruling: removes one figure, introduces another -> DISCARD ─────────────────────
@@ -166,7 +166,7 @@ def test_removing_one_figure_while_introducing_another_is_discarded():
 
     keep, arm = rkp.keep_rewrite(before, after)
     assert keep is False, "trading one invented figure for another is not a correctness improvement"
-    assert arm == rkp.DISCARD_FIGURE_INTRODUCED
+    assert arm == rkp.DROP_FIGURE_INTRODUCED
 
 
 def test_swap_across_figure_classes_is_also_discarded():
@@ -175,7 +175,7 @@ def test_swap_across_figure_classes_is_also_discarded():
     before = [{"type": "fabricated_number", "claimed": 326.3, "detail": "..."}]
     after = [{"type": "fabricated_date", "claimed": "2026-01-02", "detail": "..."}]
     keep, arm = rkp.keep_rewrite(before, after)
-    assert keep is False and arm == rkp.DISCARD_FIGURE_INTRODUCED
+    assert keep is False and arm == rkp.DROP_FIGURE_INTRODUCED
 
 
 def test_a_figure_removed_and_a_framing_finding_added_is_kept():
@@ -235,7 +235,7 @@ def test_discard_telemetry_names_the_predicate_that_dropped_it():
     assert not corrected and text == DRAFT
     assert m.call_count == 1
     args, kwargs = m.call_args
-    assert args[0] == rkp.DISCARD_FIGURE_INTRODUCED
+    assert args[0] == rkp.DROP_FIGURE_INTRODUCED
     assert args[1] == "test_3217_swap"
     assert "figures 1->1" in kwargs["reason"] and "total 1->1" in kwargs["reason"]
 
@@ -272,13 +272,13 @@ def test_every_figure_type_is_a_type_the_grounder_can_actually_emit():
 
 
 def test_malformed_findings_never_raise():
-    assert rkp.keep_rewrite(None, None) == (False, rkp.DISCARD_NOT_BETTER)
+    assert rkp.keep_rewrite(None, None) == (False, rkp.DROP_NOT_BETTER)
     assert rkp.describe_delta(None, None) == "figures 0->0 total 0->0"
     # Non-dict entries still COUNT toward the composite (they are findings the caller
     # produced); they simply contribute nothing to the figure census.
     junk_before = ["not a dict", 7]
     junk_after = [{"type": "fabricated_number", "claimed": 1.0}, "still not a dict"]
-    assert rkp.keep_rewrite(junk_before, junk_after) == (False, rkp.DISCARD_FIGURE_INTRODUCED)
+    assert rkp.keep_rewrite(junk_before, junk_after) == (False, rkp.DROP_FIGURE_INTRODUCED)
     assert rkp.describe_delta(junk_before, junk_after) == "figures 0->1 total 2->2"
 
 
@@ -302,7 +302,7 @@ def test_nothing_a_caller_logs_can_carry_finding_TEXT():
     note = rkp.describe_delta(before, after)
 
     assert marker not in arm and marker not in note
-    assert arm in {rkp.KEEP_STRICTLY_FEWER, rkp.KEEP_FIGURE_REMOVED, rkp.DISCARD_FIGURE_INTRODUCED, rkp.DISCARD_NOT_BETTER}
+    assert arm in {rkp.KEEP_STRICTLY_FEWER, rkp.KEEP_FIGURE_REMOVED, rkp.DROP_FIGURE_INTRODUCED, rkp.DROP_NOT_BETTER}
     assert note == "figures 1->0 total 1->1"
 
 

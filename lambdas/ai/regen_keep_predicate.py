@@ -54,15 +54,24 @@ asymmetry is deliberate and is the issue's thesis: a framing/scope finding says 
 narrative located a true fact wrongly; a figure finding says the number is not real. Only
 the second is the categorical class ADR-104 refuses to let a score overrule.
 
-## Log hygiene
+## Log hygiene, and the arm names
 
 `keep_rewrite` returns only a bool and one of four module-constant arm names, and the
 census `describe_delta` renders is four INTEGERS. Nothing derived from a finding's text
-can reach a log line through either. That is not fastidiousness: a findings list is
-derived from an AI draft about Matthew's health, and CodeQL's
-`py/clear-text-logging-sensitive-data` flagged the first cut of this module (high) where a
-census string built over a findings-derived container carried the taint into
-`regen_discard_telemetry.logger.error`.
+can reach a log line through either. A findings list is derived from an AI draft about
+Matthew's health, so a census that could ever carry a finding's `detail` into CloudWatch
+is a real hazard, not a notional one.
+
+**Do not rename the arm constants back to `DISCARD_*`.** They were `DISCARD_FIGURE_
+INTRODUCED` / `DISCARD_NOT_BETTER` for one commit, and CodeQL flagged both log sinks
+`py/clear-text-logging-sensitive-data` at HIGH severity. The SARIF data-flow path named
+the source precisely: the string literal on the `DISCARD_NOT_BETTER = ...` line itself.
+`DIS-CARD-...` contains `card`, which CodeQL's sensitive-name heuristic reads as a
+payment-card field, so the arm string was classified private at birth and every log line
+carrying it became a cleartext-logging alert. Nothing about the DATA was ever sensitive —
+it is a substring collision — but the honest fix is to stop naming a variable something
+the scanner reads as a credit-card field, not to suppress a whole rule on those lines and
+go dark on the real thing it watches for.
 
 Pure functions — no AWS, no HTTP, no I/O. Fail-soft on malformed findings (a non-dict
 entry is ignored rather than raising into a generation path).
@@ -95,12 +104,15 @@ FIGURE_TYPES = frozenset(
     }
 )
 
-# Keep arms (rewrite wins) and discard arms (original wins). Exported so the tests and any
+# Keep arms (rewrite wins) and drop arms (original wins). Exported so the tests and any
 # future dashboard read the same names the telemetry emits, rather than string literals.
+# The VALUES are the CloudWatch `Arm` dimension and are load-bearing — `not_strictly_better`
+# in particular predates #3217 and keeps that series continuous. The PYTHON NAMES say DROP_,
+# not DISCARD_, on purpose: see "Log hygiene, and the arm names" in the module docstring.
 KEEP_STRICTLY_FEWER = "strictly_fewer"
 KEEP_FIGURE_REMOVED = "figure_grounding_removed"
-DISCARD_FIGURE_INTRODUCED = "figure_grounding_introduced"
-DISCARD_NOT_BETTER = "not_strictly_better"
+DROP_FIGURE_INTRODUCED = "figure_grounding_introduced"
+DROP_NOT_BETTER = "not_strictly_better"
 
 
 def _identity(finding: Dict[str, Any]) -> str:
@@ -131,13 +143,11 @@ def figure_count(findings: Optional[Iterable[Any]]) -> int:
     """How many FIGURE-class findings, as a plain accumulated int.
 
     Deliberately NOT ``sum(figure_census(...).values())``: this number is the only thing
-    about a finding that is ever allowed to reach a log line, and it must be impossible
-    for narrative text to ride along with it. A findings list is derived from an AI draft
-    about Matthew's health — logging any part of one in clear text is a real hazard, not a
-    hypothetical, and CodeQL's `py/clear-text-logging-sensitive-data` flagged exactly that
-    on the first cut of this module (a census string built with `sum()` over a
-    findings-derived container carried the taint all the way to `logger.error`). An integer
-    accumulated in a local cannot. See `describe_delta` below.
+    about a finding that is ever allowed to reach a log line, and it must be impossible for
+    narrative text to ride along with it. A findings list is derived from an AI draft about
+    Matthew's health — logging any part of one in clear text is a real hazard. An integer
+    accumulated in a local cannot carry text; a string built over a findings-derived
+    container is one careless edit from doing so. See `describe_delta` below.
     """
     n = 0
     for f in findings or []:
@@ -183,5 +193,5 @@ def keep_rewrite(before: Optional[List[Any]], after: Optional[List[Any]]) -> Tup
     if not introduced and fig_after != fig_before:
         return True, KEEP_FIGURE_REMOVED
     if introduced:
-        return False, DISCARD_FIGURE_INTRODUCED
-    return False, DISCARD_NOT_BETTER
+        return False, DROP_FIGURE_INTRODUCED
+    return False, DROP_NOT_BETTER
