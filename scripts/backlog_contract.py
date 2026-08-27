@@ -103,6 +103,29 @@ ANY_HEADING_RE = re.compile(r"^#{1,6}[ \t]")
 # later_staleness (a parked idea is not stale debt).
 MILESTONE_ORDER: Tuple[str, ...] = ("Now", "Next", "Later", "Roadmap")
 
+# ── the `Now`-liveness floor and the refill budget (ADR-099 + its 2026-08-22 ¶3) ──
+# These live HERE, not in the gate that enforces them, because two modules must agree on
+# them and a copy is the drift: `check_backlog_hygiene.rule_now_liveness` fires below the
+# floor, and `backlog_next.plan_now_refill` computes the promotions that clear it. A floor
+# read from one place and a refill sized from another is the exact shape of "the gate and
+# its remedy are not connected" (#3254).
+NOW_LIVENESS_MIN = 3  # ≥3 non-blocked `type:story` on `Now`, or the queue is not live
+
+# ADR-099 amendment ¶3: "the sanctioned path out is promotion to `Now` — deliberately, at
+# most about one product item per cycle — not gradual leakage." The cap is expressed per
+# REFILL, not per cycle, and that is a deliberate under-approximation: the corpus cannot
+# tell how many Roadmap→Now promotions a cycle has already taken (the promotion rewrites
+# the very arrow that would record it), so the planner offers at most one and says out loud
+# that confirming the cycle budget is the operator's call. Under-offering is the safe
+# direction; a planner that promoted five would be ¶3's "gradual leakage" with a script's
+# authority behind it.
+ROADMAP_PICKS_PER_REFILL = 1
+
+# The milestones a `Now` refill may draw from, derived from the order rather than re-typed
+# — Next and Later are debt, Roadmap is the ¶3 product pick.
+DONOR_MILESTONES: Tuple[str, ...] = tuple(m for m in MILESTONE_ORDER if m != "Now")
+PRODUCT_MILESTONE = "Roadmap"
+
 BLOCKED_LABELS = ("gate:owner",)
 BLOCKED_LABEL_PREFIXES = ("blocked:",)
 
@@ -175,6 +198,29 @@ def parse_score_line(body: Optional[str]) -> Optional[Score]:
             raw=stripped,
         )
     return None
+
+
+def retarget_score_line(raw: Optional[str], milestone: str) -> Optional[str]:
+    """The same canonical score line with its `→ <milestone>` arrow pointed at `milestone`.
+
+    A milestone move is TWO edits, not one. ADR-099 ¶5 requires the score line's arrow to
+    equal the real milestone, and `check_backlog_hygiene.rule_score_line_canonical`
+    enforces that at VIOLATION severity — so `gh issue edit N --milestone Now` on its own
+    swaps a blocking `now_liveness` finding for a blocking `score_line_canonical` one. The
+    refill planner emits this rewritten line beside every promotion so the remedy is the
+    whole remedy (#3254).
+
+    Returns None when `raw` is not the canonical grammar — a legacy or absent score line
+    cannot be retargeted, it has to be written, and saying so is better than guessing.
+    """
+    if not raw or milestone not in MILESTONE_ORDER:
+        return None
+    m = SCORE_LINE_RE.match(raw.strip())
+    if not m:
+        return None
+    start, end = m.span("milestone")
+    text = raw.strip()
+    return text[:start] + milestone + text[end:]
 
 
 def _section_lines(body: Optional[str], heading_re: "re.Pattern[str]") -> List[str]:
