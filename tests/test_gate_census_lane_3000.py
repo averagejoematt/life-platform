@@ -236,7 +236,7 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # 563 -> 564 (2026-08-28, #3245): ONE further real gate carried by this branch and
 # preserved through the merge with main's own 561->563 raise above (originally recorded
 # as 561 -> 562). The reason it was first written for still holds verbatim:
- ONE real gate, `guard::scripts/hooks/guard_bash.py` — the
+#   ONE real gate, `guard::scripts/hooks/guard_bash.py` — the
 # PreToolUse hook that flags a merge with no named-check assertion, a deploy from a
 # worktree, and a force-push to main. Verified as a genuine addition rather than the
 # prose-phantom this comment warns about: the census gate-id sets were diffed before and
