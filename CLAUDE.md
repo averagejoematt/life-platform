@@ -210,9 +210,8 @@ silent omission is not an outcome.**
 
 **Verified:** 2026-08-28 (Opus 5, **Session I**, autonomous with merge+deploy authority, ALL-OPUS —
 the plan `~/.claude/plans/twinkling-noodling-treehouse.md` plus two owner-directed extensions, a
-rituals run and a bug-bash sweep; twelve agent lanes). **Main ends RED at `a099c14c`, diagnosed** — one gating reader-truth HIGH on `/method/board/`, ground-truthed as a substantially TRUE claim (food/journal/workout logging genuinely zero since genesis) that nonetheless asserts an absence without naming its denominator: #3252 box 2, whose fix shipped 30 min earlier and clears when the stored artifact regenerates. **12 PRs merged · 6 issues
-closed with verdicts · 10 filed, every one adversarially verified · 4 §10 folds.** Open 51 → 56,
-**net +5, stated not suppressed**: the drain took it 51 → 45, then the sweep found eleven real
+rituals run and a bug-bash sweep; twelve agent lanes). **Main ends RED for a PROVEN live defect** — the gating Visual QA reproduced a `/method/board/` coach read asserting four absences of which **two are false** (strava 2, habitify 12), and #3276's fix deployed hours BEFORE the board regenerated, so the check is not reaching that surface (#3294). Do not clear it with a no-op dispatch: that greens `check_main_green` while skipping the very QA job that fails (#2578).** Open 51 → 55,
+**net +4, stated not suppressed**: the drain took it 51 → 45, then the sweep found eleven real
 defects that survived verification. **Three issues deliberately NOT closed despite their PRs
 merging** (#3252, #3250, #2801) — `Fixes` downgraded to `Refs` on two PRs; a merge is not a closure.
 **The September ceiling is re-derived and live: $150/$176 → $215/$252** (ADR-133 amendment, #2801),

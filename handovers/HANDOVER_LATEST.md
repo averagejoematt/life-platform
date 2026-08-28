@@ -11,18 +11,21 @@ discharged and #3245 was picked up and landed.
 
 ## The score
 
-- **12 PRs merged**: #3267 #3268 #3269 #3270 #3271 #3272 #3273 #3274 #3245 #3276 #3280 #3275.
-- **6 issues CLOSED with verdicts**: #3264, #3255, #3258, #3260, #3261, #3257.
-- **10 issues FILED**, every one adversarially verified: #3277 #3278 #3279 #3282 #3283 #3284
-  #3285 #3286 #3287 #3288. Plus 4 §10 folds (#2799 ×1, #2578 ×3).
-- **Open 51 → 56. Net +5 — and that is the correct outcome, stated rather than suppressed.**
+- **19 PRs merged**: #3267 #3268 #3269 #3270 #3271 #3272 #3273 #3274 #3245 #3276 #3280 #3275
+  — then, post-wrap under a second owner grant: #3290 #3291 #3292 plus four driver commits.
+- **10 issues CLOSED with verdicts**: #3264, #3255, #3258, #3260, #3261, #3257, #3282, #3285,
+  #3286, #3287.
+- **14 issues FILED**, every one adversarially verified or ground-truthed: #3277 #3278 #3279
+  #3282 #3283 #3284 #3285 #3286 #3287 #3288 #3289 #3293 #3294. Plus 6 §10 folds
+  (#2799 ×1, #2578 ×4, #1367 ×1).
+- **Open 51 → 55. Net +4 — the correct outcome, stated rather than suppressed.**
   The drain phase took it 51 → 45; the owner then asked mid-session for a bug bash, and the sweep
   found eleven real defects that survived adversarial verification. Suppressing verified
   reader-facing defects to protect a net-open metric is the disease this repo documents.
 - **Three issues deliberately NOT closed** despite their PRs merging — #3252, #3250, #2801 each
   got a box-by-box verdict and `Fixes` was downgraded to `Refs` on two PRs. A merge is not a closure.
-- **Four deploys, every one verified by CONTENT.** **Six deploy leases disposed** — five approved
-  after a content decode, one **rejected**.
+- **Seven deploys, every one verified by CONTENT.** **Twelve deploy leases disposed** — nine
+  approved after a content decode, three **rejected**.
 
 ## The through-line: the stated mechanism and the actual mechanism had diverged
 
@@ -97,6 +100,52 @@ otherwise reads as a failed deploy.
   has run at least once` — the daily red #3273 armed is resolved by running the rituals, not by
   stamping them.
 
+## Post-wrap: a second grant, and the finding that justified refusing a green
+
+The owner approved three more things after the wrap: clear main, reap the worktrees, drain the
+reader-facing queue. All three landed, and the third produced the session's sharpest result.
+
+**Main's red was cleared the wrong way first, deliberately, and I said so.** I dispatched a CI/CD
+run to prove the board artifact had regenerated. No code had changed, so `Plan deployments` found
+nothing and the run **skipped Deploy, Smoke, post-deploy integration and the Visual QA** — then
+concluded `success`. `check_main_green` flipped to ✅ on a run that never executed the job that made
+main red. `latest_main_conclusion` reads the conclusion and inspects nothing about which jobs ran, so
+**a red main is clearable in one command, with no code, no deploy and no QA.** I predicted the skip
+before dispatching, refused to bank it, left the `Main:` decode in place, and folded it onto #2578.
+
+**That refusal was load-bearing.** The next run that actually deployed ran the QA for real, and the
+`/method/board/` HIGH **reproduced** — surviving #3102's confirm step, while a second finding in the
+same run was correctly marked NON-REPRODUCED and ungated. The untruncated text asserts *"has not
+logged any food, training, habits, or journal entries since"* the cycle start. Ground truth:
+
+| asserted absent | source | records | |
+|---|---|---|---|
+| food | macrofactor | 0 | ✅ |
+| **training** | **strava** | **2** | ❌ |
+| **habits** | **habitify** | **12** | ❌ |
+| journal | notion | 0 | ✅ |
+
+**Two of four asserted absences are false, one by twelve records.** And the timing is what makes it
+conclusive: #3276's absence-sourcing fix deployed at ~06:00Z; the board regenerated at **15:09Z**,
+after it, and still produced this. So the check exists, is deployed, and **is not reaching that
+surface** — a different defect from "the check does not exist", which is what #3252 box 2 was. Filed
+as **#3294** on `Now`. Had the hollow green been accepted, this would have been recorded as cleared.
+
+**A second near-miss: the worktree reaper would have deleted three live lanes.** Its first real use.
+"Clean, and every commit already in `origin/main`" cannot distinguish *finished* from *started ninety
+seconds ago* — dirtiness is a lagging signal of liveness and the tool has no leading one. It is a
+**race**: reap ten minutes later and all three read dirty, so the tool looks safe. Filed as **#3289**
+with `git worktree lock` as the fix. Reaped safely after the lanes finished: **13 of 14 removed**,
+the one failure being the primary clone, which git refuses and which the loop reports and skips.
+
+**The verification lesson.** Two adversarial passes confirmed the findings, corrected several numbers
+and refuted three sub-claims — but both stayed scoped to *what the finders reported*. Lane L traced
+the #3287 **shape** instead and found it in two more consumers: `/api/pulse` had its own `Limit=1`
+over the same widened range, handing the **water** and weight reads the partial next-UTC-day record
+for the same ~7h, under a comment claiming it fetched "the PT-date record specifically". **A verifier
+that only re-derives the claim can confirm a true finding and leave most of its blast radius
+unfound.**
+
 ## Incidents & gotchas
 
 - **A lease would have shipped a tree without the ceiling.** `b4f849f4` was *strictly newer than
@@ -136,17 +185,15 @@ ruling) · `docs/OPERATING_DISCIPLINE.md` (new §5 production authority) · `doc
 ceiling prose sites
 **Decisions:** ADR-133 amendment (the September base) · ADR-104 amendment (auto-synced counts as
 "logging", owner ruling 2026-08-28)
-**Main:** red — the last CI/CD run (`a099c14c`) failed on ONE gating reader-truth HIGH, and it is
-diagnosed, not unexplained. `/method/board/`: a coach read asserts *"eleven days into the cycle with
-no active logging (food, …)"*. **Ground-truthed before acting** (the judge flakes HIGH on true
-claims): since genesis, macrofactor **0**, notion **0**, hevy **0**, strava **2** — the claim is
-**substantially true**, so it is not fabrication. But Strava did log, and under the owner's
-2026-08-28 ruling auto-synced counts as logging, so the narrative asserts an absence without naming
-its denominator — precisely #3252 box 2. **The remedy shipped ~30 min before that run** (#3276) and
-the board is a stored DynamoDB artifact written earlier, so it clears when the artifact regenerates.
-Nothing was rolled back, correctly: the rollback reverts `site/` and this content is DynamoDB-served
-— #3252's unmet box 5, demonstrated live. Recorded with the ground truth on #3252. Later doc-only
-pushes are `path-filter-skip`, so no newer CI/CD run supersedes it. **doc-sync clean.**
+**Main:** red — and this time for a **proven, live, reader-facing defect**, not an unexplained one.
+The gating Visual QA on the last deploying run (`93e08039`) reproduced the `/method/board/` HIGH,
+surviving #3102's confirm step. Ground-truthed: the read asserts four absences and **two are false**
+(strava 2 training records, habitify 12 habit records). #3276's fix deployed ~06:00Z and the board
+regenerated at 15:09Z *after* it, so the check is deployed and not reaching that surface. Filed as
+**#3294** (`Now`). Nothing rolled back, correctly — the rollback reverts `site/` and this is
+DynamoDB-served, #3252's unmet box 5 demonstrated a second time. **Do not clear this with a no-op
+`workflow_dispatch`**: that turns `check_main_green` ✅ while skipping the very QA job that fails
+(folded onto #2578). **doc-sync clean.**
 **Deploy:** 4, all verified by content — AWS Budget `150.0 → 215.0` · governor `"215"/"252"` ·
 site-api · qa-smoke · og-image-generator (cards regenerated and read back)
 **Incidents:** 5 worth recording — the pre-ceiling lease; the census swallowing a syntax error; the
@@ -171,11 +218,18 @@ attribute before touching the number. `--decoded` after naming it.
   v4-redirects CloudFront Function body is a separately published artifact only Matthew republishes.
   Week 2 and Week 3 are pre-blackholed on the same three lines. `gate:owner`, so it will **not**
   self-select into `/uplevel`'s seed query.
-- **#3282** — genome coaching selects on gene presence; on `Now`, emitting today. Privacy: Tier 2,
-  mechanism-only in all public text.
-- **#3285** — the OG home card paints a weight gain in success green under "LOST". `AMBER` exists one
-  line away.
-- **#3283 #3286 #3287 #3277 #3278 #3279 #3288** — filed, verified, on `Later`.
+- ~~**#3282**~~ **CLOSED** — the selector reads the stored record; pagination 84 → **93 genes**; a
+  fourth defect found in the same file (multi-row genes kept whichever row DynamoDB returned last).
+- ~~**#3285**~~ **CLOSED and verified live** — the card now reads 0 GREEN / 1350 AMBER in the delta
+  tile, re-sampled from the deployed PNG.
+- **#3283 #3277 #3278 #3279 #3288** — filed, verified, on `Later`. #3286/#3287 are CLOSED.
+- **#3294** — the board asserts two false absences; the #3276 check is deployed but not reaching that
+  surface. `Now`. **This is why main is red.**
+- **#3293** — two more surfaces state a direction from a signed value; `site_api_pulse.py:301`
+  asserts `"up"` on absent/zero data while `:412` in the same file already does it correctly.
+- **#3289** — the worktree reaper cannot tell a live lane from a finished one.
+- **not-work — `/api/pulse`'s `mind` glyph has no `as_of` at all**, so #3287's disclosure cannot
+  reach it; and `water`'s date is honest but not frame-labelled. Lane L named both, out of scope.
 - **#3252** — box 2 is now UNBLOCKED by the owner's ADR-104 ruling and shipped in #3276; box 5 (the
   rollback-scope ruling) still needs a live gated run.
 - **#3250** — open at 3 of 5: the `/review <lens>` spine, the ADR-099 dedup, the exemption orphans.
@@ -191,7 +245,7 @@ attribute before touching the number. `--decoded` after naming it.
 - **not-work — the #3260 alarm is unproven in production** until a dimensionless
   `AnthropicAPIFailure` datapoint appears after a real failure. A green suite is not evidence.
 - **not-work — `mcp/` (~21k lines) is essentially unswept** by the bug bash; the finder said so.
-- **not-work — ~35 stale worktrees**; the reaper #3245 brought is now on main.
+- **not-work — worktrees reaped**: 13 of 14 removed, 25 kept. #3289 records the near-miss.
 - **Dated:** **2026-08-31** — #3178 sentinel proof, #3191 TTL sweep · **2026-09-01** — the ceiling
   window reverts (now a RAISE, no action) · **2026-09-06** — #3245's calendar hold expires ·
   **2026-09-09** — `prediction-gradable-share-low` must carry a `#N` · **2026-09-16** —
