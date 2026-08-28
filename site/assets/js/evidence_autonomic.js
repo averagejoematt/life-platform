@@ -82,6 +82,29 @@ export function renderAutonomic(d) {
 
 // ── Zone-2 breakdown (RQA-07) ──────────────────────────────────────────────────
 
+const _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// #3286 — a Zone-2 tally with no date on it is what let a ten-day-old week render as
+// "this week". Every week the panel draws now wears its range.
+//
+// Formatted from the STRING parts, never `new Date("2026-08-24")`: a bare YYYY-MM-DD is
+// parsed as UTC midnight, and rendering that through a Pacific locale prints the PREVIOUS
+// day. That is the same "a date pushed through a clock that isn't its own" defect this
+// panel is being fixed for — it would be absurd to reintroduce it in the label.
+export function weekRange(w) {
+  const start = w && w.week_start ? String(w.week_start).slice(0, 10) : "";
+  const end = w && w.week_end ? String(w.week_end).slice(0, 10) : "";
+  const part = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return null;
+    return { mon: _MONTHS[Number(m[2]) - 1] || m[2], day: String(Number(m[3])) };
+  };
+  const a = part(start), b = part(end);
+  if (!a) return start || "—";
+  if (!b) return `${a.mon} ${a.day}`;
+  return a.mon === b.mon ? `${a.mon} ${a.day}–${b.day}` : `${a.mon} ${a.day} – ${b.mon} ${b.day}`;
+}
+
 export function renderZone2(d) {
   if (!d || d.available === false) {
     const reason = (d && d.reason) || "No qualifying cardio activity yet — Zone-2 time fills in as sessions with heart-rate land.";
@@ -96,10 +119,28 @@ export function renderZone2(d) {
   const parts = [];
 
   // Altitude 1 — this week vs the 150-min reference (targetSpine reuse).
+  //
+  // #3286 — the panel used to render `current_week` as "this week" with NO date anywhere
+  // on it, while the endpoint's `current_week` was `weeks[-1]`: the last week that had
+  // activity. On 2026-08-27 that was the week of 08-17 — ten days old — published as
+  // "this week" beside a sibling endpoint reporting trailing-7d Zone-2 of zero. The API
+  // now serves the real calendar week (an explicit dated zero when nothing qualified);
+  // this renders its RANGE unconditionally, so a tally can never again be read as a week
+  // it does not belong to, and names the last active week rather than hiding it.
   if (cur) {
-    parts.push(sec("This week vs the 150-minute reference",
-      targetSpine(cur.zone_2_minutes, target, { valueLabel: "this week", targetLabel: "150 min", unit: " min", label: "Zone-2 aerobic minutes" }) +
-      `<p class="rd-meta label">The week-so-far Zone-2 tally against the widely-cited 150 min/week aerobic reference (Attia · Huberman · WHO). Zone 2 is ${esc(s.zone_2_hr_range || "—")} for a max HR of ${fmt(s.max_hr_used, 0)}. A reference line, not a prescription.</p>`));
+    const range = weekRange(cur);
+    const zeroWeek = cur.no_activity_recorded === true;
+    const last = d.latest_active_week || null;
+    const gap = Number(cur.days_since_activity);
+    const lastNote = (zeroWeek && last)
+      ? ` The most recent week with a qualifying session was <strong>${esc(weekRange(last))}</strong> — ${fmt(last.zone_2_minutes, 0)} min.`
+      : "";
+    const darkNote = (zeroWeek && cur.source_last_activity)
+      ? ` Nothing has qualified since <strong>${esc(cur.source_last_activity)}</strong>${Number.isFinite(gap) ? ` (${gap} day${gap === 1 ? "" : "s"})` : ""} — a measured zero, not a missing read.`
+      : "";
+    parts.push(sec(`This week (${range}) vs the 150-minute reference`,
+      targetSpine(cur.zone_2_minutes, target, { valueLabel: range, targetLabel: "150 min", unit: " min", label: "Zone-2 aerobic minutes" }) +
+      `<p class="rd-meta label">The week-so-far Zone-2 tally for the current calendar week, <strong>${esc(range)}</strong>, against the widely-cited 150 min/week aerobic reference (Attia · Huberman · WHO).${darkNote}${lastNote} Zone 2 is ${esc(s.zone_2_hr_range || "—")} for a max HR of ${fmt(s.max_hr_used, 0)}. A reference line, not a prescription.</p>`));
   }
 
   // Altitude 2 — weekly Zone-2 minutes (barChart reuse).
@@ -107,7 +148,10 @@ export function renderZone2(d) {
     const items = weeks.map((w) => ({ label: String(w.week_start).slice(5), value: w.zone_2_minutes }));
     parts.push(sec("Zone-2 minutes by week",
       barChart(items, { valueKey: "value", labelKey: "label", label: "Zone-2 min / week" }) +
-      `<p class="rd-meta label">${s.weeks_meeting_target || 0} of ${s.weeks_analyzed || weeks.length} weeks hit the 150-min mark (${fmt(s.target_hit_rate_pct, 0)}%); the window averages ${fmt(s.avg_weekly_zone_2_min, 0)} min/week.${d.trend ? ` Direction is <strong>${esc(d.trend.direction)}</strong> (${fmt(d.trend.first_half_avg_min, 0)} → ${fmt(d.trend.second_half_avg_min, 0)} min).` : ""}</p>`));
+      // #3286: `weeks` holds only the weeks that HAD qualifying activity — a blank week is
+      // absent from this chart, not a zero bar. Said out loud so the last bar is never read
+      // as "the current week" the way `current_week` used to be.
+      `<p class="rd-meta label">Weeks with at least one qualifying session (a blank week is absent, not a zero bar). ${s.weeks_meeting_target || 0} of ${s.weeks_analyzed || weeks.length} weeks hit the 150-min mark (${fmt(s.target_hit_rate_pct, 0)}%); the window averages ${fmt(s.avg_weekly_zone_2_min, 0)} min/week.${d.trend ? ` Direction is <strong>${esc(d.trend.direction)}</strong> (${fmt(d.trend.first_half_avg_min, 0)} → ${fmt(d.trend.second_half_avg_min, 0)} min).` : ""}</p>`));
   }
 
   // Altitude 3 — the full 5-zone distribution + Zone-2 sport mix, as honest tables.

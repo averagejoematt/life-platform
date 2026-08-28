@@ -92,23 +92,48 @@ export function vitalsLadder(comps, hist) {
 // P0.3 — earned glyphs: light ember ONLY on a real daily signal (gray-state glyphs render
 // unlit — nothing is always-lit/decorative). Habits use "X of N today" (the honest fallback;
 // no hourly "by-this-hour" baseline is fabricated) and cross-link to the Habits page.
+// #3287 — the provenance the API computes and the page used to drop. `as_of` is the day
+// the figure actually belongs to; the section header says "Today, so far", so any glyph
+// whose `as_of` is NOT the page's own Pacific date is publishing a different day's number
+// under today's heading. That was invisible: the chip rendered `gl.label || gl.delta_label`
+// and nothing else, so /api/pulse could serve `movement.as_of = 2026-08-28` on a page
+// stamped 2026-08-27 (a partial next-UTC-day step count, coloured red) with no way for a
+// reader to see it. Rendered only on a MISMATCH — an always-on date on every chip would be
+// noise, and the reader would learn to skip the one line that matters.
+export function glyphAsOfNote(gl, pageDate) {
+  if (!gl || !gl.as_of || !pageDate || gl.as_of === pageDate) return "";
+  // apple_health's DATE# key names a UTC day (TD-19 Phase 2), so the date alone would
+  // read as a Pacific day it isn't. Name the frame when the API declares one.
+  const frame = gl.as_of_frame === "utc" ? " UTC" : "";
+  return `<span class="vg-asof label">as of ${esc(gl.as_of)}${frame}</span>`;
+}
+
 export function vitalsGlyphs(p, habitsToday) {
   const g = (p && p.glyphs) || {};
+  const pageDate = (p && p.date) || "";
   const ORDER = [["recovery", "recovered"], ["sleep", "slept"], ["scale", "weight"], ["movement", "moved"], ["lift", "lifted"], ["water", "hydration"], ["journal", "journal"], ["mind", "mind"]];
+  let mismatched = 0;
   const chips = ORDER.map(([k, word]) => {
     const gl = g[k]; if (!gl) return null;
     const lit = gl.state && gl.state !== "gray";
     const val = gl.label || gl.delta_label || "";
-    return `<span class="vg ${lit ? "vg-lit" : "vg-off"}"><span class="vg-dot" aria-hidden="true"></span><span class="vg-word">${esc(word)}</span>${val ? `<span class="vg-val mono">${esc(val)}</span>` : ""}</span>`;
+    const asOf = glyphAsOfNote(gl, pageDate);
+    if (asOf) mismatched += 1;
+    return `<span class="vg ${lit ? "vg-lit" : "vg-off"}${asOf ? " vg-otherday" : ""}"><span class="vg-dot" aria-hidden="true"></span><span class="vg-word">${esc(word)}</span>${val ? `<span class="vg-val mono">${esc(val)}</span>` : ""}${asOf}</span>`;
   }).filter(Boolean);
   if (habitsToday && habitsToday.total) {
     const lit = habitsToday.done > 0;
     chips.unshift(`<a class="vg ${lit ? "vg-lit" : "vg-off"}" href="/data/habits/"><span class="vg-dot" aria-hidden="true"></span><span class="vg-word">habits</span><span class="vg-val mono">${habitsToday.done} of ${habitsToday.total}</span></a>`);
   }
   if (!chips.length) return "";
+  // The caption can only claim "fires today" for the chips that actually do. When one
+  // doesn't, the caption says so rather than the date-stamp contradicting it silently.
+  const asOfNote = mismatched
+    ? ` ${mismatched === 1 ? "One signal is" : mismatched + " signals are"} stamped with the day the reading belongs to — that figure is <strong>not</strong> today's.`
+    : "";
   return sec("Today, so far — the signals that have fired",
     `<div class="vg-row">${chips.join("")}</div>` +
-    `<p class="rd-meta label">A glyph lights only when its signal actually fires today — the unlit ones simply haven't yet (no decorative always-on tiles). Habits show <strong>${habitsToday ? habitsToday.done + " of " + habitsToday.total : "—"} done today</strong>; an "average by this hour" benchmark waits on hourly habit history rather than being faked.</p>`);
+    `<p class="rd-meta label">A glyph lights only when its signal actually fires today — the unlit ones simply haven't yet (no decorative always-on tiles).${asOfNote} Habits show <strong>${habitsToday ? habitsToday.done + " of " + habitsToday.total : "—"} done today</strong>; an "average by this hour" benchmark waits on hourly habit history rather than being faked.</p>`);
 }
 
 // P1.3 — readiness decomposed: the recovery number broken into its drivers (HRV, RHR, sleep) —

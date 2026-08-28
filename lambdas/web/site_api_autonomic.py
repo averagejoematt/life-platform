@@ -260,14 +260,68 @@ def _week_start(date_str):
     return (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d")
 
 
-def _compute_zone2_breakdown(strava_items, profile, weekly_target_min=ZONE2_WEEKLY_TARGET_MIN, min_duration_min=ZONE2_MIN_DURATION_MIN):
+def _week_end(week_start):
+    """The Sunday closing the Monday-anchored week — the other half of the date range
+    a reader needs to know WHICH week a tally belongs to (#3286)."""
+    d = datetime.strptime(week_start[:10], "%Y-%m-%d")
+    return (d + timedelta(days=6)).strftime("%Y-%m-%d")
+
+
+def _zero_week(week_start, weekly_target_min):
+    """An explicit, dated zero for a calendar week with no qualifying activity (#3286).
+
+    NOT a fabricated value and not the ADR-104 "absent ⇒ null" case. The 90-day query
+    covers this week in full; zero qualifying sessions landed in it, and zero is the
+    measurement. What ADR-104 forbids is publishing a number the data does not support
+    — which is exactly what the old `weeks[-1]` fallback did by serving an OLDER week's
+    real tally under the name "current week". `activity_count: 0` + `no_activity_recorded`
+    let a consumer tell "measured zero" from "we have nothing", and `source_last_activity`
+    names the last day anything qualified so a dark upstream reads as darkness, not effort.
+    """
+    return {
+        "week_start": week_start,
+        "week_end": _week_end(week_start),
+        "zone_2_minutes": 0.0,
+        "target_pct": 0 if weekly_target_min > 0 else None,  # same shape as an active week
+        "target_met": False,
+        "total_exercise_min": 0.0,
+        "activity_count": 0,
+        "no_activity_recorded": True,
+    }
+
+
+def _compute_zone2_breakdown(
+    strava_items, profile, weekly_target_min=ZONE2_WEEKLY_TARGET_MIN, min_duration_min=ZONE2_MIN_DURATION_MIN, today=None
+):
     """Pure port of tool_get_zone2_breakdown, trimmed to the public payload.
 
     Classifies each qualifying Strava activity into an HR zone by average HR as a
     percentage of max HR (from profile), aggregates weekly Zone-2 minutes against the
     150-min reference, and rolls up the full 5-zone distribution + a Zone-2 sport
     breakdown. Returns {"available": False, ...} when there is no qualifying activity
-    (never a fabricated zero week)."""
+    (never a fabricated zero week).
+
+    #3286 — `current_week` MEANS the current calendar week. It used to be `weeks[-1]`,
+    and `weeks` only ever contained weeks that had qualifying activity, so "the last week
+    with data" was published under the name "current week" with no date anywhere on the
+    surface. Measured live 2026-08-27: `/api/zone2` served `week_start 2026-08-17` — the
+    week *before last* — as the current week, with a nonzero tally, while
+    `/api/training_overview` reported trailing-7d Zone-2 of 0 and `/api/source_freshness`
+    had strava behavioral-stale for ~238h. Three surfaces, one loudest and wrong.
+
+    The posture is BOTH halves of the issue's choice, and neither is a new convention:
+      • `current_week` is now the real Pacific calendar week, present with an explicit
+        dated zero when nothing qualified (`_zero_week`) — the honest-absence shape the
+        rest of the platform already uses.
+      • `latest_active_week` keeps the last week that DID have activity, named, so the
+        real number is not withheld — it is just no longer mislabelled.
+    Both carry `week_start`+`week_end`, because a tally without its date range is what
+    made the old bug unreadable from the page.
+
+    `today` is injectable so the calendar boundary can be pinned in tests rather than
+    depending on the hour CI happens to run (#3206's lesson); it defaults to the caller's
+    Pacific day. The frame is PACIFIC — the site is Pacific end-to-end (#2506/#2675) and
+    strava's DATE# keys are Pacific-framed (registry `day_key_frame` default)."""
     max_hr = _sf((profile or {}).get("max_heart_rate")) or 190.0
 
     zone_hr_ranges = {}
@@ -345,6 +399,7 @@ def _compute_zone2_breakdown(strava_items, profile, weekly_target_min=ZONE2_WEEK
         weeks.append(
             {
                 "week_start": wk,
+                "week_end": _week_end(wk),  # #3286: a tally is unreadable without its range
                 "zone_2_minutes": round(z2, 1),
                 "target_pct": round(100 * z2 / weekly_target_min) if weekly_target_min > 0 else None,
                 "target_met": z2 >= weekly_target_min,
@@ -402,11 +457,39 @@ def _compute_zone2_breakdown(strava_items, profile, weekly_target_min=ZONE2_WEEK
         direction = "increasing" if second > first + 5 else "decreasing" if second < first - 5 else "steady"
         trend = {"direction": direction, "first_half_avg_min": round(first, 1), "second_half_avg_min": round(second, 1)}
 
+    # ── #3286: the current CALENDAR week, and separately the last ACTIVE one ──
+    pt_today = today or datetime.now(PT).strftime("%Y-%m-%d")
+    current_week_start = _week_start(pt_today)
+    by_week_start = {w["week_start"]: w for w in weeks}
+    current_week = by_week_start.get(current_week_start) or _zero_week(current_week_start, weekly_target_min)
+    latest_active_week = weeks[-1] if weeks else None
+    last_activity_date = activities[-1]["date"] if activities else None
+    try:
+        days_since_activity = (
+            (datetime.strptime(pt_today, "%Y-%m-%d") - datetime.strptime(last_activity_date, "%Y-%m-%d")).days
+            if last_activity_date
+            else None
+        )
+    except ValueError:
+        days_since_activity = None
+    current_week = {
+        **current_week,
+        "is_current_calendar_week": True,
+        "source_last_activity": last_activity_date,
+        "days_since_activity": days_since_activity,
+    }
+
     return {
         "available": True,
         "period": {"start_date": activities[0]["date"], "end_date": activities[-1]["date"], "weeks_analyzed": n_weeks},
         "weekly_target_min": weekly_target_min,
-        "current_week": weeks[-1] if weeks else None,
+        "pacific_today": pt_today,  # #3286: the frame the week boundary was drawn in, stated
+        "current_week": current_week,
+        # #3286: `weeks` has ALWAYS held only weeks with qualifying activity — a calendar
+        # week with none is simply absent. That is fine for the bar chart and the summary
+        # denominators, and it is precisely why `weeks[-1]` could not be "current week".
+        # Named separately so nothing has to re-derive it (and mislabel it) again.
+        "latest_active_week": latest_active_week,
         "weeks": weeks,
         "zone_distribution": zone_distribution,
         "sport_breakdown": sport_breakdown,
@@ -429,12 +512,20 @@ def handle_zone2_breakdown() -> dict:
 
     Read-only. Reads the trailing 90 days of Strava, classifies each session by HR
     zone, and rolls up the weekly Zone-2 tally + the 5-zone distribution. Honest empty
-    state when no qualifying activity exists. Cache 1800s."""
+    state when no qualifying activity exists. Cache 1800s.
+
+    #3286: the envelope declares `content_as_of` — the last day anything qualified. The
+    payload is computed at request time, but its CONTENT can be a week and a half old
+    while strava is behavioral-stale, and `_meta.generated_at` defaulting to the request
+    instant is the same laundering #3268 named on the coaching board: a held read wearing
+    a fresher date on every fetch. `_meta.served_at` still carries the request time."""
     try:
         today = datetime.now(PT).strftime("%Y-%m-%d")
         start = (datetime.now(PT) - timedelta(days=ZONE2_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
         strava = _query_source("strava", start, today)
-        return _ok(_compute_zone2_breakdown(strava, _get_profile()), cache_seconds=1800)
+        payload = _compute_zone2_breakdown(strava, _get_profile(), today=today)
+        _last = (payload.get("current_week") or {}).get("source_last_activity")
+        return _ok(payload, cache_seconds=1800, content_as_of=_last)
     except Exception as e:
         logger.error(f"[site_api] /api/zone2 failed: {e}")
         return _error(500, "zone 2 breakdown unavailable")

@@ -30,6 +30,7 @@ from web.site_api_common import (
     night_of_for,
 )
 from web.site_api_phase_frame import label_with_span, spans_cycle  # #2957 — cross-phase framing
+from web.vitals_resolver import reached_in_pacific  # #3287 — the ONE "has PT reached this DATE# day" predicate
 
 
 def pulse(*, _g) -> dict:
@@ -69,12 +70,21 @@ def pulse(*, _g) -> dict:
     withings = _latest_item("withings") or {}
     ah = None
     try:
+        # #3287: the query range is deliberately widened to today(UTC) so a boundary
+        # record is never MISSED — but apple_health's DATE# names a UTC day, so from
+        # ~17:00 PT the newest row in that range is a partial *next*-UTC-day record.
+        # `Limit=1` therefore handed the water/weight reads that partial for ~7h every
+        # evening, under a comment that claims it gets "the PT-date record specifically".
+        # Fetch the small range and take the newest day PT has actually reached. The
+        # window is unchanged; only which row wins is. Not a clamp (#3232) — the UTC
+        # key is correct, it simply is not "today, so far" on a Pacific page.
         ah_resp = table.query(
             KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}apple_health") & Key("sk").between(f"DATE#{q_start}", f"DATE#{q_end}"),
             ScanIndexForward=False,
-            Limit=1,
+            Limit=4,
         )
-        ah = _decimal_to_float(ah_resp.get("Items", [{}])[0]) if ah_resp.get("Items") else {}
+        _ah_items = [i for i in ah_resp.get("Items", []) if reached_in_pacific(str(i.get("sk", "")).replace("DATE#", "")[:10], today_pt)]
+        ah = _decimal_to_float(_ah_items[0]) if _ah_items else {}
     except Exception:
         ah = {}
     habitify = _latest_item("habit_scores") or {}
@@ -308,7 +318,12 @@ def pulse(*, _g) -> dict:
             "liters": water_l,
             "target": 3.0,
             "label": f"{water_l}L" if water_l else None,
-            "as_of": today_pt,
+            # #3287: was an unconditional `today_pt` — the glyph ASSERTED today for a
+            # figure it read off whatever apple_health row the scan returned. The date
+            # now comes from the record, so a days-old hydration total can no longer be
+            # published as today's (the same honesty `scale` has had since the
+            # 2026-07-10 truth audit).
+            "as_of": ah_date or today_pt,
         },
         "movement": {
             "state": _movement_state(),
@@ -317,6 +332,12 @@ def pulse(*, _g) -> dict:
             "label": f"{int(steps):,} steps" if steps else None,
             "source": _vr["steps_source"],
             "as_of": _vr["steps_as_of"],
+            # #3287: apple_health's DATE# key names a UTC day (TD-19 Phase 2), so
+            # "as_of == today_pt" does NOT mean "the Pacific day so far" — it means
+            # the UTC day that closed at 17:00 PT. The frame travels with the date so
+            # the page can say which, instead of the reader assuming Pacific.
+            # `.get` because a stubbed spine (tests, older callers) may not carry it.
+            "as_of_frame": _vr.get("steps_as_of_frame"),
         },
         "recovery": {
             "state": _recovery_state(),
