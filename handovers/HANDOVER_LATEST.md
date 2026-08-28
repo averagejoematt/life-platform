@@ -11,7 +11,7 @@ discharged and #3245 was picked up and landed.
 
 ## The score
 
-- **11 PRs merged**: #3267 #3268 #3269 #3270 #3271 #3272 #3273 #3274 #3245 #3276 #3280.
+- **12 PRs merged**: #3267 #3268 #3269 #3270 #3271 #3272 #3273 #3274 #3245 #3276 #3280 #3275.
 - **6 issues CLOSED with verdicts**: #3264, #3255, #3258, #3260, #3261, #3257.
 - **10 issues FILED**, every one adversarially verified: #3277 #3278 #3279 #3282 #3283 #3284
   #3285 #3286 #3287 #3288. Plus 4 §10 folds (#2799 ×1, #2578 ×3).
@@ -93,7 +93,9 @@ otherwise reads as a failed deploy.
 - **`proportionality-reread` (#3275)** — 73 rows walked, ~60 verified unchanged, **11 corrected**,
   and **two demote triggers found already fired unnoticed** (fresh-eyes 2026-07-26; reader-truth
   2026-08-26). The privacy-tier row's rent was understated ~10x (31 fields/42 pairs vs "3 fields,
-  4 pairs"). Landing at wrap time.
+  4 pairs"). **Landed.** The calendar now reports `no ritual outside its window, and every ritual
+  has run at least once` — the daily red #3273 armed is resolved by running the rituals, not by
+  stamping them.
 
 ## Incidents & gotchas
 
@@ -173,7 +175,7 @@ attribute before touching the number. `--decoded` after naming it.
   as undecided; re-raise only at a materially larger n than 42.
 - **#2883** — owner ruled **re-measure at n=30**. New datum recorded on the issue: only ~36% of real
   Bedrock spend carries a `CallerClass` dimension, which may be the reachable bar.
-- **not-work — `operating-calendar.yml` red clears once #3275 lands**; `craft-review` is already OK.
+- **not-work — `operating-calendar.yml` is GREEN again**: both NEVER-RUN entries ran and landed.
 - **not-work — rotate `life-platform/bluesky` and `life-platform/youtube`** if the owner judges it
   warranted: a subagent read them incidentally; values are in a local temp transcript only.
 - **not-work — the #3260 alarm is unproven in production** until a dimensionless

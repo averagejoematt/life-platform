@@ -210,7 +210,7 @@ silent omission is not an outcome.**
 
 **Verified:** 2026-08-28 (Opus 5, **Session I**, autonomous with merge+deploy authority, ALL-OPUS —
 the plan `~/.claude/plans/twinkling-noodling-treehouse.md` plus two owner-directed extensions, a
-rituals run and a bug-bash sweep; twelve agent lanes). **Main GREEN.** **11 PRs merged · 6 issues
+rituals run and a bug-bash sweep; twelve agent lanes). **Main GREEN.** **12 PRs merged · 6 issues
 closed with verdicts · 10 filed, every one adversarially verified · 4 §10 folds.** Open 51 → 56,
 **net +5, stated not suppressed**: the drain took it 51 → 45, then the sweep found eleven real
 defects that survived verification. **Three issues deliberately NOT closed despite their PRs
@@ -231,9 +231,9 @@ diverged** — a metric clearing by dilution while its comment credited a retire
 citing an expired window; five rulings expressing "never gating" as a value that gates; and **`main`
 has no branch protection and zero required checks** (#3288), so eleven merges were gated solely by
 `wait_pr_green.sh` and an unpiped exit code. **#3245 landed** — the 102-file skills-corpus PR, with
-its worktree reaper. **Both NEVER-RUN rituals actually ran**: craft-review (B overall, 23 findings)
+its worktree reaper. **Both NEVER-RUN rituals actually ran and landed**: craft-review (B overall, 23 findings)
 and the proportionality re-read (73 rows, 11 corrected, **two demote triggers already fired
-unnoticed**). Owner decisions taken: #3083 **decided hold**, #2883 **re-measure at n=30**, and
+unnoticed**); the calendar now reports every ritual has run at least once. Owner decisions taken: #3083 **decided hold**, #2883 **re-measure at n=30**, and
 **auto-synced sources count as "logging"** (ADR-104 amendment), which unblocked #3252's dead box.
 **Needs the owner's hands: #3284** — the cycle's chronicle article is unreachable to every reader and
 the fix requires a manual CloudFront function publish. Full narrative:
