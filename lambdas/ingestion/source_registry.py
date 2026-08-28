@@ -213,6 +213,26 @@ DEFAULT_STALE_HOURS = 48
 #                  CHANNEL_STALE_DAYS (the #498 drift class). Presence is a
 #                  BEHAVIORAL surface: it narrates, it never pages — adding this
 #                  facet must not touch any checker/paging projection.
+#   evidence_for   (#3252, ADR-104 2026-08-28) the `ai.behavior_logs.LOG_CATEGORIES`
+#                  tokens this source can SUBSTANTIATE — i.e. the categories whose
+#                  "he did / did not do this" question a record from this source
+#                  answers. It is the DENOMINATOR of an absence claim, and it is a
+#                  deliberately different axis from every facet above it:
+#                    * `behavioral` asks "does staleness mean a lapse or a break?"
+#                    * `capture_channel` asks "did a human type it?"
+#                    * `engagement_channel` asks "does it stop when he disengages?"
+#                    * `evidence_for` asks "if he HAD done it, would this source know?"
+#                  The 2026-08-28 owner ruling is why the third and the fourth are not
+#                  the same list: an AUTO-SYNCED source counts as logging. If the data
+#                  arrived, it was logged, whether or not Matthew typed it — so a
+#                  narrative that says "you didn't log a run" is WRONG when Strava
+#                  synced one. Strava therefore carries `evidence_for: ("workout",)`
+#                  while carrying no `engagement_channel`, and an absence claim about
+#                  workouts that consulted only Hevy is unsourced, not true.
+#                  Read by ai.absence_sourcing.evidence_sources_by_category(); a source
+#                  with no facet answers no absence question and is simply absent from
+#                  every denominator. Absent for eating_window/fasting on purpose —
+#                  NO source records them, which is itself the honest answer.
 #   hae_datatypes  (apple_health only) per-sub-datatype liveness thresholds for the
 #                  streams that all share the ONE apple_health partition, so a
 #                  partition-level "fresh" can hide a months-dark sensor (D-4/#468).
@@ -374,6 +394,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             "filename_legacy": "DD.json",
             "note": "2026-05-17 SIMP-2 migration (ADR-056) flipped 'DD.json'→'YYYY-MM-DD.json'; frozen pre-migration objects remain (#1256) — use raw_date_key_candidates() for historical dates.",
         },
+        # #3252: an activity IS a workout record, and it arrives without Matthew
+        # typing anything. That is exactly the auto-synced case the 2026-08-28 ruling
+        # settled — Strava is in the workout denominator even though it is not an
+        # engagement channel.
+        "evidence_for": ("workout",),
         # DI-2: the original source-of-truth reconciler (the Jun-2026 evening-walk
         # fix). strava_lambda._reconcile, wired in ingestion_stack. TR-07 generalized
         # this facet so whoop opts in the same way.
@@ -416,6 +441,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "qa_tier": "required",
         "method": "Health Auto Export webhook, near-real-time",
         "metrics": "Steps, active energy, CGM, blood pressure, state of mind",
+        # #3252: HAE pushes steps AND the `workouts` sub-datatype below — both are
+        # passive captures, and both are evidence under the auto-sync ruling.
+        "evidence_for": ("steps", "workout"),
         "posture": "load-bearing",
         "raw_layout": {
             "prefix": "raw/matthew/health_auto_export",
@@ -630,6 +658,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # #914: the PRIMARY presence anchor — the daily-expected manual channel and
         # the first, most reliable thing to stop when routine breaks.
         "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
+        # #3252: the only source that records what he ate.
+        "evidence_for": ("nutrition",),
     },
     "hevy": {
         "label": "Hevy",
@@ -649,6 +679,9 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # #914: lifting has legit rest days — lenient so a rest day never reads as
         # falling off (the interactive workout channel; macrofactor_workouts is a mirror).
         "engagement_channel": {"label": "training", "stale_days": 4},
+        # #3252: strength sessions only. Hevy is ONE of three workout sources, which is
+        # the whole point of the facet — Hevy-only evidence cannot carry "no training".
+        "evidence_for": ("workout",),
     },
     "measurements": {
         "label": "Tape measure",
@@ -702,6 +735,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "qa_tier": None,  # paused sources render ⏸ from the paused flag
         "method": "OAuth API pull, 4x daily — paused (ADR-074)",
         "metrics": "Stress, body battery, steps",
+        # #3252: steps, and PAUSED (ADR-074) — the canonical stale-is-not-absent
+        # case. A paused source cannot report, so it can neither confirm nor deny a
+        # step absence; absence_sourcing returns `stale`, never `absent`, while it
+        # is in a category denominator.
+        "evidence_for": ("steps",),
         "posture": "paused",
         "raw_layout": {
             "prefix": "raw/matthew/garmin",
@@ -766,6 +804,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         # 4d "quiet" mark is narrative-only and deliberately tighter than the 14d
         # evening-nudge threshold above — different surface, different kindness.)
         "engagement_channel": {"label": "journal", "stale_days": 4},
+        # #3252: the journal database is the only place an entry lands.
+        "evidence_for": ("journal",),
     },
     # ── #1669 (epic #1668): inbound social ingestion — YouTube, the reference source.
     #    Modelled on `notion` (a behavioral, API-pulled, many-items-per-day source), but
@@ -1345,6 +1385,26 @@ def engagement_channels() -> dict:
             "primary": bool(ch.get("primary")),
         }
     return out
+
+
+def evidence_sources_by_category() -> dict:
+    """{log_category: (source_id, …)} — the DENOMINATOR of an absence claim (#3252).
+
+    Derived from the `evidence_for` facet, sorted for determinism. This is the one
+    place the platform answers "which sources could have known?", and it exists so no
+    consumer keeps its own list: a hand-typed set of "sources that count" is precisely
+    how an auto-synced source (Strava) got silently excluded from a training-absence
+    claim on the public board, which is the defect #3252 box 2 was filed for.
+
+    A category with no source here has an EMPTY tuple, and that is an answer, not a
+    gap — nothing in the pipeline records an eating window or a fast, so no ingest
+    evidence can substantiate an absence claim about one.
+    """
+    out: dict[str, list[str]] = {}
+    for key, row in SOURCE_REGISTRY.items():
+        for category in cast("tuple[str, ...]", row.get("evidence_for") or ()):
+            out.setdefault(str(category), []).append(key)
+    return {c: tuple(sorted(v)) for c, v in sorted(out.items())}
 
 
 def engagement_primary_channel() -> str:

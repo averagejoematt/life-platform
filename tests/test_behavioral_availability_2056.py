@@ -189,8 +189,15 @@ class TestPresenceDerivation:
         )
         a = bl.available_logs_from_presence(sig, "2026-08-06")
         assert "nutrition" in a.present  # logged that very day
-        assert "workout" in a.covered and "workout" not in a.present  # last lift was 08-04
         assert "journal" in a.covered and "journal" not in a.present  # nothing in-window
+        # #3252: `workout` USED to read "covered, absent — last lift was 08-04". It no
+        # longer can. The presence record carries Hevy and nothing else, while the
+        # registry's workout denominator is hevy + strava + apple_health, so this
+        # derivation has not consulted two of the three sources that could have recorded
+        # a workout. Under the 2026-08-28 auto-sync ruling that makes the absence
+        # unlicensed, not true — the exact shape that let /method/board/ say "no
+        # training since August 17th" with two Strava activities in the window.
+        assert "workout" not in a.covered and "workout" not in a.present
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -205,9 +212,17 @@ class TestRecencyDerivation:
         assert a.covered == frozenset({"nutrition"})
 
     def test_positive_days_since_is_covered_absent(self):
-        a = bl.available_logs_from_recency({"days_since_last_lift": 3})
+        a = bl.available_logs_from_recency({"days_since_last_journal": 3})
         assert a.present == frozenset()
-        assert a.covered == frozenset({"workout"})
+        assert a.covered == frozenset({"journal"})
+
+    def test_a_hevy_only_lift_field_cannot_carry_a_workout_absence(self):
+        """#3252: `days_since_last_lift` is computed from Hevy rows alone, so on its own
+        it has consulted one of the three sources in the workout denominator. Absence
+        demotes to uncovered; naming the other two restores it."""
+        assert bl.available_logs_from_recency({"days_since_last_lift": 3}).covered == frozenset()
+        named = bl.available_logs_from_recency({"days_since_last_lift": 3}, sources_observed=("strava", "apple_health"))
+        assert named.covered == frozenset({"workout"}) and named.present == frozenset()
 
     def test_none_means_nothing_in_the_lookback_which_is_also_absent(self):
         """`_recency_stats` returns None when the whole window is empty. 'No log in 30

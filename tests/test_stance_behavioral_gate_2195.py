@@ -186,10 +186,15 @@ class TestGateActuallyFires:
         sig = _signal(macrofactor=_gen_day())
         assert _gate(self.UNSEEN, sig, monkeypatch) == []
 
-    def test_workout_and_journal_are_covered_too(self, monkeypatch):
+    def test_journal_is_covered_too_but_workout_no_longer_is(self, monkeypatch):
+        """#3252: journal still flags — Notion is the whole journal denominator. Workout
+        does NOT, and that is the fix, not a regression: the presence signal carries Hevy
+        only, so "no workout log exists" is an absence claim this gate has not sourced.
+        Flagging it would tell a coach to rewrite a sentence that may well be true —
+        Strava syncs runs without Matthew typing anything (owner ruling 2026-08-28)."""
         sig = _signal(macrofactor=_gen_day(), hevy=_stale_log_day(), notion=_stale_log_day())
         found = _gate("You completed your workout today and you journaled today.", sig, monkeypatch)
-        assert sorted(f["category"] for f in found) == ["journal", "workout"]
+        assert sorted(f["category"] for f in found) == ["journal"]
 
     def test_advice_framing_is_not_a_completed_action_claim(self, monkeypatch):
         sig = _signal(macrofactor=_stale_log_day())

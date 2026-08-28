@@ -225,11 +225,13 @@ def available_logs_from_presence(signal, date_iso) -> LogAvailability:
 
     present, covered = set(), set()
     dates: dict[str, str | None] = {}
+    observed: dict[str, str | None] = {}
     for channel, category in PRESENCE_CHANNEL_CATEGORIES.items():
         entry = detail.get(channel)
         if not isinstance(entry, dict):
             continue  # the channel is not in this record at all — say nothing about it
         last = _iso(entry.get("last_log_date"))
+        observed[channel] = last
         if last == target:
             present.add(category)
             covered.add(category)
@@ -250,7 +252,11 @@ def available_logs_from_presence(signal, date_iso) -> LogAvailability:
             # log DATE is still a fact this record knows, and it is the fact that
             # licenses — or refuses — a "stopped N days ago" framing.
             dates[category] = last
-    return LogAvailability(_norm(present), _norm(covered), _norm_dates(dates))
+    return _sourced(
+        LogAvailability(_norm(present), _norm(covered), _norm_dates(dates)),
+        observed,
+        window_start,
+    )
 
 
 # ── Derivation 2: a domain snapshot's recency fields ─────────────────────────
@@ -265,9 +271,19 @@ RECENCY_FIELD_CATEGORIES = {
     "days_since_last_journal": "journal",
     "days_since_last_lift": "workout",
 }
+# #3252: which registry SOURCE each field was computed from — the numerator, i.e. a fact
+# about `ai_expert_analyzer_lambda._recency_stats`'s own query, not about which sources
+# "count" (that denominator is derived from the registry, in ai.absence_sourcing).
+# `days_since_last_lift` is Hevy rows only — the training snapshot's `training_dates`
+# DOES include Strava, but this field does not, and conflating them is the #3252 defect.
+RECENCY_FIELD_SOURCES = {
+    "days_since_last_food_log": "macrofactor",
+    "days_since_last_journal": "notion",
+    "days_since_last_lift": "hevy",
+}
 
 
-def available_logs_from_recency(data, reference_date=None) -> LogAvailability:
+def available_logs_from_recency(data, reference_date=None, sources_observed=None) -> LogAvailability:
     """`LogAvailability` from a snapshot's `days_since_last_*` fields.
 
     ``0`` ⇒ logged on the snapshot's reference day (present). Any positive number ⇒ the
@@ -280,14 +296,22 @@ def available_logs_from_recency(data, reference_date=None) -> LogAvailability:
     is what licenses a "stopped N days ago" framing downstream. Withhold it and the dates
     simply stay unknown — the counts and coverage are byte-identical either way, so no
     existing caller changes behaviour by not passing it.
+
+    ``sources_observed`` (#3252, optional) names ADDITIONAL registry sources the caller
+    consulted beyond the one each present field speaks for (`RECENCY_FIELD_SOURCES`). Any
+    category whose registry denominator is still not fully named is demoted to uncovered
+    — see `ai.absence_sourcing`. `workout` is the live case: the field is Hevy-only, so a
+    caller that has Strava in hand must say so to keep the category answerable.
     """
     data = data if isinstance(data, dict) else {}
     ref = _iso(reference_date)
     present, covered = set(), set()
     dates: dict[str, str | None] = {}
+    observed = set(sources_observed or ())
     for field, category in RECENCY_FIELD_CATEGORIES.items():
         if field not in data:
             continue
+        observed.add(RECENCY_FIELD_SOURCES[field])
         days = data.get(field)
         if days is None:
             covered.add(category)
@@ -303,7 +327,31 @@ def available_logs_from_recency(data, reference_date=None) -> LogAvailability:
             present.add(category)
         if ref is not None and n >= 0:
             dates[category] = _shift_days(ref, -n)
-    return LogAvailability(_norm(present), _norm(covered), _norm_dates(dates))
+    # #3252: a recency field is one SOURCE's answer, not the category's. `days_since_
+    # last_lift` is Hevy rows alone, so unless the caller names Strava and Apple Health it
+    # has not consulted the workout denominator and cannot carry a workout absence.
+    return _sourced(LogAvailability(_norm(present), _norm(covered), _norm_dates(dates)), observed, None)
+
+
+def _sourced(avail, observed, window_start):
+    """#3252: hand the derived availability to the absence-sourcing gate, fail-closed.
+
+    Imported lazily and on purpose: `ai.absence_sourcing` imports THIS module for the
+    category vocabulary and the `LogAvailability`/`AbsenceTransition` shapes, so a
+    module-level import here would be a cycle. A missing registry (a bundle that somehow
+    shipped without `ingestion/`) must not silently widen a claim, so the failure path
+    returns the EMPTY availability — nothing answerable — rather than the un-narrowed one.
+    """
+    try:
+        from ai.absence_sourcing import sourced_availability
+    except ImportError:  # pragma: no cover — the bundle always carries the registry
+        return LogAvailability.none()
+    return sourced_availability(
+        avail,
+        sources_observed=tuple(observed or ()),
+        source_last_dates=observed if isinstance(observed, dict) else None,
+        window_start=window_start,
+    )
 
 
 def _iso(value):
@@ -468,6 +516,7 @@ def transition_from_presence_signal(signal, category="nutrition") -> AbsenceTran
     cat = str(category or "").strip().lower()
 
     dates = {}
+    dates_sources: dict[str, str | None] = {}
     for channel, mapped in PRESENCE_CHANNEL_CATEGORIES.items():
         entry = detail.get(channel)
         if not isinstance(entry, dict):
@@ -476,13 +525,29 @@ def transition_from_presence_signal(signal, category="nutrition") -> AbsenceTran
             continue  # the record does not carry the fact at all → genuinely unknown
         last = _iso(entry.get("last_log_date"))
         dates[mapped] = last  # None here IS the answer: nothing in the observed window
+        dates_sources[channel] = last  # #3252: the SOURCE ids this signal let us consult
     # The top-level food fields are the clamped pair the coach cards actually read. They
     # agree with channel_detail["macrofactor"] by construction; read them too so a signal
     # that carries only the flat shape still derives rather than falling to unknown.
     if "nutrition" not in dates and "last_food_log_date" in signal:
         dates["nutrition"] = _iso(signal.get("last_food_log_date"))
+        # #3252: the flat field IS the food channel's answer in its pre-channel_detail
+        # shape, so the source it came from was consulted. Resolved through the existing
+        # channel→category map rather than named here — a source id typed into this
+        # module would be the hand-list the registry derivation exists to prevent.
+        for _ch, _cat in PRESENCE_CHANNEL_CATEGORIES.items():
+            if _cat == "nutrition":
+                dates_sources[_ch] = dates["nutrition"]
     avail = LogAvailability(frozenset(), frozenset(), _norm_dates(dates))
-    return absence_transition(avail, cat, ref, win)
+    tr = absence_transition(avail, cat, ref, win)
+    # #3252: the transition is only as good as its denominator. `channel_detail` carries
+    # the engagement channels and nothing else, so a workout absence derived here has
+    # never seen Strava — demote it to `unknown` rather than hand a short claim onward.
+    try:
+        from ai.absence_sourcing import sourced_transitions
+    except ImportError:  # pragma: no cover — the bundle always carries the registry
+        return AbsenceTransition(cat, TRANSITION_UNKNOWN, None, None, win)
+    return sourced_transitions({cat: tr}, sources_observed=tuple(dates_sources), source_last_dates=dates_sources, window_start=win)[cat]
 
 
 # ── The guard: a transition framing must be licensed by a real date ──────────

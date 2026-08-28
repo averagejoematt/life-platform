@@ -136,6 +136,23 @@ except ImportError:  # pragma: no cover — flat/layer bundle layout
         ungrounded_behavioral_findings,
     )
 
+# 6. Absence SOURCING (#3252 box 2, ADR-104 amendment 2026-08-28). The transition family
+# above answers "did an absence happen?"; this one answers "who did you ask?". The board
+# said "no training since August 17th" from Hevy alone while Strava had synced two
+# activities inside that window — nothing lied, the denominator was just short by one
+# auto-synced source and no instrument could see it. `unsourced_absence_findings` is the
+# check; `sourced_availability` / `sourced_transitions` are the fail-closed halves that
+# remove the unlicensed answer before a model sees it. Own module for the §2 ceiling and
+# because its denominator is DERIVED from the ingestion registry, not stated.
+from ai.absence_sourcing import (  # noqa: F401,E402
+    AbsenceSourcing,
+    absence_sourcing,
+    evidence_sources,
+    sourced_availability,
+    sourced_transitions,
+    unsourced_absence_findings,
+)
+
 _NUM_RE = re.compile(r"\d+(?:\.\d+)?")
 _THOUSANDS_RE = re.compile(r"(?<=\d),(?=\d{3}\b)")
 
