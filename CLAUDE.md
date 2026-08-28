@@ -221,7 +221,8 @@ that never reaches tier 2 in any of them, against a measured $5.74/day (sd $4.32
 own premise was false**: "doing nothing selects tier 3 on 09-01" priced September against August's
 *month-end projection*; `_project_month_end` is month-scoped and `_decide_tier` caps at
 `actual_mtd_tier + 1`, so $150 reaches tier 3 on **~Sep 21** — the cliff was real, its date wrong by
-twenty days. Because $215 exceeds the window's $200, **the 09-01 revert is now a RAISE**. Four
+twenty days. Because $215 exceeds the August window's own ceiling, **the 09-01 revert is now a
+RAISE**. Four
 deploys, every one verified by CONTENT; the invisible one (`cdk deploy LifePlatformCore`, **zero CDK
 file changes**) moved the AWS Budget 150.0 → 215.0. Six leases disposed, one **rejected** because it
 carried `MONTHLY_CEILING = "150"` — *strictly newer than live yet older than main on the one number
