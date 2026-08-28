@@ -127,7 +127,7 @@ GitHub Actions (`.github/workflows/ci-cd.yml`): Lint → Test → Plan → Deplo
 
 **Single chokepoint:** all Claude calls route through `lambdas/bedrock_client.invoke()` (ADR-062). Auth is IAM (`bedrock:InvokeModel` + `InvokeModelWithResponseStream`), no API key. Cross-region inference profiles required: `us.anthropic.claude-sonnet-4-6` (narrative) and `us.anthropic.claude-haiku-4-5-20251001-v1:0` (structured). Prompt caching uses `cache_control` blocks on the system message (~2048+ tokens to engage).
 
-**$150/month hard ceiling** (ADR-063; base $75→$85 2026-07-08, →$150 by the ADR-133 amendment 2026-08-18 #2836 — the permanent September base, derived from measured steady state $4.12/day n=6 ≈ $124/mo, NOT from a projection; **floats to $176 in reader-traffic surge mode** — ≥900 trailing-7d uniques, ADR-133). **August 2026 ONLY the base is $200 / surge $235** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16 #2734, `_TEMP_CEILING_WINDOW`) — a dated window that **auto-reverts 2026-09-01 with no deploy or manual step**; the AWS Budgets backstop moved $85→$150 WITH the permanent base (#2836 — it was pinned at $85 only while the raises were temporary; a permanent $150 base against an $85 backstop would page every month by construction): one AWS budget covers ALL spend (`life-platform-monthly-75` — name is historical, deliberately not renamed). `cost_governor_lambda` (every 8h) projects month-end spend (non-AI from Cost Explorer + Bedrock token usage × current price) and writes a tier 0–3 to SSM `/life-platform/budget-tier`; tier bands are fixed fractions (≈73%/87%/97%) of the effective ceiling. `lambdas/ai/budget_guard.py` (bundled module) gates AI features by tier (audience-ordered per ADR-125):
+**$150/month hard ceiling** (ADR-063; base $75→$85 2026-07-08, →$150 by the ADR-133 amendment 2026-08-18 #2836 — the permanent September base, derived from measured steady state $4.12/day n=6 ≈ $124/mo, NOT from a projection; **floats to $176 in reader-traffic surge mode** — ≥900 trailing-7d uniques, ADR-133). **August 2026 ONLY, a dated window raised the base to $200 / surge $235** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16 #2734, `_TEMP_CEILING_WINDOW`) — a dated window that **auto-reverts 2026-09-01 with no deploy or manual step**; the AWS Budgets backstop moved $85→$150 WITH the permanent base (#2836 — it was pinned at $85 only while the raises were temporary; a permanent $150 base against an $85 backstop would page every month by construction): one AWS budget covers ALL spend (`life-platform-monthly-75` — name is historical, deliberately not renamed). `cost_governor_lambda` (every 8h) projects month-end spend (non-AI from Cost Explorer + Bedrock token usage × current price) and writes a tier 0–3 to SSM `/life-platform/budget-tier`; tier bands are fixed fractions (≈73%/87%/97%) of the effective ceiling. `lambdas/ai/budget_guard.py` (bundled module) gates AI features by tier (audience-ordered per ADR-125):
 - **0** (<73% of ceiling): all AI runs normally.
 - **1** (73–87%): internal/dev AI paused (ensemble, chronicle editor, coherence-semantic).
 - **2** (87–97%): + reader narratives paused (coach commentary, State of Matthew, chronicle).
@@ -208,35 +208,45 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-27 (Opus 5, **autonomous 9h overnight**, owner asleep — the OVERNIGHT
-boot prompt of `~/.claude/plans/purring-doodling-boot.md`). **Main GREEN at c78730ae.** All-Opus,
-Fable untouched. **11 closed with verdicts** (#2961, #3217, #3221, #3219, #3220, #3085, #3222,
-#3224, #2817, #3065, #3213), **12 PRs merged**, **ZERO standalone issues filed** — six findings
-folded onto existing epics as §10 checkboxes (#2799 ×1, #2578 ×3, #2798 ×2). **Open 58 → 47: net
-−11**, ending the two-session treadmill (D +1, E +2). The batch rule alone closed three issues in
-one CI cycle (#3228). Three deploys, each verified by **content** not sha — the fleet bundle was
-unzipped and grepped to confirm `regen_keep_predicate.py` present AND its caller wired. **The
-session's through-line was instruments that report success without doing their job**, found five
-times independently: the gate census counted **ten libraries as gates** on a filename substring
-(560→551 — #2578's own denominator, wrong by ten); the engine-doc gate compares **dates, not
-content**, and `COACH_STANCE.md` had **18 of 27 citations wrong** while its stamp claimed it had
-re-checked a line that is blank; `TruncatedResponses` has never fired for the function it guards;
-the auto-reconcile job reported `success` while leaving the tree drifted **twice, redding main both
-times**; and my own negative control passed vacuously (`find_module`, removed in 3.12). **#3234 is
-the best find** — the reconcile job could never derive the census fact because `setup-ci` installs
-no packages and `gate_census` needs PyYAML: **#3156's second home**, missed when that issue fixed
-`docs-ci.yml`. Proved with a control, and **proven live within the hour** (`1d5513b9c` cleared drift
-unaided). My first diagnosis of it was wrong and the correction is posted publicly on #2578. **A
-gate caught a live reader-facing bug nobody was looking for** — `/api/source_freshness` served a
-**future date** for 7h a day; #3232 ruled the frame before touching the display and refused to
-clamp. **Three lanes falsified the premise of the issue they were sent to fix** (#3217's "composite
-score" does not exist; #2817's 57 sites were already swept by #3196 — which *introduced* the one
-real defect, a Pacific day anchored at UTC midnight that sent a live inflated SNS alert; #3224's
-growth is 79.7% existing tests slowing, closed **without a budget raise**, a first in five
-instances). Gotchas: a deploy lease **stranded 7.5h** whose approval would have rolled back two
-live-deployed fixes; #3222 **falsely auto-closed** by a shared-scratchpad path collision, not a
-mistyped number; **#3231 shipped half-broken with every one of its own tests green** (a perf fix has
-no failing test). **Zero event swallows** vs five in Session E. **Next:** #3204 (its lane never reported) ·
-#2883 · #2888 · #2835/#3079 (promoted this wrap) · #2578's three new checkboxes · owner batch 16
-items, now including two tokens measured load-bearing tonight. Full narrative:
+**Verified:** 2026-08-27 (Opus 5, **Session H**, autonomous with merge+deploy authority, ALL-OPUS —
+`~/.claude/plans/dreamy-painting-glacier.md` Part B). **Main GREEN.** A second session held
+`skills-corpus-governable-phase1` in the primary clone throughout; **all driver git work ran from a
+detached worktree at `origin/main`** and PR #3245 was never touched. **6 PRs merged** (#3248, #3249,
+#3253, #3256, #3259, #3263), **3 closed with verdicts** (#2999, #3254, #3237), **12 filed**. **Open
+42 → 51: net +9 — the deliberately correct outcome**, since the non-Fable queue was exhausted and
+the refill adds before it subtracts; nothing was suppressed to protect the number. Part A's four
+owner decisions were not supplied, so #2801/#2833/#3083/#2834 were **parked, not worked**.
+**The through-line: the platform's own written claims about itself drift faster than its code.**
+Found nine times. **Lane 1's premise was inverted** — the plan said the 09-01 ceiling rollover would
+red on eight docs; it reds on **two**, and the other six are *structurally invisible* (`BUDGET_NEAR`
+needs a ceiling word within 20 chars). Measured by standing the real scanners at 2026-09-02: **14
+unframed occurrences, 2 caught**. The risk was **silence, not noise** — undiscoverable by the diff
+read the plan asked for. Fixed by a **derivation**: `retired_figures()` forbids the expired pair
+rather than merely un-allowing it, inert while the window runs (a dead-man), proved 12 → 0 with a
+negative control that actually reds. **Lane 2 found BOTH sides of a contradiction wrong in opposite
+directions** — #2801's "$6.78/day" is a **7-day sum** (real ~$1.04/day, so the CI lever is
+**~$31–60/mo, down from the ~$203/mo the epic assumed**), and `budget_guard`'s "pennies per run" priced the *nightly Lambda*
+copy while labelling the *CI* copy (~24¢, ~13x); the **prose** gate is 4x the vision gate. **#2883's
+title asks for an alarm that already exists** and is lit 21/21; its "closing at ~0.02/day" claim
+dies on OLS — slope **-0.0056/day, 95% CI [-0.0152, +0.0040]**, an interval that **includes
+non-decreasing**. **`fullreview-delta` names a ritual the skill does not implement**, so the
+calendar was **NOT stamped** — a bounded two-lens sweep ran instead and is not a delta. **The
+sanctioned Roadmap refill cannot refill this queue**: all 12 startable candidates are `model:fable`,
+so a promotion would green `now_liveness` while adding zero startable work; #3256 now **refuses**
+that and prints `NO REMEDY IN THE CORPUS`. **The site auto-rollback reported `success` on a defect
+it cannot reach** (stored artifact in DynamoDB, verified still live). **A citation chain cited two
+closed issues** while asserting a finding had "no recurrence since" — the same fingerprint is in the
+log inside 72h. **The reader-truth judge emits findings its own note retracts** ("No flag warranted
+on reconsideration") and the pipeline counts them. One plan finding was a **false positive**
+(`broadcast_sensitivity` is deliberately unregistered, documented in-file) and was rejected publicly
+on #2799 rather than filed. Verified-with-positive-controls filings: **#3260** (`slo-ai-coaching-success`
+is dimensionless and slept through **191 real failures in one day**), **#3261** (two live OG cards
+publish 116/59/$13 against 76/104/$146 — and discard the correct values they already loaded),
+**#3262**, **#3257**, **#3258**. Gotchas: **`gh run list --commit <short-sha>` returns `[]` falsely**
+(use the API at the full 40-char sha); **piped exit codes lied twice**; **my own three filings broke
+the hygiene gate** (1 → 5 violations) and it caught all four; and **labelling #2978 `blocked:date`
+honestly fired a blocking gate** — the hygiene system punishes accurate blockage-reporting. One
+fleet deploy (`5e392255`) **verified by content**, two leases **rejected**, neither left waiting.
+**Next:** #3260 · #3261 (both S, both verified) · #3250 · #3264 · #2999's residual on #2578 · the
+owner batch, led by the **September 1 ceiling cliff, now 4 days out**. Full narrative:
 `handovers/HANDOVER_LATEST.md`.

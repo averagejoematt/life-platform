@@ -29,12 +29,13 @@ folder hierarchy, is how you navigate. Every page carries a status header
 6. [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the layer below QUICKSTART: bare metal → operational (rebuild a lost/replacement Mac from zero)
 7. [ARCHITECTURE.md](ARCHITECTURE.md) — the full system design
 8. [CONVENTIONS.md](CONVENTIONS.md) — the load-bearing reflexes (read before your first deploy)
+9. [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) — how work is adjudicated and a session is driven (read before your first PR); its §6 names what the repo still cannot tell you (#2848)
 
 **"I'm operating the system today"** (on-call view):
 [RUNBOOK.md](RUNBOOK.md) — daily ops + troubleshooting · [MONITORING.md](MONITORING.md) — what fires and why · [SLOs.md](SLOs.md) · [OPERATOR_GUIDE.md](OPERATOR_GUIDE.md) — the daily health check · [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) — backups + drilled restore procedures
 
 **"I'm taking this platform over from the AI"** (successor view):
-[CONTINUITY.md](CONTINUITY.md) — the map of every state surface outside `docs/` (session handovers, platform memory, skills), the memory-export tooling, and the day-1 reading order · [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the from-zero rebuild runbook if the laptop is gone.
+[OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) — the operating reflexes that used to live only in the operator's private memory, and the honest list of what still does (#2848) · [CONTINUITY.md](CONTINUITY.md) — the map of every state surface outside `docs/` (session handovers, platform memory, skills), the memory-export tooling, and the day-1 reading order · [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the from-zero rebuild runbook if the laptop is gone.
 
 **"I'm changing the public website"**:
 [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) — the durable why · [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) — what each page is for · [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) — the standards · [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) — how to change it well · [SITE_AUTHORING.md](SITE_AUTHORING.md) — add/change a page end-to-end
@@ -84,6 +85,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [DECISIONS.md](DECISIONS.md) | **ADRs (001–155)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | **The "definition of an A" for craft** — the 10-dimension rubric + naming/size/gate standards `/craft-review` grades against |
+| [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) | **The work-adjudication + session reflexes** — verifying a finding, closing an issue, judging an epic, concurrent lanes, watchers; plus the dated memory-corpus audit and the residual gap list (#2848) |
 | [CONTINUITY.md](CONTINUITY.md) | What lives outside `docs/` and how a human reads/exports it |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
 | [IDEMPOTENCY.md](IDEMPOTENCY.md) | **The replay census** — every external side effect (28 SES senders, the live webhook, site writes, write-MCP) × what happens if it runs twice; the three replay vectors and which guard covers which (DIL-025) |

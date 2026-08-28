@@ -3305,6 +3305,25 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3235"
         }
       ]
+    },
+    {
+      "id": "2026-08-27-the-sensor-that-ended",
+      "date": "2026-08-27",
+      "title": "The sensor ended, and the page kept answering as if it hadn't",
+      "shipped": "A continuous glucose monitor is a disposable thing. It runs its course and stops, and a new one goes on a few days later. That is not a malfunction — it is how the hardware works. But the site did not know how to say so. When the readings stopped on the 24th, /api/glucose kept serving that last day's average as the current one, undated, with a cheerful 'excellent' beside it. The dashboard held yesterday's number rather than clearing it, and the published stats file republished an average with no date attached at all, sitting next to a weight reading that was correctly dated. Nothing was broken. Everything was wrong. Now the endpoint nulls the average, the time-in-range and the as-of date when the sensor has gone quiet, and returns a small block that says plainly how many days dark it has been and that the last-known values are exactly that — last known, not current. The reading itself survives, dated, where it belongs.",
+      "why_it_mattered": "The honest-numbers rule on this platform is not about avoiding lies, which is easy. It is about absence, which is hard. A missing measurement has no natural shape on a page: there is nothing to render, so the easiest thing a system can do is show you the last thing it had and let you assume it is now. Every instrument here has that failure mode waiting in it. The fix that matters is not this one endpoint — it is that absence became a thing the code can express, with a name and a day count, instead of a gap that silently fills itself with the past.",
+      "gotcha": "The first version of the fix published its own date under the key `as_of_date` — and immediately tripped the very check it was written to satisfy, because a block announcing that nothing is current was itself announcing a currency stamp. It got caught by the fix's own test, not in review. Renaming the field to `last_reading_date` was the whole repair. Separately, an existing test failed and turned out to be right: the dashboard's retention of yesterday's values is deliberate — that job merges into the same document twice more during the day — so the change was narrowed to adding the missing branch rather than making the writes unconditional. No fixture was edited and no assertion relaxed to make it pass.",
+      "honest_miss": "A reader now learns the sensor has gone quiet. An operator still does not. The per-datatype liveness machinery already exists and is inert — never published as a metric, never alarmed — and the one health check that reads it only asks whether a dark datatype is carrying a number, never whether one has gone dark. That leg was deliberately cut for scope and is tracked, not quietly dropped. It also cannot simply be added: the file it belongs in is two lines from a hard size ceiling, so it has to be paid for by extracting code, not by raising the limit. And the honest coda is that by the time this shipped, a new sensor was already on and reporting — so the absence path is proven by its tests and by a control that fails when it should, rather than by watching it work in production.",
+      "prs": [
+        {
+          "label": "PR #3239",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3239"
+        },
+        {
+          "label": "PR #3243",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3243"
+        }
+      ]
     }
   ]
 }

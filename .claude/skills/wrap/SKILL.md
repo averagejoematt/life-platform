@@ -357,8 +357,13 @@ query and nothing noticed. That script's single rule is now absorbed and it is d
   reachable from this session, the linter fails open (prints a skip note, exits 0) — a
   missing `gh` auth or no network must never wedge the wrap. Note that in the handover
   rather than silently skipping the check.
-- Its `now_liveness` and `later_staleness` findings are not defects — they are (e9)'s
-  input. Carry them there rather than fixing them here.
+- Its `now_liveness`, `now_lane_coverage` and `later_staleness` findings are not defects —
+  they are (e9)'s input. Carry them there rather than fixing them here. Since #3254
+  `now_liveness` prints its own derived remedy (the issues to promote and both edits each
+  one needs), so (e9) is execution, not diagnosis.
+- **The bare invocation is lane-blind on purpose** (it is the corpus-wide contract check).
+  When (e9) acts on the queue, re-run it as `--lane <sonnet|opus|fable>` for the session's
+  own model — the count otherwise includes stories the running model cannot start (#3254).
 
 ### (e8) Closure-comment gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4)/(e5)/(e7) (#1870)
 
@@ -406,16 +411,45 @@ it, while `Now` sat at zero actionable work (all 3 open `Now` stories carried
 upkeep the wrap can't skip.
 
 - **Refill `Now`.** (e7)'s `now_liveness` finding is the trigger: if `Now` holds fewer than
-  3 actionable (non-`gate:owner`, non-`blocked:*`) stories, promote the top-scored
-  actionable `Next` stories until it does:
+  3 actionable (non-`gate:owner`, non-`blocked:*`) **stories**, promote until it does.
+  **You do not have to work out which ones — the finding prints its own remedy (#3254), and
+  the full plan with the exact commands is one call:**
   ```bash
-  python3 scripts/backlog_next.py --milestone Next
-  gh issue edit <N> --milestone Now
+  python3 scripts/backlog_next.py --refill-now --lane <sonnet|opus|fable>   # THE plan, scoped to YOUR model
+  python3 scripts/backlog_next.py --milestone Next                          # the donor pool in full, if you want to look
   ```
   Promote **by the printed rank** — the stored ADR-099 score line is the selector, never a
-  fresh re-scoring (that habit is the headline finding #1863 fixed). If nothing on `Next`
-  is actionable either, say so; an empty queue reported is honest, an empty queue unsaid
-  is the failure.
+  fresh re-scoring (that habit is the headline finding #1863 fixed). Four things the plan
+  encodes that the old prose version of this step got wrong or left out:
+  - **A promotion is TWO edits.** `gh issue edit <N> --milestone Now` moves the milestone;
+    ADR-099 ¶5 also requires the body's **score line** `→ <milestone>` arrow to be
+    retargeted to `→ Now`. The milestone edit alone just swaps a blocking `now_liveness`
+    finding for a blocking `score_line_canonical` one and the wrap stays red. The plan
+    prints the rewritten line for every pick.
+  - **Only `type:story` counts.** `now_liveness` selects on stories, so promoting a
+    `type:bug` or `type:chore` moves the queue's depth and not the gate.
+  - **`Next` is not the only donor.** The walk is `Next` → `Later` → **`Roadmap`**, the
+    ADR-099 order. The `Roadmap` step is that ADR's amendment ¶3 promotion path, capped at
+    **one product pick**, flagged as such in the plan — and confirming that no other
+    `Roadmap`→`Now` promotion was taken this experiment cycle is the one step the corpus
+    cannot derive for you, so it is yours.
+  - **Pass `--lane <your model>`.** `now_liveness` counts stories; work is partitioned by
+    `model:*` and a session runs in one lane. Measured 2026-08-27: the whole sanctioned
+    refill supply was 12 startable stories and **all 12 were `model:fable`** while the
+    session was all-Opus — a lane-blind promotion would have turned the gate green and
+    added zero startable work. Lane-scoped, the plan refuses those picks and says so.
+    `check_backlog_hygiene.py --lane <model>` (or `BACKLOG_LANE=<model>`) scopes the gate
+    the same way. The advisory `now_lane_coverage` covers the other half — a `Now` that is
+    at the floor but concentrated in one lane.
+  - **`NO REMEDY IN THE CORPUS`** is a real verdict the plan prints when even the full
+    sanctioned walk cannot reach the floor. It names the levers in order — file work, or
+    unblock a named `gate:owner`/`blocked:*` story, or amend ADR-099 ¶3 to raise the
+    product-pick rate, or hand the wrap to a session in the lane that has the work.
+    **Never lower `bc.NOW_LIVENESS_MIN` to clear it**; the floor moves by ADR, not by wrap.
+  An empty queue reported is honest, an empty queue unsaid is the failure. And note the
+  standing tension, which is a feature: labelling a story `blocked:*` **honestly** is what
+  fires this gate. The gate is right to fire — the queue really is not live — and the fix
+  is the plan above, never a quieter label.
 - **Sweep `Later`.** The stale list is (e7)'s `later_staleness` output:
   ```bash
   python3 scripts/check_backlog_hygiene.py --advisory --rule later_staleness
@@ -589,7 +623,7 @@ The registry (#3007 — one row per former guardrail bullet, no rule dropped):
 | Stash empty + hook fresh, or explained (#1326) | (e5) | `git stash list` + `deploy/session_postflight.py` (Phase 1) | `**Stash/hooks:** clean` / `<found + action>` |
 | Filing-contract violators get fixed, not deferred (#1870, blocking since #1872 — which absorbed and deleted the old #1349 `model:*`-only gate). A printed violator on an issue this session filed, touched or closed may not be left unfixed; a live-fetch failure still fails open (exit 0), noted in the handover | (e7) | `scripts/check_backlog_hygiene.py` bare (Phase 1) | (fail-open noted in handover) |
 | Outcome verdict on every closure, never silence (#1870) — the ADR-099 closure comment (`**Shipped:** …` + `**Outcome:** <realized\|partial\|not-realized> — …`) on each issue closed, `not planned` closes included; a fabricated `realized` is worse than a blank comment (ADR-104) | (e8) | line asserted by `check_handover_lines.py` | `**Closures:** <#N commented or "none — …">` |
-| The queue is refilled or its depth is reported, never silence (#1870) — `Now` below 3 actionable gets promotions from `Next` by stored rank; every `Later` issue untouched >60d gets an explicit promote-or-close call | (e9) | `scripts/backlog_next.py`; line asserted by `check_handover_lines.py` | `**Backlog:** …` |
+| The queue is refilled or its depth is reported, never silence (#1870) — `Now` below 3 actionable gets promotions by stored rank from the derived `Next → Later → Roadmap` plan (#3254), scoped to the session's `--lane`; every `Later` issue untouched >60d gets an explicit promote-or-close call | (e9) | `scripts/backlog_next.py --refill-now --lane <model>`; line asserted by `check_handover_lines.py` | `**Backlog:** …` |
 | A red alarm >72h cites something, or the wrap names it (#1959); since #2912 a FIRED-AND-CLEARED flap in the 72h window is answered the same way — never waved through because the board "looks green now" | (e10) | `scripts/check_alarm_citations.py` exit 0, clean or `--decoded` (Phase 1); `docs/alarm_citations.json` | `**Alarms:** …` |
 | A `::warning::` on green main gets triaged, or the wrap names it (#1966) — an issue or an explicit named decision, never left both unfixed and unacknowledged | (e11) | `scripts/check_ci_warnings.py` exit 0, clean or `--decoded` (Phase 1) | `**CI warnings:** …` |
 | Standing machinery gets a `docs/PROPORTIONALITY.md` row, or the wrap says why not (#2380, enforced by #2761) — a line claiming a row the ledger never saw fails loudly | (e12) | `scripts/check_proportionality_ledger.py` (Phase 3) | `**Ledger:** …` |

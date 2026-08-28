@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import ast
 import datetime as _dt
+import re as _re
 from pathlib import Path
 from typing import NamedTuple
 
@@ -119,6 +120,33 @@ class CeilingFamily(NamedTuple):
             allowed |= {int(v) for v in (self.window_base, self.window_surge) if v is not None}
         return allowed
 
+    def retired_figures(self, today: _dt.date | None = None) -> set[int]:
+        """The dated window's pair, once that window has EXPIRED.
+
+        Empty while the window runs (those figures ARE the truth then) and empty when
+        no window is declared. This is the half `figures()` structurally cannot express:
+        `figures()` answers "may prose say this today?" by returning the ALLOWED set,
+        and an expired window figure is merely *absent* from it.
+
+        Absent is not the same as forbidden, and the gap is not theoretical. The
+        allowed-set check only ever inspects a figure that `BUDGET_NEAR` matched, and
+        that regex requires a ceiling word within 20 characters — so an expired window
+        figure phrased any other way is invisible to the check rather than caught by
+        it. Measured on 2026-08-27, five days before the August window closed: **14
+        unframed occurrences of the $200/$235 pair across the scanned surfaces, of
+        which the allowed-set check saw 2.** The other 12 would have stated a retired
+        ceiling as current truth indefinitely, with CI green the whole time.
+
+        These specific numbers get a proximity-free scan instead. That is safe here
+        and nowhere else: they are a closed set of retired literals, so there is no
+        population of legitimate unrelated matches to protect. Historical framing and
+        the `drift-ok` marker still exempt, so a doc discussing the window as history
+        stays legal — which is the only thing prose should be saying about it.
+        """
+        if not self.window or self.window_active(today):
+            return set()
+        return {int(v) for v in (self.window_base, self.window_surge) if v is not None}
+
     def all_figures(self) -> set[int]:
         """Every figure in the family, window or not — what a HAND-TYPED COPY guard
         cares about. `figures()` asks "may prose say this today?"; this asks "is this
@@ -181,6 +209,29 @@ def governor_ceilings(today: _dt.date | None = None, src: Path | None = None) ->
     if fam.source is not None and not fam.source.exists():
         return set(), "cost_governor_lambda.py not found"
     return fam.figures(today), fam.provenance(today)
+
+
+def retired_regex(figures: set[int]):
+    """`$200|$235` as a compiled pattern with the figure in group 1, or None if empty.
+
+    Built here rather than at the call site so that injecting a simulated date and
+    injecting a figure set go through the SAME construction the live gate uses — a
+    test that hand-rolls its own pattern proves that pattern, not the shipped one.
+    """
+    if not figures:
+        return None
+    return _re.compile(r"\$(" + "|".join(str(f) for f in sorted(figures)) + r")\b(?!\.\d)")
+
+
+def retired_window_figures(today: _dt.date | None = None, src: Path | None = None) -> set[int]:
+    """Window figures that have EXPIRED and may no longer stand as a current claim.
+
+    Companion to `governor_ceilings`; see `CeilingFamily.retired_figures` for why an
+    expired figure needs forbidding rather than merely un-allowing. `today` is
+    injectable for the same reason it is there — a dated gate that can only be
+    exercised on the date it fires is a gate nobody has proven.
+    """
+    return read_family(src).retired_figures(today)
 
 
 def base_ceiling_usd(src: Path | None = None) -> float:

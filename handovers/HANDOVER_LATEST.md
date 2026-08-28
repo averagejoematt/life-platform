@@ -1,234 +1,215 @@
-# Handover — 2026-08-27 (Opus 5, autonomous 9h overnight): Session F — eleven closed, net −11, and five green instruments that were not measuring anything
+# Handover — 2026-08-27 (Opus 5): Session H — six merged, net +9 open, and a session where the plan's own premises were wrong more often than they were right
 
-**Session:** Opus 5. Drove: *"Boot Session F of the self-sustaining push — a 9-HOUR OVERNIGHT RUN,
-9pm–6am PT, owner ASLEEP and unavailable the whole time"*
-(`~/.claude/plans/purring-doodling-boot.md`, the OVERNIGHT boot prompt). AUTONOMOUS with
-merge+deploy authority. ALL-OPUS — driver and all eight implementation lanes. Fable untouched, so
-#3042 and #2849 were out of scope by definition. **Nobody was awake to ask; no lane was blocked on
-the owner and nothing idled waiting for one.** Previous handover archived as
-`HANDOVER_2026-08-26_session-e-drain.md` on `session-archive`.
+**Session:** Opus 5, AUTONOMOUS with merge+deploy authority, ALL-OPUS. Drove
+`~/.claude/plans/dreamy-painting-glacier.md` (Part B). Part A's four owner decisions were
+**not** supplied, so #2801/#2833/#3083/#2834 were parked, not worked — as the brief directed.
+A second session held `skills-corpus-governable-phase1` in the primary clone throughout; **all
+driver git work ran from a detached worktree at `origin/main`** and PR #3245 was never touched.
 
-## The score — the metric the plan was written to fix
+## The score — and why the headline number is positive on purpose
 
-- **11 issues CLOSED with verdicts**: #2961, #3217, #3221, #3219, #3220, #3085, #3222, #3224,
-  #2817, #3065, #3213.
-- **12 PRs merged**: #3225, #3226, #3228, #3230, #3227, #3234, #3233, #3232, #3235, #3236, #3229
-  (plus #3231, merged then corrected by #3235).
-- **ZERO standalone issues filed.** Six findings folded onto existing epics as checkboxes per
-  CONVENTIONS §10 — #2799 ×1, #2578 ×3, #2798 ×2.
-- **Open count 58 → 47. Net −11.** Sessions D and E both closed 5 and both *grew* the backlog
-  (+1, +2). The three owner-ratified rules held: filings default to `Later` (and in the event, to
-  an epic checkbox); §10 class-first before filing standalone; batch S-effort disjoint-file fixes.
-  **The batch rule alone closed three issues in one CI cycle** (#3228 → #3221 + #3219 + #3220).
-- **Three deploys, each verified by content rather than by sha**: the fleet at `8c8be22e`
-  (CI took the "Fleet deploy (shared module changed)" path itself — the manual `deploy_fleet.sh`
-  would have been Session E's redundant-concurrent-deploy mistake); `site-api` at `cf899970`; and
-  `life-platform-freshness-checker` at `452929f1`. For the fleet I unzipped the deployed bundle
-  and grepped the shipped module — `ai/regen_keep_predicate.py` present at 10,477 bytes with the
-  `KEEP_FIGURE_REMOVED`/`DROP_*` arms, and `grounded_generation.py:102` importing it. Module
-  present, module correct, caller wired.
+- **Open 42 → 51. Net +9.** This is the **correct** outcome and the plan said so in advance:
+  the non-Fable queue was functionally exhausted, and the sanctioned refill adds before it
+  subtracts. **Twelve** issues filed, none suppressed to protect a metric.
+- **6 PRs merged**: #3248, #3249, #3253, #3256, #3259, #3263.
+- **3 issues closed with verdicts**: **#2999** (gates slice 2 — census proven **25/561 → 40/561**,
+  4.5% → 7.1%, `BASELINE_TOTAL_GATES` unchanged, no baseline raised), **#3254**, **#3237**. That is
+  the low end of the honest 3–5 target and I am not dressing it up. **#2848 was deliberately NOT
+  closed** despite its PR merging: its own cold read says the Outcome is not met, so it got a
+  box-by-box verdict instead. A merge is not a closure.
+- **1 fleet deploy** (`5e392255`), **verified by CONTENT** — the live `daily-brief` bundle was
+  downloaded and grepped: `ai/budget_guard.py:226` carries the corrected ~$0.24/run measurement and
+  `coach/coach_sim_scoreboard.py:77` the reframed ceiling. **2 deploy leases REJECTED** (`69e0b933`,
+  `157c81b3`) — both superseded; the second would have shipped a `platform_counts.py` literal that a
+  later reconcile had already moved again. Neither was left waiting.
 
-## The through-line: instruments that report success without doing their job
+## The through-line: the platform's *descriptions* of itself drift faster than its code
 
-Not a theme I went looking for. It surfaced five times independently.
+Session F found instruments that report success without doing their job. H found the layer
+above: **written claims about the system — issue titles, code comments, citation notes,
+calendar entries, and the session plan itself — that measurement contradicts.** Nine times.
 
-1. **The gate census counted ten libraries as gates** (#3220). Not one — ten, measured by
-   `git archive`-ing both trees and diffing the id sets: 560 → **551**. `coach_quality_gate.py`,
-   `experiment_gates.py`, `item_size_guard.py`, `quality_gate_contract.py` and six more entered a
-   ratcheted inventory purely on a filename substring. **That is #2578's own denominator**, wrong
-   by ten the whole time. The lane deliberately did NOT hand-re-admit them — re-admission is a
-   one-line `# gate-entrypoint:` marker in the file being claimed, because a hand-list is the thing
-   the census exists to replace.
-2. **The engine-doc gate compares dates, not content** (folded → #2578). An end-to-end re-verify
-   found **18 of `COACH_STANCE.md`'s 27 `file:line` citations wrong** — eight of them a uniform +1
-   from a single import #2811 added. Worse: the 2026-08-25 stamp explicitly *recorded* that it had
-   re-checked an anchor and that it "still lands on its banner." It does not; that line is blank.
-   A `Verified` date is a human claim wearing the costume of a machine check.
-3. **`TruncatedResponses` has never fired for the function it guards** (posted on #3083). The same
-   function publishes `AnthropicOutputTokens` under the correct dimension, so the emit path works.
-   #3083's acceptance box 3 cannot be checked on present evidence.
-4. **The auto-reconcile job reported `success` while leaving the tree drifted** — twice, redding
-   main both times. Root cause below; it is the session's best single find.
-5. **My own negative control passed vacuously.** Proving the PyYAML theory, I first blocked the
-   import with a `sys.meta_path` finder using `find_module` — **removed in Python 3.12** — so
-   `import yaml` succeeded and the test returned 552 as though nothing were wrong. The real proof
-   is `sys.modules["yaml"] = None`. I made the same error twice: a CloudWatch query against a
-   log group that does not exist returned zero events, and I briefly read that as a measurement.
+1. **Lane 1's premise was inverted.** The plan said `check_doc_facts` would **red on eight
+   docs** on 09-01. It reds on **two**. The other six are *structurally invisible* —
+   `BUDGET_NEAR` needs a ceiling word within 20 characters, and those lines phrase `$200`
+   further away. Measured by standing the real scanners at 2026-09-02: **14 unframed
+   occurrences, 2 caught.** The risk was **silence, not noise** — the more dangerous of the
+   two, and undiscoverable by reading the diff the plan asked me to read.
+2. **Lane 2 found BOTH sides of a contradiction wrong, in opposite directions.** #2801's
+   "$6.78/day" is a **7-day sum** (`cost_governor_lambda.py:1001` divides `ai_daily`; `:1012`
+   does not divide the class split). Real: **~$1.04/day**. And `budget_guard`'s "pennies per
+   run" described the **nightly qa_smoke Lambda** (1.4¢) while labelling the **CI** copy
+   (~24¢, ~13x). The prose gate is **4x the vision gate** — the opposite of the
+   images-are-expensive intuition.
+3. **#2883's title is stale.** It asks for an alarm that already exists —
+   `cost-metric-drift-sustained`, AST-pinned to `DRIFT_RATIO_BAR`. It is **lit right now,
+   21/21 datapoints**, exactly as its CDK comment predicted.
+4. **The "it's closing" claim about that ratio does not survive arithmetic.** OLS on n=8:
+   slope **-0.0056/day, 95% CI [-0.0152, +0.0040]** — **the interval includes non-decreasing.**
+   The circulating figure (~0.02/day) is 3.6x the point estimate and outside the CI entirely.
+5. **`fullreview-delta` names a procedure that does not exist.** `.claude/commands/fullreview.md`
+   implements only full-unseeded and seeded modes. A calendar entry counting down to a hard
+   date for an undefined ritual. I therefore **did not stamp the calendar** (see below).
+6. **The sanctioned refill cannot refill this queue.** All **12** startable Roadmap/Next
+   candidates are `model:fable`; this session was all-Opus. A fully-implemented Roadmap
+   promotion would make `now_liveness` numerically green while adding **zero** startable work.
+   Lane 3 independently re-derived 12/12 and built the lane filter that refuses it.
+7. **The site auto-rollback reported `success` on a defect it cannot reach.** The gating QA
+   caught a real `/method/board/` contradiction; the rollback reverts `site/`, the content is
+   a stored artifact in DynamoDB. **Verified still live in production.**
+8. **A citation chain cited two closed issues,** and its note asserted finding `539c6d` was
+   *"fixed … no recurrence since."* The identical fingerprint is in the log **inside the last
+   72h**. A human-memory negative, trusted for four days.
+9. **The reader-truth judge emits findings its own note retracts.** Live: `[temporal_contradiction/low]`
+   ending *"No flag warranted on reconsideration."* The pipeline counted it and lit
+   `qa-smoke-warnings` anyway.
 
-## #3234 — the root cause behind two red trunks, found by refusing my own first answer
+And the plan's one **false positive**, caught before filing: `broadcast_sensitivity` "silently
+defaults to cutoff 3" is **deliberate, documented in-file at `:275-278`**, and the tier-3 hold
+is the intended fail-closed posture. Rejected publicly on #2799 so nobody re-files it.
 
-I posted to #2578 that the reconcile job had a **whitelist gap**. That was wrong; the whitelist
-already covers `docs/*.md`. The real chain:
+## Lane 1 — the 09-01 rollover, proved at a simulated date
 
-`run_generators` → `sync_doc_metadata --apply` → `discover_gate_census_count()` →
-`gate_census.discover_ci_gates()` → **`import yaml`** — and `ci-cd.yml`'s reconcile job uses the
-shared `setup-ci` composite, which installs **no packages**.
+The fix is a **derivation, not a sweep**: `budget_ceilings.retired_figures()` returns the dated
+window's pair **once that window has expired** — empty while it runs, so it is a **dead-man for
+the rollover**. `check_doc_facts` matches that closed set of dead literals with **no proximity
+requirement** (safe only there: retired numbers have no legitimate match population to shield).
+`check_doc_facts.py` stayed under its 1200-line ceiling at **1197** — the derivation went to the
+module that already owns the window. **No baseline raised.**
 
-**#3156 fixed exactly this in `docs-ci.yml`. `ci-cd.yml`'s reconcile job has the identical need and
-was missed.** Post-#3156 it fails *honestly* — an underivable census outside `--check` is skipped
-with a printed reason rather than compared against a frozen fallback — which is precisely why
-nobody noticed. Proved with a control: without yaml `(None, ModuleNotFoundError)`, with it
-`(552, None)`. **Proven live within the hour of merging**: reconcile commit `1d5513b9c` moved the
-census fact 552 → 554 unaided, the first time all night it cleared drift without me.
-
-I posted the correction publicly on #2578 rather than editing the original, so the wrong diagnosis
-and how it was caught both stay visible.
-
-## A gate caught a live reader-facing bug nobody was looking for
-
-CI/CD run `33040437876` concluded `failure` with deploy, smoke and post-deploy integration checks
-all green. The sole failure was the gating visual-QA job, on one reproduced high:
-
-> 🔴 `/method/pipeline/`: Apple Health shows **'LAST UPDATE 2026-08-27'** but today is **2026-08-26**.
-
-**Not a flake, and the harness proved that itself** — the same run's other new high failed to
-reproduce on the immediate second judge pass and was correctly ungated by #3102's confirm step.
-Ground-truthed against production: `/api/source_freshness` served `last_update: "2026-08-27"` at
-22:38 **Pacific on the 26th**. A UTC-keyed date on a Pacific-framed page, so readers saw a future
-date for seven hours a day. Fixed in #3232 — which **ruled the frame before touching the display**
-and established that the UTC `DATE#` key is deliberate and correct (TD-19 Phase 2), so the defect
-was presentation, not storage. It explicitly refused to clamp, and pinned a test that clamping is
-the wrong fix.
-
-## Three lanes falsified the premise of the issue they were sent to fix
-
-That is a better signal than the closure count: the backlog's *descriptions* are drifting from the
-code faster than the code is drifting from correct.
-
-- **#3217** — `regen_once` is not in `ai_calls.py` (it is in `grounded_generation.py`), and there
-  is **no "composite quality score"**: the veto was `len(fixed) < len(findings)`, one
-  undifferentiated count across a dozen heterogeneous classes, so a `fabricated_number` removal was
-  outvoted by unrelated ones. Also: CodeQL flagged the arm literal `DISCARD_NOT_BETTER` as
-  clear-text logging of sensitive data — the substring **`card`** trips its payment-card heuristic.
-  Renamed to `DROP_*` rather than suppressed.
-- **#2817** — boxes 1 and 2 were **already closed by #3196 on 08-25**; 57 claimed sites measured
-  60 and all 60 were already swept. The lane refused to re-claim them and found instead **one real
-  defect both matchers are structurally blind to** (below).
-- **#3224** — the growth is **79.7% existing tests getting slower**, not new tests, falsifying both
-  the issue's framing and my own alternative hypothesis. Root cause isolated by `cProfile`:
-  #3126/#3156 put `gate_census.build_census()` on the doc-sync path, so the full suite performs
-  **19 complete census builds, mean 8.07s — 15.8% of wall clock**. Closed **without raising the
-  budget** — the first non-raise in the class's five-instance history — with
-  `HARD_CEILING_SECONDS = 2100` read from the workflow's own `timeout-minutes` so it cannot drift.
+Proof was a simulated date, not a diff read: **12 → 0** post-revert offenders. Negative control:
+reverting one doc fix reds the test naming `docs/RUNBOOK.md:1626: $200` and `$235`; restoring
+greens it. The prose was reframed with **"raised to"** rather than past tense — "was $200" would
+be **false today**, while the window is still in force.
 
 ## Incidents & gotchas
 
-- **A production deploy lease sat STRANDED 7.5h** (#1901 class) and **approving it would have
-  rolled back two fixes deployed live the same session**. Found by the wrap's own (e2) gate.
-- **The freshness checker sent a real inflated alert.** `Alert sent for 5 stale source(s)` at
-  05:47Z (22:47 PT) with every age +7h. `freshness_checker_lambda.py:612` anchored a **Pacific**
-  `DATE#` day at **UTC midnight**. Structurally unreachable by both matchers — `strptime` is the
-  *inverse* of a clock — and **#3196's own sweep introduced it**, having applied the correct fix
-  200 lines away in the same package.
-- **#3222 was falsely auto-closed.** Root cause was **not** a mistyped PR number (my first
-  diagnosis, corrected publicly): two lanes both wrote their PR body to the shared
-  `<scratchpad>/pr_body.md`, clobbering each other in **both** directions. Fix is a lane-unique
-  filename; every lane launched after that point was instructed accordingly.
-- **#3231 shipped half-broken with all 12 of its tests green.** Its autouse fixture cleared the
-  *shared* cache mid-suite; the only symptom was one line in a durations block. I merged on a
-  correct green verdict ~10 min before the author's report arrived carrying the correction (#3235).
-- **The census baseline is a serialization point.** Four lanes rebased on one integer; one hit a
-  genuine merge conflict GitHub was still advertising as `MERGEABLE`. Two measurement traps were
-  found and recorded in-file: an unresolved merge makes git list a path once *per stage*, inflating
-  the count by +4; and **a comment can mint a gate** — spelling a tree-sweep idiom out in prose
-  reclassified a file and moved the census by one.
-- **Zero event swallows** — against five in Session E. Every push was swallow-checked at ~90s.
-- **My own elapsed-time errors, and the agents'.** Two lanes independently reported the suite as
-  "~90 minutes in" when it was 18; I checked the clock directly rather than taking either.
+- **`gh run list --commit <short-sha>` returns `[]` falsely.** It looks exactly like a swallowed
+  push. The reliable query is the API at the **full 40-char** sha — `dd7dccd62` showed 0 runs by
+  the first method and **2** by the second. I nearly opened a swallow investigation on it.
+- **Piped exit codes lied twice.** `check_backlog_hygiene.py | tail` reported `0` while the gate
+  exited **1**. Every verdict since was taken unpiped.
+- **My own three filings broke the hygiene gate** — 1 violation → 5 (missing epic links, 6
+  checkboxes where the contract is 3–5, an Outcome with no sanctioned audience). The gate caught
+  all four and I fixed them. Worth stating: the filer is not exempt from the filing contract.
+- **Labelling an issue honestly fired a blocking gate.** Adding `blocked:date` to #2978 (correct
+  — it is date-blocked to ~09-24) immediately violated `now_liveness`. **The hygiene system
+  punishes accurate blockage-reporting**; that tension is now #3254's, and fixed by #3256.
+- **`now_liveness` counts `type:story` only.** A P2 reader-facing bug on `Now` does not make the
+  queue "live." Two of my `Now` filings could not satisfy it by construction.
+- **A CloudWatch namespace guess returned `n=0`** and looked exactly like a measurement of zero.
+  The real namespace was `LifePlatform/Budget`, with 15 datapoints. Positive controls were
+  required of every agent for exactly this reason, and the verifier used them throughout.
+
+## Verified findings now filed (all adversarially re-confirmed, with positive controls)
+
+- **#3260 — `slo-ai-coaching-success` is dimensionless and cannot fire.** Alarm reads a series
+  nobody writes; all 7 emitters attach `LambdaFunction`. **180d: 0 datapoints at the alarm vs
+  329 real failures on `daily-brief` alone — 191 across five Lambdas on 2026-05-26 in one day**,
+  against a `Sum >= 3` threshold. Last state change **2026-03-08**. `docs/SLOs.md:77` and
+  `docs/MONITORING.md:174` both describe behaviour it does not have.
+- **#3261 — two live OG share cards publish fabricated numbers.** `og-builders.png` renders
+  **116 MCP TOOLS / 59 LAMBDAS / $13 MONTHLY COST** against truth **76 / 104 / $146 MTD** (the
+  `$13` is off **7.6x**), and `og_image_lambda.py:278` **discards the correct values it already
+  loaded**. Sibling `og-labs.png` says 74 biomarkers / 7 draws against **152 / 8**.
+- **#3262 — both Claude hooks are dark inside a worktree**, this repo's standard concurrency
+  mode. `guard_bash.py` tests `--git-common-dir`, which ends in `/.git` from *every* worktree,
+  so the deploy-from-a-worktree detector is unreachable in all cases; `_hooklib`'s state dir is
+  unconstructible where `.git` is a file, and `_load`/`_save` swallow the `NotADirectoryError`.
+  Neither is tested because `CLAUDE_HOOK_INERT=1` short-circuits both.
+- **#3257** `/api/source_freshness` ages a **Pacific** `DATE#` key at **UTC midnight** — a record
+  stamped today reads **21.7h old**, verified live. The ops-side sibling was fixed to Pacific two
+  days ago (`452929f17`), so two consumers of the same key now disagree by 7h and the
+  reader-facing one is wrong.
+- **#3252** a paused-regeneration board narrative behind a fresh envelope · **#3258** the
+  self-retracting judge · **#3250** nine review rituals, three greener-than-real registry entries
+  · **#3255** `test_secret_references` cannot fail on its own default · **#3254** the refill gap.
 
 ## Gate lines
 
-**Build beat:** 2026-08-27-the-green-instruments
-**Docs:** `docs/INCIDENT_LOG.md` (+5 rows, header + derived Patterns block regenerated) ·
-`docs/alarm_citations.json` (budget-tier-escalation flap cited to #2801) · `docs/CONVENTIONS.md`
-(agent_commit deletion/rename reflex, via #3228) · `docs/engines/COACH_STANCE.md` (18 of 27
-citations corrected by AST, via #3230) · `docs/PROPORTIONALITY.md` + `lambdas/web/platform_counts.py`
-reconciled on main · `deploy/sync_doc_metadata.py --apply`
-**Decisions:** none filed — the one governance-shaped call (design (a) for the `auto-filed` carve-out)
-is recorded at its point of enforcement in `scripts/check_backlog_hygiene.py` with (b) and its
-rejection reasons, per #3065's own acceptance box 1; it constrains one linter, not the architecture
-**Main:** green (`c78730ae`) — after rejecting the 7.5h stranded lease that was queuing every later
-run behind it at 0 jobs; the earlier `28233fe7` reconcile red was a push race against my own
-concurrent merges and self-healed at `1d5513b9c`, exactly as that job's error text predicts
-**Incidents:** 5 rows added — the 7.5h stranded lease with its rollback near-miss · main red twice
-on the census literal while the reconcile job reported success (#3234) · #3222's false auto-close
-from a shared scratchpad path · #3231's half-broken shed with 12 green tests · the live inflated
-stale-source alert from the UTC-midnight anchor
-**Stash/hooks:** clean
-**Closures:** #2961, #3217, #3221, #3219, #3220, #3085, #3222, #3224, #2817, #3065, #3213 — all 11
-commented with contract-shape Shipped/Outcome verdicts; **#2817 recorded `partial`** because its
-first two boxes were already closed by #3196 and the lane refused to re-claim them
-**Backlog:** `Now` refilled to 4 actionable — promoted **#2835** (1.00) and **#3079** (0.90) from
-`Later` by stored rank, score lines corrected to `→ Now` in the same edit. `Next` holds only #2849
-(Fable, banked by standing owner call), so refill from `Next` was impossible without overriding it —
-same constraint Session E hit. Later sweep: no stale issues
-**Alarms:** 4 lit, all cited; 1 fired-and-cleared flap now cited —
-`life-platform-budget-tier-escalation` entered and cleared ALARM **twice** in the 72h window as the
-projection oscillated across the ~87% band, cited to epic #2801 with the ADR-125 consequence named
-**CI warnings:** none — `check_ci_warnings` reports nothing to triage (it reads the latest *green*
-completed run; the queue was still draining behind the stranded lease at wrap time)
-**Ledger:** omitted — the one new standing subsystem (#3213's cron-freshness watcher) landed with
-its rent already priced *inside* the work: a derived-not-declared cadence registry, an explicit
-watched/unwatched ruling for all 11 scheduled workflows with RE-RULE IF conditions, and a
-`+2` gate-census entry adjudicated in-file. A `docs/PROPORTIONALITY.md` row would restate that
-verbatim; deferring it deliberately to the #2578 sweep that will re-price the census rows anyway
+**Build beat:** none — no merged+deployed reader-facing change this session. The fleet deploy
+carried comment/metadata only; every reader-facing finding was **filed, not fixed**.
+**Docs:** `docs/OPERATING_DISCIPLINE.md` (new) · `docs/ONBOARDING.md` cold-start section ·
+`docs/CONTINUITY.md` §4 · `docs/CONVENTIONS.md` · `docs/DECISIONS.md` (ADR-125 dated correction,
+annotated not rewritten) · `docs/alarm_citations.json` re-pointed · `docs/COST_TRACKER.md`,
+`OPERATOR_GUIDE.md`, `RUNBOOK.md`, `design/COACH_HUMANITY_ROADMAP.md`, `CLAUDE.md` reframed
+**Decisions:** the AI-CI-cadence decision is now **filed as #3251 (`gate:owner`)** rather than
+living in a comment — the specific defect Part A named
+**Main:** green (`3eff37e6` vouches; HEAD `90b278f1` is a reconcile bot push that mints no CI/CD
+run — `bot-push-no-dispatch`, expected, not a swallow). Six merges, each swallow-checked at the
+**full 40-char** sha; both rejected leases report as rejected-and-superseded, not red. Doc-sync
+drift on main: clean (`sync_doc_metadata --check` exit 0 after reconcile `90b278f1e`)
+**Deploy:** fleet at `5e392255` — comments/metadata only, no behaviour change, deployed == main
+**Calendar:** **NOT stamped.** `fullreview-delta` is due 08-29 (hard 09-01) and I did not run it,
+because the ritual it names **does not exist** in the skill. Stamping would have been exactly the
+manufactured freshness this session spent nine findings documenting. A bounded two-lens sweep ran
+instead and produced the refill; it is **not** a delta and must not be recorded as one.
+**Incidents:** 3 row(s) worth recording — (1) the site auto-rollback reported `success` on a
+`/method/board/` defect it structurally cannot reach (it reverts `site/`; the content is a stored
+DynamoDB artifact), a fresh instance of the rollback-scope class, filed #3252; (2) an alarm citation
+chain pointed at **two closed issues** while asserting a finding had "no recurrence since" — the
+same fingerprint was in the log inside 72h, fixed in #3259 and filed as #3258; (3) `gh run list
+--commit <short-sha>` returned `[]` on a live sha, which is indistinguishable from a swallowed push
+— the reliable query is the Actions API at the full 40-char sha
+**Closures:** #2999, #3254, #3237 — all commented with contract-shape verdicts. **#2848 deliberately
+NOT closed** despite PR #3253 merging: its own cold read shows the Outcome unmet (2 of 4 boxes), so
+it carries a box-by-box verdict and the five-item gap list instead. A merge is not a closure
+**Alarms:** 5 lit, all cited, gate exit 0 after re-pointing `qa-smoke-warnings` at #3258.
+`cost-metric-drift-sustained` is lit **21/21** — exactly as its own CDK comment predicted, and the
+direct evidence behind the #2883 re-decision
+**CI warnings:** 1 — the unit suite at **2244s/1950s**, the class's **seventh** instance
+(157→294→688→830→1507→1994→2244). Both prior owners (#3106, #3224) are closed, so it had none.
+Filed **#3265** with #3224's instruction carried forward: *attribute before touching the number* —
+the dominant term was duplicated whole-repo scans, not test count. Not raised, not normalised
+**Backlog:** `Now` refilled to 3 stories via Lane 3's own new planner — promoted **#3250**
+(both edits: milestone AND score-line arrow) and filed **#3264**. The planner **refused** to clear
+the count with `model:fable` work and printed `NO REMEDY IN THE CORPUS`; the new `now_lane_coverage`
+advisory now reports the truth on every run: **sonnet 0 · opus 3 · fable 0**
+**Ledger:** omitted — no new standing subsystem; #3256's planner priced its own rent in-file
+(which charter primitives it carries and which it omits, with reasons)
+**Stash/hooks:** clean — one WIP stash from my own branch-hop was dropped after confirming its
+content had merged as #3259
 
-## Owner batch (16 items — 13 carried + 3 new)
+## Owner batch
 
-1. RECONCILE_PUSH_TOKEN PAT (D0.6) — **now measurably load-bearing:** the reconcile job lost a push
-   race twice tonight · 2. DEPLOY_GATE_JANITOR_TOKEN (#3021) — **also load-bearing:** a lease sat
-   stranded 7.5h and only the wrap gate found it · 3. respiratory_rate/disturbance_count consent
-   (#3045) · 4. Notion secret deletion (#2890) · 5. ~~#2961 cdk-import approval~~ **DONE — used, and
-   it paid off by falsifying the operation's premise** · 6. #2834 IAM posture · 7. **#3083 — the
-   measurement is posted (0 of 42, ≤7.1% ceiling); the fail-open-vs-hold posture call is yours** ·
-   8. DIL-027 restore-drill appointment · 9. S3 Batch Replication backfill click (~$0.49) ·
-   10. **#3042 re-grade** · 11. Whoop re-auth if pending · 12. #2883 box-4 call · 13. **NEW —
-   `aws cloudwatch delete-alarms --region us-east-1 --alarm-names life-platform-cf-auth-errors`**
-   (the #2961 disposition; joins #2962's existing leg) · 14. **NEW — the freshness-checker's alert
-   state write is failing:** `AccessDeniedException` on `dynamodb:PutItem` for the notion leg,
-   caught and logged non-fatally, so episode/dedup tracking for that path is silently broken ·
-   15. **NEW — `deploy-wedge-watch.yml` declares `*/15` and GitHub delivers 40–120 min** (4.3h gap
-   on 08-26); #3213's watcher makes declared-vs-delivered visible for the first time — decide
-   whether the declared cadence should be made honest · 16. **The September 1 cliff** — the ceiling
-   auto-reverts $200 → $150 in five days.
+1. **The ceiling call (#2801) — 4 days left, and the arithmetic changed today.** On 09-01 the
+   base reverts $200 → $150; tier-3 band **$146.00**; projected **$175.18**. Lane 2's measurement
+   **cuts the CI lever from ~$203/mo to ~$31–60/mo** — so option 2 is *weaker* than the epic
+   claimed, but at the top of that range it may still clear $146 on its own. Doing nothing selects
+   **tier 3 by default**. Recommendation unchanged: **raise the September base to ~$190–200.**
+2. **#3251** — the AI-CI-cadence decision, now filed. Note two things before deciding: SSM
+   `qa-level=lean` **cannot reach the measured money** (`visual-qa.yml:136` exempts deploy-gating
+   QA by design), and the expensive gate (**`reader_truth_qa`, 81%**) is *not* the one that
+   caught the live bug (`visual_ai_qa`, 19%).
+3. **#3083** fail-open→fail-closed destination · **#2833** shadow re-price · **#2834** IAM posture
+   — all still parked; no decisions were supplied, so none were acted on.
+4. **#2883 is now `gate:owner`.** Its bar is likely unachievable as written; the CI on the trend
+   includes zero. Recommend re-measuring at n=30 before retiring or amending the bar.
+5. Carried: RECONCILE_PUSH_TOKEN PAT · DEPLOY_GATE_JANITOR_TOKEN · respiratory_rate consent
+   (#3045) · Notion secret deletion (#2890) · DIL-027 restore drill · S3 Batch Replication
+   backfill · #3042 re-grade · Whoop re-auth · the `cf-auth-errors` alarm deletion.
 
-## Residuals / next picks
+## Residual / next picks
 
-- **#3204** — the only `Now` bug left. **Its lane reported ~11h in, after this wrap, having been
-  pinged at 2h; no PR, working tree uncommitted.** (An earlier draft of this handover said it never
-  reported — that was true when written and is now wrong.) **The investigation is worth more than
-  the missing PR and is captured on the issue** (comment 5441525624): the wire confirms the owner's
-  Box-1 answer (rows arrive daily, `blood_glucose_*` absent 08-25/26/27); the per-sub-datatype
-  liveness machinery **already exists and is inert** — never emitted as a metric, never alerted on,
-  and the one qa-smoke check reading it rules on whether a *dark* datatype carries a number, never
-  on whether one **is** dark; and **two further reader-facing defects are worse than the endpoint
-  because they never decay** — `site_stats_refresh_lambda.py:193` re-reads its own prior
-  `public_stats.json` (live artifact publishes an **undated `glucose_avg: 107`** from before 08-24
-  beside a correctly-dated `weight_as_of`), and `dashboard_refresh_lambda.py:368` shadows yesterday
-  then writes with no `else`. The front-end is **accidentally** honest via a key mismatch
-  (`cur.avg` vs `avg_mg_dl`), and its empty state is gated on a 30-day `has_cgm` that would not have
-  shown until ~09-23. Note: `qa_smoke_lambda.py` is at **1198/1200**, so the new check must be paid
-  for by extraction, never a baseline raise. Start here.
-- **#2883** (P2, budget self-metric drift) and **#2888** (P2, input-token diet) — the two remaining
-  P2s on `Now`, both untouched tonight.
-- **#2835** and **#3079** — promoted to `Now` this wrap by stored rank; unstarted.
-- **#2578's three new checkboxes** — the ten name-only census rows someone must adjudicate, the
-  engine-doc citation gate, and the reconcile job's *class* fix (it should fail when
-  `sync_doc_metadata --check` is still non-zero after it runs; #3234 fixed the instance only).
-- **#2798's two new checkboxes** — the `/api/source_freshness` frame work is done in #3232, but the
-  epic stays open on the remaining tz children.
-- **#2799's checkbox** — six workflow runs stuck `queued` on deleted branches whose PRs already
-  merged, one since 2026-08-06.
-- **not-work — 10 unguarded UTC-anchor sites outside `lambdas/emails/`** (6 in `lambdas/web/`,
-  which owes #2414's stricter zero). Hand-read by the #2817 lane and believed correct, but that is
-  an audit, not a gate. Owner's call whether it earns an issue.
-- **not-work — `#3202`'s last acceptance box stays unproven.** Budget tier was ≥2 for the whole
-  session, which pauses `coach_narrative`, and the only effective override window (16:00–17:00Z)
-  falls after this session ended. Needs a 17:00Z brief with tier < 2.
-- **not-work — ~80 stale git worktrees** accumulated across sessions; `git worktree list` is
-  unreadable. Housekeeping, no defect.
-- **Dated observations (no action until they mature):** **2026-08-31 (Monday)** — #3178's sentinel
-  cadence proof and #3191's TTL-parity sweep · **~08-29** — `ai-tokens-platform-daily-total` and
-  `prediction-gradable-share-low` cross 72h · **2026-09-01** — the $200 → $150 ceiling revert ·
-  **~09-24** — #2978's 30-day re-measure · **2026-10-15** — WAF revisit · **2026-09-22** — legacy
-  unsubscribe sunset.
+- **#3260** — `slo-ai-coaching-success` is dimensionless and cannot fire; it slept through 191 real
+  failures in a single day. S-effort, verified with live positive controls. Best value on the board.
+- **#3261** — two live OG share cards publish fabricated numbers and regenerate **daily**, so this is
+  a reader-facing honesty violation that republishes itself every 24h. S-effort.
+- **#3257** — `/api/source_freshness` ages a Pacific key at UTC midnight; the public board and the ops
+  checker now disagree by 7h on the same key.
+- **#3250** — decide what `fullreview-delta` IS before running it. If #3245's review consolidation
+  lands first, the next run is a **new baseline**, not a delta, and must be recorded as one.
+- **#3264** — deploy authorization exists nowhere in the repo; #2848's box 4 cannot be checked until
+  this is closed. This session exercised that authority from a boot prompt alone.
+- **#2848** — open with a box-by-box verdict; boxes 2 and 4 unmet, five-item cold-read gap list posted.
+- **#2578** — carries #2999's residual (90 of family 5's 105 structural gates unproven; the other four
+  census families have no generated verdicts at all) plus the garmin alarm fold.
+- **#2801 / #2833 / #2834 / #3083 / #3251** — all `gate:owner`; parked, awaiting decisions — **not-work
+  — blocked on an owner call, not on an implementer.**
+- The **September 1 ceiling cliff** is 4 days out and #2801 is the decision that governs it —
+  **not-work — the call is the owner's; the measurement is done and posted.**
+- `Now` is lane-concentrated **sonnet 0 · opus 3 · fable 0** — a sonnet or fable session finds zero
+  startable stories however the total reads (#3254's new `now_lane_coverage` advisory reports it
+  every run) — **not-work — a supply fact, not a defect to fix.**
+- Five session worktrees remain at `/tmp/h-lane2`, `/tmp/h-lane3`, `/tmp/h-lane4`, `/tmp/h-lane5`,
+  `/tmp/sessionH` — **not-work — housekeeping; reap with `scripts/worktree_reaper.py`.**

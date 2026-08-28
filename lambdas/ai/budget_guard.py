@@ -206,10 +206,36 @@ _FEATURE_CUTOFF = {
     # AUDIENCE, and these two serve the OPERATOR — the person deciding whether the
     # deploy that just landed is safe. That answer is upstream of every reader
     # surface below it, so it cannot be the first thing sacrificed. Their cost
-    # profile agrees: both are per-DEPLOY and bounded (one Haiku batch over <= 8
-    # surfaces; <= 3 images x 6 tier-1 doors at ~$0.001/image — pennies per run),
-    # not per-day and open-ended like their former band-mates, and their value
-    # peaks exactly when shipping, which is when a pause is most likely in force.
+    # profile agrees on the SHAPE — both are per-DEPLOY and bounded, not per-day
+    # and open-ended like their former band-mates, and their value peaks exactly
+    # when shipping, which is when a pause is most likely in force.
+    #
+    # The MAGNITUDE this comment used to assert ("one Haiku batch over <= 8
+    # surfaces; <= 3 images x 6 tier-1 doors at ~$0.001/image — pennies per run")
+    # was wrong, and wrong in a specific way worth keeping written down: it is an
+    # accurate description of the NIGHTLY qa_smoke Lambda copy of reader-truth,
+    # applied by mistake to the CI copy. CI runs --reader-truth over the FULL page
+    # surface (see the comment on ci-cd.yml's sweep step), not over 8 surfaces.
+    # Measured 2026-08-27 via #3240's feature attribution — the first build that
+    # could tell the two copies apart — from LifePlatform/AI::EstimatedCostUSD,
+    # n=5 deploy-time runs, all Haiku, in the `--ai-qa --ai-qa-max-tier 1
+    # --reader-truth` mode that both ci-cd.yml and site-deploy.yml run:
+    #
+    #   reader_truth_qa (CI)      ~20 calls  ~156K in tok   ~$0.194/run
+    #   visual_ai_qa    (CI)        6 calls   40.4K in tok   ~$0.045/run
+    #   ---- the pair                                       ~$0.24/run
+    #   reader-truth (qa_smoke Lambda, for contrast)  2 calls  12.3K  ~$0.014/inv
+    #
+    # So: ~24 cents a run, not pennies; and the PROSE gate is the expensive half
+    # at ~13x the Lambda copy's unit and ~4x the vision gate — the opposite of
+    # where the images-are-expensive intuition pointed. "Bounded" still holds (the
+    # per-run figure is stable to the cent across runs); the DAILY total is
+    # merge-cadence-driven — $0.90-$2.84/day over the only 3 complete UTC days the
+    # CallerClass dimension has existed for (2026-08-24..26, mean $1.63, sd $1.06),
+    # with 08-27 already at $3.10 partial, and $1.04/day averaged over the cost
+    # governor's own trailing-7d window. Two units this table does NOT price: the
+    # Sunday full-surface --ai-qa pass (visual-qa.yml, no tier cap) and the daily
+    # standalone --reader-truth fire.
     # At cutoff 3 they stop precisely when bedrock_client stops everything — "they
     # run whenever Bedrock runs at all" — and the pause is then reported, not
     # inferred: SKIPPED-BY-BUDGET in the run output, the CI job summary + a

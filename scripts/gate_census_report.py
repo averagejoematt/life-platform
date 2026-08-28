@@ -61,6 +61,16 @@ def render_report(census: dict[str, Any]) -> str:
     add(f"  UNPROVEN (can fail, proof not written)   n = {n - len(proven) - len(attempted)}   <- real #2578 work")
     add(f"  UNPROVABLE (nothing to fail, excluded)   n = {len(name_only)}   <- NOT #2578 work, NOT in the total above")
     add("")
+    # #2999 box 1/box 4: the number that matters is a FRACTION with an n, printed every
+    # run, next to the reading it has to beat. A count of proofs with no denominator is
+    # how "7 proven" read as progress for four months.
+    if n:
+        add(
+            f"VERDICT FRACTION             {len(proven)}/{n} proven ({len(proven) / n:.1%}) "
+            f"+ {len(attempted)} attempted-not-proved = {(len(proven) + len(attempted)) / n:.1%} adjudicated"
+        )
+        add("  reference points             7/490 (1.4%) when #2999 was filed 2026-08-22; 25/561 (4.5%) on main 2026-08-27")
+    add("")
 
     # #3220: the name-only report. These matched `_GUARD_NAME` and have no
     # structural way to fail, so they are OUT of the count — named here because a

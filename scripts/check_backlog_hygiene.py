@@ -118,6 +118,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import backlog_contract as bc  # noqa: E402
+import backlog_next as bn  # noqa: E402
 
 REPO = "averagejoematt/life-platform"
 
@@ -154,7 +155,11 @@ TRACKER_MARKER = "<!-- advisory-failure:"
 TRACKER_CLOSE_POLICY = "**Close policy:**"
 
 ACCEPTANCE_MIN, ACCEPTANCE_MAX = 3, 5
-NOW_LIVENESS_MIN = 3  # ≥3 non-blocked stories on `Now`, or the queue is not live
+# The floor moved to backlog_contract (#3254) so the gate that FIRES below it and the
+# planner that computes the promotions clearing it read one number. This is an alias,
+# not a second definition — re-typing `3` here is exactly the copy that lets a remedy
+# be sized against a floor nobody enforces.
+NOW_LIVENESS_MIN = bc.NOW_LIVENESS_MIN
 LATER_STALE_DAYS = 60
 
 VIOLATION = "violation"
@@ -566,21 +571,83 @@ def rule_epic_story_coverage(ctxs: List[Dict[str, Any]]) -> List[Finding]:
     return out
 
 
-def rule_now_liveness(ctxs: List[Dict[str, Any]]) -> List[Finding]:
-    """`Now` holds at least 3 stories a session can actually start.
+def rule_now_lane_coverage(ctxs: List[Dict[str, Any]]) -> List[Finding]:
+    """The composition behind `now_liveness`'s number — ADVISORY, and never silent when
+    a whole model lane has zero startable `Now` work (#3254, measured 2026-08-27).
 
-    The measured failure: all three open `Now` stories carried `gate:owner`, so the
-    documented seed query returned zero actionable work and the queue was dead
-    without anyone being told.
+    `now_liveness` counts stories. Work is partitioned by `model:*` lane and a session
+    runs in exactly one of them, so a `Now` holding three stories all in one lane is a
+    LIVE queue by the count and a DEAD queue for the two sessions that cannot start any
+    of them. Measured that day: `Next` (1 startable) and `Roadmap` (11 startable) were
+    **12 of 12 `model:fable`** while the running session was all-Opus — so the sanctioned
+    refill could have made the blocking gate green while adding zero startable work. That
+    is the repo's recurring class: an instrument reporting success without doing its job.
+
+    ADVISORY, deliberately, and the promotion criterion is stated rather than left to
+    taste (the ADR-108 pattern): making it blocking imposes a ≥1-story-per-lane floor
+    nobody has argued for, and would red the wrap today for a corpus shape that is a
+    scheduling fact, not a defect. Flip it to VIOLATION when a measured 30-day window
+    shows a lane starved while the count read live. Until then it is loud and free.
+
+    It fires ONLY while `now_liveness` is silent — i.e. exactly when the count reads LIVE
+    and is lying. Below the floor the same composition is already in that rule's own
+    message, and one fact reported twice trains a reader to skim both.
     """
-    live = [ctx for ctx in ctxs if ctx["milestone"] == "Now" and "type:story" in ctx["labels"] and not ctx["blocking"]]
-    if len(live) >= NOW_LIVENESS_MIN:
+    startable = [c for c in ctxs if c["milestone"] == "Now" and "type:story" in c["labels"] and not c["blocking"]]
+    if len(startable) < NOW_LIVENESS_MIN:
+        return []
+    lanes = bn.lane_histogram(startable)
+    empty = [lane for lane, count in lanes if count == 0 and lane in bc.MODEL_LANES]
+    if not empty:
+        return []
+    return [
+        Finding(
+            "now_lane_coverage",
+            None,
+            f"`Now` startable work is lane-concentrated ({bn.lane_summary(lanes)}): a "
+            f"{'/'.join(empty)} session finds ZERO startable stories however the total reads. "
+            "`now_liveness` counts stories, not startable-work-for-the-running-model — "
+            "run `scripts/backlog_next.py --refill-now --lane <model>` before trusting the count.",
+            ADVISORY,
+        )
+    ]
+
+
+def rule_now_liveness(ctxs: List[Dict[str, Any]], lane: Optional[str] = None) -> List[Finding]:
+    """`Now` holds at least 3 stories a session can actually start — and, when it does
+    not, this finding CARRIES ITS OWN REMEDY (#3254).
+
+    The measured failure this rule was born for: all three open `Now` stories carried
+    `gate:owner`, so the documented seed query returned zero actionable work and the
+    queue was dead without anyone being told.
+
+    The second failure, measured 2026-08-27 and fixed here: the message said "refill it
+    (#1870's wrap step)", and that step walked `Next` only. `Now` sat at exactly the floor
+    with `Next` holding one startable story and `Later` none — one closure from a BLOCKING
+    gate whose named remedy was already exhausted. ADR-099's amendment ¶3 does declare a
+    `Roadmap` promotion path, but it names no actor and no procedure, so nothing connected
+    the two. The rule now derives the promotion plan from the same corpus it is judging
+    (`backlog_next.plan_now_refill`) and prints it: the issue numbers, the donor milestone,
+    the ¶3 product-pick budget, and the fact that a promotion is two edits. When the corpus
+    genuinely cannot reach the floor it says NO REMEDY IN THE CORPUS and names the levers —
+    a distinct, loud verdict rather than a ritual's name.
+    """
+    # The ctx dicts carry every bn.PLAN_ROW_KEYS field — the agreement that lets the gate
+    # print its own remedy without a second parse. tests/test_now_refill_remedy_3254.py
+    # holds it as a contract test on both builders, so a key renamed on either side reds.
+    plan = bn.plan_now_refill(ctxs, lane=lane)
+    if plan.short <= 0:
         return []
     gated = [ctx for ctx in ctxs if ctx["milestone"] == "Now" and "type:story" in ctx["labels"] and ctx["blocking"]]
-    detail = f"{len(live)} non-blocked story(ies) on `Now` (want ≥{NOW_LIVENESS_MIN})"
+    scope = f" in lane model:{lane}" if lane else ""
+    detail = f"{plan.live_now} non-blocked story(ies){scope} on `Now` (want ≥{NOW_LIVENESS_MIN})"
     if gated:
         detail += f"; {len(gated)} more are gate:owner/blocked:*"
-    return [Finding("now_liveness", None, f"Now queue is not live: {detail} — refill it (#1870's wrap step)")]
+    message = f"Now queue is not live: {detail} — refill it (#1870's wrap step (e9))"
+    remedy = bn.refill_remedy_lines(plan)
+    if remedy:
+        message += "\n    " + "\n    ".join(remedy)
+    return [Finding("now_liveness", None, message)]
 
 
 def rule_later_staleness(ctxs: List[Dict[str, Any]], now: datetime) -> List[Finding]:
@@ -611,8 +678,13 @@ def rule_later_staleness(ctxs: List[Dict[str, Any]], now: datetime) -> List[Find
 # ── the whole check ─────────────────────────────────────────────────────────────
 
 
-def check(issues: List[Dict[str, Any]], now: Optional[datetime] = None) -> List[Finding]:
-    """Every rule over the whole fetched corpus, in a stable order."""
+def check(issues: List[Dict[str, Any]], now: Optional[datetime] = None, lane: Optional[str] = None) -> List[Finding]:
+    """Every rule over the whole fetched corpus, in a stable order.
+
+    `lane` scopes the queue-liveness floor to one `model:*` lane (#3254) — the running
+    session's own. Default None keeps the historical lane-blind count, which is why
+    `rule_now_lane_coverage` reports the composition unconditionally.
+    """
     now = now or datetime.now(timezone.utc)
     ctxs = [build_ctx(issue) for issue in issues]
     findings: List[Finding] = []
@@ -624,7 +696,8 @@ def check(issues: List[Dict[str, Any]], now: Optional[datetime] = None) -> List[
         for rule in TRACKER_RULES if is_tracker(ctx) else PER_ISSUE_RULES:
             findings.extend(rule(ctx))
     findings.extend(rule_epic_story_coverage(ctxs))
-    findings.extend(rule_now_liveness(ctxs))
+    findings.extend(rule_now_liveness(ctxs, lane=lane))
+    findings.extend(rule_now_lane_coverage(ctxs))
     findings.extend(rule_later_staleness(ctxs, now))
     return findings
 
@@ -709,6 +782,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--summary", action="store_true", help="Counts per rule only, no per-issue lines.")
     parser.add_argument("--now", help="ISO timestamp for the staleness rule (default: now). Injected so tests are deterministic.")
     parser.add_argument(
+        "--lane",
+        choices=list(bc.MODEL_LANES),
+        default=os.environ.get("BACKLOG_LANE") or None,
+        help="Scope now_liveness to one model:* lane — the running session's (env BACKLOG_LANE). "
+        "Without it the count includes work the running model cannot start (#3254).",
+    )
+    parser.add_argument(
         "--issues-json", help="Offline fixture path (gh issue list --json number,title,labels,milestone,body,updatedAt output)."
     )
     args = parser.parse_args(argv)
@@ -721,7 +801,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0  # fail-open: no gh/network/auth available in this context — ALWAYS, blocking mode included
 
     now = _parse_iso(args.now) if args.now else None
-    findings = check(issues, now=now)
+    findings = check(issues, now=now, lane=args.lane)
     if args.rule:
         findings = [f for f in findings if f.rule in set(args.rule)]
 

@@ -84,8 +84,17 @@ def _live_now_queue(n=3, start=900):
 
     Every whole-corpus test carries these so a fixture's own violation is the only
     thing the assertions see, rather than an incidental now_liveness firing.
+
+    The lanes CYCLE (#3254) rather than all being `model:sonnet`: `now_lane_coverage`
+    reports a `Now` whose startable work is concentrated in one lane, because a queue of
+    three sonnet stories is a live count and a dead queue for an opus session. A
+    single-lane baseline fixture would carry that advisory into every whole-corpus test
+    and hide the violation each one is actually about.
     """
-    return [_issue(number=start + i, labels=("type:story", "area:infra", "model:sonnet", "prio:P3")) for i in range(n)]
+    return [
+        _issue(number=start + i, labels=("type:story", "area:infra", f"model:{bc.MODEL_LANES[i % len(bc.MODEL_LANES)]}", "prio:P3"))
+        for i in range(n)
+    ]
 
 
 # ── the gate is wired into the /wrap skill (mirrors the old test_story_label_gate_1349) ──

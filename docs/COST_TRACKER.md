@@ -6,7 +6,7 @@ Last updated: 2026-08-26 (v8.6.0)
 
 > Budget ceiling: **$150/month all-in** base, floating to **$176 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated
-> $200 base / $235 surge window** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16
+> window raised that pair to $200 base / $235 surge** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16
 > #2734, `_TEMP_CEILING_WINDOW`) that auto-reverts 2026-09-01. The AWS Budgets
 > backstop moved $85 → $150 with the permanent base (#2836, `core_stack.py`
 > `budget_limit=150`): it was pinned at $85 only while the raises were temporary, and
@@ -35,7 +35,7 @@ own output, computed 2026-08-19T00:00Z):
 | Tier | **1** (Caution — internal/dev AI paused) |
 | MTD estimated total | $110.81 (governor; carries the deliberate 1.15x AI buffer — CE actual MTD-18d is $100.98) |
 | Projected month-end | $171.72 (governor, spike-contaminated) vs **measured spike-free run-rate $4.12/day (sd 0.66, n=6) ≈ $124/mo, 95% CI $108–139** |
-| Effective ceiling | **$200 — August window** (surge inactive: 773 trailing-7d uniques < 900) |
+| Effective ceiling | **raised to $200 — August window, reverts 2026-09-01** (surge inactive: 773 trailing-7d uniques < 900) |
 | Burn (trailing 7d) | AI ~$2.97/day + non-AI ~$1.71/day |
 
 ## The real monthly bill (Cost Explorer, unblended)
@@ -186,7 +186,7 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 | May 2026 | **$48.19** (CE actual) | 3 (metric began May 29) | + Bedrock $14.29 (Sonnet $9.31 + Haiku $4.98) — Bedrock-cutover marathon + v4 launch. WAF deleted at month end (~−$8/mo). |
 | Jun 2026 | **$79.80** (CE actual, peak) | **19 / 30** | Bedrock $43.98 (Haiku $26.91 + Sonnet $17.07), CloudWatch $14.87, Secrets $7.98, Tax $7.56. Coaching-door launch + QA marathons; tier-2/3 excursion Jun 15–18; 94% of the $85 base — held. |
 | Jul 2026 | **$98.35** (CE actual — first close over the $85 base) | **26 / 31** | Bedrock $49.51 (Haiku $28.47 + Sonnet $21.04), CloudWatch $24.50, Secrets $9.83, Tax $9.26. Continuous tier-1 from Jul 6; surge first activated 2026-07-19 (972 uniques). Cost per reader-week ≈ $98.35 ÷ (972 × 4.43) ≈ **$0.023**. |
-| Aug 2026 (MTD 18d) | **$100.98** (CE actual, interim — $200 window month) | **13 / 18** | Bedrock $61.35 (Haiku $31.00 + Sonnet $30.35 — dev spikes 08-10 $18.33, 08-09 $6.49), CloudWatch $19.87, Tax $9.45, Secrets $6.62. Spike-free run-rate $4.12/day (sd 0.66, n=6) ≈ $124/mo. 773 trailing-7d uniques (surge off). Close this row at month end. |
+| Aug 2026 (MTD 18d) | **$100.98** (CE actual, interim — month the window raised the base to $200) | **13 / 18** | Bedrock $61.35 (Haiku $31.00 + Sonnet $30.35 — dev spikes 08-10 $18.33, 08-09 $6.49), CloudWatch $19.87, Tax $9.45, Secrets $6.62. Spike-free run-rate $4.12/day (sd 0.66, n=6) ≈ $124/mo. 773 trailing-7d uniques (surge off). Close this row at month end. |
 
 ## Current cost structure (rate card, verified 2026-08-18)
 
