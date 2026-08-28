@@ -122,7 +122,7 @@ _DATE_RE_GROUPS = 1  # every probe regex carries exactly one capture group: the 
 
 def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None):
     return {
-        "skill": skill,  # .claude/commands/<skill>.md, or None for a doc-only ritual
+        "skill": skill,  # resolved via skill_registry.skill_path(), or None for a doc-only ritual
         "cadence_days": cadence_days,
         "grace_days": grace_days,
         "attendance": attendance,
@@ -155,7 +155,7 @@ CALENDAR: dict[str, dict] = {
             "shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to "
             "session; any fullreview run (full, delta or partial) resets this clock, because "
             "the weekly claim is 'the platform was looked at', not 'the look was small'. "
-            "Delta mode itself is defined in `.claude/commands/fullreview.md` § 'Delta mode' "
+            "Delta mode itself is defined in the fullreview skill § 'Delta mode' "
             "(#3250) — the artifact this probe reads is named there, so the clock and the "
             "procedure cannot drift apart."
         ),
@@ -319,7 +319,7 @@ CALENDAR: dict[str, dict] = {
 
 # ── The set guard's exemptions ────────────────────────────────────────────────
 # Discovery (see tests/test_operating_calendar_2832.py) enumerates every review-family
-# skill in .claude/commands (*review*.md + frontier-plan.md). Each one is either ON the
+# skill in the skill registry (*review* + frontier-plan). Each one is either ON the
 # calendar above or HERE with a dated reason. An undated or reasonless exemption is the
 # old failure mode — "we'll get to it" with no clock.
 EXEMPT: dict[str, tuple[str, str]] = {
@@ -498,16 +498,26 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str], list[str]
 
 
 # ── The set guard, factored for mutation-proofing ─────────────────────────────
+def _skill_registry():
+    """Import the ONE skill registry lazily (keeps module import cheap and test-stubbable)."""
+    import importlib.util
+
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "skill_registry.py")
+    spec = importlib.util.spec_from_file_location("_skill_registry", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def review_skill_files(repo: str = REPO) -> set[str]:
-    """Discovery: every review-family skill name in .claude/commands.
+    """Discovery: every review-family skill name, via scripts/skill_registry.
 
     Filename-based on purpose (*review* + frontier-plan): a skill's text can say
     anything, but its NAME is what sessions invoke. Blind spot, stated: a judgment
     ritual not named *review* (e.g. cost-diligence) is not discovered — the registry
     half still catches it the moment an entry or exemption names it.
     """
-    d = os.path.join(repo, ".claude", "commands")
-    names = {f[:-3] for f in os.listdir(d) if f.endswith(".md")}
+    names = set(_skill_registry().skill_names())
     return {n for n in names if "review" in n} | ({"frontier-plan"} & names)
 
 

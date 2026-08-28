@@ -64,7 +64,7 @@ sys.path.insert(0, os.path.join(ROOT, "tests"))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 # The 4 north-star audiences (docs/PLATFORM_NORTH_STAR.md) — the same lens
-# .claude/commands/uplevel.md Phase 1 asks a human session to apply.
+# .claude/skills/uplevel/SKILL.md Phase 1 asks a human session to apply.
 AUDIENCES = {
     "reddit_newcomer": "A Reddit newcomer landing for the first time. Comprehension first, "
     "fascination second — does the causal loop (data -> coaching -> protocols -> story) click "

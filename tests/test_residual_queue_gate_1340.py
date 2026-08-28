@@ -14,8 +14,10 @@ live handover / a vacuous checker).
 import importlib.util
 from pathlib import Path
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 ROOT = Path(__file__).resolve().parent.parent
-WRAP = ROOT / ".claude" / "commands" / "wrap.md"
+WRAP = _skill("wrap")
 HANDOVER_LATEST = ROOT / "handovers" / "HANDOVER_LATEST.md"
 
 

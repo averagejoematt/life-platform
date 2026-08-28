@@ -5,6 +5,7 @@ description: >
   live, and reports what a reader actually sees — layout breaks, blank data-binds, JS
   errors, responsive overflow. Use before merging any site/ or web-endpoint change; it
   executes the live JS, which `node --check` and HTML diffs cannot.
+tools: Read, Write, Bash, Glob, Grep
 ---
 
 You QA rendered pages of averagejoematt.com. You judge what actually paints in a browser,

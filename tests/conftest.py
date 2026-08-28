@@ -248,8 +248,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_site_api_namespace_guard_3002.py",  # #3002: one site-API metric namespace, no casing twins — repo-shape sweep, pre-merge
         "test_emf_namespace_ledger_2837.py",  # #2837: AST sweep of every metric emitter — a NEW namespace must join the ledger BEFORE merge, not after the bill
         "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
-        "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps .claude/commands + docs/reviews — repo-shape, pre-merge
+        "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps the skill registry + docs/reviews — repo-shape, pre-merge
         "test_full_suite_premerge_3025.py",  # #3025: lane-parity contracts sweep two workflow files — repo-shape, pre-merge
+        # The skill/agent corpus contract. Sweeps .claude/ via scripts/skill_registry.py
+        # rather than the source tree, so premerge_derivation cannot discover it —
+        # hand-listed, same shape as test_operating_calendar_2832.py above. Pre-merge
+        # because a dead reference in a skill is silent: it misleads the next session
+        # rather than raising, and the next session may be an unattended one.
+        "test_skill_contract.py",
         # #3213: the scheduled-workflow cadence registry. Its verdict is pure repo shape
         # (every `cron:` in .github/workflows/ carries a watched/unwatched ruling, no
         # ruling points at a workflow that lost its cron, and the watcher itself never

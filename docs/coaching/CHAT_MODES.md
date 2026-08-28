@@ -93,24 +93,24 @@ change or contradict anything recorded above, it defines what consumes those fin
 
 Conversation is the platform's fourth ingestion channel (epic `#1476`, alongside
 wearables/APIs, manual uploads, and the Notion journal itself). Each mode below is a
-**versioned, invocable playbook** — a `.claude/commands/*.md` file in this repo — usable
+**versioned, invocable playbook** — a `.claude/skills/*/SKILL.md` file in this repo — usable
 from Claude Code today. There is no separate "skills" location in this repo:
-`.claude/commands/*.md` files ARE the skills (the available-skills list Claude Code
+`.claude/skills/*/SKILL.md` files ARE the skills (the available-skills list Claude Code
 surfaces is generated 1:1 from these filenames).
 
 ## The modes
 
 | Mode | Command file | What it's for | Cadence |
 |---|---|---|---|
-| **Daily debrief** | `.claude/commands/daily-debrief.md` | Post-workout review + night-before session authoring (`manage_hevy_routine` draft→dry_run→commit). Condensed from `docs/coaching/COACH_SESSION.md`, which stays the full source. | Nightly, when training |
-| **Journal interview** | `.claude/commands/journal-interview.md` | Claude interviews Matthew, composes a journal entry, writes it to the Notion journal DB (Morning / Evening / Weekly Reflection / Stressor / Health Event templates). The `publish` variant (#1567) instead composes a *public* essay from the interview — exact-text in-chat approval gates the PR; no approval → private Notion draft, never published. | Daily / ad hoc |
-| **Speak to coaches** | `.claude/commands/speak-to-coaches.md` | Works the open coach check-in queue (`#915`) one question at a time, conversationally; optional habit-reflection pass; weekly Field Notes response. | Ad hoc, whenever Matthew has a few minutes |
-| **Open check-in** | `.claude/commands/open-checkin.md` | Free-form talk with no queue to work — Matthew just talks, Claude routes whatever comes up to the right write tool at the close. | Whenever |
-| **Team meeting** | `.claude/commands/team-meeting.md` | The weekly all-hands (#1575): agenda auto-assembled from live data (track records, open experiments, freshness flags, flourishing trend), 3-5 coach voices with disagreement REQUIRED where their data genuinely diverges, minutes routed through the contract table + one allude-tier "the team met" memory line (#1483). | Weekly (Sunday, before the 19:00 UTC hypothesis run) |
-| **Milestone interview** | `.claude/commands/interview.md` | The longform biographical deep interview (#1576 — the March-2026 pattern made repeatable). Brief uses the prequel-brief structure and lands in PRIVATE S3 (`raw/matthew/interviews/`) — NEVER in git while the repo is public. Feeds the essay generator (#1566) via its what-to-abstract section only. | Monthly + cycle events (genesis eve, day 30, cycle close) |
-| **Vlog / video diary** | `.claude/commands/vlog.md` | Claude as live interviewer for the Insta360 Luna video diaries (#1571, epic #1564). Zero-setup open — the priming bundle also loads the diary's own memory: previous entry, due on-tape claims, pending coach reactions (#1841). Seven-format library incl. `micro` (the days-1–7 wall floor + 30s bad-day floor, ADR-104 framing; day-30/60/90 rewatch retro). Route-the-takeaways close → Notion `Video Diary` template (`channel: video_diary`, #1572 — the Template select options themselves were only added 2026-07-26, #1840) **+ the TAPE NOTE**: 3–5 verbatim moments the post-production desk (`~/Documents/Claude/vlog/`, outside the repo) string-matches into the whisper SRT for real clip timecodes. Studio kit in private S3 `config/studio/`. | Whenever the Luna comes out |
+| **Daily debrief** | `.claude/skills/daily-debrief/SKILL.md` | Post-workout review + night-before session authoring (`manage_hevy_routine` draft→dry_run→commit). Condensed from `docs/coaching/COACH_SESSION.md`, which stays the full source. | Nightly, when training |
+| **Journal interview** | `.claude/skills/journal-interview/SKILL.md` | Claude interviews Matthew, composes a journal entry, writes it to the Notion journal DB (Morning / Evening / Weekly Reflection / Stressor / Health Event templates). The `publish` variant (#1567) instead composes a *public* essay from the interview — exact-text in-chat approval gates the PR; no approval → private Notion draft, never published. | Daily / ad hoc |
+| **Speak to coaches** | `.claude/skills/speak-to-coaches/SKILL.md` | Works the open coach check-in queue (`#915`) one question at a time, conversationally; optional habit-reflection pass; weekly Field Notes response. | Ad hoc, whenever Matthew has a few minutes |
+| **Open check-in** | `.claude/skills/open-checkin/SKILL.md` | Free-form talk with no queue to work — Matthew just talks, Claude routes whatever comes up to the right write tool at the close. | Whenever |
+| **Team meeting** | `.claude/skills/team-meeting/SKILL.md` | The weekly all-hands (#1575): agenda auto-assembled from live data (track records, open experiments, freshness flags, flourishing trend), 3-5 coach voices with disagreement REQUIRED where their data genuinely diverges, minutes routed through the contract table + one allude-tier "the team met" memory line (#1483). | Weekly (Sunday, before the 19:00 UTC hypothesis run) |
+| **Milestone interview** | `.claude/skills/interview/SKILL.md` | The longform biographical deep interview (#1576 — the March-2026 pattern made repeatable). Brief uses the prequel-brief structure and lands in PRIVATE S3 (`raw/matthew/interviews/`) — NEVER in git while the repo is public. Feeds the essay generator (#1566) via its what-to-abstract section only. | Monthly + cycle events (genesis eve, day 30, cycle close) |
+| **Vlog / video diary** | `.claude/skills/vlog/SKILL.md` | Claude as live interviewer for the Insta360 Luna video diaries (#1571, epic #1564). Zero-setup open — the priming bundle also loads the diary's own memory: previous entry, due on-tape claims, pending coach reactions (#1841). Seven-format library incl. `micro` (the days-1–7 wall floor + 30s bad-day floor, ADR-104 framing; day-30/60/90 rewatch retro). Route-the-takeaways close → Notion `Video Diary` template (`channel: video_diary`, #1572 — the Template select options themselves were only added 2026-07-26, #1840) **+ the TAPE NOTE**: 3–5 verbatim moments the post-production desk (`~/Documents/Claude/vlog/`, outside the repo) string-matches into the whisper SRT for real clip timecodes. Studio kit in private S3 `config/studio/`. | Whenever the Luna comes out |
 
-One further command, `.claude/commands/journey-review.md`, is not a capture mode — it's the
+One further command, `.claude/skills/journey-review/SKILL.md`, is not a capture mode — it's the
 periodic ritual that audits these seven for drift (MCP inventory sweep, stale-channel
 check, prompt/config parity against the claude.ai Project prompts). See its own file for
 scope.
@@ -183,17 +183,17 @@ truth; the claude.ai Project prompts are a Matthew-side artifact condensed FROM 
 never the reverse.** Concretely:
 
 - A behavior change (a new write tool, a changed routing rule, a new verbatim/skip rule)
-  is made in the relevant `.claude/commands/*.md` file first, and in this doc's
+  is made in the relevant `.claude/skills/*/SKILL.md` file first, and in this doc's
   route-the-takeaways contract if it adds or changes a row.
 - The claude.ai Project prompt is then hand-condensed from the updated command file —
   that condensation step is Matthew's, not automated (no MCP write path pushes prompt
   text into claude.ai). It happens on Matthew's own cadence, not per-commit.
 - Because the condensation is manual and out-of-band, the two surfaces **can drift**.
-  `.claude/commands/journey-review.md` is the periodic check for that drift — it doesn't
+  `.claude/skills/journey-review/SKILL.md` is the periodic check for that drift — it doesn't
   fix it (it can't reach the claude.ai side), it flags it so Matthew can re-condense.
 - For `/vlog` specifically that check is now mechanical: **`python3
   scripts/check_vlog_prompt_parity.py`** (#1571) diffs the load-bearing rules of
-  `.claude/commands/vlog.md` against the condensed Project prompt in the private studio
+  `.claude/skills/vlog/SKILL.md` against the condensed Project prompt in the private studio
   kit and names what the phone is missing. It reads S3 read-only and is owner-run, not a
   CI gate — the kit is deliberately not in git, so no CI job can see it. Its checklist
   can't rot: `tests/test_vlog_mode_contract_1571.py` asserts every rule it checks for is

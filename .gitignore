@@ -116,6 +116,11 @@ config/pii_denylist.local.json
 config/content_filter.local.json
 cdk/_bundle_staging/
 .worktrees/
+# Agent worktrees. These were ignored ONLY via .git/info/exclude, which is untracked —
+# so the rule existed on one machine and in no clean checkout. An agent worktree created
+# here in CI or on a fresh clone would be a full second copy of the repo, TRACKED. The
+# rule belongs in the committed file (2026-08-27).
+.claude/worktrees/
 
 # #1650: session exhaust lives on the `session-archive` branch, not in the product
 # tree. Only the LIVE pointer (HANDOVER_LATEST.md) + the directory README are tracked

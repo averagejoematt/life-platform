@@ -20,13 +20,15 @@ hand-listed endpoints, no dial) before the rewrite.
 import os
 import re
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
-_SKILL = os.path.join(_REPO, ".claude", "commands", "qa.md")
+_SKILL = str(_skill("qa"))
 
 
 def _skill_text():
-    assert os.path.exists(_SKILL), ".claude/commands/qa.md missing — the /qa skill is gone"
+    assert os.path.exists(_SKILL), ".claude/skills/qa/SKILL.md missing — the /qa skill is gone"
     with open(_SKILL, encoding="utf-8") as f:
         return f.read()
 

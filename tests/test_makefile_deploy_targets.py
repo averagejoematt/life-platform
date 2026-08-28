@@ -1,5 +1,5 @@
 """tests/test_makefile_deploy_targets.py — the Makefile is a second entry-point
-system alongside deploy/*.md and .claude/commands/deploy.md (#1323, SDLC review
+system alongside deploy/*.md and .claude/skills/deploy/SKILL.md (#1323, SDLC review
 2026-07-18). It rots the same way docs do: a script gets deleted or renamed and
 a `make <target>` line still shells out to the corpse.
 
@@ -65,7 +65,7 @@ def test_deploy_site_api_does_not_use_single_file_deploy_lambda_sh():
     sibling imports (web.site_api_*, hevy_common, …) break under a single-file
     deploy_lambda.sh invocation. The Makefile's site-api target must use the
     dedicated full-tree script instead (see deploy/deploy_site_api.sh, docs/
-    .claude/commands/deploy.md 'Special case — life-platform-site-api')."""
+    .claude/skills/deploy/SKILL.md 'Special case — life-platform-site-api')."""
     text = MAKEFILE.read_text(encoding="utf-8")
     # isolate the deploy-site-api recipe block
     match = re.search(r"^deploy-site-api:.*?\n((?:\t.*\n?)+)", text, re.MULTILINE)

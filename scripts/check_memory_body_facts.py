@@ -3,7 +3,7 @@
 
 THE PROBLEM
   `check_doc_facts.py` guards the repo's doc surface for stale genesis/date/stack-name
-  literals, but its `_scan_files()` only walks README/CLAUDE.md/.claude/commands/docs — the
+  literals, but its `_scan_files()` only walks README/CLAUDE.md/.claude/skills/docs — the
   memory dir (`~/.claude/projects/.../memory/`) is outside the repo, structurally invisible
   to that gate. That let a `MEMORY.md` INDEX line get corrected while the topic-file BODY
   kept issuing a categorical wrong directive: `project_launch_dates.md` said "always use
@@ -19,7 +19,7 @@ THE FIX
   (1) a categorical "always use <date>" genesis directive that disagrees with the live
   `EXPERIMENT_START_DATE` (`lambdas/common/constants.py`, via `check_doc_facts._ground_truth()` —
   the same single source), and (2) a small registry of known-retired stack-ownership
-  literals. `/wrap` step (c) runs this every session (see `.claude/commands/wrap.md`) — the
+  literals. `/wrap` step (c) runs this every session (see `.claude/skills/wrap/SKILL.md`) — the
   memory dir is outside git, so this is a manually-invoked reflex, not a CI job. The pytest
   regression for this script (`tests/test_memory_body_drift_gate_1342.py`) plants synthetic
   fixture text reproducing the two known defects verbatim (the real memory dir is not
