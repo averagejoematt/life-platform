@@ -101,6 +101,7 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
     _error,
     _ok,
     as_of_day_n as _as_of_day_n,
+    content_vintage as _content_vintage,  # #3252 — the envelope may not out-claim its stalest member
     get_request_id,
     logger,
     pre_start_meta,
@@ -740,12 +741,26 @@ def _dispatch_route(event, path, method):
             # #1986: the dashboard's weekly-call byline is the registry's board lead —
             # the same character the roster one tab away bills as lead.
             _cd_lead_name, _cd_lead_title = _lead_byline()
-            _cd_priority = {"text": None, "coach_name": _cd_lead_name, "coach_title": _cd_lead_title, "generated_at": None}
+            # #3252: `as_of_day_n` is not decoration here — it is the ONLY machine-checkable
+            # anchor on the board's most prominent block. The integrator's call makes explicit
+            # RELATIVE-TIME claims in its prose ("he's been eleven days into the cycle…"), and
+            # until now this dict carried `generated_at` and nothing else, so no check anywhere
+            # could compare the sentence's day against the day it was written for. The seven
+            # coach cards below have carried `analysis_as_of_day_n` since 2026-08-27; the block
+            # a reader meets FIRST had no anchor at all. None = UNKNOWN (renders nothing).
+            _cd_priority = {
+                "text": None,
+                "coach_name": _cd_lead_name,
+                "coach_title": _cd_lead_title,
+                "generated_at": None,
+                "as_of_day_n": None,
+            }
             try:
                 _cd_int = _integrator_digest()  # #946: tombstone/phase-guarded
                 if _cd_int:
                     _cd_priority["text"] = _cd_int.get("analysis", "")
                     _cd_priority["generated_at"] = _cd_int.get("generated_at", "")
+                    _cd_priority["as_of_day_n"] = _as_of_day_n(_cd_priority["generated_at"], EXPERIMENT_START)
             except Exception:
                 pass
 
@@ -866,12 +881,51 @@ def _dispatch_route(event, path, method):
             # Limit predictions to 10 most recent
             _cd_predictions = _cd_predictions[-10:]
 
+            # #3252 — the envelope's vintage, and the board's day SPAN.
+            #
+            # Every narrative block on this payload is a STORED record, so the response
+            # has two different times and used to publish only one of them: `_meta`
+            # carried the request instant while the prose under it was frozen (measured
+            # live 2026-08-27 — an envelope stamped 00:28Z over a sleep-coach card
+            # written 31h earlier, under `regeneration_paused: true`). Declaring the
+            # OLDEST constituent stamp makes `_meta.generated_at` describe the content;
+            # `_meta.served_at` keeps the request instant, so nothing is lost.
+            _cd_content_as_of = _content_vintage(
+                _cd_priority.get("generated_at"),
+                *[_c.get("analysis_generated_at") for _c in _cd_coaches],
+            )
+            # The board is not a single vintage and pretending otherwise is the second
+            # half of the same untruth: while regeneration is paused the members drift
+            # APART (one coach's daily run lands, another's does not), so "six at Day 11,
+            # one at Day 10" is the normal state, not an anomaly. It is DISCLOSED rather
+            # than reconciled — reconciling would mean either withholding six current
+            # reads or restating one stale read as current, and both are worse than
+            # saying which days the board is speaking from. Absent when no member has a
+            # known day (absent-is-unknown, #1971), never a fabricated span.
+            _cd_day_ns = sorted(
+                {
+                    _d
+                    for _d in [_cd_priority.get("as_of_day_n")] + [_c.get("analysis_as_of_day_n") for _c in _cd_coaches]
+                    if isinstance(_d, int) and not isinstance(_d, bool) and _d > 0
+                }
+            )
+            _cd_day_span = (
+                {
+                    "oldest_day_n": _cd_day_ns[0],
+                    "newest_day_n": _cd_day_ns[-1],
+                    "mixed": len(_cd_day_ns) > 1,
+                }
+                if _cd_day_ns
+                else None
+            )
+
             return _ok(
                 {
                     "weekly_priority": _cd_priority,
                     "open_actions": _cd_actions,
                     "coaches": _cd_coaches,
                     "predictions": _cd_predictions,
+                    "content_day_span": _cd_day_span,
                     # #1971 (completes #802 on the door's FIRST screen): the same
                     # budget-guard pause signal /api/coach_analysis already carries.
                     # The coach OUTPUT# reads above are written by the coach_narrative
@@ -882,6 +936,7 @@ def _dispatch_route(event, path, method):
                     "regeneration_paused": _regeneration_paused("coach_narrative"),
                 },
                 cache_seconds=300,
+                content_as_of=_cd_content_as_of,
             )
         except Exception as _e:
             print(f"[WARN] /api/coaching-dashboard failed: {_e}")

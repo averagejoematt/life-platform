@@ -40,6 +40,7 @@ from web.site_api_common import (
     _error,
     _ok,
     as_of_day_n,
+    content_vintage,
     logger,
     pre_start_meta,
 )
@@ -708,17 +709,27 @@ def handle_weekly_priority(event, *, _g):
         if not _int_item:
             return _ok({"weekly_priority": None, "cross_domain_notes": {}, "pre_start": False}, cache_seconds=300)
         _lead_name, _lead_title = _lead_byline()
+        # #3252 — the SET, not the instance. This endpoint reads the SAME stored
+        # EXPERT#integrator record the coaching-dashboard's `weekly_priority` block
+        # reads, and it is the second surface that renders the integrator's
+        # relative-time prose ("eleven days into the cycle"), on /coaching/'s week
+        # lens. Fixing only the dashboard would leave this one unanchored, which is
+        # precisely how #802 shipped ONE surface and left the door's first screen
+        # lying (#1971's lesson). Same derived day number, same declared vintage.
+        _wp_generated_at = _int_item.get("generated_at", "")
         return _ok(
             {
                 "weekly_priority": _int_item.get("analysis", ""),
                 "cross_domain_notes": _int_item.get("cross_domain_notes", {}),
-                "generated_at": _int_item.get("generated_at", ""),
+                "generated_at": _wp_generated_at,
+                "as_of_day_n": as_of_day_n(_wp_generated_at, _g["EXPERIMENT_START"]),
                 "week_number": _int_item.get("week_number"),
                 "coach_name": _lead_name,
                 "coach_title": _lead_title,
                 "pre_start": False,
             },
             cache_seconds=300,
+            content_as_of=content_vintage(_wp_generated_at),
         )
     except Exception as _e:
         logger.warning(f"[/api/weekly_priority] {_e}")
