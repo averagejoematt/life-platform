@@ -43,7 +43,13 @@ import backlog_contract as bc  # noqa: E402
 import backlog_next as bn  # noqa: E402
 import check_backlog_hygiene as hy  # noqa: E402
 
-WRAP = ROOT / ".claude" / "commands" / "wrap.md"
+# Resolved through the ONE registry, never a hard-coded layout literal. This line was
+# deliberately left hard-coded by #3256 so the skills-corpus rename would fail LOUDLY
+# here instead of passing silently against a path that no longer exists (#3245).
+# It did exactly that; this is the collision resolving, not a workaround.
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
+WRAP = Path(_skill("wrap"))
 
 
 # ── fixtures as data (the house style) ──────────────────────────────────────────
