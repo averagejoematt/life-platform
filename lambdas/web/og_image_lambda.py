@@ -28,6 +28,11 @@ from ingestion.source_registry import SOURCE_REGISTRY
 # moment (og_moments), character (#420), chronicle (#405) — shares one template.
 from web import card_engine
 
+# #3285: the sign of `journey.lost_lbs` decides the home card's caption AND its colour.
+# Shared with scripts/v4_proof.py (the home og:description) so the card and the meta
+# text can never disagree about which way the number points. See the module docstring.
+from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta
+
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 CF_DIST_ID = os.environ.get("CF_DISTRIBUTION_ID", "E3S424OXQZ8NBE")
@@ -72,6 +77,25 @@ def _fmt(val, decimals=0, suffix=""):
     return card_engine.fmt(val, decimals, suffix)
 
 
+# #3285 — the home card's weight-delta tile: one (caption, token) per direction.
+#
+# GREEN is the success colour and is reserved for movement toward the goal. AMBER is
+# this repo's established "honest miss" accent (card_engine.py:42, #405/#551) — a gain
+# is a miss and must never wear GREEN. Neither "LOST 0" nor "GAINED 0" is true at zero,
+# so the even case gets the neutral caption "NET CHANGE" in the plain TEXT colour, which
+# claims nothing in either direction; UNKNOWN reuses it (the value renders as an em-dash
+# via card_engine.fmt, so the caption must not assert a direction either).
+#
+# The tile draws the MAGNITUDE, not the signed value: the caption carries the direction,
+# so "-5 lbs" under "LOST" — a double negative in the success colour — is unreachable.
+_DELTA_TILE: dict[str, tuple[str, tuple[int, int, int]]] = {
+    DOWN: ("LOST", GREEN),
+    UP: ("GAINED", AMBER),
+    EVEN: ("NET CHANGE", TEXT),
+    UNKNOWN: ("NET CHANGE", TEXT),
+}
+
+
 def build_home(stats):
     img, draw = _base_image()
     _draw_header(draw, "The Measured Life")
@@ -87,9 +111,14 @@ def build_home(stats):
     n_sources = len(SOURCE_REGISTRY)
     draw.text((48, 180), f"One man. {n_sources} data sources. Total transparency.", fill=MUTED, font=_font(FONT_MONO, 14))
 
-    # Metrics row
-    lost = journey.get("lost_lbs")
-    _draw_metric(draw, 48, 260, _fmt(lost, 0, " lbs"), "LOST", GREEN)
+    # Metrics row. #3285: the first tile takes BOTH its caption and its colour from the
+    # SIGN of the value — never from a literal. It used to pass the constants "LOST" and
+    # GREEN unconditionally to a signed number, so the day the delta went the wrong way
+    # the most-shared artifact on the platform published a gain as "-5 lbs" under "LOST"
+    # in the success colour. See _DELTA_TILE and web/journey_direction.py.
+    direction, magnitude = classify_delta(journey.get("lost_lbs"))
+    delta_label, delta_color = _DELTA_TILE[direction]
+    _draw_metric(draw, 48, 260, _fmt(magnitude, 0, " lbs"), delta_label, delta_color)
     _draw_metric(draw, 320, 260, _fmt(vitals.get("hrv_ms"), 0, " ms"), "HRV")
     _draw_metric(draw, 580, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
     _draw_metric(draw, 820, 260, _fmt(platform.get("tier0_streak"), 0), "STREAK")

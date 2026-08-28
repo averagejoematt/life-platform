@@ -46,6 +46,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 from common.pacific_time import pacific_date_of, pacific_day_n, pacific_today  # noqa: E402
 
+# #3285: the direction of the weight delta is RULED in one place, shared with the OG
+# card builder (lambdas/web/og_image_lambda.build_home) so the picture and the meta
+# text can never point opposite ways. Stdlib-only module — safe for a build script.
+from web.journey_direction import DOWN, EVEN, UNKNOWN, classify_delta  # noqa: E402
+
 SITE = "https://averagejoematt.com"
 SNAPSHOT = Path(__file__).resolve().parent / "proof_snapshot.json"
 CONSTANTS_PY = Path(__file__).resolve().parent.parent / "lambdas" / "common" / "constants.py"
@@ -604,6 +609,26 @@ def _fmt_lbs(x) -> str:
     return f"{int(round(float(x)))}"
 
 
+def _delta_clause(lost_lbs) -> str:
+    """The direction of travel in WORDS, from the shared #3285 ruling.
+
+    Home's sentences used to hardcode " lb down" after a SIGNED `lost_lbs`, so the day
+    the delta went the wrong way both the og:description and the no-JS proof block read
+    "-5 lb down" — a double negative on the platform's most-shared link preview. The
+    number here is the magnitude; this clause carries the direction, and it comes from
+    `web.journey_direction`, the same ruling the OG card's caption/colour comes from.
+
+    Returns "" when there is nothing to say (absent/non-numeric) — the caller drops the
+    clause rather than inventing a direction (ADR-104). Whole pounds, matching _fmt_lbs.
+    """
+    direction, magnitude = classify_delta(lost_lbs)
+    if direction == UNKNOWN or magnitude is None:
+        return ""
+    if direction == EVEN:
+        return "no net change."
+    return f"{_fmt_lbs(magnitude)} lb {'down' if direction == DOWN else 'up'}."
+
+
 def _long_date(iso: str) -> str:
     """'2026-07-19' -> 'Sunday, July 19' (falls back to the raw string)."""
     try:
@@ -741,11 +766,11 @@ def home_block_html(journey: dict, char: dict) -> str:
         )
     else:
         day_n = day_frame_n
-        lost = _fmt_lbs(journey.get("lost_lbs"))
+        delta = _delta_clause(journey.get("lost_lbs"))  # #3285: direction from the sign, not a literal
         cur = _fmt_lbs(journey.get("current_weight"))
         day_txt = f"Day {int(day_n)}. " if isinstance(day_n, (int, float)) else ""
-        if cur and lost:
-            prog = f"{_esc(day_txt)}From {_esc(sw)} lb toward {_esc(gw)} lb — {_esc(cur)} lb now, {_esc(lost)} lb down."
+        if cur and delta:
+            prog = f"{_esc(day_txt)}From {_esc(sw)} lb toward {_esc(gw)} lb — {_esc(cur)} lb now, {_esc(delta)}"
         else:
             prog = f"{_esc(day_txt)}From {_esc(sw)} lb toward {_esc(gw)} lb{_esc(climb)} — measured every day, published either way."
         lines.append(f"<p><strong>{prog}</strong></p>")
@@ -858,10 +883,18 @@ def home_og(journey: dict, char: dict) -> dict:
         )
     else:
         day_n = day_frame_n
-        lost = _fmt_lbs(journey.get("lost_lbs"))
         day_txt = f"Day {int(day_n)}: " if isinstance(day_n, (int, float)) else ""
-        gained = f"{lost} lb down. " if lost else ""
-        desc = f"{day_txt}{sw} lb toward {gw} lb — {gained}Every number published either way. As of {as_of}."
+        # #3285: two fixes in one sentence. (a) The first weight a reader scans as
+        # "where he is now" WAS the cycle START — `sw` opened the line under the words
+        # "toward <goal>" while the current weight, which the payload carries, went
+        # unused. (b) The delta clause was the literal " lb down" appended to a SIGNED
+        # value, so a gain published as "-5 lb down". Current weight leads now, and the
+        # direction comes from the shared ruling in words.
+        cur = _fmt_lbs(journey.get("current_weight"))
+        delta = _delta_clause(journey.get("lost_lbs"))
+        head = f"{cur} lb now, from a {sw} lb start toward {gw} lb" if cur else f"{sw} lb start toward {gw} lb"
+        lead = f"{head} — {delta}" if delta else f"{head}."
+        desc = f"{day_txt}{lead} Every number published either way. As of {as_of}."
     level = (char or {}).get("level")
     if level is not None:
         desc += f" Character level {int(level)}."
