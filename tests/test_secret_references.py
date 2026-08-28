@@ -14,17 +14,44 @@ Rules:
   SR1  Every secret name literal in Lambda source must be in KNOWN_SECRETS
        or DELETED_SECRETS (to surface deleted ones explicitly)
   SR2  No Lambda source may reference a DELETED secret by name
-  SR3  Secret name patterns must follow the life-platform/* convention
-       (catches typos like 'life-platorm/ai-keys')
-  SR4  Sanity: at least some secret references found (guards against regex breakage)
+  SR3  Residual invariant on the extractor (see its docstring — it is NOT a
+       near-miss-prefix typo detector, and says why)
+  SR4  Sanity: every scanned file parsed, and at least some references found
+  SR5  Positive + negative controls on the extractor itself: the documented
+       root-cause shape is inside the scan surface, and prose is not (#3255)
 
 Scope: lambdas/*.py and mcp/*.py and mcp_server.py
+
+EXTRACTION IS AST-LEVEL, NOT LINE-LEVEL (#3255, 2026-08-27)
+───────────────────────────────────────────────────────────
+v1.0.0 read each file as text, matched quoted `life-platform/...` with a regex,
+and dropped any LINE containing one of six identifier substrings (`SECRET_NAME`,
+`secret_name`, ...) as a "false positive". Those identifiers sit on the same line
+as the literal in the canonical form:
+
+    SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/todoits")
+
+so the line-level suppression discarded the string literal along with the
+identifier — and that line IS the March-2026 outage shape this module's own
+docstring cites. Measured on `main` before the fix: 38 lines carrying a secret
+literal were masked against 33 that reached SR1, and 4 real secret ids at 6 sites
+were audited by nothing.
+
+The fix is not a longer suppression list — the identifier and the literal are
+different tokens, so the scanner reads TOKENS. `_extract_from_source` parses the
+module with `ast` and collects string CONSTANTS that are exactly a secret name.
+An identifier can never be a `Constant`, a comment is not in the AST at all, and a
+docstring that merely mentions an id is one long constant that does not
+full-match — so the suppression list has nothing left to suppress and is gone.
+Post-fix: 0 masked, 69 references audited.
 
 Run:  python3 -m pytest tests/test_secret_references.py -v
 
 v1.0.0 — 2026-03-15 (R13-F04)
+v2.0.0 — 2026-08-27 (#3255, epic #2578): AST token extraction; mask removed
 """
 
+import ast
 import os
 import re
 import sys
@@ -80,6 +107,16 @@ KNOWN_SECRETS = {
     "life-platform/digest",  # #1623 (2026-07-26): milestone-digest recipients + reply-to; operator-provisioned, disarmed no-op until it exists
     "life-platform/continuity-contacts",  # #1400 (2026-08-10): continuity contacts for the Permanence Contract's dead-man's switch — real people's contact details, owner-provisioned, NEVER in git (DATA_GOVERNANCE). The switch runs disarmed (falls back to the operator address and reports contacts_configured=false) until it exists.
     "life-platform/telegram",  # #2364 (2026-08-09): coach chat — per-bot tokens + chat-id allow-list + webhook_secret; owner-provisioned via setup_telegram_bots.py
+    # ── #3255 (2026-08-27): the four ids the line-level mask hid ──────────────
+    # All four were ALREADY in test_iam_secrets_consistency.py's KNOWN_SECRETS and in
+    # ARCHITECTURE.md's Secrets Manager table; only this registry — the one whose gate
+    # could not see them — had drifted. Each verified provisioned in AWS on 2026-08-27
+    # via `aws secretsmanager list-secrets --region us-west-2` before being added here;
+    # none was added to make a red test green.
+    "life-platform/google-tts",  # 2026-06-14 (ADR-087): Google Chirp 3:HD TTS key for the podcasts — lambdas/ai/google_tts.py, lambdas/ai/gemini_tts.py
+    "life-platform/hevy-write",  # ADR-066 (2026-05-31): write-capable Hevy key, separate from the read key — lambdas/training/hevy_write_client.py
+    "life-platform/ritual-token-secret",  # #769 (ADR-124): HMAC key for the evening-ritual one-tap links (mint: evening-nudge, verify: site-api)
+    "life-platform/site-api-origin-secret",  # #815 R22-SEC-03 / #1589: the x-amj-origin CloudFront gate value, read at runtime by the AI-quality canary
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
 
@@ -90,24 +127,22 @@ DELETED_SECRETS = {
     "life-platform/anthropic-api-key",  # Phase 1.4 (2026-05-16): orphan soft-deleted, permanent 2026-05-23
 }
 
-# Partial strings that appear in code but are NOT literal secret names.
-# Used to avoid false positives on env var names, variable names, etc.
-FALSE_POSITIVE_PATTERNS = {
-    "SECRET_NAME",  # env var name
-    "ANTHROPIC_SECRET",  # env var name
-    "MCP_SECRET_NAME",  # env var name
-    "HABITIFY_SECRET_NAME",  # env var name
-    "NOTION_SECRET_NAME",  # env var name
-    "secret_name",  # local variable name
-    "_secret_name",  # local variable name
-    "SecretString",  # boto3 response field
-    "get_secret_value",  # boto3 call
-    "secret.get(",  # dict access
-    "secrets.get(",  # dict access
-}
+# NOTE (#3255): there is deliberately NO false-positive suppression list here any more.
+# v1.0.0 carried `FALSE_POSITIVE_PATTERNS` — twelve substrings (`SECRET_NAME`,
+# `secret_name`, `SecretString`, `get_secret_value`, ...) whose presence anywhere on a
+# line dropped that whole line from the scan. Every entry named an IDENTIFIER, but the
+# suppression was applied at LINE scope, so it also discarded the string literal beside
+# the identifier. Reading string CONSTANTS out of the AST makes the whole category
+# unrepresentable: `SECRET_NAME` the identifier is an `ast.Name`, never an `ast.Constant`,
+# so it cannot be a false positive to suppress. Re-introducing a line-level (or
+# substring) filter here re-introduces the defect — SR5 is the regression guard.
 
-# Regex: matches quoted 'life-platform/...' string literals in source code.
-_SECRET_LITERAL_RE = re.compile(r"""['\"](life-platform/[a-zA-Z0-9_\-]+)['\"]""")
+# A string constant is a secret reference iff it is EXACTLY a secret name.
+# Full-match, not search: a docstring or a log message that merely mentions an id is one
+# long constant and is not a live reference (docstring ids have their own gate,
+# tests/test_docstring_secret_ids_2653.py), and an SSM path like
+# `/life-platform/budget-tier` is not one either — it does not start at `life-platform`.
+_SECRET_NAME_RE = re.compile(r"life-platform/[a-zA-Z0-9_\-]+")
 
 # Convention: all secret names must have this prefix.
 _CONVENTION_RE = re.compile(r"^life-platform/")
@@ -139,37 +174,50 @@ def _collect_files():
     return sorted(files)
 
 
-def _extract_secret_literals(filepath):
-    """Extract all 'life-platform/...' string literals from a source file.
+def _extract_from_source(source, filename="<source>"):
+    """Extract every secret-name string CONSTANT from Python source text.
 
-    Returns list of (line_number, secret_name) tuples.
-    Skips comment lines and lines containing known-false-positive patterns.
+    Returns list of (line_number, secret_name) tuples, in source order.
+
+    Token-level by construction (#3255): only `ast.Constant` string nodes that
+    full-match a secret name are collected, so identifiers, attribute names,
+    comments and prose are structurally out of reach — no suppression list needed.
+    Raises SyntaxError for unparseable source; the caller decides what that means.
     """
+    tree = ast.parse(source, filename=filename)
     results = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and _SECRET_NAME_RE.fullmatch(node.value):
+            results.append((node.lineno, node.value))
+    return sorted(results)
+
+
+def _extract_secret_literals(filepath):
+    """`_extract_from_source` over a file. Returns (refs, parse_error_or_None).
+
+    A parse failure is RETURNED, never swallowed: v1.0.0's `except Exception: pass`
+    meant a file the scanner could not read contributed zero references and said
+    nothing, which is a silent false-green in a gate whose whole job is to notice
+    what is missing. SR4 asserts the error list is empty.
+    """
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        source = f.read()
     try:
-        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            for lineno, line in enumerate(f, 1):
-                stripped = line.strip()
-                if stripped.startswith("#"):  # full-line comment
-                    continue
-                # Skip lines that are clearly env var names or variable assignments,
-                # not actual secret string lookups
-                if any(fp in line for fp in FALSE_POSITIVE_PATTERNS):
-                    continue
-                for match in _SECRET_LITERAL_RE.finditer(line):
-                    secret_name = match.group(1)
-                    results.append((lineno, secret_name))
-    except Exception:
-        pass
-    return results
+        return _extract_from_source(source, filepath), None
+    except SyntaxError as exc:
+        return [], f"{os.path.relpath(filepath, ROOT)}: {type(exc).__name__}: {exc}"
 
 
 # ── Pre-compute scan results once at module load ──────────────────────────────
 
 _FILES = _collect_files()
 _ALL_REFS: list = []
+_PARSE_ERRORS: list = []
 for _f in _FILES:
-    for _lineno, _name in _extract_secret_literals(_f):
+    _refs, _err = _extract_secret_literals(_f)
+    if _err:
+        _PARSE_ERRORS.append(_err)
+    for _lineno, _name in _refs:
         _ALL_REFS.append((_f, _lineno, _name))
 
 
@@ -239,10 +287,19 @@ def test_sr2_no_deleted_secret_references():
 
 
 def test_sr3_secret_names_follow_convention():
-    """SR3: All 'life-platform/...' literals must follow the naming convention.
+    """SR3: every extracted name carries the life-platform/ prefix.
 
-    Catches typos like 'life-platorm/ai-keys' (missed 'f') or
-    'life_platform/ai-keys' (underscore instead of hyphen).
+    STATED SCOPE, measured 2026-08-27 (#3255) — read this before trusting the green.
+    This is a RESIDUAL INVARIANT on the extractor, not a typo detector. `_SECRET_NAME_RE`
+    already requires the prefix, so SR3 can only fail if that regex and `_CONVENTION_RE`
+    are edited apart. It does NOT catch a near-miss prefix (`life-platorm/ai-keys`,
+    `life_platform/ai-keys`) — such a string never becomes a ref in the first place.
+
+    Why that gap was left open rather than closed here: a fuzzy-prefix rule was measured
+    against the tree, and the ONLY near-miss it finds is `LifePlatform/AI` — the
+    CloudWatch EMF namespace, at 67 sites. Closing the gap therefore requires a
+    suppression list, which is precisely the machinery #3255 removed. It is a separate
+    decision with its own trade-off, not a silent extension of this one.
     """
     violations = []
     for filepath, lineno, secret_name in _ALL_REFS:
@@ -258,24 +315,81 @@ def test_sr3_secret_names_follow_convention():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SR4 — Sanity: scanner must find at least some references
+# SR4 — Sanity: scanner must read every file, and find at least some references
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 def test_sr4_secret_references_found():
-    """SR4: The scanner must find at least a minimum number of secret references.
+    """SR4: The scanner must parse every file it walked and find some references.
 
     Guards against silent false-greens caused by a broken regex or empty
     SCAN_PATHS. If _ALL_REFS is empty it's the scanner that's broken, not
     the code.
+
+    #3255 added the parse half: a file the scanner cannot read contributes zero
+    references, which is indistinguishable from a clean file unless it is reported.
     """
+    assert (
+        not _PARSE_ERRORS
+    ), f"SR4 FAIL: {len(_PARSE_ERRORS)} scanned file(s) did not parse, so they were audited " "by nothing:\n" + "\n".join(
+        f"  {e}" for e in _PARSE_ERRORS
+    )
+
     MIN_EXPECTED = 3  # conservative lower bound
     assert len(_ALL_REFS) >= MIN_EXPECTED, (
         f"SR4 FAIL: Only {len(_ALL_REFS)} secret references found across all source files. "
         f"Expected at least {MIN_EXPECTED}. The scanner may be broken — "
-        f"check _SECRET_LITERAL_RE and SCAN_PATHS.\n"
+        f"check _SECRET_NAME_RE and SCAN_PATHS.\n"
         f"Files scanned: {len(_FILES)}"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SR5 — Controls on the extractor itself (#3255)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# The canonical form the March-2026 outage took, and the form v1.0.0's line-level
+# suppression discarded whole. Kept as source text so the control exercises the real
+# extractor rather than a paraphrase of it.
+_ENV_DEFAULT_SHAPE = 'import os\n\nSECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/todoits")\n'
+
+
+def test_sr5_the_env_default_shape_is_inside_the_scan_surface():
+    """SR5 (positive control): the outage shape this module exists for is extracted.
+
+    This is the assertion that fails if anyone re-introduces line-level or substring
+    suppression. Before #3255 the extractor returned [] for this exact input while
+    all four rules reported green — a gate that could not fail on its own root cause.
+    """
+    refs = _extract_from_source(_ENV_DEFAULT_SHAPE)
+    assert refs == [(3, "life-platform/todoits")], (
+        f"SR5 FAIL: the extractor returned {refs!r} for the canonical secret-default line. "
+        'The `SECRET_NAME = os.environ.get("SECRET_NAME", ...)` form is the shape this '
+        "module's docstring names as its reason to exist (#3255) — it must be scanned, and "
+        "the typo'd name in it must then fail SR1."
+    )
+    assert "life-platform/todoits" not in KNOWN_SECRETS, "the control's typo'd name must be unknown, or it proves nothing"
+
+
+def test_sr5_prose_and_identifiers_are_not_references():
+    """SR5 (negative control): token scope, not line scope, in the other direction.
+
+    Comments, docstrings and identifiers must NOT become references — otherwise the
+    fix for the mask would just trade a false-green for a false-red, and the next
+    author would reach for a suppression list again.
+    """
+    prose = (
+        '"""Reads life-platform/whoop at boot; see life-platform/ai-keys."""\n\n'
+        "# life-platform/webhook-key was deleted in 2026-03\n"
+        "life_platform_whoop = 1\n"
+    )
+    assert _extract_from_source(prose) == [], "prose/identifier mentions must not be scanned as live references"
+
+
+def test_sr5_a_file_that_cannot_be_parsed_is_reported_not_swallowed():
+    """SR5: the parse failure is raised to the caller, which is what SR4 asserts on."""
+    with pytest.raises(SyntaxError):
+        _extract_from_source("def broken(:\n")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

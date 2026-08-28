@@ -78,6 +78,7 @@ USAGE
 """
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -293,6 +294,62 @@ def dead_citations(alarms, citations, issue_states):
             state = issue_states.get(num)
             if state is not None and str(state).upper() != "OPEN":
                 out.append((name, f"#{num}"))
+    return out
+
+
+# #3258: a citation note may not assert that a fixed cause has NOT COME BACK
+# unless it says where it looked. The measured instance: qa-smoke-warnings' entry
+# read "Home-hero temporal framing (539c6d, 08-16..08-23) — fixed by #3066/PR#3075
+# …, no recurrence since" while the identical fingerprint `539c6d` was in
+# /aws/lambda/life-platform-qa-smoke inside the last 72h. Nothing checked it,
+# because the claim was prose re-verified by a human's memory.
+#
+# The rule is deliberately ASYMMETRIC and that asymmetry is the point: a
+# recurrence-negative is unfalsifiable from the registry alone, so it must carry
+# its derivation (the log group it was read from, or the query that read it). A
+# positive claim needs no marker — it is checkable by looking. The check
+# UNDER-catches by construction (a novel wording slips through) and that is the
+# safe direction for a doc lint: it can only fail to flag a sloppy note, never
+# suppress a real signal. That is the opposite of the #2959/#3003/#3199
+# phrase-matched SUPPRESSOR family, where under-catching means going blind.
+_RECURRENCE_NEGATIVE = re.compile(
+    r"\bno (?:further )?recurrence\b|\b(?:has|have)(?: not|n't) recurred\b|\bnot recurred\b|\bnever recurred\b|\bno repeat\b",
+    re.I,
+)
+# What counts as "derived": the note names the log group it was read from, or the
+# read itself. Both are things a reviewer can re-run; a date alone is not.
+_DERIVATION_MARKERS = ("/aws/lambda/", "/aws/", "filter-log-events", "describe-alarm-history", "start-query")
+
+# The marker must sit NEAR the claim, not merely somewhere in the same entry. The
+# first draft of this check tested the whole note, and its own must-fail mutation
+# passed vacuously: appending "…, no recurrence since" to the end of a long entry
+# that happened to name a log group 1,900 characters earlier was not flagged. A
+# derivation attaches to a claim, not to a paragraph. Same shape as #3208's
+# `_FRACTION_CONTEXT_CHARS` and for the same reason.
+_DERIVATION_CONTEXT_CHARS = 240
+
+
+def unfalsifiable_negatives(citations):
+    """(alarm_name, matched_phrase) for every citation asserting a recurrence
+    NEGATIVE without naming how it was derived (#3258).
+
+    A claim is derived when a derivation marker appears within
+    `_DERIVATION_CONTEXT_CHARS` of it. EVERY recurrence-negative in an entry must
+    be derived — one derived claim does not license a second undated one.
+
+    Pure and offline — it reads the committed registry only, so it is enforced by
+    the unit suite on every PR rather than only on a /wrap run against live AWS.
+    """
+    out = []
+    for name, entry in sorted((citations or {}).items()):
+        if not isinstance(entry, dict):
+            continue
+        text = f"{entry.get('citation', '')} {entry.get('note', '')}"
+        for m in _RECURRENCE_NEGATIVE.finditer(text):
+            window = text[max(0, m.start() - _DERIVATION_CONTEXT_CHARS) : m.end() + _DERIVATION_CONTEXT_CHARS]
+            if any(marker in window for marker in _DERIVATION_MARKERS):
+                continue
+            out.append((name, m.group(0)))
     return out
 
 

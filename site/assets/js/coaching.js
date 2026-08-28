@@ -552,7 +552,15 @@ async function renderReadWeek(read) {
   const [wp, som] = await Promise.all([tryJSON("/api/weekly_priority"), tryJSON("/api/state_of_matthew")]);
   let h = `<p class="dx-kicker label">the week · what each domain showed</p><h2 class="dx-title">This week</h2>`;
   if (wp && wp.weekly_priority) {
-    h += `<section class="read-priority"><p class="dx-kicker label">the week's call · ${esc(wp.coach_name || LEAD_BYLINE_FALLBACK)}</p><blockquote class="rp-text">${esc(wp.weekly_priority)}</blockquote></section>`;
+    // #3252 — the SECOND surface that renders the integrator's call, and it was
+    // undated too. The prose makes relative-time claims ("eleven days into the
+    // cycle"), so the dateline carries the day number the text was written FOR,
+    // above the quote it frames — never below it, and never a literal (the API's
+    // derived `as_of_day_n`; absent renders nothing at all).
+    const wpAsOf = weeklyAsOf(wp.generated_at, wp.as_of_day_n);
+    h += `<section class="read-priority"><p class="dx-kicker label">the week's call · ${esc(wp.coach_name || LEAD_BYLINE_FALLBACK)}</p>` +
+      (wpAsOf ? `<p class="rp-asof label">${esc(wpAsOf)}</p>` : "") +
+      `<blockquote class="rp-text">${esc(wp.weekly_priority)}</blockquote></section>`;
   }
   const notes = (wp && wp.cross_domain_notes) || {};
   const keys = Object.keys(notes);

@@ -759,3 +759,130 @@ def is_active_vs_passive_objection(finding):
         return False
     today_n = int(m.group(1) or m.group(2))
     return today_n > 1
+
+
+# ── #3258 (2026-08-27): the ledger's ADVISORY verdict, recorded as a FIELD ─────
+#
+# THE OBSERVED FAILURE. `/aws/lambda/life-platform-qa-smoke`, Day 11, finding
+# `539c6d`, severity `low` — verbatim wire note (576 chars, matching the log's own
+# "full note (576 chars)" stamp; replayed in tests/test_reader_truth_retracted_3258.py):
+#
+#   "Home page states 'This attempt starts at the Day‑1 weigh‑in, aimed at 185 lbs
+#    held for 90 consecutive days' but does not explicitly label this as a
+#    forward-looking goal or checkpoint. … However, the context ('aimed at', 'or
+#    the checkpoint fails') makes clear it is a prospective goal. This is ambiguous
+#    rather than contradictory — the phrasing is acceptable for describing a cycle
+#    objective. No flag warranted on reconsideration."
+#
+# The judge reasoned its way to a verdict of NO finding and the structured output
+# still carried one. `qa_check.split_warns()` saw a non-chronic WARN, routed it to
+# `WarnCount`, and `qa-smoke-warnings` lit.
+#
+# WHY THE OBVIOUS FIX IS THE WRONG ONE. `is_self_refuted` above is a phrase list
+# ("no contradiction", "self-consistent", "within phase bounds", "label is
+# accurate"). "No flag warranted on reconsideration" is not on it, and adding it
+# would be the fifth member of a family this repo has measured failing in the field
+# three times (#2959 → #3003 → #3199, and #3208's own widening comment). A
+# suppressor keyed to one phrasing does not survive the oracle's non-stationary
+# rephrasing. The phrase list is NOT extended here, deliberately.
+#
+# WHAT IS ACTUALLY BROKEN — and it is not the wording. Two structural facts,
+# measured against the live predicate set on the wire note above:
+#
+#   1. `is_vagueness_objection(f)` is **True** on it ("This is ambiguous rather
+#      than contradictory"). #3003 already adjudicated this exact class. But
+#      `assess_prose` only CONSULTED the demotion predicates under
+#      `if f["severity"] != "low"`, so a finding the model itself rated `low` was
+#      never adjudicated at all — the ledger was blind to precisely the severity
+#      the warnings alarm still fires on.
+#   2. Every demotion ruling in this file states, in its own comment, that the
+#      finding it adjudicates is "visible as advisory, **never gating**"
+#      (#2959 ×2, #3003, #3199 ×2). All five demote to `low` — and `low` gates:
+#      `qa_check_reader_truth` puts low/med in one WARN and `split_warns` sends
+#      that to the alarmed `WarnCount`. There was no channel below `low`, so five
+#      rulings have been asserting an outcome the pipeline could not deliver.
+#
+# THE FIX, structurally. The adjudication stops being a severity side-effect and
+# becomes DATA on the finding: every ruling that fires appends its id to the
+# finding's `rulings` list, at EVERY severity. `qa_check_reader_truth` then routes
+# on that field — adjudicated findings ride `ChronicWarnCount` (fully visible in
+# the check list, the email and the logs; watched by no alarm, #1958), and
+# `WarnCount` counts exactly the findings on which NO reconsideration fired. That
+# is the issue's Outcome made literal: a lit `qa-smoke-warnings` means a
+# reader-truth finding survived the judge's own reconsideration.
+#
+# RESIDUE, named honestly rather than papered over: a retraction that no predicate
+# in this ledger adjudicates still reaches `WarnCount`. The durable fix for THAT is
+# the response contract — a per-finding `verdict: flag|withdrawn` field the judge
+# fills, so a retraction has a structured place to live instead of leaking into
+# prose. It is deliberately not shipped here: it cannot be measured from a worktree
+# (a Bedrock invoke is a write), and no recorded payload carries the field, so it
+# could not have a must-fail case replayed from the wire — which is exactly the
+# unmeasured-prompt-change shape #2613 and #2741 charge a deploy for.
+
+RULINGS_FIELD = "rulings"
+
+
+def advisory_rulings(start_date, today=None):
+    """The ledger's ADVISORY rulings as ``(id, label, predicate, reason)`` (#3258).
+
+    ONE table, so the set the assessment loop consults and the set this file
+    documents cannot drift apart (charter primitive 1). Ordering is the order the
+    rulings were written; a finding may match more than one and records all of
+    them. `start_date`/`today` are the phase anchors the two date-aware
+    predicates need — bound here so every caller passes the same frame.
+
+    `label` is the human phrase the assessment loop prints ("a vagueness-objection
+    finding"); it carries its own article and noun so the five log lines stay
+    byte-identical to the ones each ruling shipped with, while `id` — the machine
+    key recorded on the finding — stays a stable snake_case token.
+
+    DROP rulings (`is_code_owned_temporal`, `is_wake_frame_correct`,
+    `is_utc_offset_misread`, `is_durable_design_copy`, `is_prior_cycle_archive`,
+    `is_coach_surface_audience`, `is_self_refuted`) are deliberately NOT in this
+    table: a dropped finding never reaches a bucket at all, so it needs no
+    channel. This table is only the rulings whose own stated outcome is
+    "visible as advisory, never gating".
+    """
+    return (
+        (
+            "day_counter_bound",
+            "a day-counter-bound finding",
+            is_day_counter_bound_inference,
+            "the day counter is not a data bound, #2959",
+        ),
+        (
+            "position_banner_misread",
+            "a position-banner misread",
+            lambda f: is_position_banner_misread(f, start_date, today),
+            "the banner is a clock, not a content label, #2959",
+        ),
+        (
+            "vagueness_objection",
+            "a vagueness-objection finding",
+            is_vagueness_objection,
+            "'vague' is not a temporal_contradiction, #3003",
+        ),
+        (
+            "sparsity_objection",
+            "a sparsity-objection finding",
+            is_sparsity_objection,
+            "a cadence gap is not a temporal_contradiction, #3199",
+        ),
+        (
+            "active_vs_passive",
+            "an active-vs-passive objection",
+            is_active_vs_passive_objection,
+            "day arithmetic alone does not disprove it, #3199",
+        ),
+    )
+
+
+def is_advisory(finding):
+    """True when the ruling ledger adjudicated `finding` as advisory (#3258).
+
+    The routing key `qa_check_reader_truth` reads. Reads a FIELD the assessment
+    loop wrote, never the note — a finding with no `rulings` entry is one no
+    reconsideration touched, and it keeps its place in the alarmed `WarnCount`.
+    """
+    return bool((finding or {}).get(RULINGS_FIELD))

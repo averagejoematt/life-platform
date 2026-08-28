@@ -893,6 +893,10 @@ body { overflow-x: hidden; }
    you now; By Coach = the read on top of the domain data. Reuses dx-/coach-/tt- tokens. */
 .read-priority { margin: var(--sp-4) 0; padding: var(--sp-4) var(--sp-5); border-left: 3px solid var(--ember);
   background: var(--ember-wash); border-radius: var(--radius-sm); }
+/* #3252 — the week's-call dateline, ABOVE the quote it frames (a stamp a reader
+   meets after the claim is a footnote, not a frame). Its own class so the gap
+   below it is the frame's, not .rp-text's leading margin. */
+.rp-asof { margin: var(--sp-1) 0 0; color: var(--ink-faint); }
 .rp-text { margin: var(--sp-2) 0 0; font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); color: var(--ink); }
 .read-digest { margin-top: var(--sp-5); }
 .rd-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-2); }

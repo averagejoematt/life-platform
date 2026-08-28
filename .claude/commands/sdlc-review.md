@@ -10,7 +10,10 @@ ideation → issue → worktree → AI implementation → verify → PR → depl
 measurable pipeline. Nothing in the artifact reviews covers this ground deeper than one lens;
 this ritual owns it.
 
-Cadence: quarterly-ish, or before any commercialization/showcase milestone, or on request.
+Cadence is NOT set here: the `sdlc-review` entry in `scripts/operating_calendar.py` is the
+registry (quarterly + grace, with this ritual's two standing obligations recorded on the
+entry so they cannot die with a session's memory). Also run before any
+commercialization/showcase milestone, or on request.
 Token-heavy multi-agent ritual (same order as /platform-review). Two input modes:
 - `/sdlc-review` — full unseeded sweep.
 - `/sdlc-review <path-or-note>` — seeded: Matthew hands observations ("deploys feel scary",
@@ -55,27 +58,40 @@ for this ritual), Cost Explorer, CloudWatch describe/get, SSM get, S3 get/list.
    `fullreview_grades_*.json` to avoid re-litigating artifact-review ground. Also load
    `docs/TESTING.md` § "QA Strategy Scorecard" — the baseline/target/current record the
    quarterly QA re-grade folded into Phase 3 diffs against.
-4. Write the **shared context block** every lens brief carries verbatim: platform paragraph,
-   ground truth, the three axes, the evidence rule, the do-not-refile list, and any seeded
-   hypotheses (each assigned to exactly ONE owner lens; other lenses may cite but not file).
+4. **Derive the grading anchors — never read a magnitude out of this file.** Run
+   `python3 scripts/review_anchors.py` and carry its block verbatim into the shared context.
+   Every magnitude in the lens table below is an anchor KEY (`test_modules`,
+   `deploy_entrypoints`, …), resolved on the day of the run. This is not ceremony: on
+   2026-08-27 the hand-typed anchors in this file were measured **2.7x** below the real test
+   suite and roughly half the real `deploy/` surface, and a denominator that far off does not
+   grade — it flatters (#3250 carries the stale values; they are deliberately not re-typed
+   here, because a number typed into a rubric is exactly what rotted). If a lens
+   needs a magnitude the script does not derive, add it to `DERIVATIONS` in that script; do
+   not type it here. Counts owned elsewhere (the gate estate, the MCP tool count, the
+   `platform_counts.py` doc literals) are cited from their owner, never re-derived.
+5. Write the **shared context block** every lens brief carries verbatim: platform paragraph,
+   ground truth, the derived anchor block, the three axes, the evidence rule, the
+   do-not-refile list, and any seeded hypotheses (each assigned to exactly ONE owner lens;
+   other lenses may cite but not file).
 
 ## Phase 1 — The panel (fan-out; Workflow tool explicitly authorized)
 
-One agent per lens. Twelve lenses, each grading a lifecycle stage or cross-cutting practice:
+One agent per lens — the table below IS the lens set, and its row count is the panel size
+(counted from the table, never asserted in prose beside it):
 
 | # | Lens | Grades | Looks at |
 |---|------|--------|----------|
 | 1 | Ideation & discovery | How ideas become work | ADR-099 flow health (issue quality, score-line honesty, milestone hygiene), north-star→epic→story linkage, strategy-driven vs findings-driven backlog mix, fresh-eyes/review pipelines as idea sources |
-| 2 | Planning & design practice | Deciding before building | ADR corpus quality at n≈135 (decision vs diary, discoverability, superseded-marking), when specs/briefs precede code, design-before-build discipline in recent PRs |
+| 2 | Planning & design practice | Deciding before building | ADR corpus quality at `adr_records` (decision vs diary, discoverability, superseded-marking), when specs/briefs precede code, design-before-build discipline in recent PRs |
 | 3 | AI-engineering practice | The Claude org | CLAUDE.md size/efficacy as a prompt, memory-system health (orphans, staleness, duplication), commands/skills/agents fit + redundancy, `model:*` routing accuracy vs actual usage, subagent verification discipline, handover ritual cost/benefit |
 | 4 | Version control & integration | Git as a system | worktree/merge-queue/reconcile practice, squash-drift incidents, doc-sync literal conflicts, pre-commit posture (client-only, fails open), CODEOWNERS/branch-protection reality, PR template fit |
-| 5 | Build & deploy engineering | The path to prod | the `deploy/` script surface (~85 scripts): consolidation candidates, one-bundle #781 integrity, deploy-path count vs need, whether known traps live in memory/docs vs enforced in code |
-| 6 | Testing & quality economics | The gate estate | suite runtime/flake economics at ~380 test files, gate taxonomy coherence (who owns what), coverage floor honesty, AI-output eval maturity (golden briefs, faithfulness, canaries), load/perf testing absence |
+| 5 | Build & deploy engineering | The path to prod | the `deploy/` script surface (`deploy_entrypoints` at the top level, `deploy_surface` in total): consolidation candidates, one-bundle #781 integrity, deploy-path count vs need, whether known traps live in memory/docs vs enforced in code |
+| 6 | Testing & quality economics | The gate estate | suite runtime/flake economics at `test_modules` (`test_suite_files` collected), gate taxonomy coherence (who owns what — size the estate from `scripts/gate_census.py`, not from a guess), coverage floor honesty, AI-output eval maturity (golden briefs, faithfulness, canaries), load/perf testing absence |
 | 7 | Release & environments | Blast radius | staging absence (prevent vs detect-and-revert posture), single account/region topology, feature-flag absence, the production approval gate as practiced, rollback drill evidence |
 | 8 | Operations & oversight | Running it | alarm estate vs real failure modes, DLQ hygiene, SLOs as practiced, remediation-agent + fresh-eyes **efficacy** (PRs merged / true-positive rate / cost — are the autonomous loops earning their keep?), incident log discipline, on-call-of-one sustainability |
 | 9 | Security & supply chain | The attack surface as process | SCA/CVE + SAST posture (Dependabot bumps ≠ vuln scanning), secrets rotation as practiced vs documented, IAM change process, OIDC posture, public-surface hardening cadence |
 | 10 | Cost engineering | Unit economics | ADR-063 governor as practice, spend attribution granularity, cost-per-feature visibility, the unit-economics story a commercialization would need |
-| 11 | Knowledge & continuity | The second brain | docs mass (60+ process docs; the session log on the `session-archive` branch): asset or drag — doc-maintenance cost per change, staleness beyond the gated facts, bus-factor/successor path (CONTINUITY, ACCOUNTS, bootstrap docs) actually walkable |
+| 11 | Knowledge & continuity | The second brain | docs mass (`process_docs` at the top level, `docs_surface` in total; the session log on the `session-archive` branch): asset or drag — doc-maintenance cost per change, staleness beyond the gated facts, bus-factor/successor path (CONTINUITY, ACCOUNTS, bootstrap docs) actually walkable |
 | 12 | Commercialization readiness | The acquirer's audit | multi-tenancy distance, health-data compliance surface (PII/HIPAA-adjacency of the data classes held), licensing/IP hygiene, which best-practice deviations are documented postures vs accidents, the ordered path to "defensible product" |
 
 **Every lens brief MUST carry:**

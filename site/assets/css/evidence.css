@@ -334,6 +334,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 /* The board — AI expert roster */
 .board-kicker { color: var(--ember); display: block; margin-bottom: var(--sp-2); }
+/* #3252 — the integrator's dateline sits BETWEEN the kicker and the prose it frames.
+   Its own class for the same reason .bc-dateline has one: a stamp a reader meets after
+   the claim is a footnote, not a frame, and the kicker's trailing margin is wrong for a
+   line that must read as attached to the prose below it. */
+.board-asof { color: var(--ink-faint); margin: calc(-1 * var(--sp-1)) 0 var(--sp-2); }
 .coach-grid { display: grid; gap: var(--bento-gap); grid-template-columns: 1fr; }
 @media (min-width: 601px) { .coach-grid { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 901px) { .coach-grid { grid-template-columns: 1fr 1fr 1fr; } }

@@ -92,7 +92,7 @@ even that script and duplicates its metric/threshold exactly with no action at a
                                        an exact duplicate, just routed to a second
                                        billing topic. Both predate ADR-133's cost
                                        governance (the AWS Budget
-                                       life-platform-monthly-75, $150 ceiling, covering
+                                       life-platform-monthly-75, $215 ceiling, covering
                                        ALL spend + cost_governor_lambda's SSM
                                        budget-tier system) by months; a flat $5
                                        total-AWS-spend threshold is not a meaningful

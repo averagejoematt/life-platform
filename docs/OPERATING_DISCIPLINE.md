@@ -14,7 +14,7 @@ share a checkout — lived only in the operator's private Claude memory files, o
 on one laptop (`docs/CONTINUITY.md` §4). #2848 is the migration; this is where it landed.
 
 **The one-place rule holds.** A rule stated here is not restated in `CONVENTIONS.md`,
-`CHARTER.md`, `CLAUDE.md` or a subagent prompt, and vice versa — §5 below is the routing
+`CHARTER.md`, `CLAUDE.md` or a subagent prompt, and vice versa — §6 below is the routing
 table for what deliberately lives elsewhere. If you find a rule in two places, one copy
 is stale: fix it to a one-line pointer.
 
@@ -190,11 +190,61 @@ the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
 
 ---
 
-## 5. What deliberately lives elsewhere
+## 5. Production authority — who may deploy, and what a waiting gate is
+
+The `production` GitHub Environment gate is the real authority boundary in this system.
+Everything below it — `deploy/deploy_lambda.sh`, `deploy/cdk_deploy.sh`, the site path — is
+mechanics, and the mechanics are in `docs/CONVENTIONS.md`. **This section is the only place
+that says who may pull the lever.** It exists because the rule previously lived nowhere in
+the repo: a session could find *how* to deploy and not *whether it may* (#3264).
+
+1. **The default is ask. Matthew approves production deploys.** Absent an explicit grant,
+   a session that believes a deploy is needed **states the ask and stops** — one numbered
+   request naming the function or stack, the sha, and why. It does not deploy, and it does
+   not approve a waiting gate. "The change is obviously correct" is not an authorization.
+
+2. **A standing grant supersedes the per-action ask, and only a standing grant does.** A
+   session brief that says *autonomous with merge+deploy authority* IS the authorization —
+   for the whole session, for every action inside it. **Do not re-ask per action**; a grant
+   that has to be re-confirmed each time is not a grant, and the re-asking is itself the
+   failure mode it was written to prevent. A grant covers the work in front of it, not a
+   later session: authority does not carry across the session boundary.
+
+3. **A gated run is a LEASE on a specific sha, not a queue ticket.** Approving it deploys
+   *that tree*, not today's. This is the whole risk. A lease minted before later merges
+   will ship a tree **older than what is already live** — Session F found one stranded 7.5h
+   whose approval would have rolled back two fixes deployed the same session, and Session B
+   found a 16.4h lease that would have regressed the fleet. Neither was a hypothetical.
+
+4. **Decode every lease against what is ACTUALLY live before disposing of it.** Not against
+   the PR title, not against the merge order, and not against the sha alone — compare by
+   **content**: download the deployed bundle and grep for the change (`docs/CONVENTIONS.md`
+   has the procedure). A sha comparison cannot see a manual deploy that already shipped the
+   same code, which is the common case at the end of a working session.
+
+5. **Dispose of it: approve or reject, never leave it waiting.** `deploy/approve_deployment.sh`
+   and `deploy/reject_deployment.sh` are both first-class outcomes, and **rejection is the
+   more common correct one** — a superseded lease should be rejected, not approved "to clear
+   it". A lease left waiting is not neutral: it queues every later run behind it at zero jobs
+   and reads as a wedge (`deploy/watch_deploy_gate.sh`, `scripts/check_deploy_wedge.py`).
+
+6. **Rejecting is not reverting.** A rejected lease ships nothing; it does not undo a deploy
+   that already happened. If production is wrong, that is a rollback (`docs/RUNBOOK.md`), a
+   separate act with its own authority question — and note the site rollback's scope does not
+   reach DynamoDB-sourced content or `/api/*`.
+
+7. **Auto-merge never auto-deploys.** `remediation/automerge.py` merges a narrow allowlisted
+   class without a human; CI's production approval gate stays intact behind it (ADR-065). A
+   merged PR is not a deployed one, and "it merged" is never evidence that it shipped.
+
+---
+
+## 6. What deliberately lives elsewhere
 
 | Family | Canonical home |
 |---|---|
-| Deploy, CI gates, git/merge mechanics, doc-sync literals, rollback | `docs/CONVENTIONS.md` |
+| Deploy, CI gates, git/merge mechanics, doc-sync literals, rollback — the **mechanics** | `docs/CONVENTIONS.md` |
+| Who may deploy, standing grants, disposing a waiting gate — the **authority** | §5 above (deliberately NOT in `CONVENTIONS.md`) |
 | Proving a gate can fail; fixture-is-the-wire; defect class → owning gate | `docs/CONVENTIONS.md` §9 and §9a |
 | Filing discipline — file into the class, not the symptom | `docs/CONVENTIONS.md` §10 |
 | The five architecture primitives and the paved roads | `docs/CHARTER.md` |
@@ -206,18 +256,17 @@ the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
 
 ---
 
-## 6. Residual — what a memoryless session still cannot determine from this repo
+## 7. Residual — what a memoryless session still cannot determine from this repo
 
 The cold-read exercise for #2848's fourth acceptance box: walk the repo with no session
 memory and record what could not be answered. These are the gaps that remain **after**
 this page. Each is a real hole, named rather than closed.
 
-1. **Deploy authorization.** Nothing in the repo states who may run a production deploy,
-   what a standing authorization grant looks like, or that approving a waiting gate is a
-   decision with a rollback consequence. The rule lives only in the operator's memory
-   ("Matthew runs deploys unless a session brief grants otherwise"). A memoryless session
-   can find *how* to deploy (`docs/QUICKSTART.md`, the `/deploy` skill) but not *whether
-   it may*. **This is the highest-value remaining gap.**
+1. ~~**Deploy authorization.**~~ **CLOSED 2026-08-28 by #3264** — §5 above. It was the
+   highest-value gap on this list: the only one where a successor acting reasonably on repo
+   evidence alone could take a destructive production action, or strand the pipeline by
+   refusing a safe one. Left visible rather than deleted, so the shape of what was missing
+   stays legible.
 
 2. **Which instrument-verification rules are binding.** The "an instrument that reports
    success without doing its job" family — negative controls, denominators, what makes a

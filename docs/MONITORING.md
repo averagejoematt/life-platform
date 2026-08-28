@@ -53,7 +53,7 @@ read the stack for routing.
 > cap prevents a 19-function aggregate that pages). Ingestion failure is caught downstream
 > via `slo-source-freshness`, `ingest-consecutive-failures-*`, the DLQ-depth alarms, and
 > the canary. Budget breaches page via an AWS Budget + cost-governor SSM tiers
-> (`life-platform-monthly-75`, $150 ceiling, ADR-133), not a CloudWatch alarm.
+> (`life-platform-monthly-75`, $215 ceiling, ADR-133), not a CloudWatch alarm.
 
 **OAuth auth-death coverage (#1960).** `ingest-auth-unhealthy-24h` is the fleet-wide
 aggregate (dimensionless `LifePlatform/OAuth IngestAuthHealthy`, Min<1 over 1h — re-cut
