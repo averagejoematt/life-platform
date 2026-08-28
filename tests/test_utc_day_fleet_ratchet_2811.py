@@ -960,7 +960,13 @@ def test_the_freshness_checker_anchors_its_day_in_the_frame_that_names_it():
         "compared it against `pacific_now()`, inflating every age by the Pacific offset. "
         "Use `.replace(tzinfo=PACIFIC)`, or reduce BOTH operands to `.date()`."
     )
-    assert "tzinfo=PACIFIC" in src, f"{rel} lost the Pacific anchor #2817 gave it"
+    # #3257: the anchor moved from an inline `.replace(tzinfo=PACIFIC)` to the shared,
+    # per-source `common.pacific_time.anchor_day_key` — because apple_health's DATE# day
+    # is genuinely UTC (TD-19 Phase 2) and because the public board reading these same
+    # keys must agree with this checker by construction rather than by two copies of one
+    # line staying in sync (they did not: the board was still UTC-anchored, 7h out).
+    # The invariant is unchanged; its address is not.
+    assert "anchor_day_key(date_str, source_key)" in src, f"{rel} lost the frame-correct day anchor #2817/#3257 gave it"
 
 
 def test_the_email_day_anchor_rulings_are_exact_and_shrink_only():

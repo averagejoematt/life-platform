@@ -141,7 +141,7 @@ def build_training(stats):
     draw.text((48, 180), "Whoop strain x Strava volume x recovery.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     z2 = training.get("zone2_this_week_min")
-    _draw_metric(draw, 48, 260, _fmt(z2, 0, " min"), "ZONE 2 THIS WEEK")
+    _draw_metric(draw, 48, 260, _fmt(z2, 0, " min"), "ZONE 2 THIS WEEK")  # og-literal-ok: an intensity zone NAME, not a count
     _draw_metric(draw, 380, 260, _fmt(training.get("acwr"), 1), "ACWR")
     _draw_metric(draw, 620, 260, training.get("form_status", "\u2014").upper(), "FORM")
 
@@ -173,9 +173,12 @@ def build_character(stats):
     img, draw = _base_image()
     _draw_header(draw, "Character Sheet")
     draw.text((48, 100), "THE SCORE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "Gamified health tracking. 7 pillars. Real XP.", fill=MUTED, font=_font(FONT_MONO, 14))
+    # og-literal-ok: 7 = the character engine's fixed pillar set (sleep, movement, nutrition,
+    # metabolic, mind, relationships, consistency — health/character_engine.py). A structural
+    # constant of the model, not a measurement that can drift under the card.
+    draw.text((48, 180), "Gamified health tracking. 7 pillars. Real XP.", fill=MUTED, font=_font(FONT_MONO, 14))  # og-literal-ok: see above
     platform = stats.get("platform", {})
-    _draw_metric(draw, 48, 260, _fmt(platform.get("tier0_streak"), 0), "TIER-0 STREAK", GREEN)
+    _draw_metric(draw, 48, 260, _fmt(platform.get("tier0_streak"), 0), "TIER-0 STREAK", GREEN)  # og-literal-ok: a tier NAME
     _draw_metric(draw, 380, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
     _draw_footer(draw, stats)
     return img
@@ -207,12 +210,23 @@ def build_mind(stats):
 
 
 def build_labs(stats):
+    """#3261 (sibling of build_builders): drew "74 biomarkers. 7 draws." plus `74` and `7`
+    tiles, against a live `/api/labs` reporting 152 distinct biomarkers and 8 draws.
+
+    Unlike the builders card there is nothing to derive FROM here: labs live in DynamoDB,
+    this Lambda has no table access (its role grants two S3 GetObjects — public_stats.json
+    and the board answers feed) and `public_stats.json` carries no labs block. So the
+    numbers are REMOVED rather than corrected — the `build_essay_org_chart` /
+    `build_chronicle` treatment ("no fabricated metrics"), which is the honest option when
+    a surface cannot reach its ground truth (ADR-104). Restoring numbers to this card means
+    publishing `labs: {total_draws, total_biomarkers}` into public_stats.json first; then
+    they can be drawn the way build_builders now draws its own.
+    """
     img, draw = _base_image()
     _draw_header(draw, "Bloodwork Intelligence")
     draw.text((48, 100), "THE LABS", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "74 biomarkers. 7 draws. The ground truth.", fill=MUTED, font=_font(FONT_MONO, 14))
-    _draw_metric(draw, 48, 260, "74", "BIOMARKERS")
-    _draw_metric(draw, 320, 260, "7", "DRAWS")
+    draw.text((48, 180), "Full blood panels, marker by marker. The ground truth.", fill=MUTED, font=_font(FONT_MONO, 14))
+    draw.text((48, 260), "Every draw published. Every out-of-range flag included.", fill=FAINT, font=_font(FONT_MONO, 13))
     _draw_footer(draw, stats)
     return img
 
@@ -240,7 +254,7 @@ def build_weekly(stats):
 
 def build_experiments(stats):
     img, draw = _base_image()
-    _draw_header(draw, "N=1 Experiments")
+    _draw_header(draw, "N=1 Experiments")  # og-literal-ok: "N=1" is the study-design idiom, not a platform count
     draw.text((48, 100), "EXPERIMENTS", fill=TEXT, font=_font(FONT_DISPLAY, 72))
     draw.text((48, 180), "Testing protocols against my own data.", fill=MUTED, font=_font(FONT_MONO, 14))
     _draw_footer(draw, stats)
@@ -271,14 +285,38 @@ def build_essay_org_chart(stats):
 
 
 def build_builders(stats):
+    """#3261: this card published three fabricated numbers daily for months.
+
+    It drew `116` MCP TOOLS / `59` LAMBDAS / `$13` MONTHLY COST while the truth — sitting
+    in the `public_stats.json` this very function already loads — was 76 / 104, and the
+    real spend was $146.07 MTD (July $98.35), so the dollar figure was off by 7.6x. Line
+    278 was a bare `stats.get("platform", {})` whose result was DISCARDED; the correct
+    values were read and thrown away. The `116` happened to equal the live alarm count,
+    which is how a stale literal keeps reading as plausible.
+
+    Two rulings here, both ADR-104:
+      * tool/Lambda counts are now DERIVED from `platform`, and data sources from the
+        canonical registry (the #1260 shape the home card already uses);
+      * the MONTHLY COST tile and the "$13/month" subtitle are GONE, not corrected. This
+        Lambda has no grounded cost source in reach — its IAM allows exactly two S3
+        GetObjects and neither carries spend — and the honest treatment of a number you
+        cannot ground is absence, never a plausible-looking constant. (If cost belongs on
+        this card, the producer must publish it into public_stats.json first.)
+
+    All three tiles read the SAME loaded `platform` block, deliberately: `data_sources`
+    there is the curated public-catalogue count (web/platform_counts.py, doc-synced),
+    which is a different surface from the home card's `len(SOURCE_REGISTRY)` raw-registry
+    count — the #1260 comment says so explicitly. Mixing the two on one card would put two
+    defensible-but-different source counts side by side with the tool/Lambda figures.
+    """
     img, draw = _base_image()
     _draw_header(draw, "For Builders")
+    platform = stats.get("platform", {})
     draw.text((48, 100), "THE BUILD", fill=TEXT, font=_font(FONT_DISPLAY, 72))
-    draw.text((48, 180), "How to build an AI health platform for $13/month.", fill=MUTED, font=_font(FONT_MONO, 14))
-    stats.get("platform", {})
-    _draw_metric(draw, 48, 260, "116", "MCP TOOLS")
-    _draw_metric(draw, 320, 260, "59", "LAMBDAS")
-    _draw_metric(draw, 560, 260, "$13", "MONTHLY COST")
+    draw.text((48, 180), "How one person builds an AI health platform, in public.", fill=MUTED, font=_font(FONT_MONO, 14))
+    _draw_metric(draw, 48, 260, _fmt(platform.get("mcp_tools"), 0), "MCP TOOLS")
+    _draw_metric(draw, 320, 260, _fmt(platform.get("lambdas"), 0), "LAMBDAS")
+    _draw_metric(draw, 560, 260, _fmt(platform.get("data_sources"), 0), "DATA SOURCES")
     _draw_footer(draw, stats)
     return img
 

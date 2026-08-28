@@ -135,18 +135,26 @@ def _run_freshness(monkeypatch, *, row_days_back, instant, utc_anchor=False):
     """Drive the REAL `lambda_handler` at `instant` with one whoop row `row_days_back`
     Pacific days old. Returns (body, sns_double).
 
-    `utc_anchor=True` is the MUTATION: it rebinds the module's `PACIFIC` name to
-    `timezone.utc`, which turns the shipped
-    `strptime(...).replace(tzinfo=PACIFIC)` back into the pre-#2817
-    `strptime(...).replace(tzinfo=timezone.utc)` exactly — no re-implementation of the
-    old code in the test, just the one name the fix introduced.
+    `utc_anchor=True` is the MUTATION: it replaces the module's `anchor_day_key` with the
+    pre-#2817 arithmetic (`strptime(...).replace(tzinfo=timezone.utc)`) — no
+    re-implementation of the handler in the test, just the one seam the fix introduced.
+
+    #3257 moved that seam. The fix originally bound `PACIFIC` in this module and the
+    mutation rebound that name; the anchor is now resolved PER SOURCE through
+    `common.pacific_time.anchor_day_key`, because apple_health's `DATE#` day really is a
+    UTC calendar day (TD-19 Phase 2) and a blanket Pacific sweep was wrong for it — and
+    because the public board reading the same keys had to be able to agree with this
+    checker by construction. The lever moved; every behavioural assertion below is
+    unchanged, and the mutated run must still fail them.
     """
     pt = freeze_pacific(monkeypatch, fc, instant)
     row_day = pt.date() - timedelta(days=row_days_back)  # derived from the HANDLER's clock
     table = FakeTable(rows=[_whoop_row(row_day)])
     sns, _cw = _install(monkeypatch, table)
     if utc_anchor:
-        monkeypatch.setattr(fc, "PACIFIC", timezone.utc)
+        monkeypatch.setattr(
+            fc, "anchor_day_key", lambda date_str, source: datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        )
     return fc.lambda_handler({}, None), sns
 
 
@@ -235,7 +243,11 @@ def test_the_sibling_day_vs_day_checks_were_already_honest_and_stay_that_way(mon
     datatypes = [{"key": "steps", "label": "Steps", "fields": ["steps"], "stale_days": 2}]
 
     before = fc.compute_datatype_liveness(records, pt, datatypes)
-    monkeypatch.setattr(fc, "PACIFIC", timezone.utc)
+    # #3257: the mutation lever moved with the seam (see `_run_freshness`). Flipping the
+    # day anchor to UTC must still change nothing here — that is the point of this test.
+    monkeypatch.setattr(
+        fc, "anchor_day_key", lambda date_str, source: datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    )
     after = fc.compute_datatype_liveness(records, pt, datatypes)
 
     assert before == after, "day-vs-day arithmetic must be frame-immune"

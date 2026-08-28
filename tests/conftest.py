@@ -273,6 +273,14 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # arrives after the merge is the unguarded copy already in the tree, which is the
         # post-merge-only fold #2372 exists to stop. 8 tests in ~1.2s.
         "test_shared_image_prepare_3079.py",
+        # #3260: the alarm<->emission dimension agreement for the two dimensionless FLEET
+        # alarms. It os.walks lambdas/ for every emitter of those metric names and AST-reads
+        # cdk/stacks/monitoring_stack.py — pure repo shape, no runtime. Pre-merge because the
+        # change that breaks it is a PR's own diff (a new emitter, or a `dims=` added to a
+        # fleet aggregate), and because the defect it exists for was an alarm that watched a
+        # series nothing wrote for 180 days: a red that arrives after the merge is the dark
+        # alarm already deployed. 6 tests in ~0.2s.
+        "test_alarm_emission_dimension_3260.py",
         "test_csp_hardening_3048.py",  # #3048: site/ tree sweep — no non-legacy page may reintroduce an executable inline script; repo-shape, pre-merge
         "test_grant_enumeration_drift.py",  # #2824: consumer⊆granted across cdk/stacks + lambdas/ + .github/workflows + infra/iam — a new fail-closed consumer (or a role that drops a grant) must red BEFORE the merge, not after the channel is already stranded
         "test_no_hardcoded_feature_tier.py",

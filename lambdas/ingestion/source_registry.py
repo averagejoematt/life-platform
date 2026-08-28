@@ -154,6 +154,29 @@ DEFAULT_STALE_HOURS = 48
 #                  history. The alternative to `unmodeled_legacy` is always to model instead
 #                  — this facet is for the case that's out of scope, not a shortcut around one
 #                  that isn't.
+#   day_key_frame  (#3257) WHICH CALENDAR the source's `DATE#YYYY-MM-DD` sort key names.
+#                  Absent = 'pacific', the platform default: `ingestion_framework.py`
+#                  stamps `pacific_today()` (truth audit 2026-07-10), so a framework
+#                  source's day key is a PACIFIC calendar day. The single exception is
+#                  'utc', carried by apple_health: TD-19 Phase 2 (2026-05-03,
+#                  docs/audits/TD-19_DATE_PARTITION_AUDIT.md) made
+#                  health_auto_export_lambda.parse_date_str convert the device's source-tz
+#                  timestamp to UTC BEFORE extracting the day, deliberately, so HAE's
+#                  many sub-streams share one partition frame.
+#                  WHY THIS IS A FACET AND NOT A CONSTANT IN EACH CONSUMER: a `DATE#` day
+#                  is a DAY, not an instant, so any consumer that ages it must anchor it —
+#                  and it must anchor it in the frame that NAMED it. Anchoring a Pacific
+#                  day at UTC midnight puts the day's start 7h (PDT) / 8h (PST) before it
+#                  began. That is exactly what `/api/source_freshness` did to 11 of its 12
+#                  board sources: a record stamped with today's Pacific date was served to
+#                  readers as **21.7 hours old**, in the same payload that said
+#                  `pacific_today: 2026-08-27`. `freshness_checker_lambda` had the same
+#                  defect and was fixed to a blanket Pacific anchor two days earlier
+#                  (452929f17/#2817) — which left the two consumers of these keys
+#                  disagreeing by 7h, and made apple_health wrong in the other direction.
+#                  Read via `day_key_frame_for()` / `utc_day_key_source_ids()`; never
+#                  hardcode the frame at a call site and never CLAMP the resulting age
+#                  (#3232 ruled the storage key correct — the defect is presentation).
 #   inbound_mode   (#1677) how a record can arrive AT ALL. Absent = a fetch of some kind
 #                  exists. 'paste-only' = the closed platforms (X/Instagram/TikTok):
 #                  no client, no secret, no token path in this repo — the owner pastes
@@ -415,6 +438,11 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "expected_days": 7,
         "qa_tier": "required",
         "method": "Health Auto Export webhook, near-real-time",
+        # #3257: the ONE source whose DATE# key names a UTC calendar day, not a Pacific
+        # one — health_auto_export_lambda.parse_date_str converts to UTC before taking the
+        # day (TD-19 Phase 2). Every consumer that ages this key must anchor it at UTC
+        # midnight; the other 11 board sources anchor at Pacific midnight.
+        "day_key_frame": "utc",
         "metrics": "Steps, active energy, CGM, blood pressure, state of mind",
         "posture": "load-bearing",
         "raw_layout": {
@@ -1182,6 +1210,30 @@ def mcp_source_ids() -> list:
     Replaces mcp/config.SOURCES."""
     keys = {k for k, v in SOURCE_REGISTRY.items() if v.get("partition", True)}
     return sorted(keys | set(EXTRA_QUERYABLE_PARTITIONS))
+
+
+DEFAULT_DAY_KEY_FRAME = "pacific"
+
+
+def day_key_frame_for(source: str) -> str:
+    """'pacific' | 'utc' — which calendar a source's ``DATE#YYYY-MM-DD`` key names (#3257).
+
+    THE ONE ADDRESS for this question. Both consumers of these keys that compute an AGE
+    (``web/site_api_freshness.py`` for the public board, ``emails/freshness_checker_lambda.py``
+    for the ops alert) resolve it here, so they cannot drift apart the way they did between
+    452929f17 and #3257 — a 7-hour disagreement about the same record, with the reader-facing
+    one wrong. Defaults to Pacific for an unknown key: the framework's ``pacific_today()``
+    stamp is the platform default, and defaulting to the majority frame fails toward the
+    right answer for any source that has not yet been classified.
+    """
+    return SOURCE_REGISTRY.get(source, {}).get("day_key_frame") or DEFAULT_DAY_KEY_FRAME
+
+
+def utc_day_key_source_ids() -> set:
+    """Sources whose ``DATE#`` day key is a UTC calendar day (TD-19 Phase 2) — currently
+    just apple_health. Derived from the facet so a second HAE-fed partition joins it by
+    being declared, not by a consumer remembering."""
+    return {k for k, v in SOURCE_REGISTRY.items() if v.get("day_key_frame") == "utc"}
 
 
 def raw_layouts() -> dict:

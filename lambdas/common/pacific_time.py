@@ -52,6 +52,38 @@ def pacific_today() -> str:
     return pacific_now().strftime("%Y-%m-%d")
 
 
+def anchor_day_key(date_str: str, source: str) -> datetime:
+    """Turn a ``DATE#YYYY-MM-DD`` day key into the aware INSTANT that day began (#3257).
+
+    A ``DATE#`` key names a DAY, not an instant. Ageing it means picking a midnight, and
+    the only defensible midnight is the one in the calendar that NAMED the key. Get that
+    wrong and the error is exactly the offset — 7h in PDT, 8h in PST — every single time,
+    silently, with a one-hour seasonal shift across DST.
+
+    That is not hypothetical. ``/api/source_freshness`` anchored every source at UTC
+    midnight while 11 of its 12 sources are Pacific-keyed (``ingestion_framework.py``
+    stamps ``pacific_today()``), and served a record stamped *with today's Pacific date*
+    as **21.7 hours old** — in the same payload that reported ``pacific_today``. The ops
+    sibling reading the same keys had been fixed to Pacific two days earlier
+    (452929f17/#2817), so the two consumers disagreed by 7h and the reader-facing one was
+    the wrong one.
+
+    ``strptime`` is the INVERSE of a clock, which is why both PT-sweep matchers
+    (#2811/#2414) are blind to this: they look for something that ASKS the time. Nothing
+    here does. The frame comes from the registry's ``day_key_frame`` facet — apple_health
+    is UTC by TD-19 Phase 2, everything else Pacific — and an unknown source defaults to
+    Pacific, the platform default, so a new source fails toward the right answer.
+
+    NOT a clamp. #3232 ruled the stored key correct and refused to clamp a legitimately-UTC
+    day back to PT-today; that ruling stands. This changes the ARITHMETIC's frame, nothing
+    about the stored value or what is displayed.
+    """
+    from ingestion.source_registry import day_key_frame_for  # local: registry is not a common/ dependency
+
+    tz = timezone.utc if day_key_frame_for(source) == "utc" else PACIFIC
+    return datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=tz)
+
+
 def parse_iso_utc(value) -> datetime | None:
     """THE ISO-8601 parser (#1964) — returns a timezone-AWARE datetime, or None.
 
