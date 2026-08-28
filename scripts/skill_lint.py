@@ -75,7 +75,6 @@ NO_CONTRACT_TEST: dict[str, str] = {
     "design-implement": "2026-08-27",
     "design-sync": "2026-08-27",
     "frontier-plan": "2026-08-27",
-    "fullreview": "2026-08-27",
     "interview": "2026-08-27",
     "journey-review": "2026-08-27",
     "open-checkin": "2026-08-27",

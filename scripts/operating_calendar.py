@@ -155,7 +155,7 @@ CALENDAR: dict[str, dict] = {
             "shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to "
             "session; any fullreview run (full, delta or partial) resets this clock, because "
             "the weekly claim is 'the platform was looked at', not 'the look was small'. "
-            "Delta mode itself is defined in `.claude/commands/fullreview.md` § 'Delta mode' "
+            "Delta mode itself is defined in the fullreview skill § 'Delta mode' "
             "(#3250) — the artifact this probe reads is named there, so the clock and the "
             "procedure cannot drift apart."
         ),

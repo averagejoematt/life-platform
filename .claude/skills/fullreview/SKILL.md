@@ -1,6 +1,6 @@
 ---
 name: fullreview
-description: "Convene the 17-lens expert panel: grade every area of the product A-F with evidence, verify findings adversarially, and produce a remediation ledger to A. Use for a comprehensive product-quality review or a periodic full-platform grading."
+description: "Convene the full expert panel: grade every area of the product A-F with evidence, verify findings adversarially, and produce a remediation ledger to A. Use for a comprehensive product-quality review or a periodic full-platform grading."
 user-invocable: true
 argument-hint: "[area or lens subset]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite, WebFetch, WebSearch

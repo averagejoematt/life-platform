@@ -293,7 +293,9 @@ def test_delta_mode_is_a_defined_procedure():
     """#3250: the calendar entry named a procedure the skill did not implement. The clock
     and the procedure must not drift apart, so the skill has to define delta mode AND name
     the exact artifact filename this entry's probe reads."""
-    text = open(os.path.join(REPO, ".claude", "commands", "fullreview.md"), encoding="utf-8").read()
+    from skill_paths import require_skill  # the ONE registry — never a layout literal
+
+    text = open(require_skill("fullreview"), encoding="utf-8").read()
     assert re.search(r"^##\s+Delta mode", text, re.M), "fullreview.md must define delta mode as its own section"
     assert "fullreview_grades_<date>_delta.json" in text, "delta mode must name the artifact the calendar probes"
     probe_rx = re.compile(oc.CALENDAR["fullreview-delta"]["probe"][2])
@@ -329,7 +331,13 @@ def _calendared_skill_paths():
     """Scope: the skills the calendar actually schedules. An off-calendar (EXEMPT) skill
     grades nothing on a clock, so its rubric is not load-bearing — and the scope is derived
     from the registry rather than hand-listed, so adding a ritual adds it to this guard."""
-    return {s: os.path.join(REPO, ".claude", "commands", s + ".md") for e in oc.CALENDAR.values() if (s := e["skill"])}
+    # Resolved through the ONE registry, never a layout literal. This line hard-coded
+    # `.claude/commands/<n>.md` and broke on the #3245 skills-corpus rename exactly as
+    # that PR's own note predicted — loudly, which is the design working. `oc.review_skill_files()`
+    # was already registry-aware; only this test half was not.
+    from skill_paths import skill_path
+
+    return {s: skill_path(s) for e in oc.CALENDAR.values() if (s := e["skill"]) and skill_path(s)}
 
 
 def _magnitude_hits(text):
