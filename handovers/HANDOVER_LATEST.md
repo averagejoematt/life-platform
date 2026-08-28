@@ -136,7 +136,17 @@ ruling) · `docs/OPERATING_DISCIPLINE.md` (new §5 production authority) · `doc
 ceiling prose sites
 **Decisions:** ADR-133 amendment (the September base) · ADR-104 amendment (auto-synced counts as
 "logging", owner ruling 2026-08-28)
-**Main:** green · doc-sync clean
+**Main:** red — the last CI/CD run (`a099c14c`) failed on ONE gating reader-truth HIGH, and it is
+diagnosed, not unexplained. `/method/board/`: a coach read asserts *"eleven days into the cycle with
+no active logging (food, …)"*. **Ground-truthed before acting** (the judge flakes HIGH on true
+claims): since genesis, macrofactor **0**, notion **0**, hevy **0**, strava **2** — the claim is
+**substantially true**, so it is not fabrication. But Strava did log, and under the owner's
+2026-08-28 ruling auto-synced counts as logging, so the narrative asserts an absence without naming
+its denominator — precisely #3252 box 2. **The remedy shipped ~30 min before that run** (#3276) and
+the board is a stored DynamoDB artifact written earlier, so it clears when the artifact regenerates.
+Nothing was rolled back, correctly: the rollback reverts `site/` and this content is DynamoDB-served
+— #3252's unmet box 5, demonstrated live. Recorded with the ground truth on #3252. Later doc-only
+pushes are `path-filter-skip`, so no newer CI/CD run supersedes it. **doc-sync clean.**
 **Deploy:** 4, all verified by content — AWS Budget `150.0 → 215.0` · governor `"215"/"252"` ·
 site-api · qa-smoke · og-image-generator (cards regenerated and read back)
 **Incidents:** 5 worth recording — the pre-ceiling lease; the census swallowing a syntax error; the
