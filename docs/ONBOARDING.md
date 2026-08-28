@@ -267,7 +267,7 @@ answers the question in the middle column and nothing else has to be remembered.
 | `handovers/HANDOVER_LATEST.md` | Where were we; what is in flight, deployed, or waiting on a human | The only handover on `main`; history is on the `session-archive` branch |
 | `docs/CHARTER.md` | The five architecture primitives and the paved roads | Boot from this, not from re-reading prose docs |
 | `docs/CONVENTIONS.md` | Deploy, CI gates, merge/git mechanics, doc-sync literals, rollback | Read before touching anything that deploys. §9 is the defect-class → owning-gate index |
-| `docs/OPERATING_DISCIPLINE.md` | How work is adjudicated and a session is driven: verifying a finding, closing an issue, judging an epic, concurrency, watchers | §6 is the honest list of what this repo still cannot tell you |
+| `docs/OPERATING_DISCIPLINE.md` | How work is adjudicated and a session is driven: verifying a finding, closing an issue, judging an epic, concurrency, watchers — **and §5, whether you may deploy at all** | Read §5 before approving any waiting production gate: a gated run is a lease on a sha, and approving a stale one can ship a tree older than what is live. §7 is the honest list of what this repo still cannot tell you |
 | `docs/CONTINUITY.md` | Every state surface that is not in `docs/` — the session log, DynamoDB platform memory, the laptop-only assets, the S3 runtime config | Read this before assuming the repo is the whole system |
 | `scripts/backlog_next.py` | What to work on — the open corpus ranked by each issue's stored ADR-099 score | Run it; the backlog is GitHub Issues, not a file |
 | `scripts/blast_radius.py` | What a change touches, and what feeds a module | Query it (`--touches` / `--feeds`) instead of re-deriving from prose |

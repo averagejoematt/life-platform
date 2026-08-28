@@ -80,6 +80,11 @@ requires already knowing which symbol to look for.
 
 ## 2. Deploy from `main`, not the worktree branch
 
+> **Authority, not mechanics:** who may run a production deploy, what a standing grant is,
+> and what approving or rejecting a waiting gate actually does live in
+> `docs/OPERATING_DISCIPLINE.md` §5 (#3264) — deliberately not restated here, per the
+> one-place rule. This section and the rest of §2–§6 are the mechanics only.
+
 `cdk deploy` and the `deploy/*.sh` scripts package the **current working tree**, not
 `origin/main`. In the worktree each PR is built on its own branch forked off main
 *before* its siblings merged — so that branch's tree is missing every other PR's
