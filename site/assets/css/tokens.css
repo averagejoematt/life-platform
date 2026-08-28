@@ -914,6 +914,11 @@ td .evb .evb-tip { left: auto; right: 0; }
 .vg-off { opacity: 0.55; border-style: dashed; }
 .vg-off .vg-word { color: var(--ink-faint); }
 a.vg-lit:hover { background: var(--ember-wash); }
+/* #3287 — a glyph whose reading belongs to a day other than the page's own Pacific date
+   wears that date. Muted and dashed rather than alarmed: the number is real, the day is
+   the thing that differs. */
+.vg-asof { font-size: var(--fs-label); color: var(--ink-faint); letter-spacing: 0.02em; white-space: nowrap; }
+.vg-otherday { border-style: dashed; }
 /* #1371 — "warming up": hollow marks filling toward an instrument's real arming
    threshold (the earned-glyph vocabulary applied to a not-yet-armed instrument).
    Hollow = days still needed, lit ember = days accrued. Never red, never a spinner —
