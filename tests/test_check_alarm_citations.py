@@ -713,3 +713,87 @@ def test_the_live_registry_has_no_dead_citation_on_a_lit_alarm():
     data = cac.load_citations()
     refs = sorted({r for e in data.values() if isinstance(e, dict) for r in re.findall(r"#(\d+)", str(e.get("citation", "")))})
     assert refs, "no issue refs in the registry — the scan is vacuous, not clean"
+
+
+# ── #3258: a recurrence NEGATIVE must name how it was derived ──────────────────
+# The measured instance: qa-smoke-warnings' entry asserted "fixed by #3066/PR#3075
+# …, no recurrence since" while the identical finding fingerprint 539c6d was in
+# /aws/lambda/life-platform-qa-smoke inside the last 72h. The claim was a human's
+# memory, nothing checked it, and it hid a live recurrence for four days.
+
+
+def test_a_bare_no_recurrence_claim_is_flagged():
+    """The must-fail case: the exact prose the qa-smoke-warnings entry carried."""
+    citations = {
+        "qa-smoke-warnings": {
+            "citation": "#3066",
+            "note": "Home-hero temporal framing (539c6d, 08-16..08-23) — fixed by #3066/PR#3075 (merged 2026-08-23 22:35Z), no recurrence since",
+        }
+    }
+    out = cac.unfalsifiable_negatives(citations)
+    assert out == [("qa-smoke-warnings", "no recurrence")], out
+
+
+def test_a_derived_no_recurrence_claim_is_not_flagged():
+    """The other half — a claim that names the log it was read from is evidence,
+    and must not be flagged. Without this the rule would just ban the sentence."""
+    citations = {
+        "some-alarm": {
+            "citation": "#1",
+            "note": "no recurrence since 2026-08-24 — derived from /aws/lambda/life-platform-qa-smoke over the last 72h",
+        }
+    }
+    assert cac.unfalsifiable_negatives(citations) == []
+
+
+def test_a_positive_claim_needs_no_derivation_marker():
+    """Asymmetric on purpose: a positive is checkable by looking, a negative is not."""
+    citations = {"a": {"citation": "#1", "note": "fired twice on 2026-08-26, cleared both times"}}
+    assert cac.unfalsifiable_negatives(citations) == []
+
+
+def test_the_negative_matcher_covers_the_ordinary_paraphrases():
+    for phrase in ("no further recurrence", "has not recurred", "hasn't recurred", "never recurred", "no repeat"):
+        citations = {"a": {"citation": "#1", "note": f"fixed 2026-08-01, {phrase} since"}}
+        assert cac.unfalsifiable_negatives(citations), phrase
+
+
+def test_the_live_registry_carries_no_underived_recurrence_negative():
+    """The committed baseline (#3258 acceptance 3). Enforced offline on every PR,
+    not only on a /wrap run — the registry is a committed file, so the file is the
+    right place to check it."""
+    offenders = cac.unfalsifiable_negatives(cac.load_citations())
+    assert not offenders, (
+        "docs/alarm_citations.json asserts a recurrence NEGATIVE with no derivation: "
+        f"{offenders}. Either name the log group/query the claim was read from, or remove the claim — "
+        "a human-memory negative is not evidence (#3258)."
+    )
+
+
+def test_a_distant_derivation_marker_does_not_license_a_second_bare_claim():
+    """The vacuous-control lesson, pinned. The first draft of this rule tested the
+    whole entry, so appending ", no recurrence since" to a long note that named a
+    log group 1,900 chars earlier passed — the must-fail case did not fail. A
+    derivation attaches to a claim, not to a paragraph."""
+    filler = "x " * 400
+    citations = {
+        "a": {
+            "citation": "#1",
+            "note": f"derived from /aws/lambda/life-platform-qa-smoke over 30d. {filler} And separately, no recurrence since 2026-08-01.",
+        }
+    }
+    assert cac.unfalsifiable_negatives(citations) == [("a", "no recurrence")]
+
+
+def test_every_negative_in_one_entry_is_checked_not_just_the_first():
+    """`finditer`, not `search`: an entry may carry two claims and only one of them
+    derived. The undated one is still an unfalsifiable negative."""
+    citations = {
+        "a": {
+            "citation": "#1",
+            "note": "no recurrence since 2026-08-24 per filter-log-events on /aws/lambda/life-platform-qa-smoke."
+            + (" y" * 400)
+            + " Also it has not recurred on the site side.",
+        }
+    }
+    assert cac.unfalsifiable_negatives(citations) == [("a", "has not recurred")]
