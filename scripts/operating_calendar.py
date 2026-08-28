@@ -45,15 +45,46 @@ before the calendar existed — and an armed gate over un-baselined debt blocks 
 pipeline on history instead of behavior (the 2026-08-21 reader-truth lesson). With it,
 every ritual gets one full window from adoption; from then on the schedule is live.
 
+AN ANCHOR IS A GRANT, NOT EVIDENCE (#3250)
+------------------------------------------
+v1.1 fixes the calendar's own version of the disease it was built to detect. Until now a
+ritual that had NEVER produced its artifact printed the state word ``OK`` — the distinction
+lived in the display string (``last never (anchored 2026-08-22)``) and was absent from the
+verdict, so ``--due`` exited 0 and the daily sweep reported "✅ no ritual outside its
+window" over two rituals nobody has ever run (craft-review, proportionality-reread). A
+dead-man that is green because it was *anchored* rather than because the ritual *ran* is a
+lying gauge, and this file's whole thesis is that absence must be louder than failure.
+
+So: ``NEVER-RUN`` is now its own state, it is never ``OK``, and ``--due`` exits **3** on it
+(distinct from OVERDUE's 1, so a reader — and the workflow log — can tell "nobody has ever
+done this" from "somebody stopped doing this"). The anchor still holds the *window* open;
+it no longer holds the *verdict* green. The only honest clearings are running the ritual
+(its dated artifact) or a dated ``EXEMPT`` row.
+
+DEFERRAL IS A DECISION, WITH A DATE AND A REASON (the ``hold`` field, #3250)
+---------------------------------------------------------------------------
+Sometimes a ritual should *not* run on schedule for a reason that is itself sound — e.g.
+the instrument was just rewritten, so the next run has to be recorded as a new baseline
+rather than compared against a reading the rewrite invalidated. That is a decision, and
+the old options were both bad: run a meaningless comparison, or let the clock lapse
+silently. An entry may now carry ``hold=(declared, until, reason)`` — a ONE-TIME, dated,
+reasoned re-anchor of that entry's clock to ``until``, rendered verbatim into the generated
+doc. Rules the guards enforce (tests/test_operating_calendar_2832.py): the reason must name
+its cause issue, the window is bounded, and a hold NEVER suppresses the NEVER-RUN verdict —
+deferring a ritual cannot manufacture evidence that it ever happened.
+
 USAGE
 -----
     python3 scripts/operating_calendar.py            # human table, exit 0 always
-    python3 scripts/operating_calendar.py --due      # dead-man: exit 1 if any OVERDUE
+    python3 scripts/operating_calendar.py --due      # dead-man: 1 = OVERDUE, 3 = never-run
     python3 scripts/operating_calendar.py --due --today 2026-12-01   # deterministic (tests)
     python3 scripts/operating_calendar.py --check    # docs/OPERATING_CALENDAR.md drift → exit 1
     python3 scripts/operating_calendar.py --apply    # regenerate docs/OPERATING_CALENDAR.md
 
-v1.0.0 — 2026-08-22 (#2832)
+Exit codes: 0 clean · 1 at least one OVERDUE · 2 bad --today · 3 no OVERDUE but at least
+one ritual has never produced its artifact.
+
+v1.1.0 — 2026-08-27 (#3250) · v1.0.0 — 2026-08-22 (#2832)
 """
 
 from __future__ import annotations
@@ -89,7 +120,7 @@ OWNER = "owner-attended"
 _DATE_RE_GROUPS = 1  # every probe regex carries exactly one capture group: the date
 
 
-def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason):
+def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None):
     return {
         "skill": skill,  # .claude/commands/<skill>.md, or None for a doc-only ritual
         "cadence_days": cadence_days,
@@ -98,7 +129,16 @@ def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reas
         "probe": probe,  # (kind, relative dir-or-file, regex with one date group)
         "obligations": tuple(obligations),
         "reason": reason,
+        # (declared YYYY-MM-DD, until YYYY-MM-DD, reason naming the cause issue) — a
+        # one-time dated re-anchor of THIS entry's clock. See the module docstring.
+        "hold": hold,
     }
+
+
+# A hold may buy at most this many days. Longer than one cadence-and-a-bit is not a
+# deferral, it is a retirement wearing a deferral's clothes — and a retirement goes
+# through EXEMPT, which the set guard reads.
+MAX_HOLD_DAYS = 45
 
 
 CALENDAR: dict[str, dict] = {
@@ -114,7 +154,23 @@ CALENDAR: dict[str, dict] = {
             "The one review family that was still alive at #2832's filing — weekly-ish and "
             "shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to "
             "session; any fullreview run (full, delta or partial) resets this clock, because "
-            "the weekly claim is 'the platform was looked at', not 'the look was small'."
+            "the weekly claim is 'the platform was looked at', not 'the look was small'. "
+            "Delta mode itself is defined in `.claude/commands/fullreview.md` § 'Delta mode' "
+            "(#3250) — the artifact this probe reads is named there, so the clock and the "
+            "procedure cannot drift apart."
+        ),
+        hold=(
+            "2026-08-27",
+            "2026-09-06",
+            "#3245 rewrites the review-skill corpus (102 files) — the instrument this clock "
+            "measures. A delta grades the platform against the PREVIOUS run's anchors, so a "
+            "delta run across an instrument rewrite produces a number that means nothing: the "
+            "movement would be the rubric moving, not the platform. Decision (#3250, Session I): "
+            "do NOT run a delta into the rewrite. The next fullreview run is recorded as a NEW "
+            "BASELINE (a full, suffix-free grades file), and this clock is re-anchored once to "
+            "2026-09-06 so the 2026-09-01 hard date is discharged by a written decision rather "
+            "than by a silent lapse. This hold is one-time: after 2026-09-06 the ordinary "
+            "cadence applies and a missed run reds like any other.",
         ),
     ),
     # ── Monthly ───────────────────────────────────────────────────────────────
@@ -330,29 +386,75 @@ def newest_run(entry: dict, repo: str = REPO) -> date | None:
 
 # ── The dead-man ──────────────────────────────────────────────────────────────
 OK = "OK"
+NEVER = "NEVER-RUN"  # #3250 — the artifact has never existed; an anchor is not a run
+HELD = "HELD"  # a dated, reasoned, one-time deferral is in force (see `hold`)
 DUE = "DUE"  # inside the grace window — run it now, nothing screams yet
 OVERDUE = "OVERDUE"  # past cadence + grace — the scheduled workflow reds on this
 
+# The exit codes `main()` returns under --due. Named because the workflow log and the
+# tests both read them, and an undocumented integer is how a distinct signal becomes
+# invisible again.
+EXIT_CLEAN = 0
+EXIT_OVERDUE = 1
+EXIT_BAD_ARG = 2
+EXIT_NEVER_RUN = 3
+
+
+def _hold_dates(entry: dict) -> tuple[date, date] | None:
+    """(declared, until) for an entry carrying a hold, else None."""
+    hold = entry.get("hold")
+    if not hold:
+        return None
+    declared, until, _reason = hold
+    d, u = _parse_date(declared), _parse_date(until)
+    if d is None or u is None:  # pragma: no cover — well-formedness test pins the shape
+        raise ValueError(f"hold dates must be YYYY-MM-DD, got {declared!r}/{until!r}")
+    return d, u
+
 
 def status(entry: dict, today: date, repo: str = REPO) -> dict:
-    """One ritual's dead-man verdict. Clock = max(newest artifact, ADOPTED)."""
+    """One ritual's dead-man verdict.
+
+    Clock = max(newest artifact, ADOPTED, hold.until). The clock floor is what the anchor
+    and a hold move; the STATE is what neither of them may fake. `never_ran` travels
+    beside `state` so a caller can act on the distinction the display used to own alone.
+    """
     last = newest_run(entry, repo)
-    clock = max(last, ADOPTED) if last else ADOPTED
+    hold = _hold_dates(entry)
+    floor = max(ADOPTED, hold[1]) if hold else ADOPTED
+    clock = max(last, floor) if last else floor
     due_by = clock + timedelta(days=entry["cadence_days"])
     hard_by = due_by + timedelta(days=entry["grace_days"])
     if today > hard_by:
         state = OVERDUE
     elif today > due_by:
         state = DUE
+    elif last is None:
+        # #3250: this is the branch that used to say OK. A ritual with no artifact has
+        # produced no evidence, and a hold does NOT override it — deferring a ritual
+        # cannot manufacture a run that never happened.
+        state = NEVER
+    elif hold and today <= hold[1]:
+        state = HELD
     else:
         state = OK
-    return {"last": last, "clock": clock, "due_by": due_by, "hard_by": hard_by, "state": state}
+    return {
+        "last": last,
+        "clock": clock,
+        "due_by": due_by,
+        "hard_by": hard_by,
+        "state": state,
+        "never_ran": last is None,
+        "held_until": hold[1] if hold else None,
+    }
 
 
-def due_report(today: date, repo: str = REPO) -> tuple[str, list[str]]:
-    """(human table, [names of OVERDUE rituals])."""
-    lines = [f"Platform Operating Calendar — dead-man sweep as of {today} (#2832)", ""]
+def due_report(today: date, repo: str = REPO) -> tuple[str, list[str], list[str]]:
+    """(human table, [names of OVERDUE rituals], [names of rituals that NEVER ran])."""
+    lines = [f"Platform Operating Calendar — dead-man sweep as of {today} (#2832, #3250)", ""]
     overdue: list[str] = []
+    never: list[str] = []
+    held: list[str] = []
     width = max(len(n) for n in CALENDAR)
     for name in sorted(CALENDAR, key=lambda n: CALENDAR[n]["cadence_days"]):
         st = status(CALENDAR[name], today, repo)
@@ -363,6 +465,15 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str]]:
         )
         if st["state"] == OVERDUE:
             overdue.append(name)
+        if st["never_ran"]:
+            never.append(name)
+        if st["state"] == HELD:
+            held.append(name)
+    if held:
+        lines += ["", "⏸  held by a dated decision (clock re-anchored once, reason in the registry):"]
+        for name in held:
+            declared, until, reason = CALENDAR[name]["hold"]
+            lines.append(f"   {name}: declared {declared}, resumes {until} — {reason.split('.')[0]}.")
     if overdue:
         lines += [
             "",
@@ -371,9 +482,19 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str]]:
             "   that lens. Run the ritual (its artifact resets the clock) — do not",
             "   re-anchor, and do not exempt without a dated reason in EXEMPT.",
         ]
-    else:
-        lines += ["", "✅ no ritual outside its window."]
-    return "\n".join(lines), overdue
+    if never:
+        lines += [
+            "",
+            f"⚠️  {len(never)} ritual(s) have NEVER produced their artifact: {', '.join(never)}",
+            "   Their windows are open because of the adoption anchor, not because anything",
+            "   ran. An anchor is a grant, not evidence — this sweep cannot say these rituals",
+            "   happened, and it will not print OK as if it could (#3250). Clear it by RUNNING",
+            "   the ritual, or by retiring it with a dated EXEMPT row. Re-anchoring is not a",
+            f"   clearing. (--due exits {EXIT_NEVER_RUN} on this state.)",
+        ]
+    if not overdue and not never:
+        lines += ["", "✅ no ritual outside its window, and every ritual has run at least once."]
+    return "\n".join(lines), overdue, never
 
 
 # ── The set guard, factored for mutation-proofing ─────────────────────────────
@@ -437,14 +558,36 @@ def render_doc() -> str:
     for name in sorted(EXEMPT):
         d, reason = EXEMPT[name]
         out.append(f"- **{name}** ({d}) — {reason}")
+    out += ["", "## Dated holds (a deferral is a decision, #3250)", ""]
+    holds = [n for n in sorted(CALENDAR) if CALENDAR[n]["hold"]]
+    if holds:
+        for name in holds:
+            declared, until, reason = CALENDAR[name]["hold"]
+            out.append(f"- **{name}** — declared {declared}, resumes {until}. {reason}")
+    else:
+        out.append("_None in force._")
     out += [
         "",
-        "## The anchor rule",
+        "A hold re-anchors ONE entry's clock ONE time, with a date and a written reason, so a",
+        "deliberate skip is discharged by a decision instead of a silent lapse. It is bounded",
+        f"(at most {MAX_HOLD_DAYS} days) and it never suppresses the NEVER-RUN verdict below:",
+        "deferring a ritual cannot manufacture evidence that it ever happened. A skip that",
+        "wants to be permanent belongs in the exemption list above, not in a hold.",
+        "",
+        "## The anchor rule — and what an anchor may NOT do",
         "",
         f"Every clock starts at `max(newest artifact, {ADOPTED})` — the calendar's adoption",
         "date. Without it the dead-man is born red on rituals that never ran (craft-review),",
         "which blocks on history instead of behavior. Never bump the anchor to silence an",
         "overdue ritual: the artifact is the only honest reset.",
+        "",
+        "The anchor holds the **window** open. Since #3250 it no longer holds the **verdict**",
+        "green: a ritual with no artifact reports `NEVER-RUN`, never `OK`, and `--due` exits",
+        f"`{EXIT_NEVER_RUN}` for it (`{EXIT_OVERDUE}` stays reserved for OVERDUE, so the log",
+        "distinguishes 'somebody stopped doing this' from 'nobody has ever done this'). The",
+        "distinction used to live only in the display string `last never (anchored …)` while",
+        "the verdict said OK — a dead-man green because it was anchored rather than because",
+        "the ritual ran is the exact lying-gauge shape this calendar exists to kill.",
         "",
     ]
     return "\n".join(out)
@@ -475,10 +618,14 @@ def main(argv: list[str] | None = None) -> int:
     today = _parse_date(args.today) if args.today else date.today()
     if args.today and not today:
         print(f"❌ --today {args.today!r} is not YYYY-MM-DD")
-        return 2
-    report, overdue = due_report(today)
+        return EXIT_BAD_ARG
+    report, overdue, never = due_report(today)
     print(report)
-    return 1 if (args.due and overdue) else 0
+    if not args.due:
+        return EXIT_CLEAN
+    if overdue:
+        return EXIT_OVERDUE
+    return EXIT_NEVER_RUN if never else EXIT_CLEAN
 
 
 if __name__ == "__main__":

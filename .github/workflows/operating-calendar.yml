@@ -11,6 +11,13 @@ name: Operating calendar dead-man
 # innocent PR happens to run next (the #2975 misattribution class). The deterministic
 # doc-drift half (--check) lives in docs-ci; only the time-based half lives here.
 #
+# Exit codes (#3250) — the sweep now distinguishes two different silences, because a
+# single "non-zero" hid one of them: 1 = at least one ritual is OVERDUE (somebody stopped
+# doing it); 3 = nothing is overdue but at least one ritual has NEVER produced its artifact
+# (nobody has ever done it — it was reporting OK purely because the adoption anchor held
+# its window open). Both red this run on purpose. The honest clearings are running the
+# ritual or retiring it with a dated EXEMPT row; re-anchoring is not a clearing.
+#
 # 15:40 UTC daily — offset from the other scheduled workflows (fresh-eyes Sun 15:00,
 # golden-brief-eval Mon 15:17, config-drift daily 15:20, eval-harvest 3rd 16:23,
 # remediation MWF 14:45, CodeQL Sat 12:13). Fixed UTC, no DST drift.
@@ -37,5 +44,19 @@ jobs:
       # Depth-1 is safe here BY DESIGN: every probe reads the date in the artifact's
       # own filename (or a dated ledger line), never git history or mtimes — see the
       # "HOW LAST RUN IS MEASURED" note in scripts/operating_calendar.py.
+      # No pipe anywhere in this step: a piped step exits with the LAST command's status
+      # and would swallow the verdict (the "CI gate that cannot fail" class). The rc is
+      # captured, annotated, and re-raised verbatim.
       - name: Dead-man sweep (--due)
-        run: python3 scripts/operating_calendar.py --due
+        run: |
+          set +e
+          python3 scripts/operating_calendar.py --due
+          rc=$?
+          set -e
+          case "${rc}" in
+            0) echo "::notice::Every ritual is inside its window AND has run at least once." ;;
+            1) echo "::error::A judgment ritual is OVERDUE. Run it — its dated artifact is the only honest reset (never re-anchor)." ;;
+            3) echo "::error::A ritual has NEVER produced its artifact (#3250): anchored is not run. Run it, or retire it with a dated EXEMPT row." ;;
+            *) echo "::error::scripts/operating_calendar.py exited ${rc} — unexpected; read the output above." ;;
+          esac
+          exit "${rc}"
