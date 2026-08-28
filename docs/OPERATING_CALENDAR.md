@@ -40,7 +40,7 @@ dated artifact, and the dead-man reds when a window closes empty.
 - **craft-review** — Had NEVER executed at #2832's filing despite its own instruction to register a scheduled run — the exact silent-stop this calendar exists to make impossible. Its first run creates docs/reviews/craft_grades_<date>.json and starts the clock for real; until then the adoption anchor holds the window.
 - **emf-series-census** — #2837: CloudWatch MetricMonitorUsage grew 9x in three months (7.4 -> 66.9 metric-months, $0 -> $18.88) and flipped past AlarmMonitorUsage with nothing watching — 743 series across 35 namespaces had no inventory, budget or owner, so the only detector was the invoice. The ledger makes each namespace name a consumer; this entry is what keeps the count a LIVE measurement rather than a one-time audit. It rides the monthly cost close (cost-diligence Phase 5) because the series count is only meaningful next to the dollars it explains.
 - **frontier-plan** — The full-horizon review (quantified self → quantified life). Its report is docs/reviews/FRONTIER_REVIEW_<date>.md — the command file names that path as canonical so a run cannot land its artifact somewhere this probe cannot see.
-- **fullreview-delta** — The one review family that was still alive at #2832's filing — weekly-ish and shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to session; any fullreview run (full, delta or partial) resets this clock, because the weekly claim is 'the platform was looked at', not 'the look was small'.
+- **fullreview-delta** — The one review family that was still alive at #2832's filing — weekly-ish and shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to session; any fullreview run (full, delta or partial) resets this clock, because the weekly claim is 'the platform was looked at', not 'the look was small'. Delta mode itself is defined in `.claude/commands/fullreview.md` § 'Delta mode' (#3250) — the artifact this probe reads is named there, so the clock and the procedure cannot drift apart.
 - **fullreview-full** — Deltas drift: each one grades against the last, so a slow slide can stay invisible to every individual delta. A monthly FULL run re-grades every area from scratch. The probe deliberately excludes _delta/_partial filenames — only a full-suffix-free grades file resets this clock.
 - **managed-where-reverify** — The out-of-IaC ledger sat self-stamped 'Verified 2026-07-09' for ~7 weeks while three GitHub rows inverted underneath it, and the 2026-08-23 external diligence review read the stale rows as current truth — manufacturing two P0 findings (DIL-004/DIL-006). A self-description doc is an external-assessment attack surface when stale; the probe reads the dated '- Re-verified:' log lines, not the header stamp, for the same reason proportionality-reread does (a bumped literal is not a re-read, #2986).
 - **proportionality-reread** — ADR-103/144's quarterly re-read was chained to two rituals that did not run. The probe reads the dated `- Re-read:` lines in the ledger's own Re-read log — NOT the `Verified:` stamp, which automation refreshes and which therefore cannot distinguish a real re-read from a literal bump (the stale-behind-a-fresh-timestamp class, #2986).
@@ -52,9 +52,27 @@ dated artifact, and the dead-man reds when a window closes empty.
 - **platform-review** (2026-08-22) — Not in the #2832 adopted calendar: its ground (full-platform sweep) is covered by the monthly fullreview-full entry's panel; it has never run as a command since it landed. Revive deliberately with its own entry if the fullreview panel proves too narrow — do not let it half-exist off-calendar.
 - **site-review** (2026-08-22) — Owner-attended editorial walkthrough of the public site — run when the site's story changes (a redesign, a new door), not on a clock. Cadencing an editorial judgment would manufacture runs with nothing to judge; the accuracy-full entry owns the site's monthly truth pass.
 
-## The anchor rule
+## Dated holds (a deferral is a decision, #3250)
+
+- **fullreview-delta** — declared 2026-08-27, resumes 2026-09-06. #3245 rewrites the review-skill corpus (102 files) — the instrument this clock measures. A delta grades the platform against the PREVIOUS run's anchors, so a delta run across an instrument rewrite produces a number that means nothing: the movement would be the rubric moving, not the platform. Decision (#3250, Session I): do NOT run a delta into the rewrite. The next fullreview run is recorded as a NEW BASELINE (a full, suffix-free grades file), and this clock is re-anchored once to 2026-09-06 so the 2026-09-01 hard date is discharged by a written decision rather than by a silent lapse. This hold is one-time: after 2026-09-06 the ordinary cadence applies and a missed run reds like any other.
+
+A hold re-anchors ONE entry's clock ONE time, with a date and a written reason, so a
+deliberate skip is discharged by a decision instead of a silent lapse. It is bounded
+(at most 45 days) and it never suppresses the NEVER-RUN verdict below:
+deferring a ritual cannot manufacture evidence that it ever happened. A skip that
+wants to be permanent belongs in the exemption list above, not in a hold.
+
+## The anchor rule — and what an anchor may NOT do
 
 Every clock starts at `max(newest artifact, 2026-08-22)` — the calendar's adoption
 date. Without it the dead-man is born red on rituals that never ran (craft-review),
 which blocks on history instead of behavior. Never bump the anchor to silence an
 overdue ritual: the artifact is the only honest reset.
+
+The anchor holds the **window** open. Since #3250 it no longer holds the **verdict**
+green: a ritual with no artifact reports `NEVER-RUN`, never `OK`, and `--due` exits
+`3` for it (`1` stays reserved for OVERDUE, so the log
+distinguishes 'somebody stopped doing this' from 'nobody has ever done this'). The
+distinction used to live only in the display string `last never (anchored …)` while
+the verdict said OK — a dead-man green because it was anchored rather than because
+the ritual ran is the exact lying-gauge shape this calendar exists to kill.
