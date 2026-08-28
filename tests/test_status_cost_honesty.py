@@ -234,7 +234,16 @@ def test_governor_effective_ceiling_moves_across_the_window_boundary(monkeypatch
     assert base_aug == cg._TEMP_CEILING_USD, "inside the window the raised ceiling must apply"
     assert surge_aug == cg._TEMP_SURGE_CEILING_USD
     assert base_sep == cg.MONTHLY_CEILING, "September must be back on the standing ceiling"
-    assert base_aug > base_sep
+    # The load-bearing property is that the boundary CHANGES the effective ceiling, not
+    # that the window is higher. That direction assumption held for three windows and
+    # stopped holding at the 2026-08-28 amendment (#2801): the September base moved to
+    # $215, above the window's own $200, so the 09-01 revert is a RAISE. Asserting
+    # `base_aug > base_sep` was encoding "a dated window is always a raise", which was
+    # never the mechanism — _effective_ceiling floors surge at the base precisely because
+    # the pair can invert. Assert the difference, and assert the floor invariant that IS
+    # structural.
+    assert base_aug != base_sep, "the boundary must change the effective ceiling"
+    assert surge_aug >= base_aug, "surge may never sit below the base in force (_effective_ceiling max())"
 
 
 def test_the_window_reverts_on_its_own_date_with_no_deploy(monkeypatch):
