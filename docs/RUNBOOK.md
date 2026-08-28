@@ -1001,7 +1001,7 @@ aws dynamodb get-item --table-name life-platform \
 
 ## Cost Monitoring
 
-Monthly ceiling: **$150 all-in, enforced** (ADR-063 + ADR-133 amendment; $176 in reader-traffic surge mode; cost-governor degrades AI by tier). See `docs/COST_TRACKER.md` for the full breakdown.
+Monthly ceiling: **$215 all-in, enforced** (ADR-063 + ADR-133 amendment; $252 in reader-traffic surge mode; cost-governor degrades AI by tier). See `docs/COST_TRACKER.md` for the full breakdown.
 
 Real run-rate (CE, 2026-06-08 sweep): Mar $20.04 → Apr $35.01 → May $48.19 (peak, Bedrock $14.29) → steady-state **~$25-40/mo**. Bedrock is the swing factor (priced from CloudWatch token metrics); WAF deleted (~−$8/mo).
 
@@ -1623,7 +1623,7 @@ See ADR-058/077 in `docs/DECISIONS.md` for the design rationale.
 
 ## Budget Guardrails (ADR-063)
 
-The monthly AWS budget — **$150 base** (ADR-133 amendment 2026-08-18, #2836/#2895; was $75, then $85), floating to **$176 in reader-traffic surge mode** (ADR-133) — is enforced by a two-component system. For August 2026 only, a dated `_TEMP_CEILING_WINDOW` raised that pair to $200/$235; it auto-reverts 2026-09-01 with no deploy or manual step.
+The monthly AWS budget — **$215 base** (ADR-133 amendment 2026-08-28, #2801; was $75, then $85, then $150), floating to **$252 in reader-traffic surge mode** (ADR-133) — is enforced by a two-component system. For August 2026 only, a dated `_TEMP_CEILING_WINDOW` raised that pair to $200/$235; it auto-reverts 2026-09-01 with no deploy or manual step.
 
 - **`life-platform-cost-governor`** Lambda (every 8h — `cron(0 0/8 * * ? *)`, `cdk/stacks/operational_stack.py`) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
 - **`lambdas/ai/budget_guard.py`** (bundled module, #781) — calling code uses `allow(feature)` to gate AI by tier.
@@ -1632,10 +1632,10 @@ The monthly AWS budget — **$150 base** (ADR-133 amendment 2026-08-18, #2836/#2
 
 | Tier | Projected (vs effective ceiling) | What pauses (audience-ordered, ADR-125) |
 |---|---|---|
-| 0 | <73% of ceiling ($110.00 at the $150 base) | nothing — all AI runs normally |
+| 0 | <73% of ceiling ($157.67 at the $215 base) | nothing — all AI runs normally |
 | 1 | 73–87% | internal/dev AI — ensemble, chronicle editor, coherence-semantic |
 | 2 | 87–97% | + reader narratives — coach commentary, State of Matthew, chronicle |
-| 3 | ≥97% ($146.00 at the $150 base) | hard cutoff — website AI returns "paused" JSON; `bedrock_client.invoke()` raises `BudgetExceeded`; daily brief skips AI |
+| 3 | ≥97% ($209.27 at the $215 base) | hard cutoff — website AI returns "paused" JSON; `bedrock_client.invoke()` raises `BudgetExceeded`; daily brief skips AI |
 
 **Check current tier:**
 ```bash

@@ -150,7 +150,7 @@ CACHING_DECISIONS: dict[str, dict[str, Any]] = {
             "config/coaches/_shared_standard.json hoisted in), 55% of the floor, so reaching "
             "it needs ~1,858 tok of PURE PADDING inside a quality-JUDGE prompt. Measured prize "
             "for padding both callers to the floor: $0.29/mo; the ceiling if the floor did not "
-            "exist at all is $0.69/mo (0.46% of the $150 ADR-133 ceiling). Not worth degrading "
+            "exist at all is $0.69/mo (0.32% of the $215 ADR-133 ceiling). Not worth degrading "
             "the judge for. Revisit if the model's floor drops or the prompt grows on its merits."
         ),
     },

@@ -304,7 +304,7 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 
 ## Budget
 
-- **Enforced ceiling**: $150/month base, floating to $176 in reader-traffic surge mode (ADR-063 + ADR-133)
+- **Enforced ceiling**: $215/month base, floating to $252 in reader-traffic surge mode (ADR-063 + ADR-133)
 - **Real run-rate**: ~$25–40/month steady-state — see `docs/COST_TRACKER.md` for the live breakdown
 - **Enforcement**: cost-governor writes a tier 0–3 to SSM; `budget_guard.py` degrades AI features by tier (CLAUDE.md "AI Inference" section)
 - **Cost Explorer**:
