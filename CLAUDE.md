@@ -208,45 +208,32 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-27 (Opus 5, **Session H**, autonomous with merge+deploy authority, ALL-OPUS —
-`~/.claude/plans/dreamy-painting-glacier.md` Part B). **Main GREEN.** A second session held
-`skills-corpus-governable-phase1` in the primary clone throughout; **all driver git work ran from a
-detached worktree at `origin/main`** and PR #3245 was never touched. **6 PRs merged** (#3248, #3249,
-#3253, #3256, #3259, #3263), **3 closed with verdicts** (#2999, #3254, #3237), **12 filed**. **Open
-42 → 51: net +9 — the deliberately correct outcome**, since the non-Fable queue was exhausted and
-the refill adds before it subtracts; nothing was suppressed to protect the number. Part A's four
-owner decisions were not supplied, so #2801/#2833/#3083/#2834 were **parked, not worked**.
-**The through-line: the platform's own written claims about itself drift faster than its code.**
-Found nine times. **Lane 1's premise was inverted** — the plan said the 09-01 ceiling rollover would
-red on eight docs; it reds on **two**, and the other six are *structurally invisible* (`BUDGET_NEAR`
-needs a ceiling word within 20 chars). Measured by standing the real scanners at 2026-09-02: **14
-unframed occurrences, 2 caught**. The risk was **silence, not noise** — undiscoverable by the diff
-read the plan asked for. Fixed by a **derivation**: `retired_figures()` forbids the expired pair
-rather than merely un-allowing it, inert while the window runs (a dead-man), proved 12 → 0 with a
-negative control that actually reds. **Lane 2 found BOTH sides of a contradiction wrong in opposite
-directions** — #2801's "$6.78/day" is a **7-day sum** (real ~$1.04/day, so the CI lever is
-**~$31–60/mo, down from the ~$203/mo the epic assumed**), and `budget_guard`'s "pennies per run" priced the *nightly Lambda*
-copy while labelling the *CI* copy (~24¢, ~13x); the **prose** gate is 4x the vision gate. **#2883's
-title asks for an alarm that already exists** and is lit 21/21; its "closing at ~0.02/day" claim
-dies on OLS — slope **-0.0056/day, 95% CI [-0.0152, +0.0040]**, an interval that **includes
-non-decreasing**. **`fullreview-delta` names a ritual the skill does not implement**, so the
-calendar was **NOT stamped** — a bounded two-lens sweep ran instead and is not a delta. **The
-sanctioned Roadmap refill cannot refill this queue**: all 12 startable candidates are `model:fable`,
-so a promotion would green `now_liveness` while adding zero startable work; #3256 now **refuses**
-that and prints `NO REMEDY IN THE CORPUS`. **The site auto-rollback reported `success` on a defect
-it cannot reach** (stored artifact in DynamoDB, verified still live). **A citation chain cited two
-closed issues** while asserting a finding had "no recurrence since" — the same fingerprint is in the
-log inside 72h. **The reader-truth judge emits findings its own note retracts** ("No flag warranted
-on reconsideration") and the pipeline counts them. One plan finding was a **false positive**
-(`broadcast_sensitivity` is deliberately unregistered, documented in-file) and was rejected publicly
-on #2799 rather than filed. Verified-with-positive-controls filings: **#3260** (`slo-ai-coaching-success`
-is dimensionless and slept through **191 real failures in one day**), **#3261** (two live OG cards
-publish 116/59/$13 against 76/104/$146 — and discard the correct values they already loaded),
-**#3262**, **#3257**, **#3258**. Gotchas: **`gh run list --commit <short-sha>` returns `[]` falsely**
-(use the API at the full 40-char sha); **piped exit codes lied twice**; **my own three filings broke
-the hygiene gate** (1 → 5 violations) and it caught all four; and **labelling #2978 `blocked:date`
-honestly fired a blocking gate** — the hygiene system punishes accurate blockage-reporting. One
-fleet deploy (`5e392255`) **verified by content**, two leases **rejected**, neither left waiting.
-**Next:** #3260 · #3261 (both S, both verified) · #3250 · #3264 · #2999's residual on #2578 · the
-owner batch, led by the **September 1 ceiling cliff, now 4 days out**. Full narrative:
+**Verified:** 2026-08-28 (Opus 5, **Session I**, autonomous with merge+deploy authority, ALL-OPUS —
+the plan `~/.claude/plans/twinkling-noodling-treehouse.md` plus two owner-directed extensions, a
+rituals run and a bug-bash sweep; twelve agent lanes). **Main GREEN.** **11 PRs merged · 6 issues
+closed with verdicts · 10 filed, every one adversarially verified · 4 §10 folds.** Open 51 → 56,
+**net +5, stated not suppressed**: the drain took it 51 → 45, then the sweep found eleven real
+defects that survived verification. **Three issues deliberately NOT closed despite their PRs
+merging** (#3252, #3250, #2801) — `Fixes` downgraded to `Refs` on two PRs; a merge is not a closure.
+**The September ceiling is re-derived and live: $150/$176 → $215/$252** (ADR-133 amendment, #2801),
+chosen by *executing* `_decide_tier` over a simulated September at three burn rates — the lowest base
+that never reaches tier 2 in any of them, against a measured $5.74/day (sd $4.32, n=25). **The plan's
+own premise was false**: "doing nothing selects tier 3 on 09-01" priced September against August's
+*month-end projection*; `_project_month_end` is month-scoped and `_decide_tier` caps at
+`actual_mtd_tier + 1`, so $150 reaches tier 3 on **~Sep 21** — the cliff was real, its date wrong by
+twenty days. Because $215 exceeds the window's $200, **the 09-01 revert is now a RAISE**. Four
+deploys, every one verified by CONTENT; the invisible one (`cdk deploy LifePlatformCore`, **zero CDK
+file changes**) moved the AWS Budget 150.0 → 215.0. Six leases disposed, one **rejected** because it
+carried `MONTHLY_CEILING = "150"` — *strictly newer than live yet older than main on the one number
+the session existed to change*. **Through-line: the stated mechanism and the actual mechanism had
+diverged** — a metric clearing by dilution while its comment credited a retirement job; an alarm
+citing an expired window; five rulings expressing "never gating" as a value that gates; and **`main`
+has no branch protection and zero required checks** (#3288), so eleven merges were gated solely by
+`wait_pr_green.sh` and an unpiped exit code. **#3245 landed** — the 102-file skills-corpus PR, with
+its worktree reaper. **Both NEVER-RUN rituals actually ran**: craft-review (B overall, 23 findings)
+and the proportionality re-read (73 rows, 11 corrected, **two demote triggers already fired
+unnoticed**). Owner decisions taken: #3083 **decided hold**, #2883 **re-measure at n=30**, and
+**auto-synced sources count as "logging"** (ADR-104 amendment), which unblocked #3252's dead box.
+**Needs the owner's hands: #3284** — the cycle's chronicle article is unreachable to every reader and
+the fix requires a manual CloudFront function publish. Full narrative:
 `handovers/HANDOVER_LATEST.md`.

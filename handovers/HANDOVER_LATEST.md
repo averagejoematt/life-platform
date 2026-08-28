@@ -1,215 +1,186 @@
-# Handover — 2026-08-27 (Opus 5): Session H — six merged, net +9 open, and a session where the plan's own premises were wrong more often than they were right
+# Handover — 2026-08-27/28 (Opus 5): Session I — the cliff was real, its date was wrong by twenty days
 
 **Session:** Opus 5, AUTONOMOUS with merge+deploy authority, ALL-OPUS. Drove
-`~/.claude/plans/dreamy-painting-glacier.md` (Part B). Part A's four owner decisions were
-**not** supplied, so #2801/#2833/#3083/#2834 were parked, not worked — as the brief directed.
-A second session held `skills-corpus-governable-phase1` in the primary clone throughout; **all
-driver git work ran from a detached worktree at `origin/main`** and PR #3245 was never touched.
+`~/.claude/plans/twinkling-noodling-treehouse.md`, then two owner-directed extensions: a rituals
+run and a bug-bash sweep. Twelve agent lanes. Previous handover archived on `session-archive`.
 
-## The score — and why the headline number is positive on purpose
+**The second session holding `skills-corpus-governable-phase1` had ENDED** — established by evidence,
+not assumption (zero files touched in the primary clone in 6h, no Claude Code process on the repo,
+clean tree, PR gone `CONFLICTING` with nobody rebasing). Session H's never-touch order was
+discharged and #3245 was picked up and landed.
 
-- **Open 42 → 51. Net +9.** This is the **correct** outcome and the plan said so in advance:
-  the non-Fable queue was functionally exhausted, and the sanctioned refill adds before it
-  subtracts. **Twelve** issues filed, none suppressed to protect a metric.
-- **6 PRs merged**: #3248, #3249, #3253, #3256, #3259, #3263.
-- **3 issues closed with verdicts**: **#2999** (gates slice 2 — census proven **25/561 → 40/561**,
-  4.5% → 7.1%, `BASELINE_TOTAL_GATES` unchanged, no baseline raised), **#3254**, **#3237**. That is
-  the low end of the honest 3–5 target and I am not dressing it up. **#2848 was deliberately NOT
-  closed** despite its PR merging: its own cold read says the Outcome is not met, so it got a
-  box-by-box verdict instead. A merge is not a closure.
-- **1 fleet deploy** (`5e392255`), **verified by CONTENT** — the live `daily-brief` bundle was
-  downloaded and grepped: `ai/budget_guard.py:226` carries the corrected ~$0.24/run measurement and
-  `coach/coach_sim_scoreboard.py:77` the reframed ceiling. **2 deploy leases REJECTED** (`69e0b933`,
-  `157c81b3`) — both superseded; the second would have shipped a `platform_counts.py` literal that a
-  later reconcile had already moved again. Neither was left waiting.
+## The score
 
-## The through-line: the platform's *descriptions* of itself drift faster than its code
+- **11 PRs merged**: #3267 #3268 #3269 #3270 #3271 #3272 #3273 #3274 #3245 #3276 #3280.
+- **6 issues CLOSED with verdicts**: #3264, #3255, #3258, #3260, #3261, #3257.
+- **10 issues FILED**, every one adversarially verified: #3277 #3278 #3279 #3282 #3283 #3284
+  #3285 #3286 #3287 #3288. Plus 4 §10 folds (#2799 ×1, #2578 ×3).
+- **Open 51 → 56. Net +5 — and that is the correct outcome, stated rather than suppressed.**
+  The drain phase took it 51 → 45; the owner then asked mid-session for a bug bash, and the sweep
+  found eleven real defects that survived adversarial verification. Suppressing verified
+  reader-facing defects to protect a net-open metric is the disease this repo documents.
+- **Three issues deliberately NOT closed** despite their PRs merging — #3252, #3250, #2801 each
+  got a box-by-box verdict and `Fixes` was downgraded to `Refs` on two PRs. A merge is not a closure.
+- **Four deploys, every one verified by CONTENT.** **Six deploy leases disposed** — five approved
+  after a content decode, one **rejected**.
 
-Session F found instruments that report success without doing their job. H found the layer
-above: **written claims about the system — issue titles, code comments, citation notes,
-calendar entries, and the session plan itself — that measurement contradicts.** Nine times.
+## The through-line: the stated mechanism and the actual mechanism had diverged
 
-1. **Lane 1's premise was inverted.** The plan said `check_doc_facts` would **red on eight
-   docs** on 09-01. It reds on **two**. The other six are *structurally invisible* —
-   `BUDGET_NEAR` needs a ceiling word within 20 characters, and those lines phrase `$200`
-   further away. Measured by standing the real scanners at 2026-09-02: **14 unframed
-   occurrences, 2 caught.** The risk was **silence, not noise** — the more dangerous of the
-   two, and undiscoverable by reading the diff the plan asked me to read.
-2. **Lane 2 found BOTH sides of a contradiction wrong, in opposite directions.** #2801's
-   "$6.78/day" is a **7-day sum** (`cost_governor_lambda.py:1001` divides `ai_daily`; `:1012`
-   does not divide the class split). Real: **~$1.04/day**. And `budget_guard`'s "pennies per
-   run" described the **nightly qa_smoke Lambda** (1.4¢) while labelling the **CI** copy
-   (~24¢, ~13x). The prose gate is **4x the vision gate** — the opposite of the
-   images-are-expensive intuition.
-3. **#2883's title is stale.** It asks for an alarm that already exists —
-   `cost-metric-drift-sustained`, AST-pinned to `DRIFT_RATIO_BAR`. It is **lit right now,
-   21/21 datapoints**, exactly as its CDK comment predicted.
-4. **The "it's closing" claim about that ratio does not survive arithmetic.** OLS on n=8:
-   slope **-0.0056/day, 95% CI [-0.0152, +0.0040]** — **the interval includes non-decreasing.**
-   The circulating figure (~0.02/day) is 3.6x the point estimate and outside the CI entirely.
-5. **`fullreview-delta` names a procedure that does not exist.** `.claude/commands/fullreview.md`
-   implements only full-unseeded and seeded modes. A calendar entry counting down to a hard
-   date for an undefined ritual. I therefore **did not stamp the calendar** (see below).
-6. **The sanctioned refill cannot refill this queue.** All **12** startable Roadmap/Next
-   candidates are `model:fable`; this session was all-Opus. A fully-implemented Roadmap
-   promotion would make `now_liveness` numerically green while adding **zero** startable work.
-   Lane 3 independently re-derived 12/12 and built the lane filter that refuses it.
-7. **The site auto-rollback reported `success` on a defect it cannot reach.** The gating QA
-   caught a real `/method/board/` contradiction; the rollback reverts `site/`, the content is
-   a stored artifact in DynamoDB. **Verified still live in production.**
-8. **A citation chain cited two closed issues,** and its note asserted finding `539c6d` was
-   *"fixed … no recurrence since."* The identical fingerprint is in the log **inside the last
-   72h**. A human-memory negative, trusted for four days.
-9. **The reader-truth judge emits findings its own note retracts.** Live: `[temporal_contradiction/low]`
-   ending *"No flag warranted on reconsideration."* The pipeline counted it and lit
-   `qa-smoke-warnings` anyway.
+Session F found instruments reporting success without doing their job. H found written claims
+measurement contradicts. I found the layer under both: **things that ARE working, but not by the
+mechanism their own documentation names** — so the explanation anyone would act on is wrong even
+while the number looks fine.
 
-And the plan's one **false positive**, caught before filing: `broadcast_sensitivity` "silently
-defaults to cutoff 3" is **deliberate, documented in-file at `:275-278`**, and the tier-3 hold
-is the intended fail-closed posture. Rejected publicly on #2799 so nobody re-files it.
+1. **The cliff's date.** "Doing nothing selects tier 3 on 09-01" — in the #2801 epic, in Session H's
+   owner batch, and in this session's own plan — is **false**, structurally. It priced September
+   against August's *month-end projection* ($176.34), a terminal value for a 90%-elapsed month.
+   `_project_month_end` is month-scoped; `_decide_tier` caps at `actual_mtd_tier + 1`. Simulated
+   through the real function, $150 reaches **tier 1 Sep 8 · tier 2 Sep 18 · tier 3 Sep 21**. The
+   cliff is real; its date was wrong by twenty days.
+2. **`prediction-gradable-share-low` clears by dilution, not retirement.** Its CDK comment credits
+   `_retire_ungradeable`; measured, `GradableShare` rises 0.3951 → 0.4556 over four days while
+   `UngradeablePendingCount` is **flat at 49 every day**.
+3. **`ai-tokens-platform-daily-total` cited a window that had already expired** while the alarm
+   stayed lit — a genuine sustained breach (195,560 / 167,974 against a 150,000 threshold).
+4. **Five reader-truth rulings asserted an outcome the pipeline could not deliver** — all five say
+   "visible as advisory, never gating" and all five express it as `severity = low`, which gates.
+5. **Two `KNOWN_SECRETS` registries had drifted for months by exactly four ids**, invisible because
+   the gate that would have reported it could not see the references.
+6. **`main` has no branch protection and zero required checks** (#3288). `CONVENTIONS.md` describes
+   a merge gate that does not exist; the honest record two files away is machine-pinned, the false
+   one is not. Eleven PRs merged tonight gated **solely** by `wait_pr_green.sh` and an unpiped exit
+   code. The discipline held — but it was the only belt, not a second one.
+7. **The gating render sweep runs axe only at the desktop viewport** (#3277). The finder called the
+   a11y defects WebKit-specific; the verifier ran both engines at both viewports and got
+   byte-identical results. 100% viewport-driven, 0% engine-driven — and in 6 runs the WebKit
+   workflow has found **zero** genuinely engine-specific bugs, a live ADR-103 datum.
+8. **The chronicle's canonical permalink 301s to the wrong hub** (#3284). A one-way ratchet:
+   `register_permalink_redirect()` only appends, while `untombstone_and_redate()` resurrects the
+   record without un-registering. **And the existing gate asserts the blackhole is correct** —
+   `tests/test_redirect_spotcheck.py` checks the 301 returns its declared Location.
 
-## Lane 1 — the 09-01 rollover, proved at a simulated date
+## Lane 1 — the September ceiling, re-derived rather than raised
 
-The fix is a **derivation, not a sweep**: `budget_ceilings.retired_figures()` returns the dated
-window's pair **once that window has expired** — empty while it runs, so it is a **dead-man for
-the rollover**. `check_doc_facts` matches that closed set of dead literals with **no proximity
-requirement** (safe only there: retired numbers have no legitimate match population to shield).
-`check_doc_facts.py` stayed under its 1200-line ceiling at **1197** — the derivation went to the
-module that already owns the window. **No baseline raised.**
+`$150/$176` → **`$215/$252`**, permanent, not a fourth dated window.
 
-Proof was a simulated date, not a diff read: **12 → 0** post-revert offenders. Negative control:
-reverting one doc fix reds the test naming `docs/RUNBOOK.md:1626: $200` and `$235`; restoring
-greens it. The prose was reframed with **"raised to"** rather than past tense — "was $200" would
-be **false today**, while the window is still in force.
+**Measured steady state, explicitly not a projection:** Cost Explorer unblended **$5.74/day, sd
+$4.32, n=25** (08-01..08-25) → ~$172/mo, 95% CI $121–223. 08-26/27 excluded as **incomplete, not
+outliers** — CE's Bedrock line lags 24–48h, and treating a lagging partial as a low day is the error
+that produced the $4.12/day figure behind $150. Month actuals **May $48.19 · Jun $79.80 ·
+Jul $98.35 · Aug ~$165** — roughly +$30/month, four months running.
+
+**$215 chosen by executing `_decide_tier`** over a simulated September at three burn rates: the
+lowest base that **never reaches tier 2 in any scenario** while still engaging the tier-1 ladder in
+two — ADR-133's accepted posture without making tier 0 the cosmetic norm that same ADR rejects. The
+plan's $205 hits tier 2 on Sep 28. All 15 published table rows were re-verified against the real
+functions before the ADR shipped. Positive control: the sim reproduces the live governor exactly
+(176.35 vs 176.34; tier 2 vs 2).
+
+**The invisible deploy step worked and was verified:** `cdk deploy LifePlatformCore` with **zero CDK
+file changes** moved the AWS Budget `150.0 → 215.0`, because `BUDGET_AMOUNT_USD` resolves at *synth*
+time by parsing the governor source.
+
+**Tier after deploy is 2 — correct, and predicted before it was observed.** The August window holds
+until 09-01. Writing the prediction down first mattered: "still tier 2 after a ceiling raise"
+otherwise reads as a failed deploy.
+
+## Rituals — both NEVER-RUN entries actually run
+
+- **`craft-review` (#3280)** now reads OK on main. Graded **B overall** across 10 lenses, 23
+  findings, magnitudes derived from `review_anchors.py`. Its verdict in one line: *a repo whose
+  machinery is consistently stronger than its self-description.* It refuted one of its own lenses'
+  claims rather than banking it. #3288 is its sharpest finding, filed.
+- **`proportionality-reread` (#3275)** — 73 rows walked, ~60 verified unchanged, **11 corrected**,
+  and **two demote triggers found already fired unnoticed** (fresh-eyes 2026-07-26; reader-truth
+  2026-08-26). The privacy-tier row's rent was understated ~10x (31 fields/42 pairs vs "3 fields,
+  4 pairs"). Landing at wrap time.
 
 ## Incidents & gotchas
 
-- **`gh run list --commit <short-sha>` returns `[]` falsely.** It looks exactly like a swallowed
-  push. The reliable query is the API at the **full 40-char** sha — `dd7dccd62` showed 0 runs by
-  the first method and **2** by the second. I nearly opened a swallow investigation on it.
-- **Piped exit codes lied twice.** `check_backlog_hygiene.py | tail` reported `0` while the gate
-  exited **1**. Every verdict since was taken unpiped.
-- **My own three filings broke the hygiene gate** — 1 violation → 5 (missing epic links, 6
-  checkboxes where the contract is 3–5, an Outcome with no sanctioned audience). The gate caught
-  all four and I fixed them. Worth stating: the filer is not exempt from the filing contract.
-- **Labelling an issue honestly fired a blocking gate.** Adding `blocked:date` to #2978 (correct
-  — it is date-blocked to ~09-24) immediately violated `now_liveness`. **The hygiene system
-  punishes accurate blockage-reporting**; that tension is now #3254's, and fixed by #3256.
-- **`now_liveness` counts `type:story` only.** A P2 reader-facing bug on `Now` does not make the
-  queue "live." Two of my `Now` filings could not satisfy it by construction.
-- **A CloudWatch namespace guess returned `n=0`** and looked exactly like a measurement of zero.
-  The real namespace was `LifePlatform/Budget`, with 15 datapoints. Positive controls were
-  required of every agent for exactly this reason, and the verifier used them throughout.
-
-## Verified findings now filed (all adversarially re-confirmed, with positive controls)
-
-- **#3260 — `slo-ai-coaching-success` is dimensionless and cannot fire.** Alarm reads a series
-  nobody writes; all 7 emitters attach `LambdaFunction`. **180d: 0 datapoints at the alarm vs
-  329 real failures on `daily-brief` alone — 191 across five Lambdas on 2026-05-26 in one day**,
-  against a `Sum >= 3` threshold. Last state change **2026-03-08**. `docs/SLOs.md:77` and
-  `docs/MONITORING.md:174` both describe behaviour it does not have.
-- **#3261 — two live OG share cards publish fabricated numbers.** `og-builders.png` renders
-  **116 MCP TOOLS / 59 LAMBDAS / $13 MONTHLY COST** against truth **76 / 104 / $146 MTD** (the
-  `$13` is off **7.6x**), and `og_image_lambda.py:278` **discards the correct values it already
-  loaded**. Sibling `og-labs.png` says 74 biomarkers / 7 draws against **152 / 8**.
-- **#3262 — both Claude hooks are dark inside a worktree**, this repo's standard concurrency
-  mode. `guard_bash.py` tests `--git-common-dir`, which ends in `/.git` from *every* worktree,
-  so the deploy-from-a-worktree detector is unreachable in all cases; `_hooklib`'s state dir is
-  unconstructible where `.git` is a file, and `_load`/`_save` swallow the `NotADirectoryError`.
-  Neither is tested because `CLAUDE_HOOK_INERT=1` short-circuits both.
-- **#3257** `/api/source_freshness` ages a **Pacific** `DATE#` key at **UTC midnight** — a record
-  stamped today reads **21.7h old**, verified live. The ops-side sibling was fixed to Pacific two
-  days ago (`452929f17`), so two consumers of the same key now disagree by 7h and the
-  reader-facing one is wrong.
-- **#3252** a paused-regeneration board narrative behind a fresh envelope · **#3258** the
-  self-retracting judge · **#3250** nine review rituals, three greener-than-real registry entries
-  · **#3255** `test_secret_references` cannot fail on its own default · **#3254** the refill gap.
+- **A lease would have shipped a tree without the ceiling.** `b4f849f4` was *strictly newer than
+  live* — ancestry alone waves it through — but carried `MONTHLY_CEILING = "150"`, older than main
+  on the one number the session existed to change. Rejected with the decode. **"Newer than live" is
+  not "carries the change you are deploying for."**
+- **The census told me 562 and it was lying, because of my own mistake.** A scripted merge
+  resolution dropped a `#`, so `test_gate_census_lane_3000.py` stopped parsing;
+  `discover_registry_gates` swallows `SyntaxError`, so the file silently contributed **zero** gates
+  and the count went **down** — the reassuring direction. Caught only because 562 disagreed with
+  arithmetic done first. Folded to #2578.
+- **`wait_pr_green` correctly REFUSED to classify a drift red** on #3271 because a
+  non-`platform_counts.py` file was in it. Exit 1, not 4. The classifier was right; I was one file short.
+- **I hit the piped-exit-code trap myself** — `check_backlog_hygiene.py | tail` printed `EXIT=0`
+  while the gate exits **1**. Third recorded instance, and it was in my own brief.
+- **My own docstring edit contained a literal `"""` and broke the module.**
+- **A broader regression than the PR's own selection caught a real red** —
+  `test_status_cost_honesty` asserted `base_aug > base_sep`, an encoded "a dated window is always a
+  raise" that inverts now that $215 > $200.
+- **Two issue-filers ran concurrently and both edited epic bodies.** A clobber risk I should have
+  staggered; verified afterwards that all five roster additions survived.
+- **A subagent incidentally read two plaintext secrets** while verifying source provisioning and
+  flagged it itself. Scope contained: only secret *names* are in tracked files; the values sit in a
+  local temp transcript outside the repo, uncommitted. Rotation is an owner judgment call.
+- **Zero event swallows.** Every push swallow-checked at ~90s at the full 40-char sha.
 
 ## Gate lines
 
-**Build beat:** none — no merged+deployed reader-facing change this session. The fleet deploy
-carried comment/metadata only; every reader-facing finding was **filed, not fixed**.
-**Docs:** `docs/OPERATING_DISCIPLINE.md` (new) · `docs/ONBOARDING.md` cold-start section ·
-`docs/CONTINUITY.md` §4 · `docs/CONVENTIONS.md` · `docs/DECISIONS.md` (ADR-125 dated correction,
-annotated not rewritten) · `docs/alarm_citations.json` re-pointed · `docs/COST_TRACKER.md`,
-`OPERATOR_GUIDE.md`, `RUNBOOK.md`, `design/COACH_HUMANITY_ROADMAP.md`, `CLAUDE.md` reframed
-**Decisions:** the AI-CI-cadence decision is now **filed as #3251 (`gate:owner`)** rather than
-living in a comment — the specific defect Part A named
-**Main:** green (`3eff37e6` vouches; HEAD `90b278f1` is a reconcile bot push that mints no CI/CD
-run — `bot-push-no-dispatch`, expected, not a swallow). Six merges, each swallow-checked at the
-**full 40-char** sha; both rejected leases report as rejected-and-superseded, not red. Doc-sync
-drift on main: clean (`sync_doc_metadata --check` exit 0 after reconcile `90b278f1e`)
-**Deploy:** fleet at `5e392255` — comments/metadata only, no behaviour change, deployed == main
-**Calendar:** **NOT stamped.** `fullreview-delta` is due 08-29 (hard 09-01) and I did not run it,
-because the ritual it names **does not exist** in the skill. Stamping would have been exactly the
-manufactured freshness this session spent nine findings documenting. A bounded two-lens sweep ran
-instead and produced the refill; it is **not** a delta and must not be recorded as one.
-**Incidents:** 3 row(s) worth recording — (1) the site auto-rollback reported `success` on a
-`/method/board/` defect it structurally cannot reach (it reverts `site/`; the content is a stored
-DynamoDB artifact), a fresh instance of the rollback-scope class, filed #3252; (2) an alarm citation
-chain pointed at **two closed issues** while asserting a finding had "no recurrence since" — the
-same fingerprint was in the log inside 72h, fixed in #3259 and filed as #3258; (3) `gh run list
---commit <short-sha>` returned `[]` on a live sha, which is indistinguishable from a swallowed push
-— the reliable query is the Actions API at the full 40-char sha
-**Closures:** #2999, #3254, #3237 — all commented with contract-shape verdicts. **#2848 deliberately
-NOT closed** despite PR #3253 merging: its own cold read shows the Outcome unmet (2 of 4 boxes), so
-it carries a box-by-box verdict and the five-item gap list instead. A merge is not a closure
-**Alarms:** 5 lit, all cited, gate exit 0 after re-pointing `qa-smoke-warnings` at #3258.
-`cost-metric-drift-sustained` is lit **21/21** — exactly as its own CDK comment predicted, and the
-direct evidence behind the #2883 re-decision
-**CI warnings:** 1 — the unit suite at **2244s/1950s**, the class's **seventh** instance
-(157→294→688→830→1507→1994→2244). Both prior owners (#3106, #3224) are closed, so it had none.
-Filed **#3265** with #3224's instruction carried forward: *attribute before touching the number* —
-the dominant term was duplicated whole-repo scans, not test count. Not raised, not normalised
-**Backlog:** `Now` refilled to 3 stories via Lane 3's own new planner — promoted **#3250**
-(both edits: milestone AND score-line arrow) and filed **#3264**. The planner **refused** to clear
-the count with `model:fable` work and printed `NO REMEDY IN THE CORPUS`; the new `now_lane_coverage`
-advisory now reports the truth on every run: **sonnet 0 · opus 3 · fable 0**
-**Ledger:** omitted — no new standing subsystem; #3256's planner priced its own rent in-file
-(which charter primitives it carries and which it omits, with reasons)
-**Stash/hooks:** clean — one WIP stash from my own branch-hop was dropped after confirming its
-content had merged as #3259
-
-## Owner batch
-
-1. **The ceiling call (#2801) — 4 days left, and the arithmetic changed today.** On 09-01 the
-   base reverts $200 → $150; tier-3 band **$146.00**; projected **$175.18**. Lane 2's measurement
-   **cuts the CI lever from ~$203/mo to ~$31–60/mo** — so option 2 is *weaker* than the epic
-   claimed, but at the top of that range it may still clear $146 on its own. Doing nothing selects
-   **tier 3 by default**. Recommendation unchanged: **raise the September base to ~$190–200.**
-2. **#3251** — the AI-CI-cadence decision, now filed. Note two things before deciding: SSM
-   `qa-level=lean` **cannot reach the measured money** (`visual-qa.yml:136` exempts deploy-gating
-   QA by design), and the expensive gate (**`reader_truth_qa`, 81%**) is *not* the one that
-   caught the live bug (`visual_ai_qa`, 19%).
-3. **#3083** fail-open→fail-closed destination · **#2833** shadow re-price · **#2834** IAM posture
-   — all still parked; no decisions were supplied, so none were acted on.
-4. **#2883 is now `gate:owner`.** Its bar is likely unachievable as written; the CI on the trend
-   includes zero. Recommend re-measuring at n=30 before retiring or amending the bar.
-5. Carried: RECONCILE_PUSH_TOKEN PAT · DEPLOY_GATE_JANITOR_TOKEN · respiratory_rate consent
-   (#3045) · Notion secret deletion (#2890) · DIL-027 restore drill · S3 Batch Replication
-   backfill · #3042 re-grade · Whoop re-auth · the `cf-auth-errors` alarm deletion.
+**Build beat:** 2026-08-28-the-stated-mechanism — #3261's fabricated share-card numbers and #3257's
+Pacific freshness frame are merged AND deployed, verified by unzipping the shipped bundles and
+regenerating the cards (14/14).
+**Docs:** `docs/DECISIONS.md` (ADR-133 amendment 2026-08-28; ADR-104 amendment for the absence
+ruling) · `docs/OPERATING_DISCIPLINE.md` (new §5 production authority) · `docs/CONVENTIONS.md` ·
+`docs/ONBOARDING.md` · `docs/COST_TRACKER.md` · `docs/OPERATOR_GUIDE.md` · `docs/ARCHITECTURE.md` ·
+`docs/RUNBOOK.md` · `docs/PROPORTIONALITY.md` · `docs/OPERATING_CALENDAR.md` ·
+`docs/alarm_citations.json` · `docs/reviews/craft_grades_2026-08-27.json` · `CLAUDE.md` · ~29
+ceiling prose sites
+**Decisions:** ADR-133 amendment (the September base) · ADR-104 amendment (auto-synced counts as
+"logging", owner ruling 2026-08-28)
+**Main:** green · doc-sync clean
+**Deploy:** 4, all verified by content — AWS Budget `150.0 → 215.0` · governor `"215"/"252"` ·
+site-api · qa-smoke · og-image-generator (cards regenerated and read back)
+**Incidents:** 5 worth recording — the pre-ceiling lease; the census swallowing a syntax error; the
+drift red `wait_pr_green` refused to misclassify; the piped exit code; the concurrent epic-body edits
+**Closures:** #3264 #3255 #3258 #3260 #3261 #3257 — all with contract-shape verdicts. #3252, #3250,
+#2801 deliberately NOT closed
+**Backlog:** promoted **#3265** (both edits). **`now_liveness` stays RED at 2 of 3, recorded not
+suppressed** — the planner prints `NO REMEDY IN THE CORPUS` for the opus lane; the only sanctioned
+promotion (#2849) is `model:fable`, which three consecutive sessions have declined. The queue is
+short *because this session drained it*. Two filers independently reached the same conclusion.
+**Alarms:** all cited, gate exit 0
+**CI warnings:** 1 — the unit suite at 2298s/1950s, the class's **eighth** instance. Triage: **no new
+filing, no raise** — owned by **#3265**, promoted to `Now` this wrap. #3224's instruction stands:
+attribute before touching the number. `--decoded` after naming it.
+**Ledger:** the `proportionality-reread` in #3275 *is* this session's ledger work — 11 rows corrected
+**Stash/hooks:** clean
 
 ## Residual / next picks
 
-- **#3260** — `slo-ai-coaching-success` is dimensionless and cannot fire; it slept through 191 real
-  failures in a single day. S-effort, verified with live positive controls. Best value on the board.
-- **#3261** — two live OG share cards publish fabricated numbers and regenerate **daily**, so this is
-  a reader-facing honesty violation that republishes itself every 24h. S-effort.
-- **#3257** — `/api/source_freshness` ages a Pacific key at UTC midnight; the public board and the ops
-  checker now disagree by 7h on the same key.
-- **#3250** — decide what `fullreview-delta` IS before running it. If #3245's review consolidation
-  lands first, the next run is a **new baseline**, not a delta, and must be recorded as one.
-- **#3264** — deploy authorization exists nowhere in the repo; #2848's box 4 cannot be checked until
-  this is closed. This session exercised that authority from a boot prompt alone.
-- **#2848** — open with a box-by-box verdict; boxes 2 and 4 unmet, five-item cold-read gap list posted.
-- **#2578** — carries #2999's residual (90 of family 5's 105 structural gates unproven; the other four
-  census families have no generated verdicts at all) plus the garmin alarm fold.
-- **#2801 / #2833 / #2834 / #3083 / #3251** — all `gate:owner`; parked, awaiting decisions — **not-work
-  — blocked on an owner call, not on an implementer.**
-- The **September 1 ceiling cliff** is 4 days out and #2801 is the decision that governs it —
-  **not-work — the call is the owner's; the measurement is done and posted.**
-- `Now` is lane-concentrated **sonnet 0 · opus 3 · fable 0** — a sonnet or fable session finds zero
-  startable stories however the total reads (#3254's new `now_lane_coverage` advisory reports it
-  every run) — **not-work — a supply fact, not a defect to fix.**
-- Five session worktrees remain at `/tmp/h-lane2`, `/tmp/h-lane3`, `/tmp/h-lane4`, `/tmp/h-lane5`,
-  `/tmp/sessionH` — **not-work — housekeeping; reap with `scripts/worktree_reaper.py`.**
+- **#3284 — needs the owner's hands.** The current cycle's chronicle article (24 KB, real, in the
+  live catalog) is unreachable to **every** reader. A repo-side fix does not deploy: the
+  v4-redirects CloudFront Function body is a separately published artifact only Matthew republishes.
+  Week 2 and Week 3 are pre-blackholed on the same three lines. `gate:owner`, so it will **not**
+  self-select into `/uplevel`'s seed query.
+- **#3282** — genome coaching selects on gene presence; on `Now`, emitting today. Privacy: Tier 2,
+  mechanism-only in all public text.
+- **#3285** — the OG home card paints a weight gain in success green under "LOST". `AMBER` exists one
+  line away.
+- **#3283 #3286 #3287 #3277 #3278 #3279 #3288** — filed, verified, on `Later`.
+- **#3252** — box 2 is now UNBLOCKED by the owner's ADR-104 ruling and shipped in #3276; box 5 (the
+  rollback-scope ruling) still needs a live gated run.
+- **#3250** — open at 3 of 5: the `/review <lens>` spine, the ADR-099 dedup, the exemption orphans.
+- **#2801** — open at 2 of 4: the CloudWatch EMF estate inventory and the secrets-manager floor.
+- **#2578** — carries three new §10 folds this session.
+- **#3083** — **decided hold** (owner, 2026-08-28), not a fourth silent parking. Do not re-surface
+  as undecided; re-raise only at a materially larger n than 42.
+- **#2883** — owner ruled **re-measure at n=30**. New datum recorded on the issue: only ~36% of real
+  Bedrock spend carries a `CallerClass` dimension, which may be the reachable bar.
+- **not-work — `operating-calendar.yml` red clears once #3275 lands**; `craft-review` is already OK.
+- **not-work — rotate `life-platform/bluesky` and `life-platform/youtube`** if the owner judges it
+  warranted: a subagent read them incidentally; values are in a local temp transcript only.
+- **not-work — the #3260 alarm is unproven in production** until a dimensionless
+  `AnthropicAPIFailure` datapoint appears after a real failure. A green suite is not evidence.
+- **not-work — `mcp/` (~21k lines) is essentially unswept** by the bug bash; the finder said so.
+- **not-work — ~35 stale worktrees**; the reaper #3245 brought is now on main.
+- **Dated:** **2026-08-31** — #3178 sentinel proof, #3191 TTL sweep · **2026-09-01** — the ceiling
+  window reverts (now a RAISE, no action) · **2026-09-06** — #3245's calendar hold expires ·
+  **2026-09-09** — `prediction-gradable-share-low` must carry a `#N` · **2026-09-16** —
+  `fullreview-delta` hard date · **~2026-09-24** — #2978's re-measure.
