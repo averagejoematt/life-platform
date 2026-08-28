@@ -148,7 +148,7 @@ python3 scripts/transcribe_solo.py rec.m4a --post-to-notion --dry-run
 The page body is the transcript; only a **pointer** to the recording (filename +
 duration) is recorded as page properties — the video/audio file itself is never
 uploaded (#1573 AC2; Matthew separately decides if/when full video ever goes to
-S3, cost-gated against the $150 ceiling). For an unattended watched-folder setup,
+S3, cost-gated against the $215 ceiling). For an unattended watched-folder setup,
 stage the launchd wrapper + this script to `~/.local/bin`, NOT under `~/Documents`
 (the TCC ~/Documents trap — a LaunchAgent reading ~/Documents exits 126).
 

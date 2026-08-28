@@ -6,7 +6,7 @@
 ![IaC](https://img.shields.io/badge/IaC-AWS_CDK-FF9900)
 ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
-A personal **health-intelligence platform** — it ingests data from ~20 wearables/apps/labs, stores it in a single-table data model, runs a deterministic computation pipeline plus an 8-agent AI coaching layer, and publishes the results (privately and at **[averagejoematt.com](https://averagejoematt.com)**) — all on a hard **$150/month enforced budget** (floats to $176 in reader-traffic surge mode — ADR-133).
+A personal **health-intelligence platform** — it ingests data from ~20 wearables/apps/labs, stores it in a single-table data model, runs a deterministic computation pipeline plus an 8-agent AI coaching layer, and publishes the results (privately and at **[averagejoematt.com](https://averagejoematt.com)**) — all on a hard **$215/month enforced budget** (floats to $252 in reader-traffic surge mode — ADR-133).
 
 > **N=1, in public, kept honest.** Everything is correlative (never causal), confidence-labelled, and the down weeks are shown, not hidden.
 
@@ -21,7 +21,7 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 | **Single-table DynamoDB** | `USER#…#SOURCE#…` / `DATE#…`, on-demand, 2 sanctioned GSIs (ADR-097; PITR + KMS) |
 | **AWS Bedrock** | Claude Sonnet 4.6 (narrative) + Haiku 4.5 (structured), prompt-cached |
 | **10 CDK stacks** | CDK-managed application infra with a declared out-of-IaC ring ([`docs/MANAGED_WHERE_LEDGER.md`](docs/MANAGED_WHERE_LEDGER.md)); OIDC CI/CD with a production-approval gate + auto-rollback |
-| **Enforced budget ceiling** | $150/mo base, $176 in reader-traffic surge (ADR-133 owns the number) — a cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
+| **Enforced budget ceiling** | $215/mo base, $252 in reader-traffic surge (ADR-133 owns the number) — a cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
 | **v4 site** | Three doors — Cockpit (`/cockpit/`), Story (`/story/`), Evidence (`/evidence/`) |
 
 ## Architecture (one line)

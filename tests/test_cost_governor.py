@@ -36,7 +36,7 @@ def _pin_normal_thresholds(gov, monkeypatch):
 def _pin_base_ceilings(gov, monkeypatch):
     """Same treatment for the calendar-scoped CEILING override
     (_TEMP_CEILING_WINDOW, August 2026). The assertions in this module are written
-    against the $150/$176 base pair; without this pin every ceiling test in here
+    against the $215/$252 base pair; without this pin every ceiling test in here
     false-fails for the duration of any raise window and silently passes again
     once it lapses. The window's own behaviour is tested explicitly below, with
     the clock injected rather than ambient.
@@ -51,8 +51,8 @@ def _pin_base_ceilings(gov, monkeypatch):
 # The dollar thresholds (55/65/73) are calibrated against the ORIGINAL $75
 # reference ceiling (_THRESHOLD_REFERENCE_CEILING) and scale as fixed fractions
 # (≈73%/87%/97%) of whatever ceiling is in effect. These boundary tests pin the
-# reference mapping (explicit ceiling=75.0); the $150-base default (ADR-133
-# amendment 2026-08-18, #2836) is pinned separately below.
+# reference mapping (explicit ceiling=75.0); the $215-base default (ADR-133
+# amendment 2026-08-28, #2801) is pinned separately below.
 
 
 @pytest.mark.parametrize(
@@ -76,20 +76,20 @@ def test_tier_thresholds_at_reference_ceiling(gov, projected, expected):
     "projected,expected",
     [
         (0, 0),
-        (109.99, 0),  # under 55 × 150/75 = 110.00
-        (110.0, 1),
-        (129.99, 1),  # under 65 × 150/75 = 130.00
-        (130.0, 2),
-        (145.99, 2),  # under 73 × 150/75 = 146.00
-        (146.0, 3),
+        (157.66, 0),  # under 55 × 215/75 = 157.67
+        (157.67, 1),
+        (186.33, 1),  # under 65 × 215/75 = 186.33
+        (186.34, 2),
+        (209.26, 2),  # under 73 × 215/75 = 209.27
+        (209.27, 3),
         (500, 3),
     ],
 )
-def test_tier_thresholds_at_150_base_default(gov, projected, expected):
-    """The current $150 base (ADR-133 amendment 2026-08-18, #2836) is the
+def test_tier_thresholds_at_215_base_default(gov, projected, expected):
+    """The current $215 base (ADR-133 amendment 2026-08-28, #2801) is the
     DEFAULT ceiling — the bands re-derive proportionally: boundaries
-    $110.00 / $130.00 / $146.00."""
-    assert gov.MONTHLY_CEILING == 150.0
+    $157.67 / $186.33 / $209.27."""
+    assert gov.MONTHLY_CEILING == 215.0
     assert gov._tier_for(projected) == expected
 
 
@@ -248,12 +248,12 @@ def test_non_ai_series_excludes_bedrock_edition_services(gov, monkeypatch):
 @pytest.mark.parametrize(
     "recent_uniques,expected_ceiling,expected_surge",
     [
-        (0, 150.0, False),
-        (899, 150.0, False),  # boundary: one under the threshold
-        (900, 176.0, True),  # boundary: exactly at the threshold — crosses
-        (901, 176.0, True),
-        (5000, 176.0, True),  # a genuine viral spike
-        (None, 150.0, False),  # no signal yet (metric never emitted) → fails closed to the BASE
+        (0, 215.0, False),
+        (899, 215.0, False),  # boundary: one under the threshold
+        (900, 252.0, True),  # boundary: exactly at the threshold — crosses
+        (901, 252.0, True),
+        (5000, 252.0, True),  # a genuine viral spike
+        (None, 215.0, False),  # no signal yet (metric never emitted) → fails closed to the BASE
     ],
 )
 def test_effective_ceiling_rule(gov, recent_uniques, expected_ceiling, expected_surge):
@@ -263,34 +263,34 @@ def test_effective_ceiling_rule(gov, recent_uniques, expected_ceiling, expected_
 
 
 def test_surge_engages_only_on_traffic_never_on_spend(gov):
-    """Constraint #3 (#739 scope): the ceiling stays at the $150 base when
+    """Constraint #3 (#739 scope): the ceiling stays at the $215 base when
     uniques are below threshold REGARDLESS of projection. A heavy, over-budget
     spend projection with organic (sub-threshold) traffic must not float it."""
     ceiling, surge_active = gov._effective_ceiling(recent_uniques=288)  # real recent baseline
-    assert ceiling == 150.0
+    assert ceiling == 215.0
     assert surge_active is False
     # Feed that ceiling into _decide_tier with a way-over-budget projection —
     # the tier still escalates (spend enforcement is untouched), but the
     # CEILING itself never moved off the base because of the projection.
     tier = gov._decide_tier(projected=500.0, mtd=200.0, elapsed_days=20.0, ceiling=ceiling)
     assert tier == 3  # spend enforcement still works — this isn't a bypass
-    assert ceiling == 150.0  # the ceiling that produced it was never surged
+    assert ceiling == 215.0  # the ceiling that produced it was never surged
 
 
 def test_tier_for_scales_proportionally_with_surge_ceiling(gov):
     """The tier BANDS (≈73%/87%/97% of ceiling) stay proportionally identical
     under the surge ceiling — only the dollar amounts that trip them move.
     Thresholds scale from the $75 REFERENCE calibration, not from the base."""
-    ratio = 176.0 / 75.0  # ceiling / _THRESHOLD_REFERENCE_CEILING
-    assert gov._tier_for(55 * ratio - 0.01, ceiling=176.0) == 0
-    assert gov._tier_for(55 * ratio, ceiling=176.0) == 1
-    assert gov._tier_for(65 * ratio, ceiling=176.0) == 2
-    assert gov._tier_for(73 * ratio, ceiling=176.0) == 3
-    # A projection over the hard-stop line at the $150 base gets ROOM once surge
+    ratio = 252.0 / 75.0  # ceiling / _THRESHOLD_REFERENCE_CEILING
+    assert gov._tier_for(55 * ratio - 0.01, ceiling=252.0) == 0
+    assert gov._tier_for(55 * ratio, ceiling=252.0) == 1
+    assert gov._tier_for(65 * ratio, ceiling=252.0) == 2
+    assert gov._tier_for(73 * ratio, ceiling=252.0) == 3
+    # A projection over the hard-stop line at the $215 base gets ROOM once surge
     # mode is active — this is the entire point of the story: reader-driven AI
     # spend that would have hard-stopped now degrades gently instead.
-    assert gov._tier_for(147.0) == 3  # $150 base: $147 is past the $146.00 hard stop
-    assert gov._tier_for(147.0, ceiling=176.0) == 1  # $176 surge: same $147 is tier 1
+    assert gov._tier_for(210.0) == 3  # $215 base: $210 is past the $209.27 hard stop
+    assert gov._tier_for(210.0, ceiling=252.0) == 1  # $252 surge: same $210 is tier 1
 
 
 # ── temporary raise window (_TEMP_CEILING_WINDOW) ────────────────────────────
@@ -318,13 +318,13 @@ def _clock_at(day):
 @pytest.mark.parametrize(
     "today,expected",
     [
-        (date(2026, 7, 31), (150.0, 176.0)),  # day before the window opens (base pair is
+        (date(2026, 7, 31), (215.0, 252.0)),  # day before the window opens (base pair is
         # resolved from today's constants — the code keeps no memory of July's $85)
         (date(2026, 8, 1), (200.0, 235.0)),  # inclusive start
         (date(2026, 8, 9), (200.0, 235.0)),  # the day the first August raise was decided
         (date(2026, 8, 31), (200.0, 235.0)),  # last day inside
-        (date(2026, 9, 1), (150.0, 176.0)),  # EXCLUSIVE end — reverts unattended, now to the $150 base
-        (date(2027, 8, 15), (150.0, 176.0)),  # does not recur next August
+        (date(2026, 9, 1), (215.0, 252.0)),  # EXCLUSIVE end — reverts unattended, now to the $215 base
+        (date(2027, 8, 15), (215.0, 252.0)),  # does not recur next August
     ],
 )
 def test_temp_ceiling_window_opens_and_self_reverts(gov, monkeypatch, today, expected):
@@ -367,11 +367,23 @@ def test_july_window_actually_reaches_tier_1(gov, monkeypatch):
 
 def test_decide_tier_default_ceiling_is_the_base(gov):
     """The runtime-resolved default (`ceiling=None` → MONTHLY_CEILING) makes
-    every pre-existing 3-arg call site behave exactly like an explicit
-    ceiling=$85 call."""
-    assert gov._decide_tier(projected=157.0, mtd=28.86, elapsed_days=5.8) == gov._decide_tier(
-        projected=157.0, mtd=28.86, elapsed_days=5.8, ceiling=85.0
-    )
+    every pre-existing 3-arg call site behave exactly like an explicit call at
+    today's base.
+
+    This assertion used to hardcode `ceiling=85.0` — the base at the time it was
+    written — and then kept passing through the $150 amendment by COINCIDENCE
+    (the same projection happened to land on tier 1 under both ceilings). It
+    stopped agreeing at $215, which is how the staleness surfaced. It now
+    derives the comparison ceiling from the constant it is actually claiming,
+    and pins a DISCRIMINATING case so it cannot pass vacuously: a ceiling that
+    differs must produce a different tier for this projection, or the `ceiling`
+    argument is not being read at all."""
+    args = dict(projected=157.0, mtd=28.86, elapsed_days=5.8)
+    assert gov._decide_tier(**args) == gov._decide_tier(**args, ceiling=gov.MONTHLY_CEILING)
+    # must-fail arm: $157 is tier 0 at the $215 base (band $157.67) and tier 1
+    # at $150 (band $110, capped by actual mtd). If these ever agree, the
+    # sentinel is not resolving and the test above is vacuous.
+    assert gov._decide_tier(**args) != gov._decide_tier(**args, ceiling=150.0)
 
 
 # ── _tier_crossing_forecast: the #2381 crossing-date visibility ──────────────
@@ -492,7 +504,7 @@ def test_alert_surge_engage_uses_active_ceilings_in_temp_window(gov, monkeypatch
     body = fake_sns.calls[0]["Message"]
     assert "$200" in subj and "$235" in subj, f"subject must carry the ACTIVE pair, not the base constants: {subj!r}"
     assert "$200" in body and "$235" in body, f"body must carry the ACTIVE pair, not the base constants: {body!r}"
-    assert "$150" not in subj and "$176" not in subj, f"subject must not fall back to the out-of-window base pair: {subj!r}"
+    assert "$215" not in subj and "$252" not in subj, f"subject must not fall back to the out-of-window base pair: {subj!r}"
 
 
 def test_alert_surge_disengage_uses_active_ceilings_in_temp_window(gov, monkeypatch):
@@ -506,7 +518,7 @@ def test_alert_surge_disengage_uses_active_ceilings_in_temp_window(gov, monkeypa
     assert len(fake_sns.calls) == 1
     subj = fake_sns.calls[0]["Subject"]
     body = fake_sns.calls[0]["Message"]
-    assert "$200" in subj, f"subject must revert to the ACTIVE base ($200 in this window), not $150: {subj!r}"
+    assert "$200" in subj, f"subject must revert to the ACTIVE base ($200 in this window), not $215: {subj!r}"
     assert "$235" in body and "$200" in body, f"body must name the ACTIVE pair reverted from/to: {body!r}"
 
 
@@ -522,7 +534,7 @@ def test_alert_surge_out_of_window_still_uses_the_default_base(gov, monkeypatch)
     gov._alert_surge(active=True, recent_uniques=950, mtd=50.0, projected=80.0)
 
     subj = fake_sns.calls[0]["Subject"]
-    assert "$150" in subj and "$176" in subj, f"outside any window the alert should use the base pair: {subj!r}"
+    assert "$215" in subj and "$252" in subj, f"outside any window the alert should use the base pair: {subj!r}"
 
 
 # ── #2116: the TokenAlarmGenesisWindowActive gauge ───────────────────────────

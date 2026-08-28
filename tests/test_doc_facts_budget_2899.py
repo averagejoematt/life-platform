@@ -141,7 +141,7 @@ def test_allowed_set_is_derived_from_the_governor_not_hand_typed(facts):
     """Charter rule 1. The permanent base/surge pair must come from
     cost_governor_lambda.py, so moving the ceiling cannot leave this gate behind."""
     allowed, provenance = facts._governor_ceilings(today=dt.date(2026, 9, 15))
-    assert {150, 176} <= allowed, f"base/surge must be parsed from the governor, got {allowed}"
+    assert {215, 252} <= allowed, f"base/surge must be parsed from the governor, got {allowed}"
     assert "base/surge" in provenance
 
 
@@ -288,7 +288,7 @@ def test_retired_window_scan_can_actually_fail(facts):
     after = facts._retired_window_figures(today=dt.date(2026, 9, 2))
     during = facts._retired_window_figures(today=dt.date(2026, 8, 15))
 
-    assert facts._budget_offenders(line, allowed={150, 176}, retired=after) == [200, 235], (
+    assert facts._budget_offenders(line, allowed={215, 252}, retired=after) == [200, 235], (
         "the retired-window scan did not fire on a stale claim after the revert — " "this gate cannot fail, so it is not a gate"
     )
     assert during == set(), "inside its own window the pair is truth, not drift"
@@ -296,7 +296,7 @@ def test_retired_window_scan_can_actually_fail(facts):
 
     # ...and historical framing still exempts, or every honest retrospective reds.
     framed = "For August 2026 only, a dated window raised the base to $200 / surge $235."
-    assert facts._budget_offenders(framed, allowed={150, 176}, retired=after) == []
+    assert facts._budget_offenders(framed, allowed={215, 252}, retired=after) == []
 
 
 def test_live_tree_states_no_retired_ceiling_after_the_window_reverts(facts):

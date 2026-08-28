@@ -4,16 +4,21 @@
 
 Last updated: 2026-08-26 (v8.6.0)
 
-> Budget ceiling: **$150/month all-in** base, floating to **$176 in surge mode** on real
+> Budget ceiling: **$215/month all-in** base, floating to **$252 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated
 > window raised that pair to $200 base / $235 surge** (ADR-133 amendments 2026-08-09 #2381 + 2026-08-16
-> #2734, `_TEMP_CEILING_WINDOW`) that auto-reverts 2026-09-01. The AWS Budgets
-> backstop moved $85 → $150 with the permanent base (#2836, `core_stack.py`
-> `budget_limit=150`): it was pinned at $85 only while the raises were temporary, and
-> a permanent $150 base against an $85 backstop would page every month by
-> construction. The September base decision is **settled** — $150 base / $176 surge,
-> permanent (#2895), derived from measured steady state ($4.12/day, sd 0.66, n=6 →
-> ~$124/mo, 95% CI $108–139) rather than the spike-inflated projection.
+> #2734, `_TEMP_CEILING_WINDOW`) that auto-reverts 2026-09-01 — note the window is
+> now BELOW the base it reverts to, so 09-01 is a raise, not a cut. The AWS Budgets
+> backstop moves WITH the permanent base (#2801, `core_stack.py` — the amount is
+> resolved at CDK **synth** time by parsing `cost_governor_lambda.py`, so there is no
+> `budget_limit=` literal to read; an earlier version of this line pointed at one that
+> no longer exists): it was pinned low only while the raises were temporary, and a
+> permanent base above the backstop would page every month by construction.
+> The September base decision is **settled** — $215 base / $252 surge, permanent
+> (#2801), derived from measured steady state (Cost Explorer unblended $5.74/day,
+> sd $4.32, n=25 over 2026-08-01..08-25 → ~$172/mo, 95% CI $121–223) rather than a
+> projection. $215 is the lowest base that never reaches tier 2 in any of three
+> modelled September burn rates — see ADR-133's 2026-08-28 amendment for the table.
 > History: $25 → $75 with the Bedrock migration + automated guardrails
 > (2026-05-29), $75 → $85 on 2026-07-08 (ADR-133 amendment). Design constraint: every
 > feature must justify its cost.
@@ -91,15 +96,15 @@ Three layers — `lambdas/ai/budget_guard.py`, `lambdas/operational/cost_governo
    payload persists until the governor's next 8h run rewrites it).
 3. **budget_guard** (graceful degradation, audience-ordered per ADR-125 — the daily
    brief is protected longest). The bands are **fixed fractions of the effective
-   ceiling** (≈73% / 87% / 97%), so they scale automatically between the $150 base and
-   the $176 surge ceiling:
+   ceiling** (≈73% / 87% / 97%), so they scale automatically between the $215 base and
+   the $252 surge ceiling:
 
-   | Tier | Band (of effective ceiling) | Trips at ($150 base) | Trips at ($176 surge) | Effect |
+   | Tier | Band (of effective ceiling) | Trips at ($215 base) | Trips at ($252 surge) | Effect |
    |------|------------------------------|---------------------|-----------------------|--------|
-   | 0 Normal | < 73% | < $110.00 | < $129.07 | everything runs |
-   | 1 Caution | 73–87% | $110.00 | $129.07 | internal/dev AI paused (ensemble, chronicle editor, coherence-semantic) |
-   | 2 Restrict | 87–97% | $130.00 | $152.53 | + reader narratives paused (coach commentary, State of Matthew, chronicle) |
-   | 3 Hard stop | ≥ 97% | $146.00 | $171.31 | + website AI returns "paused", daily brief data-only; `bedrock_client` refuses |
+   | 0 Normal | < 73% | < $157.67 | < $184.80 | everything runs |
+   | 1 Caution | 73–87% | $157.67 | $184.80 | internal/dev AI paused (ensemble, chronicle editor, coherence-semantic) |
+   | 2 Restrict | 87–97% | $186.33 | $218.40 | + reader narratives paused (coach commentary, State of Matthew, chronicle) |
+   | 3 Hard stop | ≥ 97% | $209.27 | $245.28 | + website AI returns "paused", daily brief data-only; `bedrock_client` refuses |
 
    Trip amounts computed by executing `cost_governor_lambda._tier_for`'s own band
    scaling (thresholds `[(73,3),(65,2),(55,1)]` against the $75 reference ceiling),
@@ -204,7 +209,7 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 
 ## GitHub Actions / Repo Hosting (#1334, #1453 — added 2026-07-18)
 
-**The $150 AWS budget governor above covers AWS spend only.** GitHub became a
+**The $215 AWS budget governor above covers AWS spend only.** GitHub became a
 *metered production dependency* the moment the repo went private (2026-07-13,
 `project_repo_visibility.md`): CI (`ci-cd.yml`), the standing site-deploy path
 (`site-deploy.yml`), and the remediation agent (`remediation-agent.yml`) all now

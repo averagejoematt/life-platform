@@ -3,7 +3,7 @@
   "_meta": {
     "generated_by": "scripts/v4_build_stack_manifest.py — derived from source_registry.py + the public protocol/supplement catalogues (#1401); never hand-edit",
     "schema_version": "1.0.0",
-    "updated": "2026-08-23",
+    "updated": "2026-08-28",
     "framing": "Fork the architecture, not the data. This describes the instrument — what measures and how — and contains no health metrics, no personal records, and no account-specific identifiers.",
     "license": "The manifest is published for reuse. It is a description, not a guarantee."
   },
@@ -849,8 +849,8 @@
       "verifiability": "These are not the platform's own claims about itself: the live endpoints above serve the governor's own numbers, refreshed every 8 hours, and omit dollars rather than freeze them when the upstream reading goes stale.",
       "monthly_usd_typical": "~$100",
       "monthly_usd_typical_basis": "the run-rate published on /method/cost/, read from the same constant the /api/platform_stats endpoint serves — not a second opinion about it.",
-      "ceiling_usd": 150.0,
-      "surge_ceiling_usd": 176.0,
+      "ceiling_usd": 215.0,
+      "surge_ceiling_usd": 252.0,
       "surge_trigger_trailing_7d_uniques": 900,
       "ceiling_basis": "a self-imposed hard limit (ADR-063/133), enforced in code rather than aspired to: a governor reprojects month-end spend every 8 hours and publishes a degradation tier, and each AI feature reads that tier before it runs. The limit floats to the surge value only while real reader traffic exceeds the trigger above."
     },
