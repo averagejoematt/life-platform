@@ -158,6 +158,36 @@ test("weeklyAsOf: no/invalid date renders nothing — never a fabricated stamp",
   assert.equal(weeklyAsOf("not-a-date"), "");
 });
 
+/* ── #3252: the integrator's call carries a DAY number too ─────────────────
+   Its prose dates itself in experiment days ("he's been eleven days into the
+   cycle"), and while regeneration is paused that sentence keeps asserting a
+   frozen day as today's. The calendar date alone cannot reconcile it. */
+
+test("weeklyAsOf: the day number joins the calendar date (#3252)", () => {
+  assert.match(weeklyAsOf("2026-08-27T14:02:46.793290+00:00", 11), /^as of Aug 27 · Day 11/);
+});
+
+test("weeklyAsOf: an unknown day renders the date ALONE, never Day 0 or a guess", () => {
+  // The must-fail direction is a fabricated anchor: a wrong day number is strictly
+  // worse than none, so every non-positive-integer collapses to no day at all.
+  for (const bad of [undefined, null, 0, -3, "11", 11.5, NaN, true]) {
+    assert.equal(weeklyAsOf("2026-08-27T14:02:46.793290+00:00", bad), "as of Aug 27",
+      `day ${JSON.stringify(bad)} must render no day label`);
+  }
+});
+
+test("weeklyAsOf: an undatable record renders nothing even WITH a day number", () => {
+  // A day number cannot resurrect a stamp the date half refused — otherwise the
+  // helper would print a bare "Day 11" with nothing anchoring it to a date.
+  assert.equal(weeklyAsOf("not-a-date", 11), "");
+  assert.equal(weeklyAsOf("", 11), "");
+});
+
+test("weeklyAsOf: a stale record keeps its day number AND its pending suffix", () => {
+  const tenDaysAgo = new Date(Date.now() - 240 * 3600e3).toISOString();
+  assert.match(weeklyAsOf(tenDaysAgo, 4), /^as of .+ · Day 4 — next refresh pending$/);
+});
+
 test("datableTensions REFUSES undated argument prose (#2383)", () => {
   const dated = { topic: "zone 2", position_a: "a", position_b: "b", generated_at: "2026-08-05T14:00:00Z" };
   const undated = { topic: "protein", position_a: "x", position_b: "y" }; // absent = unknown (deploy race) → refuse

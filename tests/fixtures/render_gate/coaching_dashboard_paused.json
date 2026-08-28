@@ -1,9 +1,17 @@
 {
-  "_comment": "#1971 — /api/coaching-dashboard under a tier >= 2 budget pause (regeneration_paused: true). Shape mirrors the inline handler in lambdas/web/site_api_lambda.py; values are realistic-but-static and in-range for the accuracy rubric. The paused flag is the point: the gate asserts the roster cards render the 'refresh paused (budget guard)' kicker (.rd-paused).",
+  "_comment": "#1971 — /api/coaching-dashboard under a tier >= 2 budget pause (regeneration_paused: true). Shape mirrors the inline handler in lambdas/web/site_api_lambda.py; values are realistic-but-static and in-range for the accuracy rubric. The paused flag is the point: the gate asserts the roster cards render the 'refresh paused (budget guard)' kicker (.rd-paused). #3252 re-anchored the timestamps onto the live cycle-14 window (genesis 2026-08-17) and added the fields the served payload now carries — _meta.generated_at is the OLDEST member's stamp (not the request instant), _meta.served_at is the request instant, weekly_priority.as_of_day_n anchors the integrator's relative-time prose, and content_day_span discloses that the board's members were written on different days. The stamps here are the shape the writers actually emit (microseconds + '+00:00'), and the day numbers are consistent with the genesis above — a fixture whose day numbers contradicted its own timestamps would teach the render gate the wrong thing.",
+  "_meta": {
+    "generated_at": "2026-08-26T17:02:28.557831+00:00",
+    "served_at": "2026-08-28T00:28:08.391078+00:00",
+    "content_as_of": "2026-08-26T17:02:28.557831+00:00",
+    "cache_seconds": 300
+  },
   "weekly_priority": {
     "text": "Protect the sleep window this week — the deficit only compounds when the nights hold.",
     "coach_name": "Dr. Eli Marsh",
-    "generated_at": "2026-07-28T17:05:00Z"
+    "coach_title": "Integrative Health Lead",
+    "generated_at": "2026-08-27T14:02:46.793290+00:00",
+    "as_of_day_n": 11
   },
   "open_actions": [],
   "coaches": [
@@ -18,7 +26,8 @@
       "emotional_investment": "invested",
       "prediction_count": 2,
       "data_phase": "established",
-      "analysis_generated_at": "2026-07-30T14:05:00Z"
+      "analysis_generated_at": "2026-08-26T17:02:28.557831+00:00",
+      "analysis_as_of_day_n": 10
     },
     {
       "coach_id": "training",
@@ -31,7 +40,8 @@
       "emotional_investment": "curious",
       "prediction_count": 1,
       "data_phase": "established",
-      "analysis_generated_at": "2026-07-29T14:05:00Z"
+      "analysis_generated_at": "2026-08-27T17:04:05.045277+00:00",
+      "analysis_as_of_day_n": 11
     },
     {
       "coach_id": "nutrition",
@@ -44,9 +54,15 @@
       "emotional_investment": "neutral",
       "prediction_count": 0,
       "data_phase": "established",
-      "analysis_generated_at": "2026-07-30T14:05:00Z"
+      "analysis_generated_at": "2026-08-27T17:02:37.845317+00:00",
+      "analysis_as_of_day_n": 11
     }
   ],
   "predictions": [],
+  "content_day_span": {
+    "oldest_day_n": 10,
+    "newest_day_n": 11,
+    "mixed": true
+  },
   "regeneration_paused": true
 }
