@@ -91,6 +91,23 @@ SANCTIONED_CHRONIC_SITES = {
     # #2670, class (a) — check_receipt_replay's config/engine-drift branch (mismatch branch
     # untouched, stays alarmed). Measurement + rationale: docs/alarm_citations.json.
     ("qa_smoke_lambda.py", "check_receipt_replay"),
+    # #3258, class (b) — a reader-truth finding the RULING LEDGER already adjudicated.
+    # This is the first chronic site in the reader-truth pair and it is a deliberate,
+    # reviewed decision, so state the whole argument here rather than a pointer:
+    #
+    #   * Five predicates in lambdas/operational/reader_truth_rulings.py (#2959 x2,
+    #     #3003, #3199 x2) each adjudicate a MEASURED false-positive class, and each
+    #     says in its own comment that the finding it catches stays "visible as
+    #     advisory, NEVER gating". All five expressed that as severity=low — and low
+    #     lands in the alarmed WarnCount, so the promise was never kept.
+    #   * The routing key is a FIELD (`rulings`, written by assess_prose), not a
+    #     phrase match on the model's note. `reader_truth:verdict` — the check that
+    #     carries every UNadjudicated finding — is untouched and stays alarmed, as
+    #     does #2741's unconfirmed-high demotion (those carry no rulings).
+    #   * Live evidence: /aws/lambda/life-platform-qa-smoke finding 539c6d at Day 11,
+    #     a `low` whose own note ends "No flag warranted on reconsideration" — the
+    #     judge retracted it, the pipeline counted it, qa-smoke-warnings lit (#3258).
+    ("qa_check_reader_truth.py", "check_reader_truth"),
 }
 
 
@@ -446,11 +463,51 @@ def test_chronic_call_sites_are_exactly_the_sanctioned_set():
 def test_reader_truth_half_routes_through_the_same_default():
     """#1944 split the reader-truth pair out of qa_smoke_lambda; both halves
     build the same Check class, so every reader-truth warn is alarmed unless it
-    ever explicitly (and test-visibly, above) opts out. Assert the module has
-    zero chronic opt-outs today."""
+    ever explicitly (and test-visibly, above) opts out.
+
+    #3258 takes that opt-out ONCE, for `reader_truth:advisory` — findings the
+    ruling ledger has already adjudicated. This assertion is TIGHTENED rather than
+    relaxed: the reader-truth pair may carry exactly that one chronic site, the
+    rubric module none at all, and — the part that actually matters — the
+    `reader_truth:verdict` check, which carries every finding NO ruling touched,
+    must never be one of them (see the source guard below)."""
     sites, _ = _chronic_true_call_sites()
-    assert not [s for s in sites if s[0] == "qa_check_reader_truth.py"]
-    assert not [s for s in sites if s[0] == "reader_truth_qa.py"]
+    assert [s for s in sites if s[0] == "qa_check_reader_truth.py"] == [("qa_check_reader_truth.py", "check_reader_truth")], (
+        "the reader-truth chronic set drifted — the ONLY sanctioned opt-out is the #3258 "
+        "reader_truth:advisory warn inside check_reader_truth"
+    )
+    assert not [
+        s for s in sites if s[0] == "reader_truth_qa.py"
+    ], "the rubric module must never mute a warn — it constructs no Checks at all"
+
+
+def test_the_reader_truth_verdict_check_is_never_chronic():
+    """The negative direction of #3258, asserted on the source: the chronic opt-out
+    belongs to `reader_truth:advisory` alone. If `reader_truth:verdict` — the check
+    that carries every UNadjudicated finding, including a novel high demoted by
+    #2741's confirmation pass — ever acquired `chronic=True`, the alarm would go
+    blind to exactly the class it exists for, and the AST scan above would still
+    pass because the enclosing function is the same one."""
+    path = OPERATIONAL / "qa_check_reader_truth.py"
+    tree = ast.parse(path.read_text(), filename=str(path))
+    offenders = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "warn"):
+            continue
+        if not any(kw.arg == "chronic" and isinstance(kw.value, ast.Constant) and kw.value.value is True for kw in node.keywords):
+            continue
+        # Walk out to the Check(...) constructor this warn is chained onto and read its name.
+        target = node.func.value
+        while isinstance(target, ast.Call) and isinstance(target.func, ast.Attribute):
+            target = target.func.value
+        name = None
+        if isinstance(target, ast.Call) and getattr(target.func, "id", None) == "Check" and target.args:
+            arg = target.args[0]
+            name = arg.value if isinstance(arg, ast.Constant) else ast.unparse(arg)
+        offenders.append((node.lineno, name))
+    assert offenders, "no chronic reader-truth warn found at all — the #3258 advisory route is missing or unwired"
+    bad = [o for o in offenders if o[1] != "reader_truth:advisory"]
+    assert not bad, f"a reader-truth check other than reader_truth:advisory is muted from qa-smoke-warnings: {bad}"
 
 
 # ---------------------------------------------------------------------------

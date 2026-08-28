@@ -100,11 +100,14 @@ SEVERITIES = ("low", "med", "high")
 from operational.reader_truth_rulings import (  # noqa: F401
     CODE_OWNED_TEMPORAL_SURFACES,
     DURABLE_DESIGN_COPY,
+    RULINGS_FIELD,
     _is_registered_span,
     _normalize_copy,
     _note_dates,
     _pacific_renderings,
+    advisory_rulings,
     is_active_vs_passive_objection,
+    is_advisory,
     is_coach_surface_audience,
     is_code_owned_temporal,
     is_day_counter_bound_inference,
@@ -640,64 +643,40 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                         f"(its own final sentence withdraws the contradiction, #2959): {f['note'][:120]}"
                     )
                     continue
-                # #2959: the model turned the prompt's own day counter into a bound on
-                # what data can exist ("only 6 days of current-experiment data") and
-                # flagged legitimately cross-phase content (ADR-077: raw timeseries,
-                # archives and the build narrative survive genesis) — five instances
-                # in 24h across two blocked deploys. DEMOTED to low, never gating;
-                # the strict payloads where pre-cycle rows ARE defects stay owned by
-                # phase_plausibility. Printed, never silently swallowed.
-                if f["severity"] != "low" and is_day_counter_bound_inference(f):
-                    print(
-                        f"  ↩ reader-truth: demoted a day-counter-bound finding on {f['page']} "
-                        f"{f['severity']}→low (the day counter is not a data bound, #2959): {f['note'][:120]}"
-                    )
-                    f = dict(f, severity="low")
-                # #2959 (2026-08-23): the position banner ('DAY N · WEEK K') is
-                # today's clock, not a label on the dated content beneath it — the
-                # model mapped a chronicle piece's own (correct) date to "Day 2, not
-                # Day 7" and gated on the banner as if it claimed the piece was Day-7
-                # content (run 32650063358, the receipts-caption rollback). DEMOTED to
-                # low, never gating; a note whose day-mapping is about TODAY (the
-                # banner itself wrong, the #2941 class) survives at full severity.
-                # Printed, never silently swallowed.
-                if f["severity"] != "low" and is_position_banner_misread(f, phase["start_date"], today_iso):
-                    print(
-                        f"  ↩ reader-truth: demoted a position-banner misread on {f['page']} "
-                        f"{f['severity']}→low (the banner is a clock, not a content label, #2959): {f['note'][:120]}"
-                    )
-                    f = dict(f, severity="low")
-                # #3003: a "contradiction" whose own objection resolves to vagueness is
-                # an editorial complaint, not an impossibility — DEMOTED to low (kept
-                # visible as advisory, never gating). Printed, never silently swallowed.
-                if f["severity"] != "low" and is_vagueness_objection(f):
-                    print(
-                        f"  ↩ reader-truth: demoted a vagueness-objection finding on {f['page']} "
-                        f"{f['severity']}→low ('vague' is not a temporal_contradiction, #3003): {f['note'][:120]}"
-                    )
-                    f = dict(f, severity="low")
-                # #3199: the objection is that an honestly-labeled reading count
-                # ("N readings so far") is small relative to the elapsed-day span
-                # — a cross-signal cadence gap (Withings owner-initiated vs HRV
-                # passive-daily), not an impossibility. DEMOTED to low, never
-                # gating. Printed, never silently swallowed.
-                if f["severity"] != "low" and is_sparsity_objection(f):
-                    print(
-                        f"  ↩ reader-truth: demoted a sparsity-objection finding on {f['page']} "
-                        f"{f['severity']}→low (a cadence gap is not a temporal_contradiction, #3199): {f['note'][:120]}"
-                    )
-                    f = dict(f, severity="low")
-                # #3199: a claim scoped to ACTIVE logging ("went silent … since
-                # August 17th") objected to with nothing but a Day-1/today
-                # restatement — the auto-rollback flake that reverted its own fix
-                # (ground-truthed TRUE against DDB the same night). DEMOTED to
-                # low, never gating. Printed, never silently swallowed.
-                if f["severity"] != "low" and is_active_vs_passive_objection(f):
-                    print(
-                        f"  ↩ reader-truth: demoted an active-vs-passive objection on {f['page']} "
-                        f"{f['severity']}→low (day arithmetic alone does not disprove it, #3199): {f['note'][:120]}"
-                    )
-                    f = dict(f, severity="low")
+                # ── the ADVISORY rulings (#2959/#3003/#3199), one table ────────
+                # Each of these five adjudicated a measured false-positive class
+                # and each says, in its own comment block, that the finding it
+                # catches stays "visible as advisory, never gating". #3258 makes
+                # that true in two ways the old shape could not:
+                #
+                #   (a) CONSULTED AT EVERY SEVERITY. This block used to be five
+                #       `if f["severity"] != "low" and <ruling>(f)` statements, so
+                #       a finding the model itself rated `low` was never
+                #       adjudicated — and `low` is exactly the severity
+                #       qa-smoke-warnings still fires on. The live Day-11 `539c6d`
+                #       retraction is a `low` on which `is_vagueness_objection`
+                #       returns True; the ledger simply never asked.
+                #   (b) RECORDED AS A FIELD, not as a severity side-effect. The
+                #       ruling ids land on the finding (`rulings`), which is what
+                #       qa_check_reader_truth routes on — adjudicated findings go
+                #       to the non-alarmed ChronicWarnCount, so WarnCount means
+                #       "no reconsideration fired on this one".
+                #
+                # The severity demotion is unchanged and still only applies above
+                # `low` (demoting a low to a low was always a no-op). Every ruling
+                # is printed, never silently swallowed.
+                for ruling_id, label, fires, reason in advisory_rulings(phase["start_date"], today_iso):
+                    if not fires(f):
+                        continue
+                    f = dict(f, **{RULINGS_FIELD: sorted(set(f.get(RULINGS_FIELD) or ()) | {ruling_id})})
+                    if f["severity"] != "low":
+                        print(f"  ↩ reader-truth: demoted {label} on {f['page']} " f"{f['severity']}→low ({reason}): {f['note'][:120]}")
+                        f = dict(f, severity="low")
+                    else:
+                        print(
+                            f"  ↩ reader-truth: adjudicated {label} on {f['page']} as ADVISORY at low "
+                            f"({reason}) — visible, never alarmed (#3258): {f['note'][:120]}"
+                        )
                 findings.append(f)
         except Exception as e:
             errors.append(f"batch [{', '.join(str(p.get('path')) for p in batch)}]: {str(e)[:140]}")
