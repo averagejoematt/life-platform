@@ -1,7 +1,7 @@
 # CONTINUITY — if the AI is gone
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (handovers/ split to the `session-archive` branch, #1650; datadrops backup is a manual push, no FDA grant — §3c posture)
-> **Sources of truth:** handovers/HANDOVER_LATEST.md + the `session-archive` branch, .claude/commands/, mcp memory tool code, this repo's git history
+> **Sources of truth:** handovers/HANDOVER_LATEST.md + the `session-archive` branch, .claude/skills/, mcp memory tool code, this repo's git history
 
 This page maps every piece of operational state that lives **outside `docs/`** — where
 it is, how a human reads it, and how to export it. The bar: with all AI tooling powered
@@ -11,7 +11,7 @@ the accumulated institutional memory says.
 
 There are six state surfaces. Three are in this repo (the session log — `handovers/` on
 `main` plus the `session-archive` branch — the CLAUDE.md
-session block, `.claude/commands/`), one is in DynamoDB (platform memory), one is on
+session block, `.claude/skills/`), one is in DynamoDB (platform memory), one is on
 Matthew's laptop only (Claude Code file memory — **one of the TWO laptop-only assets (see the launchd runtime below)**), and one
 is on GitHub (the Issues backlog).
 
@@ -184,7 +184,7 @@ manual push when you add one is enough (`docs/NEW_MACHINE_BOOTSTRAP.md` §3c).
 private 2026-07-13, memory files contain personal detail and security-incident narrative
 by design and must stay out of git (visibility can flip back; the discipline is permanent).
 
-## 5. `.claude/commands/` — the skills are human runbooks
+## 5. `.claude/skills/` — the skills are human runbooks
 
 Each skill file is a step-by-step process document. They were written to drive an AI
 session, but a human can follow them directly:

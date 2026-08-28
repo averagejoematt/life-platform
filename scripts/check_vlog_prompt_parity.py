@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """check_vlog_prompt_parity.py — is the phone running the same interview as Claude Code? (#1571)
 
-`.claude/commands/vlog.md` is upstream; the claude.ai Project prompt inside the
+`.claude/skills/vlog/SKILL.md` is upstream; the claude.ai Project prompt inside the
 PRIVATE studio kit (`s3://matthew-life-platform/config/studio/VLOG_STUDIO_KIT.md`)
 is a Matthew-side condensation of it. `docs/coaching/CHAT_MODES.md` §"claude.ai vs.
 Claude Code" already says those two surfaces CAN drift and that the drift is only
@@ -38,9 +38,26 @@ import os
 import re
 import sys
 
+
+def _skill_registry():
+    """The ONE registry for Claude Code skills + agents (scripts/skill_registry.py)."""
+    import importlib.util
+    import os as _os
+
+    _here = _os.path.dirname(_os.path.abspath(__file__))
+    _cands = [_os.path.join(_here, "skill_registry.py"), _os.path.join(_here, "..", "scripts", "skill_registry.py")]
+    for _p in _cands:
+        if _os.path.isfile(_p):
+            spec = importlib.util.spec_from_file_location("_skill_registry", _p)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise FileNotFoundError("scripts/skill_registry.py not found")
+
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-MODE_FILE = os.path.join(REPO, ".claude", "commands", "vlog.md")
+MODE_FILE = str(_skill_registry().require_skill("vlog"))
 
 KIT_BUCKET = "matthew-life-platform"
 KIT_KEY = "config/studio/VLOG_STUDIO_KIT.md"
@@ -49,7 +66,7 @@ KIT_KEY = "config/studio/VLOG_STUDIO_KIT.md"
 # ── The parity contract ───────────────────────────────────────────────────────
 # Each rule is (id, anchor, keywords, why).
 #
-#   anchor   — a substring that MUST appear in .claude/commands/vlog.md. This is
+#   anchor   — a substring that MUST appear in .claude/skills/vlog/SKILL.md. This is
 #              what stops the checklist from rotting: if a rule is reworded or
 #              dropped upstream, the anchor stops matching and the test reds, so
 #              the checklist has to be updated deliberately rather than silently
@@ -183,7 +200,7 @@ def check(mode_text: str, kit_text: str) -> dict:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Check the claude.ai vlog Project prompt against .claude/commands/vlog.md")
+    ap = argparse.ArgumentParser(description="Check the claude.ai vlog Project prompt against .claude/skills/vlog/SKILL.md")
     ap.add_argument("--kit", help="read the studio kit from a local path instead of private S3")
     ap.add_argument("--json", action="store_true", dest="as_json", help="machine-readable report")
     args = ap.parse_args()
@@ -208,7 +225,7 @@ def main() -> int:
         )
         return 0
 
-    print("vlog Project prompt has DRIFTED from .claude/commands/vlog.md (the repo file is upstream).\n")
+    print("vlog Project prompt has DRIFTED from .claude/skills/vlog/SKILL.md (the repo file is upstream).\n")
     if report["formats_missing"]:
         print(f"  formats not in the phone prompt: {', '.join(report['formats_missing'])}")
     for m in report["rules_missing"]:

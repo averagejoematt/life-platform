@@ -15,7 +15,7 @@ THE FIX
   `handovers/HANDOVER_LATEST.md`, and exits 1 naming each missing one — generalising what
   check_proportionality_ledger.py already does for `**Ledger:**`.
 
-  The expected markers are DERIVED FROM `.claude/commands/wrap.md`, never hand-listed
+  The expected markers are DERIVED FROM `.claude/skills/wrap/SKILL.md`, never hand-listed
   here: each wrap gate states its contract with the house phrase "carries one line
   (either way)" / "must carry one line", immediately followed by the backticked
   `**Marker:**` token. We parse exactly that. A hand-list would drift the moment a
@@ -26,7 +26,7 @@ THE FIX
 USAGE
   python3 scripts/check_handover_lines.py [HANDOVER_PATH] [--wrap WRAP_PATH]
     HANDOVER_PATH defaults to handovers/HANDOVER_LATEST.md;
-    WRAP_PATH defaults to .claude/commands/wrap.md (test hook).
+    WRAP_PATH defaults to .claude/skills/wrap/SKILL.md (test hook).
   Exit 0: every derived marker line present. Exit 1: one or more missing (each named).
   Exit 2: the derivation itself regressed (wrap.md unreadable or too few markers found).
 """
@@ -35,9 +35,26 @@ import re
 import sys
 from pathlib import Path
 
+
+def _skill_registry():
+    """The ONE registry for Claude Code skills + agents (scripts/skill_registry.py)."""
+    import importlib.util
+    import os as _os
+
+    _here = _os.path.dirname(_os.path.abspath(__file__))
+    _cands = [_os.path.join(_here, "skill_registry.py"), _os.path.join(_here, "..", "scripts", "skill_registry.py")]
+    for _p in _cands:
+        if _os.path.isfile(_p):
+            spec = importlib.util.spec_from_file_location("_skill_registry", _p)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise FileNotFoundError("scripts/skill_registry.py not found")
+
+
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_HANDOVER = ROOT / "handovers" / "HANDOVER_LATEST.md"
-DEFAULT_WRAP = ROOT / ".claude" / "commands" / "wrap.md"
+DEFAULT_WRAP = _skill_registry().require_skill("wrap")
 
 # Fewer derived markers than this means the wrap.md parse regressed, not that the wrap
 # got simpler — eleven gates carry a marker line as of #3006 (see the file docstring).

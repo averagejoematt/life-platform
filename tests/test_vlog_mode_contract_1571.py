@@ -1,6 +1,6 @@
 """tests/test_vlog_mode_contract_1571.py — the /vlog mode's contract (#1571, epic #1564).
 
-The mode itself is prose (`.claude/commands/vlog.md`), so nothing compiles it and
+The mode itself is prose (`.claude/skills/vlog/SKILL.md`), so nothing compiles it and
 nothing caught it drifting from the code it drives. Three couplings in that prose
 are load-bearing and silently breakable:
 
@@ -29,6 +29,7 @@ import re
 import sys
 
 import pytest
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 for p in (os.path.join(ROOT, "lambdas"), os.path.join(ROOT, "lambdas", "ingestion"), ROOT):
@@ -40,7 +41,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
-MODE_PATH = os.path.join(ROOT, ".claude", "commands", "vlog.md")
+MODE_PATH = str(_skill("vlog"))
 CHAT_MODES_PATH = os.path.join(ROOT, "docs", "coaching", "CHAT_MODES.md")
 
 
@@ -165,7 +166,7 @@ def test_parity_checker_detects_a_stripped_prompt(mode_text, parity):
 def test_mode_is_registered_in_chat_modes(mode_text):
     with open(CHAT_MODES_PATH, encoding="utf-8") as fh:
         doc = fh.read()
-    assert ".claude/commands/vlog.md" in doc, "the mode must appear in the CHAT_MODES.md mode table"
+    assert ".claude/skills/vlog/SKILL.md" in doc, "the mode must appear in the CHAT_MODES.md mode table"
     assert "manage_diary_claims" in doc, "the on-tape-claims row of the route-the-takeaways contract"
 
 
@@ -173,7 +174,7 @@ def test_chat_modes_heading_counts_the_modes_it_lists():
     """The section heading is a count, and counts drift as modes are added."""
     with open(CHAT_MODES_PATH, encoding="utf-8") as fh:
         doc = fh.read()
-    listed = re.findall(r"`\.claude/commands/([a-z-]+)\.md`", doc.split("## The modes", 1)[1].split("\n\n", 2)[1])
+    listed = re.findall(r"`\.claude/skills/([a-z-]+)/SKILL\.md`", doc.split("## The modes", 1)[1].split("\n\n", 2)[1])
     heading = re.search(r"^# The (\w+) chat modes", doc, re.MULTILINE)
     assert heading, "the chat-modes section heading is missing"
     words = {"four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9}

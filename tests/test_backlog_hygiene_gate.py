@@ -25,9 +25,10 @@ sys.path.insert(0, os.path.join(_REPO, "scripts"))
 import advisory_failure_issue as afi  # noqa: E402
 import backlog_contract as bc  # noqa: E402
 import check_backlog_hygiene as hy  # noqa: E402
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 
 ROOT = Path(_REPO)
-WRAP = ROOT / ".claude" / "commands" / "wrap.md"
+WRAP = _skill("wrap")
 
 NOW = datetime(2026, 7, 27, tzinfo=timezone.utc)
 CANONICAL_SCORE = "**Score:** P2 · Impact 3 × Confidence 1.0 / Effort S(1) = 3.00 → Now"

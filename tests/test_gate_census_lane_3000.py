@@ -3,7 +3,7 @@
 Epic #2578's fourth acceptance box: "a recurring check keeps the inventory honest, so a
 newly-added gate cannot enter the platform unverified." Measured 2026-08-22: `gate_census`
 matched zero workflow files (`grep -rn "gate_census" .github/workflows/*.yml
-.claude/commands/*.md` — nothing). `tests/test_gate_census_2578.py` mutation-proves the
+.claude/skills/*/SKILL.md` — nothing). `tests/test_gate_census_2578.py` mutation-proves the
 census's EXTRACTORS against synthetic fixtures; nothing anywhere ran the census against
 the REAL repo and asked whether a gate had entered with no verdict. This file is that ask.
 
@@ -233,7 +233,19 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # Both arrive UNPROVEN: live unproven 518 -> 520 against the committed 541, so
 # BASELINE_UNPROVEN_GATES is NOT moved — it still has headroom and moving it would spend
 # margin this PR did not need.
-BASELINE_TOTAL_GATES = 563
+# 563 -> 564 (2026-08-28, #3245): ONE further real gate carried by this branch and
+# preserved through the merge with main's own 561->563 raise above (originally recorded
+# as 561 -> 562). The reason it was first written for still holds verbatim:
+#   ONE real gate, `guard::scripts/hooks/guard_bash.py` — the
+# PreToolUse hook that flags a merge with no named-check assertion, a deploy from a
+# worktree, and a force-push to main. Verified as a genuine addition rather than the
+# prose-phantom this comment warns about: the census gate-id sets were diffed before and
+# after, and that id is the only member added. Registering
+# `tests/test_skill_contract.py` in _PREMERGE_EXTRA_FILES also mints a gate, so the
+# measurement was taken with every new file `git add`ed — an untracked guard measures as
+# absent. Unproven fell 541 -> 534 over the same window (#3242's adjudication); that
+# ceiling is left where its owner set it.
+BASELINE_TOTAL_GATES = 564
 BASELINE_UNPROVEN_GATES = 541
 
 

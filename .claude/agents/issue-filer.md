@@ -49,3 +49,20 @@ You file GitHub issues for the life-platform repo (`averagejoematt/life-platform
 - Run `gh` with `-R averagejoematt/life-platform` (you may be outside the repo tree). Write bodies to temp files and use `--body-file` (quoting safety).
 - Before filing anything: `gh issue list --state open --limit 60` + grep `deploy/generate_review_bundle.py` §13b — do not duplicate.
 - After filing: verify each issue exists (`gh issue view N --json title`), then return the key→number map and any failures honestly. Never mark a failed create as filed.
+
+## What a stale board looks like (why the rules above are strict)
+
+Measured 2026-08-23: **312 issues filed and 311 closed in fourteen days** while the open
+corpus held ~50. The board churned; it did not drain. Three rules follow from that, and
+they are why `## Outcome` and the class-first rule exist:
+
+- **File into the CLASS, not the symptom** (CONVENTIONS §10). `#2978` exists only because
+  five closed per-symptom issues read as class closure while the failure rate got worse.
+- **A class with a live residual keeps an OPEN tracker** (§8b) with a dated, measured
+  acceptance. Eight incidents recurred while every named structural issue read CLOSED.
+- **Partial acceptance is not a close.** Merge the PR, reopen the issue, name the unmet
+  boxes — three times in one day. Judge an epic by its unchecked BOXES, never by its child
+  count: one epic had zero open children and eight unchecked acceptance boxes.
+
+One hazard to avoid emitting: an auto-close keyword ignores negation. "This PR does NOT
+close #N" still closes #N, and a `Fixes` in a COMMIT message beats a PR-body edit.

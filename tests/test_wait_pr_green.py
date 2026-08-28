@@ -200,12 +200,27 @@ def test_lambdas_change_adds_wiki_drift_gates():
     assert "Wiki drift gates" in p.stdout
 
 
-def test_claude_commands_change_adds_wiki_drift_gates():
-    # .claude/commands/** is in docs-ci.yml's pull_request paths — this is exactly
-    # the path this issue's own PR touches (reconcile-branch.md), so the derivation
-    # must catch it.
-    p = _derive(".claude/commands/reconcile-branch.md")
-    assert "Wiki drift gates" in p.stdout
+def test_claude_skill_change_adds_wiki_drift_gates():
+    # The skill corpus is in docs-ci.yml's pull_request paths. The path is DERIVED from
+    # the registry rather than typed: this assertion previously pinned
+    # `.claude/commands/reconcile-branch.md`, and when the corpus moved to
+    # `.claude/skills/<name>/SKILL.md` the literal silently stopped describing anything
+    # real — a green test on a file that no longer exists.
+    from skill_paths import require_skill
+
+    rel = str(require_skill("reconcile-branch").relative_to(_REPO))
+    p = _derive(rel)
+    assert "Wiki drift gates" in p.stdout, f"{rel} must attract the wiki gates"
+
+
+def test_claude_agent_change_adds_wiki_drift_gates():
+    # Agents were in NO workflow path filter before #skills-registry — an agent prompt
+    # could change and attract zero doc gates.
+    from skill_paths import agent_files
+
+    rel = str(agent_files()[0].relative_to(_REPO))
+    p = _derive(rel)
+    assert "Wiki drift gates" in p.stdout, f"{rel} must attract the wiki gates"
 
 
 # ── #3200: reconcile-owned-red classification ───────────────────────────────

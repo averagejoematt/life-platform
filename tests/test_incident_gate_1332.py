@@ -13,8 +13,10 @@ Every test here fails on the pre-#1332 tree (missing gate text / missing backfil
 import re
 from pathlib import Path
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 ROOT = Path(__file__).resolve().parent.parent
-WRAP = ROOT / ".claude" / "commands" / "wrap.md"
+WRAP = _skill("wrap")
 LOG = ROOT / "docs" / "INCIDENT_LOG.md"
 
 

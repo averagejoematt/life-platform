@@ -44,12 +44,13 @@ import pytest  # noqa: E402
 from content import journal_quotes as jq  # noqa: E402
 from experiment import phase_taxonomy as pt  # noqa: E402
 from privacy import privacy_guard  # noqa: E402
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
 from web import site_api_common as sac  # noqa: E402 — reuse the real normalizer, not a copy of it
 
 from mcp import tools_journal as tj  # noqa: E402
 
 DECISIONS = os.path.join(_REPO, "docs", "DECISIONS.md")
-COMMAND_DOC = os.path.join(_REPO, ".claude", "commands", "journal-interview.md")
+COMMAND_DOC = str(_skill("journal-interview"))
 
 CLEAN_LINE = "I used to be a main character - and I feel like an extra in my own life now."
 

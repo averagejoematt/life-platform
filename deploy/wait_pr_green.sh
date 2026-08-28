@@ -156,10 +156,10 @@ derive_expected_checks() {
       "Migration coverage + HTML well-formedness" \
       "Render + accuracy gate (local render)"
   fi
-  # docs-ci.yml pull_request paths: docs/**, README.md, CLAUDE.md, .claude/commands/**,
+  # docs-ci.yml pull_request paths: docs/**, README.md, CLAUDE.md, .claude/{skills,agents}/**,
   # deploy/sync_doc_metadata.py, scripts/check_doc_*.py, + the code half
   # (lambdas/**, mcp/**, config/**, cdk/**) + two named tests/ fact-source files.
-  if grep -qE '^docs/|^README\.md$|^CLAUDE\.md$|^\.claude/commands/|^deploy/sync_doc_metadata\.py$|^scripts/check_doc_.*\.py$|^scripts/doc_facts_ops\.py$|^scripts/generate_adr_index\.py$|^scripts/generate_mcp_tool_catalog\.py$|^scripts/operating_calendar\.py$|^lambdas/|^mcp/|^config/|^cdk/|^tests/qa_manifest\.py$|^tests/leak_token_sweep\.py$|^tests/test_platform_stats_truth\.py$' <<<"${files}"; then
+  if grep -qE '^docs/|^README\.md$|^CLAUDE\.md$|^\.claude/(skills|agents)/|^\.claude/README\.md$|^deploy/sync_doc_metadata\.py$|^scripts/check_doc_.*\.py$|^scripts/doc_facts_ops\.py$|^scripts/generate_adr_index\.py$|^scripts/generate_mcp_tool_catalog\.py$|^scripts/operating_calendar\.py$|^lambdas/|^mcp/|^config/|^cdk/|^tests/qa_manifest\.py$|^tests/leak_token_sweep\.py$|^tests/test_platform_stats_truth\.py$' <<<"${files}"; then
     echo "Wiki drift gates"
   fi
 }

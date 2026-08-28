@@ -120,7 +120,7 @@
 # without running main — see tests/test_merge_train_3104.py, which drives them
 # against synthetic `git init` repos with no network and no `gh`.
 #
-# KNOWN REPO GOTCHA: `.claude/commands/reconcile-branch.md` §4 documents a
+# KNOWN REPO GOTCHA: `.claude/skills/reconcile-branch/SKILL.md` §4 documents a
 # `rebase --continue` phantom wedge. This script does not try to unwedge it — if
 # `--continue` refuses, the PR is aborted out of the train and named, and the
 # driver works that one PR by hand with the documented recipe.

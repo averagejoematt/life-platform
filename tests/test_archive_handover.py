@@ -182,7 +182,7 @@ def test_only_the_live_pointer_and_its_readme_are_tracked_in_main():
     assert _tracked_handovers() == ["handovers/HANDOVER_LATEST.md", "handovers/README.md"], (
         "handovers/ on main holds ONLY the live pointer + its README. A dated handover here "
         "means a wrap wrote to main instead of the session-archive branch — see "
-        "scripts/archive_handover.py and .claude/commands/wrap.md step (a)."
+        "scripts/archive_handover.py and .claude/skills/wrap/SKILL.md step (a)."
     )
 
 

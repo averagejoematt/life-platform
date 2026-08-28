@@ -113,7 +113,11 @@ class TestLogAvailabilityCarriesDates:
     def test_the_presence_derivation_now_carries_the_dates_it_already_read(self):
         a = bl.available_logs_from_presence(_signal(food_last="2026-08-05"), TODAY)
         assert a.last_date("nutrition") == "2026-08-05"
-        assert a.last_date("workout") == "2026-08-05"
+        # #3252: the workout date the signal carries is Hevy's, and Hevy is one of three
+        # sources in the registry's workout denominator. An absence derived from it is
+        # unlicensed, so the derivation drops the category rather than handing a short
+        # claim onward — `knows_last_date` is the honest answer, and it is False.
+        assert not a.knows_last_date("workout")
 
     def test_the_recency_derivation_reconstructs_dates_when_given_a_reference(self):
         a = bl.available_logs_from_recency({"days_since_last_food_log": 3}, reference_date=TODAY)

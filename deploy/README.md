@@ -7,7 +7,7 @@
 > **The canonical deploy *rules* live in `docs/CONVENTIONS.md` §1–§2** (the #781 one-bundle
 > invariant, deploy-from-main, squash-drift checks, site-deploy-on-merge). This file only
 > describes what the scripts *are*; when a rule is stated here it's a pointer, not the truth.
-> The session driver with the function-name → source-file mapping is `.claude/commands/deploy.md`.
+> The session driver with the function-name → source-file mapping is `.claude/skills/deploy/SKILL.md`.
 >
 > **Symptom-keyed operational runbook:** `deploy/OPERATIONAL_RUNBOOK.md` — read first when something looks wrong.
 > **First time deploying?** Read `docs/QUICKSTART.md` — it has a deploy decision tree and gotchas.
@@ -44,7 +44,7 @@ channel stays on the staging module. Full rule: `docs/CONVENTIONS.md` §1.
    to live here is **retired** — it staged no `lambdas/` tree and boot-broke the function
    with `No module named 'reading'`; `docs/_lint/tombstones.txt` now bans it.)
 3. **site-api** → `bash deploy/deploy_site_api.sh` (full bundle + invoke-verifies a real
-   route; infra is CDK-owned in `cdk/stacks/serve_stack.py` — see `.claude/commands/deploy.md`).
+   route; infra is CDK-owned in `cdk/stacks/serve_stack.py` — see `.claude/skills/deploy/SKILL.md`).
 4. **Shared module** (`ai_calls.py`, `stats_core.py`, …) → `bash deploy/deploy_fleet.sh`
    (one bundle → every function) or `cd cdk && npx cdk deploy --all`.
 5. **CDK changes** (IAM, schedules, new Lambda) → `cd cdk && npx cdk deploy <StackName>`.
@@ -183,4 +183,4 @@ truth. The live inventory is:
 
 - `docs/ARCHITECTURE.md` — the system-level Lambda inventory (counts auto-synced by `sync_doc_metadata.py`)
 - `ci/lambda_map.json` — source-file → function mapping (+ per-Lambda region overrides) used by the deploy scripts
-- `.claude/commands/deploy.md` — the function-name → source-file mapping for attended deploys
+- `.claude/skills/deploy/SKILL.md` — the function-name → source-file mapping for attended deploys

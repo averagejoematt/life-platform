@@ -2,7 +2,7 @@
 tests/test_deploy_doc_map.py — the /deploy skill's function→source table must be
 generator output from ci/lambda_map.json (#2005, devex-1).
 
-History: the table in .claude/commands/deploy.md was hand-typed and drifted — a dead
+History: the table in .claude/skills/deploy/SKILL.md was hand-typed and drifted — a dead
 function (apple-health-ingestion), a wrong source path (weather_handler.py), and 43
 live functions missing entirely. This gate asserts the doc block is byte-identical to
 what deploy/sync_deploy_doc_map.py renders from the map, so ANY map change (function
@@ -18,9 +18,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from skill_paths import require_skill as _skill  # the ONE skill registry (no hard-coded .claude paths)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "deploy" / "sync_deploy_doc_map.py"
-DOC = REPO_ROOT / ".claude" / "commands" / "deploy.md"
+DOC = _skill("deploy")
 MAP = REPO_ROOT / "ci" / "lambda_map.json"
 
 spec = importlib.util.spec_from_file_location("sync_deploy_doc_map", SCRIPT)

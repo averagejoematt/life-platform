@@ -23,7 +23,7 @@ The hooks it installs:
 3. **Run the local checks** (below) — same gates as CI, so failures surface before the push.
 4. **Commit** with a Conventional-Commits subject (the commit-msg hook enforces it). **No tool-attribution trailers** — commits carry the work, not the tooling (owner decision 2026-08-12; see CLAUDE.md "Authorship").
 5. **Open the PR.** The body is prefilled from [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md); include `Fixes #<issue>` and the post-merge deploy/ops steps.
-6. **Merge ≠ deploy.** Lambda/infra code deploys from `main` via the playbook after merge; `site/**` auto-deploys on merge. See the PR template's deploy-notes section and [`.claude/commands/deploy.md`](.claude/commands/deploy.md).
+6. **Merge ≠ deploy.** Lambda/infra code deploys from `main` via the playbook after merge; `site/**` auto-deploys on merge. See the PR template's deploy-notes section and [`.claude/skills/deploy/SKILL.md`](.claude/skills/deploy/SKILL.md).
 
 ## Commit messages
 

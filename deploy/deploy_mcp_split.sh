@@ -3,7 +3,7 @@
 #
 # The MCP Lambda is a MULTI-MODULE package: mcp_server.py + mcp_bridge.py + the whole mcp/
 # directory. A single-file deploy drops the siblings and breaks the import graph, so this
-# always ships the full package (the documented build in .claude/commands/deploy.md).
+# always ships the full package (the documented build in .claude/skills/deploy/SKILL.md).
 #
 # Gate: refuses to deploy unless tests/test_mcp_registry.py is green (tool fns must be wired).
 # Rollback: saves the currently-deployed code to /tmp before overwriting.

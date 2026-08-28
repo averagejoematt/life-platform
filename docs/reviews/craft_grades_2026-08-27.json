@@ -1,0 +1,533 @@
+{
+  "date": "2026-08-27",
+  "run_id": "craft-2026-08-27-laneH",
+  "ritual": "craft-review",
+  "sequence": "FIRST RUN - no prior craft_grades_*.json existed; this file is the baseline and starts the operating-calendar clock (#2832/#3250).",
+  "model": "claude-opus-5[1m]",
+  "method": "6-lens promotion-committee panel (Eng I / Senior / Staff / Principal / EM / CIO), one grader per lens over a shared verbatim context block, read-only contract, followed by a driver verification pass that re-reproduced every load-bearing claim before it entered this file. Rubric: docs/ENGINEERING_STANDARDS.md D1-D10 with its own A/C/F anchors. Magnitudes come from scripts/review_anchors.py (derived at run time, #3273) and scripts/gate_census.py - none is hand-typed. Grades are 'A for a solo public platform's stated postures' per ADR-103: a documented loose posture is an A, an undocumented one is the defect.",
+  "ground_truth": {
+    "main_sha": "d794b5f3a84626048b0302891f87da47bed68196",
+    "repo_visibility": "PUBLIC",
+    "open_issues": 45,
+    "gate_census": {
+      "gates": 563,
+      "unproven": 520,
+      "unprovable_excluded": 6,
+      "source": "python3 scripts/gate_census.py"
+    },
+    "anchors_source": "scripts/review_anchors.py (derived 2026-08-27)",
+    "anchors": {
+      "test_modules": 1019,
+      "test_suite_files": 977,
+      "deploy_entrypoints": 152,
+      "deploy_surface": 347,
+      "adr_records": 153,
+      "process_docs": 59,
+      "docs_surface": 357,
+      "ci_workflows": 23,
+      "lambda_modules": 444,
+      "mcp_modules": 40,
+      "claude_commands": 23,
+      "claude_agents": 4,
+      "cdk_stacks": 30
+    },
+    "tracked_top_level_dirs": 21
+  },
+  "overall_grade": "B",
+  "overall_justification": "Two dimensions at A (D6 supply-chain, D9 AI-era engineering) and eight at B. This is a repo whose MACHINERY is consistently stronger than its SELF-DESCRIPTION. Nearly every B is the same defect wearing a different hat: a mechanism that works, graded down because the document naming that mechanism describes something else. The estate a cold reader would praise - 468/468 modules typed clean, a blocking CVE gate over a zero-third-party runtime, 30 AI surfaces derived and policed, a module-size ratchet whose debt is measurably shrinking, an exact root-clutter allowlist, wall-clock time-bomb guards with dead-entry checks - is real and verified. What a cold reader would fault is that the repo's prose cannot be trusted at the same level as its code: the section titled 'What gates the MERGE' describes a merge gate that does not exist, the tombstone gate is green over the violation class it was built for, and 82% of Verified: stamps are older than the content they certify. The repo's own instruments found most of this first (#3250, #2610, #3207, #3273) - the self-correction culture is genuinely A-grade; the gap is that it has been applied to gates far more consistently than to documents.",
+  "through_line": "Session I's through-line - things that work, but not by the mechanism their own documentation names - was not merely present; it was the DOMINANT finding shape, arriving independently in all ten dimensions from six graders who could not see each other's work. Eight of the eleven P2s are instances: the merge-gate prose (D7-1), the phrase-matched tombstone rule (D10-1), the Verified: stamp (D10-2), the headroom instrument blind to files at the wall (D2-1), the composite frozen below its call sites while claiming parity (D5-1), the mypy census two populations stale (D4-1), the dead-reference gate blind to 94% of citations (D1-3), and the first-day commands that exit 1 (D1-2).",
+  "lenses": {
+    "eng1": {
+      "role": "Eng I / new hire",
+      "question": "Can I find my way around? Is anything obviously junk or confusing?",
+      "dimensions": [
+        "D1"
+      ],
+      "findings_confirmed": 4,
+      "findings_refuted": 1,
+      "refuted_note": "Killed its own README-ceiling finding after checking cost_governor_lambda.py:178,192 - README was right, the stale side was elsewhere and is #2801's ground."
+    },
+    "senior": {
+      "role": "Senior engineer",
+      "question": "Would I approve a random file in review?",
+      "dimensions": [
+        "D3",
+        "D10"
+      ],
+      "findings_confirmed": 4,
+      "findings_refuted": 0,
+      "sample_note": "Sampled 10 files cold, would approve 9 unchanged."
+    },
+    "staff": {
+      "role": "Staff engineer",
+      "question": "Does the structure communicate the architecture?",
+      "dimensions": [
+        "D2",
+        "D5"
+      ],
+      "findings_confirmed": 4,
+      "findings_refuted": 0
+    },
+    "principal": {
+      "role": "Principal engineer",
+      "question": "Do I trust the gates? Is the abstraction taste right?",
+      "dimensions": [
+        "D4",
+        "D9"
+      ],
+      "findings_confirmed": 4,
+      "findings_refuted": 1,
+      "refuted_note": "FALSIFIED its own assigned hypothesis that CLEAN_DIRS' non-recursive globs leak modules: 468/468 covered, symmetric difference empty both directions, closed by an fs-derived recursive guard. Reported as an A."
+    },
+    "em": {
+      "role": "Engineering Manager",
+      "question": "Could someone else contribute tomorrow?",
+      "dimensions": [
+        "D7",
+        "D8"
+      ],
+      "findings_confirmed": 5,
+      "findings_refuted": 1,
+      "refuted_note": "Killed its own 'hypothesis not collected in deploy_critical lane' suspicion - collection-time import makes the comment precise."
+    },
+    "cio": {
+      "role": "CIO / acquirer",
+      "question": "What is the risk if I inherit this?",
+      "dimensions": [
+        "D6"
+      ],
+      "findings_confirmed": 1,
+      "findings_refuted": 0
+    }
+  },
+  "dimensions": {
+    "D1": {
+      "dimension": "First impression / repo cleanliness",
+      "lens": "eng1",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Root is load-bearing dirs only; every tracked dir earns its place; no committed archives, process exhaust, or throwaway artifacts.",
+        "C": "A few stray dirs; some tracked junk; tree needs the README to be legible.",
+        "F": "Committed dead-code archives, spike PNGs, session transcripts, backups; the root reads as a working directory."
+      },
+      "justification": "Root is clean, all 21 tracked top-level dirs are allowlisted with real reasons and support dirs carry READMEs (A-shape), and there is zero tracked junk - but a 167-file committed archive of one-shot scripts, the exact artifact D1's F-anchor names, is mandated by ADR-059 and forbidden by ENGINEERING_STANDARDS section 1 with nothing resolving the conflict.",
+      "findings_confirmed": 4,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D1-1",
+          "summary": "deploy/archive/ is 167 tracked files (48% of deploy/'s 347) and the repo's two canonical documents give OPPOSITE instructions about it; the D1 ratchet cannot see it because it only inspects TOP-LEVEL dirs.",
+          "evidence": "git ls-files deploy/archive | wc -l -> 167; git ls-files deploy | wc -l -> 347. Contents include literal backups: deploy/archive/registry_pre_consolidation_backup.py, deploy/archive/weather_lambda.py.deleted. No README in the dir. MANDATED at docs/DECISIONS.md:1745 (ADR-059 Consequences): 'One-off scripts older than 30 days are moved to deploy/archive/<YYYY-MM-DD>/ once their execution is logged.' FORBIDDEN at docs/ENGINEERING_STANDARDS.md section 1: 'Never commit a manual archive/ of superseded code, one-shot migration scripts that already ran... If you need old state, it is in history.' Cost on record, docs/INCIDENT_LOG.md:153: PR #1049 archived a script to deploy/archive/onetime/ while tests/test_predictions_one_store_726.py still imported it -> ModuleNotFoundError on every full-suite run, ~26h of unnoticed CI red.",
+          "sev": "P2",
+          "effort": "M",
+          "regression_guard": "Resolve in ONE direction (amend ADR-059 as superseded, or name deploy/archive as the standards' registered exception + give it a README stating retention), then extend tests/test_root_clutter_guard.py with a sub-archive assertion so a NEW <dir>/archive/ reds CI - the guard inspects only top-level dirs, which is why 167 files accumulated one level down while it stayed green."
+        },
+        {
+          "id": "D1-2",
+          "summary": "Both first-day worked examples in QUICKSTART's deploy section pass ONE argument to scripts that hard-require TWO and exit 1; the adjacent stack list is short one stack.",
+          "evidence": "docs/QUICKSTART.md:115 'bash deploy/deploy_and_verify.sh daily-brief' vs deploy/deploy_and_verify.sh:45 'if [ $# -lt 2 ]; then ... exit 1'. docs/QUICKSTART.md:125 'bash deploy/deploy_lambda.sh life-platform-mcp' vs deploy/deploy_lambda.sh:35 same floor. CLAUDE.md already documents the correct two-arg form, so the repo knows. docs/QUICKSTART.md:134 lists 9 stack names; cdk/app.py instantiates 10 (LifePlatformBackup absent).",
+          "sev": "P2",
+          "effort": "S",
+          "regression_guard": "A doc-command contract test: extract every fenced 'bash deploy/*.sh ...' invocation from QUICKSTART/RUNBOOK, parse each script's [ $# -lt N ] floor, fail when a documented invocation is below it. Add the stack-name list to deploy/sync_doc_metadata.py, which already generates the stack COUNT from the same cdk/app.py parse."
+        },
+        {
+          "id": "D1-3",
+          "summary": "The only dead-reference gate on main is structurally blind to ~94% of how this repo cites files: check_doc_links.py deliberately skips code spans, and repo paths here are written in backticks, not markdown links.",
+          "evidence": "scripts/check_doc_links.py:14-16 SKIPPED list includes 'code spans/fenced blocks (links inside them are illustrative)'. Measured across the active doc surface: 168 markdown-link citations vs 2,515 backticked repo-path citations; 158 distinct dead paths / 280 occurrences. Live-doc instances: docs/ONBOARDING.md:80 'lambdas/bedrock_client.invoke()' (module is lambdas/ai/bedrock_client.py) and :129 'lambdas/coach_computation_engine.py' (now lambdas/coach/), both moved by ADR-146/#1653; CLAUDE.md:128 carries the same dead path.",
+          "sev": "P2",
+          "effort": "M",
+          "regression_guard": "Second pass over code spans matching a sanctioned-top-dir path shape, judged by git ls-files tracked-ness rather than os.path.exists (the on-disk form passes on a polluted dev box and reds later on someone else's commit), with CHANGELOG/DECISIONS/INCIDENT_LOG exempt as historical ledgers."
+        },
+        {
+          "id": "D1-4",
+          "summary": "README.md, the front page, still sells the superseded v4 'three doors' IA including an /evidence/ door that no longer exists; ONBOARDING.md one level down states the correct v5 IA.",
+          "evidence": "README.md:25 '| **v4 site** | Three doors - Cockpit (/cockpit/), Story (/story/), Evidence (/evidence/) |'. Reality: 'ls -d site/evidence' -> No such file or directory; redirects.map:35 '/evidence/ -> /data/'; site/ holds cockpit, data, coaching, protocols, story. docs/ONBOARDING.md:18 already states the 5-door v5 IA. README's numeric literals ARE sync-owned (deploy/sync_doc_metadata.py:904-919); the IA sentence is hand-typed and owned by nothing.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Add a sync_doc_metadata.py rule deriving the door list from the tracked site/*/index.html set - the same mechanism already keeping README's three counts honest, extended to the one front-door claim that is not generated."
+        }
+      ]
+    },
+    "D2": {
+      "dimension": "Structure & module hygiene",
+      "lens": "staff",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Packaging finished; no source file over the size ceiling without a documented reason; boundaries are obvious; the debt ledger shrinks and its instrument sees every file at risk.",
+        "C": "Half-done packaging (subpackages plus a flat pile); one or two god-modules.",
+        "F": "A flat pile of modules; multiple 2-3k-line files; no discernible structure."
+      },
+      "justification": "ADR-146 packaging is genuinely finished (zero loose modules at lambdas/ root) and the module-size ratchet is the best-designed guard in the repo with debt measurably shrinking (27 entries/51,748 lines -> 24/42,701 in 17 days, entries reaching the terminal cure and being pruned) - held to B because the headroom instrument reports 9 files at zero headroom when the true at-the-wall set is 12, and its scope excludes remediation/.",
+      "findings_confirmed": 3,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D2-1",
+          "summary": "The module-size headroom instrument is blind to files at the ceiling that are NOT in BASELINE, so completing the cure moves a file from the monitored set to the unmonitored one. It reports 9 at zero headroom; the true reds-on-your-next-line set is 12.",
+          "evidence": "python3 scripts/module_size_headroom.py --zero -> 'module-size baselines: 24 entries, 9 at ZERO headroom (ceiling 1200)'. headroom_table() iterates BASELINE only. Three in-scope files sit at the wall and are absent from BASELINE (verified by grep against tests/test_module_size_guard.py): lambdas/emails/wednesday_chronicle_lambda.py = 1200 lines (exactly AT the ceiling), deploy/restart_pipeline.py = 1199, lambdas/operational/qa_smoke_lambda.py = 1198. This is the #2612 incident shape (restart_pipeline hit 1193/1200 mid-change) reached via the cured path rather than the baselined one.",
+          "sev": "P2",
+          "effort": "S",
+          "regression_guard": "Make headroom_table() iterate the SCOPE_DIRS tree and union it with BASELINE, so any file within N lines of the ceiling appears whether or not it carries a baseline entry. The extraction queue is the point of the tool; a file at 1200/1200 is the most urgent row and is currently invisible."
+        },
+        {
+          "id": "D2-2",
+          "summary": "The module-size guard's SCOPE_DIRS omits remediation/, so the self-healing agent that holds OIDC credentials is unpoliced by the size ratchet while the docstring claims first-party coverage.",
+          "evidence": "SCOPE_DIRS = (lambdas, mcp, scripts, deploy, cdk) in tests/test_module_size_guard.py; remediation/agent.py is 965 lines and out of scope. remediation/ IS on the root-clutter allowlist as first-party ('Self-healing agent (agent.py/automerge.py)'), so the two guards disagree about what counts as first-party source.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Add remediation/ to SCOPE_DIRS (it lands green today at 965 < 1200, so this is a free ratchet), or state the exclusion in the docstring with a reason."
+        },
+        {
+          "id": "D2-3",
+          "summary": "A BASELINE slot is occupied by a file inside deploy/archive/onetime/ that can never be drained, permanently inflating the debt ledger with a row no extraction can retire.",
+          "evidence": "deploy/archive/onetime/daily_brief_lambda.py holds a tests/test_module_size_guard.BASELINE entry. Per ADR-059 the file is frozen archive; per the standards a baseline entry 'is debt, not a home' whose terminal cure is dropping under the ceiling. An archived file will never be refactored, so the row is undrainable. Interacts with D1-1: resolving the deploy/archive question also resolves this row.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Exclude deploy/archive/** from SCOPE_DIRS and drop the entry, so the ledger counts only live code that can actually be cured."
+        }
+      ]
+    },
+    "D3": {
+      "dimension": "Naming & code aesthetics",
+      "lens": "senior",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Idiomatic, consistent, self-explaining names; earned abstractions; a stranger reads a random file and nods.",
+        "C": "Mostly consistent; some cryptic or inconsistent names; occasional cleverness tax.",
+        "F": "Inconsistent conventions; misleading names; abstraction for its own sake."
+      },
+      "justification": "An AST sweep of 642 first-party Python files found ZERO naming violations and 9 of 10 randomly sampled files would pass review unchanged - a genuinely excellent Python surface - but the conformance is entirely cultural (ruff never selects N, no pep8-naming plugin), and the site/ JS surface has no linter at all.",
+      "findings_confirmed": 2,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D3-1",
+          "summary": "Perfect Python naming conformance is achieved with zero mechanical enforcement: ruff selects [E,W,F,I,S] and never N, and no pep8-naming plugin is configured. A free, currently-green ratchet is unclaimed.",
+          "evidence": "AST scan over 642 first-party .py files: 0 non-snake_case functions, 0 non-PascalCase classes, 0 non-conforming module filenames. Config: pyproject.toml [tool.ruff.lint] select does not include 'N'; grep for pep8-naming across pyproject.toml/.flake8/requirements-dev.txt -> no match. The standards (section 3) state the convention as a rule new code 'must meet', and nothing enforces it.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Add 'N' to ruff's select list. It lands green today across the whole first-party surface, converting a cultural convention into a ratchet at zero remediation cost - the repo's own 'mechanical, not cultural' standard (section 7) applied to its own section 3."
+        },
+        {
+          "id": "D3-2",
+          "summary": "site/ has no JavaScript linter of any kind: ruff's extend-exclude lists 'site', and no eslint/biome config exists - so the front-end's naming and style standards in ENGINEERING_STANDARDS section 3 are unenforced by anything.",
+          "evidence": "pyproject.toml [tool.black] extend-exclude and the ruff exclusion both list 'site'. No .eslintrc*, eslint.config.*, or biome.json anywhere in the tree. docs/ENGINEERING_STANDARDS.md section 3 nonetheless specifies JS/ES module conventions (camelCase functions, PascalCase components). The v4-gate.yml JS jobs run an import-graph check and unit tests - correctness, never style.",
+          "sev": "P3",
+          "effort": "M",
+          "regression_guard": "Either adopt one JS linter for site/ with a rent story, or amend section 3 to state that JS style is deliberately unenforced - the standards' own escape hatch requires writing down why. An undocumented unenforced standard is the defect; a documented one is an A."
+        }
+      ]
+    },
+    "D4": {
+      "dimension": "Trustworthy gates",
+      "lens": "principal",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "A skeptic believes lint/type/coverage mean something AND the gate's own written record is derived, not hand-typed: real mypy over the whole first-party surface, no blanket waivers, an enforced coverage floor with an up-only guard in code.",
+        "C": "Gates pass but are visibly loose - broad disable_error_code, per-directory suppressions, a floor below any meaningful number - or loose-but-undocumented.",
+        "F": "Gates are decorative: everything substantive silenced, green means nothing."
+      },
+      "justification": "The machinery is A-grade and verified green (468/468 modules typed clean, empty denylist, zero per-module ignore_errors, a 3-code up-only disable list, floor 74 above the stated 70 target plus an 83.20 high-water ratchet) - held to B because the census the standard itself designates as the record is two populations stale on exactly the two flags it names as the end-state, and 83.8% of per-site lint waivers waive nothing.",
+      "findings_confirmed": 3,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D4-1",
+          "summary": "The mypy census the standards designate as 'the record' is stale by two populations on the two flags named as the end-state, and the tool that refreshed its siblings has no code path for them.",
+          "evidence": "docs/ENGINEERING_STANDARDS.md section 4: 'the current census for each is recorded in mypy.ini'. mypy.ini:6 and :29 record a '350-module surface' measured 2026-08-06 (check_untyped_defs=True(330), warn_return_any=True(159)); actual today: 'python3 tests/mypy_clean_set.py | wc -l' -> 468, corroborated by a live run reporting 'Success: no issues found in 468 source files'. 'grep check_untyped_defs scripts/mypy_disable_cost.py' -> empty (the refresher prices the three disable codes only). Teeth, measured by AST over the clean set: 2,663 of 5,269 functions (50.5%) are unannotated so mypy never enters their bodies - 82,884 of 147,558 function-body lines (56.2%) are unchecked. The green is true and covers under half the body lines.",
+          "sev": "P2",
+          "effort": "M",
+          "regression_guard": "Add a --flags mode to scripts/mypy_disable_cost.py measuring both flags over clean_modules(), then extend tests/test_mypy_clean_modules.py (which already regex-parses mypy.ini) to assert the module count written in mypy.ini equals len(clean_modules()). Derivation guard - the repo's own pattern.",
+          "extends": "extends #2578 (a green instrument must be able to state what it measured)"
+        },
+        {
+          "id": "D4-2",
+          "summary": "439 of 524 per-site '# noqa' waivers name a code no configured linter reports - 346 of them BLE001 - so broad 'except Exception:' reads as a linted, individually-justified class and is in fact entirely unlinted. Nothing detects the rot because RUF100 is unselected.",
+          "evidence": "Classifier over git ls-files lambdas mcp against ruff select=[E,W,F,I,S] minus ignores and flake8's set minus extend-ignore: LIVE 85, DEAD 439 (BLE001:346, E402:60, E501:8, S310:7, ARG001:4, ...), TOTAL 524. Driver-reproduced: 'grep -rho \"# noqa: *BLE001\" lambdas mcp | wc -l' -> 346; total noqa -> 524; 'grep -rn \"BLE\\|RUF100\" pyproject.toml .flake8' -> NO MATCH. Many carry earnest reasons ('# noqa: BLE001 - fail-soft is the contract'). This is NOT a request to enable BLE001 (a 346-site bill needing its own rent story); the defect is that the repo cannot distinguish a live waiver from a decorative one.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "A ~30-line test parsing pyproject [tool.ruff.lint].select/ignore plus .flake8 extend-ignore, failing when a '# noqa:<code>' names a code neither tool reports - so a future PR either enables the rule or writes the comment as a plain comment. Self-updating: it reads the configs, not a hand list."
+        },
+        {
+          "id": "D4-3",
+          "summary": "Three derived registries carry hand-typed prose censuses that disagree with the derivation sitting beside them; in every case the derivation is correct and only the prose drifted.",
+          "evidence": "tests/mypy_clean_set.py:13 says the disable list 'still carries four structural codes - assignment / arg-type / return-value / operator' vs mypy.ini:85 'disable_error_code = assignment, arg-type, operator' (3; return-value was enabled 2026-08-15). tests/test_mypy_clean_modules.py:41 '# Currently: 4 structural codes' sits three lines above GLOBAL_DISABLE_BASELINE with 3 entries. mypy.ini:17 'Codes now ENABLED (was 14, now 10)' - 11 are enabled. tests/grounding_wiring.py:20 'The remaining 9 exemptions are all structural' vs its own scan_tree(): 22 exemptions of 30 surfaces.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "One assert per file comparing the prose number to the parsed/derived value - each of these tests already parses the artifact it describes.",
+          "extends": "extends #2799"
+        }
+      ]
+    },
+    "D5": {
+      "dimension": "CI/CD maintainability",
+      "lens": "staff",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Pipelines are DRY: shared setup in composite actions, thin reusable workflows, no mega-file - AND the shared building block is maintained, not frozen at birth.",
+        "C": "Duplicated setup across workflows; one large workflow file.",
+        "F": "A single multi-thousand-line workflow plus N near-duplicate copies."
+      },
+      "justification": "The composite action and reusable-workflow primitives exist and are real (23 workflows, no mega-file, shared setup-ci consumed across the estate) - held to B because the composite 45 call sites depend on has been committed exactly once, at creation, and now pins an action SHA older than every call site while its own comment asserts parity.",
+      "findings_confirmed": 1,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D5-1",
+          "summary": "The shared setup-ci composite has drifted below its own call sites and is invisible to Dependabot: it pins configure-aws-credentials at v6.2.2 while all three call sites are v6.2.3, and its inline comment asserts the parity that no longer holds.",
+          "evidence": ".github/actions/setup-ci/action.yml:51 'uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2'; call sites ci-cd.yml:962, ci-cd.yml:1412, site-deploy.yml:371 all '@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3'. The false claim is at action.yml:46: '# Same SHA as every hand-rolled call site (v6.2.2). OIDC auth - the calling job'. 'git log --oneline -- .github/actions/setup-ci/action.yml' -> exactly ONE commit (203d6d1f5, its creation). Dependabot's github-actions ecosystem is configured with directory '/', which reaches .github/workflows/ but NOT nested composite action files - so the one file 45 call sites depend on is the one file the bumper cannot see.",
+          "sev": "P2",
+          "effort": "S",
+          "regression_guard": "Add a second github-actions Dependabot entry for directory '/.github/actions/setup-ci' (Dependabot does not recurse), and drop the 'Same SHA as every call site' comments - a parity claim maintained by hand is the thing that just failed. A SHA-parity test between the composite and its call sites is the stronger form."
+        }
+      ]
+    },
+    "D6": {
+      "dimension": "Supply-chain & security posture",
+      "lens": "cio",
+      "grade": "A",
+      "rubric_anchors": {
+        "A": "Secret-scan plus SAST plus CVE gate plus SBOM present; security-relevant gates block or ratchet; where a control is advisory, the choice is defended in a dated decision record.",
+        "C": "Some scanning, mostly advisory/non-blocking; no SBOM.",
+        "F": "No secret-scanning, no SAST, no CVE gate - or all continue-on-error."
+      },
+      "justification": "All four controls are present, the CVE gate genuinely blocks with a zero-entry allowlist, the production runtime imports zero third-party packages (the strongest possible answer to a CVE question), and the two advisory controls are advisory BY WRITTEN DECISION quoted inline - a documented posture, which the calibration rule grades A.",
+      "findings_confirmed": 1,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D6-1",
+          "summary": "GitHub-native secret_scanning and push_protection - the only whole-history secret coverage in the estate - are the one security surface absent from github_posture.json, the file that exists to catch exactly this regression class.",
+          "evidence": "python3 -c on deploy/github_posture.json -> declared surfaces are ['_comment','environment_production','main_ruleset','main_required_checks_ruleset','repo_settings','vulnerability_alerts','push_run_detector']; 'grep -c secret_scanning deploy/github_posture.json' -> 0. Both are ENABLED live. Both gitleaks lanes scan only the PR commit range / push, so the native scanner is the sole whole-history coverage. The same file already records that the 2026-07-13 private flip silently dropped environment protection - the precedent for a setting reverting unnoticed on a visibility change, and this repo went PUBLIC 2026-07-20.",
+          "sev": "P2",
+          "effort": "S",
+          "regression_guard": "Add a secret_scanning surface (secret_scanning + secret_scanning_push_protection) to deploy/github_posture.json so the existing weekly drift sentinel reports it - reuses the primitive rather than adding machinery.",
+          "extends": "extends #3042"
+        }
+      ]
+    },
+    "D7": {
+      "dimension": "Team-readiness signals",
+      "lens": "em",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "main protected with the posture documented; real ownership routing; a contribution path that works. For a solo public repo: the live control set matches a written decision and a reader can learn what gates main from one authoritative place.",
+        "C": "Trivial CODEOWNERS; conventions cultural not mechanical; protection undocumented - a reader must guess what gates main.",
+        "F": "No branch protection, no ownership, no contribution path, no explanation."
+      },
+      "justification": "Live main carries a real ruleset (deletion + non_fast_forward, active, no bypass actors) and its ABSENT required-checks half is honestly documented as applied:false and machine-pinned - a genuine A pattern - but docs/CONVENTIONS.md's section literally titled 'What gates the MERGE' and ADR-148 both assert the never-applied ruleset as present-tense fact, so the repo's most-read convention doc misstates what gates main.",
+      "findings_confirmed": 2,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D7-1",
+          "summary": "THE REVIEW'S SHARPEST FINDING. CONVENTIONS.md's 'What gates the MERGE' section and ADR-148 state that two check-runs are required on every PR to main via the main-required-fast-lane ruleset. That ruleset does not exist; main has ZERO required status checks. The correct statement sits in the same docs/ tree with a guard on it - the false one is unguarded.",
+          "evidence": "LIVE, driver-reproduced: 'gh api repos/:owner/:repo/branches/main/protection' -> HTTP 404 'Branch not protected'; 'gh api repos/:owner/:repo/rulesets --jq length' -> 1; 'gh api repos/:owner/:repo/rules/branches/main' -> [\"deletion\",\"non_fast_forward\"]. Zero required checks, zero required reviews. FALSE DOC: docs/CONVENTIONS.md:238-240 'Two check-runs are **required** on every PR to main by the main-required-fast-lane ruleset'; :459 'The only control on main is via rulesets, and there are two' (there is one); docs/DECISIONS.md:4173 ADR-148 amendment: \"'can merge past it' is no longer true for those two checks\". TRUE DOC, same tree: docs/MANAGED_WHERE_LEDGER.md:40 '2026-08-23 live: **NOT YET APPLIED** - no such ruleset exists on the repo; main has NO required status checks today', machine-pinned by deploy/github_posture.json '\"applied\": false' + blocked_on and held by tests/test_posture_pending_marker.py - whose scope covers only the ledger and the JSON, never CONVENTIONS.md or DECISIONS.md.",
+          "sev": "P2",
+          "effort": "S",
+          "regression_guard": "Extend the #3207 marker contract: add a claiming_docs list to the posture JSON naming every doc that describes the surface, and extend tests/test_posture_pending_marker.py to assert each named doc carries a pending qualifier while applied:false. This is the DOC half only - applying the ruleset is blocked on RECONCILE_PUSH_TOKEN.",
+          "extends": "extends #3042 (applying the ruleset itself is A-Grade D0.6)"
+        },
+        {
+          "id": "D7-2",
+          "summary": "The Conventional-Commits gate CONTRIBUTING.md calls 'mechanical, not cultural' exists only as a local git hook, so on any clone where install_hooks.sh was not run it is exactly cultural.",
+          "evidence": "CONTRIBUTING.md: 'commit-msg - rejects a subject that is not a Conventional Commit, so the convention is mechanical, not cultural', and separately '.git/hooks/ is local and untracked' plus 'bypass in a genuine emergency with git commit --no-verify'. CI check: 'grep -rln \"commit-msg\\|[Cc]onventional\" .github/workflows/' -> no matches. Measured conformance is nonetheless 195/200 recent commits, so the convention is real - it is the ENFORCEMENT claim that is not. Note #3262 (both Claude hooks dark inside a worktree) is the same local-hook fragility in an adjacent surface.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Add the subject regex to the existing pr-checks.yml fast-lane job over the PR commit range - no new workflow and no new required context, mirroring the gitleaks 'PR commit range only' idiom already in that file."
+        }
+      ]
+    },
+    "D8": {
+      "dimension": "Testing depth",
+      "lens": "em",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Beyond example-based: property-based tests on the pure calculators AND the AI honesty gates, CI-wired so they cannot silently skip; no wall-clock time-bombs; the tier is documented so a second maintainer extends it by convention.",
+        "C": "Example-based only, but well-structured and non-brittle.",
+        "F": "Sparse or brittle tests; coverage floor is a fig leaf; tests encode date time-bombs that red main on their own."
+      },
+      "justification": "The property tier is genuine and correctly aimed (4 modules / 35 @given covering 2 pure calculators and the 2 ADR-104/105 honesty gates, hard-imported with Hypothesis pinned in BOTH CI lanes) and the wall-clock time-bomb discipline is best-in-class - but it is 4 of 977 suite files, the purest and most invariant-rich module in the repo has none, and docs/TESTING.md never mentions the tier exists.",
+      "findings_confirmed": 3,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D8-1",
+          "summary": "lambdas/common/stats_core.py - the repo's purest module and the computational spine of ADR-105's rigor bar - carries zero property-based tests, though it meets the exact purity criterion the repo's own property tests cite.",
+          "evidence": "'wc -l lambdas/common/stats_core.py' -> 824. Its only imports are 'import math' and 'import random' - no clock, no I/O, no boto3. 25 public functions including pearson_r, fisher_ci, moving_block_bootstrap_ci, bh_fdr, brier_score, reliability_bins, whose invariants are trivially expressible (r in [-1,1]; BH-adjusted p in [0,1] and >= raw p; Brier in [0,1]; seeded-bootstrap determinism; reliability-bin count conservation). Only example-based tests/test_stats_core.py exists. Scale: 4 files carry @given of 977 suite files (0.41%). The repo's own precedent, tests/test_prop_bsts_lite.py, justifies its target as 'pure by construction (no I/O, no clock, no imports beyond math)' - stats_core meets that bar and was skipped.",
+          "sev": "P2",
+          "effort": "M",
+          "regression_guard": "Add tests/test_prop_stats_core.py, then close the class with a PURE_CALCULATORS registry (module -> why it qualifies) plus a test asserting each entry has a tests/test_prop_<name>.py - giving the tier the charter's registry + derivation-guard + ratchet shape instead of 4 files someone happened to write."
+        },
+        {
+          "id": "D8-2",
+          "summary": "The property tier is invisible in the docs a maintainer reads: docs/TESTING.md (395 lines, 13 numbered categories, three 'Pattern for a new X test' sections) never mentions Hypothesis, @given, or property testing. Neither does CONTRIBUTING.md.",
+          "evidence": "'grep -n -i \"hypothesis\\|property\\|@given\\|prop_\" docs/TESTING.md' -> zero matches against 395 lines. Same grep on CONTRIBUTING.md -> zero. Meanwhile the tier IS fully CI-wired: requirements-dev.txt:14 hypothesis==6.165.10; ci-cd.yml:456 and ci-test.yml:48 both install it; tests/deploy_critical_lane_deps.py:18 pins it. The tier survives as 4 files, not as a convention anyone can extend.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Add a category 14 to docs/TESTING.md with the purity criterion and one worked @given; if the PURE_CALCULATORS registry lands, have the same test assert the doc section names it so the doc cannot rot away from the registry."
+        },
+        {
+          "id": "D8-3",
+          "summary": "docs/TESTING.md states the unit suite runs in ~3 seconds; the committed budget is 1950 seconds, and the same page contradicts itself 23 lines later.",
+          "evidence": "docs/TESTING.md:15 '| Unit | tests/test_*.py (no integration mark) | ~3s for all | Yes, every push |' and :27 '# All unit tests (fast - ~3 sec)'. tests/test_duration_budget_ratchet.py:189 'BUDGET_SECONDS = 1950' and :200 'HARD_CEILING_SECONDS = 2100'. That is ~650x. The same doc says '~2.5 min ... 7,544 tests' 23 lines below its own '~3s' claim. Distinct from #3265 (which is the budget being BREACHED at 2244s); this is the canonical testing doc's stated number.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Generate the runtime cell from the same source the duration ratchet reads, or delete the number - a hand-typed performance figure in a doc is the literal class deploy/sync_doc_metadata.py exists to eliminate.",
+          "extends": "extends #3265 (same surface, different defect)"
+        }
+      ]
+    },
+    "D9": {
+      "dimension": "AI-era engineering & proportionality",
+      "lens": "principal",
+      "grade": "A",
+      "rubric_anchors": {
+        "A": "Every AI surface discovered by derivation (not a hand list) carries a deterministic gate with a per-class policy and a written exemption reason; deterministic layers block and LLM-judge layers stay advisory; a legible per-subsystem rent/demote ledger exists.",
+        "C": "Strong AI guardrails but the surface list is hand-maintained, or the complexity ledger exists without rent classes or demote triggers.",
+        "F": "AI output ungated/unevaluated; sprawling machinery with no rent story."
+      },
+      "justification": "tests/grounding_wiring.py AST-discovers 30 AI surfaces and matches 30 policy entries with zero symmetric difference, asserting both directions per gate class; all 19 continue-on-error sites are inventory/SBOM/LLM-judge steps while deterministic verdicts block; PROPORTIONALITY.md is 73 rows with explicit rent classes and a named demote trigger on 58 - the ledger answers the proportionality question rather than defending it.",
+      "findings_confirmed": 1,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D9-1",
+          "summary": "15 of 73 proportionality rows state no demote/retire trigger, and one row misnames its own gating mechanism - crediting a weekly workflow with a gate that is actually a test in the suite.",
+          "evidence": "Row parse of docs/PROPORTIONALITY.md: 73 rows, 15 with no demote/retire/revisit language - all in the older pre-2026-08 cohort (Phase machinery, Coherence sentinel, 8-coach board, Budget governor, Character engine, MCP server, ...). ADR-144's standard in that same file: 'every standing subsystem names what it costs, what it earns, and what would demote it.' Sharpest instance is a wrong fact: the row 'golden-brief-eval workflow | Load-bearing | CI | Deterministic canary gating every push' credits a workflow whose trigger block is schedule cron '17 15 * * 1' + workflow_dispatch only (.github/workflows/golden-brief-eval.yml:27-37) - no push trigger. That workflow's own header line 11 states the true mechanism: 'The DETERMINISTIC verdicts already gate every deploy: tests/test_golden_brief_eval.py'. 'grep -c \"^- Re-read:\" docs/PROPORTIONALITY.md' -> 0.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Extend scripts/check_proportionality_ledger.py to fail on a row whose column carries no demote clause (with an explicit 'demote: n/a - <reason>' escape hatch), and to resolve any <name>.yml cited in a row against that workflow's real trigger block.",
+          "extends": "extends #2800 (proportionality-reread is NEVER-RUN; PR #3275 is landing the first re-read)"
+        }
+      ]
+    },
+    "D10": {
+      "dimension": "Docs & decision hygiene",
+      "lens": "senior+driver",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Living, self-critical, non-aspirational; anti-drift machinery; the active set is easy to see; a doc's freshness claim is derived rather than asserted.",
+        "C": "Large surface, some staleness, no drift machinery.",
+        "F": "Aspirational docs stating intended state as fact; rotting wiki."
+      },
+      "justification": "The anti-drift machinery is real and extensive (docs/README.md indexes 59/59 top-level docs with zero dead refs and a status header on every one; sync_doc_metadata --check passes clean; API.md declares its own incompleteness rather than implying coverage) - held to B because the Verified: freshness stamp is a hand-typed human claim on 48 of 58 stamped docs, and the tombstone gate passes green over a live violation of the very class it was built for.",
+      "findings_confirmed": 3,
+      "findings_refuted": 0,
+      "findings": [
+        {
+          "id": "D10-1",
+          "summary": "The tombstone gate reports green over a live violation of the exact class it was built to catch, because its rule is phrase-matched rather than structural.",
+          "evidence": "mcp/utils.py:12 'Stable module - part of the Layer (ADR-027 stable core tier).' docs/DECISIONS.md:59 'ADR-027 | MCP Two-Tier Structure: Stable Core -> Layer ... | Superseded by ADR-131 (2026-07-06)'; DECISIONS.md:3939 says that Layer tier 'never existed to depend on it.' The gate DOES scan mcp/ (SOURCE_DIRS = lambdas, mcp) and passes: 'python3 scripts/check_doc_tombstones.py' -> 'tombstones OK - no live doc references a retired concept (20 rules)'. The rule meant to catch it, docs/_lint/tombstones.txt:25, is the regex 'shared[- ](?:Lambda[- ])?layer' - it requires the literal word 'shared', which this line does not contain. docs/CONVENTIONS.md:839-840 records the scan was built BECAUSE #781 left 35+ stale 'part of the ... layer' claims. The 36th survived it.",
+          "sev": "P2",
+          "effort": "S",
+          "regression_guard": "Make the rule structural: match 'the Layer'/'stable core tier' and any reference to a superseded ADR id, deriving the superseded set from the DECISIONS.md status column rather than from a hand-written phrase list. This is the known phrase-matched-suppressor class (#2959/#3003/#3199 family) in a new home - every phrase-matched member of that family has failed in the field."
+        },
+        {
+          "id": "D10-2",
+          "summary": "The Verified: freshness stamp is a hand-typed human claim, and on 48 of 58 stamped docs (82%) it is older than the doc's own last content commit - by up to 100 days. The rubric doc that DEFINES this dimension is itself in the stale set.",
+          "evidence": "Driver measurement on d794b5f3a, EXCLUDING automated 'chore(reconcile)' commits so the result is not an artifact of literal regeneration: 58 docs/*.md carry a '**Verified:**' stamp; 48 have a stamp older than their newest human/content commit. Worst: DECISIONS.md, INCIDENT_LOG.md, INFRASTRUCTURE.md, SLOs.md all stamped 2026-05-19 with content commits on 2026-08-27 (+100d); TESTING.md +97d; API.md +96d; SECURITY.md +48d; REPO_STRUCTURE.md +45d. docs/ENGINEERING_STANDARDS.md:3 stamps 'Verified: 2026-07-21' while taking content commits on 2026-07-26 (#1650), 2026-08-07 (#2170) and 2026-08-13 (#2610), and its body cites a 2026-08-09 measurement. The class has NO OPEN OWNER: the standards doc itself says the engine-doc gate has 'the same failure shape (#2619) ... it is not fixed by this policy note', and #2619 is CLOSED.",
+          "sev": "P2",
+          "effort": "M",
+          "regression_guard": "Derive the stamp instead of typing it - a --check comparing each stamp against the file's newest non-reconcile commit date, the same way platform_counts.py derives literals. A stamp that certifies content but is compared only against a date is the #973/#2619 class; tonight's COACH_STANCE.md instance (18 of 27 citations wrong while green) is the live proof it still bites."
+        },
+        {
+          "id": "D10-3",
+          "summary": "The root-clutter guard's prose asserts two invariants it never checks, and carries a hand-typed magnitude that is already wrong.",
+          "evidence": "tests/test_root_clutter_guard.py:36 and :49 state 'Cross-checked against docs/REPO_STRUCTURE.md; support dirs also carry a one-line README.' Both are TRUE today (driver-verified: 11/11 support dirs have README.md) but neither is asserted - 'README' appears only in comments; the guard asserts subset-of-allowlist only. Separately :44 reads '\"cdk\": \"Infrastructure-as-code - the 9 CDK stacks\"' while 'grep -c \"Stack(\" cdk/app.py' -> 10. docs/REPO_STRUCTURE.md itself omits .claude and .github, the two dirs it does not cover.",
+          "sev": "P3",
+          "effort": "S",
+          "regression_guard": "Assert the two invariants (a README exists for each support-tier entry; every allowlist key appears in REPO_STRUCTURE.md) and delete the derivable magnitude from the reason string - a count inside a guard is the #3273 class one layer down."
+        }
+      ]
+    }
+  },
+  "already_A": [
+    {
+      "what": "The operating calendar made NEVER-RUN its own state rather than printing OK - the repo caught its own instrument lying, and it is why this review exists.",
+      "why": "This is the single strongest craft signal in the tree: a dead-man that was green because it was ANCHORED rather than because the ritual RAN, diagnosed and fixed by its own author, with a distinct exit code so a reader can tell 'nobody has ever done this' from 'somebody stopped doing this'.",
+      "evidence": "scripts/operating_calendar.py:49-63: 'a ritual that had NEVER produced its artifact printed the state word OK ... A dead-man that is green because it was anchored rather than because the ritual ran is a lying gauge, and this file's whole thesis is that absence must be louder than failure.' Enforced by tests/test_operating_calendar_2832.py::test_hold_moves_the_clock_but_never_the_never_run_verdict - a hold cannot manufacture evidence a ritual happened."
+    },
+    {
+      "what": "The applied:false posture-pending contract (#3207): the repo documents a control it has NOT applied, live-accurately, and machine-pins that admission so it cannot rot into a false green - in EITHER direction.",
+      "why": "The exact ADR-103 ideal. main genuinely has no required checks and the ledger says so in those words; the sentinel reports the surface as 'pending' (distinct from drift) and refuses to recommend --apply while the blocker is unmet, AND reports a live-applied surface still marked applied:false as DRIFT. Most repos ship the aspirational prose; this one shipped the retraction with a test on it.",
+      "evidence": "docs/MANAGED_WHERE_LEDGER.md:40 verified against live gh api (rulesets length 1, rules [deletion, non_fast_forward]); deploy/github_posture.json '\"applied\": false' + blocked_on RECONCILE_PUSH_TOKEN, independently confirmed unmet via 'gh secret list'; pinned by tests/test_posture_pending_marker.py."
+    },
+    {
+      "what": "The mypy clean set genuinely covers the whole first-party surface - the documented trap is closed by construction, not by discipline.",
+      "why": "CLAUDE.md warns CLEAN_DIRS globs are non-recursive so a new package silently leaves the gate. A lens was briefed to hunt exactly that and the evidence refused it.",
+      "evidence": "clean_modules() -> 468; git ls-files lambdas mcp .py excluding __init__ -> 468; set difference empty BOTH directions; fs-derived package dirs (16) == CLEAN_DIRS (16). Live run: 'Success: no issues found in 468 source files'. Empty DIRTY, zero per-module ignore_errors, up-only-guarded disable list."
+    },
+    {
+      "what": "The production runtime imports ZERO third-party packages - the strongest possible answer to a supply-chain question.",
+      "why": "A CVE gate matters less when there is almost nothing to have a CVE. The stdlib-urllib posture (ADR-062 excepting Bedrock via boto3) is not a slogan; it holds across the whole runtime, and the binary layers that do exist carry generated manifests with a coverage check that reds on an unmanifested layer ARN.",
+      "evidence": "Full import census over 444 lambda + 40 mcp modules: only stdlib plus runtime-provided boto3/botocore. pip-audit BLOCKS (ci-lint.yml:162 'exit 1') with a ZERO-entry allowlist (.github/pip-audit-allowlist.txt); continue-on-error appears only at :204 (license inventory) and :229 (SBOM), never on the CVE gate. Zero tracked .env/.pem/credentials, zero AKIA/ASIA literals, OIDC everywhere, permissions: on 23/23 workflows."
+    },
+    {
+      "what": "The module-size ratchet caught ITSELF being decorative, and the debt is measurably shrinking without a single baseline raise.",
+      "why": "Membership was once a permanent exemption; 24 of 28 entries had drifted +3,565 lines while the guard stayed green. The fix (#2610) invented the earned-headroom N/5 rule rather than re-baselining, and entries now reach the terminal cure and get pruned.",
+      "evidence": "27 entries / 51,748 lines -> 24 / 42,701 in 17 days. role_policies.py 3291 -> a 165-line facade; site_api_data.py 3016 -> 362. ENGINEERING_STANDARDS section 2: 'No blanket re-baseline with headroom ... Raising every number at once is \"raise the baseline\" with extra steps.' No blanket re-baseline was ever taken."
+    },
+    {
+      "what": "Wall-clock time-bomb discipline: two complementary AST sweeps, a one-entry allowlist, and a dead-entry check - and the Sept-1 cliff was already defused before I went looking for it.",
+      "why": "Most repos treat 'no date time-bombs' as advice. Here it is two derived guards covering complementary shapes, each documenting why its sibling cannot see its class, with a dead-man that fails when an allowlist entry no longer matches real code.",
+      "evidence": "tests/test_wallclock_globals_2223.py ALLOWED_WALLCLOCK_GLOBALS has exactly one entry with a paragraph justifying it, plus lines 122-123 asserting no dead entries. tests/test_wallclock_fixture_bombs_2376.py guards the complementary shape. tests/test_cost_governor.py:296-333 parameterizes the auto-revert across date(2026,8,31)/date(2026,9,1)/date(2027,8,15) with an injected clock."
+    },
+    {
+      "what": "tests/grounding_wiring.py - the best single artifact read in this review.",
+      "why": "It AST-DISCOVERS the AI surfaces rather than listing them, then asserts both directions against policy with a per-surface written exemption reason. A new AI surface cannot default into silence.",
+      "evidence": "Live scan_tree(): 30 discovered surfaces, 30 policy entries, zero symmetric difference, per-gate-class required/exempt assertions. Sibling pattern in lambdas/operational/continuity_watch.py, which derives its watched set from the source registry's behavioral facet and RAISES on an unknown source."
+    },
+    {
+      "what": "CONTRIBUTING.md's self-retraction, and docs/API.md declaring its own incompleteness.",
+      "why": "The anti-F for D10. Both refuse to imply coverage they do not have - CONTRIBUTING names its own prior false claim and points at the machine-readable source instead of restating a fact that drifts.",
+      "evidence": "CONTRIBUTING.md: 'The branch posture is whatever deploy/github_posture.json declares - that file is the source of truth, not a hand-stated claim here (this sentence previously claimed \"PRs required\"; live main had no such rule - the DIL-005 lesson).' Every clause verified live. docs/API.md:5 declares it documents 20 of 132 endpoints."
+    },
+    {
+      "what": "Decisions become gates, not culture - and the naming conformance is perfect.",
+      "why": "The 2026-08-12 no-tool-attribution owner decision is enforced by a test rather than remembered. And an AST sweep of 642 first-party files found zero naming violations.",
+      "evidence": "tests/test_no_tool_attribution_3005.py; 0 occurrences across the last 300 commits. Naming: 0 non-snake_case functions, 0 non-PascalCase classes, 0 bad module filenames over 642 files. 195/200 recent commit subjects are conventional-commit form and state the FINDING, not the change."
+    },
+    {
+      "what": "CONFIRMED-CORRECT DELIBERATE POSTURES (graded A, not faulted - the calibration rule's requirement).",
+      "why": "Each is the loose setting a hostile reader reaches for first, and each is the right call with the reasoning written down.",
+      "evidence": "(1) check_untyped_defs=False / warn_return_any=False - cost MEASURED (330/159), owner named (#2638), and mypy.ini:80-84 states outright that 'mypy passed' overclaims: 'the gate is genuinely armed ... for a NARROWER class than full strictness.' A solo operator flipping a flag yielding 489 errors in one commit would be worse engineering. (2) 21 top-level dirs against D1's '<=~10' target - the escape hatch is used exactly as section 1 prescribes: every dir carries a real README AND an allowlist reason, and the guard's docstring honestly labels the '<=10' target as aspirational rather than claiming to enforce it. (3) CodeQL and SBOM advisory - by written decision quoted inline at codeql.yml:43-51 (ADR-148). (4) The AI-code bar enforced provenance-blind - no mechanical AI-authorship detector exists, and none should; a provenance gate would create a second, softer standard by existing."
+    }
+  ],
+  "coverage_boundary": {
+    "_note": "Required by the ritual. False comprehensiveness is this review's failure mode; this section is deliberately specific about what NO lens looked at.",
+    "not_examined": [
+      "THE TEST SUITE WAS NEVER RUN. No lens executed pytest (one collected the deploy-critical lane only: 1636/22721 selected). Every claim about a gate is a claim about its SOURCE, not about a live pass/fail. Current green/red and true runtime are unknown here - see #3265.",
+      "ACTUAL COVERAGE PERCENTAGE. The enforced floor (74) and ratchet literals (83.20 high-water) were read; measured coverage was not computed.",
+      "NO GATE WAS PROVEN ABLE TO FAIL. 520 of 563 gates are UNPROVEN (#2578). Every 'the guard enforces X' statement rests on reading the assertion, except the four cases where a mechanism was shown green over a real violation (D10-1 tombstone, D2-1 headroom, D7-1 merge prose, D1-3 code-span blindness) - those are proven blind, which is the opposite direction.",
+      "HYPOTHESIS STRATEGY QUALITY. The 35 @given docstrings and targets were read; whether each strategy is well-chosen was NOT audited. A weak strategy makes a property test vacuous - the vacuous-negative-control class (#3273) applies and was not ruled out.",
+      "THE SITE FRONT-END AS CODE. site/ was examined only for IA claims and linter absence. No JS was read for correctness, structure, or accessibility. tests/js/*.mjs were spot-checked only.",
+      "THE 153 ADRs were not read end to end; only ADR-027/059/103/104/105/107/108/125/129/131/133/144/146/148 were opened where a finding depended on them.",
+      "docs/archive/ (115 files) and the ~146 other archive-named files beyond deploy/archive were COUNTED, never read.",
+      "cdk/ stack internals, IAM policy content, and infra/ JSON snapshots were not reviewed for correctness - only for size, region-map registration, and the audit-record claim.",
+      "PRODUCT CORRECTNESS, DEPLOY INTEGRITY, THE ALARM ESTATE, AND SDLC PROCESS were deliberately out of scope (graded by /fullreview 2026-08-16 and /sdlc-review 2026-07-18).",
+      "AWS was never queried. No runtime, cost, or CloudWatch state informs any grade. GitHub was queried read-only for repo settings, rulesets, secrets list, issues and PRs.",
+      "THE ~400 REMAINING LAMBDA MODULES were not individually assessed for property-test suitability; a ~30-module shortlist was audited by import-grep, so uncovered pure calculators beyond stats_core.py likely exist.",
+      "THE DRIFT SENTINEL'S RUN HISTORY was not verified - its CONTRACT was read, so 'the weekly check fires' is unconfirmed here, though the live state its ledger asserts was independently confirmed.",
+      "MYPY VERSION PARITY: a lens ran locally-installed mypy 2.1.0 while scripts/ci_pins.py reports the CI pin as 2.3.1, so 'Success on 468 files' is a lower bound on cleanliness, not a CI-identical result."
+    ],
+    "driver_refuted": [
+      {
+        "claim": "CLAUDE.md states the AI ceiling as $150 base / $176 surge against code at $215/$252 (raised by the EM lens as an adjacent observation).",
+        "verdict": "REFUTED for the repo. 'grep -c \"$150/month hard ceiling\" CLAUDE.md' -> 0; CLAUDE.md carries '**$215/month hard ceiling**' and matches lambdas/ai/budget_guard.py:5-6 within hours of tonight's #3267 change. The $150/$176 pair exists only in the operator's out-of-repo memory file, which is not repo craft. The Eng I lens independently reached the correct conclusion on the same surface. Not filed - and it is positive evidence FOR the doc-sync machinery."
+      }
+    ]
+  },
+  "path_to_A": [
+    "1. Correct the three prose sites asserting the unapplied main-required-fast-lane ruleset as live fact (CONVENTIONS.md:238-240 and :459, DECISIONS.md:4173) and extend the #3207 marker with a claiming_docs list the posture test enforces. The single highest-value fix in this review: the posture is ALREADY correctly documented and machine-pinned one file away - only the most-read doc disagrees.",
+    "2. Make the tombstone rule structural rather than phrase-matched, deriving the superseded-ADR set from the DECISIONS.md status column. It is currently green over a live violation of its own class.",
+    "3. Derive the Verified: stamp instead of typing it (compare against each file's newest non-reconcile commit). 82% of stamped docs are stale and the class has no open owner since #2619 closed.",
+    "4. Make the module-size headroom instrument iterate the tree unioned with BASELINE, so a file at 1200/1200 appears in the extraction queue instead of vanishing from it on completing the cure.",
+    "5. Resolve the ADR-059 vs ENGINEERING_STANDARDS contradiction over deploy/archive/ in one direction, and extend the root-clutter ratchet to sub-archives so the next one reds at 1 file rather than 167.",
+    "6. Fix QUICKSTART's two first-day commands to the real two-arg form and add a doc-command contract test; teach check_doc_links.py to read backticked repo paths by git tracked-ness.",
+    "7. Add the second Dependabot entry for .github/actions/setup-ci (Dependabot does not recurse) and drop the hand-maintained SHA-parity comments.",
+    "8. Write tests/test_prop_stats_core.py and register the property tier (PURE_CALCULATORS registry + a test asserting each entry has a test_prop_ file); document it as TESTING.md category 14.",
+    "9. Add 'N' to ruff's select list - it lands green today across 642 files, converting perfect-but-cultural naming conformance into a ratchet at zero cost.",
+    "10. Add a secret_scanning surface to github_posture.json so the weekly sentinel covers the only whole-history secret control."
+  ]
+}
