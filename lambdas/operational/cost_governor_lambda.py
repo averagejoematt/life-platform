@@ -28,23 +28,25 @@ tripped tiers. Fail-closed: with no CallerClass datapoints (nothing redeployed
 yet, or CloudWatch unreadable) the share is None and the arithmetic is
 bit-identical to the pre-#2892 projection. See PROJECTED_CALLER_CLASSES.
 
-Tiers (projected month-end total vs the EFFECTIVE ceiling — base $150 since the
-ADR-133 amendment 2026-07-08, $100 in surge mode). The tier bands are fixed
-FRACTIONS of the ceiling (≈73%/87%/97%, the original $75 calibration in
-_TIER_THRESHOLDS, scaled by _tier_for):
-  0 Normal    < 73% of ceiling  ($62.33 at the $85 base)
+Tiers (projected month-end total vs the EFFECTIVE ceiling — the base/surge pair
+in force today is whatever _active_ceilings() returns; see MONTHLY_CEILING and
+SURGE_CEILING_USD for the current values and their derivation). The tier bands
+are fixed FRACTIONS of the ceiling (≈73%/87%/97%, the original $75 calibration
+in _TIER_THRESHOLDS, scaled by _tier_for):
+  0 Normal    < 73% of ceiling
   1 Caution   73–87%            → pause internal/dev AI (ensemble, chronicle editor,
                                   coherence-semantic)
   2 Restrict  87–97%            → + pause reader narratives (coach commentary,
                                   State of Matthew, chronicle)
-  3 Hard stop ≥ 97% of ceiling  ($82.73 at the $85 base) → + pause the ask endpoints
+  3 Hard stop ≥ 97% of ceiling  → + pause the ask endpoints
                                   (/api/ask, /api/board_ask) and daily-brief AI;
                                   brief goes data-only
-(The dollar figures above are the $85-base ones. A temporary raise window is in
-effect — see _TEMP_CEILING_WINDOW for its dates and values — during which the
-same percentages trip at proportionally higher dollars. The bands are fractions,
-so only the dollars move; deliberately not restated here, because a hardcoded
-ceiling figure in a docstring is exactly what check_doc_facts exists to catch.)
+(NO dollar figures here, deliberately. This block carried the $85-base table for
+two amendments after the base left $85, and separately claimed a base and surge
+pair that were both wrong — a hardcoded ceiling figure in a docstring is exactly
+what check_doc_facts exists to catch, and module-docstring prose is the one place
+it cannot see. The bands are fractions: read the dollars off the constants, or off
+/life-platform/budget-breakdown for what is actually in force.)
 (Bands are the audience-ordered ADR-125 ladder — the authority is
 budget_guard._FEATURE_CUTOFF, which these labels must mirror; tests/
 test_budget_guard_ladder.py pins them in lockstep.)
@@ -61,10 +63,11 @@ traffic. Real reader arrival (e.g. a Reddit hit) would auto-outage the reader
 AI at the moment of success. When the traffic digest's trailing 7-day unique
 visitor count (LifePlatform/Traffic::UniqueVisitors7d, emitted weekly by
 traffic_digest_lambda) crosses SURGE_UNIQUES_THRESHOLD, the effective monthly
-ceiling floats from the base to the surge ceiling ($85 → $100 normally; $115 →
-$135 during the August-2026 window, see _TEMP_CEILING_WINDOW) — the pair in effect
-today comes from _active_ceilings, and surge is floored at the base so it can
-never tighten the guard. See _effective_ceiling.
+ceiling floats from the base to the surge ceiling — the pair in effect today
+comes from _active_ceilings (module defaults, unless a dated window is running;
+see _TEMP_CEILING_WINDOW), and surge is floored at the base so it can never
+tighten the guard. See _effective_ceiling. (Values deliberately not restated
+here; this line carried the retired $115/$135 window pair for two amendments.)
 Tier thresholds scale proportionally with whatever ceiling is in effect (see
 _tier_for). Surge is a pure function of reader traffic, never of spend — so a
 dev-caused spend spike can NOT trigger it (isolates cause from effect, per
@@ -144,14 +147,35 @@ SSM_TIER_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier
 # budget_guard.read_breakdown / format_headroom_line, the consumer side).
 SSM_BREAKDOWN_PARAM = os.environ.get("BUDGET_BREAKDOWN_PARAM", "/life-platform/budget-breakdown")
 ALERTS_TOPIC = os.environ.get("ALERTS_TOPIC_ARN", f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts")
-# Base $150 since 2026-08-18 (ADR-133 amendment, #2836 — the September base;
-# was $85 from 2026-07-08, $75 originally per ADR-063). Derived from measured
-# steady state, NOT from the spike-inflated projection: unblended daily cost
-# 2026-08-12..08-17 was $4.12/day (sd $0.66, n=6) -> ~$124/mo, 95% CI $108-139.
-# $150 holds tier 1 — the current normal, no behaviour cuts — at that steady
-# state, and tier 0 once #2882's CloudWatch saving lands. Money above $150 buys
-# spike headroom, not steady-state behaviour.
-MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "150"))
+# Base $215 since 2026-08-28 (ADR-133 amendment, #2801 — the September base;
+# was $150 from 2026-08-18 (#2836), $85 from 2026-07-08, $75 originally per
+# ADR-063). Derived from MEASURED steady state, not from a projection: Cost
+# Explorer unblended daily total 2026-08-01..08-25 was $5.74/day (sd $4.32,
+# n=25, 95% CI $4.04-7.43) -> ~$172/mo; the trailing-10d window is $4.91/day
+# -> ~$147/mo. 08-26/27 are excluded as INCOMPLETE, not as outliers — CE's
+# Bedrock line lags 24-48h. Month actuals: May $48.19, Jun $79.80, Jul $98.35,
+# Aug ~$165 — sustained growth, so a base priced at today's rate is under water
+# within a month, which is the ADR-133 rationale for a base raise over a fourth
+# dated window.
+#
+# WHY $215 AND NOT LESS OR MORE — produced by executing _decide_tier over a
+# simulated September at three burn rates (the bands are fractions of the base,
+# so the whole ladder moves with this one number):
+#   base  governor-live 6.21/d   CE 10d 4.91/d    CE Aug 5.74/d
+#   $150  t1 Sep8  t2 18  t3 21  t1 17 t2 24 t3 30  t1 11 t2 20 t3 23
+#   $195  t1 Sep18 t2 25  t3 --  t1 29 t2 -- t3 --  t1 21 t2 30 t3 --
+#   $205  t1 Sep20 t2 28  t3 --  never           t1 24 t2 -- t3 --
+#   $215  t1 Sep22 t2 --  t3 --  never           t1 26 t2 -- t3 --
+#   $240  t1 Sep27 t2 --  t3 --  never           never
+# $215 is the lowest base that NEVER reaches tier 2 (reader narratives pause) in
+# ANY of the three scenarios, while still engaging the tier-1 ladder in two of
+# them — so it buys ADR-133's accepted dev-heavy posture without making tier 0
+# the cosmetic norm, which that ADR explicitly rejects. $240 would.
+# UNCERTAINTY, stated: the 95% CI on the measured rate ($121-223/mo) is wide
+# enough to contain both "this base is generous" and "this base is tight". It is
+# priced against the pessimistic end on purpose; the tier ladder, not the
+# ceiling, is what degrades if the rate runs hotter than measured.
+MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "215"))
 # ADR-133 (#739): surge-mode ceiling. When trailing 7-day unique visitors
 # (traffic_digest_lambda's UniqueVisitors7d metric) cross this threshold, the
 # effective ceiling floats from MONTHLY_CEILING to SURGE_CEILING_USD. The
@@ -160,7 +184,12 @@ MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "150"))
 # Both are env-overridable so the numbers are a one-line adjustment, never a
 # code change.
 SURGE_UNIQUES_THRESHOLD = int(os.environ.get("SURGE_UNIQUES_THRESHOLD", "900"))
-SURGE_CEILING_USD = float(os.environ.get("SURGE_CEILING_USD", "176"))
+# $252 moves WITH the base at the established ratio (~1.173: 85→100, 115→135,
+# 150→176, 200→235). It has to — _effective_ceiling returns the surge ceiling
+# unconditionally, so a surge ceiling below the base would tighten the guard at
+# the exact moment readers arrive. The max() floor in _effective_ceiling is the
+# structural guard; keeping the pair coherent here means it never has to fire.
+SURGE_CEILING_USD = float(os.environ.get("SURGE_CEILING_USD", "252"))
 SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-active")
 # AUGUST 2026 ONLY (auto-reverts 2026-09-01, no manual step): Matthew's call on
 # 2026-08-09 (#2381) — decided in week 2 on purpose, not in a cutoff scramble
@@ -169,8 +198,8 @@ SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-act
 # reader-narrative pause on track for mid-month, and this month a tier-2 pause
 # also silences the new Telegram coach chat (ADR-151 budget-ranks it with the
 # daily brief). Raised for ONE month; September reverts
-# automatically to the base pair below — now $150/$176 per the 2026-08-18
-# amendment (#2836), not the $85/$100 in effect when this window was written.
+# automatically to the base pair below — now $215/$252 per the 2026-08-28
+# amendment (#2801), not the $85/$100 in effect when this window was written.
 #
 # $115/$135 deliberately repeats the July-2026 amendment's shape: the tier bands
 # are fixed FRACTIONS of the ceiling (≈73/87/97%), so one raised number moves
@@ -190,10 +219,10 @@ _TEMP_CEILING_WINDOW = (date(2026, 8, 1), date(2026, 9, 1))  # [start, end)
 # $200 keeps the tier ladder meaningful against the real projection (bands at
 # ≈$146/$174/$194) instead of pinning tier 3 for the back half of the month;
 # surge keeps the ~1.18 ratio. The window's END DATE IS UNCHANGED — September
-# still reverts automatically — to $150/$176 as of the 2026-08-18 amendment.
-# The AWS Budgets backstop moved to $150 WITH the base (core_stack.py); it was
-# deliberately left at $85 through August so the temporary overrun kept
-# signalling, and that reason expires with the window.
+# still reverts automatically — to $215/$252 as of the 2026-08-28 amendment.
+# The AWS Budgets backstop moves WITH the base (core_stack.py, resolved at synth
+# time by parsing THIS file); it was deliberately left low through August so the
+# temporary overrun kept signalling, and that reason expires with the window.
 _TEMP_CEILING_USD = 200.0
 _TEMP_SURGE_CEILING_USD = 235.0
 # One sentence of WHY, carried in the breakdown payload so a public receipt can
@@ -240,9 +269,11 @@ DRIFT_RATIO_BAR = 1.15
 # Tier thresholds on PROJECTED month-end total (USD), calibrated against the
 # ORIGINAL $75 ceiling (ADR-063). _tier_for scales them by
 # ceiling / _THRESHOLD_REFERENCE_CEILING, so the bands are fixed FRACTIONS of
-# whatever ceiling is in effect (≈73%/87%/97%) — at the $150 base they trip at
-# $110.00 / $130.00 / $146.00; at the $176 surge ceiling at $129.07 / $152.53 /
-# $171.31.
+# whatever ceiling is in effect (≈73%/87%/97%). The dollar amounts are NOT
+# restated here: this comment carried the $150-base trio for an amendment after
+# the base moved, and a band table that disagrees with the constant above it is
+# worse than no table. Compute them as base × (55, 65, 73)/75, or read
+# /life-platform/budget-breakdown for what is actually in force.
 _THRESHOLD_REFERENCE_CEILING = 75.0
 _TIER_THRESHOLDS = [(73, 3), (65, 2), (55, 1)]  # checked high→low; else tier 0
 
@@ -428,8 +459,8 @@ def _tier_for(projected: float, ceiling: float = None) -> int:
     MONTHLY_CEILING). The thresholds in _active_thresholds() are calibrated
     against the ORIGINAL $75 ceiling (_THRESHOLD_REFERENCE_CEILING); they scale
     by ceiling/reference so the tier BANDS (≈73%/87%/97% of ceiling) stay
-    proportionally identical under ANY ceiling — the $150 base (ADR-133
-    amendment) or the $176 surge — only the dollar amounts that trip them move.
+    proportionally identical under ANY ceiling — the current base or surge pair,
+    or a dated window's — only the dollar amounts that trip them move.
     ceiling is resolved at call time (None sentinel) so tests can monkeypatch
     MONTHLY_CEILING without hitting the frozen-default trap."""
     if ceiling is None:
@@ -449,7 +480,7 @@ def _active_ceilings() -> tuple[float, float]:
 
     Mirrors _active_thresholds: a calendar-scoped override that reverts on its
     own date rather than needing anyone to remember. See _TEMP_CEILING_WINDOW
-    for why August 2026 is raised and why the number is $115.
+    for why August 2026 is raised and what its pair is.
     """
     if _CEILING_ENV_OVERRIDE:
         return MONTHLY_CEILING, SURGE_CEILING_USD

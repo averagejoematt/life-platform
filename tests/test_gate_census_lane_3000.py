@@ -215,7 +215,28 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 #
 # Measured with the file TRACKED, per the warning three paragraphs up — it read 560 as an
 # untracked file and 561 once committed. That warning earned its keep on this PR.
-# 561 -> 562 (2026-08-27): ONE real gate, `guard::scripts/hooks/guard_bash.py` — the
+# 561 -> 563 (2026-08-28, #3260/#3261/#3257 batch): TWO real gates, verified
+# entry-by-entry rather than inferred from the delta — both trees were `git archive`d
+# and each ran its OWN scripts/gate_census.py --json, then the id SETS were diffed:
+# ADDED exactly {registry::scripts/doc_facts_og.py::_EXEMPT,
+# structural::test_alarm_emission_dimension_3260.py}, REMOVED {} (main 561, branch 563).
+# That method matters here: a bare count delta cannot tell an addition from a
+# simultaneous add+remove, and #3220 measured ten libraries entering this inventory on a
+# filename substring alone.
+#   • the registry entry is family 3 — `scripts/doc_facts_og.py` is the OG-card literal
+#     derivation extracted out of check_doc_facts.py for #3261, and its module-level
+#     `_EXEMPT` binding mints one gate PER the family-3 rule. It is an exemption registry,
+#     which is exactly what that family exists to count.
+#   • the structural entry is family 5 — `test_alarm_emission_dimension_3260.py` sweeps
+#     `lambdas/` for alarm/emission dimension agreement, and registering it in
+#     `_PREMERGE_EXTRA_FILES` (tests/conftest.py) is itself what mints it.
+# Both arrive UNPROVEN: live unproven 518 -> 520 against the committed 541, so
+# BASELINE_UNPROVEN_GATES is NOT moved — it still has headroom and moving it would spend
+# margin this PR did not need.
+# 563 -> 564 (2026-08-28, #3245): ONE further real gate carried by this branch and
+# preserved through the merge with main's own 561->563 raise above (originally recorded
+# as 561 -> 562). The reason it was first written for still holds verbatim:
+ ONE real gate, `guard::scripts/hooks/guard_bash.py` — the
 # PreToolUse hook that flags a merge with no named-check assertion, a deploy from a
 # worktree, and a force-push to main. Verified as a genuine addition rather than the
 # prose-phantom this comment warns about: the census gate-id sets were diffed before and
@@ -224,7 +245,7 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # measurement was taken with every new file `git add`ed — an untracked guard measures as
 # absent. Unproven fell 541 -> 534 over the same window (#3242's adjudication); that
 # ceiling is left where its owner set it.
-BASELINE_TOTAL_GATES = 562
+BASELINE_TOTAL_GATES = 564
 BASELINE_UNPROVEN_GATES = 541
 
 

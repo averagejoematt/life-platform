@@ -53,7 +53,7 @@ read the stack for routing.
 > cap prevents a 19-function aggregate that pages). Ingestion failure is caught downstream
 > via `slo-source-freshness`, `ingest-consecutive-failures-*`, the DLQ-depth alarms, and
 > the canary. Budget breaches page via an AWS Budget + cost-governor SSM tiers
-> (`life-platform-monthly-75`, $150 ceiling, ADR-133), not a CloudWatch alarm.
+> (`life-platform-monthly-75`, $215 ceiling, ADR-133), not a CloudWatch alarm.
 
 **OAuth auth-death coverage (#1960).** `ingest-auth-unhealthy-24h` is the fleet-wide
 aggregate (dimensionless `LifePlatform/OAuth IngestAuthHealthy`, Min<1 over 1h — re-cut
@@ -72,6 +72,23 @@ notion is `monitored: False`). The set is **derived, not hand-listed**: the `oau
 in `lambdas/ingestion/source_registry.py` is the authority and
 `tests/test_oauth_alarm_coverage.py` fails CI if a credentialed source has no alarm or is
 routed to the wrong topic.
+
+**Two more fleet aggregates read a dimensionless series, and until 2026-08-27 nothing wrote
+it (#3260).** `slo-ai-coaching-success` (dimensionless `LifePlatform/AI AnthropicAPIFailure`,
+`Sum >= 3` per 86400s) and `life-platform-ddb-item-size-warning` (dimensionless
+`LifePlatform/DynamoDB ItemSizeBytes`, `Maximum >= 307200`) are both built with **no**
+`dims=`, while every emitter attached a dimension (`{LambdaFunction=…}` for the seven AI
+failure sites, `{Source=…}` for the single item-size site). CloudWatch does not roll a
+custom metric up across dimension sets, so both alarms watched a series that was never
+written — the AI one measurably: **0 datapoints in 180 days** against 329 real
+`{LambdaFunction=daily-brief}` failures and a 191-failure day across five Lambdas, last
+state change 2026-03-08 with `StateReason: "no datapoints were received"`. Fixed the
+`auth_breaker` way — the emitters now write **both** datapoints in one `put_metric_data`
+call. Both alarms stay dimensionless **deliberately**: they are fleet aggregates, and a
+dimension would silently reinterpret `Sum >= 3` as a per-function threshold and `Maximum`
+as a per-source one. `tests/test_alarm_emission_dimension_3260.py` sweeps `lambdas/` for
+every emitter of those two metric names — a new emitter that forgets the dimensionless
+twin reds CI — and pins the alarms' dimensionlessness.
 
 <!-- BEGIN GENERATED: alarm-inventory — deploy/sync_doc_metadata.py (#934); do not hand-edit -->
 

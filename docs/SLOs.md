@@ -74,11 +74,14 @@ All SLO alarms publish to `life-platform-alerts` SNS topic. The operational dash
 | **SLI** | Anthropic API calls that return a valid response |
 | **Target** | 99% |
 | **Window** | Rolling 7-day |
-| **Alarm** | `slo-ai-coaching-success` — fires if `AnthropicAPIFailure` count exceeds 2 in a 24-hour period |
-| **Metric** | `LifePlatform/AI::AnthropicAPIFailure` (already emitted by `ai_calls.py`) |
-| **Recovery** | Check Anthropic status page → if upstream outage, wait. If code issue, fix prompt/parsing |
+| **Alarm** | `slo-ai-coaching-success` — `Sum >= 3` over one 86400s period — it fires on the **3rd** failure in a 24-hour window (the threshold is inclusive) |
+| **Metric** | the **dimensionless** `LifePlatform/AI::AnthropicAPIFailure` — a **fleet-wide** total across every emitter, not a per-Lambda count |
+| **Emitters** | 7: `common/retry_utils.py`, `ai/ai_transport.py`, and the five coach Lambdas (`coach_ensemble_digest`, `coach_history_summarizer`, `coach_narrative_orchestrator`, `coach_quality_gate`, `coach_state_updater`) — each writes **two** datapoints per failure, one tagged `{LambdaFunction=…}` for attribution and one dimensionless for this alarm |
+| **Recovery** | Check Anthropic status page → if upstream outage, wait. If code issue, fix prompt/parsing. Attribute with the `{LambdaFunction=…}` series |
 
-**Why count-based not rate-based:** The platform makes ~15-20 AI calls/day across all Lambdas. A rate-based alarm with so few datapoints would be noisy. A count threshold of 2 failures/day means something is systematically wrong (not just a transient 429).
+**Why count-based not rate-based:** The platform makes ~15-20 AI calls/day across all Lambdas. A rate-based alarm with so few datapoints would be noisy. A count threshold of 3 failures/day (fleet-wide) means something is systematically wrong (not just a transient 429).
+
+**The dimensionless series is load-bearing (#3260).** CloudWatch does not roll a custom metric up across dimension sets. Until 2026-08-27 every emitter attached `{LambdaFunction=…}` and the alarm had no dimensions, so it read a series nothing wrote: **0 datapoints in 180 days**, while `{LambdaFunction=daily-brief}` alone recorded 329 failures over 18 days and 2026-05-26 saw 191 failures across five Lambdas. The alarm's last state change was 2026-03-08 with `StateReason: "no datapoints were received"`. The fix is the emitters' dimensionless twin — the same shape `bedrock_client._emit_usage_metrics` uses for `AnthropicOutputTokens` and `auth_breaker.auth_health_metric_data` uses for `IngestAuthHealthy`. The alarm stays dimensionless **deliberately**: a per-function dimension would silently reinterpret `Sum >= 3` as a per-function threshold (five Lambdas failing twice each = 10 real failures and no page). Pinned by `tests/test_alarm_emission_dimension_3260.py`.
 
 ---
 

@@ -7,6 +7,7 @@ import { sigil } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js";
 import { esc, tryJSON, isBad, fmt, ttl, fig, figs, sec, empty, note, kvtable } from "/assets/js/evidence_shared.js";
 import { lineChart } from "/assets/js/charts.js";
+import { coachAsOf, regenerationPaused } from "/assets/js/coach_asof.js";
 
 // The board — pick an expert, read their actual per-domain take + track record.
 // WQA-06 — surface the cross-coach DISAGREEMENTS (the moat), not eight parallel monologues.
@@ -34,17 +35,46 @@ export function boardDisagreements(tensions) {
     `<p class="rd-meta label">The moat isn't eight assistants nodding along — it's that they don't, and the disagreement is surfaced instead of averaged away. Each is an AI persona arguing from its own discipline; the board lead adjudicates, but the tension is the point. Interpretation of the data, never an instruction.</p>`);
 }
 
+/* #3252 — the board's day span, disclosed.
+   The seven coach cards and the integrator's call are separate stored records
+   written by separate runs, so they routinely span more than one experiment day —
+   measured live 2026-08-27: six coaches on Day 11, one on Day 10, the integrator on
+   Day 11, all served under one envelope stamped "now". While budget_guard pauses
+   regeneration (ADR-125 tier >= 2) that span WIDENS every day. A reader cannot see
+   it from the roster, which shows names and nothing else, so the API's
+   `content_day_span` is stated here rather than left implicit. Absent or
+   single-day => nothing renders (absent-is-unknown, #1971). */
+function boardSpanNote(span, paused) {
+  if (!span || span.mixed !== true) return "";
+  const lo = span.oldest_day_n, hi = span.newest_day_n;
+  if (!Number.isInteger(lo) || !Number.isInteger(hi)) return "";
+  const why = paused
+    ? " Narrative regeneration is paused by the budget guard, so the members that haven't refreshed keep their earlier day."
+    : " Each member refreshes on its own daily run.";
+  return `<p class="rd-meta label">The reads below were not all written on the same day — they span Day ${esc(lo)} to Day ${esc(hi)} of this cycle.${why}</p>`;
+}
+
 export async function renderBoard(d) {
   const coaches = d.coaches || []; const wp = d.weekly_priority || {};
   const team = await tryJSON("/api/coach_team");
   const disagreements = boardDisagreements(team && team.tensions);
+  // #3252: the integrator's call is the most prominent block on this page and it makes
+  // explicit RELATIVE-TIME claims in its own prose ("he's been eleven days into the
+  // cycle…"). It rendered with no dateline at all — no calendar date, no day number, no
+  // pause disclosure — so a held read asserted its frozen day number as today's, and
+  // gained a day of error for every day the pause lasted. That is what tripped the
+  // gating reader-truth judge on /method/board/ on 2026-08-27. Same helper, same copy,
+  // same absent-is-unknown discipline as every other coach dateline on the site.
+  const regenPaused = regenerationPaused(d);
+  const wpAsOf = coachAsOf(wp.generated_at, regenPaused, wp.as_of_day_n);
+  const chairStamp = wpAsOf ? `<p class="board-asof label${regenPaused ? " rd-paused" : ""}">${esc(wpAsOf)}</p>` : "";
   const chair = wp.text && !isBad(wp.text)
-    ? `<div class="rd-obs"><p class="board-kicker label">the integrator's weekly read · ${esc(wp.coach_name || "")}</p><p class="rd-primary">${esc(wp.text)}</p></div>`
+    ? `<div class="rd-obs"><p class="board-kicker label">the integrator's weekly read · ${esc(wp.coach_name || "")}</p>${chairStamp}<p class="rd-primary">${esc(wp.text)}</p></div>`
     : `<div class="rd-obs"><p class="rd-primary">The board's weekly read posts after the next briefing.</p></div>`;
   const roster = coaches.length
     ? `<div class="coach-grid">${coaches.map((c) => `<button class="coach coach-pick" data-coach="${esc(c.coach_id)}" data-name="${esc(c.name)}" data-title="${esc(c.title || "")}" style="--coach:${/^#|rgb/.test(c.color || "") ? c.color : "var(--ember)"}"><span class="coach-badge">${portrait(c, { title: "", size: 24 }) || sigil(c, { title: "" })}<span class="sr-only">${esc(c.initials || (c.name || "?").slice(0, 2))}</span></span><div><h3 class="coach-name">${esc(c.name)}</h3><p class="coach-title label">${esc(c.title || "")}</p></div></button>`).join("")}</div>`
     : empty("The expert board is being assembled.");
-  return chair + disagreements + sec("The experts — pick one to read their take", roster) +
+  return chair + disagreements + sec("The experts — pick one to read their take", boardSpanNote(d.content_day_span, regenPaused) + roster) +
     `<div class="coach-read" data-board-read></div>` +
     note("A board of named AI characters who each read the data differently. Interpretation, not instruction.");
 }

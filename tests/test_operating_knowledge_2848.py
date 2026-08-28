@@ -253,3 +253,119 @@ def test_the_real_docs_pass_the_same_functions() -> None:
     text = (REPO / _DISCIPLINE).read_text(encoding="utf-8")
     assert audit_ledger_errors(text) == []
     assert unresolved_citations(text) == []
+
+
+# ── #3264: production authority — the cold-read gap that risked a destructive act ──────
+#
+# #2848's residual gap 1 was the only one where a successor acting reasonably on repo
+# evidence alone could take a destructive production action (approve a stale lease and
+# ship a tree older than what is live) or strand the pipeline (leave one waiting). The
+# rule lived exclusively in the operator's off-repo memory.
+#
+# This gate is deliberately STRUCTURAL where it can be: it anchors on tracked repo paths
+# and on cross-page pointers, not on prose phrasing. Phrase-matched rules are a
+# known-failed family here (#2959/#3003/#3199) — every field instance of one has failed.
+# The two textual arms below are load-bearing CONCEPTS, not phrasings, and each is
+# mutation-proved to actually red.
+
+_AUTHORITY_HEADING = "## 5. Production authority — who may deploy, and what a waiting gate is"
+_LEASE_SCRIPTS = ("deploy/approve_deployment.sh", "deploy/reject_deployment.sh")
+
+
+def authority_section(text: str) -> str:
+    """The production-authority section — empty string when the heading is gone."""
+    if _AUTHORITY_HEADING not in text:
+        return ""
+    return text.split(_AUTHORITY_HEADING, 1)[1].split("\n## ", 1)[0]
+
+
+def deploy_authority_errors(discipline: str, conventions: str, onboarding: str) -> list[str]:
+    """Pure decision function — takes its documents as arguments, never reads the repo,
+    so the RULE can be mutation-proven independently of today's prose."""
+    errors: list[str] = []
+    section = authority_section(discipline)
+    if not section:
+        return [f"{_DISCIPLINE} has lost its production-authority section (#3264)"]
+
+    # Structural: both disposal paths must be named. Naming only `approve` is the exact
+    # failure mode — rejection is the MORE common correct outcome for a stale lease.
+    for script in _LEASE_SCRIPTS:
+        if script not in section:
+            errors.append(f"the authority section never names {script} — a lease has two dispositions, not one")
+
+    # Concept, not phrasing: a gated run is a lease on a SHA. Without this a reader
+    # treats approval as a queue ticket, which is how a tree older than live gets shipped.
+    if "lease" not in section.lower() or "sha" not in section.lower():
+        errors.append("the authority section does not state that a gated run is a lease on a specific sha")
+
+    # Concept, not phrasing: the default when no grant exists.
+    if "standing grant" not in section.lower():
+        errors.append("the authority section does not define what a standing grant is")
+
+    # Structural cross-page pointers — a rule nobody is routed to is a rule nobody reads.
+    if "OPERATING_DISCIPLINE.md" not in conventions:
+        errors.append("docs/CONVENTIONS.md does not route deploy AUTHORITY to the discipline page")
+    if _COLD_START_HEADING in onboarding:
+        cold = cold_start_section(onboarding)
+        if "OPERATING_DISCIPLINE" not in cold:
+            errors.append("the cold-start reading order does not name the page that carries deploy authority")
+    return errors
+
+
+def test_deploy_authority_is_documented() -> None:
+    """The live documents satisfy #3264's contract."""
+    errors = deploy_authority_errors(
+        (REPO / _DISCIPLINE).read_text(encoding="utf-8"),
+        (REPO / "docs/CONVENTIONS.md").read_text(encoding="utf-8"),
+        (REPO / _ONBOARDING).read_text(encoding="utf-8"),
+    )
+    print(f"[#3264] production-authority contract: {len(errors)} error(s)")
+    assert not errors, "deploy authority is not documented to contract:\n  " + "\n  ".join(errors)
+
+
+def test_the_authority_sections_scripts_are_real() -> None:
+    """The disposal procedure must name scripts that EXIST — a runbook pointing at a
+    script git does not know is worse than no runbook."""
+    for script in _LEASE_SCRIPTS:
+        assert _tracked(script), f"{script} is named as the disposal procedure but git does not track it"
+
+
+def test_a_missing_authority_section_reds() -> None:
+    """Mutation proof: delete the section and the gate must fail."""
+    live = (REPO / _DISCIPLINE).read_text(encoding="utf-8")
+    conv = (REPO / "docs/CONVENTIONS.md").read_text(encoding="utf-8")
+    onb = (REPO / _ONBOARDING).read_text(encoding="utf-8")
+    assert deploy_authority_errors(live, conv, onb) == []  # positive control
+    gutted = live.replace(_AUTHORITY_HEADING, "## 5. Something Else")
+    assert any("lost its production-authority section" in e for e in deploy_authority_errors(gutted, conv, onb))
+
+
+def test_dropping_the_reject_path_reds() -> None:
+    """Mutation proof for the arm that matters most: a section that names only
+    `approve_deployment.sh` teaches a reader that approving is the way to clear a lease.
+    Rejecting a superseded lease is the more common correct disposition."""
+    live = (REPO / _DISCIPLINE).read_text(encoding="utf-8")
+    conv = (REPO / "docs/CONVENTIONS.md").read_text(encoding="utf-8")
+    onb = (REPO / _ONBOARDING).read_text(encoding="utf-8")
+    approve_only = live.replace("deploy/reject_deployment.sh", "deploy/approve_deployment.sh")
+    errors = deploy_authority_errors(approve_only, conv, onb)
+    assert any("reject_deployment.sh" in e for e in errors), errors
+
+
+def test_losing_the_lease_semantics_reds() -> None:
+    """Mutation proof: strip the lease/sha concept and the gate must fail. This is the
+    arm that guards against shipping a tree older than what is live."""
+    live = (REPO / _DISCIPLINE).read_text(encoding="utf-8")
+    conv = (REPO / "docs/CONVENTIONS.md").read_text(encoding="utf-8")
+    onb = (REPO / _ONBOARDING).read_text(encoding="utf-8")
+    section = authority_section(live)
+    flattened = live.replace(section, section.replace("lease", "item").replace("LEASE", "ITEM"))
+    assert any("lease on a specific sha" in e for e in deploy_authority_errors(flattened, conv, onb))
+
+
+def test_an_unrouted_authority_page_reds() -> None:
+    """Mutation proof: a rule nobody is routed to is a rule nobody reads."""
+    live = (REPO / _DISCIPLINE).read_text(encoding="utf-8")
+    onb = (REPO / _ONBOARDING).read_text(encoding="utf-8")
+    errors = deploy_authority_errors(live, "no pointer here", onb)
+    assert any("does not route deploy AUTHORITY" in e for e in errors), errors

@@ -561,6 +561,89 @@ def test_og_source_count_clean_on_current_tree():
     assert hits == [], "an og card still hardcodes a stale data-source count:\n" + "\n".join(hits)
 
 
+def _og_literal_rule():
+    """The #3261 drawn-literal rule, loaded through check_doc_facts so the re-export the
+    CI gate actually calls is the thing under test (not a second import path)."""
+    return _load("scripts/check_doc_facts.py").og_literal_hits
+
+
+def test_og_literal_gate_is_not_vacuous():
+    """#3261. #1260's guard pattern-matched ONE phrase ("N data sources") and was green for
+    eight months while `build_builders` published 116 tools / 59 lambdas / "$13 a month"
+    against 76 / 104 / $146 MTD, and `build_labs` published 74 biomarkers / 7 draws against
+    152 / 8 — both regenerating daily. A third phrase would not have been a fix.
+
+    So the rule is derived from what a card DRAWS. This test proves it bites on the exact
+    shipped defect, and on a defect it was never told about."""
+    og_literal_hits = _og_literal_rule()
+    d = Path(tempfile.mkdtemp())
+
+    # the EXACT pre-fix builders card — caught.
+    bad = d / "og_builders.py"
+    bad.write_text(
+        "def build_builders(stats):\n"
+        '    _draw_metric(draw, 48, 260, "116", "MCP TOOLS")\n'
+        '    draw.text((48, 180), "How to build an AI health platform for $13/month.", fill=MUTED)\n'
+    )
+    hits = og_literal_hits([bad])
+    assert len(hits) == 2, f"the drawn-literal rule is VACUOUS on the shipped defect: {hits}"
+    assert "'116'" in hits[0] and "$13/month" in hits[1]
+
+    # A NUMBER THE RULE WAS NEVER TOLD ABOUT — the whole point. No phrase list contains
+    # "coaches"; the rule flags it because it is a digit drawn on a card.
+    novel = d / "og_novel.py"
+    novel.write_text('def build_team(stats):\n    draw.text((48, 180), "9 AI coaches. One human.", fill=MUTED)\n')
+    assert len(og_literal_hits([novel])) == 1, "a fabricated number in a phrase nobody anticipated must still red"
+
+    # the fixed shape: derived values, no literal — clean.
+    good = d / "og_good.py"
+    good.write_text(
+        "def build_builders(stats):\n"
+        "    platform = stats.get('platform', {})\n"
+        '    _draw_metric(draw, 48, 260, _fmt(platform.get("mcp_tools"), 0), "MCP TOOLS")\n'
+        '    draw.text((48, 180), f"{n} tools.", fill=MUTED)\n'
+    )
+    assert og_literal_hits([good]) == []
+
+    # an f-string is inspected PIECEWISE — an honest interpolation does not launder a
+    # fabricated literal sitting beside it.
+    mixed = d / "og_mixed.py"
+    mixed.write_text('def build_x(stats):\n    draw.text((0, 0), f"{n} tools and 59 lambdas.", fill=MUTED)\n')
+    assert len(og_literal_hits([mixed])) == 1, "an f-string's literal parts must still be checked"
+
+    # the escape hatch, and only with a stated reason.
+    exempt = d / "og_exempt.py"
+    exempt.write_text('def build_x(stats):\n    draw.text((0, 0), "7 pillars.")  # og-literal-ok: the fixed pillar set\n')
+    assert og_literal_hits([exempt]) == []
+
+    # OUTSIDE a card builder — module scaffolding is not a reader surface.
+    outside = d / "og_outside.py"
+    outside.write_text('def _upload(s3):\n    draw.text((0, 0), "59 lambdas")\n')
+    assert og_literal_hits([outside]) == []
+
+
+def test_og_literal_gate_reports_an_unregistered_drawing_primitive():
+    """The hole an AST rule can have: a drawing helper it does not recognise carries an
+    unchecked literal, and the rule reports green — the exact shape of #3261 one level up.
+    A new primitive must announce itself instead."""
+    og_literal_hits = _og_literal_rule()
+    d = Path(tempfile.mkdtemp())
+    f = d / "og_new_primitive.py"
+    f.write_text('def build_x(stats):\n    draw.banner((0, 0), "116 MCP tools")\n')
+    hits = og_literal_hits([f])
+    assert len(hits) == 1 and "UNREGISTERED" in hits[0] and "draw.banner" in hits[0]
+
+
+def test_og_literal_gate_clean_on_current_tree():
+    """After the #3261 fix, no og card draws an unexplained number (the evidence pointer no
+    longer reproduces), and the scan is reading real files — a scan of nothing passes too."""
+    facts = _load("scripts/check_doc_facts.py")
+    files = facts._scan_og_files()
+    assert len(files) >= 3, f"the og-card scan found only {len(files)} files — it is not reading the tree"
+    hits = facts.og_literal_hits(files)
+    assert hits == [], "an og card draws a hardcoded number:\n" + "\n".join(hits)
+
+
 def test_data_governance_gate_is_not_vacuous():
     """#1351/#3043 (per the #1189 vacuous-scan lesson): the DATA_GOVERNANCE.md scan must
     FLAG a visibility claim that disagrees with LIVE visibility (BOTH directions — the

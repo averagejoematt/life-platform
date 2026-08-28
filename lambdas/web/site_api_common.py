@@ -393,6 +393,61 @@ def as_of_day_n(generated_at, start_date: str) -> "int | None":
     return pacific_day_n(start_date, written) or None
 
 
+def content_vintage(*timestamps) -> "str | None":
+    """The OLDEST parseable instant among a response's constituent records — the
+    honest vintage of the CONTENT inside an envelope (#3252).
+
+    A handler that assembles a payload out of STORED narrative records has two
+    different times, and conflating them is an ADR-104 violation that grows on its
+    own: the instant the wrapper was assembled (always now) and the instant the
+    prose inside it was written (frozen the moment regeneration pauses, ADR-125
+    tier >= 2). Measured live 2026-08-27 on /api/coaching-dashboard:
+
+        _meta.generated_at                  2026-08-28T00:28:08Z   (request time)
+        weekly_priority.generated_at        2026-08-27T14:02:46Z   (Day 11)
+        coaches[sleep].analysis_generated_at 2026-08-26T17:02:28Z  (Day 10)
+
+    The envelope reported a freshness NO field under it had. `_ok(content_as_of=…)`
+    is how a handler declares the real one.
+
+    OLDEST, not newest, and that is the whole rule: an envelope may not claim more
+    freshness than its STALEST member. Six coaches at Day 11 and one at Day 10 is a
+    Day-10 payload for any reader who reads the Day-10 card — taking the max would
+    let the freshest member launder the rest, which is the same laundering the
+    request-time stamp was already doing.
+
+    Unparseable/empty values are IGNORED rather than treated as unknown-and-therefore-
+    oldest: a record that lost its timestamp must not silently backdate the envelope
+    to the epoch. Returns None when nothing parses, and None means the caller declares
+    no vintage — `_ok` then behaves exactly as it did before this existed.
+
+    Comparison is on the parsed instant, never on the string: the writers here emit
+    `2026-08-27T14:02:46.793290+00:00` (microseconds, `+00:00`) while sk-derived
+    fallbacks are bare `2026-08-26` — lexicographic order across those two shapes is
+    wrong (`"2026-08-26" > "2026-08-26T17:02"`), which is exactly how a stale member
+    would be reported as the freshest. The returned value is the caller's ORIGINAL
+    string, not a re-serialised one, so nothing downstream sees a reformatted stamp.
+    """
+    best = None
+    for raw in timestamps:
+        if not raw or not isinstance(raw, str):
+            continue
+        text = raw.strip()
+        if not text:
+            continue
+        try:
+            probe = text[:-1] + "+00:00" if text.endswith("Z") else text
+            parsed = datetime.fromisoformat(probe)
+        except (ValueError, TypeError):
+            continue
+        if parsed.tzinfo is None:
+            # Writers emit UTC; a value that lost its suffix must not become local.
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        if best is None or parsed < best[0]:
+            best = (parsed, text)
+    return best[1] if best else None
+
+
 def pre_start_meta() -> dict | None:
     """The pre-start countdown contract (#931). A reset can stage a FUTURE genesis
     (constants regenerate the night before Day 1), and for that window the site is
@@ -798,8 +853,39 @@ def _request_id_headers() -> dict:
     return {}
 
 
-def _ok(data: dict, cache_seconds: int = 300, degraded: object = None) -> dict:
+def _ok(data: dict, cache_seconds: int = 300, degraded: object = None, content_as_of: "str | None" = None) -> dict:
     """Return a successful API response with caching headers.
+
+    #3252: `content_as_of` is how a handler that serves STORED narrative declares
+    the vintage of the prose inside the envelope, and it is the fix for a defect
+    that gets worse by itself. `_meta.generated_at` was ALWAYS the request instant,
+    on every one of this package's endpoints — fine where the payload really is
+    derived at request time from live rows, and a lie on an endpoint whose content
+    is a frozen AI narrative. While budget_guard pauses regeneration (ADR-125 tier
+    >= 2) the prose stops moving and the stamp does not, so a held read wears a
+    fresher date every time it is fetched. Measured live on /api/coaching-dashboard
+    2026-08-27: an envelope stamped 00:28Z over a coach card written 31 hours
+    earlier, with nothing in the payload naming the gap.
+
+    The two times are now separate fields and BOTH are always present:
+
+      • `_meta.served_at`   — when this response was assembled. Always now. New
+        field, so nothing that reads `generated_at` had to be re-taught, and
+        anything that genuinely wanted "when did the API answer" has a name for it.
+      • `_meta.generated_at` — when the CONTENT was generated: the declared
+        `content_as_of` when a handler passes one, else the assembly instant
+        (unchanged for every handler that does not). The name has always promised
+        this; only the dishonest cases move.
+
+    `_meta.content_as_of` is emitted only when declared — an unambiguous key for a
+    consumer that must know whether the vintage was ASSERTED by the handler or is
+    merely the request time defaulted in. Absent means "this handler declares no
+    stored vintage", never "the content is fresh" (the #1971 absent-is-unknown rule).
+
+    An unparseable `content_as_of` is DROPPED and the envelope falls back to the
+    assembly instant, rather than publishing a stamp nothing can read: `_meta` is
+    the layer a reader checks freshness against, so a garbage value there is worse
+    than the old behaviour, not better.
 
     #2686: `degraded` is how a 200 returned from inside an `except` says so. Fourteen
     handlers in this package answer 200 with a fallback payload when their read fails —
@@ -816,9 +902,15 @@ def _ok(data: dict, cache_seconds: int = 300, degraded: object = None) -> dict:
     a cached CDN response is a small information leak with no reader value.
     """
     rid = get_request_id()
+    served_at = datetime.now(timezone.utc).isoformat()
+    # A declared vintage is honoured only if it PARSES — content_vintage() over the
+    # single value re-uses the one parser rather than adding a second one here.
+    declared = content_vintage(content_as_of) if content_as_of else None
     meta = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": declared or served_at,
+        "served_at": served_at,
         "cache_seconds": cache_seconds,
+        **({"content_as_of": declared} if declared else {}),
         **({"request_id": rid} if rid else {}),
     }
     if degraded:

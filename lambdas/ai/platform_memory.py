@@ -25,7 +25,7 @@ Two halves:
    ai_calls._allowlist_prompt — injected memories are valid grounding sources
    by construction, not by exemption.
 
-Token budget (ADR-063, the $150/mo guard): the block is hard-capped by
+Token budget (ADR-063, the $215/mo guard): the block is hard-capped by
 DEFAULT_MAX_ITEMS records and DEFAULT_MAX_CHARS characters (~450 tokens) per
 coach per generation — a bounded, deterministic cost, never an open-ended dump.
 

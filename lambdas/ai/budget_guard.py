@@ -2,8 +2,8 @@
 budget_guard.py — read the budget tier and gate AI features (graceful degradation).
 
 The cost_governor Lambda writes a tier (0-3) to SSM /life-platform/budget-tier
-based on near-real-time spend vs the monthly ceiling ($150 base since the
-ADR-133 amendment 2026-08-18 (#2836); floats to $176 in reader-traffic surge mode).
+based on near-real-time spend vs the monthly ceiling ($215 base since the
+ADR-133 amendment 2026-08-28 (#2801); floats to $252 in reader-traffic surge mode).
 AI features call allow() to decide whether to run or degrade;
 bedrock_client.invoke() calls current_tier() as the Tier-3 hard backstop.
 

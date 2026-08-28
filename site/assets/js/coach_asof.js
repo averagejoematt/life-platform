@@ -72,13 +72,25 @@ export function ensembleFallback(payload) {
 // this writer has no budget-guard feature gate and no fallback path (a failed
 // synthesis writes nothing), so the honest states are dated / dated-stale /
 // undated — and an undated band must not render (datableTensions below).
+//
+// #3252 — the DAY NUMBER, for the same reason coachAsOf carries one. The
+// integrator's weekly call is the block a reader meets first on /method/board/ and
+// on /coaching/'s week lens, and its prose dates ITSELF in experiment days ("he's
+// been eleven days into the cycle with no active logging"). A calendar date alone
+// does not reconcile that sentence — the reader would have to know that Aug 27 was
+// Day 11 — and while the record is held the sentence keeps asserting its frozen day
+// as today's. `asOfDayN` is the API's derived `as_of_day_n`; anything that is not a
+// positive integer is UNKNOWN and renders nothing (a wrong day number is strictly
+// worse than none). The argument is OPTIONAL so every existing call site keeps its
+// exact previous output.
 const WEEKLY_STALE_HOURS = 8 * 24; // the writer's cadence + the record's TTL
 
-export function weeklyAsOf(generatedAt) {
+export function weeklyAsOf(generatedAt, asOfDayN) {
   const d = generatedAt ? new Date(generatedAt) : null;
   if (!d || isNaN(d.getTime())) return "";
   const dateStr = d.toLocaleDateString("en-US", { timeZone: PT_TZ, month: "short", day: "numeric" });
-  return (Date.now() - d.getTime()) / 36e5 > WEEKLY_STALE_HOURS ? `as of ${dateStr} — next refresh pending` : `as of ${dateStr}`;
+  const stamp = [`as of ${dateStr}`, dayLabel(asOfDayN)].filter(Boolean).join(" · ");
+  return (Date.now() - d.getTime()) / 36e5 > WEEKLY_STALE_HOURS ? `${stamp} — next refresh pending` : stamp;
 }
 
 // #2383 — the tensions band REFUSES to render argument prose it cannot date: a

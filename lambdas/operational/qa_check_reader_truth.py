@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 # Posture: budget-aware (operator-truth band, tier 3 only per ADR-125 as amended by
 # #1927 — reported as an explicit ⏸ skip, never silent green) and fail-SOFT on Bedrock/
 # fetch errors (a Bedrock outage must never red the nightly). Only a HIGH truth
-# finding is a failure (lands in the alert email); med/low are warnings.
+# finding is a failure (lands in the alert email); med/low are warnings — and
+# since #3258 a med/low the ruling ledger already adjudicated (reader_truth_qa's
+# `rulings` field) is a CHRONIC warn: reported everywhere, counted by no alarm.
 
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://averagejoematt.com")
 
@@ -301,6 +303,41 @@ def check_reader_truth():
         # It is demoted to the WARN bucket, still named, still carrying its detail.
         lower = lower + unconfirmed
 
+    # ── #3258: the ruling ledger gets the channel it has been promising ───────
+    # Five rulings in reader_truth_rulings.py (#2959 ×2, #3003, #3199 ×2) each
+    # state that the finding they adjudicate is "visible as advisory, NEVER
+    # gating" — and all five expressed that as `severity = low`, which lands
+    # here, in the same WARN as a novel finding, and increments the alarmed
+    # WarnCount. So `qa-smoke-warnings` could not mean what its Outcome says.
+    # The live proof: Day-11 finding 539c6d, a `low` whose own note ends "No flag
+    # warranted on reconsideration" — the judge retracted it and the alarm lit.
+    #
+    # `is_advisory` reads the `rulings` FIELD assess_prose wrote, never the note
+    # (a phrase-matched retraction test is the #2959/#3003/#3199 family this repo
+    # has measured failing three times). An adjudicated finding rides
+    # ChronicWarnCount: fully visible in the check list, the failure email and the
+    # logs, watched by no alarm (#1958). WarnCount then counts exactly the
+    # findings on which NO reconsideration fired.
+    #
+    # A `high` cannot reach this bucket adjudicated — every ruling demotes above
+    # `low` before the split — and #2741's unconfirmed highs carry no rulings, so
+    # they stay alarmed exactly as that issue intended.
+    advisory = [f for f in lower if reader_truth_qa.is_advisory(f)]
+    lower = [f for f in lower if not reader_truth_qa.is_advisory(f)]
+    if advisory:
+        adv_summary, adv_details = summarize_findings(advisory)
+        ruling_ids = sorted({r for f in advisory for r in f.get(reader_truth_qa.RULINGS_FIELD) or ()})
+        checks.append(
+            Check("reader_truth:advisory", "Reader Truth", CONTENT_TRUTH).warn(
+                f"{len(advisory)} truth finding(s) adjudicated ADVISORY by the ruling ledger at {day} "
+                f"[{', '.join(ruling_ids)}] — reported, never alarmed (#3258): {adv_summary}",
+                chronic=True,
+            )
+            # #2620: the untruncated note travels with the advisory too — an
+            # adjudication a human cannot read is an adjudication nobody audits.
+            .with_details(adv_details)
+        )
+
     if highs:
         summary, detail_lines = summarize_findings(highs)
         verdict.fail(f"{len(highs)} high truth finding(s) at {day}, confirmed on a second pass: {summary}").with_details(detail_lines)
@@ -309,6 +346,16 @@ def check_reader_truth():
         verdict.warn(f"{len(lower)} low/med truth finding(s) at {day}: {summary}").with_details(detail_lines)
     elif errors:
         verdict.warn(f"no verdict at {day} — all {len(errors)} AI batch(es) errored (fail-soft)")
+    elif advisory:
+        # #3258: NOT "clean". Every finding this run produced was adjudicated
+        # advisory by the ledger, which is a different statement from "the judge
+        # found nothing" — saying "clean" here would be the ADR-104 class this
+        # surface exists to police, inside the police. The count and the pointer
+        # to reader_truth:advisory are the honest version.
+        verdict.ok(
+            f"{len(surfaces)} surfaces at {day} — no truth finding survived the ruling ledger "
+            f"({len(advisory)} adjudicated advisory, see reader_truth:advisory)"
+        )
     else:
         verdict.ok(f"{len(surfaces)} surfaces clean at {day} — no truth findings")
     checks.append(verdict)

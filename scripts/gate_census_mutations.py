@@ -155,22 +155,35 @@ _UNTYPED_HANDLERS_PY = '"""probe."""\n\n' + "\n\n".join("def lambda_handler(even
 
 _XFAIL_PY = '"""probe."""\n\n' "import pytest\n\n\n" "@pytest.mark.xfail\n" "def test_probe():\n" "    assert False\n"
 
-# These three carry a secret NAME, never a secret value (Secrets-Manager-only, per
-# CLAUDE.md). The identifiers deliberately say `ID` rather than `SECRET`: ruff's
-# flake8-bandit S105 rules on the TARGET NAME, and `_..._SECRET_PY = "<string>"` reads to
-# it as a hardcoded credential. Renaming keeps the gate honest instead of noqa-ing it.
+# These carry a secret NAME, never a secret value (Secrets-Manager-only, per CLAUDE.md).
+# The identifiers deliberately say `ID` rather than `SECRET`: ruff's flake8-bandit S105
+# rules on the TARGET NAME, and `_..._SECRET_PY = "<string>"` reads to it as a hardcoded
+# credential. Renaming keeps the gate honest instead of noqa-ing it.
 #
-# NOTE the variable name INSIDE the first plant. `SECRET_NAME` there yields a GREEN
-# mutated run, because test_secret_references.FALSE_POSITIVE_PATTERNS drops any LINE
-# containing that string — which is the shape of the outage the guard's own docstring
-# cites (issue #3255). The armed plant deliberately avoids the mask so the run measures
-# the arm that IS armed; the masked form is the DARK_CONTROLS entry below.
+# #3255 (2026-08-27) PROMOTED the masked form from DARK_CONTROLS to the armed spec.
+# Until then, `test_secret_references.FALSE_POSITIVE_PATTERNS` dropped any LINE
+# containing `SECRET_NAME`, so `_MASKED_ID_PY` — the exact wrong-default shape the
+# guard's own docstring cites as its reason to exist — left the gate GREEN, and the
+# armed spec had to use `_UNKNOWN_ID_PY`, a bare literal that dodges the mask. The gate
+# now extracts string CONSTANTS from the AST, where identifiers are unrepresentable, so
+# the hard shape is the one worth planting and `_UNKNOWN_ID_PY` is the easy subset of it.
 _UNKNOWN_ID_PY = '"""probe."""\n\n' '_PROBE_ID = "life-platform/probe-2999-not-a-real-secret"\n'
 
 _MASKED_ID_PY = (
-    '"""probe — the documented root-cause shape, on a masked line."""\n\n'
+    '"""probe — the documented root-cause shape (#3255): a wrong secret default."""\n\n'
     "import os\n\n"
     'SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/probe-2999-not-a-real-secret")\n'
+)
+
+# The successor blind spot, measured 2026-08-27 after #3255 landed: the SAME unknown id,
+# assembled from two constants instead of written as one. Neither half full-matches a
+# secret name, so no `ast.Constant` in the module is a reference and the gate stays green.
+# In scope by every reading — it is a shipping Lambda module naming a secret that does not
+# exist — and dark, which is what makes it a control rather than a broken plant.
+_SPLIT_ID_PY = (
+    '"""probe — an unknown secret id assembled from parts rather than written whole."""\n\n'
+    '_PREFIX = "life-platform/"\n'
+    '_PROBE_ID = _PREFIX + "probe-2999-not-a-real-secret"\n'
 )
 
 _DEAD_SYMBOL_PY = '"""probe."""\n\n\n' "def probe(client):\n" "    return client.write_action()\n"
@@ -253,8 +266,13 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_secret_references.py": MutationSpec(
         gate_id="structural::test_secret_references.py",
         target="tests/test_secret_references.py",
-        detects="a Lambda naming a secret that exists in neither KNOWN_SECRETS nor DELETED_SECRETS (R13-F04)",
-        plants=(("lambdas/common/_census_probe_2999.py", _UNKNOWN_ID_PY),),
+        detects=(
+            "a Lambda naming a secret that exists in neither KNOWN_SECRETS nor DELETED_SECRETS (R13-F04), "
+            'written in the canonical `SECRET_NAME = os.environ.get("SECRET_NAME", ...)` default form — '
+            "the March-2026 wrong-default shape the guard's own docstring cites, promoted from DARK_CONTROLS "
+            "by #3255"
+        ),
+        plants=(("lambdas/common/_census_probe_2999.py", _MASKED_ID_PY),),
         track=False,
     ),
     "structural::test_no_hardcoded_feature_tier.py": MutationSpec(
@@ -300,15 +318,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
 # return DARK, and `tests/test_gate_census_mutations_2999.py` fails if one starts passing
 # (a silently-widened gate is as much a change of meaning as a silently-narrowed one).
 DARK_CONTROLS: dict[str, MutationSpec] = {
-    "structural::test_secret_references.py::masked-line": MutationSpec(
+    "structural::test_secret_references.py::assembled-id": MutationSpec(
         gate_id="structural::test_secret_references.py",
         target="tests/test_secret_references.py",
         detects=(
-            "the SAME unknown secret name as the armed spec, on a line that also carries the string "
-            "SECRET_NAME — i.e. the exact `SECRET_NAME = os.environ.get(...)` default this guard's own "
-            "docstring names as the outage it prevents. FALSE_POSITIVE_PATTERNS drops the whole line."
+            "the SAME unknown secret name as the armed spec, assembled at runtime from two constants "
+            '(`_PREFIX + "probe-..."`) instead of written as one literal. The scanner reads string '
+            "CONSTANTS out of the AST, and neither half is a whole secret name, so a Lambda that builds "
+            "its secret id by concatenation or f-string interpolation is audited by nothing. Measured "
+            "2026-08-27, and it is the SUCCESSOR to the masked-line blind spot #3255 closed — that one is "
+            "now the armed spec above."
         ),
-        plants=(("lambdas/common/_census_probe_2999.py", _MASKED_ID_PY),),
+        plants=(("lambdas/common/_census_probe_2999.py", _SPLIT_ID_PY),),
         track=False,
     ),
 }
@@ -418,16 +439,22 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
     ),
     "structural::test_secret_references.py": _proof(
         "structural::test_secret_references.py",
-        "baseline: 4 passed | mutated: 1 failed, 3 passed :: test_sr1_all_secret_references_are_known | reverted: 4 passed",
-        "MEASURED BLIND SPOT, and it is the guard's own stated origin shape. FALSE_POSITIVE_PATTERNS "
-        "drops any LINE containing `SECRET_NAME` (and five sibling identifiers), so "
-        '`SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/todoits")` — the wrong-default '
-        "outage the module docstring cites as the reason it exists — is skipped whole. Measured on the "
-        "same tree as the proof above: 38 lines carrying a secret literal are masked against 33 that "
-        "reach SR1, and four ids are consequently unaudited — life-platform/google-tts (x2), "
-        "life-platform/hevy-write, life-platform/ritual-token-secret (x2), "
-        "life-platform/site-api-origin-secret. The DARK half is re-run as a control by this module's "
-        "DARK_CONTROLS and is filed as issue #3255; the ARMED half above is the arm that works.",
+        "baseline: 7 passed | mutated: 1 failed, 6 passed :: test_sr1_all_secret_references_are_known | reverted: 7 passed",
+        "The plant is now the guard's own stated origin shape — the wrong-default line "
+        '`SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/todoits")` — and it REDS, which it '
+        "did not before #3255 (2026-08-27). Until then FALSE_POSITIVE_PATTERNS dropped any LINE "
+        "containing `SECRET_NAME` (and five sibling identifiers), masking 38 secret-literal lines "
+        "against 33 that reached SR1 and leaving four real ids audited by nothing (google-tts x2, "
+        "hevy-write, ritual-token-secret x2, site-api-origin-secret — all four provisioned in AWS, all "
+        "four already in the IAM-layer registry, so the drift was in this gate alone). Extraction is now "
+        "`ast.Constant` full-match: 0 suppressed, 69 references audited. SCOPE, and the SUCCESSOR BLIND "
+        "SPOT: only a WHOLE secret-name literal is a reference, so an id assembled by concatenation or "
+        "f-string interpolation is invisible — measured DARK 2026-08-27 and carried as this module's "
+        "`::assembled-id` control. Comments, docstring mentions and prose are out of scope by design "
+        "(docstring ids are tests/test_docstring_secret_ids_2653.py's gate). SR3 is a residual invariant "
+        "on the extractor, NOT a near-miss-prefix typo detector: the only near-miss in the tree is the "
+        "`LifePlatform/AI` EMF namespace at 67 sites, so closing that would take the suppression list "
+        "#3255 just removed. Scans lambdas/ + mcp/ + mcp_server.py only.",
     ),
     "structural::test_no_hardcoded_feature_tier.py": _proof(
         "structural::test_no_hardcoded_feature_tier.py",

@@ -589,63 +589,6 @@ _collect_producer_mirrors = _pmc._collect_producer_mirrors
 _producer_mirror_hits = _pmc._producer_mirror_hits
 
 
-# ── #1260: reader-facing "N data sources" scan (lambdas/web/og_*.py) ──────────
-# The OG card lambda draws share-preview PNGs quoted on 72 pages — the platform's most
-# distributed surface. og_image_lambda.py hardcoded "One man. 25 data sources." while the
-# canonical registry (lambdas/source_registry.py, SOURCE_REGISTRY) has 16 top-level sources
-# — an uncomputed, inflated count exactly in the ADR-104 honest-numbers / stale-count drift
-# class this gate was built to kill, but the doc scan above scopes docs/* only and never
-# reaches lambda-emitted strings. This rule policies the reader-facing "N data sources"
-# phrasing in any lambdas/web/og_*.py against the LIVE registry length (the same source the
-# fixed card derives from), so the card and the gate can never disagree.
-#
-# GROUND TRUTH is the registry itself, AST-counted (not the hand-maintained PLATFORM_FACTS
-# data_sources literal, which counts a different — public-catalogue — surface): the card
-# derives `len(SOURCE_REGISTRY)` at runtime, so the gate must police against exactly that.
-#
-# PRECISION: skip full-line `#` comments and HISTORICAL-framed lines (as the ceiling scan
-# does). The correct card writes an f-string `{n} data sources` — no numeric literal — so a
-# fixed card is clean; only a hardcoded digit next to "data sources" trips.
-OG_DIR = ROOT / "lambdas" / "web"
-SOURCE_REGISTRY_PATH = ROOT / "lambdas" / "ingestion" / "source_registry.py"
-OG_SOURCE_COUNT = re.compile(r"(?<![\w.])(\d+)\s+data sources?\b")
-
-
-def _registry_source_count() -> int | None:
-    """Top-level key count of SOURCE_REGISTRY in lambdas/source_registry.py, AST-parsed.
-
-    Read as TEXT + AST (never imported) so the gate stays import-free and can't drag in a
-    lambda's runtime deps. This is the ONE source of truth for the reader-facing card count.
-    """
-    import ast
-
-    if not SOURCE_REGISTRY_PATH.exists():
-        return None
-    try:
-        tree = ast.parse(SOURCE_REGISTRY_PATH.read_text(encoding="utf-8"))
-    except SyntaxError:
-        return None
-    for node in ast.walk(tree):
-        # Both forms: `X = {...}` is ast.Assign, `X: T = {...}` is ast.AnnAssign.
-        # #1677 annotated SOURCE_REGISTRY and this walk silently returned None —
-        # a discovery that finds nothing reads as "no data", not as "I broke".
-        if isinstance(node, ast.AnnAssign):
-            tgts = [node.target]
-        elif isinstance(node, ast.Assign):
-            tgts = list(node.targets)
-        else:
-            continue
-        for tgt in tgts:
-            if isinstance(tgt, ast.Name) and tgt.id == "SOURCE_REGISTRY" and isinstance(node.value, ast.Dict):
-                # A `**SPLICE` entry contributes a None key; count real string keys only.
-                return sum(1 for k in node.value.keys if isinstance(k, ast.Constant))
-    return None
-
-
-def _scan_og_files() -> list[Path]:
-    return sorted(OG_DIR.glob("og_*.py")) if OG_DIR.exists() else []
-
-
 def _og_source_hits(files, truth: int) -> list[str]:
     """Reader-facing "N data sources" literals in og_*.py that disagree with the registry.
 
@@ -688,6 +631,18 @@ from doc_facts_governance import (  # noqa: E402,F401
     VERIFIED_HEADER_RE,
     _data_governance_hits,
     _live_repo_private,
+)
+
+# ── #1260/#3261: OG share-card fact gate — extracted to doc_facts_og.py (2026-08-27,
+# #1665 ceiling). Names re-exported here so `_og_source_hits` below and every caller keep
+# one address; `og_literal_hits` is the NEW general drawn-literal rule.
+from doc_facts_og import (  # noqa: E402,F401
+    OG_DIR,
+    OG_SOURCE_COUNT,
+    SOURCE_REGISTRY_PATH,
+    _registry_source_count,
+    _scan_og_files,
+    og_literal_hits,
 )
 
 # ── #1348: Verified-stamp >60d ADVISORY (canonical docs, warn-only) ───────────
@@ -1113,6 +1068,10 @@ def main():
         print("error: could not discover SOURCE_REGISTRY count for the og-card scan", file=sys.stderr)
         sys.exit(2)
     hits += _og_source_hits(_scan_og_files(), registry_n)
+    # #3261: the GENERAL rule — every numeric literal actually drawn onto a card must be
+    # data-derived or explicitly exempted. #1260's phrase scan above could only ever see
+    # the one card it was written for; two siblings published worse numbers for months.
+    hits += og_literal_hits(_scan_og_files())
 
     # #1957: the operational-claim half of the gate — the four classes the #1205 cron
     # scan structurally cannot see (tier semantics, doc-named Lambdas, alarm inventory,
