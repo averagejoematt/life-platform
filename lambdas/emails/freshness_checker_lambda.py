@@ -71,7 +71,7 @@ AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 # (a sensor-session lapse reports, it never pages). Lookback below covers the widest.
 # #746: the list now lives in the canonical source_registry (apple_health.hae_datatypes)
 # so every source threshold sits in one place; this is an alias, not a second copy.
-from common.pacific_time import PACIFIC, pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.pacific_time import anchor_day_key, pacific_now  # #2817/#3257: the Pacific frame + THE per-source day-key anchor
 from ingestion.source_registry import hae_datatype_thresholds  # noqa: E402
 
 HAE_DATATYPES = hae_datatype_thresholds()
@@ -621,9 +621,20 @@ def lambda_handler(event, context):
             # sibling checks in this module (`compute_datatype_liveness`,
             # `check_apple_health_datatypes`, `check_apple_health_activity`) already
             # do honest day-vs-day arithmetic; this is the one that mixed a day with
-            # an instant. `.replace(tzinfo=PACIFIC)` is DST-correct — zoneinfo
+            # an instant. The Pacific anchor is DST-correct — zoneinfo
             # resolves the offset from the wall time, unlike a fixed -7/-8.
-            last_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=PACIFIC)
+            #
+            # #3257 AMENDMENT: Pacific for 11 of the 12 sources — but not for ALL of them.
+            # apple_health's DATE# key is a UTC calendar day by TD-19 Phase 2
+            # (health_auto_export_lambda.parse_date_str converts to UTC before taking the
+            # day), so a blanket Pacific anchor overstated its freshness by the offset and,
+            # on the public board, would have produced a NEGATIVE age for the 7h a day that
+            # UTC-today runs ahead of PT-today. The frame is now the registry's
+            # `day_key_frame` facet, resolved through the ONE helper both this checker and
+            # /api/source_freshness call — so the ops alert and the public board can never
+            # again disagree about the age of the same key (they disagreed by 7h between
+            # 452929f17 and #3257, and the reader-facing one was the wrong one).
+            last_date = anchor_day_key(date_str, source_key)
             age_hours = (now - last_date).total_seconds() / 3600
 
             source_stale_hrs = SOURCE_STALE_HOURS.get(source_key, STALE_HOURS)

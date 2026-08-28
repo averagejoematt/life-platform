@@ -85,7 +85,25 @@ def _emit_failure_metric() -> None:
                     "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
                     "Value": 1,
                     "Unit": "Count",
-                }
+                },
+                # #3260: THE DIMENSIONLESS TWIN — the series the alarm actually reads.
+                # `slo-ai-coaching-success` (cdk/stacks/monitoring_stack.py) watches
+                # LifePlatform/AI::AnthropicAPIFailure with NO dimensions, and CloudWatch does
+                # not roll a custom metric up across dimension sets. All seven emitters attached
+                # {LambdaFunction=...}, so for 180 days the alarm read a series nothing wrote:
+                # 0 datapoints at the alarm against 191 real failures across five Lambdas on
+                # 2026-05-26 alone, threshold Sum>=3, last state change 2026-03-08.
+                #
+                # THE RULING (#3260): the alarm keeps its FLEET-WIDE semantic — "3 Bedrock
+                # transport failures anywhere on the platform in a day pages" — so the fix is to
+                # write the fleet-wide series, not to split into five per-function alarms whose
+                # Sum>=3 would silently become a per-function threshold (five Lambdas failing
+                # twice each = 10 failures and no page). The per-function series above is
+                # UNTOUCHED, so attribution and every existing consumer see no discontinuity.
+                # Same shape bedrock_client._emit_usage_metrics already uses for
+                # AnthropicOutputTokens / EstimatedCostUSD: one PutMetricData call, two
+                # datapoints. The six sibling copies of this function carry the one-line form.
+                {"MetricName": "AnthropicAPIFailure", "Value": 1, "Unit": "Count"},
             ],
         )
     except Exception as e:

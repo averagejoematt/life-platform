@@ -101,7 +101,8 @@ def _emit_failure_metric(metric_name: str = "AnthropicAPIFailure"):
                     "Dimensions": [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}],
                     "Value": 1,
                     "Unit": "Count",
-                }
+                },
+                {"MetricName": metric_name, "Value": 1, "Unit": "Count"},  # #3260: fleet-wide twin (see common/retry_utils)
             ],
         )
     except Exception as e:

@@ -6,7 +6,7 @@ facade's injectable/monkeypatched state via `_g["<name>"]` — same object the t
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import PACIFIC as PT, parse_iso_utc  # #1964: THE one Pacific frame + ISO parser
+from common.pacific_time import PACIFIC as PT, anchor_day_key, parse_iso_utc  # #1964/#3257: THE one Pacific frame, parser + day-key anchor
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from web.site_api_common import USER_PREFIX, _decimal_to_float, _error, _ok, logger
@@ -133,7 +133,8 @@ def source_freshness(*, _g) -> dict:
     # #2675) — and it is computed server-side because the front-end cannot: a reader in
     # Tokyo has a different "today", and the site's frame is Pacific by decree, not by
     # viewer locale.
-    pt_today = now.astimezone(PT).strftime("%Y-%m-%d")
+    pt_now = now.astimezone(PT)
+    pt_today = pt_now.strftime("%Y-%m-%d")
     # utc-exempt(#2798): NOT a reader "today" — never rendered as a date. Used only to
     # PROVE that a stored day key sitting ahead of PT-today is tracking the UTC calendar
     # (see the frame block below), so the frame label is derived rather than asserted.
@@ -157,7 +158,19 @@ def source_freshness(*, _g) -> dict:
             date_str = _latest_date_str(sid, _g=_g)
             if date_str:
                 last_update = date_str
-                last_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                # #3257: ANCHOR THE DAY IN THE FRAME THAT NAMES IT. This line used to be
+                # `.replace(tzinfo=timezone.utc)` for all 12 board sources, of which 11 are
+                # PACIFIC-keyed (ingestion_framework stamps pacific_today()). That put those
+                # days' start 7h (PDT) / 8h (PST) before they began, so a record stamped with
+                # today's Pacific date was served as 21.7h old in the same payload that
+                # reported `pacific_today` — verified live 2026-08-27. apple_health keeps the
+                # UTC anchor (TD-19 Phase 2), which is why the frame is resolved PER SOURCE
+                # from the registry facet rather than swept to Pacific wholesale: a blanket
+                # Pacific anchor would make apple_health's age NEGATIVE for the 7h a day that
+                # UTC-today runs ahead of PT-today. Same helper the ops checker uses, so the
+                # public board and the alert can no longer disagree about one key (452929f17
+                # fixed one of the two and created that disagreement).
+                last_dt = anchor_day_key(date_str, sid)
                 last_update_ts = last_dt.isoformat()
                 age_hours = round((now - last_dt).total_seconds() / 3600, 1)
                 stale_hours = _FRESHNESS_STALE_HOURS.get(sid, _FRESHNESS_DEFAULT_STALE_HOURS)
@@ -198,7 +211,12 @@ def source_freshness(*, _g) -> dict:
             entry["capture_channel"] = manual_meta["channel"]
             entry["manual"] = True
             if status in ("stale", "behavioral-stale"):
-                entry["days_dark"] = _days_dark(last_update, now)
+                # #3257: `_days_dark` does `now.date() - last.date()`, so the DAY of `now`
+                # is the whole arithmetic. A UTC `now` rolls over at 17:00 PT, which made
+                # the reader-facing "dark N days" stamp read one day too high every
+                # evening — 7 hours a day, invisible for the other 17 (the #3206 shape).
+                # `pt_now` is the SAME instant, in the frame the page is written in.
+                entry["days_dark"] = _days_dark(last_update, pt_now)
         # #2798 (epic) — THE FRAME, stamped per row.
         #
         # THE RULING: `last_update` is a stored DATE# day key and for the near-real-time

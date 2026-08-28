@@ -110,7 +110,19 @@ def _emit_size_metric(source: str, size_bytes: int) -> None:
                     "Dimensions": [{"Name": "Source", "Value": source}],
                     "Value": size_bytes,
                     "Unit": "Bytes",
-                }
+                },
+                # #3260 (identical shape to slo-ai-coaching-success): the
+                # `life-platform-ddb-item-size-warning` alarm watches
+                # LifePlatform/DynamoDB::ItemSizeBytes with NO dimensions, and this was its
+                # ONLY emitter — attaching {Source=...} and nothing else. CloudWatch does not
+                # roll a custom metric up across dimension sets, so the alarm's Maximum >=
+                # 307200 has never had a datapoint to evaluate. No comment anywhere claimed
+                # the dimensionlessness was deliberate (contrast the auth_breaker twin, which
+                # says so in the source). The alarm's semantic is "the largest item ANY source
+                # wrote is approaching the 400 KB DDB limit" — fleet-wide by construction —
+                # so the fleet-wide series is the right one to write; the per-Source series
+                # above stays for attribution once it fires.
+                {"MetricName": "ItemSizeBytes", "Value": size_bytes, "Unit": "Bytes"},
             ],
         )
     except Exception as e:
