@@ -23,8 +23,20 @@
     <key>RunAtLoad</key>
     <true/>
 
-    <key>StandardOutPath</key>
-    <string>/Users/matthewwalker/dev/life-platform/ingest/ingest.log</string>
+    <!-- StandardErrorPath ONLY — deliberately no StandardOutPath.
+
+         process_all_drops.sh's log() pipes through `tee -a "$LOG"`, which writes the
+         line to ingest.log AND re-emits it on stdout. With StandardOutPath set to that
+         same file, launchd captured the echo and appended it a second time: every
+         logged line appeared TWICE, so any count of drops processed read double. The
+         two writers were the bug, not the shared path.
+
+         tee stays, so a manual `bash ingest/process_all_drops.sh` still prints to the
+         console. Everything the script logs on purpose already reaches the file — the
+         backfills are invoked with `>> "$LOG" 2>&1` — so discarding launchd's stdout
+         loses nothing. StandardErrorPath remains: it is the only channel that catches
+         failures the script never gets to log, such as the interpreter refusing to
+         start the script at all ("Operation not permitted"). -->
     <key>StandardErrorPath</key>
     <string>/Users/matthewwalker/dev/life-platform/ingest/ingest.log</string>
 </dict>
