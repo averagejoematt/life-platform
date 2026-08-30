@@ -815,7 +815,16 @@ from sentinel_quota import (  # noqa: E402,F401
 # forever. Read that module's docstring for what it can and cannot fail on.
 from sentinel_replication import check_raw_replication  # noqa: E402,F401
 
-# ── 11. sentinel cadence dead-man (#3130) ─────────────────────────────────────
+# ── 11. EventBridge rule drift (#3279) ────────────────────────────────────────
+# Own module (same split shape as the other sentinel_* siblings): before it, this
+# sweep had NO events client at all — 96 live rules with zero drift coverage, which is
+# how an ENABLED, targetless, out-of-IaC rule (life-platform-monthly-export) survived
+# 5.5 months past a review that had already seen it. Reports enabled rules with zero
+# targets and rules absent from every CDK stack; read that module's docstring for the
+# PhysicalResourceId ARN-vs-name normalization that a naive comparison gets wrong.
+from sentinel_events import check_eventbridge_rules  # noqa: E402,F401
+
+# ── 12. sentinel cadence dead-man (#3130) ─────────────────────────────────────
 # Own module (same split shape as sentinel_github/sentinel_quota/sentinel_replication):
 # a self-report at the START of each run asserting the PREVIOUS run(s) left a
 # drift-log record, so a sentinel run that dies before persist() is caught by the
@@ -1013,6 +1022,7 @@ def run_sweep():
         "github_quota": check_github_quota(),
         "codeql_alerts": check_codeql_alerts(),
         "hae_webhook_ingress": check_hae_webhook_ingress(),
+        "eventbridge_rules": check_eventbridge_rules(),
         "raw_replication": check_raw_replication(),
         "sentinel_cadence": check_sentinel_cadence(),
     }
@@ -1057,6 +1067,7 @@ def _summary(status, checks):
         ("github_config", "GitHub config diverges from documented posture"),
         ("github_push_runs", "main-push workflow runs not queuing"),
         ("hae_webhook_ingress", "HAE webhook ingress grant drift"),
+        ("eventbridge_rules", "EventBridge rule drift — enabled-targetless or out-of-IaC rule(s)"),
         ("raw_replication", "raw/ cross-region backup not verified"),
         ("sentinel_cadence", "sentinel cadence gap — a missed/stale weekly drift-log record"),
     ):
@@ -1123,6 +1134,8 @@ def print_summary(record):
                 detail = f" — {c.get('warn', '')}"
             elif name == "codeql_alerts":
                 # #2578: a drift line with no detail is a finding nobody can act on.
+                detail = f" — {c.get('detail', '')}"
+            elif name == "eventbridge_rules":
                 detail = f" — {c.get('detail', '')}"
             elif name == "raw_replication":
                 detail = f" — {c.get('detail', '')}"

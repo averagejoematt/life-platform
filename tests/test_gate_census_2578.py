@@ -469,11 +469,15 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
     attempted = [g for g in gates if g["verdict"] == "attempted-unproven"]
     unproven = [g for g in gates if g["verdict"] == "unproven"]
     assert len(proven) + len(attempted) + len(unproven) == len(gates)
+    # Upper band 40 → 41 on 2026-08-29: #3279 added sentinel::deploy/sentinel_events.py::
+    # check_eventbridge_rules with both halves mutation-proved in tests/test_sentinel_events_3279.py.
+    # This band catches BULK marking-proven-without-mutations; move it only with a new proof to cite.
     assert (
         # Upper bound raised 40 → 45 (2026-08-29, #3294): the 41st proof is
         # `structural::test_absence_coverage_3294.py`, mutation-backed via the
         # re-runnable harness (ARMED 1/1) — the bound exists to catch proofs that
-        # stop being mutation-backed, and this one is.
+        # stop being mutation-backed, and this one is. (#3279 adds the 42nd — the
+        # sentinel events-client proof — still under the same bound.)
         3
         <= len(proven)
         <= 45

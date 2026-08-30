@@ -67,9 +67,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 # check_* names pulled from a `from <module> import (...)` in drift_sentinel.py are only
-# in scope when <module> is one of these four #1665-extracted siblings — see the module
+# in scope when <module> is one of these #1665-shaped extracted siblings — see the module
 # docstring above for why session_postflight.py is deliberately excluded.
-_SENTINEL_SIBLINGS = ("sentinel_github", "sentinel_quota", "sentinel_replication", "sentinel_cadence")
+# sentinel_events joined 2026-08-29 (#3279).
+_SENTINEL_SIBLINGS = ("sentinel_github", "sentinel_quota", "sentinel_replication", "sentinel_cadence", "sentinel_events")
 
 
 def _sentinel_check_defs(text: str) -> dict[str, tuple[int, str]]:

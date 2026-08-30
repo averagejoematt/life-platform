@@ -446,4 +446,28 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-08-24",
     },
+    "sentinel::deploy/sentinel_events.py::check_eventbridge_rules": {
+        "gate_name": "check_eventbridge_rules",
+        "command": "python3 -m pytest tests/test_sentinel_events_3279.py -q",
+        "mutation": (
+            "(a) three planted shapes on fakes built to the real call shapes: an ENABLED rule with zero targets (the "
+            "live life-platform-monthly-export condition, #3279), a live rule absent from every stack's resource list "
+            "and from KNOWN_OUT_OF_IAC_RULES, and an ALLOWLISTED rule that is enabled-targetless (the allowlist must "
+            "not suppress the dangling half). (b) list_rules raising, list_stack_resources raising (the vacuum that "
+            "would red every rule as an orphan), and list_targets_by_rule raising."
+        ),
+        "observed": (
+            "exit 0 with each (a) shape reporting status='drift' naming the exact rule, reaching "
+            "drift_report.as_signal's flagging map through run_sweep; the all-managed all-targeted baseline reports "
+            "'clean', and the CFN ARN-shaped PhysicalResourceId (10 of 93 live managed rules) is proved to match its "
+            "live bare-name twin rather than false-positive. (b) all three cannot-observe shapes -> status='error' "
+            "naming the failing call; the unread-IaC shape publishes NO orphan list."
+        ),
+        "scope": (
+            "Default event bus, REGION only (mirrors check_orphan_functions; zero AWS::Events::Rule live in the "
+            "us-east-1/us-east-2 stacks, measured 2026-08-29). A DISABLED targetless rule does not drift — disabled "
+            "rules fire nothing. " + _ERROR_IS_NOT_A_SIGNAL
+        ),
+        "proved_on": "2026-08-29",
+    },
 }

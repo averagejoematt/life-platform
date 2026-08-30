@@ -306,6 +306,7 @@ def _patch_all(
     s3_lifecycle=None,
     dynamodb_ttl=None,
     cadence=None,
+    events=None,
 ):
     # DIL-027 (#3042): the raw/ cross-region backup check. Patched here like every
     # other AWS-touching check so the sweep-shape tests stay offline.
@@ -316,6 +317,14 @@ def _patch_all(
         ds,
         "check_sentinel_cadence",
         lambda *a, **k: cadence or {"status": "clean", "missing_dates": [], "latest_date": "2026-08-22", "days_stale": 2},
+    )
+    # #3279: the EventBridge-rules check. Patched like every other AWS-touching check
+    # so the sweep-shape tests stay offline.
+    monkeypatch.setattr(
+        ds,
+        "check_eventbridge_rules",
+        lambda *a, **k: events
+        or {"status": "clean", "live_count": 96, "managed_count": 93, "enabled_targetless": [], "out_of_iac": [], "known_out_of_iac": {}},
     )
     monkeypatch.setattr(ds, "check_codeql_alerts", lambda: codeql or {"status": "clean", "open_count": 0, "sample": []})
     monkeypatch.setattr(

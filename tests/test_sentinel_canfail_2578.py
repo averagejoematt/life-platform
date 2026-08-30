@@ -164,7 +164,7 @@ def test_postflight_unimportable_module_is_error_not_a_crashed_sweep(monkeypatch
 
 def test_a_crashed_postflight_would_have_taken_the_whole_sweep_with_it(monkeypatch):
     """The blast radius, asserted rather than described: `run_sweep()` wraps nothing,
-    so any check that raises kills all fifteen. This is why (b) above matters more for
+    so any check that raises kills every one of them. This is why (b) above matters more for
     `check_postflight` than for a check whose own try-block already contains it."""
     src = ast.parse(Path(_ROOT, "deploy", "drift_sentinel.py").read_text(encoding="utf-8"))
     run_sweep = next(n for n in src.body if isinstance(n, ast.FunctionDef) and n.name == "run_sweep")
@@ -423,6 +423,7 @@ def test_doc_literals_unreadable_fact_source_is_error_not_clean(monkeypatch):
 _DS = "tests/test_drift_sentinel.py"
 _HERE = "tests/test_sentinel_canfail_2578.py"
 _REPL = "tests/test_raw_replication_dil027.py"
+_EV = "tests/test_sentinel_events_3279.py"
 
 PROOF_INDEX: dict[str, dict[str, object]] = {
     # ── the ten defined in deploy/drift_sentinel.py ───────────────────────────
@@ -522,6 +523,16 @@ PROOF_INDEX: dict[str, dict[str, object]] = {
         "detect": (_DS, "test_sentinel_cadence_drift_on_a_planted_gap"),
         "cannot_observe": (_DS, "test_sentinel_cadence_fails_closed_when_the_log_is_unreadable"),
         "note": "#3130, cited not re-proved — arrived 2026-08-24 with nine mutation proofs including an unreadable log failing CLOSED.",
+    },
+    "sentinel::deploy/sentinel_events.py::check_eventbridge_rules": {
+        "detect": (_EV, "test_detects_the_live_orphan_shape_enabled_targetless_rule"),
+        "cannot_observe": (_EV, "test_cannot_list_rules_is_error_not_clean"),
+        "note": (
+            "NEW 2026-08-29 (#3279). The sweep's first events client — 96 live rules previously had zero drift "
+            "coverage. Detect proved on the exact live shape (an ENABLED targetless out-of-IaC rule, "
+            "life-platform-monthly-export) plus the out-of-IaC-with-target shape; cannot-observe proved on all "
+            "three call sites, including the unread-IaC vacuum that would otherwise red every rule as an orphan."
+        ),
     },
 }
 
@@ -633,4 +644,4 @@ def test_json_report_is_still_parseable_with_the_new_verdicts():
     census = gc.build_census(Path(_ROOT), families=("sentinel",))
     payload = json.loads(json.dumps(census, default=str))
     proven = [g for g in payload["gates"] if g["verdict"] == "can-fail (proven)"]
-    assert len(proven) == len(PROOF_INDEX) == 16
+    assert len(proven) == len(PROOF_INDEX) == 17
