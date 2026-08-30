@@ -227,11 +227,14 @@ def test_alarm_routing_known_truths():
 def test_stack_helper_names_are_unique():
     """The routing tracer resolves a helper by bare name; a collision would route one
     stack's alarms by another's helper — pinned so the assumption cannot rot silently."""
-    gen = _load_by_path("scripts/generate_platform_model.py", "_gen_for_test")
+    import ast
+
+    import platform_model_alarms as pma  # scripts/ is on sys.path above
+
     seen: dict[str, str] = {}
-    for stack, tree in gen._stack_trees().items():
-        for node in __import__("ast").walk(tree):
-            if isinstance(node, __import__("ast").FunctionDef) and gen._is_alarm_factory(node):
+    for stack, tree in pma._stack_trees().items():
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and pma._is_alarm_factory(node):
                 assert (
                     node.name not in seen or seen[node.name] == stack
                 ), f"alarm factory {node.name} defined in {seen[node.name]} and {stack}"
