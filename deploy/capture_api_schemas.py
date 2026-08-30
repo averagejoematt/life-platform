@@ -42,6 +42,14 @@ Usage:
     python3 deploy/capture_api_schemas.py --dry-run         # print the plan, no HTTP, no writes
     python3 deploy/capture_api_schemas.py --check-drift     # capture live, diff vs committed shapes, exit 1 on drift (no writes)
     python3 deploy/capture_api_schemas.py --fail-on-leak    # nonzero exit if any sentinel leak is found
+    python3 deploy/capture_api_schemas.py --only /api/sleep_detail                 # recapture ONE endpoint (repeatable)
+    python3 deploy/capture_api_schemas.py --only /api/sleep_detail --check-drift   # drift-check ONE endpoint
+
+`--only` (#3316) scopes a run to the named path(s): the post-deploy recapture of a
+single changed endpoint (the #2921 residual this flag was added for) no longer has
+to re-GET the whole 100+ endpoint surface and rewrite every snapshot's captured_at.
+In capture mode the exemptions ledger is MERGED, not rewritten — only the named
+paths' entries are refreshed, every other endpoint's entry is left untouched.
 
 Read-only: GET requests only, serial (one endpoint at a time, courtesy sleep between
 each), against https://averagejoematt.com (override with $QA_SITE_URL). Never issues
@@ -322,6 +330,47 @@ def _resolve_dynamic_param(spec: dict):
 # ── capture ──
 
 
+def _normalize_only(only) -> list:
+    """`--only` values as router paths: tolerate a missing leading slash and a
+    stray trailing slash so `api/sleep_detail/` and `/api/sleep_detail` both name
+    the same plan entry."""
+    out = []
+    for raw in only or []:
+        p = "/" + str(raw).strip().strip("/")
+        if p not in out:
+            out.append(p)
+    return out
+
+
+def filter_plan(plan: list, only) -> list:
+    """Restrict a build_plan() result to the `--only` paths (#3316).
+
+    Raises ValueError naming any requested path the router does not serve — a
+    typo must be loud, not a silent zero-endpoint run that exits 0."""
+    wanted = _normalize_only(only)
+    if not wanted:
+        return plan
+    known = {p["path"] for p in plan}
+    unknown = [w for w in wanted if w not in known]
+    if unknown:
+        raise ValueError(f"--only path(s) not in the discovered router surface: {unknown}")
+    return [p for p in plan if p["path"] in wanted]
+
+
+def merge_exemptions(existing: dict, fresh: dict, only_paths) -> dict:
+    """Exemptions ledger for a scoped (`--only`) capture run (#3316): every
+    entry for a path OUTSIDE the scope is preserved verbatim; entries for paths
+    INSIDE the scope are replaced by this run's outcome (present if the path
+    was exempted or failed capture, absent if it captured cleanly). A full run
+    (no scope) still rewrites the ledger wholesale, exactly as before."""
+    scope = set(_normalize_only(only_paths))
+    if not scope:
+        return dict(fresh)
+    merged = {k: v for k, v in (existing or {}).items() if k not in scope}
+    merged.update({k: v for k, v in fresh.items() if k in scope})
+    return merged
+
+
 def build_plan():
     """{path: EndpointRecord} for the full discovered surface, plus the resolved
     "fetch path" (query string / prefix sample) for each non-exempt entry."""
@@ -349,12 +398,17 @@ def build_plan():
     return plan
 
 
-def run_capture(*, dry_run: bool, check_drift: bool, fail_on_leak: bool) -> int:
-    plan = build_plan()
+def run_capture(*, dry_run: bool, check_drift: bool, fail_on_leak: bool, only=None) -> int:
+    try:
+        plan = filter_plan(build_plan(), only)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        return 2
     to_capture = [p for p in plan if p["action"] == "capture"]
     to_exempt = [p for p in plan if p["action"] == "exempt"]
 
-    print(f"── capture_api_schemas: {len(plan)} discovered endpoints ──")
+    scope_note = f" (scoped by --only to {len(plan)} of the discovered surface)" if only else ""
+    print(f"── capture_api_schemas: {len(plan)} discovered endpoints{scope_note} ──")
     print(f"  {len(to_capture)} planned for live capture, {len(to_exempt)} pre-exempted (write-path / requires-param)")
     if dry_run:
         for p in plan:
@@ -448,7 +502,21 @@ def run_capture(*, dry_run: bool, check_drift: bool, fail_on_leak: bool) -> int:
             print(f"  … {i + 1}/{len(to_capture)} captured")
 
     if not check_drift:
-        EXEMPTIONS_PATH.write_text(json.dumps(exemptions, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        ledger_unchanged = False
+        if only:
+            try:
+                existing = json.loads(EXEMPTIONS_PATH.read_text(encoding="utf-8")) if EXEMPTIONS_PATH.exists() else {}
+            except Exception:  # noqa: BLE001 — a corrupt ledger is rewritten from this run's scope only
+                existing = {}
+            exemptions = merge_exemptions(existing, exemptions, only)
+            # A scoped run must not churn the ledger when nothing in scope changed —
+            # a byte-level rewrite (encoding/ordering) would show up as a spurious
+            # diff on every single-endpoint recapture PR.
+            ledger_unchanged = exemptions == existing
+        if ledger_unchanged:
+            print("  exemptions ledger unchanged for the scoped path(s) — not rewritten")
+        else:
+            EXEMPTIONS_PATH.write_text(json.dumps(exemptions, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"\n{captured} snapshots written, {len(exemptions)} exemptions ({failed} from live capture failures)")
         print(f"snapshots: {SNAPSHOT_DIR}")
         print(f"exemptions: {EXEMPTIONS_PATH}")
@@ -472,8 +540,15 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="print the capture plan only, no HTTP, no writes")
     ap.add_argument("--check-drift", action="store_true", help="capture live, diff vs committed shapes, exit 1 on drift; no writes")
     ap.add_argument("--fail-on-leak", action="store_true", help="nonzero exit if any live sentinel leak is found")
+    ap.add_argument(
+        "--only",
+        action="append",
+        metavar="PATH",
+        help="scope the run to this router path (repeatable, e.g. --only /api/sleep_detail); "
+        "in capture mode the exemptions ledger is merged, not rewritten (#3316)",
+    )
     args = ap.parse_args()
-    return run_capture(dry_run=args.dry_run, check_drift=args.check_drift, fail_on_leak=args.fail_on_leak)
+    return run_capture(dry_run=args.dry_run, check_drift=args.check_drift, fail_on_leak=args.fail_on_leak, only=args.only)
 
 
 if __name__ == "__main__":

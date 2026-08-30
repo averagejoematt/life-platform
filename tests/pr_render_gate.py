@@ -196,6 +196,37 @@ POPULATED_GATE_PAGES = [
         ],
     },
     {
+        # #3316 (#2921's residual): /data/sleep/ with POPULATED whoop data. The page's
+        # main body — "Last night's stages" (reads sleep_detail.whoop.*_hours, the
+        # #2921 per-device block), the two-device dumbbell, the stage-composition
+        # columns — only materializes when sleep_detail.whoop / whoop_hours are
+        # present; the empty-mock pass renders the honest-empty state and so never
+        # exercised the post-#3023 shape. The fixture is the live payload's shape
+        # (tests/api_schemas/api_sleep_detail.json is the contract it must match —
+        # tests/test_sleep_schema_fixture_3316.py holds the two together).
+        "path": "/data/sleep/",
+        "name": "Evidence · sleep [populated whoop]",
+        "wait_for": "body",
+        "charts": ["[data-readout] svg"],
+        "checks": [
+            {
+                "selector": '.sbar[aria-label*="Whoop"]',
+                "min_count": 1,
+                "desc": "'Last night's stages' renders from sleep_detail.whoop (the #2921 per-device block)",
+            },
+            {
+                "selector": ".db-track",
+                "min_count": 3,
+                "desc": "the two-device stage dumbbell renders Deep/REM/Light from whoop_hours + the Eight Sleep pcts",
+            },
+            {
+                "selector": ".scol",
+                "min_count": 4,
+                "desc": "stage composition columns render from sleep_trend rows carrying whoop stage hours",
+            },
+        ],
+    },
+    {
         # #974: the cockpit's levers strip (the Protocols station in the daily
         # slice) only materializes with supplement-registry/experiment data — the
         # empty-mock pass renders its honest-hidden state, so this pass asserts
@@ -255,6 +286,7 @@ POPULATED_API_MOCKS = {
     "**/api/routine": "routine.json",
     "**/api/coaching-dashboard": "coaching_dashboard_paused.json",  # #1971 — paused-board disclosure
     "**/api/coach_team": "coach_team.json",  # #2383 — dated tensions → the band's as-of stamp
+    "**/api/sleep_detail": "sleep_detail.json",  # #3316 — post-#3023 per-device eightsleep/whoop blocks
 }
 
 
