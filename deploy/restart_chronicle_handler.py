@@ -69,6 +69,65 @@ def register_permalink_redirect(old_path: str, new_path: str, apply: bool) -> bo
     return True
 
 
+def unregister_permalink_redirect(old_path: str, apply: bool) -> bool:
+    """The paired REMOVAL for register_permalink_redirect (#3284): drop
+    `old_path`'s redirect line from redirects.map. Before this existed the
+    register was a one-way ratchet — #1805 registered week-04/05/06 on the
+    premise they were permanent orphans, the premise went false when cycle 14
+    published week-04, and the live 301 blackholed the published article for
+    every reader. Idempotent; no-op on dry-run, on a missing map, or when the
+    line is already absent. Returns True iff a line was removed.
+    Same NOTE as register: the live CloudFront function body is regenerated
+    from redirects.map and re-published by Matthew — nothing here touches
+    CloudFront.
+    """
+    if not apply:
+        return False
+    try:
+        text = REDIRECTS_MAP_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False
+    lines = text.splitlines()
+    kept = [line for line in lines if not line.startswith(f"{old_path}\t")]
+    if len(kept) == len(lines):
+        return False
+    REDIRECTS_MAP_PATH.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+    return True
+
+
+# A journal permalink redirect source, as register_permalink_redirect writes it
+# (week-{seq:02d}, so \d{2,} covers seq >= 100 too).
+_JOURNAL_PERMALINK_RE = re.compile(r"^/journal/posts/week-\d{2,}/$")
+
+
+def unregister_journal_permalink_redirects(apply: bool) -> list[str]:
+    """Remove EVERY /journal/posts/week-NN/ redirect source from redirects.map
+    (#3284). Called by untombstone_and_redate(): the moment any chronicle record
+    is resurrected, the journal namespace is publishing again — the lead-ins
+    re-render at week-01..0K and the Wednesday cadence continues the sequence —
+    so no week-NN slug is a "permanent orphan" (the #1805 premise) anymore.
+    The removal is deliberately the whole set, not the resurrected record's own
+    slug: a record's sequence is assigned at render time by
+    restart_leadin_pages.seq_for over the FULL visible set, so it is not
+    derivable per-record here, and any armed week-NN 301 will eventually
+    blackhole a published installment (the #3284 mechanism). The residual
+    exposure — an unpublished week-NN serving its raw JSON tombstone at 200
+    until the cadence reaches it — is bounded and unlinked (posts.json does not
+    list it), whereas the 301 blackholes real published content.
+    Returns the removed source paths ([] on dry-run).
+    """
+    if not apply:
+        return []
+    try:
+        text = REDIRECTS_MAP_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return []
+    removed = [line.split("\t", 1)[0] for line in text.splitlines() if _JOURNAL_PERMALINK_RE.match(line.split("\t", 1)[0])]
+    for old_path in removed:
+        unregister_permalink_redirect(old_path, apply)
+    return removed
+
+
 # Each entry: (prefix, archive_prefix, index_key). index_key=None → no index page
 # to rewrite for that prefix (the archive step still runs).
 CHRONICLE_PREFIXES = [
@@ -364,6 +423,13 @@ def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool, cycle
     live phase=experiment Prologue chapter carrying the OLD cycle (DATE#2026-02-28
     kept cycle=4 while its freshly-written Prologue siblings carried 5), breaking
     the ADR-077 "archive navigable by reset generation" promise for that row.
+
+    #3284: resurrection also UN-registers the journal permalink 301s — a
+    resurrected record re-arms the journal publishing cadence, so leaving any
+    /journal/posts/week-NN/ redirect behind blackholes the very content this
+    call just made visible (cycle 14's Week 1 shipped unreachable exactly this
+    way). See unregister_journal_permalink_redirects for why it is the set,
+    not one slug.
     """
     if apply:
         if cycle is None:
@@ -388,6 +454,10 @@ def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool, cycle
             ExpressionAttributeNames=names,
             ExpressionAttributeValues=values,
         )
+        # #3284: a resurrected record must not leave a live 301 behind.
+        removed = unregister_journal_permalink_redirects(apply)
+        if removed:
+            print(f"      - redirects.map: unregistered {len(removed)} journal permalink 301(s): {', '.join(removed)}")
 
 
 def main():
