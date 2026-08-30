@@ -133,22 +133,26 @@ def test_quality_gate_no_longer_caps_at_the_truncating_value(wire):
     assert isinstance(report, dict)
 
 
-def test_a_truncated_quality_gate_report_still_passes_by_default(wire, monkeypatch):
-    """Pinned as a KNOWN HOLE, not as desired behaviour (#2893 filing candidate).
+def test_a_truncated_quality_gate_report_now_fails_closed(wire, monkeypatch):
+    """The KNOWN HOLE this test used to pin is CLOSED — the conscious, reviewed
+    flip it existed to force happened.
 
-    `_build_fallback_report` returns `passed: True`, so each of the 84 measured
-    discards silently rubber-stamped a coach draft that the ADR-108 blocking gate
-    never actually evaluated. Raising the cap removes the trigger; it does not
-    close the hole. Flipping this to fail-closed is a gate-policy change with its
-    own blast radius (it would start holding briefs) and is deliberately NOT done
-    here — this test exists so the flip is a conscious, reviewed edit.
+    #3083 (owner decision 2026-08-29, ADR-108 amendment): `_build_fallback_report`
+    returns `passed: False`, so an unjudgeable draft is held under the
+    regenerate-or-hold contract instead of being rubber-stamped (each of the 84
+    measured discards had silently passed a draft the blocking gate never
+    evaluated). The decision was priced on the re-measured rate: #3081 removed
+    the dominant trigger (post-fix fallback rate 0/42) and `TruncatedResponses`
+    guards its recurrence, so the hold path fires rarely — and a hold darkens
+    only that coach's section (#966 CoachHold is terminal per-domain), never the
+    brief.
     """
     from coach import coach_quality_gate as cqg
 
     monkeypatch.setattr(cqg, "_call_haiku", lambda **kw: "I'll evaluate this draft. The coach opens with a pattern rather th")
     report = cqg._run_quality_gate("labs_coach", "draft output", {}, {})
     assert report["_fallback"] is True
-    assert report["passed"] is True
+    assert report["passed"] is False
 
 
 # ══════════════════════════════════════════════════════════════════════════════

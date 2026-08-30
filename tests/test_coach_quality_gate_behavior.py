@@ -9,8 +9,10 @@ so the contracts that matter are:
 
   * a real sub-threshold verdict must be non-negotiable — the score override
     must beat a `passed: true` the model asserted anyway,
-  * a gate that could not evaluate must fail OPEN but **visibly** (`_fallback`),
-    never silently — the ADR-125/#1927 class is a gate reporting green while dark,
+  * a gate that could not evaluate must fail CLOSED and **visibly** (`_fallback`
+    + `reason`) — #3083 (owner decision 2026-08-29, ADR-108 amendment) flipped
+    the old fail-open fallback, which had green-lit 84/484 drafts it never
+    evaluated; the ADR-125/#1927 class is a gate reporting green while dark,
   * bad input must never block publication,
   * the cross-coach comparison must cover the whole operational roster, derived
     from the canonical registry rather than a literal.
@@ -241,29 +243,40 @@ class TestVerdict:
         assert report["cross_coach_similarity_flags"] == ["mind_coach"]
 
 
-class TestFailOpenIsVisible:
-    def test_a_model_error_passes_the_draft_but_marks_the_report_as_a_fallback(self, haiku):
-        """Fail-open is the deliberate contract for gate INFRA errors — but the
-        #1927 lesson is that a gate which is dark must say so. `_fallback` is
-        the only signal that distinguishes 'evaluated and passed' from 'could
-        not evaluate'."""
+class TestFailClosedIsVisible:
+    def test_a_model_error_holds_the_draft_and_marks_the_report_as_a_fallback(self, haiku):
+        """#3083 (owner decision 2026-08-29, ADR-108 amendment): an unjudgeable
+        draft fails CLOSED — `passed: False` — so the blocking caller holds it
+        under the regenerate-or-hold contract instead of publishing a draft the
+        gate never evaluated (the old fail-open green-lit 84/484 such drafts).
+        The #1927 lesson still applies: the report must also SAY it is dark —
+        `_fallback` distinguishes 'evaluated and failed' from 'could not
+        evaluate'."""
         haiku.error = RuntimeError("bedrock timeout")
         report = _run()
-        assert report["passed"] is True
+        assert report["passed"] is False
         assert report["_fallback"] is True
 
     def test_the_fallback_report_names_the_failure_in_its_suggestions(self, haiku):
         haiku.error = RuntimeError("bedrock timeout")
         assert any("bedrock timeout" in s for s in _run()["suggestions"])
 
+    def test_the_fallback_report_carries_an_honest_reason_field(self, haiku):
+        """#3083: the hold must name the infrastructure failure, not masquerade
+        as a quality verdict."""
+        haiku.error = RuntimeError("bedrock timeout")
+        report = _run()
+        assert "bedrock timeout" in report["reason"]
+        assert "fail-closed" in report["reason"]
+
     def test_a_non_dict_model_response_is_treated_as_an_evaluation_failure(self, haiku):
         haiku.result = "I think the output looks fine!"
         report = _run()
         assert report["_fallback"] is True
-        assert report["passed"] is True
+        assert report["passed"] is False
 
     def test_the_fallback_score_is_the_neutral_midpoint_not_a_perfect_score(self, haiku):
-        """A fail-open must not be indistinguishable from a great draft."""
+        """An unjudged draft must not be indistinguishable from a great one."""
         haiku.error = RuntimeError("down")
         assert _run()["score"] == 50
 
@@ -587,3 +600,4 @@ class TestHandler:
         resp = gate.lambda_handler({"coach_id": "sleep_coach", "output_text": "draft", "skip_cross_coach": True}, None)
         assert resp["statusCode"] == 200
         assert resp["_fallback"] is True
+        assert resp["passed"] is False  # #3083: unjudged now holds, even through the 200

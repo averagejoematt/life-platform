@@ -1181,11 +1181,13 @@ def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_b
 
     N-06 (#390): promoted from the prior fire-and-forget `InvocationType="Event"`
     call (whose report was discarded — nothing ever acted on it) so the pipeline
-    can actually enforce the verdict. Fails OPEN on any infra error (invoke
-    exception, timeout, malformed payload) — an unreachable gate must never
-    block a draft; it only blocks on an actual sub-threshold verdict from a
-    gate that responded. This mirrors coach_quality_gate.py's own internal
-    fail-open contract (`_build_fallback_report`) for LLM-side failures.
+    can actually enforce the verdict. Fails OPEN on transport-level infra errors
+    ONLY (invoke exception, timeout, malformed payload) — an unreachable gate
+    never made a judgment, so it must not block. This no longer mirrors the
+    gate's own internal contract: since #3083 (owner decision 2026-08-29,
+    ADR-108 amendment) a gate that RESPONDED but could not run its judge fails
+    CLOSED (`_build_fallback_report` returns `passed: False`, `_fallback: True`)
+    and the regenerate-or-hold loop below holds that coach's section.
     """
     try:
         resp = lambda_client.invoke(
@@ -1279,7 +1281,11 @@ def _enforce_quality_gate(
     with a note.
 
     Never fails open on an actual sub-threshold verdict from a gate that
-    responded — only on gate infra errors (see `_invoke_quality_gate_sync`).
+    responded — only on transport-level infra errors (see
+    `_invoke_quality_gate_sync`). Since #3083 a responding gate whose own LLM
+    judge failed also holds (`_fallback: True`, `passed: False`): the loop
+    below regenerates once — giving the judge a second chance on a fresh
+    draft — and holds only if that attempt cannot be judged (or fails) either.
 
     #744: when the gate actually FIRES on the original draft (a real verdict,
     not a fail-open), the draft/final/findings/disposition are retained via

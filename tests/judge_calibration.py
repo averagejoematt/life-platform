@@ -44,7 +44,8 @@ THE HONESTY CONTRACT (ADR-104 honest numbers, ADR-105 rigor bar)
 ────────────────────────────────────────────────────────────────
 1. Every rate carries its denominator, and the denominator counts only cases that
    produced a REAL verdict. `_run_quality_gate` swallows every exception and
-   returns `_build_fallback_report` — `passed=True, score=50`. Counting those as
+   returns `_build_fallback_report` — `passed=False, score=50` since #3083
+   (fail-closed), `_fallback: True` either way. Counting those as
    passes would manufacture a flattering sensitivity out of a dead Bedrock
    endpoint. They are excluded and reported as `unavailable`.
 2. Uncertainty, not point estimates. Every rate ships a 95% Wilson score interval.
@@ -362,7 +363,7 @@ def _judge_one(gate, case, call_haiku=None, generation_date="2026-01-01"):
         unavailable_reason = f"non-dict gate return: {type(report).__name__}"
     elif report.get("_fallback"):
         sug = (report.get("suggestions") or [""])[0]
-        unavailable_reason = f"gate returned its permissive fallback report ({sug})"
+        unavailable_reason = f"gate returned its fallback report — judge did not run ({sug})"
     elif report.get("statusCode") not in (200, None):
         unavailable_reason = f"gate returned statusCode={report.get('statusCode')}: {report.get('error')}"
     elif not isinstance(report.get("score"), (int, float)):

@@ -55,6 +55,10 @@ S3: config/coaches/{coach_id}.json (voice spec)
 v1.0.0 — 2026-04-06 (Coach Intelligence)
 v1.1.0 — 2026-07-05 (N-06, #390): caller-side promotion to blocking; no change to
          this module's own scoring logic.
+v1.2.0 — 2026-08-29 (#3083, ADR-108 amendment): fail-closed fallback — when the
+         gate's own LLM call fails, `_build_fallback_report` reports
+         `passed: False` with an honest `reason`, so the blocking caller holds
+         the unjudged draft (regenerate-or-hold) instead of green-lighting it.
 """
 
 import json
@@ -98,7 +102,8 @@ VOICE_DISTINCTIVENESS_MINIMUM = 40  # Below this = flagged as generic
 # MEASURED 30d to 2026-08-23 from CloudWatch:
 #   • 84 of 484 metered calls (17.4%) logged `Quality gate LLM returned non-dict
 #     for … — using fallback`; the fallback is `_build_fallback_report`, which
-#     returns passed=True. Chronic — it fired on 24 of the 30 days.
+#     returned passed=True at the time (flipped to fail-closed by #3083, owner
+#     decision 2026-08-29). Chronic — it fired on 24 of the 30 days.
 #   • LifePlatform/AI AnthropicOutputTokens for coach-quality-gate: Maximum ==
 #     800.0 exactly (Average 632, n=484). Over the trailing 14d, ≥55 of 175 calls
 #     (31.4%) ended at the cap — i.e. billed in full, then discarded.
@@ -695,19 +700,28 @@ def _build_quality_gate_message(coach_id, output_text, voice_spec, generation_br
 
 
 def _build_fallback_report(coach_id, error_msg):
-    """Build a permissive fallback report when the LLM call fails.
+    """Build a FAIL-CLOSED fallback report when the gate's own LLM call fails.
 
-    The quality gate is advisory — a failure to evaluate should not block output.
-    Returns a passing report with a note about the evaluation failure.
+    #3083 (owner decision 2026-08-29, ADR-108 amendment): an unjudgeable draft is
+    HELD, never green-lit by its own fallback report. This returned `passed: True`
+    until then, and the blocking gate green-lit 84/484 drafts (17.4%, 24 of 30
+    days) it never evaluated — the dominant trigger (the 800-token judge cap) was
+    removed by #3081 (measured post-fix rate 0/42) and `TruncatedResponses`
+    guards its recurrence, so this path should now be rare. When it does fire,
+    the caller's regenerate-or-hold loop (`ai_calls._enforce_quality_gate`)
+    retries the judge on a fresh draft and holds ONLY this coach's section if
+    the judge stays dark (`CoachHold` is terminal per-domain, #966 — the brief
+    itself still ships).
     """
     return {
-        "passed": True,
+        "passed": False,
         "score": 50,
+        "reason": f"quality gate evaluation failed ({error_msg}) — draft held unjudged, fail-closed (#3083)",
         "anti_pattern_violations": [],
         "decision_class_violations": [],
         "voice_distinctiveness_score": 50,
         "cross_coach_similarity_flags": [],
-        "suggestions": [f"Quality gate evaluation failed ({error_msg}) — output passed by default"],
+        "suggestions": [f"Quality gate could not evaluate this draft ({error_msg}) — held unjudged, not passed by default (#3083)"],
         "_fallback": True,
     }
 
@@ -814,8 +828,9 @@ def _run_quality_gate(coach_id, output_text, voice_spec, generation_brief, other
     except Exception as e:
         logger.error("Quality gate LLM call failed for %s: %s", coach_id, e)
         # Deterministic-first (ADR-105): a fabricated number the grounder already
-        # caught still blocks even when the judge is unreachable. The permissive
-        # fallback exists for the LLM's opinion, not for the arithmetic.
+        # caught still rides the report even when the judge is unreachable — and
+        # since #3083 the fallback itself fails closed, so the grounder's findings
+        # land in the same held report's suggestions for the corrective rewrite.
         return _apply_number_grounding_verdict(_build_fallback_report(coach_id, str(e)), grounding)
 
 

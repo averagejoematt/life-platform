@@ -141,8 +141,9 @@ def test_model_cannot_overrule_the_deterministic_verdict(gate):
 
 
 def test_deterministic_block_survives_an_unreachable_judge(gate):
-    """Deterministic-first: the permissive fallback exists for the LLM's opinion,
-    not for the arithmetic."""
+    """Deterministic-first: the grounder's verdict rides the fallback report, so
+    a fabricated number is named even when the judge is down (and since #3083
+    the fallback itself fails closed too)."""
     cn = _canary("canary_hrv_fabricated")
 
     def _boom(*_a, **_k):
