@@ -2,10 +2,14 @@
 """
 Life Platform — Data Export & Portability Lambda (#19)
 
-Monthly full DynamoDB table dump to S3 as partitioned JSON files.
+Full DynamoDB table dump to S3 as partitioned JSON files.
 One file per source partition for easy consumption.
 
-Schedule: EventBridge — 1st of each month at 3:00 AM PT
+Schedule: NONE — on-demand only, by design (agrees with cdk/stacks/operational_stack.py
+  "life-platform-data-export (on-demand only)" and docs/DATA_GOVERNANCE.md §Export).
+  The pre-IaC monthly EventBridge rule this line used to cite — cron(0 11 1 * ? *),
+  ENABLED with zero targets — was retired by #3279 (deploy/teardown_orphan_export_rule.py);
+  deploy/sentinel_events.py now reports any such rule as drift.
 Event: {"export_type": "full"} or {} for full export
 
 Also supports:
