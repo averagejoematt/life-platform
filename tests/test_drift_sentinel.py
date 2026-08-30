@@ -1069,6 +1069,18 @@ def test_github_config_scope_gap_is_needs_owner_not_red(monkeypatch):
     # The realistic CI state without the GH_POSTURE_TOKEN secret: admin-read surfaces
     # 403 for the workflow token → "unavailable" + ONE needs-owner line naming the
     # exact fine-grained-PAT permission; NEVER drift/error for a known scope gap.
+    #
+    # 2026-08-30: the checked-in posture flipped repo_settings to applied:true (D0.6
+    # done), so the #3207 pending SHAPE this test also ranks against is synthesized —
+    # the fourth fixture tonight that had been silently using reality as its fixture.
+    import json as _json
+
+    with open(sg.GITHUB_POSTURE_FILE) as f:
+        _pending = _json.load(f)
+    _pending["repo_settings"]["applied"] = False
+    _pending["repo_settings"].pop("applied_on", None)
+    _pending["repo_settings"]["blocked_on"] = "RECONCILE_PUSH_TOKEN (pending-shape fixture; real file applied 2026-08-30)"
+    monkeypatch.setattr(sg, "_load_github_posture", lambda: _pending)
     _fake_gh(
         monkeypatch,
         _config_routes(
@@ -1076,9 +1088,9 @@ def test_github_config_scope_gap_is_needs_owner_not_red(monkeypatch):
             ruleset=(None, _SCOPE_ERR),
             rc_list=(None, _SCOPE_ERR),
             vuln=(None, _SCOPE_ERR),
-            # today's real repo state, so repo_settings reports #3207 `pending`: the
-            # aggregation must still rank `unavailable` ABOVE pending — a scope gap is
-            # "I could not look", which outranks "declared, not yet applied".
+            # auto-merge off + applied:false → repo_settings reports #3207 `pending`:
+            # the aggregation must still rank `unavailable` ABOVE pending — a scope gap
+            # is "I could not look", which outranks "declared, not yet applied".
             repo=(_REPO_AUTO_MERGE_OFF, None),
         ),
     )
