@@ -50,3 +50,11 @@ deploy_lambda\.sh.{0,3}will refuse	stale ADR-031 claim — deploy_lambda.sh acce
 # tombstone is removed. Only the issue-form rule remains below.
 \.github/ISSUE_TEMPLATE	retired (#1324) — issue forms saw 0 real-world uses (enhancement label: 0 ever); agent filing via `gh issue create` per ADR-099 IS the intake
 one channel only, no auto[- ]post	the blanket anti-auto-posting stance was amended by ADR-140 (#1630) — content syndication is sanctioned (projection-only, approval upstream, SSM kill switch, rate+spend caps); milestones/body-composition stay permanently excluded. Cite ADR-140; do not restate the old blanket claim as current
+# #2833 (2026-08-30): the remediation agent is shadow PERMANENTLY. The auto-merge gate,
+# the auto-earn marker/streak and the shadow→auto re-promotion bar are all retired; a
+# live doc that still teaches any of them is teaching a merge path that does not exist.
+remediation/automerge\.py	retired 2026-08-30 (#2833, ADR-129 amendment) — no self-merge path exists; a human merges every remediation PR. If the line describes the retirement, say "retired".
+auto_earn_marker	retired 2026-08-30 (#2833) — there is no auto-earn path; shadow is permanent
+earn_or_shadow_check	retired 2026-08-30 (#2833) — there is no auto-earn path; shadow is permanent
+10[- ]consecutive[- ]clean[- ]run	the ADR-129 re-promotion bar was retired 2026-08-30 (#2833) — shadow is permanent, there is nothing to re-promote to
+off\s*\|\s*shadow\s*\|\s*auto	`auto` is a retired remediation-mode value (#2833, 2026-08-30) — the kill-switch is `off | shadow`

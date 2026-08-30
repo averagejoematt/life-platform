@@ -27,8 +27,8 @@ DATA SOURCE — build-time, read-only (no new /api endpoint, so no autodeploy ra
       python3 scripts/v4_build_agent_review.py --no-s3         # honest empty page
 
   If S3 is unreachable and no snapshot is given, the page renders its honest empty
-  state (the agent has been in shadow mode — it proposes but does not merge, so
-  there may be zero landed auto-fixes to grade yet).
+  state (the agent is in shadow mode, permanently since #2833 — it proposes but
+  does not merge, so there are zero landed auto-fixes to grade).
 
 CHROME NOTE (#1009/#1639): the doors nav / footer / head-chrome emitted here are the
 canonical partials from `v4_chrome.py`; `scripts/v4_apply_chrome.py` re-flattens them
@@ -322,10 +322,10 @@ def render(rec: dict) -> str:
     else:
         cases_html = (
             '<div class="ar-empty">'
-            "<p>No public case files yet. The auto-merge gate has recorded no merged or held decisions, "
-            "so there is nothing to grade — which is itself the honest read on an agent that has run in "
-            "<strong>shadow mode</strong> (it triages and proposes, but a human merges). When the gate "
-            "resumes auto-merging, landed fixes will appear here with their 14-day survival grade.</p>"
+            "<p>No public case files. The auto-merge gate recorded no merged or held decisions in its "
+            "lifetime and was retired on 2026-08-30, so there is nothing to grade — which is itself the "
+            "honest read on an agent that runs in <strong>shadow mode</strong>, permanently (it triages "
+            "and proposes, but a human merges). Proposed PRs still appear here as they are opened.</p>"
             "</div>"
         )
 

@@ -118,7 +118,7 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | `deploys/` (Lambda deploy artifacts) | **Current: 30 days; non-current: 7 days (keep 1)** | Pre-existing (Expiration) + #2642 — `expire-lambda-deploy-artifacts` (added `NoncurrentVersionExpiration`) |
 | `cloudtrail/` (audit logs) | **90 days** | P2.5 / P7 — `cloudtrail-expire-90d` |
 | `mcp-audit/` (MCP write-audit trail, #753) | **90 days** (classed with `cloudtrail/` audit logs); Infrequent Access at 30 days | #886 — `mcp-audit-ia-30d-expire-90d` |
-| `remediation-log/` (automerge audit ledger, ADR-065) | **Forever**; only the `dispatch-dedupe/` sub-prefix (transient dedupe markers) expires at **1 day** | `remediation-dispatch-dedupe-expire-1d` |
+| `remediation-log/` (remediation audit ledger — agent runs, ADR-064; the `automerge/` sub-prefix is the retired gate's empty history, ADR-065/#2833) | **Forever**; only the `dispatch-dedupe/` sub-prefix (transient dedupe markers) expires at **1 day** | `remediation-dispatch-dedupe-expire-1d` |
 | `site/` (published website) | **Current: forever; non-current: 7 days (keep 1)** — every content-hashed redeploy versions the whole tree; `rollback_site.sh` rebuilds from git and never reads noncurrent S3 versions, so this cannot break rollback | #2642 — `site-expire-noncurrent-7d` |
 | `dashboard/`, `blog/` | **Forever** (static content) | None — long-lived public assets |
 

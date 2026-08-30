@@ -16,7 +16,9 @@ Source records (schema observed on the live log, not invented):
 
   • gate decisions  remediation-log/automerge/{YYYY}/{MM}/{DD}/pr{N}-{HHMMSS}.{merged|held}.json
         {pr, title, url, action:"merged"|"held", reason, infra}
-        (remediation/automerge.py::_decision / audit)
+        (written by the RETIRED remediation/automerge.py::_decision / audit — the gate
+        was removed 2026-08-30 by #2833 and the prefix holds 0 objects; the reader stays
+        so the public record is honest about the count and would render history if any)
 
 This module is PURE — it operates on already-parsed record dicts, does no I/O,
 imports no boto3 — so the build script (scripts/v4_build_agent_review.py) and the

@@ -5,9 +5,11 @@ Two things matter here:
   1. The agent reads the Coherence Sentinel's durable findings
      (coherence-log/latest.json) and surfaces them ONLY when they're flagging —
      an OK record is noise, not a signal.
-  2. The SAFETY INVARIANT: content/correctness can never auto-merge. The
-     auto-merge gate's ALLOWLIST must contain no coach/prompt/grounding/compute
-     path, so a coherence-driven content edit always needs a human.
+  2. The SAFETY INVARIANT: nothing the agent proposes can merge without a human.
+     Since #2833 (ADR-129 amendment 2026-08-30 — shadow is permanent) that is
+     structural rather than a gate's allowlist: the auto-merge gate module and the
+     auto-earn path are gone, the workflow has no merge step, and `gh pr merge` is
+     disallowed in-band. The tests in the #2833 block below hold that shape.
 """
 
 import os
@@ -23,7 +25,6 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "test")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "remediation"))
 
 import agent  # noqa: E402
-import automerge  # noqa: E402
 
 
 class _Body:
@@ -119,80 +120,102 @@ _CONTENT_MARKERS = (
 )
 
 
-def test_automerge_allowlist_has_no_content_paths():
-    for entry in automerge.ALLOWLIST:
-        low = entry.lower()
-        assert not any(m in low for m in _CONTENT_MARKERS), f"content path on auto-merge allowlist: {entry}"
-
-
-def test_automerge_denylist_blocks_bedrock_and_prompts():
-    # Defense in depth: even if a content file were mistakenly allowlisted, these
-    # denylist substrings catch the highest-risk content/AI surfaces.
-    for sub in ("bedrock_client", "budget_guard"):
-        assert sub in automerge.DENYLIST_SUBSTR
-
-
-# ── #2611: IAM is not an auto-mergeable class, and the guard is DERIVED ──────
+# ── #2833: shadow is permanent — no self-merge path, no auto-earn path ──────
 #
-# The decision (recorded next to the ALLOWLIST in remediation/automerge.py) is that
-# automated merge authority over IAM is withheld until the ADR-129 `shadow` → `auto`
-# re-promotion prices it. These tests enumerate the role_policies family from disk
-# rather than hand-listing it, so a ninth sibling is covered the day it is created —
-# hand-listing is what went stale in the #2604 split (#2608 repaired six other
-# exact-path matchers for the same reason).
+# The owner decision (issue #2833, 2026-08-29) retired `auto` mode outright. These tests
+# hold the resulting SHAPE, not a gate's configuration: the gate module is gone, the
+# workflow has no merge step, the agent forbids `gh pr merge` in-band, the earn marker
+# machinery is gone, and a stale `auto` in SSM is coerced to shadow and REPORTED rather
+# than honoured. IAM stays a human-merged class by the same structure (#2611's decision
+# is now simply "everything is human-merged").
 
-_ROLE_POLICIES_FAMILY = sorted("cdk/stacks/" + p.name for p in pathlib.Path(_REPO, "cdk", "stacks").glob("role_policies*.py"))
-
-
-def test_role_policies_family_is_nonempty():
-    """Mutation canary: if the glob ever finds nothing, the guards below pass vacuously."""
-    assert len(_ROLE_POLICIES_FAMILY) >= 2, f"expected the facade + siblings, got {_ROLE_POLICIES_FAMILY}"
-    assert "cdk/stacks/role_policies.py" in _ROLE_POLICIES_FAMILY
+_WORKFLOW_PATH = pathlib.Path(_REPO, ".github", "workflows", "remediation-agent.yml")
+_AGENT_SRC = pathlib.Path(agent.__file__).read_text(encoding="utf-8")
 
 
-def test_no_role_policies_file_is_auto_mergeable():
-    """Every member of the family — facade included — is held, with a legible reason."""
-    for path in _ROLE_POLICIES_FAMILY:
-        ok, reason = automerge.eligible([{"path": path, "additions": 3, "deletions": 0}])
-        assert not ok, f"{path} is auto-mergeable — #2611 says IAM waits for the ADR-129 promotion"
-        assert "denylisted path" in reason, reason
-        # A bare "denylisted path: …" reads as an oversight; the decision must be legible.
-        assert "#2611" in reason and "ADR-129" in reason, f"held reason is not legible: {reason}"
+def _workflow_without_comments():
+    return "\n".join(line for line in _WORKFLOW_PATH.read_text(encoding="utf-8").splitlines() if not line.lstrip().startswith("#"))
 
 
-def test_role_policies_denial_survives_a_mixed_pr():
-    """A sibling smuggled in alongside genuinely allowlisted files is still held."""
-    ok, reason = automerge.eligible(
-        [
-            {"path": "tests/test_role_policies.py", "additions": 4, "deletions": 0},
-            {"path": "cdk/stacks/role_policies_serve.py", "additions": 3, "deletions": 0},
-        ]
+def test_automerge_gate_module_is_retired():
+    assert not pathlib.Path(_REPO, "remediation", "automerge.py").exists(), "#2833 retired remediation/automerge.py — do not resurrect it"
+
+
+def test_workflow_has_no_merge_step():
+    wf = _workflow_without_comments()
+    assert "automerge" not in wf, "the workflow still runs an auto-merge step"
+    assert "gh pr merge" not in wf, "the workflow merges PRs — shadow is permanent (#2833)"
+
+
+def test_agent_forbids_merging_in_band():
+    assert '"Bash(gh pr merge *)"' in _AGENT_SRC, "the agent's disallowed_tools no longer forbids `gh pr merge`"
+
+
+def test_no_auto_earn_machinery_remains():
+    for name in ("earn_or_shadow_check", "EARN_MARKER_KEY", "AUTO_EARN_WINDOW_DAYS"):
+        assert not hasattr(agent, name), f"{name} is back — the auto-earn path was retired by #2833"
+    assert "auto_earn_marker" not in _AGENT_SRC
+
+
+def test_live_modes_are_off_and_shadow_only():
+    assert agent._LIVE_MODES == ("off", "shadow")
+
+
+def _modes(monkeypatch, mode, tier="0"):
+    values = {agent.MODE_PARAM: mode, agent.BUDGET_PARAM: tier}
+    monkeypatch.setattr(agent, "_param", lambda name, default: values.get(name, default))
+
+
+def test_gate_shadow_and_off_keep_their_semantics(monkeypatch):
+    _modes(monkeypatch, "shadow")
+    assert agent.gate() == "shadow"
+    assert agent._stale_mode is None
+    assert agent.stale_mode_escalation() is None
+    _modes(monkeypatch, "off")
+    assert agent.gate() is None
+    _modes(monkeypatch, "shadow", tier="3")
+    assert agent.gate() is None
+
+
+def test_gate_coerces_retired_auto_to_shadow_and_reports_it(monkeypatch):
+    """`auto` is rejected as a grant but not as a run: triage still happens (as shadow) and
+    the operator gets a named needs-human line telling them the parameter is stale."""
+    _modes(monkeypatch, "auto")
+    assert agent.gate() == "shadow"
+    item = agent.stale_mode_escalation()
+    assert item is not None
+    assert "'auto'" in item["issue"] and "shadow" in item["action"] and "remediation-mode" in item["action"]
+    # and it clears again once the parameter is sane
+    _modes(monkeypatch, "shadow")
+    agent.gate()
+    assert agent.stale_mode_escalation() is None
+
+
+def test_clean_run_email_still_carries_a_stale_mode_line(monkeypatch):
+    """The no-signals early return must not swallow the one deterministic line this run
+    has to say — otherwise a stale `auto` is invisible exactly on quiet days."""
+    _modes(monkeypatch, "auto")
+    monkeypatch.setattr(
+        agent,
+        "gather_signals",
+        lambda ev: {"alarms": [], "ci_failures": [], "dlq": {}, "coherence": None, "drift": None, "urgent": None},
     )
-    assert not ok
-    assert "role_policies_serve.py" in reason
+    emailed = {}
+    monkeypatch.setattr(agent, "email_report", lambda report, mode: emailed.update(report=report, mode=mode))
+    assert agent.main() == 0
+    assert emailed["mode"] == "shadow"
+    assert any("'auto'" in i["issue"] for i in emailed["report"]["needs_human"])
 
 
-def test_the_iam_denial_is_load_bearing(monkeypatch):
-    """Mutation proof: drop the #2611 entry and the same PR would merge.
-
-    Without this, the two tests above could be passing on the pre-#2611 "not on
-    allowlist" behaviour rather than on the deliberate denial.
-    """
-    files = [{"path": "cdk/stacks/role_policies_serve.py", "additions": 3, "deletions": 0}]
-    monkeypatch.setattr(automerge, "DENYLIST_SUBSTR", tuple(s for s in automerge.DENYLIST_SUBSTR if "role_policies" not in s))
-    monkeypatch.setattr(automerge, "ALLOWLIST", automerge.ALLOWLIST + ("cdk/stacks/role_policies_serve.py",))
-    ok, reason = automerge.eligible(files)
-    assert ok, f"mutation did not restore eligibility — the guards above prove nothing ({reason})"
+def test_prompt_and_taxonomy_keep_iam_human_merged():
+    prompt = open(os.path.join(_REPO, "remediation", "prompt.md")).read()
+    taxonomy = open(os.path.join(_REPO, "docs", "REMEDIATION_TAXONOMY.md")).read()
+    assert "An IAM fix is never A" in prompt
+    assert "Missing IAM grant" in taxonomy and "Bucket B" in taxonomy
+    assert "Do NOT merge" in prompt
 
 
-def test_test_role_policies_py_is_still_an_allowed_companion():
-    """The denial is prefixed to `cdk/stacks/` on purpose — a bare `role_policies`
-    substring would also deny the accompanying test update, which IS allowlisted."""
-    ok, reason = automerge.eligible([{"path": "tests/test_role_policies.py", "additions": 4, "deletions": 0}])
-    assert ok, reason
-
-
-# ── #396: report-first skeleton, ack ledger, earn-or-shadow ─────────────────
+# ── #396: report-first skeleton, ack ledger ─────────────────────────────────────────────
 
 
 def test_skeleton_report_lists_every_signal(tmp_path):
@@ -276,59 +299,6 @@ def test_update_ack_ledger_expires_old_entries(monkeypatch):
     ledger = {"dead": {"expires": (now - timedelta(days=1)).isoformat(), "bucket": "stale", "conclusion": ""}}
     out = agent.update_ack_ledger(ledger, {"needs_human": [], "stale": []}, {"alarms": []}, now=now)
     assert "dead" not in out
-
-
-def test_earn_check_noop_outside_auto():
-    assert agent.earn_or_shadow_check("shadow") is None
-
-
-def test_earn_check_flags_dialback_after_window(monkeypatch):
-    import json as _json
-    from datetime import datetime, timezone
-
-    now = datetime(2026, 7, 4, tzinfo=timezone.utc)
-    marker = {"window_started": "2026-06-01T00:00:00+00:00"}  # 33 days elapsed
-
-    def _get(**kw):
-        assert kw["Key"] == agent.EARN_MARKER_KEY
-        return {"Body": _Body(_json.dumps(marker).encode())}
-
-    monkeypatch.setattr(agent._s3, "get_object", _get)
-
-    class _Out:
-        returncode = 0
-        stdout = "[]"  # zero merged auto-fix-safe PRs
-
-    monkeypatch.setattr(agent.subprocess, "run", lambda *a, **k: _Out())
-    item = agent.earn_or_shadow_check("auto", now=now)
-    assert item is not None
-    assert "NOT earned auto mode" in item["issue"]
-    assert "remediation-mode" in item["action"] and "shadow" in item["action"]
-
-
-def test_earn_check_resets_window_when_earned(monkeypatch):
-    import json as _json
-    from datetime import datetime, timezone
-
-    now = datetime(2026, 7, 4, tzinfo=timezone.utc)
-    marker = {"window_started": "2026-06-01T00:00:00+00:00"}
-    puts = {}
-
-    def _get(**kw):
-        return {"Body": _Body(_json.dumps(marker).encode())}
-
-    monkeypatch.setattr(agent._s3, "get_object", _get)
-    monkeypatch.setattr(agent._s3, "put_object", lambda **kw: puts.update(kw))
-
-    class _Out:
-        returncode = 0
-        stdout = '[{"number": 460}]'
-
-    monkeypatch.setattr(agent.subprocess, "run", lambda *a, **k: _Out())
-    assert agent.earn_or_shadow_check("auto", now=now) is None
-    body = _json.loads(puts["Body"])
-    assert body["merged_prs"] == [460]
-    assert body["window_started"] == now.isoformat()  # window restarts — keeps being re-tested
 
 
 def test_prompt_instructs_incremental_report_and_ack_skip():

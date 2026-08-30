@@ -83,7 +83,8 @@ architecture is trying to leave. That ordering is a real dependency, not a cavea
 
 Reused, not invented: the ADR-129 numeric promotion frame governs every leg.
 Observe → propose-PR → act, per capability class; promotion requires the ADR-129
-2026-07-20 bar (10 consecutive clean runs, operator flip, never automatic). The
+2026-07-20 bar (10 consecutive clean runs, operator flip, never automatic — retired
+2026-08-30 by #2833, which made the agent's shadow posture permanent). The
 remediation agent's shadow demotion is the live precedent that the ladder runs BOTH
 directions. The Architect leg starts and stays at report-only — its "act" tier does
 not exist by design (a reviewer that can fix things stops being a reviewer).

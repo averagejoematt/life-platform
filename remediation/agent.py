@@ -3,13 +3,16 @@
 agent.py — self-healing remediation agent (runs in GitHub Actions).
 
 Flow per run:
-  1. Gate on SSM /life-platform/remediation-mode (off|shadow|auto) + budget tier.
+  1. Gate on SSM /life-platform/remediation-mode (off|shadow) + budget tier. `auto` is a
+     RETIRED value (#2833, ADR-129 amendment 2026-08-30 — shadow is permanent): nothing in
+     this pipeline can merge, so a stale `auto` in SSM runs as shadow and is reported.
   2. Gather the last 24h of signals deterministically (alarms, QA/freshness/cost,
      failed CI runs, DLQ) — cheap boto3/gh, no LLM.
   3. Hand the signals + docs/REMEDIATION_TAXONOMY.md to Claude (Agent SDK, on
      Bedrock) with a scoped toolset. Claude classifies each into A/B/C/D and:
        - Bucket A (auto-fix-safe): fix in a branch, open a PR labeled auto-fix-safe
-         (auto-merge only happens in `auto` mode via the workflow's merge gate).
+         (the label is a triage class, not a merge grant — a human merges it; the
+         deterministic auto-merge gate that once consumed it was retired by #2833).
        - Bucket B (fix-via-pr): open a PR labeled needs-review.
        - Bucket C (needs-human): no change — include the specific action in the report.
        - Bucket D (stale): collapse.
@@ -55,8 +58,18 @@ def _param(name, default):
         return default
 
 
+# The kill-switch's live values. `auto` was retired 2026-08-30 (#2833, ADR-129 amendment):
+# the auto-merge gate and the auto-earn path are gone, so there is no mode in which this
+# pipeline merges anything. A value outside this tuple is NOT honoured — gate() coerces
+# it to shadow and names it, so an operator who flips the parameter learns it did nothing
+# from the report rather than from silence.
+_LIVE_MODES = ("off", "shadow")
+_stale_mode = None  # set by gate() when SSM holds a value that is no longer live
+
+
 def gate():
     """Return the active mode, or None to skip the run."""
+    global _stale_mode
     mode = _param(MODE_PARAM, "shadow")
     if mode == "off":
         print("remediation-mode=off — no-op")
@@ -64,7 +77,27 @@ def gate():
     if int(_param(BUDGET_PARAM, "0") or 0) >= 3:
         print("budget tier 3 — skipping remediation to protect the ceiling")
         return None
+    if mode not in _LIVE_MODES:
+        _stale_mode = mode
+        print(f"::warning::remediation-mode={mode!r} is not a live value ({'|'.join(_LIVE_MODES)}) — running as shadow (#2833)")
+        return "shadow"
+    _stale_mode = None
     return mode
+
+
+def stale_mode_escalation():
+    """A needs-human line when SSM holds a retired/unknown mode value; None otherwise.
+
+    Deterministic, like the alarm-aging backstop: the LLM never sees the raw parameter,
+    so this is the only place a stale `auto` can be surfaced to the operator."""
+    if not _stale_mode:
+        return None
+    return {
+        "issue": f"SSM {MODE_PARAM} holds {_stale_mode!r}, which is not a live mode (live: {'|'.join(_LIVE_MODES)}). "
+        "`auto` was retired 2026-08-30 (#2833) — the agent has no self-merge path in any mode, so this run proceeded as shadow.",
+        "action": f"Reset it so the parameter says what the pipeline does: aws ssm put-parameter --name {MODE_PARAM} "
+        "--value shadow --type String --overwrite --region us-west-2",
+    }
 
 
 # ── Alarm-acknowledgement ledger (#396) ─────────────────────────────────────
@@ -274,89 +307,6 @@ def write_skeleton_report(report_path, signals):
     except Exception as e:
         print(f"[warn] skeleton report write: {e}")
     return skeleton
-
-
-# ── Earn-auto-or-return-to-shadow (#396) ─────────────────────────────────────
-# Auto mode is a claim the agent has to keep earning: if a full window elapses
-# with zero merged auto-fix-safe PRs, every subsequent auto run reports the
-# dial-back decision as needs-human until the operator flips the SSM mode (the
-# scoped role can't — and shouldn't — mutate SSM itself).
-
-AUTO_EARN_WINDOW_DAYS = 28
-EARN_MARKER_KEY = "remediation-log/auto_earn_marker.json"
-
-
-def earn_or_shadow_check(mode, now=None):
-    """In auto mode, return a needs_human item when the earn window has elapsed
-    with no merged auto-fix-safe PR; None otherwise. Fail-soft (never blocks)."""
-    if mode != "auto":
-        return None
-    now_dt = now or datetime.now(timezone.utc)
-    try:
-        marker = json.loads(_s3.get_object(Bucket=LOG_BUCKET, Key=EARN_MARKER_KEY)["Body"].read().decode())
-        started = datetime.fromisoformat(marker["window_started"])
-    except Exception:
-        try:
-            _s3.put_object(
-                Bucket=LOG_BUCKET,
-                Key=EARN_MARKER_KEY,
-                Body=json.dumps({"window_started": now_dt.isoformat()}),
-                ContentType="application/json",
-            )
-        except Exception as e:
-            print(f"[warn] earn marker write: {e}")
-        return None
-    if now_dt - started < timedelta(days=AUTO_EARN_WINDOW_DAYS):
-        return None
-    merged = []
-    try:
-        out = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--label",
-                "auto-fix-safe",
-                "--state",
-                "merged",
-                "--search",
-                f"merged:>={started:%Y-%m-%d}",
-                "--json",
-                "number",
-                "--limit",
-                "20",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=ROOT,
-            timeout=60,
-        )
-        if out.returncode == 0:
-            merged = json.loads(out.stdout or "[]")
-    except Exception as e:
-        print(f"[warn] earn check gh: {e}")
-        return None  # can't verify — don't cry wolf
-    if merged:
-        # Earned — restart the window so the claim keeps being re-tested.
-        try:
-            _s3.put_object(
-                Bucket=LOG_BUCKET,
-                Key=EARN_MARKER_KEY,
-                Body=json.dumps(
-                    {"window_started": now_dt.isoformat(), "earned_at": now_dt.isoformat(), "merged_prs": [m.get("number") for m in merged]}
-                ),
-                ContentType="application/json",
-            )
-        except Exception as e:
-            print(f"[warn] earn marker refresh: {e}")
-        return None
-    return {
-        "issue": f"The agent has NOT earned auto mode: 0 auto-fix-safe PRs merged since {started:%Y-%m-%d} "
-        f"(≥{AUTO_EARN_WINDOW_DAYS}d window)",
-        "action": "Dial it back to observe-only: aws ssm put-parameter --name /life-platform/remediation-mode "
-        "--value shadow --overwrite  — or fix why safe-class fixes aren't landing. "
-        "This decision is recorded in the audit log until acted on.",
-    }
 
 
 # ── Alarm-aging escalation (#1204) ──────────────────────────────────────────
@@ -902,8 +852,11 @@ def main():
         or signals.get("secrets_stale")  # .get: older test doubles/fixtures predate this key (#1329)
     ):
         print("no actionable signals — clean run")
-        if mode != "auto":  # in auto, automerge.py sends the single final email
-            email_report({}, mode)
+        report = {}
+        stale = stale_mode_escalation()
+        if stale:
+            report = {"needs_human": [stale]}
+        email_report(report, mode)
         return 0
     # #396: annotate signals already triaged on a recent run before prompting.
     ledger = load_ack_ledger()
@@ -933,10 +886,10 @@ def main():
         else:
             report["_raw"] = text[-1500:]
     report.pop("_skeleton", None)
-    # #396: auto mode is earned — surface the dial-back decision when it isn't.
-    earn_item = earn_or_shadow_check(mode)
-    if earn_item:
-        report.setdefault("needs_human", []).append(earn_item)
+    # #2833: a retired/unknown SSM mode value is a needs-human line, never a grant.
+    stale = stale_mode_escalation()
+    if stale:
+        report.setdefault("needs_human", []).append(stale)
     # #1204: deterministic alarm-aging backstop — surface any alarm stuck in ALARM
     # past the escalation window as a NAMED needs-human line, whether or not the LLM
     # triage reached it, so a burned turn budget can never silently absorb a dead
@@ -960,7 +913,7 @@ def main():
         if name not in existing_text:
             report.setdefault("needs_human", []).append(item)
             existing_text += " " + name
-    # Keep the file consistent with what we report/audit (the merge gate reads it).
+    # Keep the file consistent with what we report/audit.
     try:
         with open(report_path, "w") as f:
             json.dump(report, f)
@@ -968,12 +921,9 @@ def main():
         print(f"[warn] write report file: {e}")
     update_ack_ledger(ledger, report, signals)
     audit_log(report, signals, mode)
-    # In auto mode the merge gate (automerge.py) processes auto-fix-safe PRs and
-    # sends the single final email; in shadow/off we email here.
-    if mode != "auto":
-        email_report(report, mode)
-    else:
-        print("auto mode — deferring report email to the merge gate")
+    # One curated email per run, always from here — the merge-gate step that used to
+    # send it in `auto` was retired with the mode (#2833).
+    email_report(report, mode)
     # #1201: after the report/email/audit are written (operator is never left
     # blind), red the step if the loop didn't close — signals left untriaged with
     # a truncated `_raw` tail means the turn/token budget burned out mid-triage.

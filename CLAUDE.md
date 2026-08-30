@@ -135,17 +135,19 @@ GitHub Actions (`.github/workflows/ci-cd.yml`): Lint → Test → Plan → Deplo
 
 Daily brief is "protect longest" by design. Manual reset for testing: `aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String --overwrite`.
 
-## Self-healing Remediation Agent (ADR-064/065)
+## Self-healing Remediation Agent (ADR-064/065 — a triage instrument, shadow permanently)
 
-Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~07:45 PT Mon/Wed/Fri — cron `45 14 * * 1,3,5`; urgent alarms still trigger it on-demand via `repository_dispatch`) triages CloudWatch alarms, failed CI runs, DLQ depth, QA-smoke results — auto-fixes the safe class, opens PRs for the rest, reports needs-human items in one curated email.
+Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~07:45 PT Mon/Wed/Fri — cron `45 14 * * 1,3,5`; urgent alarms still trigger it on-demand via `repository_dispatch`) triages CloudWatch alarms, failed CI runs, DLQ depth, QA-smoke results — opens PRs for what it can fix, reports needs-human items in one curated email. **It merges nothing, in any mode.**
 
-**Auth:** AWS OIDC → `github-actions-remediation-role` (Bedrock + read-only diagnosis + scoped audit-log writes, NO deploy/IAM mutate). Model: Sonnet 4.6 on Bedrock — no Anthropic key.
+**Auth:** AWS OIDC → `github-actions-remediation-role` (Bedrock + read-only diagnosis + scoped audit-log writes, NO deploy/IAM mutate). Model: Haiku-primary on Bedrock (Sonnet for escalation) — no Anthropic key.
 
-**Kill-switch:** SSM `/life-platform/remediation-mode` = `off | shadow | auto`. Tier-3 budget also no-ops the run. **Current mode: `shadow`** (demoted 2026-07-06, ADR-129 — zero merged safe-class PRs in ~6 weeks; the agent still triages and opens PRs, it just doesn't self-merge). Re-promotion to `auto` requires the numeric 10-consecutive-clean-run bar in the ADR-129 2026-07-20 amendment (#1337), an explicit operator SSM flip — never automatic.
+**Kill-switch:** SSM `/life-platform/remediation-mode` = `off | shadow`. Tier-3 budget also no-ops the run. **`auto` is a retired value** (owner decision on #2833, 2026-08-29; ADR-129 amendment 2026-08-30): zero agent-authored safe-class PRs were ever merged in either mode, so the deterministic auto-merge gate (`remediation/automerge.py`), the `auto_earn_marker.json` streak machinery and the 10-consecutive-clean-run re-promotion bar (#1337) were all retired together. A stale `auto` in SSM is coerced to `shadow` by `agent.py::gate()` and surfaced as a needs-human line — it is never honoured. There is no re-promotion path; reopening one is a new ADR, not an SSM flip.
 
-**Auto-merge is a deterministic gate, not the agent** (ADR-065). The agent (read-only role) opens `auto-fix-safe` PRs; `remediation/automerge.py` runs after and merges only if ALL hold: every file on a narrow ALLOWLIST (lambda_map, monitoring_stack, freshness_checker, qa_smoke, tests/), no file on the DENYLIST (bedrock_client, budget_guard, auth/secrets, deploy/, workflows/, core_stack, **and the whole `cdk/stacks/role_policies*` IAM family**), diff ≤ 60 lines, lint + offline unit-test subset pass, daily cap (3) not reached. **IAM left the ALLOWLIST 2026-08-13 (#2611, ADR-065 amendment):** #2604's split turned one file into eight, so the grant is priced with the `shadow` → `auto` re-promotion (ADR-129) rather than restored by a refactor — missing-IAM-grant is Bucket B (`needs-review`, human merges) until then. **CI's production approval gate stays intact** — auto-merge does NOT auto-deploy. Infra merges that touch `cdk/` are flagged "needs cdk deploy."
+**What the agent still does:** classifies each signal per `docs/REMEDIATION_TAXONOMY.md` (A = safe-class template, B = fix-via-PR, C = needs-human, D = stale). Buckets A and B both land as PRs a human merges — the `auto-fix-safe` label is a triage class, not a grant; IAM (`cdk/stacks/role_policies*`) stays Bucket B (#2611). `gh pr merge` is in the agent's `disallowed_tools` and the workflow has no merge step (`tests/test_remediation_agent.py` + the public-claims registry hold that shape). **CI's production approval gate is untouched** — a merged PR is never a deployed one.
 
-**Audit log:** every gate decision → `s3://matthew-life-platform/remediation-log/automerge/`. Classifier rubric: `docs/REMEDIATION_TAXONOMY.md`.
+**Rent (measured, ADR-105):** `LifePlatform/AI::EstimatedCostUSD{LambdaFunction=remediation-agent}` summed **$1.60 over 2026-08-24→30 (n=9 emitting runs of 11; 3 scheduled)** ≈ $0.18/run — see the row in `docs/PROPORTIONALITY.md`. **Audit log:** every run → `s3://matthew-life-platform/remediation-log/YYYY/MM/DD/HHMMSS.json`; the `automerge/` sub-prefix is history (it holds zero objects).
+
+---
 
 ## Experiment Restart Pipeline (ADR-058/059/077)
 

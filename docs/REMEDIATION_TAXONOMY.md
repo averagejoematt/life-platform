@@ -9,16 +9,19 @@ one **bucket**. Buckets decide what the agent does. Seeded from real incidents
 fixed 2026-05-26→29; extend as new patterns recur.
 
 **Modes** (SSM `/life-platform/remediation-mode`): `off` (no-op) · `shadow`
-(diagnose + open PRs + email, never auto-merge) · `auto` (auto-merge the
-AUTO-FIX-SAFE allowlist, PR the rest).
+(diagnose + open PRs + email — a human merges every PR). `auto` was **retired
+2026-08-30** (#2833, ADR-129 amendment): there is no self-merge path in any mode, and
+a stale `auto` in SSM runs as shadow and is reported as needs-human.
 
 ---
 
-## Bucket A — AUTO-FIX-SAFE (auto-merge allowlist in `auto` mode)
+## Bucket A — AUTO-FIX-SAFE (the safe-class templates; label `auto-fix-safe`, human-merged)
 
-Only these *specific change templates* may auto-merge. The diff must match the
-template, touch only the named files, be ≤ ~40 lines, and pass full CI. Anything
-broader → Bucket B (PR for review). If unsure, downgrade to B.
+Only these *specific change templates* qualify as the safe class. The diff must match
+the template, touch only the named files, be ≤ ~40 lines, and pass full CI. Anything
+broader → Bucket B (PR for review). If unsure, downgrade to B. The label is a triage
+class — it tells the operator "template-shaped, low-risk" — **not a merge grant**: since
+#2833 nothing in the pipeline merges, so A and B differ in label and review depth only.
 
 | Pattern | Detect | Fix template | File(s) |
 |---|---|---|---|
@@ -35,11 +38,11 @@ detect `AccessDenied`/`not authorized to perform` in the logs, cross-ref the bot
 against the role, add the missing action/resource to the matching
 `cdk/stacks/role_policies_<domain>.py` sibling plus the `role_policies.py` facade
 re-export (#2604), and note that the stack needs a `cdk deploy`. What changed is the
-**merge authority**, not the diagnosis: the whole `cdk/stacks/role_policies*` family is
-on the auto-merge DENYLIST, so label the PR `needs-review`, not `auto-fix-safe`. Whether
-the agent may ever merge IAM unattended is decided with the `shadow` → `auto`
-re-promotion (ADR-129), which already carries its own 10-consecutive-clean-run bar and an
-explicit operator SSM flip. See the note above the ALLOWLIST in `remediation/automerge.py`.
+**merge authority**, not the diagnosis: IAM is never the safe class, so label the PR
+`needs-review`, not `auto-fix-safe`. The question "may the agent ever merge IAM
+unattended" was closed by #2833 (2026-08-30): the `shadow` → `auto` re-promotion that
+was to price it is retired along with the auto-merge gate — a human merges every PR,
+IAM included, permanently.
 
 ## Bucket B — FIX-VIA-PR (open a PR; human merges, never auto)
 
@@ -123,11 +126,11 @@ match, endpoints aren't degenerate), and persists its findings to
 **These are CONTENT/CORRECTNESS failures, not infra.** They are governed by one
 hard rule:
 
-> **Coherence findings are NEVER Bucket A. Content never auto-merges.** A wrong
+> **Coherence findings are NEVER Bucket A. Content is never the safe class.** A wrong
 > number in a coach essay, a prediction that won't grade, a 30-vs-86 split — fixing
 > these means touching prompts, grounding, evaluators, or re-running compute. None
-> of that is on the auto-merge allowlist, and it never will be without explicit
-> human sign-off. Route every coherence finding to **B** or **C** only.
+> of that is template-shaped, and it never will be without explicit human sign-off.
+> Route every coherence finding to **B** or **C** only.
 
 Triage by *which invariant* failed (the finding `name` tells you):
 
@@ -143,7 +146,7 @@ Triage by *which invariant* failed (the finding `name` tells you):
 When in doubt on a coherence finding → **C (needs-human)** with the specific
 invariant, the offenders, and the digest line. The goal is that the operator sees
 *"the platform is serving something wrong, here's exactly what,"* never an
-auto-merged content edit.
+hand-waved content edit.
 
 ---
 
@@ -160,21 +163,21 @@ These NEVER include arbitrary AWS writes — only the three above.
 
 ---
 
-## Hard denylist (never auto-merge, never auto-edit; always PR + review)
+## Hard denylist (never auto-edit; always PR + review)
 
 `lambdas/ai/bedrock_client.py`, `lambdas/ai/budget_guard.py`, anything under `auth`,
 `deploy/setup_github_oidc.sh`, `deploy/*deploy*.sh`, `.github/workflows/remediation-agent.yml`
 (the agent's own workflow), `cdk/app.py`, anything matching `*secret*`/`*credential*`,
 and any change that adds/removes an IAM **principal** or widens a resource to `*`.
 
-**Content/correctness is also denylisted from auto-merge:** AI/coach **prompts**,
+**Content/correctness is also never the safe class:** AI/coach **prompts**,
 grounding/canonical-facts logic, narrative generation, the prediction
 extractor/evaluator, and anything a coherence finding points at. These are always
 B or C — see "Content & coherence signals" above. A content edit is never a Bucket
 A template, regardless of diff size.
 
 ## Guardrails
-- Auto-merge max 3/day; if exceeded, switch remaining to PR + flag in the report.
+- Nothing merges. Every PR — A or B — waits for a human (#2833 retired the auto-merge gate).
 - Respect budget Tier 3 (`/life-platform/budget-tier` ≥ 3) → skip the run.
 - Every action is a git commit/PR (revertable) + a line in the S3 remediation log.
 - When confidence is low or a signal doesn't match a template → Bucket B or C, never A.
