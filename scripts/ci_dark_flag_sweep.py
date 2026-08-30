@@ -50,6 +50,7 @@ import ast
 import glob
 import os
 import re
+import shlex
 import sys
 from dataclasses import dataclass, field
 
@@ -537,11 +538,18 @@ def _resolve_sh(raw: str, repo: str, caller_dir: str | None):
     return os.path.relpath(hits[0], repo) if len(hits) == 1 else "UNRESOLVED:" + p
 
 
+_WRAPPER_WORDS = frozenset({"bash", "sh", "source", "exec", "time", "nice", "env"})
+_ASSIGNMENT_WORD_RE = re.compile(r"[A-Za-z_]\w*=")  # `VAR=value` (value already shlex-joined into the word)
+_BOUNDARY_TAIL_RE = re.compile(r"(?:;|&&|\|\||\||\(|`|\bthen|\bdo|\belse|\bif|\bwhile|\buntil|!)$")
+
+
 def _at_command_position(text: str, start: int) -> bool:
     """Is the token at `start` a command, not a word inside an echo/heredoc string or a
-    `$(...)` mention? The prefix of its line must close every quote it opens and end at a
-    command boundary (line start, `;`, `&&`, `||`, `|`, `(`, `then`/`do`/`else`, `!`,
-    `if`/`while`, or a `bash|sh|source|exec` word that itself sits at a boundary)."""
+    `$(...)` mention? The prefix of its line must close every quote it opens and, after
+    peeling any trailing `VAR=value` assignments and a `bash|sh|source|exec` wrapper word,
+    end at a command boundary (line start, `;`, `&&`, `||`, `|`, `(`, `then`/`do`/`else`,
+    `!`, `if`/`while`). Procedural on purpose — the first version was one regex whose
+    assignment group backtracked exponentially (CodeQL py/redos on this PR)."""
     line_start = text.rfind("\n", 0, start) + 1
     prefix = text[line_start:start]
     if prefix.count('"') % 2 or prefix.count("'") % 2:
@@ -549,12 +557,14 @@ def _at_command_position(text: str, start: int) -> bool:
     stripped = prefix.rstrip()
     if not stripped:
         return True
-    boundary = re.compile(
-        r"(?:^|.*?(?:;|&&|\|\||\||\(|`|\bthen|\bdo|\belse|\bif|\bwhile|\buntil|!))\s*"
-        r"(?:[A-Za-z_]\w*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*"  # leading VAR=value assignments (ALLOW_STALE_SITE=1 bash …)
-        r"(?:(?:bash|sh|source|exec|time|nice|env)\s+)?$"
-    )
-    return bool(boundary.fullmatch(stripped + " "))
+    try:
+        words = shlex.split(stripped, posix=True)
+    except ValueError:
+        words = stripped.split()
+    while words and (words[-1] in _WRAPPER_WORDS or _ASSIGNMENT_WORD_RE.match(words[-1])):
+        words.pop()
+    rest = " ".join(words)
+    return rest == "" or bool(_BOUNDARY_TAIL_RE.search(rest))
 
 
 @dataclass
