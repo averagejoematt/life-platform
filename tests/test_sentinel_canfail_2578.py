@@ -423,6 +423,7 @@ def test_doc_literals_unreadable_fact_source_is_error_not_clean(monkeypatch):
 _DS = "tests/test_drift_sentinel.py"
 _HERE = "tests/test_sentinel_canfail_2578.py"
 _REPL = "tests/test_raw_replication_dil027.py"
+_LR = "tests/test_security_log_retention_3278.py"
 _EV = "tests/test_sentinel_events_3279.py"
 
 PROOF_INDEX: dict[str, dict[str, object]] = {
@@ -532,6 +533,16 @@ PROOF_INDEX: dict[str, dict[str, object]] = {
             "coverage. Detect proved on the exact live shape (an ENABLED targetless out-of-IaC rule, "
             "life-platform-monthly-export) plus the out-of-IaC-with-target shape; cannot-observe proved on all "
             "three call sites, including the unread-IaC vacuum that would otherwise red every rule as an orphan."
+        ),
+    },
+    "sentinel::deploy/sentinel_log_retention.py::check_log_retention": {
+        "detect": (_LR, "test_detects_the_live_shape_every_group_named"),
+        "cannot_observe": (_LR, "test_cannot_enumerate_regions_is_error_naming_the_grant"),
+        "note": (
+            "NEW 2026-08-30 (#3278). The sweep's first log-group read, and its first multi-region one. Detect proved on "
+            "the exact live shape (17 groups across 7 regions: 10 NEVER_EXPIRE Lambda@Edge replicas + 7 at 30 against a "
+            "declared 90) plus a single wrong number; cannot-observe proved on all three blind states — DescribeRegions "
+            "denied (names the grant), one unreadable region (partial is not clean), and a zero-group sweep (#1189)."
         ),
     },
 }
@@ -644,4 +655,6 @@ def test_json_report_is_still_parseable_with_the_new_verdicts():
     census = gc.build_census(Path(_ROOT), families=("sentinel",))
     payload = json.loads(json.dumps(census, default=str))
     proven = [g for g in payload["gates"] if g["verdict"] == "can-fail (proven)"]
-    assert len(proven) == len(PROOF_INDEX) == 17
+    # 17 -> 18 on 2026-08-30: #3278 added sentinel::deploy/sentinel_log_retention.py::check_log_retention
+    # with both halves proved in tests/test_security_log_retention_3278.py. Move only with a new proof to cite.
+    assert len(proven) == len(PROOF_INDEX) == 18

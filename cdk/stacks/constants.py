@@ -25,6 +25,58 @@ CF_DIST_ID = os.environ.get("CF_DIST_ID", "E3S424OXQZ8NBE")
 # `check_s3_lifecycle`, deploy/drift_sentinel.py:525).
 TABLE_TTL_ATTRIBUTE = os.environ.get("TABLE_TTL_ATTRIBUTE", "ttl")
 
+# ── #3278: CloudWatch Logs retention tiers — the declared side of docs/DATA_GOVERNANCE.md ──
+# The governance table's "Logs" section promised a 90-day security tier since 2026-05-17
+# while `lambda_helpers.py` set ONE_MONTH uniformly (the only RetentionDays reference in
+# cdk/) and the two Lambda@Edge auth gates — never CDK-created — sat at 30 in their two
+# home regions and NEVER_EXPIRE in the five replica regions nobody had hand-set. Two
+# defects, one cause: the tier existed only as prose. This registry is now the ONE
+# declared source; three consumers derive from it and are parity-tested
+# (`tests/test_security_log_retention_3278.py`):
+#   1. cdk/stacks/lambda_helpers.py      — `log_retention` derived per function_name, by
+#                                          construction (no per-call-site kwarg to forget)
+#   2. deploy/sentinel_log_retention.py  — weekly declared-vs-live assertion across EVERY
+#                                          enabled region (Lambda@Edge replicates a log
+#                                          group into each region that ever served a request)
+#   3. deploy/apply_log_retention.py     — the idempotent writer for the groups CDK cannot
+#                                          own (edge replicas), dry-run by default
+# The governance doc's row is asserted against these values, so "the table moves" and
+# "the config moves" are the same edit here — never a silent doc-down reconcile.
+LOG_RETENTION_DEFAULT_DAYS = 30  # "Lambda CloudWatch Logs (most)"
+LOG_RETENTION_SECURITY_DAYS = 90  # "Lambda CloudWatch Logs (security tier)" — matches CloudTrail's 90d
+# Lambda@Edge functions are published in us-east-1 and their replica log groups are named
+# `/aws/lambda/us-east-1.<function>` in every region that executed them (including us-east-1).
+EDGE_HOME_REGION = "us-east-1"
+# function_name -> "regional" (CDK-owned, LifePlatformOperational) | "edge" (Lambda@Edge, out of CDK)
+SECURITY_TIER_LOG_FUNCTIONS = {
+    "life-platform-canary": "regional",
+    "life-platform-key-rotator": "regional",
+    "life-platform-dlq-consumer": "regional",
+    "life-platform-cf-auth": "edge",
+    "life-platform-buddy-auth": "edge",
+}
+
+
+def log_retention_days_for(function_name: str) -> int:
+    """The retention tier a Lambda's log group must carry (pure — no CDK import)."""
+    return LOG_RETENTION_SECURITY_DAYS if function_name in SECURITY_TIER_LOG_FUNCTIONS else LOG_RETENTION_DEFAULT_DAYS
+
+
+def security_tier_log_group_names() -> dict[str, str]:
+    """Every log-group name a security-tier function can appear under, -> its function.
+
+    Regional functions log to `/aws/lambda/<fn>`; edge functions log to the replica name
+    `/aws/lambda/<home-region>.<fn>` in every served region, plus the plain name in the
+    home region if ever invoked directly. All candidates are listed so the sweep guards
+    the SET rather than the two regions someone once hand-configured."""
+    out: dict[str, str] = {}
+    for fn, kind in SECURITY_TIER_LOG_FUNCTIONS.items():
+        out[f"/aws/lambda/{fn}"] = fn
+        if kind == "edge":
+            out[f"/aws/lambda/{EDGE_HOME_REGION}.{fn}"] = fn
+    return out
+
+
 # ── DIL-027: the isolated backup of the irreplaceable zone ────────────────────
 # `raw/` is the ONLY unrecomputable data on the platform (original wearable/API
 # captures; every DDB metric, every derived artifact and the whole site can be

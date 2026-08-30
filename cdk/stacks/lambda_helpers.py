@@ -69,7 +69,20 @@ import build_bundle  # noqa: E402
 # Importing by module path rather than package-relative: cdk/app.py puts
 # cdk/ on sys.path and imports `stacks.<name>`, and this module is also read
 # directly by the CI guard, which has no CDK install.
+from stacks.constants import log_retention_days_for  # noqa: E402  — #3278, see _RETENTION_DAYS_TO_ENUM below
 from stacks.lambda_enrollment import record, validate_enrollment  # noqa: E402
+
+# ── Log retention by construction (#3278) ─────────────────────────────────────
+# The tier is DERIVED from the registry in stacks/constants.py, never passed per call
+# site: a kwarg is a thing a future create_platform_lambda caller forgets, and the
+# forgotten case would silently land at the default tier — the exact way the documented
+# 90-day security tier spent three months as 30. The dict lookup fails CLOSED at synth
+# (KeyError) if the registry ever declares a day-count with no RetentionDays member.
+_RETENTION_DAYS_TO_ENUM = {
+    14: logs.RetentionDays.TWO_WEEKS,
+    30: logs.RetentionDays.ONE_MONTH,
+    90: logs.RetentionDays.THREE_MONTHS,
+}
 
 _TREE_STAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "_bundle_staging"))
 _staged = {"tree": False}
@@ -305,7 +318,9 @@ def create_platform_lambda(
         # by CDK for new Lambdas. Prevents indefinite log accumulation
         # (was the drift class that re-emerged with coach-observatory-renderer
         # and life-platform-delete-user-data on 2026-05-17).
-        log_retention=logs.RetentionDays.ONE_MONTH,
+        # #3278: the tier comes from the ONE registry (stacks/constants.py) — the
+        # security-tier functions get docs/DATA_GOVERNANCE.md's 90 days by construction.
+        log_retention=_RETENTION_DAYS_TO_ENUM[log_retention_days_for(function_name)],
         **({"retry_attempts": retry_attempts} if retry_attempts is not None else {}),
     )
 

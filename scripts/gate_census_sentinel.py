@@ -69,8 +69,15 @@ from typing import Any, Callable
 # check_* names pulled from a `from <module> import (...)` in drift_sentinel.py are only
 # in scope when <module> is one of these #1665-shaped extracted siblings — see the module
 # docstring above for why session_postflight.py is deliberately excluded.
-# sentinel_events joined 2026-08-29 (#3279).
-_SENTINEL_SIBLINGS = ("sentinel_github", "sentinel_quota", "sentinel_replication", "sentinel_cadence", "sentinel_events")
+# sentinel_events joined 2026-08-29 (#3279); sentinel_log_retention 2026-08-30 (#3278).
+_SENTINEL_SIBLINGS = (
+    "sentinel_github",
+    "sentinel_quota",
+    "sentinel_replication",
+    "sentinel_cadence",
+    "sentinel_events",
+    "sentinel_log_retention",
+)
 
 
 def _sentinel_check_defs(text: str) -> dict[str, tuple[int, str]]:

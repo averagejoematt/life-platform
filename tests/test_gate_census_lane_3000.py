@@ -289,7 +289,16 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # test_direction_of_travel_ruling_3293.py` (ARMED 1/1 on the recording run) — so the live
 # unproven count does not move (524 -> 524) and BASELINE_UNPROVEN_GATES stays where its
 # owner set it.
-BASELINE_TOTAL_GATES = 570
+# 570 -> 571 (2026-08-30, #3278): ONE real gate —
+#   sentinel::deploy/sentinel_log_retention.py::check_log_retention
+# the sweep's first log-group read and its first multi-region one (the documented 90-day
+# security-log tier measured 30d in two regions and NEVER_EXPIRE in five). Verified the
+# #3260 way: both trees ran their OWN scripts/gate_census.py --json with the new files
+# `git add`ed first; id SETS diffed: ADDED exactly the one id above, REMOVED {} (main 570,
+# branch 571). It arrives PROVEN (both family-6 halves in tests/test_security_log_retention_3278.py,
+# indexed in gate_census_proofs.py) so the live unproven count does not move (524 -> 524) and
+# BASELINE_UNPROVEN_GATES stays where its owner set it.
+BASELINE_TOTAL_GATES = 571
 BASELINE_UNPROVEN_GATES = 541
 
 

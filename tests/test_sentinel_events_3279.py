@@ -315,6 +315,7 @@ _SWEEP_STUBS = {
     "check_hae_webhook_ingress": {"status": "clean", "cdk_api_id": "x", "invoke_statements": []},
     "check_raw_replication": {"status": "clean", "objects_confirmed": 2},
     "check_sentinel_cadence": {"status": "clean", "missing_dates": [], "latest_date": "2026-08-28", "days_stale": 1},
+    "check_log_retention": {"status": "clean", "declared_days": 90, "groups_found": 17, "mismatches": [], "unreadable_regions": []},
 }
 
 

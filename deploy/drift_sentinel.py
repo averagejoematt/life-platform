@@ -834,6 +834,12 @@ from sentinel_events import check_eventbridge_rules  # noqa: E402,F401
 # the #2578 fail-closed precedent it mirrors.
 from sentinel_cadence import check_sentinel_cadence  # noqa: E402,F401
 
+# ── 13. security-tier log retention, every region (#3278) ─────────────────────
+# Own module: docs/DATA_GOVERNANCE.md promised 90 days for canary/key-rotator/dlq-consumer/
+# cf-auth since 2026-05-17; live was 30 in two regions and NEVER_EXPIRE in five (the
+# Lambda@Edge replica groups nobody hand-set). Declared side = cdk/stacks/constants.py.
+from sentinel_log_retention import check_log_retention  # noqa: E402,F401
+
 CODEQL_ALERT_BUDGET = 0
 
 # The one-time fix for a scope-gapped code-scanning read (#2578), carried in the
@@ -1025,6 +1031,7 @@ def run_sweep():
         "eventbridge_rules": check_eventbridge_rules(),
         "raw_replication": check_raw_replication(),
         "sentinel_cadence": check_sentinel_cadence(),
+        "log_retention": check_log_retention(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -1070,6 +1077,7 @@ def _summary(status, checks):
         ("eventbridge_rules", "EventBridge rule drift — enabled-targetless or out-of-IaC rule(s)"),
         ("raw_replication", "raw/ cross-region backup not verified"),
         ("sentinel_cadence", "sentinel cadence gap — a missed/stale weekly drift-log record"),
+        ("log_retention", "security-tier log retention diverges from docs/DATA_GOVERNANCE.md"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -1139,7 +1147,7 @@ def print_summary(record):
                 detail = f" — {c.get('detail', '')}"
             elif name == "raw_replication":
                 detail = f" — {c.get('detail', '')}"
-            elif name == "sentinel_cadence":
+            elif name in ("sentinel_cadence", "log_retention"):
                 detail = f" — {c.get('detail', '')}"
         elif st == "pending":
             detail = _pending_detail(c)
