@@ -564,12 +564,12 @@ COVERAGE = {
     # inbound POSTs — telegram-coach-worker above is the scheduled event-sweep, a
     # separate function) has no `schedule=` kwarg, so scheduled_lambdas() cannot and
     # should not enumerate it; it is FunctionURL-triggered only. Live-verified
-    # 2026-08-25 (epic #2799 audit): it carries ONLY `telegram-webhook-throttles` — no
+    # 2026-08-25 (epic #2799 audit): it then carried ONLY `telegram-webhook-throttles` — no
     # Errors/absence alarm at all (alerts_topic=None in its create_platform_lambda call).
-    # Deliberately left unresolved here — see the TODO in serve_stack.py right above that
-    # alarm's construction: whether an unhandled webhook exception should page, go to
-    # digest, or stay silent (Telegram retries failed deliveries itself) is an owner
-    # paging-posture call, not one this PR makes unilaterally.
+    # RESOLVED 2026-08-30 (#3317 PR, owner ruling: DIGEST): serve_stack.py now also
+    # declares `telegram-webhook-errors` (Errors Sum >= 1 / 5 min, notBreaching, digest)
+    # in place of the former TODO. Still not a ledger row — no `schedule=`, so absence
+    # is not this file's question; error coverage is the CDK declaration's.
     "weekly-plate": (EXEMPT, "2026-07-19", "Operator email (weekly plate planning); a missing issue is noticed by its reader."),
     # #2820: the stale "Operator email" rationale predated #1951 lifting this to a
     # real subscriber send (2026-08-03). Same one-metric delivery dead-man as the

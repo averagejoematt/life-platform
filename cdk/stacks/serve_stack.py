@@ -428,18 +428,36 @@ class ServeStack(Stack):
         )
         _telegram_worker_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
-        # TODO(#3161, owner paging-posture decision — NOT resolved here): live-verified
-        # 2026-08-25 that `telegram-webhook` (this Lambda; alerts_topic=None above, no
-        # `schedule=` so it's outside the heartbeat-completeness ledger's enumeration
-        # domain too) has ONLY this throttle alarm — no Errors/no-invocations alarm at
-        # all, so an unhandled exception in the webhook handler is currently silent.
-        # Deliberately NOT adding paging here: Telegram retries failed webhook deliveries
-        # itself, so an error alarm's urgency (page vs. digest vs. none) is a posture call
-        # for the owner, not a unilateral one (contrast life-platform-og-image in
-        # web_stack.py, #3161's same audit — cheap real coverage added there because no
-        # posture judgment was needed, just a missing alarm on an unambiguously-silent
-        # Lambda). Resolve by either wiring an Errors alarm here (pick urgent/digest) or
-        # recording an explicit accepted-risk decision.
+        # #3161 / epic #2799 residual "public-path-partial-watch" — DECIDED 2026-08-30 (owner):
+        # DIGEST. Live-verified 2026-08-25 that `telegram-webhook` (this Lambda; alerts_topic=None
+        # above, no `schedule=` so it is outside the heartbeat-completeness ledger's enumeration
+        # domain too) had ONLY the throttle alarm below — an unhandled exception in the webhook
+        # handler was silent. The posture call was the owner's because Telegram retries failed
+        # webhook deliveries itself, so the urgency of an error here was a judgment, not a gap
+        # (contrast life-platform-og-image in web_stack.py, #3161's same audit, where no posture
+        # judgment was needed). Ruling: digest, not paging — a retried delivery that keeps failing
+        # is a broken deploy the owner reads about in the 8AM email, not a 3AM page. Threshold 1
+        # over 5 min (the site-api-errors shape, not the worker's 3/hour): the webhook is the
+        # near-powerless front door with no fail-soft gates of its own, so a single unhandled
+        # error IS the signal. Recorded here per the TODO's own resolution clause (#3317 PR).
+        _telegram_webhook_errors = cloudwatch.Alarm(
+            self,
+            "TelegramWebhookErrors",
+            alarm_name="telegram-webhook-errors",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": "telegram-webhook"},
+                period=Duration.minutes(5),
+                statistic="Sum",
+            ),
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _telegram_webhook_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         _telegram_webhook_throttles = cloudwatch.Alarm(
             self,
             "TelegramWebhookThrottles",
