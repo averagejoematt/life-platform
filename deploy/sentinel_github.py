@@ -39,7 +39,7 @@ DEFAULT_REPO = "averagejoematt/life-platform"
 # scripts/apply_branch_protection.py::POSTURE_META_KEYS (parity pinned by
 # tests/test_posture_pending_marker.py) — a new metadata key added to only one of the
 # two would be silently compared against live state by the other.
-_POSTURE_META_KEYS = ("source", "applied", "blocked_on", "ledger_row")
+_POSTURE_META_KEYS = ("source", "applied", "applied_on", "blocked_on", "ledger_row")
 
 # The one-time owner fix for every scope-gapped surface below (#1320 gate:owner
 # remainder): a fine-grained PAT scoped to this repo, stored as the repo secret

@@ -98,6 +98,18 @@ def _posture(applied_ruleset, applied_settings=None):
         posture = json.load(f)
     posture["main_required_checks_ruleset"]["applied"] = applied_ruleset
     posture["repo_settings"]["applied"] = applied_ruleset if applied_settings is None else applied_settings
+    # 2026-08-30: the REAL file flipped to applied (D0.6 done), so the pending SHAPE —
+    # `applied: false` + `blocked_on`, no `applied_on` — is synthesized here when a test
+    # flips a surface back. The spec content under test still comes from the wire.
+    for entry in (posture["main_required_checks_ruleset"], posture["repo_settings"]):
+        if entry["applied"]:
+            entry.pop("blocked_on", None)
+        else:
+            entry.pop("applied_on", None)
+            entry.setdefault(
+                "blocked_on",
+                "RECONCILE_PUSH_TOKEN (pending-path fixture — the checked-in file went applied 2026-08-30)",
+            )
     return posture
 
 
@@ -356,7 +368,17 @@ def _fake_gh_json(spec_name, *, rc_present, auto_merge):
     return fake
 
 
-def test_writer_refuses_apply_while_the_entry_is_marked_unapplied(monkeypatch, capsys):
+def _writer_pending_posture(monkeypatch, tmp_path):
+    """Hand the WRITER a synthesized pending-state posture (see _posture).
+
+    `load_spec`'s path default binds POSTURE_FILE at def time, so patching the
+    module constant is a no-op — patch the loader itself."""
+    del tmp_path  # kept in the signature for symmetry; the loader patch needs no file
+    monkeypatch.setattr(abp, "load_spec", lambda path=None: _posture(False))
+
+
+def test_writer_refuses_apply_while_the_entry_is_marked_unapplied(monkeypatch, capsys, tmp_path):
+    _writer_pending_posture(monkeypatch, tmp_path)
     # THE WEDGE, STOPPED AT THE WRITER. The sweep's recommended command, run verbatim.
     monkeypatch.setattr(abp, "gh_json", _fake_gh_json("main-required-fast-lane", rc_present=False, auto_merge=False))
     rc = abp.main(["--apply"])
@@ -366,7 +388,8 @@ def test_writer_refuses_apply_while_the_entry_is_marked_unapplied(monkeypatch, c
     assert "Refusing to write" in err
 
 
-def test_writer_check_reports_pending_not_drift(monkeypatch, capsys):
+def test_writer_check_reports_pending_not_drift(monkeypatch, capsys, tmp_path):
+    _writer_pending_posture(monkeypatch, tmp_path)
     # `--check` is the on-demand form of the sentinel leg; it gave the same bad advice.
     monkeypatch.setattr(abp, "gh_json", _fake_gh_json("main-required-fast-lane", rc_present=False, auto_merge=False))
     rc = abp.main(["--check"])
@@ -376,7 +399,8 @@ def test_writer_check_reports_pending_not_drift(monkeypatch, capsys):
     assert "DRIFT" not in out.err
 
 
-def test_writer_check_flags_a_stale_marker_as_drift(monkeypatch, capsys):
+def test_writer_check_flags_a_stale_marker_as_drift(monkeypatch, capsys, tmp_path):
+    _writer_pending_posture(monkeypatch, tmp_path)
     # The other direction at the writer: live already matches while the posture still
     # says `applied: false` → exit 1, naming the marker.
     monkeypatch.setattr(abp, "gh_json", _fake_gh_json("main-required-fast-lane", rc_present=True, auto_merge=True))
