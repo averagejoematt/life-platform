@@ -22,6 +22,12 @@ STRUCTURAL rather than narrative:
 
 from typing import Any, Dict, List, Optional
 
+# #3283: the nested-map read is the shared accessor — this module and
+# health.labs_coaching each independently shipped the same "top-level schema
+# that never existed" bug (#1993 / #3283), so the schema read lives once in
+# health.labs_schema and both consumers import it.
+from health.labs_schema import biomarker_map
+
 
 def _as_int(value: Any, default: int) -> int:
     """Coerce a DDB-sourced number (Decimal→float after _decimal_to_float, or a
@@ -70,8 +76,7 @@ def build_labs_fact_block(lab_items: Optional[List[Dict[str, Any]]]) -> Dict[str
         }
 
     latest: Dict[str, Any] = lab_items[-1] if isinstance(lab_items[-1], dict) else {}
-    biomarkers_raw = latest.get("biomarkers")
-    biomarkers: Dict[str, Any] = biomarkers_raw if isinstance(biomarkers_raw, dict) else {}
+    biomarkers: Dict[str, Dict[str, Any]] = biomarker_map(latest)
     out_keys = [k for k in (latest.get("out_of_range") or []) if isinstance(k, str)]
 
     flagged = [_describe_marker(k, biomarkers[k]) for k in out_keys if isinstance(biomarkers.get(k), dict)]

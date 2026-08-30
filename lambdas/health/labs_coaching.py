@@ -10,16 +10,9 @@ Used by: daily_brief_lambda.py (import, not standalone)
 
 import logging
 
+from health.labs_schema import biomarker_map, is_draw_record, marker_numeric
+
 logger = logging.getLogger(__name__)
-
-
-def _float(val):
-    if val is None:
-        return None
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
 
 
 # Coaching rules: biomarker → threshold → coaching delta
@@ -94,25 +87,32 @@ def build_labs_coaching_context(table, user_prefix):
             )
         )
         items = resp.get("Items", [])
-        if not items:
-            return ""
 
-        # Build biomarker lookup from all lab items
-        biomarkers = {}
-        for item in items:
-            # Try common field patterns
-            for key in item:
-                if key in ("pk", "sk", "date", "source", "ingested_at"):
-                    continue
-                val = _float(item[key])
+        # #3283: a draw's values live ONLY under the nested `biomarkers` map
+        # (SCHEMA.md) — the old top-level scalar read matched a schema that has
+        # never existed and returned "" on every run. The map read is the shared
+        # accessor health.labs_schema (see its docstring for the #1993/#3283
+        # shared-vs-separate ruling). PROVIDER#... metadata items in the same
+        # partition are excluded before extraction.
+        draws = [item for item in items if is_draw_record(item)]
+        # Newest draw wins, EXPLICITLY: sort newest-first (sk is DATE#YYYY-MM-DD,
+        # so lexicographic == chronological) and let the first sighting of each
+        # marker stand. The old loop assigned unconditionally over the
+        # newest-first query, so last-write-wins handed the OLDEST draw the
+        # "most recent bloodwork" label.
+        draws.sort(key=lambda item: str(item.get("sk", "")), reverse=True)
+        marker_values = {}
+        for item in draws:
+            for key, entry in biomarker_map(item).items():
+                val = marker_numeric(entry)
                 if val is not None:
-                    # Normalize key to lowercase
-                    biomarkers[key.lower().replace(" ", "_")] = val
+                    # Normalize key to lowercase; first (newest) sighting wins.
+                    marker_values.setdefault(key.lower().replace(" ", "_"), val)
 
         # Apply coaching rules
         coaching_lines = []
         for bm_key, condition_fn, template in COACHING_RULES:
-            val = biomarkers.get(bm_key)
+            val = marker_values.get(bm_key)
             if val is not None:
                 try:
                     if condition_fn(val):
@@ -120,11 +120,22 @@ def build_labs_coaching_context(table, user_prefix):
                 except Exception:
                     pass
 
+        # #3283 box 3 (the #2799 floor): always log the parsed count so an empty
+        # context is never dark — "parsed 0" means extraction found nothing (this
+        # bug's class recurring), "parsed N, 0 actionable" means the rules
+        # genuinely matched nothing.
+        logger.info(
+            "Labs coaching: parsed %d biomarkers from %d draws (%d items); %d actionable",
+            len(marker_values),
+            len(draws),
+            len(items),
+            len(coaching_lines),
+        )
+
         if not coaching_lines:
             return ""
 
         result = "LABS COACHING (from most recent bloodwork):\n" + "\n".join(f"- {line}" for line in coaching_lines[:4])
-        logger.info(f"Labs coaching: {len(coaching_lines)} actionable biomarkers")
         return result
 
     except Exception as e:
