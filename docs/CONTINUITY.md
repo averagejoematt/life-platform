@@ -136,7 +136,7 @@ public.
 Claude Code's cross-session memory for this project lives at:
 
 ```
-~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/
+~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/
 ```
 
 It is **per-machine and NOT in git**. The file counts drift constantly, so read them
@@ -168,7 +168,7 @@ page's §6 — including the standing deploy-authorization boundary, which lives
 `feedback_*` memory. Recommended operator habit — back it up to the private S3 bucket:
 
 ```bash
-aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/ \
+aws s3 sync ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ \
   s3://matthew-life-platform/claude-memory-backup/ --region us-west-2
 ```
 

@@ -35,7 +35,7 @@ data + platform memory** is in DynamoDB (PITR), **raw data** is in S3, the **bac
 GitHub Issues. Two things are laptop-only and are the whole reason this runbook exists
 (`docs/CONTINUITY.md` §4 + §7):
 
-1. **Claude Code file-memory dir** — `~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/` (`MEMORY.md` + ~104 topic files). Not in git. Backed up to `s3://matthew-life-platform/claude-memory-backup/`.
+1. **Claude Code file-memory dir** — `~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/` (`MEMORY.md` + ~104 topic files). Not in git. Backed up to `s3://matthew-life-platform/claude-memory-backup/`.
 2. **The macOS launchd ingest runtime** — the drop-folder watchers that pull manual sources (Apple Health, MacroFactor). The *code* survives in git (`ingest/`); the *running agent* dies with the laptop. Scheduled AWS ingestion keeps running; manual-drop sources silently stop until the agent is reinstalled.
 
 A third, softer asset: **`datadrops/`** (gitignored) holds the original source drops
@@ -208,7 +208,7 @@ Restore the memory dir from its S3 backup into the exact per-machine path
 
 ```bash
 aws s3 sync s3://matthew-life-platform/claude-memory-backup/ \
-  ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/ \
+  ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ \
   --region us-west-2
 ```
 
@@ -333,7 +333,7 @@ cd cdk && npx cdk diff LifePlatformCore   # synth + diff works → CDK toolchain
 
 ```bash
 # One memory read round-trips:
-head -20 ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/MEMORY.md
+head -20 ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/MEMORY.md
 
 # One manual drop round-trips end-to-end (ingest runtime is live):
 #   drop a small MacroFactor CSV into ~/Documents/Claude/macrofactor_drop/

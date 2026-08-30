@@ -32,7 +32,7 @@ EXTENDING THE STACK-CLAIM REGISTRY
 
 USAGE
   python3 scripts/check_memory_body_facts.py [--memory-dir PATH]
-    Defaults to ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/
+    Defaults to ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/
     Exits 0 (clean) / 1 (drift found) / 0 with a note if the dir isn't present (e.g. CI,
     where the memory dir simply doesn't exist — this is a local/session reflex, not a gate
     CI can enforce structurally).
@@ -45,7 +45,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_MEMORY_DIR = Path.home() / ".claude" / "projects" / "-Users-matthewwalker-Documents-Claude-life-platform" / "memory"
+DEFAULT_MEMORY_DIR = Path.home() / ".claude" / "projects" / "-Users-matthewwalker-dev-life-platform" / "memory"
 
 # A line framing its date/claim as history/retired is exempt — same convention as
 # check_doc_facts.py's HISTORICAL marker set, extended with the retirement vocabulary this

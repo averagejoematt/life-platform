@@ -114,7 +114,7 @@ paragraph beneath it (the actual content).
 ### (c) Update the persistent memory system
 
 Memory lives outside the repo at
-`~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/` — it is
+`~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/` — it is
 NOT git-tracked and is a separate step from the commit in (f).
 
 - Durable, reusable lessons (a gotcha that will recur, an incident narrative, a completed
@@ -129,7 +129,7 @@ NOT git-tracked and is a separate step from the commit in (f).
   `INDEX_*.md` roll-up is invisible to every future session (repo CI can't own this — the memory dir is outside
   the repo). Index any `ORPHAN:` line before closing (c):
   ```bash
-  cd ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/
+  cd ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/
   for f in *.md; do [ "$f" = MEMORY.md ] && continue; base="${f%.md}"; \
     grep -qF "$base" MEMORY.md project_shipped_archive.md INDEX_*.md || echo "ORPHAN: $f"; done
   ```
@@ -167,7 +167,7 @@ NOT git-tracked and is a separate step from the commit in (f).
 **Close step (c) with the memory backup** — snapshot the laptop-only memory dir to
 private, versioned S3 (wiki continuity contract; the laptop is the only other copy):
 ```bash
-aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/ \
+aws s3 sync ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ \
   s3://matthew-life-platform/claude-memory-backup/ --region us-west-2
 ```
 

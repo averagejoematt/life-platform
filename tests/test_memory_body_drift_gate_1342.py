@@ -120,7 +120,17 @@ def test_gate_exempts_historically_framed_claims():
 
 # ── the two known bodies are actually fixed on disk (outside the repo) ──────────
 def _memory_dir():
-    return Path.home() / ".claude" / "projects" / "-Users-matthewwalker-Documents-Claude-life-platform" / "memory"
+    """DERIVED from the script, never spelled twice.
+
+    This used to hard-code the `-Users-matthewwalker-Documents-Claude-life-platform`
+    project key alongside the script's own copy. Claude Code derives that key from the
+    checkout's absolute path, so moving the repo (2026-08-30, ~/Documents/Claude → ~/dev)
+    re-keys the memory dir — and a second spelling means the repoint can land on the
+    script while this test keeps asserting against the old, now-unwritten directory. The
+    failure is silent in the worst way: `mem_dir.exists()` goes False and the test
+    returns green having verified nothing.
+    """
+    return _load().DEFAULT_MEMORY_DIR
 
 
 def test_known_drifted_bodies_are_fixed_if_present():
