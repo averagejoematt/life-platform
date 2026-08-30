@@ -113,8 +113,9 @@ _CONFLICT_BLOCK = "\n".join(
 # doc-status header declaring the file itself private, and only allowlists its own source.
 _PRIVATE_MARKER_DOC = "# probe\n\n> **Status:** " + _lit("PRIV", "ATE") + " / internal. Do not surface.\n"
 
-# Assembled: tests/test_no_tool_attribution_3005.py bans any MENTION of the trailer on
-# any tracked file outside CLAUDE.md and the guard itself.
+# Assembled: tests/test_no_tool_attribution_3005.py bans any MENTION of any of the three
+# banned attribution forms (co-author trailer, session-link line, generated-with footer —
+# #3328) on any tracked file outside CLAUDE.md and the guard itself. This plant is form 1.
 _ATTRIBUTION_DOC = "# probe\n\n" + _lit("Co-Author", "ed-By") + ": Claude Opus 5 <noreply@anthropic.com>\n"
 
 # Assembled: tests/test_timezone_discipline.py scans scripts/ as well as lambdas/, so the
@@ -386,7 +387,9 @@ def _command(target: str) -> str:
     return f"python3 scripts/gate_census_mutations.py --run --gate {Path(target).name}"
 
 
-def _proof(gate_id: str, observed: str, scope: str) -> dict[str, Any]:
+def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON) -> dict[str, Any]:
+    # `proved_on` is per record: a gate re-measured after the batch (because its
+    # predicates changed) carries the date it was actually watched, not the batch's.
     spec = MUTATION_SPECS[gate_id]
     return {
         "gate_name": Path(spec.target).name,
@@ -396,7 +399,7 @@ def _proof(gate_id: str, observed: str, scope: str) -> dict[str, Any]:
         + (", git-added (the gate reads the tracked set)" if spec.track else ", untracked (the gate walks the filesystem)"),
         "observed": observed,
         "scope": scope,
-        "proved_on": _PROVED_ON,
+        "proved_on": proved_on,
     }
 
 
@@ -426,13 +429,20 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
     ),
     "structural::test_no_tool_attribution_3005.py": _proof(
         "structural::test_no_tool_attribution_3005.py",
-        "baseline: 4 passed | mutated: 1 failed, 3 passed :: test_no_tracked_file_instructs_the_trailer | reverted: 4 passed",
-        "ONE of the owner decision's three banned trailers. CLAUDE.md's Authorship section bans the "
-        "co-author trailer, the session-link line, AND the generated-with PR footer; both halves of this "
-        "guard (`_MENTION` on the tracked surface, `_TRAILER` on reachable history) match only the "
-        "first. A commit or instruction file carrying either of the other two passes green. Recorded as "
-        "scope rather than a defect: the gate does what its own predicates say, and the gap is in the "
-        "predicates' coverage of the rule they enforce.",
+        "baseline: 8 passed, 1 skipped | mutated: 1 failed, 7 passed, 1 skipped :: test_no_tracked_file_instructs_the_trailer | reverted: 8 passed, 1 skipped",
+        "ALL THREE of the owner decision's banned forms since #3328 (it shipped matching one, recorded "
+        "here as a scope gap on 2026-08-27): the co-author trailer, the session-link line, AND the "
+        "generated-with PR footer / session link. `_MENTION` sweeps the tracked surface for any mention "
+        "of the three; `_TRAILER` sweeps reachable history since the ban date for the actual forms — "
+        "including the footer, because a bare `gh pr merge --squash` can copy a PR body into the squash "
+        "commit; and a PR-body sweep reads `pull_request.body` from $GITHUB_EVENT_PATH on `pull_request` "
+        "runs (both pr-checks.yml jobs) and SKIPS with a stated reason everywhere else, never a silent "
+        "pass. One independent predicate proof per form lives in the gate itself; this census plant "
+        "exercises form 1 on the tracked surface. Residual limits: a PR body EDITED after its last push "
+        "is not re-read until the next push (`edited` is not a default pull_request activity), and the "
+        "session link is pinned to `/code/session` so `claude.ai/code/artifact/…` contact-sheet links "
+        "under config/portraits/ stay legal.",
+        proved_on="2026-08-30",
     ),
     "structural::test_timezone_discipline.py": _proof(
         "structural::test_timezone_discipline.py",
