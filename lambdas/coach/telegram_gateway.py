@@ -127,6 +127,44 @@ def authorize_chat(message: dict, allowed_chat_ids) -> int:
     return chat_id
 
 
+def extract_mentions(message: dict) -> list:
+    """Every ``@username`` in the message, lowercased, without the ``@``.
+
+    Read from Telegram's OWN ``entities`` annotations, never re-parsed from the
+    text: entity offsets are the wire's statement of what was a mention, and they
+    are counted in UTF-16 CODE UNITS — an emoji before the mention shifts the
+    Python-string index but not the UTF-16 one, so the slice happens in UTF-16.
+    """
+    text = message.get("text") or ""
+    u16 = text.encode("utf-16-le")
+    out = []
+    for e in message.get("entities") or []:
+        if (e or {}).get("type") != "mention":
+            continue
+        try:
+            off, ln = int(e["offset"]), int(e["length"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        seg = u16[2 * off : 2 * (off + ln)].decode("utf-16-le", "ignore")
+        if seg.startswith("@") and len(seg) > 1:
+            out.append(seg[1:].lower())
+    return out
+
+
+def extract_reply_to_bot(message: dict) -> Optional[str]:
+    """The bot username this message replies to, lowercased — or None.
+
+    Only a BOT author counts: replying to your own earlier message (or a human's)
+    re-addresses nobody. The board room reads this as "the conversation continues
+    with that coach".
+    """
+    author = ((message.get("reply_to_message") or {}).get("from")) or {}
+    if not author.get("is_bot"):
+        return None
+    username = (author.get("username") or "").lower()
+    return username or None
+
+
 def silent_ok() -> dict:
     """The response to EVERY request, accepted or rejected.
 
@@ -164,6 +202,10 @@ def route(event: dict, *, secret: Optional[str], routing: dict, allowed_chat_ids
         "text": message.get("text") or "",
         "message_id": message.get("message_id"),
         "is_group": str(((message.get("chat") or {}).get("type") or "")).endswith("group"),
+        # The board room's who-speaks inputs (telegram_group.who_speaks) — extracted
+        # here because only the gateway sees the raw update; harmlessly empty in a 1:1.
+        "mentions": extract_mentions(message),
+        "reply_to_bot": extract_reply_to_bot(message),
         # Telegram redelivers pending updates after an outage/late webhook
         # registration — update_id is the dedupe key, date the staleness signal.
         "update_id": update.get("update_id"),

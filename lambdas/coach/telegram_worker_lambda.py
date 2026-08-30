@@ -53,7 +53,7 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger("telegram-worker")
     logger.setLevel(logging.INFO)
 
-from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway
+from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway, telegram_group
 from coach.coach_chat_grounding import build_facts_block, build_grounder, chat_available_logs
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
@@ -839,10 +839,12 @@ def _morning_checkin() -> dict:
     route = (resolve(persona_id, _s3_client(), S3_BUCKET) or {}).get("telegram_route")
     token = _bot_token(route) if route else None
     chat_ids = _bot_chat_ids(route) if route else []
-    if not token or not chat_ids:
+    # First PRIVATE id only (telegram_group): an unsolicited text must never land
+    # in the board room, and discovery can put the group id in a bot's chat_ids.
+    chat_id = telegram_group.first_private_chat_id(chat_ids)
+    if not token or chat_id is None:
         logger.info("[telegram] morning check-in dark — bot not registered (%s)", persona_id)
         return {"ok": True, "reason": "dark"}
-    chat_id = chat_ids[0]
 
     if coach_outbound.in_quiet_hours(now):
         logger.info("[telegram] morning check-in suppressed — quiet hours (%s PT)", now.hour)
@@ -885,8 +887,9 @@ def _bot_seat(persona_id: str) -> tuple:
 
     route = (resolve(persona_id, _s3_client(), S3_BUCKET) or {}).get("telegram_route")
     token = _bot_token(route) if route else None
-    chats = _bot_chat_ids(route) if route else []
-    return (token, chats[0]) if token and chats else (None, None)
+    # First PRIVATE id only — an event ping must never broadcast to the board room.
+    chat = telegram_group.first_private_chat_id(_bot_chat_ids(route)) if route else None
+    return (token, chat) if token and chat is not None else (None, None)
 
 
 def _speak_unsolicited(event: dict, token: str, chat_id) -> dict:
@@ -948,6 +951,64 @@ def _event_outbound() -> dict:
     return out
 
 
+def _resolve_persona(coach_id: str) -> tuple:
+    """Route -> persona id, or an honest refusal: ``(persona_id, None)`` / ``(None, result)``.
+
+    Shared by the 1:1 path and the board room (telegram_group) — the refusal
+    classes below guard the CLASS of unclaimed routes and must hold on both.
+
+    Route → persona is REGISTRY data (coaching-team v2): chat-tier coaches like
+    eli_marsh broke the old f"{route}_coach" string surgery. The derivation
+    stays as the offline fallback so a registry outage degrades, never renames.
+    S3 first (fresh config without a redeploy), bundled config/ as the offline
+    fallback — the pair of paths that was MISSING when every conversation ran
+    nameless ("I'm mind_coach") and persona-free. Both failing is an incident:
+    metric + alarm, and an honest role-name instead of a leaked internal id.
+    """
+    persona_id, _route_persona = persona_for_telegram_route(coach_id, s3_client=_s3_client(), bucket=S3_BUCKET)
+    if persona_id:
+        return persona_id, None
+    # The fallback may never RESURRECT a retired seat. A retired coach's
+    # short_id still satisfies f"{route}_coach", so an unmapped route whose
+    # name matches one would put a retired persona back on the phone in her
+    # own voice — worse than an honest failure, and undetectable from the
+    # reply. Found 2026-08-12 when the `training` succession alias retired
+    # (ADR-153 amendment): the route stopped resolving and the derivation
+    # silently produced `training_coach`, i.e. Dr. Sarah Chen, retired since
+    # the cycle-13 genesis. Refuse instead, and say so.
+    derived = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
+    if _persona_is_retired(derived):
+        _emit_metric("TelegramRetiredSeatRefused", coach_id)
+        logger.error("[telegram] route %r derives the RETIRED persona %r — refusing", coach_id, derived)
+        return None, {"ok": True, "reason": "route_retired"}
+    # #2719: the retired check catches a derived id that names a RETIRED seat. It does
+    # not catch one that names NO seat — found as the then-live `board` case:
+    # @ajm_board_bot provisioned with a chat id, no persona carrying telegram_route
+    # "board", derived `board_coach` nonexistent — so this fell through to _assemble,
+    # which emitted TelegramPersonaMissing and answered as "Matthew's board coach". A
+    # nameless coach with no persona block and no voice spec is worse than silence: it
+    # is a reply Matthew cannot tell apart from a real one. (`board` itself resolved
+    # 2026-08-16 — the lead chairs Grand Rounds via telegram_route_aliases — but this
+    # refusal stays: it guards the CLASS, and the day another route lands unclaimed it
+    # is what stands between Matthew and a nameless reply.)
+    #
+    # The distinction that keeps this from darking a working coach is REGISTRY
+    # READABLE vs PERSONA ABSENT. _persona_known returns None when the registry could
+    # not be read at all, and the fail-soft below treats that exactly as before — a
+    # registry hiccup must never stop a live coach from answering, which is the same
+    # reasoning _persona_is_retired documents. Only a confirmed absence refuses.
+    if _persona_known(derived) is False:
+        _emit_metric("TelegramUnmappedRouteRefused", coach_id)
+        logger.error(
+            "[telegram] route %r resolves to no persona and derives %r, which is not in the registry — refusing "
+            "rather than answering as a nameless coach",
+            coach_id,
+            derived,
+        )
+        return None, {"ok": True, "reason": "route_unmapped"}
+    return derived, None
+
+
 def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — Lambda signature
     """One work order in, one Telegram reply out (or one honest refusal).
 
@@ -989,56 +1050,17 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         logger.warning("[telegram] no bot token for %s — dropping", coach_id)
         return {"ok": False, "reason": "no token"}
 
+    # The board room (epic #2363): a group order takes the room's whole path —
+    # who-speaks decision, shared thread, speaker-stamped storage — and a silent
+    # listener must not even show a typing indicator, so this branches BEFORE it.
+    if order.get("is_group"):
+        return telegram_group.group_turn(order, token)
+
     _tg(token, "sendChatAction", {"chat_id": chat_id, "action": "typing"})
 
-    # Route → persona is REGISTRY data (coaching-team v2): chat-tier coaches like
-    # eli_marsh broke the old f"{route}_coach" string surgery. The derivation
-    # stays as the offline fallback so a registry outage degrades, never renames.
-    persona_id, _route_persona = persona_for_telegram_route(coach_id, s3_client=_s3_client(), bucket=S3_BUCKET)
-    if not persona_id:
-        # The fallback may never RESURRECT a retired seat. A retired coach's
-        # short_id still satisfies f"{route}_coach", so an unmapped route whose
-        # name matches one would put a retired persona back on the phone in her
-        # own voice — worse than an honest failure, and undetectable from the
-        # reply. Found 2026-08-12 when the `training` succession alias retired
-        # (ADR-153 amendment): the route stopped resolving and the derivation
-        # silently produced `training_coach`, i.e. Dr. Sarah Chen, retired since
-        # the cycle-13 genesis. Refuse instead, and say so.
-        derived = f"{coach_chat.normalize_coach_id(coach_id)}_coach"
-        if _persona_is_retired(derived):
-            _emit_metric("TelegramRetiredSeatRefused", coach_id)
-            logger.error("[telegram] route %r derives the RETIRED persona %r — refusing", coach_id, derived)
-            return {"ok": True, "reason": "route_retired"}
-        # #2719: the retired check catches a derived id that names a RETIRED seat. It does
-        # not catch one that names NO seat — found as the then-live `board` case:
-        # @ajm_board_bot provisioned with a chat id, no persona carrying telegram_route
-        # "board", derived `board_coach` nonexistent — so this fell through to _assemble,
-        # which emitted TelegramPersonaMissing and answered as "Matthew's board coach". A
-        # nameless coach with no persona block and no voice spec is worse than silence: it
-        # is a reply Matthew cannot tell apart from a real one. (`board` itself resolved
-        # 2026-08-16 — the lead chairs Grand Rounds via telegram_route_aliases — but this
-        # refusal stays: it guards the CLASS, and the day another route lands unclaimed it
-        # is what stands between Matthew and a nameless reply.)
-        #
-        # The distinction that keeps this from darking a working coach is REGISTRY
-        # READABLE vs PERSONA ABSENT. _persona_known returns None when the registry could
-        # not be read at all, and the fail-soft below treats that exactly as before — a
-        # registry hiccup must never stop a live coach from answering, which is the same
-        # reasoning _persona_is_retired documents. Only a confirmed absence refuses.
-        if _persona_known(derived) is False:
-            _emit_metric("TelegramUnmappedRouteRefused", coach_id)
-            logger.error(
-                "[telegram] route %r resolves to no persona and derives %r, which is not in the registry — refusing "
-                "rather than answering as a nameless coach",
-                coach_id,
-                derived,
-            )
-            return {"ok": True, "reason": "route_unmapped"}
-        persona_id = derived
-    # S3 first (fresh config without a redeploy), bundled config/ as the offline
-    # fallback — the pair of paths that was MISSING when every conversation ran
-    # nameless ("I'm mind_coach") and persona-free. Both failing is an incident:
-    # metric + alarm, and an honest role-name instead of a leaked internal id.
+    persona_id, _refusal = _resolve_persona(coach_id)
+    if _refusal:
+        return _refusal
     a = _assemble(persona_id, coach_id, allow_referral=True)
     coach_name = a["coach_name"]
     thread = a["thread"]
