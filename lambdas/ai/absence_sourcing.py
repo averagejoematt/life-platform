@@ -456,7 +456,7 @@ def sourced_quiet_channels(signal) -> QuietChannels:
 
     licensed, withheld, notes = [], [], []
     for label in quiet:
-        categories = []
+        categories: list = []
         for src in label_sources.get(label, ()):
             categories.extend(evidence_categories(src))
         if not categories:
