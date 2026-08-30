@@ -51,9 +51,12 @@ def main() -> int:
 
     if _DEPLOY.search(cmd):
         code, top = git("rev-parse", "--show-toplevel")
-        code2, common = git("rev-parse", "--git-common-dir")
-        # A worktree's git dir differs from its common dir; the main checkout's does not.
-        if code == 0 and code2 == 0 and common not in ("", ".git") and not common.endswith("/.git"):
+        code2, gitdir = git("rev-parse", "--git-dir")
+        # `--git-common-dir` ALWAYS resolves to the main checkout's `.git` — from inside a
+        # worktree too — so it can never distinguish the two (measured, #3262). `--git-dir`
+        # is the one that differs: `.git` (or `.../.git`) in the main checkout, vs.
+        # `.../.git/worktrees/<name>` inside a worktree.
+        if code == 0 and code2 == 0 and gitdir not in ("", ".git") and not gitdir.endswith("/.git"):
             return emit(
                 "deploy from a worktree",
                 [
