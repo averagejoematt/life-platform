@@ -334,7 +334,21 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # tests/test_closure_contract_3318.py (PR #3226 / PR #3253 fixtures NONGREEN, PR #3313
 # OK, every rule mutation-proven on the control), a live NONGREEN on the real PRs #3226
 # and #3253, and a live NONGREEN on its OWN PR's draft body (#3331) before the merge.
-BASELINE_TOTAL_GATES = 574
+# 574 -> 575 (2026-08-31, #3315; stacked on #3318 — this branch rebased onto PR #3341): ONE real gate, `structural::test_ci_dark_flag_sweep_3315.py`
+# — the dark-flag sweep (no CI step may reach a dependency its job never installs;
+# registering it in _PREMERGE_EXTRA_FILES is part of the same PR). Verified by id-set
+# diff (each tree ran its OWN scripts/gate_census.py --json; main from a `git archive`
+# export): ADDED {structural::test_ci_dark_flag_sweep_3315.py}, REMOVED {}, plus the
+# count-neutral index rename of deploy-wedge-watch.yml's `ci::…::watch::N` ids (two setup
+# steps inserted ahead of them: {9,10} in, {1,2} out — no proof or attempt keys on those
+# ids). It arrives PROVEN — the mutation is a planted probe workflow carrying the
+# pre-#3315 fresh-eyes install line, re-runnable via `gate_census_mutations.py --run
+# --gate test_ci_dark_flag_sweep_3315.py` — so the live unproven count does not move and
+# BASELINE_UNPROVEN_GATES stays where its owner set it. NOT counted, deliberately: this
+# PR's first push showed 576 because the sweep's `_GATE_TOOLS` tuple matched the census's
+# registry-name pattern and entered as six `registry::` phantom gates — the #3220
+# name-only misfire, cured by renaming the constant, not by bumping onto noise.
+BASELINE_TOTAL_GATES = 575
 BASELINE_UNPROVEN_GATES = 541
 
 

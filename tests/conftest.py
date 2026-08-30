@@ -212,6 +212,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_rate_limit_identity_1221.py",  # #1221: AST sweep — no handler may derive its own client identity
         "test_no_tool_attribution_3005.py",  # #3005: git ls-files sweep — no tracked file may instruct the banned trailer
         "test_no_private_markers_3043.py",  # #3043: git ls-files sweep — no tracked file may carry the PRIVATE marker
+        "test_ci_dark_flag_sweep_3315.py",  # #3315: workflow sweep — no CI step may reach a dependency its job never installs
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
