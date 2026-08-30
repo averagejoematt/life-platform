@@ -35,30 +35,44 @@ SETTLE_SECONDS = 90
 STATE = "pending_pushes.json"
 
 
-def _load() -> list[dict]:
+def _load() -> tuple[list[dict], str | None]:
+    """Returns (rows, error). A missing file (nothing recorded yet) is NOT an error —
+    only a state dir/file that exists but can't be read is. See the module contract
+    above: absence of proof is stated as such, never swallowed into silence."""
     try:
-        return json.loads(state_path(STATE).read_text())
-    except Exception:
-        return []
+        text = state_path(STATE).read_text()
+    except FileNotFoundError:
+        return [], None
+    except Exception as e:
+        return [], f"{type(e).__name__}: {e}"
+    try:
+        return json.loads(text), None
+    except Exception as e:
+        return [], f"{type(e).__name__}: {e}"
 
 
-def _save(rows: list[dict]) -> None:
+def _save(rows: list[dict]) -> str | None:
+    """Returns an error string on failure, None on success — never swallows."""
     try:
         state_path(STATE).write_text(json.dumps(rows))
-    except Exception:
-        pass
+        return None
+    except Exception as e:
+        return f"{type(e).__name__}: {e}"
 
 
 def main() -> int:
     now = time.time()
-    rows = _load()
+    rows, load_err = _load()
+    findings = []
+    if load_err:
+        findings.append(f"push record UNVERIFIED — could not read hook state ({load_err})")
 
     if _PUSH.search(bash_command(read_payload())):
         code, sha = git("rev-parse", "HEAD")
         if code == 0 and len(sha) == 40 and not any(r.get("sha") == sha for r in rows):
             rows.append({"sha": sha, "at": now})
 
-    due, pending, findings = [r for r in rows if now - r.get("at", 0) >= SETTLE_SECONDS], [], []
+    due = [r for r in rows if now - r.get("at", 0) >= SETTLE_SECONDS]
     pending = [r for r in rows if now - r.get("at", 0) < SETTLE_SECONDS]
 
     for r in due:
@@ -72,7 +86,10 @@ def main() -> int:
             findings.append("  recovery ladder: close/reopen the PR -> supersede-PR -> integration train")
         # A nonzero count is the healthy case and says nothing.
 
-    _save(pending)
+    save_err = _save(pending)
+    if save_err:
+        findings.append(f"push record UNVERIFIED — could not write hook state ({save_err})")
+
     if findings:
         return emit("push event check", findings)
     return ok()

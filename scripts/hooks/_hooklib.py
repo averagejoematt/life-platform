@@ -35,7 +35,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-STATE_DIR = ROOT / ".git" / "claude-hooks"
 
 #: "warn" (default) or "block". Only an operator flips this, never a code path.
 HOOK_MODE = os.environ.get("CLAUDE_HOOK_MODE", "warn")
@@ -80,7 +79,31 @@ def gh(*args: str, timeout: int = 25) -> tuple[int, str]:
         return 1, ""
 
 
+def _git_state_root() -> Path:
+    """The real, already-existing git directory to nest hook state under.
+
+    `ROOT / ".git"` is a git FILE (a `gitdir:` pointer), not a directory, inside a
+    worktree — `mkdir` on it raises `NotADirectoryError` (measured, #3262). `git
+    rev-parse --git-dir` resolves to the directory that actually exists in both cases:
+    `.git` in the main checkout, `<main>/.git/worktrees/<name>` inside a worktree — git
+    creates that directory itself when the worktree is added, so nesting state under it
+    never needs to create a new top-level path.
+    """
+    code, gitdir = git("rev-parse", "--git-dir")
+    if code == 0 and gitdir:
+        p = Path(gitdir)
+        return p if p.is_absolute() else ROOT / p
+    # INERT (pytest) or git unavailable: same default the code always used.
+    return ROOT / ".git"
+
+
+#: Resolved once per process. Worktree-aware (see `_git_state_root`).
+STATE_DIR = _git_state_root() / "claude-hooks"
+
+
 def state_path(name: str) -> Path:
+    """Raises on failure — callers that must not crash a hook catch this themselves and
+    report it (see `post_push_swallow._load`/`_save`) rather than have it swallowed here."""
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     return STATE_DIR / name
 
