@@ -250,6 +250,12 @@ _PREMERGE_EXTRA_FILES = frozenset(
         # presence list must wire through sourced_quiet or write its disposition BEFORE
         # the merge; the board published two false absences from exactly such a reader.
         "test_absence_coverage_3294.py",
+        # #3293: the direction-of-travel registry. Its sweep asks which modules import
+        # `web.journey_direction` at all, so a NEW surface that states a direction of
+        # travel changes the covered population — the repo-shape property. Pre-merge
+        # because #3293 IS the post-merge version of this: #3285 fixed two members of
+        # the family, three shipped on, and nothing red for a day.
+        "test_direction_of_travel_ruling_3293.py",
         "test_emf_namespace_ledger_2837.py",  # #2837: AST sweep of every metric emitter — a NEW namespace must join the ledger BEFORE merge, not after the bill
         "test_unsubscribe_token_3044.py",  # #3044: tree sweep — no lambdas/deploy module may reintroduce a plaintext-email unsubscribe link
         "test_operating_calendar_2832.py",  # #2832: calendar registry + set guard sweeps the skill registry + docs/reviews — repo-shape, pre-merge

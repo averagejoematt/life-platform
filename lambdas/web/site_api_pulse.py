@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
 
+from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #3293 — the ONE ruling on the sign of a weight delta
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     PT,
@@ -42,6 +43,58 @@ _WORKOUT_CATEGORY = "workout"
 # all. Only reached in the empty-history case; the normal path bounds each infrastructure
 # query by the best behavioral date already in hand, so it reads a handful of rows.
 _WORKOUT_COLD_LOOKBACK_DAYS = 400
+
+# #3293: the narrative's word for a zero delta. The RULING is `journey_direction`'s
+# (down / up / even / unknown); only the prose noun changes, and it changes HERE so the
+# sentence and the glyph can never be ruled on separately again.
+_NARRATIVE_DIR_WORD = {DOWN: "down", UP: "up", EVEN: "flat"}
+
+
+def weight_direction(w_val, start_weight, decimals=1):
+    """#3293 — the ONE ruling on which way this module says the scale has moved.
+
+    Two surfaces here state a direction of travel from the same pair of numbers: the
+    ``scale`` glyph's ``direction`` field and the daily narrative's ``dir_word``. They
+    used to compute it independently, 100+ lines apart, and only one of them was right.
+    The glyph read::
+
+        "direction": "down" if w_val and w_val < start_weight else "up"
+
+    which has no flat case (a delta of exactly zero asserted "up") and, worse, collapsed
+    a falsy ``w_val`` — an absent weigh-in — into "up" as well: a direction claim with no
+    data behind it. That is the ADR-104 defect, absence rendered as an assertion.
+
+    Both call sites now come through here, and here defers to
+    ``web.journey_direction.classify_delta`` — the same ruling the OG share cards and the
+    home ``og:description`` use — so a fifth surface cannot be added that disagrees with
+    the other four.
+
+    SIGN CONVENTION, in one place: ``classify_delta`` rules on ``lost_lbs``
+    (``start − current``, positive is a LOSS), while this module's own ``delta`` fields
+    run the other way (``current − start``). The subtraction below is that conversion and
+    it exists exactly once.
+
+    A NON-POSITIVE weight is absence, not a reading: the upstream
+    ``float(withings.get("weight_lbs", 0)) if withings.get("weight_lbs") else None``
+    already turns a falsy field into ``None``, so a 0 that survives to here came from a
+    truthy-but-empty payload, and nobody weighs 0 lb. Ruling on it would turn a broken
+    record into a 315 lb loss — which is the falsy collapse again, wearing the other
+    sign. It is UNKNOWN, deliberately and by the same rule as ``None``.
+
+    Returns ``(direction, magnitude)``: direction is one of DOWN/UP/EVEN/UNKNOWN and
+    magnitude is non-negative and already rounded to ``decimals`` — or ``UNKNOWN, None``
+    when there is no weigh-in to read. ``bool`` is refused for the same reason
+    ``classify_delta`` refuses it: ``True`` must never rule "1 lb down".
+    """
+    if isinstance(w_val, bool) or isinstance(start_weight, bool):
+        return UNKNOWN, None
+    try:
+        current, start = float(w_val), float(start_weight)
+    except (TypeError, ValueError):
+        return UNKNOWN, None
+    if not (current > 0 and start > 0):
+        return UNKNOWN, None
+    return classify_delta(start - current, decimals)
 
 
 def _workout_evidence(table, today_pt):
@@ -441,11 +494,17 @@ def pulse(*, _g) -> dict:
     _lift_licensed = _absence_licensed(_WORKOUT_CATEGORY, _workout_consulted, _workout_liveness, EXPERIMENT_START)
     _journal_spans = spans_cycle(journal_gap_days, _pulse_day)
 
+    # #3293: the scale glyph's direction, from the shared ruling rather than from a
+    # two-way test with a falsy collapse. `null` is the honest value when there is no
+    # weigh-in — the sibling fields below are already `null` in that case, and a JSON
+    # null cannot be mistaken for a claim the way the old unconditional "up" was.
+    _scale_dir, _ = weight_direction(w_val, start_weight)
+
     glyphs = {
         "scale": {
             "state": _scale_state(),
             "value": round(w_val, 1) if w_val else None,
-            "direction": "down" if w_val and w_val < start_weight else "up",
+            "direction": None if _scale_dir == UNKNOWN else _scale_dir,
             "delta": round(w_val - start_weight, 1) if w_val else None,
             "delta_label": f"{round(w_val - start_weight, 1):+.1f} lbs" if w_val else None,
             "as_of": w_eff_date or today_pt,
@@ -561,9 +620,13 @@ def pulse(*, _g) -> dict:
     # --- DPR-1.01: Narrative generator ---
     # Build a natural-language daily brief headline from available signals.
     narrative_parts = []
-    if w_val is not None:
-        delta_from_start = round(w_val - start_weight, 1)
-        dir_word = "down" if delta_from_start < 0 else "up" if delta_from_start > 0 else "flat"
+    # #3293: same ruling as the scale glyph above — this line was already three-way and
+    # already guarded on `is not None`, and it is what the glyph should have been doing
+    # all along. Routing both through `weight_direction` is what stops them drifting apart
+    # again; the UNKNOWN branch drops the clause rather than narrating a guess.
+    _n_dir, _n_mag = weight_direction(w_val, start_weight)
+    if w_val is not None and _n_dir != UNKNOWN:
+        dir_word = _NARRATIVE_DIR_WORD[_n_dir]
         # Staleness honesty: a days-old weigh-in narrated without a date reads as
         # today's number \u2014 stale-qualify it with the day it actually belongs to.
         _w_stale_note = ""
@@ -573,9 +636,7 @@ def pulse(*, _g) -> dict:
                 _w_stale_note = f" (last weighed {_lw_dt.strftime('%b')} {_lw_dt.day})"
             except ValueError:
                 _w_stale_note = f" (last weighed {w_eff_date})"
-        narrative_parts.append(
-            f"Day {_pulse_day}. {round(w_val, 1)} lbs \u2014 {dir_word} {abs(delta_from_start):.1f} from start{_w_stale_note}."
-        )
+        narrative_parts.append(f"Day {_pulse_day}. {round(w_val, 1)} lbs \u2014 {dir_word} {_n_mag:.1f} from start{_w_stale_note}.")
     elif _pulse_day:
         narrative_parts.append(f"Day {_pulse_day}.")
     if sleep_hrs is not None:

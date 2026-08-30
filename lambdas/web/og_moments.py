@@ -26,6 +26,8 @@ from datetime import datetime, timezone
 
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing dates anchor in the Pacific day
 
+from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #3293: the ONE ruling on the sign of the journey delta
+
 S3_BUCKET = "matthew-life-platform"
 SITE_BASE = "https://averagejoematt.com"
 MOMENTS_PREFIX = "generated/moments/"
@@ -142,6 +144,32 @@ def _put_moment(s3, mtype, mid, card_img, shell):
 # ── The three moment classes ─────────────────────────────────────────────────
 
 
+def _weight_bit(lost_lbs):
+    """#3293 — the weekly recap's weight clause, direction from the shared ruling.
+
+    This line used to be ``f"{round(journey['lost_lbs'], 1)} lbs down"``: a STATIC
+    direction word over a SIGNED value. ``lost_lbs`` is ``start − current``, so a gain
+    is negative and the card published *"-5.2 lbs down"* — the identical double
+    negative #3285 removed from the home share card, on a surface that is also shared
+    externally (the recap card's meta line, its ``og:description`` and its page body all
+    render this same string).
+
+    The direction now comes from ``web.journey_direction.classify_delta`` — the one
+    ruling the home card's caption/colour and the home ``og:description`` already use —
+    so no two shared artifacts can point opposite ways about the same number.
+
+    Returns a LIST so the caller can splice zero or one bit in: an absent, non-numeric
+    or non-finite delta contributes NOTHING rather than a guessed direction (ADR-104).
+    One decimal, matching the display the caller had.
+    """
+    direction, magnitude = classify_delta(lost_lbs, decimals=1)
+    if direction == UNKNOWN or magnitude is None:
+        return []
+    if direction == EVEN:
+        return ["weight even"]
+    return [f"{magnitude} lbs {DOWN if direction == DOWN else UP}"]
+
+
 def _sweep_week_recap(s3, stats):
     """The weekly recap — refreshed daily under the ISO-week permalink."""
     journey = stats.get("journey") or {}
@@ -152,8 +180,7 @@ def _sweep_week_recap(s3, stats):
     iso = datetime.now(PT).isocalendar()  # #2414: the week id is the reader's Pacific week
     wid = f"{iso.year}-W{iso.week:02d}"
     bits = []
-    if journey.get("lost_lbs") is not None:
-        bits.append(f"{round(journey['lost_lbs'], 1)} lbs down")
+    bits.extend(_weight_bit(journey.get("lost_lbs")))
     if vitals.get("hrv_ms") is not None:
         bits.append(f"HRV {round(vitals['hrv_ms'])} ms")
     if platform.get("tier0_streak") is not None:
