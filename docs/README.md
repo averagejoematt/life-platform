@@ -89,6 +89,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [CONTINUITY.md](CONTINUITY.md) | What lives outside `docs/` and how a human reads/exports it |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
 | [IDEMPOTENCY.md](IDEMPOTENCY.md) | **The replay census** — every external side effect (28 SES senders, the live webhook, site writes, write-MCP) × what happens if it runs twice; the three replay vectors and which guard covers which (DIL-025) |
+| [OPERATOR_SUBSTRATE_SPIKE.md](OPERATOR_SUBSTRATE_SPIKE.md) | The resident-operator substrate decision (#2849): composite — cloud routines for scheduled judgment, Actions+Bedrock for repo work, AgentCore declined per ADR-103; rent per leg, Architect leg live |
 | [NEW_SIGNAL_PLAYBOOK.md](NEW_SIGNAL_PLAYBOOK.md) | A new metric/device/source lands through one ordered checklist — absence semantics + privacy tier first (ADR-154, from the BodyScan 2 spike #2782) |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
 | [PERMANENCE_CONTRACT.md](PERMANENCE_CONTRACT.md) | **The written commitment** — nightly public archive, its admission gate, the continuity clock, and what none of it promises (#1400) |
