@@ -32,6 +32,7 @@ Pins:
 import logging
 import os
 import sys
+from contextlib import contextmanager
 from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
@@ -148,27 +149,58 @@ def test_c2_newest_draw_wins_reversed_order():
 # ---------------------------------------------------------------------------
 
 
-def test_c3_rules_matched_nothing_logs_nonzero_parsed_count(caplog):
+class _RecordingHandler(logging.Handler):
+    """Captures the platform logger's records directly. `caplog` cannot see them:
+    common.platform_logger sets propagate=False with its own handler (by design —
+    that is what puts the line on the WIRE), and pytest's caplog only listens on
+    root. The original caplog capture passed while the line was dark in production
+    (#3283 box-3 second finding) — this handler listens where CloudWatch does."""
+
+    def __init__(self):
+        super().__init__(level=logging.INFO)
+        self.records = []
+
+    def emit(self, record):
+        self.records.append(record)
+
+
+@contextmanager
+def _capture_brief_logs():
+    # NB: platform_logger's get_logger keeps its OWN singleton map — its loggers are
+    # never registered with logging's manager, so logging.getLogger("daily-brief")
+    # returns a different object. Attach to the real instance.
+    from common.platform_logger import get_logger as _plat_get_logger
+
+    lg = _plat_get_logger("daily-brief")
+    h = _RecordingHandler()
+    lg.addHandler(h)
+    try:
+        yield h.records
+    finally:
+        lg.removeHandler(h)
+
+
+def test_c3_rules_matched_nothing_logs_nonzero_parsed_count():
     """Markers parsed but no rule trips: "" is returned AND the log proves the
     extraction worked (parsed count > 0)."""
     table = _FakeTable([_draw("2026-01-02", {"marker_a": Decimal("1.0"), "marker_b": Decimal("2.0")})])
-    with caplog.at_level(logging.INFO, logger="health.labs_coaching"):
+    with _capture_brief_logs() as records:
         result = build_labs_coaching_context(table, USER_PREFIX)
     assert result == ""
-    parsed_lines = [r.getMessage() for r in caplog.records if "parsed" in r.getMessage()]
+    parsed_lines = [r.getMessage() for r in records if "parsed" in r.getMessage()]
     assert parsed_lines, "no parsed-count log line — an empty context is dark again (#3283 box 3)"
     assert "parsed 2 biomarkers" in parsed_lines[0]
     assert "0 actionable" in parsed_lines[0]
 
 
-def test_c3_extraction_found_nothing_logs_zero_parsed_count(caplog):
+def test_c3_extraction_found_nothing_logs_zero_parsed_count():
     """No parseable markers: "" is returned and the log says parsed 0 — a
     recurrence of this bug's class cannot be silent."""
     item = {"pk": f"{USER_PREFIX}labs", "sk": "DATE#2026-01-02", "ferritin": Decimal("1.0")}  # legacy shape, no map
-    with caplog.at_level(logging.INFO, logger="health.labs_coaching"):
+    with _capture_brief_logs() as records:
         result = build_labs_coaching_context(_FakeTable([item]), USER_PREFIX)
     assert result == ""
-    parsed_lines = [r.getMessage() for r in caplog.records if "parsed" in r.getMessage()]
+    parsed_lines = [r.getMessage() for r in records if "parsed" in r.getMessage()]
     assert parsed_lines
     assert "parsed 0 biomarkers" in parsed_lines[0]
 
@@ -178,12 +210,12 @@ def test_c3_extraction_found_nothing_logs_zero_parsed_count(caplog):
 # ---------------------------------------------------------------------------
 
 
-def test_c4_provider_metadata_items_are_skipped(caplog):
+def test_c4_provider_metadata_items_are_skipped():
     table = _FakeTable([_provider_item(), _draw("2026-01-02", {"marker_a": Decimal("1.0")})])
-    with caplog.at_level(logging.INFO, logger="health.labs_coaching"):
+    with _capture_brief_logs() as records:
         result = build_labs_coaching_context(table, USER_PREFIX)
     assert result == ""
-    parsed_lines = [r.getMessage() for r in caplog.records if "parsed" in r.getMessage()]
+    parsed_lines = [r.getMessage() for r in records if "parsed" in r.getMessage()]
     assert "parsed 1 biomarkers from 1 draws" in parsed_lines[0], "PROVIDER item leaked into marker extraction"
 
 

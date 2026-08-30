@@ -8,11 +8,16 @@ AI coaching references actual lab data.
 Used by: daily_brief_lambda.py (import, not standalone)
 """
 
-import logging
+from common.platform_logger import get_logger
 
 from health.labs_schema import biomarker_map, is_draw_record, marker_numeric
 
-logger = logging.getLogger(__name__)
+# #3283 box 3, second finding: the first fix logged the parsed-count via a bare
+# `logging.getLogger(__name__)`, whose records propagate to a root logger the brief's
+# Lambda never surfaces — the count line passed caplog in tests and was DARK on the
+# wire, the exact recurrence shape the box exists to prevent. platform_logger owns a
+# handler (propagate=False), so this line reaches CloudWatch like every other.
+logger = get_logger("daily-brief")
 
 
 # Coaching rules: biomarker → threshold → coaching delta
