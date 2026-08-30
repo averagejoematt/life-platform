@@ -37,11 +37,21 @@
 #   FROM NOW ON. The 37,665 objects / 541,451,065 bytes already in raw/ (measured
 #   2026-08-24) stay unprotected until an S3 Batch Replication job copies them.
 #   `deploy/sentinel_replication.py` probes an OLD key precisely so this cannot be
-#   quietly skipped — it reports drift until the backfill lands. Kick it off in the
-#   S3 console (Management → Replication rules → "Replicate existing objects") or:
+#   quietly skipped — it reports drift until the backfill lands. The job role is
+#   CDK-owned (`RawBatchReplicationRole` in backup_stack.py — deploy
+#   LifePlatformBackup first). Kick it off in the S3 console (Management →
+#   Replication rules → "Replicate existing objects") or:
 #     aws s3control create-job --account-id 205930651321 --region us-west-2 \
 #       --operation '{"S3ReplicateObject":{}}' --priority 10 \
-#       --manifest-generator file://<generated> --role-arn <batch-ops-role>
+#       --no-confirmation-required --report '{"Enabled":false}' \
+#       --role-arn arn:aws:iam::205930651321:role/life-platform-raw-batch-replication \
+#       --manifest-generator '{"S3JobManifestGenerator":{"ExpectedBucketOwner":"205930651321",
+#         "SourceBucket":"arn:aws:s3:::matthew-life-platform","EnableManifestOutput":false,
+#         "Filter":{"EligibleForReplication":true,"KeyNameConstraint":{"MatchAnyPrefix":["raw/"]},
+#         "ObjectReplicationStatuses":["NONE","FAILED"]}}}'
+#   Verify by `describe-job` (succeeded count ≈ object count) + the sentinel
+#   going clean on its next run — the job report is deliberately disabled, the
+#   sentinel's old-key probe is the proof that matters.
 #   One-time cost measured against the live inventory: ≈ $0.49 (37,665 PUTs
 #   ≈ $0.19 + 0.50 GB transfer ≈ $0.01 + Batch Operations job ≈ $0.29).
 #

@@ -67,6 +67,7 @@ from constructs import Construct
 from stacks.constants import (
     ACCT,
     RAW_BACKUP_BUCKET,
+    RAW_BATCH_REPLICATION_ROLE_NAME,
     RAW_REPLICATION_PREFIX,
     RAW_REPLICATION_ROLE_NAME,
     S3_BUCKET,
@@ -182,9 +183,41 @@ class BackupStack(Stack):
             )
         )
 
+        # ── The batch-replication (backfill) role ─────────────────────────────
+        # S3 Batch Operations assumes this for the ONE-TIME "replicate existing
+        # objects" job (deploy/apply_s3_replication.sh step 3): CRR is not
+        # retroactive, so the pre-existing raw/ history stays unprotected until a
+        # batch job initiates replication for each object. The job only
+        # INITIATES — the copy itself runs through the replication role above —
+        # so this role touches no object content on either bucket.
+        # `s3:PutInventoryConfiguration` is what the S3-generated manifest
+        # requires on the source bucket.
+        self.batch_replication_role = iam.Role(
+            self,
+            "RawBatchReplicationRole",
+            role_name=RAW_BATCH_REPLICATION_ROLE_NAME,
+            assumed_by=iam.ServicePrincipal("batchoperations.s3.amazonaws.com"),
+            description="S3 Batch Replication backfill of pre-existing raw/ history (DIL-027)",
+        )
+        self.batch_replication_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="InitiateRawReplication",
+                actions=["s3:InitiateReplication"],
+                resources=[_SOURCE_PREFIX_ARN],
+            )
+        )
+        self.batch_replication_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="GenerateManifestFromSource",
+                actions=["s3:GetReplicationConfiguration", "s3:PutInventoryConfiguration"],
+                resources=[_SOURCE_BUCKET_ARN],
+            )
+        )
+
         # ── Outputs ───────────────────────────────────────────────────────────
         # deploy/apply_s3_replication.sh cross-checks these against
         # deploy/s3_replication.json before it puts anything.
         cdk.CfnOutput(self, "RawBackupBucketName", value=self.backup_bucket.bucket_name)
         cdk.CfnOutput(self, "RawBackupBucketArn", value=self.backup_bucket.bucket_arn)
         cdk.CfnOutput(self, "RawReplicationRoleArn", value=self.replication_role.role_arn)
+        cdk.CfnOutput(self, "RawBatchReplicationRoleArn", value=self.batch_replication_role.role_arn)
