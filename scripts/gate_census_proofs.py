@@ -470,4 +470,31 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
         ),
         "proved_on": "2026-08-29",
     },
+    "sentinel::deploy/sentinel_log_retention.py::check_log_retention": {
+        "gate_name": "check_log_retention",
+        "command": "python3 -m pytest tests/test_security_log_retention_3278.py -q",
+        "mutation": (
+            "(a) the 2026-08-30 live sweep planted verbatim on fakes built to the DescribeRegions/DescribeLogGroups call "
+            "shapes (retentionInDays ABSENT for never-expire, prefix semantics on the read): 17 security-tier groups across "
+            "7 regions, 10 NEVER_EXPIRE Lambda@Edge replicas + 7 at 30d against the declared 90d; plus a single 60d group "
+            "among an otherwise-clean set; plus a longer-named sibling (`-canary-v2`) that a prefix read must not count. "
+            "(b) describe_regions raising (the region set cannot be enumerated), one region's describe_log_groups raising "
+            "with every other region clean, and a sweep that finds zero groups anywhere."
+        ),
+        "observed": (
+            "exit 0 with (a) reporting status='drift' naming all 17 groups with region + live value, NEVER_EXPIRE spelled "
+            "out and the apply command in the detail, reaching drift_report.as_signal's flagging map through run_sweep as "
+            "needs-human; the all-at-90 baseline reports 'clean' and the -v2 sibling neither drifts nor substitutes. (b) "
+            "all three -> status='error' (the region-set failure names ec2:DescribeRegions and the role file; the partial "
+            "sweep says 'not clean'; the empty sweep says ZERO), never 'clean'. The doc-side guard in the same file reds on "
+            "a planted 90->30 doc-down edit and on a function dropped from the row."
+        ),
+        "scope": (
+            "Detection, not prevention: a Lambda@Edge replica group created by a newly-served region arrives at "
+            "NEVER_EXPIRE and is caught by the NEXT weekly sweep (<=7 days), fixed by the attended apply script — CDK "
+            "owns one region per stack and CloudWatch Logs has no account-level retention default. Live steady state "
+            "until the driver runs the apply + LifePlatformOperational deploy is DRIFT (17 groups), by design. " + _ERROR_IS_NOT_A_SIGNAL
+        ),
+        "proved_on": "2026-08-30",
+    },
 }

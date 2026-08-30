@@ -41,7 +41,7 @@ PERM=$(cat <<JSON
    "logs:DescribeLogGroups","logs:DescribeLogStreams","cloudwatch:DescribeAlarms",
    "cloudwatch:DescribeAlarmHistory","cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics",
    "cloudwatch:ListMetrics","lambda:GetFunction","lambda:GetFunctionConfiguration",
-   "lambda:ListFunctions"],"Resource":"*"},
+   "lambda:ListFunctions","ec2:DescribeRegions"],"Resource":"*"},
  {"Sid":"DriftSentinel","Effect":"Allow","Action":["cloudformation:DetectStackDrift",
    "cloudformation:DescribeStackDriftDetectionStatus","cloudformation:DescribeStackResourceDrifts",
    "cloudformation:ListStackResources"],"Resource":"*"},

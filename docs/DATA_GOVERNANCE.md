@@ -136,9 +136,9 @@ No Glacier or deep-archive tier is in use today. Could be added if compliance de
 
 | Source | Retention |
 |--------|-----------|
-| Lambda CloudWatch Logs (most) | **30 days** (P1.1) |
+| Lambda CloudWatch Logs (most) | **30 days** (P1.1; `LOG_RETENTION_DEFAULT_DAYS`, the `lambda_helpers.py` default) |
 | Lambda CloudWatch Logs (power-tuning) | **14 days** |
-| Lambda CloudWatch Logs (security: canary, key-rotator, dlq-consumer, cf-auth) | **90 days** |
+| Lambda CloudWatch Logs (security tier: canary, key-rotator, dlq-consumer, cf-auth, buddy-auth — registry `cdk/stacks/constants.py::SECURITY_TIER_LOG_FUNCTIONS`) | **90 days** — the three CDK-owned functions by construction (`lambda_helpers.py` derives the tier from the registry, #3278); the two Lambda@Edge auth gates (replica groups `/aws/lambda/us-east-1.<fn>` in EVERY region that ever served a request — CDK cannot own them) by `python3 deploy/apply_log_retention.py --apply`, idempotent; asserted weekly in all enabled regions by `deploy/drift_sentinel.py::check_log_retention`, and this row is asserted against the registry by `tests/test_security_log_retention_3278.py` |
 | CloudTrail events | **90 days** (S3 lifecycle) |
 | DLQ messages | **14 days** (SQS retention) |
 | Validation errors archive (S3) | Forever in `validation-errors/` prefix |
@@ -248,6 +248,7 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-08-23 | #3044 (DIL-003/DIL-013) **retention row re-signed v2**: subscriber emails → **anonymize AT unsubscribe (0 days)**; the handler scrubs inline, the weekly sweep demoted to backstop (≤7d worst case). Unsubscribe links tokenized fleet-wide (signed HMAC over the email hash — no plaintext email in URLs; legacy links sunset 2026-09-22); `/privacy/` copy rewritten to the implemented contract | #3044 |
 | 2026-08-23 | #3045 (DIL-008/DIL-011, ADR-155, `gate:owner` signed): Tier-2 publication becomes a recorded decision — `TIER_OWNER_PUBLISHED` stamp added to `lambdas/privacy/field_tiers.py`; the full currently-served public surface (vitals set, labs panel, sleep-stage trio, lean mass, DEXA summary) stamped by explicit consent; every remaining Tier-2 prose row ported into the registry (field-level or source-level); this doc's Tier-2 section now GUARDED against the registry by `tests/test_data_governance_tier_guard_3045.py` — the twin-sources drift class is closed | #3045 |
 | 2026-08-24 | DIL-026/#2799: `imports/` closed — gained `NoncurrentVersionExpiration` (7d, keep 1), same shape as `raw/`. Was the flagged-but-out-of-scope gap from #2642's pass (2.07 GB noncurrent measured under ~0 current bytes, unbounded age — confirmed again live). Lifecycle config externalized to `deploy/s3_lifecycle.json` (single writer for both `apply_s3_lifecycle.sh` and the new declared-vs-live drift assertion, `deploy/drift_sentinel.py::check_s3_lifecycle`, weekly). `life-platform-s3-bucket-size-high` re-derived 50GB → 65GiB from measured steady-state (deploys/ 7-day rolling churn dominates at ~41-44GB under the now-routine multi-agent deploy cadence, not a coverage gap — the existing #2642 rule is confirmed live and correctly configured) | #2799 |
+| 2026-08-30 | #3278: the 90-day security-log tier was prose only — measured live: 30d in us-east-1/us-west-2, NEVER_EXPIRE in eu-west-2/eu-west-1/eu-central-1/us-east-2/us-west-1 (Lambda@Edge replica groups of the auth gates), and no group anywhere at 90. Decision: the CONFIGURATION moves to 90 (the row stands; it matches the CloudTrail/`mcp-audit/` 90d audit class) — declared once in `cdk/stacks/constants.py`, derived by CDK for the three regional functions, written by `deploy/apply_log_retention.py` for the edge replicas, asserted weekly across every enabled region by `drift_sentinel.check_log_retention` (+ `ec2:DescribeRegions` on the remediation role). `buddy-auth` added to the row — same auth-gate class, same edge mechanism | #3278 |
 
 ---
 

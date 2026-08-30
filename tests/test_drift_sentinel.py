@@ -307,6 +307,7 @@ def _patch_all(
     dynamodb_ttl=None,
     cadence=None,
     events=None,
+    log_retention=None,
 ):
     # DIL-027 (#3042): the raw/ cross-region backup check. Patched here like every
     # other AWS-touching check so the sweep-shape tests stay offline.
@@ -325,6 +326,14 @@ def _patch_all(
         "check_eventbridge_rules",
         lambda *a, **k: events
         or {"status": "clean", "live_count": 96, "managed_count": 93, "enabled_targetless": [], "out_of_iac": [], "known_out_of_iac": {}},
+    )
+    # #3278: the security-tier log-retention sweep. Patched like every other AWS-touching
+    # check so the sweep-shape tests stay offline.
+    monkeypatch.setattr(
+        ds,
+        "check_log_retention",
+        lambda *a, **k: log_retention
+        or {"status": "clean", "declared_days": 90, "groups_found": 17, "mismatches": [], "unreadable_regions": []},
     )
     monkeypatch.setattr(ds, "check_codeql_alerts", lambda: codeql or {"status": "clean", "open_count": 0, "sample": []})
     monkeypatch.setattr(

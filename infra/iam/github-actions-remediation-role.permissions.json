@@ -28,7 +28,8 @@
         "cloudwatch:ListMetrics",
         "lambda:GetFunction",
         "lambda:GetFunctionConfiguration",
-        "lambda:ListFunctions"
+        "lambda:ListFunctions",
+        "ec2:DescribeRegions"
       ],
       "Resource": "*"
     },
