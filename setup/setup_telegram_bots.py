@@ -286,6 +286,40 @@ def _adopt_chat_ids(key: str, payload: dict) -> list:
         return []
 
 
+# The top-level store entry for the board room's group chat id. NOT a bot: it has
+# no token and is never texted first — it exists so the webhook's allow-list union
+# (telegram_webhook_lambda._allowed_chat_ids) authorizes the room, while the
+# per-bot chat_ids stay purely private ids that outbound may text (the worker
+# additionally picks only POSITIVE ids — telegram_group.first_private_chat_id —
+# so a group id can never receive a morning check-in even if one lands there).
+BOARD_GROUP_KEY = "board_group"
+
+
+def bank_group_ids(found: list, payload: dict) -> list:
+    """Split group ids (negative) out of a discovery result into the board_group entry.
+
+    Returns the PRIVATE (positive) ids for the bot's own chat_ids. A group's id
+    identifies the ROOM, not the sender — it belongs to the store, not to whichever
+    bot happened to discover it first.
+    """
+    groups = []
+    private = []
+    for cid in found or []:
+        try:
+            (groups if int(cid) < 0 else private).append(cid)
+        except (TypeError, ValueError):
+            continue
+    if groups:
+        entry = payload.get(BOARD_GROUP_KEY) or {}
+        known = list(entry.get("chat_ids") or [])
+        fresh = [g for g in groups if g not in known]
+        if fresh:
+            entry["chat_ids"] = known + fresh
+            payload[BOARD_GROUP_KEY] = entry
+            print(f"    ✓ group chat id(s) {_fmt_ids(fresh)} recorded under '{BOARD_GROUP_KEY}' (the board room)")
+    return private
+
+
 def resolve_chat_ids(key: str, token: str, existing: dict, payload: dict) -> list:
     """Chat ids to ADD for this bot. Prints exactly one outcome; never prints a token.
 
@@ -298,6 +332,7 @@ def resolve_chat_ids(key: str, token: str, existing: dict, payload: dict) -> lis
     """
     known = list(existing.get("chat_ids") or [])
     found, reason = discover_chat_ids(token)
+    found = bank_group_ids(found, payload)
 
     if found:
         fresh = [c for c in found if c not in known]
@@ -391,6 +426,10 @@ def show(payload: dict) -> None:
         state = "set" if bool(e.get("bot_token")) else "—"
         flag = "  ! no chat id — cannot text first" if state == "set" and not (e.get("chat_ids") or []) else "  · not created by choice"
         print(f"  {key:11s} {state:8s} {_safe_ids(e):22s} {username} ({who}){flag}")
+    room = payload.get(BOARD_GROUP_KEY) or {}
+    room_ids = room.get("chat_ids") or []
+    room_state = _fmt_ids(room_ids) if room_ids else "— not discovered (add the bots to a group, say hi, re-run)"
+    print(f"  {BOARD_GROUP_KEY:11s} {'n/a':8s} {room_state:22s} (the board room — group chat id, no bot of its own)")
     missing = [k for k in KEYS if not (payload.get(k) or {}).get("bot_token")]
     print(f"\n  {len(KEYS) - len(missing)}/{len(KEYS)} configured" + (f" — still to do: {', '.join(missing)}" if missing else " — all set"))
     dead = _outbound_dead(payload)
@@ -428,6 +467,9 @@ def main() -> int:
     print("Already registered webhooks? getUpdates is blocked for those bots — this will say so and offer the id your other bots proved.\n")
 
     changed = 0
+    # bank_group_ids writes into payload out-of-loop-band; a run that ONLY
+    # discovered the board room's id must still save.
+    board_before = json.dumps(payload.get(BOARD_GROUP_KEY), sort_keys=True)
     for key, username, who in ALL_BOTS:
         if key not in wanted:
             continue
@@ -467,6 +509,9 @@ def main() -> int:
         payload[key] = entry
         changed += 1
         print()
+
+    if json.dumps(payload.get(BOARD_GROUP_KEY), sort_keys=True) != board_before:
+        changed += 1
 
     if not changed:
         print("nothing changed.")
