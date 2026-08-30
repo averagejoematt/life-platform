@@ -582,19 +582,24 @@ COVERAGE = {
     ),
     "life-platform-data-reconciliation": (
         EXEMPT,
-        "2026-07-19",
-        "Weekly SES gap report; a missing Monday email is humanly visible, and the daily freshness/liveness/interior-gap "
-        "alarms independently cover the data it audits.",
+        "2026-08-29",
+        "#2835: no longer a standalone email — the weekly gap report delivers as the reconciliation/latest.json artifact the "
+        "Monday ops pack (traffic-digest) embeds. A dead cron renders as a loud dated STALE/not-collected line in that weekly "
+        "email (more visible than the silently-absent email it replaced); a terminal failure lands in the DLQ digest; and the "
+        "daily freshness/liveness/interior-gap alarms independently cover the data it audits.",
     ),
     "life-platform-traffic-digest": (
         EXEMPT,
-        "2026-07-19",
-        "Operator email (weekly traffic digest); a missing issue is noticed by its reader.",
+        "2026-08-29",
+        "#2835: the Monday ops-pack email (traffic + green report + subscriber funnel + the folded reconciliation and "
+        "pip-audit sections); a missing issue is noticed by its reader (Matthew) same-morning — the operator-email class.",
     ),
     "life-platform-pip-audit": (
         EXEMPT,
-        "2026-07-19",
-        "Weekly advisory dependency audit; absence = a missed advisory email, not a data-path failure. Findings are advisory by design.",
+        "2026-08-29",
+        "#2835: advisory dependency audit, now artifact-only (pip-audit/latest.json) embedded in the Monday ops pack — a dead "
+        "cron renders as a loud dated STALE line there within its monthly cadence, and a terminal failure lands in the DLQ "
+        "digest. Findings are advisory by design; absence = a missed advisory section, not a data-path failure.",
     ),
     "life-platform-canary": (
         EXEMPT,

@@ -5789,7 +5789,7 @@
       "module": "lambdas/operational/pip_audit_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 17 ? * MON *)",
+          "expr": "cron(0 15 ? * MON *)",
           "resolution": "constant"
         }
       ],

@@ -3,7 +3,15 @@ data_reconciliation_lambda.py — DATA-3: Weekly data reconciliation job.
 
 Runs every Sunday at 11:30 PM PT (Monday 07:30 UTC) — after the weekly digest.
 Checks that all 19 active data sources have DynamoDB records for each of the
-last 7 days. Compiles a gap report and sends an SES summary email.
+last 7 days and compiles a gap report.
+
+DELIVERY (#2835): this job no longer sends its own SES email. The report is
+written to S3 (`reconciliation/latest.json`, plus the dated archive key) and
+embedded as a section of the Monday ops-pack email sent by
+`traffic_digest_lambda` at 16:00 UTC — one weekly ops email instead of three.
+The artifact write IS the delivery now: a failed write raises, so the terminal
+failure lands in the DLQ digest instead of silently rendering as a stale
+"not collected" line in next Monday's pack.
 
 PURPOSE:
   Catches silent ingestion failures that don't cause Lambda errors (e.g. API
@@ -38,8 +46,8 @@ import os
 from datetime import date, datetime, timedelta, timezone
 
 import boto3
+from common.dry_run import is_dry_run  # #2835: dry run now suppresses the artifact writes (no SES send remains here)
 from common.pacific_time import pacific_today  # #2798: the coverage window bounds DATE# keys — Pacific days
-from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -55,10 +63,12 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")
 BUCKET = os.environ["S3_BUCKET"]
 USER_ID = os.environ.get("USER_ID", "matthew")
-RECIPIENT = os.environ["EMAIL_RECIPIENT"]
-SENDER = os.environ["EMAIL_SENDER"]
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "7"))
+
+# #2835: the stable artifact key the Monday ops pack (traffic_digest_lambda)
+# reads — always overwritten with the newest report; dated keys keep history.
+LATEST_ARTIFACT_KEY = "reconciliation/latest.json"
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
@@ -91,7 +101,6 @@ SOURCES = reconciliation_sources() + COMPUTED_PARTITIONS
 # ── AWS clients ────────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE)
-ses = boto3.client("sesv2", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
 
 
@@ -141,7 +150,12 @@ def classify_severity(source_results: list[dict]) -> tuple[str, str]:
 
 
 def build_html_report(dates: list[str], source_results: list[dict], severity: str, color: str) -> str:
-    """Build HTML email with reconciliation table."""
+    """Build the reconciliation report as an EMBEDDABLE HTML fragment (#2835).
+
+    This used to be a standalone email document; it is now a `<div>` fragment
+    stored in the S3 artifact and embedded verbatim as one section of the
+    Monday ops-pack email (traffic_digest_lambda) — no DOCTYPE/html/body
+    wrapper, so it composes inside the pack's own document."""
     week_start = dates[0]
     week_end = dates[-1]
     day_labels = [datetime.strptime(d, "%Y-%m-%d").strftime("%a") for d in dates]
@@ -172,11 +186,7 @@ def build_html_report(dates: list[str], source_results: list[dict], severity: st
     # shipped as an unparseable CSS value for every report ever sent.
     summary_bg = "#f0fdf4" if total_gaps == 0 else "#fef3c7"
 
-    return f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Weekly Reconciliation</title></head>
-<body style="font-family:system-ui,sans-serif;margin:0;padding:16px;background:#f9fafb;">
-<div style="max-width:900px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);">
+    return f"""<div style="font-family:system-ui,sans-serif;max-width:900px;margin:16px 0;background:white;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
   <div style="background:{color};padding:20px 24px;">
     <h2 style="color:white;margin:0;font-size:20px;">📊 Weekly Data Reconciliation</h2>
     <p style="color:rgba(255,255,255,.9);margin:4px 0 0;font-size:13px;">{week_start} → {week_end} | {severity} | Generated {generated_at}</p>
@@ -210,8 +220,7 @@ def build_html_report(dates: list[str], source_results: list[dict], severity: st
   <div style="padding:12px 24px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;">
     AI-generated analysis, not medical advice. Life Platform v3.0 | data-reconciliation Lambda
   </div>
-</div>
-</body></html>"""
+</div>"""
 
 
 def lambda_handler(event, context):
@@ -252,57 +261,49 @@ def lambda_handler(event, context):
 
     logger.info(f"[reconciliation] Result: {severity} | {total_gaps} gaps across {sources_with_gaps} sources")
 
-    # Build + send report
+    # #2835: build the report fragment + machine-readable summary and deliver
+    # them as the S3 artifact the Monday ops pack (traffic_digest_lambda)
+    # embeds. This write IS the delivery now — a failure must raise so the
+    # scheduled run's terminal failure lands in the DLQ digest (#809/ADR-116)
+    # instead of silently aging into a stale line in next Monday's email.
     html = build_html_report(dates, source_results, severity, color)
     week_label = f"{dates[0]} → {dates[-1]}"
-    subject = f"📊 Weekly Reconciliation | {week_label} | {severity}"
 
+    summary = {
+        "week": week_label,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "severity": severity,
+        "total_gaps": total_gaps,
+        "sources_with_gaps": sources_with_gaps,
+        "results": [
+            {
+                "source": r["source"],
+                "gaps": r["gaps"],
+                "days_present": r["days_present"],
+                "missing_dates": [d for d in dates if r["coverage"].get(d) is False],
+            }
+            for r in source_results
+        ],
+        # The pre-rendered section the ops pack embeds verbatim (#2835).
+        "html": html,
+    }
     try:
-        guarded_send_email(
-            ses,
-            dry_run,
-            FromEmailAddress=SENDER,
-            Destination={"ToAddresses": [RECIPIENT]},
-            Content={
-                "Simple": {
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
-                }
-            },
-        )
-        logger.info(f"[reconciliation] Report sent: {subject}")
+        if dry_run:
+            logger.info("[reconciliation] dry-run — artifact writes suppressed (report computed in full)")
+        else:
+            body = json.dumps(summary, indent=2)
+            s3 = boto3.client("s3", region_name=REGION)
+            s3.put_object(
+                Bucket=BUCKET,
+                Key=f"reconciliation/{dates[-1]}_weekly_reconciliation.json",
+                Body=body,
+                ContentType="application/json",
+            )
+            s3.put_object(Bucket=BUCKET, Key=LATEST_ARTIFACT_KEY, Body=body, ContentType="application/json")
+            logger.info(f"[reconciliation] Artifact written: {LATEST_ARTIFACT_KEY} ({severity})")
     except Exception as e:
-        logger.error(f"[reconciliation] Failed to send report: {e}")
+        logger.error(f"[reconciliation] Failed to deliver artifact: {e}")
         raise
-
-    # Also write summary to S3 for programmatic access
-    try:
-        summary = {
-            "week": week_label,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "severity": severity,
-            "total_gaps": total_gaps,
-            "sources_with_gaps": sources_with_gaps,
-            "results": [
-                {
-                    "source": r["source"],
-                    "gaps": r["gaps"],
-                    "days_present": r["days_present"],
-                    "missing_dates": [d for d in dates if r["coverage"].get(d) is False],
-                }
-                for r in source_results
-            ],
-        }
-        s3 = boto3.client("s3", region_name=REGION)
-        s3.put_object(
-            Bucket=BUCKET,
-            Key=f"reconciliation/{dates[-1]}_weekly_reconciliation.json",
-            Body=json.dumps(summary, indent=2),
-            ContentType="application/json",
-        )
-        logger.info("[reconciliation] Summary written to S3")
-    except Exception as e:
-        logger.warning(f"[reconciliation] S3 write failed (non-fatal): {e}")
 
     return {
         "statusCode": 200,

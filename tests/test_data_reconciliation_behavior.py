@@ -18,13 +18,12 @@ Contracts pinned here:
     unknown day must not be reported to Matthew as a confirmed gap (ADR-104).
   * **The expected-days facet is honoured** — a weekday-only source that wrote
     5 of 7 days has zero gaps; the same 5/7 on a daily source is 2.
-  * **The send is gated.** The handler runs entirely through
-    ``common.send_guard``; the dry-run path must produce the identical report
-    and reach SES zero times. No email Lambda is invoked, live or otherwise
-    (#2111) — ``guarded_send_email`` is replaced with a recorder and the SES
-    client is never touched.
-  * **The S3 summary is non-fatal.** A failed archive write must not lose the
-    verdict the handler already computed.
+  * **Delivery is the artifact (#2835).** The standalone SES email is retired:
+    the handler writes the dated archive key AND ``reconciliation/latest.json``
+    (carrying the pre-rendered ``html`` section the Monday ops pack embeds),
+    a dry run computes the full report but writes nothing, and a failed
+    artifact write RAISES — it is the delivery now, so a silent miss must
+    page via the DLQ digest instead of aging into a stale pack section.
 
 No AWS and no network. Arithmetic is hand-derived in the body.
 """
@@ -33,10 +32,9 @@ from __future__ import annotations
 
 import os
 
-# Read at import time (conftest supplies fake AWS creds).
+# Read at import time (conftest supplies fake AWS creds). #2835: the module no
+# longer reads EMAIL_RECIPIENT/EMAIL_SENDER — its delivery is the S3 artifact.
 os.environ.setdefault("S3_BUCKET", "test-bucket")
-os.environ.setdefault("EMAIL_RECIPIENT", "qa@example.com")
-os.environ.setdefault("EMAIL_SENDER", "qa@example.com")
 
 import json  # noqa: E402
 import re  # noqa: E402
@@ -287,16 +285,10 @@ class _RecordingS3:
 
 @pytest.fixture()
 def handler_env(monkeypatch):
-    """Wire the handler to fakes. SES is NEVER constructed or called: the send
-    chokepoint itself is replaced with a recorder (#2111)."""
+    """Wire the handler to fakes. Since #2835 the module has NO SES client and
+    no send path at all — delivery is the S3 artifact, recorded here."""
 
     def _install(present_by_source, sources=None, s3_boom=False):
-        sends: list[dict] = []
-
-        def _send(ses_client, dry_run, **kwargs):
-            sends.append({"dry_run": dry_run, **kwargs})
-            return {"MessageId": "fake", "dry_run": dry_run}
-
         class _T:
             def get_item(self, Key, **kw):
                 source = Key["pk"].rsplit("#", 1)[-1]
@@ -305,11 +297,9 @@ def handler_env(monkeypatch):
 
         s3 = _RecordingS3(boom=s3_boom)
         monkeypatch.setattr(dr, "table", _T())
-        monkeypatch.setattr(dr, "guarded_send_email", _send)
-        monkeypatch.setattr(dr, "ses", object())  # a real SES call would raise AttributeError
         monkeypatch.setattr(dr.boto3, "client", lambda name, region_name=None: s3)
         monkeypatch.setattr(dr, "SOURCES", sources or [("whoop", 7, "Recovery"), ("strava", 5, "Cardio")])
-        return sends, s3
+        return s3
 
     return _install
 
@@ -334,7 +324,7 @@ def _all_seven(anchor_days=7):
 
 def test_handler_reports_green_when_every_source_is_whole(handler_env):
     week = _all_seven()
-    sends, s3 = handler_env({"whoop": week, "strava": week})
+    handler_env({"whoop": week, "strava": week})
     resp = dr.lambda_handler({"dry_run": True}, None)
 
     body = json.loads(resp["body"])
@@ -348,7 +338,7 @@ def test_handler_counts_gaps_against_each_sources_expected_days(handler_env):
     week = sorted(_all_seven())
     # strava expects 5/7; five present days is complete for it, but the same
     # five days on whoop (expects 7) is a two-day gap.
-    sends, s3 = handler_env({"whoop": set(week[:5]), "strava": set(week[:5])})
+    handler_env({"whoop": set(week[:5]), "strava": set(week[:5])})
     body = json.loads(dr.lambda_handler({"dry_run": True}, None)["body"])
     assert body["total_gaps"] == 2
     assert body["sources_with_gaps"] == 1
@@ -357,7 +347,7 @@ def test_handler_counts_gaps_against_each_sources_expected_days(handler_env):
 def test_handler_checks_the_last_seven_completed_days_never_today(handler_env):
     import datetime as _dt
 
-    sends, s3 = handler_env({})
+    handler_env({})
     dr.lambda_handler({"dry_run": True}, None)
     week_label = json.loads(dr.lambda_handler({"dry_run": True}, None)["body"])["week"]
     start, end = week_label.split(" → ")
@@ -371,53 +361,52 @@ def test_handler_checks_the_last_seven_completed_days_never_today(handler_env):
     assert (_dt.date.fromisoformat(end) - _dt.date.fromisoformat(start)).days == 6
 
 
-def test_handler_dry_run_builds_the_full_report_and_sends_nothing(handler_env):
-    sends, s3 = handler_env({})
-    dr.lambda_handler({"dry_run": True}, None)
-    (sent,) = sends
-    assert sent["dry_run"] is True, "the guard must receive the suppress decision, not be bypassed"
-    assert "Weekly Data Reconciliation" in sent["Content"]["Simple"]["Body"]["Html"]["Data"]
-    assert sent["Destination"]["ToAddresses"] == [dr.RECIPIENT]
-    assert sent["Content"]["Simple"]["Subject"]["Data"].startswith("📊 Weekly Reconciliation | ")
+def test_handler_dry_run_builds_the_full_report_and_writes_nothing(handler_env):
+    """#2835 folded shape of the old sends-nothing contract: with no SES send
+    left in the module, the manual-invoke hazard is the artifact overwrite —
+    a dry run must compute the full verdict and leave S3 untouched (a stray
+    latest.json overwrite would change what next Monday's ops pack embeds)."""
+    s3 = handler_env({})
+    resp = dr.lambda_handler({"dry_run": True}, None)
+    assert resp["statusCode"] == 200
+    assert json.loads(resp["body"])["severity"].startswith("RED")
+    assert s3.puts == [], "dry run must not overwrite the artifact the ops pack reads"
 
 
-def test_handler_subject_carries_the_severity_so_the_inbox_is_scannable(handler_env):
-    sends, s3 = handler_env({})
-    dr.lambda_handler({"dry_run": True}, None)
-    assert "RED — Investigate Gaps" in sends[0]["Content"]["Simple"]["Subject"]["Data"]
+def test_handler_artifact_carries_the_severity_and_the_rendered_section(handler_env):
+    """The folded shape of inbox scannability (#2835): the severity the old
+    subject line carried now rides the artifact — the ops pack lifts it into
+    the pack subject (ops_subject_suffix) and embeds the html section."""
+    s3 = handler_env({})
+    dr.lambda_handler({}, None)
+    latest = json.loads(next(p for p in s3.puts if p["Key"] == dr.LATEST_ARTIFACT_KEY)["Body"])
+    assert latest["severity"] == "RED — Investigate Gaps"
+    assert "Weekly Data Reconciliation" in latest["html"]
+    assert "<!DOCTYPE" not in latest["html"], "the section must be an embeddable fragment, not a document"
 
 
 def test_handler_archives_a_machine_readable_summary_to_s3(handler_env):
     week = sorted(_all_seven())
-    sends, s3 = handler_env({"whoop": set(week[:6]), "strava": set(week)})
-    dr.lambda_handler({"dry_run": True}, None)
+    s3 = handler_env({"whoop": set(week[:6]), "strava": set(week)})
+    dr.lambda_handler({}, None)
 
-    (put,) = s3.puts
-    assert put["Bucket"] == dr.BUCKET
-    assert put["Key"] == f"reconciliation/{week[-1]}_weekly_reconciliation.json"
-    assert put["ContentType"] == "application/json"
-    summary = json.loads(put["Body"])
+    dated, latest = s3.puts
+    assert dated["Bucket"] == dr.BUCKET
+    assert dated["Key"] == f"reconciliation/{week[-1]}_weekly_reconciliation.json"
+    assert dated["ContentType"] == "application/json"
+    assert latest["Key"] == dr.LATEST_ARTIFACT_KEY
+    assert latest["Body"] == dated["Body"], "the stable key and the dated archive must carry the same report"
+    summary = json.loads(dated["Body"])
     whoop = next(r for r in summary["results"] if r["source"] == "whoop")
     assert whoop["gaps"] == 1
     assert whoop["missing_dates"] == [week[6]]
     assert summary["severity"] == "YELLOW — Monitor"
 
 
-def test_handler_treats_a_failed_s3_archive_as_non_fatal(handler_env):
-    sends, s3 = handler_env({}, s3_boom=True)
-    resp = dr.lambda_handler({"dry_run": True}, None)
-    assert resp["statusCode"] == 200, "the verdict is already computed; a failed archive must not lose it"
-    assert len(sends) == 1
-
-
-def test_handler_raises_when_the_report_cannot_be_delivered(handler_env, monkeypatch):
-    """A silent send failure would make a dark week look identical to a clean
-    one — the handler must fail loudly so the Lambda error alarm fires."""
-    handler_env({})
-
-    def _boom(ses_client, dry_run, **kwargs):
-        raise RuntimeError("SES throttled")
-
-    monkeypatch.setattr(dr, "guarded_send_email", _boom)
-    with pytest.raises(RuntimeError, match="SES throttled"):
-        dr.lambda_handler({"dry_run": True}, None)
+def test_handler_raises_when_the_artifact_cannot_be_delivered(handler_env):
+    """#2835: the artifact IS the delivery now. A silent write failure would
+    age into a stale 'not collected' line in next Monday's pack with no page —
+    the handler must fail loudly so the terminal failure reaches the DLQ digest."""
+    handler_env({}, s3_boom=True)
+    with pytest.raises(RuntimeError, match="AccessDenied"):
+        dr.lambda_handler({}, None)

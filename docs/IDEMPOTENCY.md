@@ -114,16 +114,19 @@ the disproportion ADR-103/144 exists to refuse.
 | `operational/dlq_consumer_lambda.py` | `rate(6 hours)` | **N — accepted** | **It is itself the redrive engine.** Its digest is queue state at read time; a duplicate is a repeated reading of a moving number. |
 | `operational/qa_smoke_lambda.py` | `cron(30 18 ? * * *)` | **N — accepted** | Nightly observation, not a reproducible artifact. (Also at 1,198 of the 1,200-line module ceiling — `tests/test_module_size_guard.py` — so a guard cannot land without an unrelated extraction.) |
 | `operational/alert_digest_lambda.py` | `cron(0 15 * * ? *)` | **N — accepted** | Content is the alarm state at read time. Its role (`operational_alert_digest`) holds **no DynamoDB grant at all** — SQS drain + `DescribeAlarms` + SES. |
-| `operational/pip_audit_lambda.py` | `cron(0 17 ? * MON *)` | **N — accepted** | Its role holds **no AWS resource access at all** ("just runs pip-audit and reports"). |
-| `operational/traffic_digest_lambda.py` | `cron(0 16 ? * MON *)` | **N — accepted** | `dynamodb:Query` only — "Query only, never write — the digest is read-only by contract" (`role_policies_operational.py`). |
+| `operational/pip_audit_lambda.py` | `cron(0 15 ? * MON *)` | **Y — idempotent by construction** | **#2835 retired its SES send** — delivery is now the `pip-audit/latest.json` S3 artifact the Monday ops pack embeds; a replay overwrites the same keys with the same freshly-computed report. Its role gained exactly that write (`OpsArtifactWrite`) plus the requirements-manifest read the scan always needed (the SES-only role had made every scheduled scan die AccessDenied). |
+| `operational/traffic_digest_lambda.py` | `cron(0 16 ? * MON *)` | **N — accepted** | `dynamodb:Query` only — "Query only, never write — the digest is read-only by contract" (`role_policies_operational.py`; #2835 added read-only `s3:GetObject` on the two folded-report artifact keys). Since #2835 this is THE Monday ops-pack email — the one remaining ops send. |
 | `operational/permanence_lambda.py` | `cron(0 6 * * ? *)` | **N — accepted** | `dynamodb:Query` only, and #1400 says why out loud: "the contract's own state lives in the published continuity document rather than in a private partition." |
-| `operational/data_reconciliation_lambda.py` | `cron(30 7 ? * MON *)` | **N — accepted** | Read-only DDB grant (`GetItem`/`Query`/`Scan`, no write). Report content is a fresh reconciliation reading. |
+| `operational/data_reconciliation_lambda.py` | `cron(30 7 ? * MON *)` | **Y — idempotent by construction** | **#2835 retired its SES send** — delivery is now the `reconciliation/latest.json` S3 artifact (plus the dated archive key) the Monday ops pack embeds; a replay overwrites the same keys with the same freshly-computed report. |
 | `web/email_subscriber_lambda.py` | **reader HTTP** (FunctionURL) | **Partial — accepted** | The remaining exposure is a *reader resubmitting the form*, which is not a replay: re-sending the confirmation is the intended behaviour when someone lost the first mail. The `confirm` leg is already replay-safe — the token is `REMOVE`d on use, so a replayed confirm cannot re-send the welcome (see §4). |
 
-> The eight ops rows are the honest `N` this census was built to make sayable.
+> The ops `N` rows are the honest `N` this census was built to make sayable.
 > Their content is a *fresh observation at send time*, so a duplicate is a
 > repeated reading, not a falsified record — and closing that gap would cost a
-> write grant on five roles that are read-only on purpose.
+> write grant on roles that are read-only on purpose. (#2835 turned two of the
+> original eight — pip-audit and data-reconciliation — into non-senders whose
+> only side effect is an idempotent artifact overwrite; they stay in this table
+> because the table is where their delivery story is told.)
 
 ---
 

@@ -227,9 +227,18 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
     #1954 (subscriber funnel): + dynamodb:Query on the table (and kms:Decrypt —
     the table is CMK-encrypted) so the Monday email can join the subscriber
     partition: counts by status, 7d new-pending/new-confirmed, stray-canary-row
-    warning. Query only, never write — the digest is read-only by contract."""
+    warning. Query only, never write — the digest is read-only by contract.
+
+    #2835 (ops pack): + s3:GetObject on exactly the two folded-report artifact
+    keys (reconciliation/latest.json, pip-audit/latest.json) so the Monday
+    email can embed the retired standalone reports. Read-only additions."""
     log_bucket_arn = "arn:aws:s3:::matthew-life-platform-cf-logs"
     return [
+        iam.PolicyStatement(
+            sid="FoldedOpsArtifactsRead",
+            actions=["s3:GetObject"],
+            resources=_s3("reconciliation/latest.json", "pip-audit/latest.json"),
+        ),
         iam.PolicyStatement(
             sid="SubscriberFunnelRead",
             actions=["dynamodb:Query"],
@@ -466,12 +475,30 @@ def operational_canary() -> list[iam.PolicyStatement]:
 
 
 def operational_pip_audit() -> list[iam.PolicyStatement]:
-    """Pip audit: no AWS resource access needed — just runs pip-audit and reports."""
+    """Pip audit (#2835): reads the pinned requirements manifests from S3 and
+    writes the report artifact the Monday ops pack embeds. No SES — the
+    standalone email is retired; delivery is pip-audit/latest.json.
+
+    The read grant is also a live-bug fix folded in here: the role held ONLY
+    SES before, so every scheduled run's ListObjectsV2 on config/requirements/
+    died AccessDenied (verified in the 2026-08-03 run's logs) and the 'scan'
+    early-returned having audited nothing."""
     return [
         iam.PolicyStatement(
-            sid="SES",
-            actions=["ses:SendEmail", "sesv2:SendEmail"],
-            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+            sid="ReadRequirementsManifests",
+            actions=["s3:GetObject"],
+            resources=_s3("config/requirements/*"),
+        ),
+        iam.PolicyStatement(
+            sid="ListRequirementsPrefix",
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+            conditions={"StringLike": {"s3:prefix": "config/requirements/*"}},
+        ),
+        iam.PolicyStatement(
+            sid="OpsArtifactWrite",
+            actions=["s3:PutObject"],
+            resources=_s3("pip-audit/*"),
         ),
     ]
 
@@ -714,11 +741,12 @@ def operational_delete_user_data() -> list[iam.PolicyStatement]:
 
 
 def operational_data_reconciliation() -> list[iam.PolicyStatement]:
-    """Data reconciliation: reads DDB, sends SES report."""
+    """Data reconciliation: reads DDB, writes the report artifact (#2835 — the
+    standalone SES email is retired; delivery is reconciliation/latest.json,
+    embedded by the Monday ops pack)."""
     return _operational_base(
         ddb_actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
         needs_s3_write=["reconciliation/*"],
-        needs_ses=True,
     )
 
 
