@@ -3347,6 +3347,21 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3302"
         }
       ]
+    },
+    {
+      "id": "2026-08-30-the-room-decides-who-speaks",
+      "date": "2026-08-30",
+      "title": "Eight coaches, one group chat, and a rule for who answers",
+      "shipped": "The coaching staff got a group chat. Each coach already lives on my phone as a separate Telegram contact with their own voice and memory; Grand Rounds is now a real room where they all sit together. The engineering problem was who answers: every bot in the group receives every message independently, so eight replies to one question was the default. The fix is a rule every worker computes for itself, identically, with zero coordination — an @mention names the speaker; a reply re-addresses the coach it replies to; otherwise the chair (the head coach) answers alone. No claim table, no lock, no extra model call. The room shares one conversation thread with each coach's turns name-stamped, so a coach answering sees what colleagues actually said instead of absorbing their words as their own.",
+      "why_it_mattered": "A committee that all talks at once is noise, and a room where an unaddressed question dies in silence is worse. The who-speaks rule is the difference between a group chat and eight broadcast channels wearing one name — and because it's a pure function of the message itself, it cannot race, deadlock, or cost anything when it decides to stay silent. The silent side is observable too: a metric records every worker that decided 'not me', so nobody-answered is a measurable state, not a mystery.",
+      "gotcha": "Telegram counts mention offsets in UTF-16 code units, not characters — an emoji before an @mention shifts the slice and a naive extraction reads garbage. The tests lead with an emoji on purpose. Also: a group's chat id discovered by a bot must never land in that bot's own outbound list, or a morning check-in broadcasts to the whole room — group ids now bank separately, and the unsolicited paths only ever text private ids.",
+      "honest_miss": "The room's memory is v1: no referral handoffs, no reactions, and the daily conversation summarizer deliberately skips the room — a multi-voice scrollback needs its own summarizer to be honest, and that's a later slice. And the room isn't live in my hands yet: the bots exist in code, but the last mile is me creating them in BotFather — the first unaddressed message answered by exactly one coach is the real proof.",
+      "prs": [
+        {
+          "label": "PR #3307",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3307"
+        }
+      ]
     }
   ]
 }

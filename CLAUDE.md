@@ -208,24 +208,22 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-30 (FABLE 5, **Session J** — autonomous, then owner co-working; the session
-three sessions banked for this model). **Main GREEN at b60db50b (deploying runs green twice).**
-**10 closed / 0 filed — open 54 → 44**, 10 PRs merged, 2 fleet + 2 site deploys. **The site is
-UNFROZEN**: #3294 landed with a derived surface enumeration + mutation-proven census gate, the board
-regenerated clean on deployed code (wire re-read: licensed = food/journal, withheld = training/habits),
-visual QA green on a run that actually deployed, and #3286/#3287's front-ends re-landed (markers ×4/×2
-live). **Branch protection is ON** (#3288 — ruleset live, auto-merge on, --check clean) and the **#3021
-lease janitor is armed** — both unblocked by owner-minted tokens in-session. **The Architect operator
-leg is LIVE** (routine `architect-operator-2849`, weekly, report-only; first real ritual 09-08 =
-#2849's reopen trigger). The Fable re-grade delivered #3042's box-4 verdict honestly: 4/9 domains ≥9,
-gap list by leverage, register made 52/52. **The defining incident: a 9h stranded-lease stall** (two
-runs minted 8s apart; the older held the lease while the watch polled the newer) — INCIDENT_LOG row
-189, land §3 now enumerates ALL leases, janitor token is the machine fix. Four owner decisions
-executed (#3251→C1 shipped · #2833→shadow-permanent · #2883→block · #3083→fail-closed shipped).
-Session finds: pip-audit had audited NOTHING since inception (fixed); the judge has two REPRODUCING
-false-positive shapes (both TRUE claims, folded to #3251); fixture-was-reality broke four tests in one
-night. **The approved week plan is the driver** (`~/.claude/plans/snug-coalescing-music.md`): #2845
-system model ~25% Fable · promotions #2363→Now then #1365→Next (dated ADR-099 owner exception) ·
-#2883 Monday for the soak · drain #3250/#3265/#3293/#3289/#3262/#3277/#3278/#2833/#3251 via lanes.
-Monday verifications: first ops pack 16:00Z, governor tier 0, first graded predictions. Full narrative:
-`handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-30 (FABLE 5, **Session K** — autonomous, then owner co-working). **Main GREEN
+at cb16ef2f (final run green end-to-end incl. Visual+AI QA); ci-cd queue EMPTY, zero leases at close.**
+**8 PRs merged + deployed, 5 closed** (#3265/#3250/#3262/#3289/#3293 — waves 1+2 of the plan's drain).
+**The DIL-027 backfill is DONE**: batch role CDK-owned (#3306), S3 Batch job 41,175/41,175 replicated,
+0 failed, ~$0.49 — `sentinel_replication` **clean** after 6 days honestly red. **#2883's soak clock is
+RUNNING** (#3308 deployed): the governor's own price table had no titan row — a **500× numerator error**
+since #1384; drift 1.2849→~1.2134; verify next 8h cycle (titan ~$0.01, drift ≈1.21). **The board room
+is LIVE** (#3307, epic #2363): Grand Rounds as a real group chat — pure who-speaks rule (mention →
+reply-to → the chair), shared speaker-stamped thread, outbound can never text the room; worker bundle
+verified BY CONTENT; the owner's 10 BotFather minutes is the last mile (checklist on the epic). **The
+closure audit** (owner-prompted): ~60 closures since 08-16 → 5 escapes: #2848 REOPENED (false-close by
+stray Fixes), #3208→folded on #3251, carriers #3315/#3316/#3317 filed; **#3314 filed** — the #2845
+tail (operator facets + boot contract) finally has an open carrier, on Now; **#3318** = the class fix
+(closure DoD + two structural detectors), Later, owner may promote. Gotchas: GitHub event minting ran
+~10min delayed (delay ≠ swallow — check before the ladder); a cancelled superseded Deploy is covered by
+the next run's ACCUMULATED diff (verify by bundle content). Next: Monday verifications (governor tier 0,
+bands 157.67/186.33/209.27, ops pack 16:00Z, first graded predictions) · **#3314 is next session's
+core Fable work** · drain #3277/#3278/#2833/#2848/#3316 via lanes · 09-08 Architect ritual runs ITSELF.
+Full narrative: `handovers/HANDOVER_LATEST.md`.

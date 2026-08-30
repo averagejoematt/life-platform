@@ -1,104 +1,116 @@
-# Handover — 2026-08-29/30 (FABLE 5): Session J — the site unfrozen, ten closed, and the owner in the loop
+# Handover — 2026-08-30 (FABLE 5): Session K — the week plan's front edge, executed early
 
-**Session:** Claude Fable 5, AUTONOMOUS with merge+deploy authority — the Fable session
-three sessions banked work for. Boot: `~/.claude/plans/cryptic-sauteeing-tiger.md`
-(#3294 leads; #2849's first leg = Architect). Mid-session the owner joined live and the
-session became co-working: four gate:owner decisions answered, two GitHub tokens minted,
-a 10-hour marathon directive, and a week plan (`snug-coalescing-music.md`, approved)
-with TWO Roadmap promotions.
+**Session:** Claude Fable 5, AUTONOMOUS with merge+deploy authority, then owner co-working.
+**Driver:** the approved week plan (`~/.claude/plans/snug-coalescing-music.md`) — boot
+instruction: dispose leases, launch #2883 (Opus, the soak clock is the critical path),
+start #2363 + #2845, drain §4 in lanes, run the DIL-027 backfill as a driver action.
 
-## Closed with verdicts (10) — zero standalone issues filed
-#3294 (the floor: absence-sourcing REACHES every surface; board regenerated clean on
-deployed code; visual QA green on a DEPLOYING run) · #3283 (labs empty-string; the
-Phase-4 line fired for the first time in its history — 346 chars) · #3083 (fail-closed
-quality gate, owner decision, protect-longest test-proven) · #2835 (Monday ops-pack
-fold; found pip-audit had audited NOTHING since inception — AccessDenied on its own
-manifest) · #3284 (chronicle unblackholed; CloudFront fn published 15:23:39Z; week-04
-AND week-05 → 200 live) · #3252 (Outcome met; box-5 rollback-scope folded to #2799) ·
-#2849 (Architect routine `architect-operator-2849` live + proof-run; reopen trigger =
-the 09-08 ritual) · #3288 (branch protection APPLIED: ruleset live, auto-merge on,
---check clean, bypass proven by the next push) · #3279 (orphan rule torn down + grant
-revoked; sentinel `eventbridge_rules: clean` on the wire) · #3303 (the wedge alert —
-closed on deploys demonstrably flowing). Open 54 → **44**.
+## What shipped (8 PRs merged + deployed, 5 issues closed, 0 net filings drama)
 
-## Merged (10 PRs) + deployed
-#3295 (#3294, four CI rounds), #3296 (Fable re-grade + 52/52 register + operator
-spike), #3297 (#3283), #3298 (#3284 code), #3299 (#3279), #3300 (#3083), #3301
-(#2835 + CDK IAM applied by hand-reviewed diff), #3302 (six-endpoint vintage sweep,
-Refs #3252/#2799), #3304 (C1: prose judge off per-deploy per #3251 decision), #3305
-(labs count line to the platform logger). Two full fleet deploys green end-to-end +
-two site deploys (the second SUCCESS under the C1 profile — #3286/#3287 markers live
-×4/×2, build 1764541). Census 564 → **569** by id-set diffs (three raises, each proven).
+- **DIL-027 backfill DONE and verified** — the session's driver action. PR #3306
+  (CDK-owned `RawBatchReplicationRole`, `s3:InitiateReplication` on `raw/*` only),
+  `LifePlatformBackup` deployed, S3 Batch job `41200479` ran: **41,175/41,175 objects
+  replicated, 0 failed, ~$0.49**. `sentinel_replication` now returns **clean** after 6
+  days honestly red. The runbook comment in `apply_s3_replication.sh` upgraded to the
+  exact working `create-job` command.
+- **#2883's attribution fix merged + deployed — the soak clock is RUNNING** (PR #3308,
+  `ac701597b`, pipeline green end-to-end incl. Visual+AI QA). The real mechanism: the
+  governor's own second price table had no `titan` row → the $10/1M default vs the real
+  $0.02/1M, a **500× error inside the drift ratio's numerator** since #1384. Drift
+  1.2849 → ~1.2134 measured. Honest residual on the issue: remaining ~$17 gap has the
+  out-of-repo interactive-session signature; 1.15 may need the n=30 re-decision.
+- **The board room built and LIVE** (PR #3307, epic #2363's remaining build box):
+  Grand Rounds as a real group chat — a pure who-speaks rule computed identically by
+  every worker (coach-bot mention → reply-to → the chair, per #2719's owner decision),
+  one shared speaker-stamped `board_room` thread, group ids banked under a top-level
+  `board_group` store entry so outbound can never text the room. Same grounding seam as
+  1:1 (census-registered delegated-gated). Worker bundle verified BY CONTENT live
+  (`coach/telegram_group.py` in the deployed zip). Owner's 10 BotFather minutes is all
+  that separates build from first proof (checklist on the epic, comment 08-30).
+- **Wave drain: 5 closures via lanes** — #3265 (duration overage attributed, 2nd
+  consecutive SHED — two duplicated whole-repo scans cached), #3250 (one /review spine,
+  7 rubrics, set-guard over lenses), #3262 (both Claude hooks were dark in worktrees —
+  reproduced live, fixed structurally), #3289 (reaper reads `git worktree lock` as the
+  leading liveness signal; `lane_worktree.py` creates-and-locks), #3293 (direction-of-
+  travel siblings through the #3285 ruling + 5-surface registry guard). All commented
+  per the (e8) contract.
+- **Backlog governance with the owner in the loop**: two un-milestoned epics placed
+  (#2800→Now, #2842→Next); Now-liveness refilled by the check's own levers (#2833
+  ungated — the shadow-permanent decision was already recorded; #3278 promoted); and
+  the closure audit (below).
 
-## The 9-hour stall (the session's defining incident — owner had to ask "are we stalled?")
-Two ci-cd runs minted 8s apart at the first merge train; the OLDER held the deploy-group
-lease `waiting` while my watch polled the NEWER run's gate (structurally unopenable) in
-a silent until-loop. INCIDENT_LOG row 189; land skill §3 rewritten to
-**enumerate-ALL-leases after every merge** (structural, a run count); the machine fix —
-the #3021 janitor — was found built-but-dark for want of a token, and the owner minted
-`DEPLOY_GATE_JANITOR_TOKEN` in-session. Watch its first live rejection as its proof.
+## The session's defining find: the closed-issue residual audit
 
-## Owner session (all executed)
-Decisions: #3251→C1 (shipped, PR #3304) · #2833→shadow-permanent (reshape lane is
-next-session work, #2833) · #2883→block (start Monday for the soak) · #3083→fail-closed
-(shipped). Tokens: `RECONCILE_PUSH_TOKEN` (→ #3288 applied) + `DEPLOY_GATE_JANITOR_TOKEN`.
-Authority grants: #3284 CloudFront publish (used, dated), #2849 closure (reopen trigger
-recorded). Week plan approved: #2845 ~25% · promotions #2363→Now + #1365→Next (dated
-ADR-099 owner exception recorded on both) · #2883 Monday · drain queue to lanes · ~10%
-reserve.
+Owner asked whether #2845's shape (closed issue, commissioned follow-on, no carrier)
+was systemic. A verified sweep of ~60 closures since 08-16 found **5 escapes, ~25
+near-misses correctly cleared**:
+- **#2848 REOPENED** — a false-close: stray `Fixes` in PR #3253 closed it while its
+  author wrote "stays OPEN, Outcome not met" *after* `closedAt`. Nobody noticed for 3 days.
+- #3208's phrase-matched-rules residual → folded onto open #3251 (verified live in
+  `reader_truth_rulings.py:322-338`).
+- Carriers filed: **#3315** (CI flags w/o installed deps, epic #2578), **#3316**
+  (sleep-detail schema baseline predates #3023 — that gate is green against a shape the
+  API no longer serves), **#3317** (standing qa-smoke alarm set drain).
+- **#3314 filed** — the #2845 tail itself: the system model's operator facets + the
+  boot contract, on Now, epic #2842. The week plan's core Fable work now has an open carrier.
+- **#3318 filed** (Later, epic #2842) — the class fix: a closure DoD (the handover's
+  `not-work — <home>` rule applied symmetrically) + two STRUCTURAL detectors
+  (comments-after-closedAt; assert-the-closing-set at merge). Owner may promote.
 
-## Gotchas that will bite again (memories written for each)
-- **A merge train mints one lease PER squash** — enumerate the set, silent until-loops
-  ban (land §3 + `reference_enumerate_all_leases_after_every_merge`).
-- **Fixture-was-reality, FOUR instances in one night**: the #3207 pending-path tests
-  (×2 files), the scope-gap sentinel test, and the pulse fixtures — every test that
-  reads the checked-in state as its fixture breaks the day reality moves. Synthesize
-  the shape under test.
-- **The reader-truth judge has REPRODUCING false-positive shapes** (not flakes — they
-  pass the #3102 confirm): a live window scored out of its own days; a self-explaining
-  meter. Both ground-truthed TRUE; both rolled back a healthy deploy pre-C1
-  (`reference_judge_reproducing_false_positive_shapes`).
-- **A caplog-green log line can be DARK in CloudWatch** (platform_logger propagate=False
-  + its own singleton map) — wire lines get proven by invoke
-  (`reference_platform_logger_capture_and_dark_module_loggers`).
-- **The engine-doc gate's squash-date race**: a lane stamps day N, the squash lands N+1,
-  the gate reds main for the stamped change itself. Reconciled honestly on COACH_STANCE.
-- **My own piped-tail relapse** let 9 red tests slide into a push (caught + fixed forward
-  same hour) — verdicts UNPIPED remains the rule because it keeps being re-proven.
+## Gotchas hit (durable ones → memory)
 
-## Session-J findings folded (no standalone filings)
-#2578: remediation runs report `success` while `drift-log/latest.json` stopped landing
-08-24 (`sentinel_cadence` red 6d — the writer is dark, detection honest). #2799: the
-rollback-scope machinery (box 5 of #3268) + the seventh vintage sibling
-(`/api/ai_analysis`). #3251: the two judge FP shapes as structural adjudication-rule
-candidates.
+- **GitHub event minting ran ~10 min delayed all night**: a merge with ZERO runs at its
+  sha for 6+ minutes was NOT swallowed — the push run arrived late, after a recovery
+  `workflow_dispatch` had already minted a twin. Distinguish delay from swallow before
+  escalating the ladder; a dispatched twin is harmless (both ran; only one deploys).
+- **A cancelled Deploy is not a missed deploy**: the board-room run was superseded and
+  cancelled at its Deploy step; the NEXT approved run's matrix carried the accumulated
+  diff since the last successful deploy. Verify by bundle CONTENT (unzip the live
+  Lambda's zip), never by which run deployed it.
+- **`wrap_gates.py --gather` in the pre-flight hint is stale** — the flag doesn't exist
+  (`--verify`/`--list` only). The bare batch run is the gather.
+- CDK deploy from a non-main checkout is correctly refused by the drift guard; the
+  `--require-approval never` passthrough (`-- --require-approval never`) is needed for
+  IAM-bearing stacks in a no-TTY session.
+
+## Verification state
+
+- Main **green at cb16ef2f** — the final run green end-to-end (Deploy, Smoke, I1/I2/I5,
+  Visual+AI QA). ci-cd queue **EMPTY, zero leases** at close (enumerated, not assumed).
+- Governor verify within 8h (next cycle): Titan line ~$0.01 (was $5.77), drift ≈1.21.
+- Board room: metrics `TelegramGroupSpeaker/ListenerSilent` will first fire on the
+  owner's first group message.
 
 ## Residual / next picks
-- Week plan is the driver: #2845 (~25% Fable) · #2363 then #1365 (promotions) · #2883
-  Monday (Opus lane) · drain queue #3250/#3265/#3293/#3289/#3262/#3277/#3278/#2833/#3251.
-- `raw/` history backfill: `raw_replication` drift is the KNOWN un-backfilled pre-existing
-  history (~$0.49 S3 Batch job, DIL-027 register) — not-work — driver runs it next session
-  alongside the priced register's own trigger; no new issue (the sentinel already reds it
-  honestly and the DIL-027 row owns it).
-- Verify Monday: first ops pack 16:00Z (#2835 partial→realized), governor September run
-  (tier 0 expected; bands 157.67/186.33/209.27), first graded predictions, `UngradeablePendingCount`
-  first retirements — all covered by #2835's verdict + epic #2801/#2883 — not-work — calendar
-  verification beats, owned by the week plan.
-- 09-08: Architect routine's first real ritual (fullreview-delta) — #2849's reopen
-  trigger; if clean, #2800 likely closes on its Outcome — not-work — scheduled machinery.
-- Owner calendar: restore drill + handoff drill (~1h each) — not-work — owner scheduling.
-- Bluesky/YouTube rotation — not-work — owner-present 10-minute action.
-- Janitor first live rejection = its proof — not-work — observation, #3021's record.
+
+- **Monday verifications** (plan §3): governor September run (tier 0; bands
+  157.67/186.33/209.27; + Titan/drift check above), 16:00Z ops pack (#2835
+  partial→realized), first graded predictions, `UngradeablePendingCount` retirements —
+  not-work — calendar verification beats owned by the week plan.
+- **#3314** — the system model's operator facets + boot contract: next session's core
+  Fable work (the plan's ~25% allocation, now properly carried).
+- **#2363 go-live is the owner's 10 minutes** — BotFather per the epic comment; first
+  unaddressed group message answered by Eli alone is the proof — not-work — owner action.
+- Drain remainder for lanes: #3277 (axe viewports), #3278 (log retention), #2833
+  (shadow-permanent reshape), #2848 (reopened — 35 unhomed rules), #3251 (accumulating
+  C1 runs; two judge FP shapes + #3208's family folded there).
+- #3316's second-order find (schema gate green against a dead shape) is small and
+  self-contained — a good first lane next session.
+- **09-08 Architect ritual runs ITSELF** — #2849's reopen trigger, #2800's likely
+  closer — not-work — scheduled machinery; do not run fullreview-delta by hand first.
+- Owner calendar: restore drill + handoff drill (~1h each), Bluesky/YouTube rotation —
+  not-work — owner scheduling.
 
 ## Gate lines
-**Build beat:** 2026-08-30-the-check-that-never-reached
-**Docs:** docs/MANAGED_WHERE_LEDGER.md (posture rows flipped APPLIED), docs/INCIDENT_LOG.md (+1 row + patterns regen), docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md (52/52), docs/reviews/REGRADE_2026-08-29_FABLE.md (new), docs/OPERATOR_SUBSTRATE_SPIKE.md (new + indexed), docs/PROPORTIONALITY.md (3 rows), docs/engines/COACH_STANCE.md (squash-date reconcile)
-**Decisions:** none needed — the four owner decisions are dated comments on their issues + the ADR-108 amendment landed in PR #3300; no new ADR-class architecture choice
-**Main:** green (b60db50b)
-**Incidents:** 1 row added — the 9h stranded-lease stall (row 189, patterns regenerated)
+
+**Build beat:** 2026-08-30-the-room-decides-who-speaks
+**Docs:** docs/MANAGED_WHERE_LEDGER.md (DIL-027 replication row flipped APPLIED + backfill-complete, dated), docs/PROPORTIONALITY.md (DIL-027 row backfill parenthetical)
+**Decisions:** none needed — no ADR-class choice; the closure-contract proposal is filed as #3318 for an owner call, not decided
+**Main:** green (cb16ef2f)
+**Incidents:** none
 **Stash/hooks:** clean
-**Closures:** #3294, #3283, #3083, #2835, #3284, #3252, #2849, #3288, #3279, #3303 commented
-**Backlog:** Now 3 actionable (promoted #3277 at (e9) by printed rank; #2363→Now + #1365→Next as the week-plan promotions); Later sweep — no stale Later issues printed; advisory now_lane_coverage noted (Now is sonnet 1 · opus 2 · fable 0 — the fable lane's work is the week plan itself)
+**Closures:** #3265, #3250, #3262, #3289, #3293 commented
+**Backlog:** Now live (opus 3 · fable 1 startable; refilled via #2833 ungate + #3278 promote + #3314 filed + #2848 reopened); Later sweep — no stale Later issues printed
 **Alarms:** all cited — every alarm red >72h cites an incident row or issue; no uncited flaps
-**CI warnings:** none
-**Ledger:** Architect operator leg row added (+ the two DIL priced rows from the re-grade walk)
+**CI warnings:** 1 — duration warner (2139s/1950s) on the final green run: triaged THIS session by #3265's merged shed (second consecutive non-raise); a single-reading breach under tonight's 5-parallel-run contention is the measured 88.5%-spread noise mode; no further action, decoded
+**Ledger:** none — no new standing subsystem (the batch-replication role is a one-time leg inside the existing DIL-027 row, whose ledger text was updated; the board room rides the worker's existing posture; reaper/lane_worktree are on-demand scripts)
