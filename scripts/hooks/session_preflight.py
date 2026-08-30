@@ -83,12 +83,31 @@ def _worktrees() -> str:
     return note
 
 
+def _boot_brief() -> list[str]:
+    """The boot contract (#3314): the architecture facts a session reads FROM THE MODEL,
+    rendered by scripts/boot_brief.py. Loaded by path (this hook runs outside any
+    package). A failure prints an explicit UNVERIFIED line — never a blank."""
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("_boot_brief", ROOT / "scripts" / "boot_brief.py")
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        sys.modules[spec.name] = mod  # spec-loaded modules must be registered before exec
+        spec.loader.exec_module(mod)
+        return mod.render_lines(mod.load_model())
+    except Exception as exc:  # noqa: BLE001 — fail open, say so
+        return [f"  model       UNVERIFIED (boot brief failed: {type(exc).__name__}: {exc})"]
+
+
 def main() -> int:
     print("── session pre-flight " + "─" * 46)
     print(f"  main        {_main_green()}")
     print(f"  deploy lease {_waiting_lease()}")
     print(f"  worktrees   {_worktrees()}")
-    print("  gates       python3 scripts/wrap_gates.py --gather   (headroom per lane)")
+    for line in _boot_brief():
+        print(line)
+    print("  gates       python3 scripts/wrap_gates.py           (headroom per lane)")
     print("              python3 scripts/skill_lint.py --offline  (skill corpus)")
     print("─" * 68)
     return 0

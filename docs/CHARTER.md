@@ -101,9 +101,15 @@ or removing anything.
 ## Using this
 
 - **Session boot:** this charter + the system model (#2845 — `model/platform_model.json`,
-  queried via `scripts/blast_radius.py --touches <partition>` / `--feeds <module>`,
-  rendered as `docs/DEPENDENCY_GRAPH.md`) is the architecture context; the prose docs
-  are depth, not prerequisites.
+  queried via `scripts/blast_radius.py --touches <partition>` / `--feeds <module>` /
+  `--alarm` / `--at` / `--privacy` / `--lambda`, rendered as `docs/DEPENDENCY_GRAPH.md`)
+  is the architecture context; the prose docs are depth, not prerequisites. **The boot
+  contract is executable (#3314):** `scripts/boot_brief.py::BOOT_CONTRACT` names every
+  fact a booting session or routine reads from the model — fleet, schedules, alarms +
+  routing, privacy tiers, contracts — and the SessionStart hook prints that brief, so
+  every session boot is a consumer of the model. `tests/test_boot_contract_3314.py` pins
+  it: the brief cannot restate a number, a hand-edited model renders STALE, and prose may
+  point at the model but never disagree with it.
 - **Grading frame:** `/uplevel` and the review skills grade an area by asking which
   of the five primitives it is missing — that, not taste, is what separates the
   platform's A areas from its C areas.

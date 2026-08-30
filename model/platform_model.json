@@ -1,208 +1,734 @@
 {
   "alarms": {
+    "ai-canary-blind": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ai-canary-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
+    },
+    "ai-canary-overall": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ai-daily-spend-high": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ai-tokens-daily-brief-daily": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
     "ai-tokens-platform-daily-total": {
-      "routing": "unresolved",
-      "stack": "monitoring_stack"
+      "composites": [
+        "ai-tokens-platform-daily-total-urgent",
+        "ai-tokens-platform-daily-total-genesis-window"
+      ],
+      "kind": "metric",
+      "routing": "via-composite",
+      "stack": "monitoring_stack",
+      "via": "declaration"
+    },
+    "ai-tokens-platform-daily-total-genesis-window": {
+      "kind": "composite",
+      "members": [
+        "ai-tokens-platform-daily-total",
+        "token-alarm-genesis-window-active"
+      ],
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "declaration"
+    },
+    "ai-tokens-platform-daily-total-urgent": {
+      "kind": "composite",
+      "members": [
+        "ai-tokens-platform-daily-total",
+        "token-alarm-genesis-window-active"
+      ],
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "declaration"
     },
     "between-chronicle-scrub-failed-closed": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_silence_alarms"
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
+    },
+    "budget-tier-hardstop": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "budget-tier-sustained-7d": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "budget-tier-unreadable": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_budget_alarms"
+      "stack": "monitoring_budget_alarms",
+      "via": "declaration"
     },
     "chronicle-delivery-heartbeat": {
+      "kind": "metric",
       "routing": "urgent",
-      "stack": "email_stack"
+      "stack": "email_stack",
+      "via": "declaration"
+    },
+    "coherence-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
+    },
+    "coherence-overall": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "compute-outputs-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
+    },
+    "compute-outputs-missing": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "compute-pipeline-stale": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "cost-governor-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
     },
     "cost-metric-drift-sustained": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "declaration"
+    },
+    "daily-brief-duration-high": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "daily-brief-no-invocations-24h": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "daily-debrief-no-invocations-24h": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "email-subscriber-errors": {
-      "routing": "unresolved",
-      "stack": "web_stack"
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "web_stack",
+      "via": "helper:add_web_alarms"
     },
     "expert-gate-infra-hold": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_silence_alarms"
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
     },
     "freshness-checker-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "freshness-interior-gap": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "freshness-interior-gap-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
     },
     "grading-stalled": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_prediction_alarms"
+      "stack": "monitoring_prediction_alarms",
+      "via": "declaration"
     },
     "hae-webhook-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "ingestion_stack"
+      "stack": "ingestion_stack",
+      "via": "constructor:create_platform_lambda"
     },
     "hae-webhook-no-invocations-24h": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_stack",
+      "via": "declaration"
     },
     "hevy-restamp-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
     },
     "hevy-routine-cron-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
     },
     "ingest-auth-unhealthy-24h": {
+      "kind": "metric",
       "routing": "urgent",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_stack",
+      "via": "declaration"
+    },
+    "ingest-auth-unhealthy-dropbox": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-auth-unhealthy-garmin": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-auth-unhealthy-habitify": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-auth-unhealthy-notion": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-auth-unhealthy-todoist": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-auth-unhealthy-whoop": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-consecutive-failures-eightsleep": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-consecutive-failures-hevy": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-consecutive-failures-strava": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-consecutive-failures-whoop": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-consecutive-failures-withings": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-liveness-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
+    },
+    "ingest-liveness-unhealthy": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-reconciliation-strava": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-reconciliation-strava-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
+    },
+    "ingest-reconciliation-whoop": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "ingest-reconciliation-whoop-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
+    },
+    "ingestion-error-insight-email-parser": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "ingestion-error-og-image-generator": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "ingestion-error-pipeline-health-check": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "ingestion-error-reading-cover-pipeline": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "ingestion-error-reading-recall-sweep": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
     },
     "key-rotator-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "life-platform-alert-digest-errors": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "life-platform-alert-digest-queue-age": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "life-platform-between-chronicle-kill-switch-skip": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "declaration"
+    },
+    "life-platform-budget-tier-escalation": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "life-platform-canary-anthropic-failure": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "factory:_canary_alarm"
+    },
+    "life-platform-canary-ddb-failure": {
+      "kind": "metric",
+      "routing": "digest+paging",
+      "stack": "operational_stack",
+      "via": "factory:_canary_alarm"
+    },
+    "life-platform-canary-mcp-failure": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "factory:_canary_alarm"
+    },
+    "life-platform-canary-s3-failure": {
+      "kind": "metric",
+      "routing": "digest+paging",
+      "stack": "operational_stack",
+      "via": "factory:_canary_alarm"
+    },
+    "life-platform-canary-subscribe-cleanup-failure": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "factory:_canary_alarm"
+    },
+    "life-platform-canary-subscribe-residue": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "operational_stack",
+      "via": "factory:_canary_alarm"
+    },
+    "life-platform-chronicle-email-sender-kill-switch-skip": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "declaration"
+    },
+    "life-platform-daily-brief-errors": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "life-platform-daily-brief-memory-high": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_stack",
+      "via": "declaration"
     },
     "life-platform-data-export-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "life-platform-ddb-item-size-warning": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "life-platform-ddb-throttled-requests": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "life-platform-delete-user-data-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
+    },
+    "life-platform-dlq-consumer-errors": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "life-platform-dlq-depth-warning": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "declaration"
     },
     "life-platform-freshness-checker-not-emitting": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "declaration"
+    },
+    "life-platform-ingestion-dlq-messages": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "life-platform-insight-email-parser-parse-failure": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "declaration"
     },
     "life-platform-og-image-errors": {
-      "routing": "unresolved",
-      "stack": "web_stack"
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "web_stack",
+      "via": "helper:add_web_alarms"
     },
     "life-platform-recursive-loop": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "mcp_stack"
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
+    "life-platform-remediation-dispatcher-errors": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "life-platform-s3-bucket-size-high": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "life-platform-weekly-signal-kill-switch-skip": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "declaration"
     },
     "mcp-server-duration-high": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "mcp_stack"
+      "stack": "mcp_stack",
+      "via": "declaration"
     },
     "mcp-warmer-error": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "mcp_stack"
+      "stack": "mcp_stack",
+      "via": "constructor:create_platform_lambda"
     },
     "mcp-warmer-no-invocations-24h": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "mcp_stack"
+      "stack": "mcp_stack",
+      "via": "declaration"
     },
     "paging-budget-tier-3": {
+      "kind": "metric",
       "routing": "paging",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_stack",
+      "via": "declaration"
     },
     "paging-pipeline-dead": {
+      "kind": "metric",
       "routing": "paging",
-      "stack": "monitoring_stack"
+      "stack": "monitoring_stack",
+      "via": "declaration"
     },
     "permanence-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "constructor:create_platform_lambda"
     },
     "permanence-heartbeat": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "operational_stack"
+      "stack": "operational_stack",
+      "via": "declaration"
     },
     "prediction-gradable-share-low": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_prediction_alarms"
+      "stack": "monitoring_prediction_alarms",
+      "via": "declaration"
+    },
+    "qa-paused-by-budget": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "qa-smoke-failures": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "qa-smoke-heartbeat": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_heartbeat_alarm"
+    },
+    "qa-smoke-warnings": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "recall-index-failed-chronicle-approve": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_silence_alarms"
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
     },
     "recall-index-failed-wednesday-chronicle": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_silence_alarms"
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
     },
     "site-api-ai-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "site-api-ai-throttles": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "site-api-content-filter-fallback": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "site-api-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "site-api-handled-5xx": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "site-api-invocation-spike": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "site-api-p95-latency-high": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "site-api-throttles": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
+    },
+    "slo-ai-coaching-success": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
+    },
+    "slo-daily-brief-delivery": {
+      "kind": "metric",
+      "routing": "urgent",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "slo-mcp-availability": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "mcp_stack"
+      "stack": "mcp_stack",
+      "via": "declaration"
+    },
+    "slo-source-freshness": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_stack",
+      "via": "factory:_alarm"
     },
     "slo-warmer-completeness": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "mcp_stack"
+      "stack": "mcp_stack",
+      "via": "declaration"
     },
     "telegram-coach-hold": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "monitoring_silence_alarms"
+      "stack": "monitoring_silence_alarms",
+      "via": "declaration"
     },
     "telegram-event-sweep-heartbeat": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "telegram-webhook-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "telegram-webhook-throttles": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "telegram-worker-errors": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "telegram-worker-throttles": {
+      "kind": "metric",
       "routing": "digest",
-      "stack": "serve_stack"
+      "stack": "serve_stack",
+      "via": "declaration"
     },
     "token-alarm-genesis-window-active": {
-      "routing": "unresolved",
-      "stack": "monitoring_stack"
+      "composites": [
+        "ai-tokens-platform-daily-total-urgent",
+        "ai-tokens-platform-daily-total-genesis-window"
+      ],
+      "kind": "metric",
+      "routing": "via-composite",
+      "stack": "monitoring_stack",
+      "via": "declaration"
     },
     "weekly-signal-delivery-heartbeat": {
+      "kind": "metric",
       "routing": "urgent",
-      "stack": "email_stack"
+      "stack": "email_stack",
+      "via": "declaration"
     }
   },
   "contracts": [
@@ -6328,10 +6854,20 @@
       "contracts": "tests/pair_contract_registry.py (AST) \u2014 PairContract(...) declarations for the #2847 enrolled pairs, unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR",
       "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
       "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
-      "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets"
+      "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets",
+      "privacy": "lambdas/privacy/field_tiers.py SOURCE_TIERS + FIELD_TIERS (#2803/#3045, ADR-155 consent) \u2014 loaded, not re-typed",
+      "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron"
     },
     "counts": {
-      "alarms": 51,
+      "alarms": 119,
+      "alarms_by_routing": {
+        "digest": 88,
+        "digest+paging": 2,
+        "paging": 2,
+        "urgent": 25,
+        "via-composite": 2
+      },
+      "alarms_composite": 2,
       "contracts": 8,
       "contracts_enrolled": 8,
       "contracts_known": 8,
@@ -6341,7 +6877,12 @@
       "mcp_tool_modules": 26,
       "mcp_tools": 76,
       "partitions": 105,
-      "scheduled_lambdas": 81
+      "privacy_fields_owner_only": 33,
+      "privacy_fields_owner_published": 11,
+      "privacy_sources_owner_only": 13,
+      "privacy_sources_owner_published": 2,
+      "scheduled_lambdas": 81,
+      "schedules": 88
     },
     "coverage": {
       "edge_sites": {
@@ -6364,8 +6905,8 @@
     ],
     "scope_cuts": [
       "field-level edges wait on the #2797 per-field wiring registry",
-      "privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) \u2014 not modeled",
-      "helper-default error alarms (ingestion-error-<fn>) are not enumerated \u2014 the alarms plane matches the #2844 vocabulary (explicit alarm_name declarations)",
+      "privacy tiers list only the registry's NON-default entries \u2014 an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)",
+      "per-Lambda error alarms named dynamically inside the paved-road constructor (ingestion-error-<fn>, f-string names) are not enumerated \u2014 the alarms plane holds every alarm whose NAME is a literal at its declaring call: explicit alarm_name= kwargs, positional local-factory calls (_alarm/_heartbeat_alarm/_canary_alarm), and composite_alarm_name= declarations",
       "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)",
       "the contracts plane lists the KNOWN pairs (#2847 \u2014 the enrolled contracts unioned with the KNOWN_MUST_AGREE_PAIRS floor), not every must-agree pair on the platform \u2014 without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is the counts.contracts_ratchet floor plus the ratchets in tests/test_pair_contract_sweep_2847.py"
     ],
@@ -6374,304 +6915,372 @@
   "partitions": {
     "achievements": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "adaptive_mode": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "ai_analysis": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "anomalies": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "apple_health": {
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Health Auto Export webhook, near-real-time",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "benchmarks": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "bluesky": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Keyless public AppView pull (framework), hourly",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "calibration": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "centenarian_progress": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "challenges": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "character_receipt": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "character_sheet": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "chronicle": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "chronicling": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "circadian": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "coach_actions": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "coach_corrections": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "coach_gen_cache": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "composite_scores": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "computed_insights": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "computed_metrics": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "day_grade": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "decisions": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "deletion_log": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "dexa": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_published"
     },
     "diary_claims": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "diary_reactions": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "discovery_annotations": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "dropbox_tracker": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "effect_fits": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "eightsleep": {
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "API pull, hourly",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "email_digest": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "email_log": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "engagement_state": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "evening_ritual": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "experiment_suggestions": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "experiments": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "exposures": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "eyeball_estimate": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "felt_probe": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "field_notes": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "flourishing": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "food_delivery": {
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual log",
+      "privacy_tier": "public",
       "stale_hours": 336
     },
     "food_responses": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "forecast": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "garmin": {
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "OAuth API pull, 4x daily \u2014 paused (ADR-074)",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "genome": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "google_calendar": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "habit_causality": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "habit_scores": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "habitify": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "API pull, hourly",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "health_check": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "hevy": {
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "API-key pull, hourly 12\u201323 UTC",
+      "privacy_tier": "owner_only",
       "stale_hours": 168
     },
     "hevy_id_map": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "hypotheses": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "ingest_liveness": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "insights": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "instagram": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual paste (no token) \u2014 staged to PASTE# and ingested through the SIMP-2 framework",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "interactions": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "journal_analysis": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "journal_quotes": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "labs": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_published"
     },
     "ledger": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "life_events": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "macrofactor": {
       "category": "Manual logs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual CSV export via Dropbox poller, ~24h behind by design",
+      "privacy_tier": "owner_only",
       "stale_hours": 96
     },
     "macrofactor_meals": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "macrofactor_workouts": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "mastodon": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Keyless public REST pull (framework), hourly",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "measurements": {
@@ -6679,159 +7288,199 @@
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual entry via MCP",
+      "privacy_tier": "public",
       "stale_hours": 1440
     },
     "milestones": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "mood": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "notion": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "API pull (journal database), hourly",
+      "privacy_tier": "owner_only",
       "stale_hours": 336
     },
     "nutrition_review": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "panelcast": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "personal_baselines": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "private_intake": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "protocols": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "qa_predict_dark": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "recall_embeddings": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "rewards": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "routine_index": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "ruck_log": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "scenarios": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "sick_days": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "sleep_unified": {
       "class": "system_state",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "state_of_matthew": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "state_of_mind": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "strava": {
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "OAuth API pull, hourly",
+      "privacy_tier": "owner_only",
       "stale_hours": null
     },
     "subscribers": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "supplements": {
       "category": "Manual logs",
       "class": "cross_phase",
       "ingestion": true,
       "method": "Habitify bridge (name-mapped habits)",
+      "privacy_tier": "owner_only",
       "stale_hours": null
     },
     "temptations": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "tiktok": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual paste (no token) \u2014 staged to PASTE# and ingested through the SIMP-2 framework",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "time_affluence": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "todoist": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "API pull, 1x daily (14:00 UTC)",
+      "privacy_tier": "public",
       "stale_hours": 72
     },
     "training_notes": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "training_reference": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "travel": {
       "class": "raw_timeseries",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "weather": {
       "category": "Inputs",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Open-Meteo API pull, 2x daily",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "weekly_correlations": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "weight_episodes": {
       "class": "cross_phase",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "what_changed": {
       "class": "experiment_scoped",
-      "ingestion": false
+      "ingestion": false,
+      "privacy_tier": "public"
     },
     "whoop": {
       "category": "Wearables",
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "OAuth API pull, 5x daily",
+      "owner_only_fields": [
+        "skin_temp_celsius",
+        "sleep_consistency_percentage",
+        "spo2_percentage",
+        "time_awake_hours"
+      ],
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "withings": {
@@ -6839,6 +7488,36 @@
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "OAuth API pull, hourly",
+      "owner_only_fields": [
+        "afib_result",
+        "bmr_kcal",
+        "body_temperature_c",
+        "bone_mass_kg",
+        "bone_mass_lbs",
+        "eda_feet",
+        "eda_left_foot",
+        "eda_right_foot",
+        "extracellular_water_kg",
+        "fat_mass_kg",
+        "fat_mass_lbs",
+        "fat_ratio_pct",
+        "heart_pulse",
+        "height_m",
+        "hydration_kg",
+        "intracellular_water_kg",
+        "metabolic_age",
+        "muscle_mass_kg",
+        "muscle_mass_lbs",
+        "pr_interval_ms",
+        "pulse_wave_velocity_mps",
+        "qrs_interval_ms",
+        "qt_interval_ms",
+        "skin_temperature_c",
+        "temperature_c",
+        "vascular_age",
+        "visceral_fat_index"
+      ],
+      "privacy_tier": "public",
       "stale_hours": 168
     },
     "x": {
@@ -6846,6 +7525,7 @@
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Manual paste (no token) \u2014 staged to PASTE# and ingested through the SIMP-2 framework",
+      "privacy_tier": "public",
       "stale_hours": null
     },
     "youtube": {
@@ -6853,7 +7533,708 @@
       "class": "raw_timeseries",
       "ingestion": true,
       "method": "Keyless per-channel RSS pull (framework), hourly",
+      "privacy_tier": "public",
       "stale_hours": null
     }
-  }
+  },
+  "privacy": {
+    "consent": {
+      "adr": "ADR-155",
+      "date": "2026-08-23"
+    },
+    "default": "public \u2014 an unlisted source/field is TIER_PUBLIC by omission (field_tiers.py's stated rule)",
+    "fields": {
+      "reading": {
+        "moodSnapshot": "owner_only",
+        "retentionScore": "owner_only"
+      },
+      "whoop": {
+        "hrv": "owner_published",
+        "light_sleep_hours": "owner_published",
+        "recovery_score": "owner_published",
+        "rem_sleep_hours": "owner_published",
+        "resting_heart_rate": "owner_published",
+        "skin_temp_celsius": "owner_only",
+        "sleep_consistency_percentage": "owner_only",
+        "sleep_duration_hours": "owner_published",
+        "slow_wave_sleep_hours": "owner_published",
+        "spo2_percentage": "owner_only",
+        "time_awake_hours": "owner_only"
+      },
+      "withings": {
+        "afib_result": "owner_only",
+        "bmr_kcal": "owner_only",
+        "body_temperature_c": "owner_only",
+        "bone_mass_kg": "owner_only",
+        "bone_mass_lbs": "owner_only",
+        "eda_feet": "owner_only",
+        "eda_left_foot": "owner_only",
+        "eda_right_foot": "owner_only",
+        "extracellular_water_kg": "owner_only",
+        "fat_free_mass_kg": "owner_published",
+        "fat_free_mass_lbs": "owner_published",
+        "fat_mass_kg": "owner_only",
+        "fat_mass_lbs": "owner_only",
+        "fat_ratio_pct": "owner_only",
+        "heart_pulse": "owner_only",
+        "height_m": "owner_only",
+        "hydration_kg": "owner_only",
+        "intracellular_water_kg": "owner_only",
+        "metabolic_age": "owner_only",
+        "muscle_mass_kg": "owner_only",
+        "muscle_mass_lbs": "owner_only",
+        "pr_interval_ms": "owner_only",
+        "pulse_wave_velocity_mps": "owner_only",
+        "qrs_interval_ms": "owner_only",
+        "qt_interval_ms": "owner_only",
+        "skin_temperature_c": "owner_only",
+        "temperature_c": "owner_only",
+        "vascular_age": "owner_only",
+        "visceral_fat_index": "owner_only",
+        "weight_kg": "owner_published",
+        "weight_lbs": "owner_published"
+      }
+    },
+    "sources": {
+      "cgm_readings": "owner_only",
+      "dexa": "owner_published",
+      "felt_probe": "owner_only",
+      "flourishing": "owner_only",
+      "genome": "owner_only",
+      "hevy": "owner_only",
+      "labs": "owner_published",
+      "macrofactor": "owner_only",
+      "notion": "owner_only",
+      "private_intake": "owner_only",
+      "reading": "owner_only",
+      "sick_days": "owner_only",
+      "state_of_mind": "owner_only",
+      "strava": "owner_only",
+      "supplements": "owner_only"
+    },
+    "tiers": {
+      "0": "public",
+      "1": "internal",
+      "2": "owner_only",
+      "3": "owner_published"
+    }
+  },
+  "schedules": [
+    {
+      "expr": "cron(0 1 * * ? *)",
+      "lambda": "dashboard-refresh",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "01:00"
+    },
+    {
+      "expr": "cron(0 2 * * ? *)",
+      "lambda": "circadian-compliance",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "02:00"
+    },
+    {
+      "expr": "cron(0 2 ? * SAT *)",
+      "lambda": "weekly-plate",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "02:00"
+    },
+    {
+      "expr": "cron(0 3 * * ? *)",
+      "lambda": "evening-nudge",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "03:00"
+    },
+    {
+      "expr": "cron(0 6 * * ? *)",
+      "lambda": "life-platform-permanence",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "06:00"
+    },
+    {
+      "expr": "cron(30 7 ? * MON *)",
+      "lambda": "life-platform-data-reconciliation",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "07:30"
+    },
+    {
+      "expr": "cron(0 8 ? * MON *)",
+      "lambda": "life-platform-delete-user-data",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "08:00"
+    },
+    {
+      "expr": "cron(0 8 1 * ? *)",
+      "lambda": "personal-baselines-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "08:00"
+    },
+    {
+      "expr": "cron(0 10 * * ? *)",
+      "lambda": "journal-analyzer",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "10:00"
+    },
+    {
+      "expr": "cron(10 12 * * ? *)",
+      "lambda": "scenario-explorer",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "12:10"
+    },
+    {
+      "expr": "cron(30 13 ? * SUN *)",
+      "lambda": "hevy-routine-cron",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "13:30"
+    },
+    {
+      "expr": "cron(0 14 * * ? *)",
+      "lambda": "ai-expert-analyzer",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "14:00"
+    },
+    {
+      "expr": "cron(0 14 * * ? *)",
+      "lambda": "todoist-data-ingestion",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": "14:00"
+    },
+    {
+      "expr": "cron(30 14 * * ? *)",
+      "lambda": "journal-enrichment",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": "14:30"
+    },
+    {
+      "expr": "cron(45 14 * * ? *)",
+      "lambda": "social-enrichment",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": "14:45"
+    },
+    {
+      "expr": "cron(0 15 1 1,4,7,10 ? *)",
+      "lambda": "coach-memoir",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "15:00"
+    },
+    {
+      "expr": "cron(0 15 * * ? *)",
+      "lambda": "life-platform-alert-digest",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "15:00"
+    },
+    {
+      "expr": "cron(0 15 ? * MON *)",
+      "lambda": "life-platform-pip-audit",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "15:00"
+    },
+    {
+      "expr": "cron(0 15 ? * MON *)",
+      "lambda": "monday-compass",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "15:00"
+    },
+    {
+      "expr": "cron(0 15 1 * ? *)",
+      "lambda": "voice-fidelity-harness",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "15:00"
+    },
+    {
+      "expr": "cron(0 15 ? * WED *)",
+      "lambda": "wednesday-chronicle",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "15:00"
+    },
+    {
+      "expr": "cron(5 15 * * ? *)",
+      "lambda": "anomaly-detector",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "15:05"
+    },
+    {
+      "expr": "cron(10 15 ? * WED *)",
+      "lambda": "chronicle-email-sender",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "15:10"
+    },
+    {
+      "expr": "cron(30 15 * * ? *)",
+      "lambda": "activity-enrichment",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": "15:30"
+    },
+    {
+      "expr": "cron(0 16 * * ? *)",
+      "lambda": "coach-prediction-evaluator",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 ? * MON *)",
+      "lambda": "life-platform-traffic-digest",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 ? * 1#1 *)",
+      "lambda": "monthly-digest",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 * * ? *)",
+      "lambda": "reading-recall-sweep",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 * * ? *)",
+      "lambda": "telegram-coach-worker",
+      "resolution": "constant",
+      "stack": "serve_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(0 16 ? * SUN *)",
+      "lambda": "weekly-digest",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "16:00"
+    },
+    {
+      "expr": "cron(20 16 ? * MON,WED,FRI *)",
+      "lambda": "life-platform-ai-quality-canary",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "16:20"
+    },
+    {
+      "expr": "cron(30 16 * * ? *)",
+      "lambda": "character-sheet-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "16:30"
+    },
+    {
+      "expr": "cron(30 16 ? * SUN *)",
+      "lambda": "weekly-signal",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "16:30"
+    },
+    {
+      "expr": "cron(35 16 * * ? *)",
+      "lambda": "adaptive-mode-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "16:35"
+    },
+    {
+      "expr": "cron(40 16 * * ? *)",
+      "lambda": "daily-metrics-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "16:40"
+    },
+    {
+      "expr": "cron(45 16 * * ? *)",
+      "lambda": "daily-insight-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "16:45"
+    },
+    {
+      "expr": "cron(45 16 * * ? *)",
+      "lambda": "life-platform-freshness-checker",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "16:45"
+    },
+    {
+      "expr": "cron(50 16 * * ? *)",
+      "lambda": "forecast-engine",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "16:50"
+    },
+    {
+      "expr": "cron(55 16 * * ? *)",
+      "lambda": "acwr-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "16:55"
+    },
+    {
+      "expr": "cron(58 16 * * ? *)",
+      "lambda": "pipeline-health-check",
+      "resolution": "constructed",
+      "stack": "operational_stack",
+      "utc": "16:58"
+    },
+    {
+      "expr": "cron(0 17 ? * SUN *)",
+      "lambda": "between-chronicle",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "17:00"
+    },
+    {
+      "expr": "cron(0 17 ? * SUN *)",
+      "lambda": "coach-history-summarizer",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "17:00"
+    },
+    {
+      "expr": "cron(0 17 * * ? *)",
+      "lambda": "daily-brief",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "17:00"
+    },
+    {
+      "expr": "cron(0 17 ? * SUN *)",
+      "lambda": "episode-detect",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "17:00"
+    },
+    {
+      "expr": "cron(0 17 ? * SAT *)",
+      "lambda": "nutrition-review",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "17:00"
+    },
+    {
+      "expr": "cron(5 17 * * ? *)",
+      "lambda": "subscriber-onboarding",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "17:05"
+    },
+    {
+      "expr": "cron(10 17 * * ? *)",
+      "lambda": "pipeline-health-check",
+      "resolution": "constructed",
+      "stack": "operational_stack",
+      "utc": "17:10"
+    },
+    {
+      "expr": "cron(15 17 * * ? *)",
+      "lambda": "milestone-digest",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "17:15"
+    },
+    {
+      "expr": "cron(15 17 ? * MON-FRI *)",
+      "lambda": "telegram-coach-worker",
+      "resolution": "constant",
+      "stack": "serve_stack",
+      "utc": "17:15"
+    },
+    {
+      "expr": "cron(20 17 * * ? *)",
+      "lambda": "strava-data-ingestion",
+      "resolution": "constructed",
+      "stack": "ingestion_stack",
+      "utc": "17:20"
+    },
+    {
+      "expr": "cron(30 17 ? * 1 *)",
+      "lambda": "partner-weekly-email",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "17:30"
+    },
+    {
+      "expr": "cron(30 17 * * ? *)",
+      "lambda": "whoop-data-ingestion",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": "17:30"
+    },
+    {
+      "expr": "cron(50 17 ? * SUN *)",
+      "lambda": "failure-pattern-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "17:50"
+    },
+    {
+      "expr": "cron(0 18 ? * SUN *)",
+      "lambda": "ai-review-pack",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "18:00"
+    },
+    {
+      "expr": "cron(0 18 * * ? *)",
+      "lambda": "chronicle-approve",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "18:00"
+    },
+    {
+      "expr": "cron(0 18 * * MON,WED *)",
+      "lambda": "coach-panel-podcast",
+      "resolution": "constructed",
+      "stack": "email_stack",
+      "utc": "18:00"
+    },
+    {
+      "expr": "cron(0 18 ? * SUN *)",
+      "lambda": "field-notes-generate",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "18:00"
+    },
+    {
+      "expr": "cron(0 18 * * ? *)",
+      "lambda": "hevy-restamp",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "18:00"
+    },
+    {
+      "expr": "cron(0 18 ? * SUN *)",
+      "lambda": "inter-coach-dialogue",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "18:00"
+    },
+    {
+      "expr": "cron(20 18 * * ? *)",
+      "lambda": "whoop-data-ingestion",
+      "resolution": "constructed",
+      "stack": "ingestion_stack",
+      "utc": "18:20"
+    },
+    {
+      "expr": "cron(30 18 ? * * *)",
+      "lambda": "life-platform-qa-smoke",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "18:30"
+    },
+    {
+      "expr": "cron(30 18 ? * SUN *)",
+      "lambda": "weekly-correlation-compute",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "18:30"
+    },
+    {
+      "expr": "cron(45 18 ? * * *)",
+      "lambda": "life-platform-coherence-sentinel",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "18:45"
+    },
+    {
+      "expr": "cron(0 19 * * ? *)",
+      "lambda": "coach-daily-reflection",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "19:00"
+    },
+    {
+      "expr": "cron(0 19 * * ? *)",
+      "lambda": "daily-debrief",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": "19:00"
+    },
+    {
+      "expr": "cron(0 19 ? * SUN *)",
+      "lambda": "hypothesis-engine",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "19:00"
+    },
+    {
+      "expr": "cron(30 19 * * ? *)",
+      "lambda": "og-image-generator",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": "19:30"
+    },
+    {
+      "expr": "cron(30 19 ? * SUN *)",
+      "lambda": "state-of-matthew",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "19:30"
+    },
+    {
+      "expr": "cron(0 21 * * ? *)",
+      "lambda": "dashboard-refresh",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "21:00"
+    },
+    {
+      "expr": "cron(0 22 ? * SUN *)",
+      "lambda": "challenge-generator",
+      "resolution": "constant",
+      "stack": "compute_stack",
+      "utc": "22:00"
+    },
+    {
+      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "bluesky-social-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(10 0-5,15-23 * * ? *)",
+      "lambda": "coach-nudge",
+      "resolution": "constant",
+      "stack": "email_stack",
+      "utc": null
+    },
+    {
+      "expr": "rate(30 minutes)",
+      "lambda": "dropbox-poll",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(15 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "eightsleep-data-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "habitify-data-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 12-23 * * ? *)",
+      "lambda": "hevy-backfill",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "rate(4 hours)",
+      "lambda": "life-platform-canary",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 0/8 * * ? *)",
+      "lambda": "life-platform-cost-governor",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": null
+    },
+    {
+      "expr": "rate(6 hours)",
+      "lambda": "life-platform-dlq-consumer",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "mastodon-social-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "notion-journal-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(30 2,6,14,18,22 * * ? *)",
+      "lambda": "pipeline-health-check",
+      "resolution": "constant",
+      "stack": "operational_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 * * * ? *)",
+      "lambda": "site-stats-refresh",
+      "resolution": "constructed",
+      "stack": "operational_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(10 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "strava-data-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 14,2 * * ? *)",
+      "lambda": "weather-data-ingestion",
+      "resolution": "constant",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 0,4,12,16,20 * * ? *)",
+      "lambda": "whoop-data-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(5 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "withings-data-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    },
+    {
+      "expr": "cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)",
+      "lambda": "youtube-social-ingestion",
+      "resolution": "resolved",
+      "stack": "ingestion_stack",
+      "utc": null
+    }
+  ]
 }
