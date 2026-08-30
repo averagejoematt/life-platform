@@ -39,12 +39,19 @@ def _orch_state():
 
 
 def _lull_signal():
+    # #3294: channel_detail is on every stored presence record (the wire), and the
+    # trimmer now grades each quiet label against the registry denominator through it.
     return {
         "date": "2026-06-30",
         "presence_class": "quiet",
         "gap_days": 3,
         "last_food_log_date": "2026-06-26",
         "channels_quiet": ["food", "training", "habits"],
+        "channel_detail": {
+            "macrofactor": {"label": "food", "last_log_date": "2026-06-26", "gap_days": 3},
+            "hevy": {"label": "training", "last_log_date": None, "gap_days": 3},
+            "habitify": {"label": "habits", "last_log_date": None, "gap_days": 3},
+        },
         "passive_still_flowing": True,
         "planned_pause": False,
         "planned_pause_reason": "",
@@ -67,7 +74,12 @@ def test_trimmer_surfaces_lull_without_cause():
     out = orch._engagement_for_brief(_lull_signal())
     assert out["presence_class"] == "quiet"
     assert out["gap_days"] == 3
-    assert out["channels_quiet"] == ["food", "training", "habits"]
+    # #3294: only "food" is a LICENSED absence (macrofactor is the full nutrition
+    # denominator and it was consulted). "training" is short a denominator source
+    # (strava/apple_health never consulted) and "habits" has no evidence source at
+    # all — both travel as unverified, never as confirmed quiet.
+    assert out["channels_quiet"] == ["food"]
+    assert out["channels_unverified"] == ["training", "habits"]
     assert out["passive_still_flowing"] is True
     # The cause of the gap must never be present — only carried real signals.
     assert "reason" not in out

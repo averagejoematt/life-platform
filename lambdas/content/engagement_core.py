@@ -514,6 +514,16 @@ def sourced_quiet(sig):
         return namedtuple("QuietChannelsFallback", "licensed withheld notes")((), labels, ())
 
 
+def quiet_fields_for_brief(sig):
+    """The two brief-facing fields every narrative surface carries (#3294):
+    `channels_quiet` = labels whose absence the registry denominator licenses;
+    `channels_unverified` = labels the denominator cannot carry — withheld, and
+    named so a card can say "cannot be established" instead of inferring silence.
+    Fail-closed by construction: `sourced_quiet` licenses nothing on any failure."""
+    split = sourced_quiet(sig if isinstance(sig, dict) else {})
+    return {"channels_quiet": list(split.licensed), "channels_unverified": list(split.withheld)}
+
+
 def presence_prompt_block(sig):
     """A steering block for when Matthew's OWN logging has gone quiet (or he just
     returned). Empty string when he's present. This is what stops a narrative

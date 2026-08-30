@@ -340,10 +340,13 @@ class TestPresenceBlockDerivesItsBranch:
             block = presence_prompt_block(sig)
             assert bl.transition_from_presence_signal(sig).kind == kind
             if kind == bl.TRANSITION_NEVER_LOGGED:
-                assert "NOTHING has been logged this cycle" in block
+                # #3294 scoped the sentence to FOOD — the only category this branch's
+                # fact covers; the unscoped "NOTHING has been logged" form is the
+                # short-denominator defect the board published.
+                assert "NO FOOD has been logged this cycle" in block
             else:
                 assert "since his last food log" in block
-                assert "NOTHING has been logged this cycle" not in block
+                assert "NO FOOD has been logged this cycle" not in block
 
     def test_the_blocks_own_output_passes_its_own_guard(self):
         """End to end: the steering block the coaches actually receive must not itself
@@ -413,7 +416,7 @@ class TestMutationProof:
         from content import engagement_core as ec
 
         sig = _signal(food_last=None)
-        assert "NOTHING has been logged this cycle" in ec.presence_prompt_block(sig)
+        assert "NO FOOD has been logged this cycle" in ec.presence_prompt_block(sig)
 
         monkeypatch.setattr(
             ec,
@@ -422,4 +425,4 @@ class TestMutationProof:
         )
         reverted = ec.presence_prompt_block(sig)
         assert "since his last food log" in reverted, "the mutation must actually change behaviour"
-        assert "NOTHING has been logged this cycle" not in reverted
+        assert "NO FOOD has been logged this cycle" not in reverted

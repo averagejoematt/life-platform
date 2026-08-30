@@ -127,8 +127,7 @@ def _presence_snapshot():
             licensed, withheld = list(split.licensed), list(split.withheld)
         except Exception:  # pragma: no cover — defensive; fail CLOSED, never pass through
             licensed, withheld = [], [str(c) for c in (item.get("channels_quiet") or [])]
-        if licensed:
-            out["channels_quiet"] = licensed
+        out["channels_quiet"] = licensed
         if withheld:
             out["channels_unverified"] = withheld
             out["channels_unverified_note"] = (

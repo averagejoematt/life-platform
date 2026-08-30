@@ -331,7 +331,7 @@ _DISPOSITIONS = {
     "lambdas/web/site_api_freshness.py": "count_only",
 }
 
-_WIRED_CALLS = {"sourced_quiet", "sourced_quiet_channels"}
+_WIRED_CALLS = {"sourced_quiet", "sourced_quiet_channels", "quiet_fields_for_brief"}
 
 
 def _modules_reading_channels_quiet():
