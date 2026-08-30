@@ -50,7 +50,9 @@ running shallow, so a manual `/qa full` matters more.
 3. Report any failures, stale data, or HTTP errors.
 
 ### Mode: `tier1` — the deploy-gate shape (#1428)
-Exactly what the deploy-time gates run — flagship doors only, deterministic + AI:
+Exactly what the deploy-time gates run — flagship doors only, deterministic + AI-vision
+(no `--reader-truth`: since #3251/C1 the prose judge runs only in the daily standalone;
+the `full` mode below carries it):
 ```bash
 python3 tests/visual_qa.py --max-tier 1 --screenshot --ai-qa --ai-qa-max-tier 1
 ```

@@ -420,7 +420,10 @@ PROVEN_CAN_FAIL: dict[str, Proof] = {
     # deliberately planted mutation — the defect was already running when it was found.
     "ci::ci-cd.yml::visual-qa::4": Proof(
         gate_name="visual-qa / Run visual + AI-vision QA sweep",
-        command="python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1 --reader-truth",
+        # #3251 (C1, 2026-08-30): --reader-truth left the per-deploy copies; the prose judge
+        # runs in visual-qa.yml's daily fire only. tests/test_ci_ai_gate_cadence_3251.py
+        # holds this string to the workflow's actual invocation.
+        command="python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1",
         mutation=(
             "NONE PLANTED — the cannot-fail state was observed live in run 32509917798 / job "
             "96909117231 (2026-08-21), a real fleet deploy. The 'mutation' was the standing "

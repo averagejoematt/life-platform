@@ -40,6 +40,17 @@
 # 1) — this keeps AI-vision spend to exactly two buckets: tier-1 at every deploy,
 # full surface once a week. See tests/visual_qa.py's module docstring for the cost math.
 #
+# #3251 (owner decision, option C1, 2026-08-30) — this daily fire is now the prose
+# judge's ONLY CI home: --reader-truth was removed from the two per-deploy copies
+# (ci-cd.yml / site-deploy.yml), which keep the vision gate (--ai-qa-max-tier 1)
+# alone. Measured before the change (LifePlatform/AI per-gate rows, n=16 deploy
+# runs): reader_truth_qa $0.193/run = 81% of the $0.239 pair, while the one
+# recorded catch (2026-08-27) was the vision gate's. Accepted trade: a bad
+# narrative can be live up to ~24h before this fire reports it — and it REPORTS
+# (advisory issue + SNS), it never rolls back. Consequently qa-level=lean/off now
+# removes ALL CI prose truth-checking, not merely the standalone copy of it.
+# tests/test_ci_ai_gate_cadence_3251.py pins the split.
+#
 # #1452 — the QA-depth dial (SSM /life-platform/qa-level = full|standard|lean|off,
 # fail-open standard when unreadable, stated in the log): one knob scales THIS
 # standalone run (full = AI-vision every fire; lean = deterministic only; off =
