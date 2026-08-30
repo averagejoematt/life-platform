@@ -272,8 +272,11 @@ jobs:
           VISUAL_QA_EXPECT_BUILD: ${{ github.sha }}
         run: |
           # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
-          # time; the deterministic sweep + --reader-truth are unaffected (full surface).
-          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1 --reader-truth
+          # time; the deterministic sweep runs the full surface.
+          # #3251 (owner decision 2026-08-29, option C1): --reader-truth REMOVED from
+          # the per-deploy copies (see ci-cd.yml's twin comment for the full basis);
+          # the prose judge lives in the daily standalone (visual-qa.yml), non-gating.
+          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         run: |

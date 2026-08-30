@@ -1101,8 +1101,15 @@ jobs:
       - name: Run visual + AI-vision QA sweep
         run: |
           # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
-          # time; the deterministic sweep + --reader-truth are unaffected (full surface).
-          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1 --reader-truth
+          # time; the deterministic sweep runs the full surface.
+          # #3251 (owner decision 2026-08-29, option C1): --reader-truth REMOVED from
+          # the per-deploy copies — the prose judge was ~81% of the $0.239/run while
+          # the only recorded catch came from the vision gate, and its measured
+          # reproducing-false-positive shapes (2026-08-30: a live window scored out of
+          # its own elapsed days; a threshold meter carrying its own explanation) were
+          # rolling back healthy deploys. It still runs FULL-SURFACE in the daily
+          # standalone (visual-qa.yml), where it reports without holding a rollback.
+          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         run: |
