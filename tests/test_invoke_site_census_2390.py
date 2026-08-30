@@ -236,6 +236,14 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
         "generation that is gated there, not an unregistered one.",
         gated_by="lambdas/coach/coach_chat_grounding.py::build_grounder",
     ),
+    "lambdas/coach/telegram_group.py": _ex(
+        DELEGATED_GATED,
+        "the board room (epic #2363) — the group-chat half of the same Telegram transport, split out of the worker for its size "
+        "ceiling. A room turn runs through the identical seam: coach_chat.run_turn with the worker's _grounder_for closure over "
+        "coach_chat_grounding.build_grounder (all five classes, no exemption), same as the 1:1 path. The module's own bedrock "
+        "reference is the run_turn caller lambda; nothing reaches the model outside that gated turn.",
+        gated_by="lambdas/coach/coach_chat_grounding.py::build_grounder",
+    ),
 }
 
 # ── (c) UNGATED_READER_KNOWN — reader-facing, no registered decision, tracked ──
