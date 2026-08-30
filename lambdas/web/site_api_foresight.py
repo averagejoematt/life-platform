@@ -31,6 +31,7 @@ from web.site_api_common import (
     _decimal_to_float,
     _error,
     _ok,
+    content_vintage,
     logger,
 )
 from web.site_api_phase_frame import archival_frame  # #2957 — cross-phase framing
@@ -61,6 +62,11 @@ def forecast(*, _g) -> dict:
     # the singleton_visible guard the coach get_item readers already apply (#946/#1085).
     if not items or not singleton_visible(items[0]):
         return _ok({"available": False}, cache_seconds=900)
+    # #3252 sibling sweep: `computed_at` (tag_record's stamp) is the instant the
+    # daily forecast run actually produced this content — capture it BEFORE the
+    # strip so the envelope can declare the content's vintage instead of wearing
+    # the request instant (ADR-104). The strip itself is unchanged.
+    _computed_at = items[0].get("computed_at")
     _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
     data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
     data["available"] = True
@@ -73,7 +79,7 @@ def forecast(*, _g) -> dict:
     data["pre_start"] = bool(_pre)
     if _pre:
         data.update(_pre)
-    return _ok(data, cache_seconds=900)
+    return _ok(data, cache_seconds=900, content_as_of=content_vintage(_computed_at))
 
 
 def scenarios(*, _g) -> dict:
@@ -97,10 +103,12 @@ def scenarios(*, _g) -> dict:
     # #1197: same latest-DATE# tombstone/phase guard as handle_forecast.
     if not items or not singleton_visible(items[0]):
         return _ok({"available": False}, cache_seconds=3600)
+    # #3252 sibling sweep: declare the nightly precompute's own instant (see forecast).
+    _computed_at = items[0].get("computed_at")
     _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
     data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
     data["available"] = True
-    return _ok(data, cache_seconds=3600)
+    return _ok(data, cache_seconds=3600, content_as_of=content_vintage(_computed_at))
 
 
 def state_of_matthew(*, _g) -> dict:
@@ -133,10 +141,15 @@ def state_of_matthew(*, _g) -> dict:
     # first Sunday run of the cycle").
     if not items or not singleton_visible(items[0]):
         return _ok({"available": False}, cache_seconds=3600)
+    # #3252 sibling sweep — the worst instance of the class: a weekly-recomputed,
+    # budget-pausable (ADR-125 tier >= 2) narrative that surfaced NO generation
+    # instant at all, so a held brief wore a fresh request stamp on every fetch.
+    # `computed_at` is tag_record's stamp from state-of-matthew-lambda's write.
+    _computed_at = items[0].get("computed_at")
     _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
     data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
     data["available"] = True
-    return _ok(data, cache_seconds=3600)
+    return _ok(data, cache_seconds=3600, content_as_of=content_vintage(_computed_at))
 
 
 # ══════════════════════════════════════════════════════════════════════════════

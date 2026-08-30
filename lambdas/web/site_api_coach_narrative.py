@@ -159,6 +159,9 @@ def handle_recap(*, _g):
             }
         },
         cache_seconds=300,
+        # #3252 sibling sweep: the recap is a stored narrative written at chronicle
+        # publish time — the envelope declares ITS instant, not the request's.
+        content_as_of=content_vintage(item.get("generated_at")),
     )
 
 
@@ -348,6 +351,10 @@ def handle_coach_analysis(event, *, _g):
         # cross-coach read. ADR-104 behavioral-absence semantics: disclose the paused
         # state explicitly rather than staying silent about it.
         ensemble_fallback = False
+        # #3252 sibling sweep: when a stored ensemble digest's content actually lands
+        # in this response (cross_coach_reference below), its `created_at` joins the
+        # envelope's vintage set — content_vintage takes the OLDEST constituent.
+        _ensemble_created_at = None
         try:
             digest = _latest_cycle_digest()
             if digest:
@@ -357,6 +364,7 @@ def handle_coach_analysis(event, *, _g):
                     coaches = d.get("coaches", [])
                     if coach_id in coaches:
                         cross_coach_reference = d.get("topic", "")
+                        _ensemble_created_at = digest.get("created_at")
                         break
         except Exception:
             pass
@@ -446,6 +454,10 @@ def handle_coach_analysis(event, *, _g):
         # being re-served as though it were today's. Derived, never re-read from the
         # record's optional `days_in_experiment` stamp (see as_of_day_n's docstring).
         _generated_at = output.get("created_at") or output.get("generated_at", "")
+        # #3252 sibling sweep: every STORED record whose prose lands in this response
+        # contributes its own stamp; content_vintage() reports the OLDEST — the
+        # envelope may not claim more freshness than its stalest member (ADR-104).
+        _vintage_stamps = [_generated_at, _ensemble_created_at]
         resp = {
             "coach_id": coach_id,
             "coach_name": display.get("name", ""),
@@ -490,16 +502,23 @@ def handle_coach_analysis(event, *, _g):
         try:
             _int_item = _integrator_digest() or {}  # #946: tombstone/phase-guarded
             _cdn = _int_item.get("cross_domain_notes", {})
+            _int_used = False
             if isinstance(_cdn, dict) and domain in _cdn:
                 resp["cross_domain_note"] = _cdn[domain]
+                _int_used = True
             if _int_item.get("analysis"):
                 resp["weekly_priority"] = _int_item["analysis"]
+                _int_used = True
+            # #3252: the integrator's prose landed in the response, so its stamp
+            # joins the vintage set (the same generated_at /api/weekly_priority declares).
+            if _int_used:
+                _vintage_stamps.append(_int_item.get("generated_at"))
         except Exception:
             pass
 
         # Strip None values for cleaner JSON
         resp = {k: v for k, v in resp.items() if v is not None}
-        return _ok(resp, cache_seconds=300)
+        return _ok(resp, cache_seconds=300, content_as_of=content_vintage(*_vintage_stamps))
     except Exception as _e:
         logger.warning(f"[/api/coach_analysis] {_e}")
         return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60, degraded=_e)
@@ -780,6 +799,9 @@ def handle_month_rollup(*, _g):
                 "pre_start": False,
             },
             cache_seconds=3600,
+            # #3252 sibling sweep: the rollup is a weekly-written stored narrative —
+            # declare the writer's own generated_at as the content's vintage.
+            content_as_of=content_vintage(item.get("generated_at", "")),
         )
     except Exception as _e:
         logger.warning(f"[/api/month_rollup] {_e}")
