@@ -291,6 +291,24 @@ jobs:
         #      Read tests/test_duration_budget_ratchet.py's docstring — it now
         #      holds the whole class record plus a HARD_CEILING_SECONDS the
         #      budget may not be raised past — BEFORE editing this number.
+        #      #3265 (2026-08-30) IS THE SECOND NON-RAISE. 2244s measured on
+        #      green main (3eff37e6f, run 33102082658) was attributed, not
+        #      re-derived: sampling all 44 "test / Unit Tests" runs since
+        #      #3224 landed showed an 88.5% wall-clock spread against 3.3%
+        #      test-count growth (r=0.257 — mostly CI-queueing noise, per
+        #      #3224's own "raw CI wall clock is noisy" warning), and the
+        #      instance itself decomposed to 9.4% new-test time / 89.5%
+        #      existing-test slowdown — the SAME shape as #3224. The dominant
+        #      terms were two duplicated in-process whole-repo scans (not new
+        #      check_doc_facts.py spawns — that shed held):
+        #      tests/test_fixture_frame_pairing_3222.py re-scanned the same
+        #      ~1,036-file tree its own cached `_measure()` had already walked;
+        #      tests/test_platform_model_drift.py's `_built()` rebuilt the
+        #      system model on every one of 6 calls with zero memoization,
+        #      despite its own test proving the build is deterministic. Both
+        #      fixed with a cache, not a raise. Full attribution + both
+        #      measured before/after deltas: tests/test_duration_budget_
+        #      ratchet.py's docstring and its BUDGET_SECONDS comment block.
         #  (3) #1658: the MEASURED-coverage high-water ratchet — the only check
         #      here that can red the build. `--cov-fail-under` above is set a few
         #      points BELOW measured on purpose (anti-flap headroom), and until

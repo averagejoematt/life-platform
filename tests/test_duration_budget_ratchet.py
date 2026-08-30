@@ -32,10 +32,11 @@ This guard mirrors tests/test_coverage_floor_ratchet.py's shape exactly:
 "agreement-only" turned out to be the defect. See the class record below.
 
 ═══════════════════════════════════════════════════════════════════════════════
-THE CLASS, IN ONE PLACE (#1349 → #1966 → #2152 → #3025 → #3106 → #3224)
+THE CLASS, IN ONE PLACE (#1349 → #1966 → #2152 → #3025 → #3106 → #3224 → #3265)
 ═══════════════════════════════════════════════════════════════════════════════
 Every instance of this class has been answered by re-deriving the budget UPWARD, and
-the trend line between instances has been steeper than the raises:
+the trend line between instances has been steeper than the raises — until #3224 broke
+that streak, and #3265 kept it broken:
 
   issue   date        measured    budget moved to   response
   #1349   (origin)     157s        —                the gate itself
@@ -44,6 +45,77 @@ the trend line between instances has been steeper than the raises:
   #3025   2026-08-23  1394s       1200 → 1500       raise (+ 1 pathological test fixed)
   #3106   2026-08-24  1507s       1500 → 1950       raise
   #3224   2026-08-27  1994s       1950 → 1950       SHED — the first non-raise
+  #3265   2026-08-30  2244s       1950 → 1950       SHED — the second non-raise
+
+#3265 (2026-08-30) — ATTRIBUTION, METHOD NAMED (so the next instance repeats it rather
+than re-deriving from scratch). The 2244s in this file's own trigger issue is the
+`##[warning]Unit Tests job took 2244s...` line from run 33102082658 (job 98623415851,
+2026-08-27T18:14:07Z — the "test / Unit Tests" job, read via `gh run view --job --log`,
+not re-derived from a different measurement). Two things were measured before any
+number was touched:
+
+  1. VARIANCE, ACROSS THE WHOLE POST-#3224 WINDOW. Sampled all 44 "test / Unit Tests"
+     job runs on `main` from 33030125667 (2026-08-27T01:30, the run immediately after
+     #3224 merged) through 33326794702 (2026-08-30T18:04, the run immediately before
+     this fix) via the GitHub API + `gh run view --job --log`, reading each run's own
+     final `pytest` summary line (`N passed, ... in Ws`) rather than re-deriving it:
+     collected tests grew 22,266 -> 23,004 (+738, +3.3%); pytest wall clock ranged
+     1307.30s -> 2464.35s, an **88.5% spread against 3.3% test growth**. Pearson r
+     between per-run test count and per-run wall clock over the 44 points: **0.257** —
+     test count explains under 7% of the variance (r²). 32 of the 44 runs breached the
+     1950s budget; the very next run after this window (33326794702, unmodified code)
+     measured 1589.34s — comfortably under budget. This is #3224's own documented
+     "raw CI wall clock is a NOISY instrument" warning, now measured at n=44 instead of
+     n=3: attributing any SINGLE over-budget reading to code growth, without also
+     measuring the surrounding spread, would have re-derived a raise on noise.
+  2. THE INSTANCE ITSELF, DECOMPOSED THE SAME WAY #3224 DID (new-test time vs existing-
+     test slowdown), anchored at #3224's own landing sha (678a0598, run 33030125667:
+     22,266 tests, 1947.68s, mean 0.08748s/test) against this issue's trigger run
+     (9f... at 18:14, 33102082658: 22,541 tests, 2202.69s, mean 0.09773s/test):
+     new tests priced at the old mean explain 24.06s of the +255.01s delta (9.4%);
+     EXISTING TESTS GETTING SLOWER explain 228.2s (89.5%); interaction 2.82s (1.1%).
+     (Trigger run 33102082658 @ 3eff37e6f, 2026-08-27T18:14:07Z.) Same shape as #3224
+     (79.7% existing-test slowdown there) — so the same remedy applies: find what got a
+     duplicated whole-repo scan, not what got a new test.
+
+`pytest --durations=25` on the first green run after #3224 (33326794702, unmodified
+code) named the new dominant terms directly — not the check_doc_facts.py family #3224
+already shed (those now sit at 15-26s each, the shed held), but two OTHER whole-repo
+scans that were ALREADY duplicating themselves before #3224 landed and simply hadn't
+been the biggest term yet:
+
+  * `tests/test_fixture_frame_pairing_3222.py::test_the_one_hop_blind_spot_stays_measured`
+    (56.55s, the single slowest test in the suite) re-ran the exact same
+    `pt_paired_utc_today_sites` scan over all ~1,036 files in `_test_files()` that
+    `_measure()` — 5 lines above it, `functools.lru_cache`d — already computed for the
+    ratchet tests in the same file. Fixed by reading `_measure()`'s cached dict for the
+    direct-set membership check instead of re-scanning. Local measurement (this file
+    alone, 3-run means, `-p no:randomly`): file total 32.83s -> 23.56s (-28.2%); the
+    fixed test itself 20.99s -> 11.25s (-46.4%).
+  * `tests/test_platform_model_drift.py`'s `_built()` (which calls
+    `generate_platform_model.build_model()`, itself a scan of `lambdas/`, `mcp/`,
+    `cdk/`) was called ONCE PER TEST with no memoization at all — 6 full builds per run
+    (5 tests, one of which calls it twice to prove determinism) against a function the
+    file's own `test_generation_is_deterministic` PROVES is deterministic. Fixed with
+    one `@functools.lru_cache(maxsize=1)`. Local measurement (this file alone, 2-run
+    mean before / 3-run mean after): file total 40.21s -> 6.91s (-82.8%).
+
+Combined local saving across the two files: ~42.6s per full suite run. Projected onto
+CI's coverage-instrumented per-test costs (using the CI `--durations` figures directly,
+since local-vs-CI absolute times differ but the SAME calls were eliminated): the
+platform-model-drift family alone was 99.55s of CI wall clock across its 5 tests
+(33.94+17.68+16.00+15.97+15.96s) collapsing toward one real build (~17s) plus four
+near-zero cache hits, ~82.5s of that CI run's 1589.34s pytest wall clock; the
+fixture-pairing fix removes roughly the same 46.4% ratio from its 56.55s CI reading,
+~26.3s more. **Estimated ~109s of CI wall clock shed**, restoring headroom rather than
+narrowing it further.
+
+NOT RAISED. 1950 stays — the measured spread (§1 above) means a single 2244s reading is
+not, by itself, evidence the honest cost grew; the decomposition (§2) says what DID grow
+was duplicated scanning, which is now shed at its two live sites. If a future instance
+survives both checks — spread that does not explain it AND a decomposition dominated by
+new tests rather than existing-test slowdown — that is the argued-raise case #3224's
+"AT MOST ONE more raise" note reserves; this is not that case.
 
 WHAT #3224 MEASURED (method named, so the next instance can repeat it rather than
 re-derive from scratch). Two green-main "test / Unit Tests" runs, read from the
@@ -186,6 +258,20 @@ import pytest
 # instance of the class — was answered by removing two redundant whole-repo scans
 # (tests/repo_scan_cache.py) instead of by a fifth re-derivation. See the class record
 # in this file's docstring for the attribution and the method.
+# #3265 (2026-08-30): NOT RAISED (the second non-raise). 2244s measured against this
+# 1950s budget on run 33102082658 — the sixth instance of the class — decomposed into
+# 9.4% new-test time / 89.5% existing-test slowdown (same shape as #3224) and shed at
+# its two live sites: tests/test_fixture_frame_pairing_3222.py's one-hop-blind-spot test
+# duplicated a scan tests/repo_scan_cache.py's own SIBLING function in that file
+# (`_measure()`) had already computed; tests/test_platform_model_drift.py called
+# `generate_platform_model.build_model()` fresh on every one of its 6 test invocations
+# with no memoization at all. NOTE, for honesty: #3106's own comment three entries above
+# named this exact family ("the top 5 ... are all tests/test_platform_model_drift.py")
+# and called it "real work asserting real generated artifacts, not a slow-test mistake
+# to trim" — that assessment was WRONG for 5 of the 6 calls, which were pure duplicate
+# invocation of a function the file's own test proves deterministic; #3106 correctly
+# identified the file, incorrectly ruled out the fix. See the class record in this
+# file's docstring for the full attribution and both measured before/after deltas.
 BUDGET_SECONDS = 1950
 
 # ── THE WALL (#3224). A raise past this FAILS. Shed instead. ─────────────────
