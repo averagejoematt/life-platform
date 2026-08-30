@@ -1,0 +1,90 @@
+{
+ "body": "> **⚠️ Body repaired post-merge (2026-08-27).** Between this PR opening and merging, an\n> implementer working a *different* lane ran `gh pr edit` against **3226** instead of\n> **3227** and overwrote this body with #3222's — including a stray `Fixes #3222` trailer,\n> which falsely auto-closed #3222 on merge. #3222 has been **reopened**; its real work is\n> PR #3227. This PR's title, commits and diff were never affected — only the description.\n> The text below is reconstructed from the implementation report.\n\n## What\n\nFixes the keep/discard predicate in `regen_once` so that **a rewrite which removes an\ninvented figure is KEPT**, even when it does not also score strictly better.\n\n## The defect\n\nTwo things in the issue's framing turned out not to match the code, and both are worth\nrecording:\n\n1. **`regen_once` is not in `lambdas/ai/ai_calls.py`.** It lives in\n   `lambdas/ai/grounded_generation.py`. `ai_calls.py` is untouched by this PR.\n2. **There is no \"composite quality score.\"** The veto was\n   `len(fixed_findings) < len(findings)` — a single undifferentiated count summed across a\n   dozen heterogeneous finding classes. A `fabricated_number` removal was being outvoted by\n   *other* classes' counts, which is how a correctness fix got discarded by a quality metric.\n\n## The change\n\nNew `lambdas/ai/regen_keep_predicate.py`:\n\n```python\nif n_after < n_before:                          return True,  KEEP_STRICTLY_FEWER\nif not introduced and fig_after != fig_before:  return True,  KEEP_FIGURE_REMOVED\nif introduced:                                  return False, DROP_FIGURE_INTRODUCED\n                                                return False, DROP_NOT_BETTER\n```\n\nwhere `introduced` is a `Counter` diff over `(type, claimed-identity)` restricted to\n`FIGURE_TYPES`. The new arm is **purely additive** over the old predicate — pinned by a test\nthat sweeps >100 old-keep pairs proving this can turn a discard into a keep but never the\nreverse.\n\n**Ruling on removes-one-introduces-another: DISCARD.** The dispositive arm requires a strict\n*sub-multiset*, not merely a smaller count — trading `326.3` for `312.8` has not improved\ncorrectness and would slide toward \"always keep the rewrite.\" Cross-class swaps\n(`fabricated_number` out, `fabricated_date` in) are caught by the same rule. The mirror case\n— a figure removed while *framing* findings appear — is deliberately **kept**, and pinned.\n\nScope is the generation-time path only. **No relaxation of #2573 or ADR-104** — the blocking\ngate's own standards are unchanged; this only decides which candidate it is handed.\n\n## Verification\n\nReverting to the pre-#3217 one-liner: **9 failed / 9 passed**. Restored: **18/18**.\n\nFindings come from the real `grounding_findings` over a real draft sentence pulled read-only\nfrom DDB `EVALRET#coach_brief` (`nutrition_coach`, `flagged_dropped`) — the actual `326.3`\ninterval bound. Honest caveat: the retained `EVALRET` predates #3202's findings retention, so\nit carries the draft and disposition but not the generation-time rewrite; the *rewrite* in the\nfixture is constructed to reproduce the veto.\n\nSecond honest caveat: `test_rewrite_that_removes_nothing_and_scores_worse_is_discarded` passes\nboth before and after — it is the regression guard, not the bug. The bug direction is proved by\n`test_removing_the_fabricated_number_is_kept_even_when_the_total_grows`.\n\n## CodeQL\n\nTwo HIGH `py/clear-text-logging-sensitive-data` alerts, and the first diagnosis was wrong. The\nSARIF `codeFlows` named the real source: the arm literal `DISCARD_NOT_BETTER` contains\n**`card`**, which trips CodeQL's payment-card name heuristic. Renamed `DISCARD_*` → `DROP_*`\n(values unchanged, so the CloudWatch `Arm` series stays continuous). Renamed rather than\nsuppressed — a `# codeql[...]` would take the rule dark on two sinks that genuinely log\nAI-draft-adjacent data.\n\n## COACH_STANCE.md — checked, deliberately not stamped\n\n`grounded_generation.py` is held off that doc's Sources-of-truth line by its own #2614 scoping\nnote, so the #2619 drift gate does not fire here. Verified anyway by AST:\n`_enforce_quality_gate` is **exactly** `:1259-1325`. Found one pre-existing off-by-one left\nunfixed — the body cites `_apply_grounding_gate` at `:1330-1401`, AST says **1331–1402**;\nfixing one span would force a `Verified` bump on a doc not re-verified end to end.\n\n## Post-merge ops\n\n`lambdas/ai/regen_keep_predicate.py` is a new **bundled shared module** → fleet bundle, not\nsingle-file. Check first whether CI's Deploy job already took the \"Fleet deploy (shared module\nchanged)\" path before running anything by hand.\n\nVerify on the next 17:00 UTC brief: a `[REGEN_KEPT] arm=figure_grounding_removed` line, and\n`RegenDiscarded` reporting `figure_grounding_introduced` distinctly.\n\n## Known risk\n\nThe new arm can hand the gate a draft with **more total findings**. That is intended, but\n`CoachQualityGateHeld` may tick up while the fabricated-figure rate falls. Worth a cycle's watch.\n\nFixes #3217\n",
+ "closingIssuesReferences": [
+  {
+   "id": "I_kwDORVwPus8AAAABOaSGcA",
+   "number": 3217,
+   "repository": {
+    "id": "R_kgDORVwPug",
+    "name": "life-platform",
+    "owner": {
+     "id": "U_kgDOCm0j2Q",
+     "login": "averagejoematt"
+    }
+   },
+   "url": "https://github.com/averagejoematt/life-platform/issues/3217"
+  },
+  {
+   "id": "I_kwDORVwPus8AAAABOa38qA",
+   "number": 3222,
+   "repository": {
+    "id": "R_kgDORVwPug",
+    "name": "life-platform",
+    "owner": {
+     "id": "U_kgDOCm0j2Q",
+     "login": "averagejoematt"
+    }
+   },
+   "url": "https://github.com/averagejoematt/life-platform/issues/3222"
+  }
+ ],
+ "commits": [
+  {
+   "authoredDate": "2026-08-27T04:15:39Z",
+   "authors": [
+    {
+     "email": "integration@local",
+     "id": "",
+     "login": "",
+     "name": "integration"
+    }
+   ],
+   "committedDate": "2026-08-27T04:15:39Z",
+   "messageBody": "…ite finding count must not veto a correctness fix (#3217)\n\nregen_once's keep/discard predicate was one line — len(after) < len(before) — a\ncomparison of two UNDIFFERENTIATED finding counts across a dozen heterogeneous\nclasses. That total is a composite, and a composite can veto a correctness fix.\n\nMeasured on the wire: on the 2026-08-26 17:00Z brief nutrition_coach's draft cited\n326.3 (the upper bound of a weight-prediction interval that appears nowhere in the\ndata it was given). The corrective rewrite REMOVED that figure, the rewrite's total\nfinding count did not fall, and it was discarded. The draft carrying the invented\nnumber is the one that reached the blocking quality gate, with no 'grounding\nself-corrected' line anywhere in the log.\n\nADR-104/105 make a deterministic grounding finding non-overrulable AT THE BLOCKING\nGATE precisely because 'the narrative states a figure the data does not contain' is\ncategorical. Letting an aggregate count veto the removal of one at generation time\ninverts that ordering in the one place where a cheap fix was still in hand.\n\nThe predicate moves to ai/regen_keep_predicate.py (named for its subject, not for\nthe gate it feeds — a *_gate*.py name would have entered the #3000 filename census)\nand gains a second, independent arm:\n\n  strictly_fewer            len(after) < len(before)          — unchanged\n  figure_grounding_removed  the rewrite's FIGURE findings are a strict SUB-MULTISET\n                            of the original's — kept whatever the total did\n\nDiscards are now named: figure_grounding_introduced (the rewrite invented a figure\nthe original did not have) vs not_strictly_better. Both ride the existing #3086\nRegenDiscarded arm dimension; the old arm name is preserved so the series is\ncontinuous. A keep on the new arm prints [REGEN_KEPT].\n\nRULING on removes-one-introduces-another: DISCARD. Trading 326.3 for 312.8 has not\nimproved correctness and would slide the predicate toward 'always keep the\nrewrite'. The dispositive arm therefore requires a strict sub-multiset, not merely\na smaller count. Framing-class findings may increase without blocking it — that\nasymmetry is the issue's thesis and is pinned as a test.\n\nThe blocking gate's own standards do not move. This is the generation-time path only.\n\nFixes #3217",
+   "messageHeadline": "fix(ai): a rewrite that removes an invented figure is KEPT — a compos…",
+   "oid": "649e20c48a83b6dde16aab4ab0fb455f3d42a1c4"
+  },
+  {
+   "authoredDate": "2026-08-27T04:23:43Z",
+   "authors": [
+    {
+     "email": "integration@local",
+     "id": "",
+     "login": "",
+     "name": "integration"
+    }
+   ],
+   "committedDate": "2026-08-27T04:23:43Z",
+   "messageBody": "…ng-derived string may reach a log line (#3217)\n\nCodeQL flagged the first cut of ai/regen_keep_predicate.py\npy/clear-text-logging-sensitive-data at HIGH severity, in two places:\n  lambdas/ai/grounded_generation.py:900  (the new [REGEN_KEPT] print)\n  lambdas/ai/regen_discard_telemetry.py:54 (the pre-existing logger.error, arm arg)\n\nThe mechanism is real, not a false positive worth suppressing. keep_rewrite returned\na census STRING built with sum() over a findings-derived Counter; the taint rode the\nwhole returned tuple, so 'arm' arrived at logger.error tainted. A findings list is\nderived from an AI draft about Matthew's health — a census that could ever carry a\nfinding's detail text into CloudWatch is a genuine hazard, and the tuple made it\none line of carelessness away.\n\nRestructured so it is content-free BY CONSTRUCTION rather than by inspection:\n  * keep_rewrite -> (keep: bool, arm: str) where arm is one of four module constants\n  * describe_delta(before, after) -> FOUR INTEGERS via '%d', computed by figure_count,\n    which accumulates an int in a local rather than sum()-ing over a tainted container\n  * the [REGEN_KEPT] print is %-formatting over (arm, surface, note), not an f-string\n    over finding-derived objects\n\nTwo new tests plant a distinctive marker in every text-bearing field of the findings\n(claimed/detail/excerpt/claim) and assert it appears in neither the arm, the census,\nnor any argument of the log_discard call — end to end through regen_once.\n\nPredicate semantics are unchanged: the full mutation proof still fails 9 assertions\nagainst the pre-#3217 one-liner and passes 18/18 with it restored.",
+   "messageHeadline": "fix(ai): keep_rewrite returns only a bool + a constant arm — no findi…",
+   "oid": "df7f90a91851477896587f19058bd5dafb8a50de"
+  },
+  {
+   "authoredDate": "2026-08-27T04:28:39Z",
+   "authors": [
+    {
+     "email": "integration@local",
+     "id": "",
+     "login": "",
+     "name": "integration"
+    }
+   ],
+   "committedDate": "2026-08-27T04:28:39Z",
+   "messageBody": "…D' is what tripped CodeQL, not the census (#3217)\n\nMy first diagnosis of the two HIGH py/clear-text-logging-sensitive-data alerts was\nWRONG, and the SARIF data-flow path corrected it. Recording both, because the wrong\nexplanation was already written into the module docstring and a false rationale left\nin code is worse than none.\n\nWhat I assumed: the census string was built with sum() over a findings-derived\nCounter, so the taint rode the returned tuple into logger.error.\n\nWhat the SARIF actually says (analysis 1679343858, /language:python):\n\n  [0] regen_keep_predicate.py:103  StringLiteral            <- THE SOURCE\n  [1] regen_keep_predicate.py:103  DISCARD_NOT_BETTER\n  [3] regen_keep_predicate.py:187  Tuple [element at index 1]\n  [6] grounded_generation.py:895   arm\n  [9] grounded_generation.py:902 / regen_discard_telemetry.py:54\n\nThe source is the string literal on the 'DISCARD_NOT_BETTER = ...' line itself.\nDIS-CARD-... contains 'card', which CodeQL's sensitive-name heuristic reads as a\npayment-card field, so the arm string was classified 'private' at birth and EVERY log\nline carrying it became a cleartext-logging alert. Nothing about the data was ever\nsensitive — it is a substring collision.\n\nFix: rename the two Python constants DISCARD_FIGURE_INTRODUCED -> DROP_FIGURE_INTRODUCED\nand DISCARD_NOT_BETTER -> DROP_NOT_BETTER. The VALUES are untouched, so the CloudWatch\nArm dimension and the pre-#3217 'not_strictly_better' series are unchanged. Renaming\nrather than suppressing: a '# codeql[...]' on those lines would take the rule dark on the\ntwo sinks that actually log AI-draft-adjacent data, which is the one place it earns its\nkeep.\n\nThe previous commit's restructure (keep_rewrite returns (bool, constant); the census is\nfour ints via figure_count, not sum() over a tainted container) is KEPT — it did not\ncause the alert but it is the right shape, and it is now pinned by two marker tests. Its\ndocstring no longer claims CodeQL flagged it; the real reason is recorded in a\n'Log hygiene, and the arm names' section with a do-not-rename-back note.\n\nMutation proof re-run after the rename: 9 failed / 9 passed against the pre-#3217\none-liner, 18/18 with it restored. Predicate semantics unchanged.",
+   "messageHeadline": "fix(ai): rename the drop-arm constants DISCARD_* -> DROP_* — 'DIS-CAR…",
+   "oid": "54802189beb25de5e7a7d153b890fbe899f7d7c1"
+  }
+ ],
+ "headRefName": "issue-3217-regen-keep-predicate",
+ "number": 3226,
+ "issue_labels": {
+  "3217": [
+   "type:bug"
+  ],
+  "3222": [
+   "type:bug"
+  ]
+ },
+ "_source": "gh pr view 3226 --json number,body,headRefName,commits,closingIssuesReferences — captured 2026-08-30",
+ "_reconstructed": "PR #3226's body was repaired after the merge (its own banner says so); `Fixes #3222` restored as it stood when the merge closed #3222 (issue #3222's reopen note, 2026-08-27T04:47Z)"
+}

@@ -387,6 +387,44 @@ still pins the served dict, and the reconcile bot is still the single writer on 
 `tests/test_doc_literal_conflict_surface_3101.py` holds the invariant — a counter growing
 a second committed home fails, rather than quietly reopening the surface.
 
+### 4a2. The closure contract — what a valid issue close requires (#3318)
+
+The backlog's opening side has had a contract since ADR-099 (filer, score line, body
+shape, liveness floors — `scripts/check_backlog_hygiene.py`). The closing side had none,
+and Session K's audit (2026-08-30, every closure since 08-16) found 5 escapes in ~60
+closes: a stray `Fixes` that closed #2848 while its author wrote "stays OPEN" *after*
+`closedAt`; a scope assertion posted hours after #2670 closed; and three closing comments
+naming a residual in prose with no carrier (#2938, #2921, #3208 — the #2845 shape that left
+the week plan's core work with no open issue). The handover's residual queue, which HAS
+the `not-work — <home>` rule (#1340, wrap (e4)), audited clean the same night.
+
+The rules below are **rendered from the registry** (`python3 scripts/closure_contract.py
+--render`); `tests/test_closure_contract_3318.py` holds this block byte-equal to the
+render, so the doc cannot drift from what the detectors enforce. Two detectors make it
+fail: `scripts/closure_sweep.py` (the close, audited — session-scoped at wrap (e8), a
+30-item sample in `/sdlc-review`) and `scripts/check_pr_closing_set.py` (the PR's closing
+set, asserted on `deploy/wait_pr_green.sh`'s merge-eligible verdict — the last read of
+the body before `gh pr merge`, which is why the seam is the watcher and not
+`pr-checks.yml`, which does not fire on a body edit). **Posture: advisory** — every
+finding prints, nothing exits non-zero — until the flip bar in the registry docstring is
+met on real wraps and real merges (the ADR-108 / #1872 discipline: flip on a measurement,
+re-measured at flip time, never on the calendar).
+
+<!-- BEGIN GENERATED: closure-contract — scripts/closure_contract.py --render (#3318); do not hand-edit -->
+
+A close is valid when ALL of these hold (registry: `scripts/closure_contract.py`; posture: **warn** — see the flip bar in the registry docstring):
+
+1. **`outcome-verdict`** — Every close carries the ADR-099 closing comment — `**Shipped:** …` + `**Outcome:** <realized|partial|not-realized> — …` — written by the session that merged (wrap step (e8)). A close with no verdict is a silent close. *Detector:* `scripts/closure_sweep.py` → `no-outcome-verdict`.
+2. **`residual-homed`** — A closing comment that names a residual disposes it to EXACTLY one home: a carrier issue `#N`, a fold onto a named open issue `#N`, or an explicit `not-work — <home>`. This is the handover's residual-queue rule (#1340, wrap (e4)) applied symmetrically to the close — a `partial`/`not-realized` verdict with no home is the #2845/#3208 shape. *Detector:* `scripts/closure_sweep.py` → `unhomed-residual`.
+3. **`no-post-close-assertion`** — Nothing substantive is said on an issue after it closes. A non-bot comment later than `closedAt` + the grace window that is not the closing verdict is a structural event — the issue was still being worked, or the close was wrong (#2848, #2670). A post-close comment saying the issue stays open / must reopen / is not met is a contradiction on record. *Detector:* `scripts/closure_sweep.py` → `post-close-comment`, `post-close-assertion`.
+4. **`epic-after-children`** — An epic closes only after its child set is reconciled — no open issue still declares `**Epic:** #N` — and is judged by its Outcome sentence, never by child count (`docs/OPERATING_DISCIPLINE.md` §2.2). *Detector:* `scripts/closure_sweep.py` → `epic-children-open`.
+5. **`closing-set-declared`** — A PR's closing set — every `Fixes/Closes/Resolves #N` in the body AND in every commit message — equals the lane's declared target (the `issue-N-*` branch, or `--target`), the body and the commits agree, GitHub's own linked set agrees with the parse, and no member is a `type:epic`. The stray-`Fixes` class: #3222 (PR #3226), #2848 (PR #3253). *Detector:* `scripts/check_pr_closing_set.py` → `declared-target-mismatch`, `body-commits-disagree`, `github-parse-disagree`, `epic-in-closing-set`.
+6. **`partial-is-not-a-close`** — A PR body that still carries an unchecked acceptance box (`- [ ]`) does not carry a closing keyword; and a closing keyword closes regardless of negation or tense (`docs/OPERATING_DISCIPLINE.md` §2.1, §2.5 — #2921 closed itself twice by writing "does NOT close #2921"). *Detector:* `scripts/check_pr_closing_set.py` → `partial-acceptance-close`, `negated-closing-keyword`.
+
+Structural window: a non-verdict comment more than **10 min** after `closedAt` is a finding; the verdict comment is recognised by its `**Outcome:**` marker, never by timing. Dispositioned escapes are the dated ledger `DISPOSITIONED_ESCAPES` (6 entries) — an entry needs a date and a reason, and comes OUT when the issue is properly re-closed.
+
+<!-- END GENERATED: closure-contract -->
+
 ### 4b. Visual-QA fires independently of the pipeline (#749)
 
 The reader-facing regression net (Playwright sweep + Bedrock vision QA + the accuracy
@@ -1045,6 +1083,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | A stale `git stash` entry or a dead pre-commit hook survives across sessions | Stash + hook hygiene gate (#1326), step (e5) | `deploy/session_postflight.py` |
 | A filed issue skips the ADR-099 contract (no milestone, score line, `## Outcome`, acceptance boxes, epic link, or a `model:*`/`type:*`/`area:*`/`prio:*` label) | Filing-contract linter (#1867/#1870), step (e7) — blocking by default since #1872, which absorbed and deleted the older #1349 `model:*`-only gate | `scripts/check_backlog_hygiene.py` |
 | An issue closed this session leaves no outcome verdict (53 of the last 60 closures had zero comments) | Closure-comment gate (#1870), step (e8) | `.claude/skills/wrap/SKILL.md` step (e8); contract in ADR-099's amendment ¶3 |
+| A close that the (e8) comment cannot vouch for: the issue kept being worked AFTER `closedAt` (a comment past the grace window — #2848's "stays OPEN" at +15m, #2670's scope assertion at +2.5h), the closing comment named a residual and disposed it nowhere (#2938/#2921/#3208 — the #2845 shape), or an epic closed over an open child | Closure-DoD sweep (#3318), folded into step (e8) — ADVISORY until the registry's flip bar is met; the structural leg is a timestamp comparison, the residual leg is the (e4) `not-work — <home>` rule applied to the close | `scripts/closure_sweep.py --session`; registry `scripts/closure_contract.py`; §4a2 above |
 | `Now` sits at zero actionable stories, or a `Later` issue ages past 60d with nobody calling promote-or-close | Now-refill + `Later` sweep (#1870), step (e9) | `scripts/backlog_next.py`; `.claude/skills/wrap/SKILL.md` step (e9) |
 | The blocking `now_liveness` finding fires with no reachable remedy — the refill walked `Next` only while ADR-099 ¶3's `Roadmap` path named no actor; and a milestone-only promotion just swapped it for a blocking `score_line_canonical` | Derived Now-refill plan (#3254), embedded in the (e7) finding and run at (e9) | `backlog_next.plan_now_refill` / `--refill-now`; `tests/test_now_refill_remedy_3254.py` |
 | `Now` is at the liveness floor by COUNT while a whole `model:*` lane has zero startable stories — the refill is dischargeable with work the running session cannot begin | `now_lane_coverage` (#3254, ADVISORY) + the `--lane` scoping on the (e7) gate and the plan | `scripts/check_backlog_hygiene.py --lane`; `scripts/backlog_next.py --refill-now --lane` |
@@ -1110,6 +1149,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | A PR's push is swallowed and the watcher polls `0/N green` for the full 30-minute timeout without ever saying so — twice in one session, ~10 min of dead polling each (#3219) | After `--zero-check-grace` (default 120s) with ZERO checks attached, `wait_pr_green.sh` classifies the FULL 40-char head sha and names the state. `swallowed` → **exit 5** (distinct from 1 = red/timeout) plus the recovery ladder; path-filter-skip / bot-push / indeterminate are named and polling continues. The classification is NOT reimplemented in bash — it shells out to `classify_zero_run_head` via the adapter below, because a second copy is how #3212 happened. Progress output distinguishes "no checks attached yet" from "N of M green" | `deploy/wait_pr_green.sh`; `scripts/check_main_green.py --classify-sha <FULL-40-CHAR-SHA>` |
 | A file that ships in every Lambda bundle changes, but the deploy plan does not notice — the run goes green with `Deploy: skipped` and production keeps the old value (#2920) | Bundled-config deploy triggers **derived** from what `build_bundle.py` stages, not hand-typed. The old `food_vocabulary.json`-only special case is exactly how `config/personas.json` (and 14 `config/coaches/*.json`) went untriggered | `deploy/build_bundle.py --print-bundled-config-paths`; guard `tests/test_bundle_deploy_trigger_registry.py` |
 | A PR lands a new API route and the page consuming it together, so the auto-deploying `site/**` ships before site-api's approval-gated deploy (#2831, fired >=5x) | API-before-frontend pre-merge check (advisory) — AST-diffs `site_api_lambda.py`'s route tables; declare in the registry to clear it | `scripts/check_api_before_frontend.py`; registry `deploy/api_deploy_sequencing.json` |
+| A PR's `Fixes` set closes an issue whose work is not in the PR — two lanes publishing each other's `pr_body.md` (#3222 via PR #3226), a body carrying `Fixes #N` beside an unchecked acceptance box (#2848 via PR #3253), a negated or past-tense keyword that still closes (#2921, twice) | Closing-set assertion (#3318, ADVISORY): body + every commit message + the `issue-N-*` branch's declared target + GitHub's own `closingIssuesReferences`, asserted to agree, with epics and unchecked boxes named; runs on `wait_pr_green.sh`'s merge-eligible verdict (the last read of the body before the merge) and on `assert_pr_green.py`'s green | `scripts/check_pr_closing_set.py`; `deploy/wait_pr_green.sh::_closing_set_check`; registry `scripts/closure_contract.py`; §4a2 above |
 
 **The format gate resolves the pin, and fails closed (#2570).** It reads the version from
 `requirements-dev.txt` (the CQ-01 source of truth, the file Dependabot bumps) and probes each

@@ -79,6 +79,11 @@ GATHER = [
     Gate("doc-tombstones", "e", ["python3", "scripts/check_doc_tombstones.py"]),
     Gate("doc-index", "e", ["python3", "scripts/check_doc_index.py"]),
     Gate("adr-index", "e", ["python3", "scripts/generate_adr_index.py", "--check"]),
+    # #3318: detector A of the closure contract over THIS session's closures (closed since
+    # today 00:00 UTC — the same window (e8) lists). In the gather phase every issue closed
+    # today still lacks its (e8) verdict, so `no-outcome-verdict` here IS the (e8) to-do list;
+    # the session re-runs `--session` after commenting and pastes the summary line.
+    Gate("closure-dod", "e8", ["python3", "scripts/closure_sweep.py", "--session"], marker="Closures"),
 ]
 
 # ── the verify battery: gates that read the finished handover (run after writing it) ──
@@ -176,13 +181,26 @@ def draft_lines(results) -> list:
             filled["CI warnings"] = f"<from batch output: {_last_line(out)[:100]}>"
         else:
             filled["CI warnings"] = "<N — one-line triage per warning>"
+    if "closure-dod" in by_name:
+        # #3318: the sweep's last line is its machine-readable contract
+        # (`CLOSURE-SWEEP scanned=… hits=… dispositioned=…` or `CLOSURE-SWEEP UNVERIFIED — …`),
+        # read as a declared line, never phrase-matched out of the prose above it.
+        _ok, out = by_name["closure-dod"]
+        summary = next((ln for ln in reversed(out.splitlines()) if ln.startswith("CLOSURE-SWEEP")), "")
+        if "UNVERIFIED" in summary:
+            dod = "DoD: unverified — GitHub unreachable"
+        elif summary:
+            dod = f"DoD: <re-run `scripts/closure_sweep.py --session` AFTER commenting; before: {summary[len('CLOSURE-SWEEP '):][:100]}>"
+        else:
+            dod = "DoD: <sweep printed no summary line — see batch output>"
+        filled["Closures"] = f"<#N, #M commented | none — no issues closed this session> · {dod}"
 
     placeholders = {
         "Build beat": "<beat id | none — one-clause reason>",
         "Docs": "<pages updated | none needed — one-clause reason>",
         "Decisions": "<ADR-NNN filed | none needed — one-clause reason>",
         "Incidents": "<N row(s) added — one-clause list | none>",
-        "Closures": "<#N, #M commented | none — no issues closed this session>",
+        "Closures": "<#N, #M commented | none — no issues closed this session> · DoD: <scanned N, hits K — each hit dispositioned (carrier #N | fold #N | not-work — home)>",
         "Backlog": "<Now n actionable (promoted #N); Later sweep — calls made>",
         "Ledger": "<subsystem> row added | omitted — <reason> | none — no standing machinery shipped>",
     }

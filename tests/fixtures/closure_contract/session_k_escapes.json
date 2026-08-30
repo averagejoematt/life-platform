@@ -1,0 +1,342 @@
+{
+ "issues": [
+  {
+   "number": 2848,
+   "title": "workflow: operating knowledge moves into the repo — a fresh session with no personal memory can run the platform",
+   "state": "CLOSED",
+   "closedAt": "2026-08-27T21:57:55Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "type:story"
+     },
+     {
+      "name": "area:claude-workflow"
+     },
+     {
+      "name": "model:opus"
+     },
+     {
+      "name": "prio:P3"
+     },
+     {
+      "name": "review:elite-2026-08-16"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 4,
+    "nodes": [
+     {
+      "createdAt": "2026-08-19T20:54:42Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Disposition (Later sweep, 2026-08-19): keep on `Later`.**\n\n**Reason:** the bus-factor gap is real and I have direct evidence for it *from this session* — the session brief instructed \"boot is charter + model: read `docs/CHARTER.md` then query `scripts/blast_radius.py`, don't re-derive from prose,\" and that worked. That is precisely this issue's thesis being validated, which argues for keeping it, not closing it.\n\nKeeping rather than promoting because the highest-value half has already shipped and the residual is large. #2843 (the charter) and #2845 (the system model) moved the *architecture* knowledge into the repo. What remains outside is the review-discipline corpus (~55 entries) and the incident narratives — and the issue's own acceptance bar is \"a fresh Claude session with NO personal memory operates the platform (deploy, triage, review) from repo artifacts alone,\" which is a migration plus a real verification exercise, not a paydown item to squeeze between bug fixes.\n\nThe distinction that makes this tractable later: durable **rules** belong in the repo, incident **narratives** mostly do not. Roughly half the corpus is narrative."
+     },
+     {
+      "createdAt": "2026-08-27T22:12:54Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "Session H — **PR #3253 merged; this issue stays OPEN.** Two of four boxes are genuinely satisfied and the Outcome is not met. Recording that rather than closing on a merge.\n\n## Shipped\n\n- `docs/OPERATING_DISCIPLINE.md` (new canonical page) — 30 rules across four sections, a §5 routing table so the one-rule-one-page convention stays true, and **Appendix A: the dated audit of all 154 review-discipline memory entries**, each classified exactly once: `homed` 75 · `new` 32 · `residual` 35 · `narrative` 10 · `superseded` 2.\n- `docs/ONBOARDING.md` — a \"Cold Start — operating with no session memory\" section listing the 16 artifacts a memoryless session needs, plus an explicit statement of what it will look for and *not* find.\n- `docs/CONTINUITY.md` §4 — hand-typed memory-dir counts (`~104 topic files`, `~23 reference files`; live values 367 and ~180) replaced with the command, per the repo's own facts-that-drift rule.\n- `tests/test_operating_knowledge_2848.py` — the gate, with a real mutation proof (dead citation + miscounted class → 3 named failures; restored → 9 passed) and non-vacuity floors on both extractors, because an emptied extraction is the silent-pass shape here.\n\n## Box status — honest\n\n| Box | Status |\n|---|---|\n| 1 · corpus audited and classified | **Yes** — 154 entries, five classes |\n| 2 · durable rules migrated, memory reduced to pointers | **Half.** The 32 unhomed rul"
+     },
+     {
+      "createdAt": "2026-08-28T01:12:32Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Cold-read gap 1 is closed** — #3264 shipped in PR #3269 (merged `2399a339`).\n\n`docs/OPERATING_DISCIPLINE.md` §5 now states production deploy authority: who may approve, that the default absent a grant is *ask*, that a standing grant supersedes the per-action ask **and only a standing grant does**, that a gated run is a **lease on a specific sha** (so approving a stale one ships a tree older than what is live), that every lease must be decoded against what is **actually live by content**, and that it must be disposed — approve or reject — never left waiting.\n\nRouted per the one-place rule: `CONVENTIONS.md` keeps the deploy **mechanics** and gained a pointer; §6's routing table now splits mechanics from authority; `ONBOARDING.md`'s cold-start row names it. Gated by `tests/test_operating_knowledge_2848.py` with a pure decision function and four mutation proofs — watched red against the real file (5 failed) and green on restore (15 passed).\n\n**This was the one gap on the residual list where a successor acting reasonably on repo evidence alone could take a destructive production action**, or strand the pipeline by refusing a safe one. It is struck from §7 (renumbered from §6) — left visible as struck-through rather than deleted, so the shape of what was missing stays legible.\n\n**Box 4 is now unblocked but not yet checkable by me**: the other four cold-read gaps remain (instrument-"
+     }
+    ]
+   },
+   "_reconstructed": "closedAt/state restored to the 2026-08-27 wire (PR #3253 mergedAt); the 2026-08-30 reopen comment dropped — the issue is OPEN again on the live wire"
+  },
+  {
+   "number": 2670,
+   "title": "bug: qa-smoke-failures and -warnings have been continuously in ALARM for 14 and 27 days — neither can signal a new failure",
+   "state": "CLOSED",
+   "closedAt": "2026-08-20T15:36:03Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:infra"
+     },
+     {
+      "name": "model:sonnet"
+     },
+     {
+      "name": "prio:P2"
+     },
+     {
+      "name": "type:bug"
+     },
+     {
+      "name": "review:bugbash-2026-08-14"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 11,
+    "nodes": [
+     {
+      "createdAt": "2026-08-15T22:21:03Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Progress, not closure — the driving conditions are now measured rather than assumed.**\n\n**First, a hypothesis I had and disproved, recorded so nobody re-runs it.** I suspected these alarms might be *frozen* — stuck on a stale datapoint with the metric no longer emitting, which would mean the board wasn't saturated so much as dead. It is not: `TreatMissingData=notBreaching` on all of them, and the metrics emit daily with genuinely breaching values.\n\n```\nQaSmoke FailCount (daily max)  08-04..08-14: 2,3,5,3,4,2,3,3,3,2,1\nQaSmoke WarnCount (daily max)  08-04..08-14: 7,7,8,7,6,4,3,1,2,1,2\n```\n\nThese alarms are honest. The conditions are real and chronic, which makes #2670 harder than \"unstick the alarms\" — every one has to be fixed or explicitly accepted.\n\n**Confirmed rather than assumed, per the brief:** #2640's `chronic=True` warn is **not** a contributor. `qa_smoke_lambda.py:1121` emits `warned=len(warns_alarmed)`, and `split_warns` keeps chronic warns out of it entirely — they ride `ChronicWarnCount`. Tonight: `warned=10`, `warned_chronic=9`, so the alarmed WarnCount is **1**.\n\n## FailCount: 1 → the cause changed, and the first one is fixed\n\nTonight's run had exactly one failure, and it was the check firing on **correct writing**:\n\n```\n[QA] FAIL Reader Truth / cross_surface:vitals: coach-cited vitals disagree ...\n     — Dr. Marcus Webb cites hrv 35.3 ms vs cockpit 39.8 ms; rec"
+     },
+     {
+      "createdAt": "2026-08-16T18:18:11Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Underlying-condition diagnosis (box 1), measured 2026-08-16:**\n\nBoth alarms are `Maximum` over a **rolling 24h** window (period 86400, 1 eval, threshold ≥1) — the same clock property #2735's comment documents. A single ≥1 datapoint anywhere in 24h holds ALARM regardless of later clean runs.\n\n**qa-smoke-failures (14d):** not one structural defect — a *rotating cast of real ones*. Over the last 6 nights the FAIL stream was: recall-corpus indexer misses (2 variants ×4 nights), predict-the-week dark during a live week (×4, self-escalating), coach-cited-vitals cross-surface disagreement (×3+3). All since fixed — and **today's sole FAIL is new and is a false positive from an off-schedule run**: CI's post-deploy smoke invoked qa-smoke at **08:45 PT** (the scheduled cron is 11:30 PT), inside the window where `dashboard/matthew/data.json` honestly carries D-2 because `daily-metrics-compute` stamps PT-yesterday at **09:40 PT** (compute stack cron 16:40Z). `dashboard:date` expected PT-yesterday unconditionally → 'Stale date — expected 2026-08-15, got 2026-08-14'. Any morning CI smoke re-arms the alarm for another 24h.\n\nFix in flight (branch `fix/2670-dashboard-date-gap-window`): exactly-D-2 before a 10:30 PT cutoff is OK-with-explanation ('pre-compute morning window'); D-2 after the cutoff and anything older any time stays a hard FAIL, so the scheduled 11:30 PT sweep loses zero detectio"
+     },
+     {
+      "createdAt": "2026-08-16T18:52:02Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**The 18:30Z scheduled sweep is CLEAN — first zero-FAIL, zero-WARN run on record for this pair:**\n\n```\nPassCount 59 · WarnCount 0 · FailCount 0 · ChronicWarnCount 8 (segregated) · RunCompleted 1\n```\n\nThe rotating-cast conclusion from the diagnosis holds: with the cast's defects fixed, the scheduled cadence produces a genuinely clean board. Both alarms are now held red by exactly ONE datapoint each — the 15:45Z off-schedule CI-smoke run (FailCount=1 from the `dashboard:date` gap-window false positive PR #2785 fixes, WarnCount=1 from the character-receipts one-time re-baseline notice, which has now self-cleared as predicted).\n\n**Earliest OK for both: ~2026-08-17 15:46Z** (rolling-24h Maximum), PROVIDED no new ≥1 datapoint lands — the one realistic re-injection risk is another morning CI smoke before #2785's fix is deployed, and #2785 rides today's fleet lease, so that window closes today. The planted OK→ALARM proof (final box) runs against tomorrow's clean baseline."
+     },
+     {
+      "createdAt": "2026-08-16T20:52:48Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "The elite platform review 2026-08-16 (WS-B, `review:elite-2026-08-16`) confirmed this issue as the flagship instance of standing-ALARM decay and filed the narrow residual it leaves uncovered as #2827 (epic #2799): `alert_digest_lambda` only drains transition notifications (no `describe_alarms` anywhere in it; empty queue = no email), so an alarm that STAYS red — like the two here — vanishes from the daily 8AM email entirely; the existing mitigations (the #1204 72h aging escalation in the Mon/Wed/Fri agent email, the #1959 wrap-time citation check) are not daily and not in the digest. #2827 adds a STILL-IN-ALARM (age) section to the daily digest; draining/re-justifying the current standing set stays coordinated with this issue. A PR fixing #2827 should reference both.\n"
+     },
+     {
+      "createdAt": "2026-08-17T21:23:02Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**qa-smoke-failures: both remaining transitions observed live today (2026-08-17) — and the OK→ALARM was organic, which is stronger than the planned plant:**\n\n- **ALARM→OK at 15:46:04Z** — exactly the predicted age-out minute from the 08-16 diagnosis (the last ≥1 datapoint was 15:45Z 08-16).\n- **OK→ALARM at 18:32:04Z** — fired by the 11:30 PT **scheduled** sweep catching **3 genuine new FAILs** (`FailCount=3.0`). No plant needed: the alarm's first day back at OK, it caught real new defects and paged. That is the exact 'can signal a NEW failure' property this issue exists to restore, proven on production traffic rather than a synthetic datapoint.\n\nThe 3 FAILs it caught (triaged separately, filed/reopened with evidence): (1) `reader_truth:plausibility` — /api/vitals serves night_of 2026-08-15 at cycle Day 1; root cause is the Whoop auth-breaker latch at 12:00:37Z today (no night-of-08-16 ingest), #1934-class; (2) `redirect_spotcheck` — /archive/v1/board/product/ and /archive/v1/stack/ 404 (ISO-week-34 sample bucket); (3) `recall:corpus_freshness` — the 2026-08-16 installment missing from the recall corpus (#2705 recurrence on reset day).\n\n**qa-smoke-warnings: structurally cannot clear under the current shape — measured.** It has not transitioned since 07-18. WarnCount (non-chronic) datapoints land 1–3 nearly every day (last 50h: 1.0 on 08-16 20:41Z, 3.0 today 17:41Z — todoist snap"
+     },
+     {
+      "createdAt": "2026-08-19T02:55:14Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Box 1 — realized, verified live (not inferred)\n\nPR #2885 merged (`2b13c708`) and `life-platform-qa-smoke` deployed at that sha\n(`build_info.json: 2b13c708 built 2026-08-19T02:36:13Z`). Invoked with\n`{\"dry_run\": true}` — SES send confirmed suppressed in the log\n(`[DRY-RUN] SES send suppressed`), so this observation cost no mail.\n\n`LifePlatform/QaSmoke`, `Maximum`, the exact metrics the two alarms read:\n\n| metric | 08-18 14:03 PT (pre-deploy) | 08-18 19:48 PT (post-deploy) |\n|---|---|---|\n| `WarnCount`        | **1.0** | **0.0** |\n| `ChronicWarnCount` | 7.0 | **8.0** |\n| `FailCount`        | 0.0 | **1.0** |\n\nThe `receipt_replay` config/engine-drift warn moved out of `WarnCount` and into\n`ChronicWarnCount` — the count is conserved (7+1 → 8+0), which is the evidence that\nthis was a reclassification and not a suppression. Handler return corroborates:\n`\"warned\": 8, \"warned_chronic\": 8`.\n\n`qa-smoke-warnings` is `Maximum` over a rolling 86400s window, so the alarm itself\ncannot go OK until the last pre-fix breaching datapoint (08-18 14:03 PT) ages out —\n**earliest OK ~2026-08-19 14:03 PT**, no further deploy required.\n\n## Box 2 (the OK→ALARM transition) — still open, and now harder\n\n`FailCount` went **0.0 → 1.0** on this run, on a *genuine* finding, not a planted one:\n\n```\n[QA] FAIL [content_truth] Reader Truth / reader_truth:verdict:\n  1 high truth finding(s) at Day 2, confirmed on"
+     },
+     {
+      "createdAt": "2026-08-20T15:36:02Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## All four boxes earned — closing `realized`. Box 3 was proved by a planted failure this morning.\n\nRead against the **body** boxes (the later comment's numbering is off by one — it calls the planted-failure test \"Box 2\"; it is body box **3**).\n\n### Box 1 — the condition behind each alarm, identified and resolved ✅\n\n**`qa-smoke-failures`:** the sole remaining driver was `reader_truth:verdict` re-litigating home-page copy that had already been formally ruled correct twice. Fixed **structurally** in #2880 — `DURABLE_DESIGN_COPY` became the registry and `build_prompt` renders the rubric's example list from that tuple, so the clause the model reads and the clause the code enforces cannot drift. Tracked and closed as #2741 today.\n\n**`qa-smoke-warnings`:** fixed in `2b13c708c` (#2885) — *\"chronic-ize the recurring config/engine drift warn holding qa-smoke-warnings red\"*. The live run now reports:\n\n```\n[QA] 7 warning(s) (0 alarmed, 7 chronic), 0 failures\n```\n\nSeven warnings still print; **zero of them alarm**. Each is separately owned (#1956 for the canary `AccessDenied`, optional-absence on withings/notion/supplements, hydration null, mcp cache_warm, character receipt replay). One of them names this issue in its own text — `(#2670: chronic, not a one-time event)`.\n\n### Box 2 — both observed transitioning back to OK ✅\n\n```\nqa-smoke-warnings   ALARM -> OK   2026-08-19T14:08:52.285-07:0"
+     },
+     {
+      "createdAt": "2026-08-20T15:38:27Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Correction to the closure comment — the planted alarm self-cleared in **60 seconds**, not ~24h\n\nI stated above that the planted `WarnCount=1` would keep `qa-smoke-warnings` in ALARM until ≈2026-08-21T15:34Z on a trailing-24h `Maximum` window. **That was wrong.** Measured:\n\n```\nAlarm updated from OK to ALARM   2026-08-20T08:34:27.517-07:00\nAlarm updated from ALARM to OK   2026-08-20T08:35:27.528-07:00   <-- 60 seconds later\n```\n\n**The residual cost of the test was therefore zero** — `qa-smoke-warnings` is already back to OK and is free to signal tonight's 18:30Z run. Box 3 is unaffected: the OK→ALARM transition at 08:34:27 is banked in `describe-alarm-history` and is exactly what the box required.\n\n**Why my prediction was wrong.** I inferred the 24h window from two organic clearances that both landed at 24h+3min after the last breaching datapoint (08-19 02:50Z → 08-20 02:53Z; 08-18 21:05Z → 08-19 21:08Z). That inference fit the organic data and did not survive the planted test.\n\nThe metric shows exactly one datapoint in the window and no zero:\n\n```\n$ get-metric-statistics --metric-name WarnCount --period 60\n  Maximum      1.0   2026-08-20T08:33:00-07:00\n  SampleCount  1.0   2026-08-20T08:33:00-07:00\n```\n\n…yet the recovery reason cites `[0.0 (…15:35:00)]`. There is no such 0.0 datapoint. That is **`TreatMissingData: notBreaching` rendering an empty evaluation window as zero** "
+     },
+     {
+      "createdAt": "2026-08-20T18:08:14Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Post-closure: the planted test predicted the organic behaviour, ~2.5 hours later\n\nClosed `realized` this morning on a **planted** `WarnCount=1` that drove `qa-smoke-warnings` OK→ALARM in 50 seconds (08:34:27 PDT), then self-cleared in 60s.\n\nThe same alarm has now done it **organically**, on a real finding:\n\n```\nqa-smoke-warnings   OK -> ALARM   2026-08-20T11:03:27.530-07:00\n[QA] 10 warning(s) (2 alarmed, 8 chronic), 0 failures\n```\n\nThree things this confirms that the planted test could only predict:\n\n1. **The alarm genuinely signals new warnings.** `2 alarmed` — a real, non-chronic warning appeared and moved the alarm. That is box 3's outcome reached without a synthetic datapoint.\n2. **The chronic classification is doing real work.** 8 of the 10 warnings are chronic and were correctly excluded from `WarnCount`; only the 2 new ones alarmed. Had the #2885 chronic-ization not landed, all 10 would have counted and the alarm would never have left ALARM to begin with — the saturation this issue was filed about.\n3. **`qa-smoke-failures` stayed OK throughout** (still 2026-08-19T19:53:11-07:00). The two alarms are now independently meaningful: warnings moved, failures did not. Before this issue, both were permanently red and neither carried information.\n\nThe warning that drove it was a `reader_truth:confirm` **demotion** — a `high` finding that did not reproduce on a second pass, dem"
+     },
+     {
+      "createdAt": "2026-08-22T02:15:06Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "Cross-link per #2827 acceptance box 3: PR #2945 adds a daily STILL-IN-ALARM section (with ages) to the alert digest, so the standing reds tracked here will now re-surface in the operator's daily email instead of only in Mon/Wed/Fri agent runs. The drain/re-justification of the current standing set (qa-smoke alarms standing red) remains this issue's scope — the digest change makes that set visible daily but does not clear it."
+     }
+    ]
+   }
+  },
+  {
+   "number": 3208,
+   "title": "truth-qa: the #2959 day-counter-bound demotion is lexical, not structural — the same finding demotes live but gated main's visual-qa on /method/intelligence/ ('9/10 days of data' on Day 10)",
+   "state": "CLOSED",
+   "closedAt": "2026-08-26T20:05:09Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:ai"
+     },
+     {
+      "name": "model:sonnet"
+     },
+     {
+      "name": "prio:P2"
+     },
+     {
+      "name": "type:bug"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "createdAt": "2026-08-26T20:05:36Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Verdict — closing as shipped (PR #3210, merged `902b9abb`)\n\n**Shipped.** `is_day_counter_bound_inference` (#2959) is now **structural rather than lexical**: it demotes when the note cites a day number *and* asserts a matching data-quantity from **either** channel — the original `only|at most|a maximum of N days` scaffold, **or** an `N/M` progress fraction whose denominator matches the cited day ±1, guarded by requiring numerator ≤ denominator and the word \"data\" nearby. Demotion is still high→low, never a drop; the finding stays visible as advisory.\n\n**The real CI note was recovered from the run ARTIFACT**, not the truncated log line — `gh run download 33001307897 --name visual-qa-screenshots`, `report.json`, `/method/intelligence/` `truth_findings[0].note`:\n\n> States 'DAYS OF DATA TOWARD THE FIRST CORRELATION MATRIX · 9/10' and 'No correlations yet — the honest state, not a broken pipeline. The weekly matrix computes its first pairs once 10 overlapping days of this cycle's data exist.' On Day 10 of the cycle, 10 days of data should exist, making this claim impossible.\n\nThat inference is the day-counter-as-data-bound error this ruling exists to reject: Days 1–9 are complete, **Day 10 is in progress**, so \"9/10\" is honest.\n\n**Mutation proofs (agent's three):** `test_day_counter_bound_fires_on_the_recovered_ci_note`, `test_day_counter_bound_still_fires_on_the_already_working_live_phrasing` (no regression on the phrasing that already worked), `test_day_counter_bound_fraction_spares_a_genuine_wrong_day_defect` (a #2941-shaped wrong-Day-number does NOT demote). Plus a guard against sweeping in unrelated ratios and an end-to-end `assess_prose` wiring proof. All 4 pre-existing tests pass unmodified; `tests/test_reader_truth_qa.py` → 95 passed.\n\n**Driver's independent verification** — this rule SUPPRESSES truth findings, so I re-proved it myself against the merged predicate rather than accepting the report, including two cases the agent did not test:\n\n| case | demoted | expected |\n|---|---|---|\n| the real CI note | True | True |\n| the old lexical phrasing | True | True |\n| genuine wrong-day defect (`DAY 14` vs actual Day 10) | False | False |\n| **unrelated ratio** (`3/5 workouts completed`, Day 10) | False | False |\n| **wrong category** (same note as `duplicated_narrative`) | False | False |\n\nAll five as expected.\n\n**No baseline entry was added** — `tests/truth_baseline.json` stays at `pages: {}` where #3199 left it this morning. This was fixed by the rule, not papered over by the ledger.\n\n## The class, stated plainly\n\n**Third instance in one session.** #3199 fixed this exact failure mode twice hours earlier in the same file: its first `is_sparsity_objection` was keyword-matched and was *measured failing live* against a rephrasing sharing no keywords, so it was rewritten as a numeric predicate, and `is_active_vs_passive_objection`'s regexes were loosened for the same reason. #3199's closing note named the residual risk in the family's own words — \"a suppressor written against one observed string fires once\" — and `_DAY_BOUND_RE` was that suppressor, discovered hours later by costing main a pipeline red.\n\nThe durable lesson for this family: **a demotion rule must key on the structure of the objection (numbers, categories, relationships), never on the oracle's chosen wording.** Any remaining member of the #2959/#3003 family that still matches on phrasing is a latent pipeline red.\n\n**Outcome (operator).** The day-counter-bound ruling holds regardless of how the oracle words the objection; real day-arithmetic defects still gate.\n"
+     }
+    ]
+   }
+  },
+  {
+   "number": 2938,
+   "title": "ci: both AI gates in the deploy-gating visual-qa job are dark — boto3 is never installed, so --ai-qa and --reader-truth skip and the job reports success",
+   "state": "CLOSED",
+   "closedAt": "2026-08-22T00:51:48Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:infra"
+     },
+     {
+      "name": "model:sonnet"
+     },
+     {
+      "name": "prio:P2"
+     },
+     {
+      "name": "type:bug"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "createdAt": "2026-08-22T01:17:26Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Shipped:** `boto3`+`botocore` installed in all three visual-qa workflow copies, and `run_sweep` now returns `failed == 0 and not ai_gate_failures` · PR #2940 · merged + on main.\n\n**Outcome:** partial — the code and config are shipped and the census entry moved `unproven` → `can-fail (proven)`, but **the post-fix RED has not been observed end-to-end in CI**, and I am not going to record it as though it had.\n\nWhat is verified: the pre-fix cannot-fail state is a live production observation (run 32509917798 / job 96909117231 — both AI sections printed `⚠ AI-QA unavailable … No module named 'boto3'` and the job concluded `success`). The decision function is mutation-proved over all six status shapes (11 tests), including that a budget-tier pause still does **not** fail. All three workflows now install the dependency, pinned via `ci_pins.py`.\n\nWhat is not: this PR's own visual-qa job runs *with* boto3, so it goes green and cannot demonstrate the failure. Confirming the red needs a deliberate boto3-less run, which is not worth wedging the deploy path for. That limit is written into the proof's `scope` field rather than left implied — the next genuine Bedrock outage will demonstrate it for free.\n\nTwo acceptance boxes are deliberately unclaimed:\n- \"remove boto3 and confirm the job goes RED\" — proven at the decision-function level only, per above.\n- \"sweep the sibling class: any other "
+     }
+    ]
+   }
+  },
+  {
+   "number": 2921,
+   "title": "sleep: /api/sleep_detail interleaves Eight Sleep and Whoop in one object — total_sleep_hours 1.4 sits beside deep 1.98 + rem 1.64, and the percentages belong to the other device",
+   "state": "CLOSED",
+   "closedAt": "2026-08-23T06:39:33Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:data"
+     },
+     {
+      "name": "model:sonnet"
+     },
+     {
+      "name": "prio:P2"
+     },
+     {
+      "name": "type:bug"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 4,
+    "nodes": [
+     {
+      "createdAt": "2026-08-21T23:30:15Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "Reopened — closed by accident, not by resolution.\n\nPR #2939 fixed a *different* defect on this endpoint (`light_pct: 106.7`, an impossible percentage) and I deliberately withheld a closing keyword. The commit body says, verbatim:\n\n> Does NOT close #2921 -- that issue's other half, the API interleaving Eight Sleep and Whoop figures in one object, is untouched here\n\n**A negated closing keyword still closes.** GitHub's parser matches `close #2921` and never sees the `NOT`. Writing the disclaimer is what closed the issue — the disclaimer was the bug.\n\nThis is the [reference_negated_closing_keyword_still_closes] trap, and it took out #1221 the same way on 2026-08-21. Correct form is to never put the word `close` adjacent to the number at all: say \"Refs #2921\" and put the scope note in prose that avoids the keyword entirely.\n\n**What remains open here, untouched by #2939:** the API interleaves Eight Sleep and Whoop figures in one object. Verified live during that work — the served `sleep_trend` row for 2026-08-20 carries `hours: 5.2` and `deep_sleep_hours: 1.98`, while the stored Eight Sleep row for the same night has `sleep_duration_hours: 1.35` and `deep_hours: 0.15`. The hours come from one device and the percentages from another, which is exactly this issue's original complaint and is still true."
+     },
+     {
+      "createdAt": "2026-08-22T14:06:57Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "Reopened — closed by accident **again**, and by the very commit that documented the first accident. The 2026-08-21 wrap commit `f0a9e49c` narrates the earlier mistake in its body: *\"closed #2921 by accident writing 'Does NOT close #2921' … and closed #2578 overclaiming\"*. GitHub's parser reads the literal phrase `closed #2921` as a closing keyword regardless of the surrounding prose, so **writing about a closure in past tense closes the issue** — a second variant of the same trap, one layer up. Both re-closed at 01:27Z, ~1 minute after that commit was pushed.\n\nNeither is resolved: #2578's box 2 still needs the honest bounded definition, #2921's device-interleaving half is still untouched by #2939."
+     },
+     {
+      "createdAt": "2026-08-22T16:41:16Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Live qa-smoke evidence, 2026-08-22** — this is firing nightly and is one of the two real failures behind the lit `qa-smoke-failures` alarm:\n\n```\n[QA] FAIL [content_truth] Reader Truth / reader_truth:verdict: 1 high truth finding(s)\nat Day 5, confirmed on a second pass: /api/sleep_detail [temporal_contradiction·fcd7d5]\nsleep_trend row dated 2026-08-21 reports sleep_start at 2026-08-21T07:02:51.150Z\n```\n\nTwo things this adds to the issue as filed:\n\n1. **It is reader-visible and recurring**, not a one-off payload oddity — the oracle confirms it on a second pass each run.\n2. The symptom here is a **`sleep_start` that reads as morning** (07:02Z on the row dated 2026-08-21), which is consistent with the filed diagnosis that two devices' fields are being interleaved into one object — a `sleep_start` from one device sitting beside stage data from the other.\n\nNot re-diagnosing beyond that; the filed root cause still looks right. Flagging only that it has a live, dated, reproducing signal now, which should make it cheap to verify a fix.\n\nRelated: the alarm carrying this signal is itself latched for unrelated reasons (`#2976`), so this FAIL is currently buried."
+     },
+     {
+      "createdAt": "2026-08-23T07:18:24Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Closure: realized** (PR #3023, merged 2026-08-23; site-api deployed 06:57Z via the approved pipeline run 32623497239, verified live post-deploy).\n\nAcceptance boxes:\n- **(a) SoT ruling in SCHEMA.md** — sleep surface ownership recorded per the #2782 withings pattern (in the PR).\n- **(b) Per-source namespacing chosen** (additive): live `/api/sleep_detail` now carries `sleep_detail.eightsleep` and `sleep_detail.whoop` blocks — verified on the deployed payload: each block self-consistent by construction (own hours ÷ own total), both carrying explicit `night_of: 2026-08-21` / `as_of_date: 2026-08-22` (box e). Every pre-existing flat field untouched, so the ~7 incident-lesson tests (#1968/#2344/#2575/#2613) needed no changes and /legacy stays frozen.\n- **(c) Internal-consistency guard, mutation-proved** — mixing two sources reds the guard (tests in the PR).\n- **(d) AI narrative surfaces checked** — daily brief + coaches pull sleep via MCP/DDB directly, not this endpoint; the reader-visible bug was `site/assets/js/evidence_sleep.js` reading blended fields for the stage bar — fixed to read `whoop.*_hours`, null-guarded for either deploy order.\n- Two devices disagreeing stays presented as two measurements (real data, ADR-104), never blended into one impossible object.\n\n**Residuals (stated in the PR, not glossed):** `tests/api_schemas/api_sleep_detail.json` snapshot needs a post-deploy "
+     }
+    ]
+   }
+  },
+  {
+   "number": 3222,
+   "title": "tz: main is RED — permanence + reconciliation fixtures compute expectations on a UTC clock while their handlers moved to Pacific in #3206, failing 7 hours of every 24",
+   "state": "CLOSED",
+   "closedAt": "2026-08-27T05:36:04Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:infra"
+     },
+     {
+      "name": "model:opus"
+     },
+     {
+      "name": "prio:P2"
+     },
+     {
+      "name": "type:bug"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 4,
+    "nodes": [
+     {
+      "createdAt": "2026-08-27T01:27:22Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Partially shipped — PR #3223, merged `678a0598`. **This issue stays OPEN.**\n\nThe red is cleared and boxes 1–3 are done. **#3223 deliberately does not carry `Fixes #3222`** — three\nacceptance boxes remain, and auto-closing on them would be the same false green refused on #2798\nearlier tonight.\n\n### Done\n\n- `_days_ago` (`test_permanence_lambda_1400.py`) and `_all_seven` (`test_data_reconciliation_behavior.py`)\n  now derive from `common.pacific_time.pacific_today()` — the handlers' own helper.\n- The slack assertion at `test_data_reconciliation_behavior.py:364` moved to the Pacific frame. Against\n  a rolled UTC today it would have passed even if the handler wrongly included its own today.\n- 48 passed, `flake8` clean, `black`/`ruff` clean.\n\nBoth docstrings now record the window and why the frame is load-bearing, so the next reader does not\nre-derive it.\n\n### Still open — the set, not the instance\n\n- [ ] **14 test files** compute dates from `now(timezone.utc).date()` / `utcnow().date()`. Each must be\n      ruled against **its own handler's** frame — a vendor instant, a TTL or a billing window is\n      legitimately UTC — and the PT-handler ones fixed.\n- [ ] A guard so the class cannot re-enter silently. Nearest machinery is #2811's matcher\n      (`_clock_returning_functions`, `_taint_index` in `tests/test_pacific_today_guard_2414.py`),\n      which landed tonight in `70d6eef9`.\n- [ "
+     },
+     {
+      "createdAt": "2026-08-27T04:47:42Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Reopened — this was a false auto-close, not a resolution.**\n\n#3222 was closed at 2026-08-27T04:46:42Z by the merge of PR **#3226**, which implements **#3217** (`regen_once`'s keep/discard predicate) and contains **none** of this issue's work.\n\nRoot cause: an implementer ran `gh pr edit` against the wrong PR number, overwriting #3226's body with #3222's — including its `Fixes #3222` line. #3226's *title*, *commits* and *diff* are all #3217's; only the body was clobbered. The stray trailer then auto-closed this issue on merge.\n\nVerified before reopening: `tests/test_fixture_frame_pairing_3222.py` — the guard this issue's boxes 4–6 are about — **does not exist on `main`**. The merged diff is `grounded_generation.py`, `regen_keep_predicate.py`, `regen_discard_telemetry.py`, `mypy.ini` and `test_regen_keep_predicate_3217.py`. Nothing from this issue shipped.\n\nThe real work is open on PR **#3227**, in CI now. Boxes 4–6 stay unchecked until it merges.\n\nThis is the second time in two sessions the `Fixes` trailer has been the failure surface — #3223 deliberately omitted it to *avoid* exactly this, and #3225 had it stripped by hand tonight for the same reason. Recording it as an incident."
+     },
+     {
+      "createdAt": "2026-08-27T05:36:24Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "## Correction to the reopen note above — the root cause was NOT a wrong PR number\n\nI diagnosed tonight's false auto-close as an implementer running `gh pr edit` against the wrong PR. **That was wrong.** The lane that actually experienced it reported the real mechanism, and it matters because the fix is different.\n\n**Both lanes wrote their PR body to the same path:** `<session-scratchpad>/pr_body.md`. The scratchpad directory is shared across concurrently-running agents, not namespaced per lane. So one lane's write clobbered the other's file, and each then published the other's content — including its `Fixes` trailers. It happened in **both directions**: #3227 briefly carried #3226's three `Fixes` lines, and #3226 carried #3227's `Fixes #3222`, which is the one that survived to merge and falsely closed this issue.\n\nSo it was a **shared-filename collision between parallel agents**, not operator error at the `gh` call. Nobody typed the wrong number.\n\nThat distinction changes the remediation:\n- \"Double-check the PR number\" — what I told several lanes tonight — would **not** have prevented it. The number was right; the file contents were not.\n- The actual fix is a **lane-unique scratch filename** (e.g. `pr_body_<issue>.md`), or writing the body via stdin and never touching a shared path.\n\nRecording it here rather than filing an eighth issue tonight. The durable version belongs in th"
+     },
+     {
+      "createdAt": "2026-08-27T13:43:41Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Shipped:** every UTC-clock fixture ruled against its own handler's frame, plus a re-entry guard · PR #3227 (`50819534`) · tests + `scripts/gate_census.py`, no deploy.\n**Outcome:** realized — 6 genuine defects fixed, 8 UTC-vs-UTC pairings left alone with the handler's `utc-exempt` marker cited, 6 non-sites. The best catch: `test_site_api_ai_behavior.py` proves a *fallback to yesterday*, but `site_api_ai_context._ask_fetch_context` probes **today first** in `datetime.now(PT)` — so a UTC \"yesterday\" **was** the handler's today for 7 hours a day and the test passed without the fallback ever running. The guard imports #2811's matcher rather than forking it, and the PT-evening window is exercised at a **constructed** 23:30 PT instant — no nightly job, no wall-clock dependence, which is the trap #3206 shipped. A matcher blind spot was found, measured and left open deliberately: `reads_pt_clock` is a *direct* read, so a test naming a delegate is invisible; widening to a one-hop closure was measured at +17 sites, 12 of them in files this PR rules CORRECT, and rejected — the 5-file closure set is pinned instead so a sixth entrant reds the guard.\n**Note:** this issue was **falsely auto-closed earlier in the session** by a stray `Fixes #3222` in PR #3226, caused by two lanes writing their PR bodies to the same shared scratchpad path. It was reopened, and this close is the real one."
+     }
+    ]
+   }
+  }
+ ],
+ "open_issues": [],
+ "_source": "gh api graphql — Issue nodes captured 2026-08-30 (Session K audit corpus); bodies truncated to the load-bearing text, shape untouched"
+}
