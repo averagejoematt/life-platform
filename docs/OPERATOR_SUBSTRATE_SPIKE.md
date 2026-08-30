@@ -1,5 +1,7 @@
 # Resident-Operator Substrate Spike (#2849, 2026-08-29)
 
+> **Status:** canonical decision record · **Owner:** Matthew · **Verified:** 2026-08-29
+
 **The question:** on what substrate does the platform's judgment loop run when the
 owner's laptop is closed? Three candidates existed, none decided or priced. This spike
 decides, per role, with rent per leg (ADR-103). The staff model is the five-role table
