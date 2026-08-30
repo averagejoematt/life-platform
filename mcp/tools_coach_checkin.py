@@ -100,13 +100,12 @@ def _presence_snapshot():
     try:
         item = _table_ref.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
         item = _d2f(item)
-        return {
+        out = {
             k: item.get(k)
             for k in (
                 "presence_class",
                 "gap_days",
                 "last_food_log_date",
-                "channels_quiet",
                 "returned",
                 "resumed_after_days",
                 "planned_pause",
@@ -115,6 +114,28 @@ def _presence_snapshot():
             )
             if item.get(k) is not None
         }
+        # #3294: the raw `channels_quiet` list is a category-level absence assertion
+        # whose denominator is one source per label; this snapshot feeds a Bedrock
+        # question-generation prompt, so an unlicensed label here becomes a coach
+        # asking "why did you stop training?" over a window Strava recorded training
+        # in. Same ONE address as every other narrative surface, same fail-closed
+        # degradation (an import failure licenses nothing).
+        try:
+            from content.engagement_core import sourced_quiet
+
+            split = sourced_quiet(item)
+            licensed, withheld = list(split.licensed), list(split.withheld)
+        except Exception:  # pragma: no cover — defensive; fail CLOSED, never pass through
+            licensed, withheld = [], [str(c) for c in (item.get("channels_quiet") or [])]
+        if licensed:
+            out["channels_quiet"] = licensed
+        if withheld:
+            out["channels_unverified"] = withheld
+            out["channels_unverified_note"] = (
+                "channels_unverified CANNOT be asserted as absences — the platform could not "
+                "establish them from the sources it consulted. Never ask about them as if he stopped."
+            )
+        return out
     except Exception as e:  # noqa: BLE001 — fail-soft
         logger.warning(f"[#915] presence read failed: {e}")
         return {}

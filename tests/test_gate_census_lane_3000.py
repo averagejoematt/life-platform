@@ -245,7 +245,18 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # measurement was taken with every new file `git add`ed — an untracked guard measures as
 # absent. Unproven fell 541 -> 534 over the same window (#3242's adjudication); that
 # ceiling is left where its owner set it.
-BASELINE_TOTAL_GATES = 564
+# 564 -> 565 (2026-08-29, #3294): ONE real gate,
+# `structural::test_absence_coverage_3294.py` — the channels_quiet reader enumeration
+# (family 5; registering it in _PREMERGE_EXTRA_FILES is part of the same PR). Verified by
+# id-set diff, not count delta: each tree ran its own scripts/gate_census.py --json;
+# ADDED exactly {structural::test_absence_coverage_3294.py}, REMOVED {} (main 564,
+# branch 565). Measured with the file TRACKED (`git add` first — an untracked guard
+# measures as absent). It arrives PROVEN: the mutation is a planted raw-list reader in
+# lambdas/common/, re-runnable via `gate_census_mutations.py --run --gate
+# structural::test_absence_coverage_3294.py` (ARMED 1/1 on the recording run), so the
+# live unproven count does not move and BASELINE_UNPROVEN_GATES stays where its owner
+# set it.
+BASELINE_TOTAL_GATES = 565
 BASELINE_UNPROVEN_GATES = 541
 
 
