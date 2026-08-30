@@ -64,7 +64,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `life-platform-dlq-consumer` | operational_stack | `rate(6 hours)` | constant |
 | `life-platform-freshness-checker` | operational_stack | `cron(45 16 * * ? *)` | constant |
 | `life-platform-permanence` | operational_stack | `cron(0 6 * * ? *)` | constant |
-| `life-platform-pip-audit` | operational_stack | `cron(0 17 ? * MON *)` | constant |
+| `life-platform-pip-audit` | operational_stack | `cron(0 15 ? * MON *)` | constant |
 | `life-platform-qa-smoke` | operational_stack | `cron(30 18 ? * * *)` | constant |
 | `life-platform-traffic-digest` | operational_stack | `cron(0 16 ? * MON *)` | constant |
 | `mastodon-social-ingestion` | ingestion_stack | `cron(0 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23 * * ? *)` | resolved |

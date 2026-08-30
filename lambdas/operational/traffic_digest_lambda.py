@@ -1,5 +1,5 @@
 """
-traffic_digest_lambda.py — privacy-clean weekly traffic digest.
+traffic_digest_lambda.py — the Monday ops-pack email (traffic + folded ops reports).
 
 Reads CloudFront standard access logs (the site's own first-party server logs —
 no cookies, no client JS, no third party) from the log bucket, aggregates the
@@ -19,6 +19,16 @@ PRIVACY (matches the no-tracking ethos):
   • Output is aggregate counts only.
 
 Schedule: weekly (Mondays). Reuses the SES email pattern. No external deps.
+
+THE OPS PACK (#2835): this email is the ONE weekly ops email. Besides the
+traffic sections it already carried (green report #1446, subscriber funnel
+#1954), it now embeds the two reports that used to be standalone Monday
+emails — data-reconciliation (weekly source-coverage gaps) and pip-audit
+(monthly dependency scan). Those Lambdas still run on their own crons; they
+deliver S3 JSON artifacts (`reconciliation/latest.json`, `pip-audit/latest.json`)
+whose pre-rendered `html` section this pack embeds verbatim. Every fold is
+fail-soft with honest absence + loud staleness (ADR-104): a dead producer
+renders as a dated STALE/not-collected line, never as silence.
 
 Also emits the 7-day unique/page-view counts as CloudWatch metrics
 (LifePlatform/Traffic::UniqueVisitors7d / PageViews7d) — the cost_governor
@@ -350,7 +360,7 @@ def build_subscriber_funnel_html(funnel):
     return "".join(parts)
 
 
-def build_html(agg, start_date, end_date, green_html="", funnel=None):
+def build_html(agg, start_date, end_date, green_html="", funnel=None, ops_html=""):
     def rows(pairs, label):
         if not pairs:
             return f'<tr><td colspan="2" style="color:#888;padding:6px 0">No {label} this week.</td></tr>'
@@ -389,6 +399,7 @@ def build_html(agg, start_date, end_date, green_html="", funnel=None):
 <table style="width:100%;border-collapse:collapse">{rows(agg['top_referrers'], 'external referrers')}</table>
 {watched_block(agg.get('watched_pages', []))}
 {build_subscriber_funnel_html(funnel) if funnel is not None else ""}
+{ops_html}
 {green_html}
 <p style="color:#888;font-size:12px;margin-top:24px">From first-party CloudFront access logs — aggregate only, no cookies, no tracking, IPs hashed-then-discarded. {agg['returning_visitors']} of {agg['unique_visitors']} visitors returned on a second day.</p>
 </body></html>"""
@@ -651,6 +662,80 @@ def build_green_report_html(report):
     return "".join(parts)
 
 
+# ── Folded ops reports (#2835) ───────────────────────────────────────────────
+# data-reconciliation (Mon 07:30 UTC, weekly) and pip-audit (first Monday
+# 15:00 UTC, monthly) used to be standalone Monday emails. They now deliver S3
+# JSON artifacts carrying a pre-rendered `html` fragment; this pack embeds
+# them, making it the one weekly ops email. Both folds are fail-soft: a
+# missing/unreadable artifact renders an honest "not collected" line, and an
+# artifact older than its producer's cadence renders a loud STALE warning —
+# a dead producer must be more visible in the pack than it was as a silently
+# absent email (ADR-104).
+
+OPS_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+RECON_ARTIFACT_KEY = "reconciliation/latest.json"
+PIP_AUDIT_ARTIFACT_KEY = "pip-audit/latest.json"
+RECON_MAX_AGE_DAYS = 8  # weekly cadence + one day of cron slippage
+PIP_AUDIT_MAX_AGE_DAYS = 38  # monthly (first-Monday) cadence + slippage
+
+
+def collect_ops_artifact(s3, key):
+    """Fetch one folded-report artifact — fail-soft: any failure returns an
+    error dict and the section renders an honest 'not collected' line."""
+    try:
+        raw = s3.get_object(Bucket=OPS_BUCKET, Key=key)["Body"].read()
+        artifact = json.loads(raw)
+        if not isinstance(artifact, dict):
+            return {"error": f"artifact {key} is not a JSON object"}
+        return artifact
+    except Exception as e:
+        return {"error": f"artifact {key} unreadable ({str(e)[:120]})"}
+
+
+def build_ops_section_html(title, artifact, max_age_days, cadence_note, now=None):
+    """Render one folded ops-report section (#2835). Must never raise — same
+    contract as build_green_report_html: every key may be absent, None or
+    error-shaped, and a crash here would take the whole ops pack down."""
+    now = now or datetime.now(timezone.utc)
+    parts = [f'<h2 style="font-size:16px;margin-top:28px">{title}</h2>']
+    artifact = artifact or {}
+    html = artifact.get("html")
+    if artifact.get("error") or not isinstance(html, str) or not html.strip():
+        reason = artifact.get("error") or "artifact carries no rendered section"
+        parts.append(f'<p style="color:#6e665a;font-size:13px">not collected — {reason}</p>')
+        return "".join(parts)
+    generated = parse_iso_utc(artifact.get("generated_at"))
+    if generated is None:
+        parts.append(
+            '<p style="color:#9a6700;font-size:13px">⚠ artifact carries no readable generated_at stamp — '
+            "age unknown; treat the section below with suspicion</p>"
+        )
+    elif (now - generated).days > max_age_days:
+        parts.append(
+            f'<p style="color:#9a6700;font-size:13px">⚠ STALE — generated {(now - generated).days} days ago '
+            f"({cadence_note}); the producing Lambda may be dead</p>"
+        )
+    parts.append(html)
+    stamp = f" — generated {generated.strftime('%Y-%m-%d %H:%M UTC')}" if generated else ""
+    parts.append(f'<p style="color:#888;font-size:12px;margin:8px 0 0">{cadence_note}; folded into this ops pack (#2835){stamp}.</p>')
+    return "".join(parts)
+
+
+def ops_subject_suffix(recon_artifact, pip_artifact):
+    """Carry the retired emails' inbox-scannability into the pack's subject:
+    a RED/YELLOW reconciliation week or a vulnerable dependency scan must be
+    visible without opening the email (the folded shape of the old subjects)."""
+    bits = []
+    severity = str((recon_artifact or {}).get("severity") or "")
+    if severity.startswith("RED"):
+        bits.append("recon RED")
+    elif severity.startswith("YELLOW"):
+        bits.append("recon YELLOW")
+    if (pip_artifact or {}).get("has_vulnerabilities"):
+        bits.append("deps VULNERABLE")
+    return "".join(f" · {b}" for b in bits)
+
+
 def _load_logs(s3, start_dt):
     """List + read CF log objects modified within the window.
 
@@ -674,7 +759,7 @@ def _load_logs(s3, start_dt):
     return texts, object_count
 
 
-def _emit_no_logs_alert(s3, cw, start_dt, now, green_html="", dry_run: bool = False):
+def _emit_no_logs_alert(s3, cw, start_dt, now, green_html="", dry_run: bool = False, ops_html=""):
     """Send a loud email + CloudWatch metric when the log source is empty."""
     cw.put_metric_data(
         Namespace="LifePlatform/Traffic",
@@ -691,6 +776,7 @@ in <code>s3://{LOG_BUCKET}/{LOG_PREFIX}</code> for the window
 <code>aws cloudfront get-distribution-config --id E3S424OXQZ8NBE --query DistributionConfig.Logging</code></p>
 <p>If logging is off, re-enable it via CDK (it is now declared in web_stack.py)
 and run <code>cdk deploy LifePlatformWeb</code>.</p>
+{ops_html}
 {green_html}
 </body></html>"""
     try:
@@ -746,9 +832,38 @@ def lambda_handler(event, context):
             logger.warning("subscriber funnel failed (fail-soft, #1954): %s", e)
             funnel = {"error": f"funnel collector error (fail-soft): {str(e)[:120]}"}
 
+        # #2835: the folded ops-report sections — the reconciliation and
+        # pip-audit reports now deliver as S3 artifacts this pack embeds
+        # instead of standalone Monday emails. Fail-soft belt-and-braces: even
+        # a builder bug must not take the pack down.
+        try:
+            recon_artifact = collect_ops_artifact(s3, RECON_ARTIFACT_KEY)
+            pip_artifact = collect_ops_artifact(s3, PIP_AUDIT_ARTIFACT_KEY)
+            ops_html = build_ops_section_html(
+                "Data reconciliation — weekly source coverage",
+                recon_artifact,
+                RECON_MAX_AGE_DAYS,
+                "weekly (Mon 07:30 UTC, data-reconciliation Lambda)",
+                now=now,
+            ) + build_ops_section_html(
+                "Dependency audit — pip-audit",
+                pip_artifact,
+                PIP_AUDIT_MAX_AGE_DAYS,
+                "monthly (first Monday 15:00 UTC, pip-audit Lambda)",
+                now=now,
+            )
+            subject_suffix = ops_subject_suffix(recon_artifact, pip_artifact)
+        except Exception as e:
+            logger.warning("folded ops sections failed (fail-soft, #2835): %s", e)
+            ops_html = (
+                '<h2 style="font-size:16px;margin-top:28px">Folded ops reports</h2>'
+                f'<p style="color:#6e665a;font-size:13px">not collected — section builder error (fail-soft): {str(e)[:160]}</p>'
+            )
+            subject_suffix = ""
+
         if object_count == 0:
             # No log objects at all — logging is likely disabled, not just a quiet week.
-            _emit_no_logs_alert(s3, cw, start_dt, now, green_html, dry_run=dry_run)
+            _emit_no_logs_alert(s3, cw, start_dt, now, green_html, dry_run=dry_run, ops_html=ops_html)
             return {"statusCode": 200, "body": "no log objects — alert sent"}
 
         records = []
@@ -785,11 +900,11 @@ def lambda_handler(event, context):
         if quiet:
             logger.info("no human page views in window (logs present, genuinely quiet) — sending green report anyway (#1446)")
 
-        html = build_html(agg, start_dt.strftime("%b %d"), now.strftime("%b %d"), green_html, funnel=funnel)
+        html = build_html(agg, start_dt.strftime("%b %d"), now.strftime("%b %d"), green_html, funnel=funnel, ops_html=ops_html)
         subject = (
-            "Weekly ops — quiet traffic week · QA green report"
+            f"Weekly ops pack — quiet traffic week · QA green report{subject_suffix}"
             if quiet
-            else f"Weekly traffic — {agg['page_views']} views, {agg['unique_visitors']} visitors · green report"
+            else f"Weekly ops pack — {agg['page_views']} views, {agg['unique_visitors']} visitors{subject_suffix}"
         )
         guarded_send_email(
             boto3.client("sesv2", region_name=REGION),

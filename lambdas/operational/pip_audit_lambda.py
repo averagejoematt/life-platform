@@ -1,18 +1,27 @@
 """
 pip_audit_lambda.py — SEC-5: Monthly dependency vulnerability scanning.
 
-Runs first Monday of each month at 9:00 AM PT (17:00 UTC).
+Runs first Monday of each month at 8:00 AM PT (15:00 UTC — moved from 17:00
+by #2835 so the report is fresh before the 16:00 UTC Monday ops pack sends).
 Reads all `lambdas/requirements/*.txt` files from S3, installs dependencies
-into a temp virtualenv, runs pip-audit, and emails a vulnerability report.
+into a temp virtualenv, runs pip-audit, and writes a vulnerability report.
 
 Since only garmin.txt has real deps (the rest are placeholder stubs), this
 Lambda is lightweight — typically runs in <60 seconds.
+
+DELIVERY (#2835): this job no longer sends its own SES email. The report is
+written to S3 (`pip-audit/latest.json`, plus a dated archive key) and embedded
+as a section of the Monday ops-pack email sent by `traffic_digest_lambda` —
+one weekly ops email instead of three. The artifact write IS the delivery: a
+failed write raises (DLQ digest, #809/ADR-116). The #1336 SCA config-gap
+hard-fail semantics are unchanged — the artifact is written FIRST, then the
+invocation raises, exactly as the email used to go out before the raise.
 
 HOW IT WORKS:
   1. Downloads all requirements/*.txt files from S3 (uploaded during MAINT-1)
   2. Runs `pip install --dry-run` + `pip-audit --requirement` for each
   3. Aggregates findings: (vulnerability, package, version, CVE, severity, fix)
-  4. Emails summary — GREEN if clean, RED if any HIGH/CRITICAL findings
+  4. Writes the report artifact — GREEN if clean, RED if any findings
 
 S3 LAYOUT (written by deploy/upload_requirements_to_s3.sh):
   matthew-life-platform/
@@ -42,8 +51,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3
-from common.pacific_time import pacific_now  # #2798: the operator reads this subject in PT
-from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+from common.dry_run import is_dry_run  # #2835: dry run now suppresses the artifact writes (no SES send remains here)
+from common.pacific_time import pacific_now  # #2798: the operator reads this report's date in PT
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -58,12 +67,13 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 BUCKET = os.environ["S3_BUCKET"]
 USER_ID = os.environ.get("USER_ID", "matthew")
-RECIPIENT = os.environ["EMAIL_RECIPIENT"]
-SENDER = os.environ["EMAIL_SENDER"]
 REQ_S3_PREFIX = os.environ.get("REQ_S3_PREFIX", "config/requirements/")
 
+# #2835: the stable artifact key the Monday ops pack (traffic_digest_lambda)
+# reads — always overwritten with the newest scan; dated keys keep history.
+LATEST_ARTIFACT_KEY = "pip-audit/latest.json"
+
 s3 = boto3.client("s3", region_name=REGION)
-ses = boto3.client("sesv2", region_name=REGION)
 
 # ── SCA layer-manifest coverage guard (#1336) ───────────────────────────────────
 # Every binary dependency layer referenced by a `*_LAYER_ARN` in cdk/stacks/constants.py
@@ -322,7 +332,13 @@ def audit_requirements_file(req_path: str, lambda_name: str) -> dict:
 
 
 def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
-    """Build HTML email. Returns (html, has_vulnerabilities)."""
+    """Build the report as an EMBEDDABLE HTML fragment (#2835). Returns
+    (html, has_vulnerabilities).
+
+    This used to be a standalone email document; it is now a `<div>` fragment
+    stored in the S3 artifact and embedded verbatim as one section of the
+    Monday ops-pack email (traffic_digest_lambda) — no DOCTYPE/html/body
+    wrapper, so it composes inside the pack's own document."""
     total_vulns = sum(len(r["vulnerabilities"]) for r in results)
     has_vulns = total_vulns > 0
     has_errors = any(r["status"] == "error" for r in results)
@@ -397,11 +413,7 @@ def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
         </tr>"""
 
     return (
-        f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family:system-ui,sans-serif;margin:0;padding:16px;background:#f9fafb;">
-<div style="max-width:900px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);">
+        f"""<div style="font-family:system-ui,sans-serif;max-width:900px;margin:16px 0;background:white;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
   <div style="background:{header_color};padding:20px 24px;">
     <h2 style="color:white;margin:0;font-size:20px;">{status_icon} Monthly pip-audit Report</h2>
     <p style="color:rgba(255,255,255,.9);margin:4px 0 0;font-size:13px;">{scan_date} | {status_text}</p>
@@ -429,8 +441,7 @@ def build_report_html(results: list[dict], scan_date: str) -> tuple[str, bool]:
   <div style="padding:12px 24px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;">
     AI-generated analysis, not medical advice. Life Platform | pip-audit Lambda (SEC-5)
   </div>
-</div>
-</body></html>""",
+</div>""",
         has_vulns,
     )
 
@@ -561,36 +572,44 @@ def lambda_handler(event, context):
 
     html, has_vulns = build_report_html(results, scan_date)
     total_vulns = sum(len(r["vulnerabilities"]) for r in results)
-    vuln_icon = "🔴" if has_vulns else "🟢"
-    subject = f"{vuln_icon} Monthly pip-audit | {scan_date[:10]} | {'VULNERABLE — action required' if has_vulns else 'Clean'}"
 
-    try:
-        guarded_send_email(
-            ses,
-            dry_run,
-            FromEmailAddress=SENDER,
-            Destination={"ToAddresses": [RECIPIENT]},
-            Content={
-                "Simple": {
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
-                }
-            },
-        )
-        logger.info(f"[pip_audit] Report sent: {subject}")
-    except Exception as e:
-        logger.error(f"[pip_audit] Failed to send report: {e}")
-        raise
-
-    # RED-on-missing-manifest / disabled-alerts: fail the invocation (non-zero → CloudWatch
-    # Errors alarm) AFTER the report email is sent, so the operator sees the detail AND the
-    # scheduled run pages (#1336 AC2/AC5). Vulnerable-package findings intentionally stay
-    # email-only (unchanged prior behavior); only the CONFIG gaps this story closes hard-fail.
+    # #2835: deliver the report as the S3 artifact the Monday ops pack
+    # (traffic_digest_lambda) embeds — one weekly ops email instead of three.
+    # This write IS the delivery: a failure raises (DLQ digest, #809/ADR-116).
+    artifact = {
+        "scan_date": scan_date,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "files_audited": len(results),
+        "total_vulnerabilities": total_vulns,
+        "has_vulnerabilities": has_vulns,
+        "hard_fail_reasons": [],  # filled below, before the write
+        # The pre-rendered section the ops pack embeds verbatim (#2835).
+        "html": html,
+    }
     hard_fail_reasons = []
     if missing_layer_manifests:
         hard_fail_reasons.append(f"unscanned deployed layer(s) with no manifest: {missing_layer_manifests}")
     if alerts["status"] == "disabled":
         hard_fail_reasons.append("GitHub vulnerability/Dependabot alerts DISABLED")
+    artifact["hard_fail_reasons"] = hard_fail_reasons
+
+    try:
+        if dry_run:
+            logger.info("[pip_audit] dry-run — artifact writes suppressed (report computed in full)")
+        else:
+            body = json.dumps(artifact, indent=2)
+            date_key = f"pip-audit/{scan_date[:10]}_pip_audit.json"
+            s3.put_object(Bucket=BUCKET, Key=date_key, Body=body, ContentType="application/json")
+            s3.put_object(Bucket=BUCKET, Key=LATEST_ARTIFACT_KEY, Body=body, ContentType="application/json")
+            logger.info(f"[pip_audit] Artifact written: {LATEST_ARTIFACT_KEY} ({total_vulns} vulnerabilities)")
+    except Exception as e:
+        logger.error(f"[pip_audit] Failed to deliver artifact: {e}")
+        raise
+
+    # RED-on-missing-manifest / disabled-alerts: fail the invocation (non-zero → CloudWatch
+    # Errors alarm) AFTER the report artifact is written, so the operator sees the detail AND
+    # the scheduled run pages (#1336 AC2/AC5). Vulnerable-package findings intentionally stay
+    # report-only (unchanged prior behavior); only the CONFIG gaps that story closes hard-fail.
     if hard_fail_reasons:
         raise RuntimeError("SCA guard RED (#1336): " + "; ".join(hard_fail_reasons))
 

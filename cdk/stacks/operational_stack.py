@@ -10,7 +10,7 @@ Lambdas (11):
   life-platform-freshness-checker   cron(45 16 * * ? *)     — 9:45 AM PT daily
   life-platform-dlq-consumer        rate(6 hours)
   life-platform-canary              rate(4 hours)
-  life-platform-pip-audit           cron(0 17 ? * MON *)    — Every Monday
+  life-platform-pip-audit           cron(0 15 ? * MON *)    — Every Monday (#2835: before the 16:00 UTC ops pack)
   life-platform-qa-smoke            cron(30 18 ? * * *)     — Daily 11:30 AM PT
   life-platform-key-rotator         (Secrets Manager rotation trigger only)
   life-platform-data-export         (on-demand only)
@@ -178,7 +178,10 @@ class OperationalStack(Stack):
         cdk.CfnOutput(self, "AlertDigestQueueUrl", value=digest_queue.queue_url)
         cdk.CfnOutput(self, "AlertDigestLambdaArn", value=digest_lambda.function_arn)
 
-        # ── 2c. Weekly traffic digest (privacy-clean returnability measurement) ──
+        # ── 2c. Weekly traffic digest — the Monday ops-pack email (#2835) ──
+        # Besides the traffic sections it always carried (green report #1446,
+        # subscriber funnel #1954), it embeds the folded data-reconciliation and
+        # pip-audit report artifacts, making it the ONE weekly ops email.
         # CloudFront standard access logs (first-party server logs — no cookies, no
         # client JS, no third party) land in this bucket; the Lambda aggregates the
         # past 7 days (IPs hashed-then-discarded) and emails a digest. ObjectOwnership
@@ -466,17 +469,19 @@ class OperationalStack(Stack):
         alerts_email = self.node.try_get_context("alerts_email") or "awsdev@mattsusername.com"
         local_alerts_topic.add_subscription(sns_subs.EmailSubscription(alerts_email))
 
-        # ── 4. Pip Audit — every Monday
+        # ── 4. Pip Audit — every Monday (self-guards to first Monday of month)
+        # #2835: no longer sends its own email — it writes pip-audit/latest.json,
+        # which the 16:00 UTC Monday ops pack (traffic-digest) embeds; the cron
+        # moved 17:00 → 15:00 UTC so the artifact is fresh before the pack sends.
         create_platform_lambda(
             self,
             "PipAudit",
             function_name="life-platform-pip-audit",
             source_file="lambdas/operational/pip_audit_lambda.py",
             handler="operational.pip_audit_lambda.lambda_handler",
-            schedule="cron(0 17 ? * MON *)",
+            schedule="cron(0 15 ? * MON *)",
             timeout_seconds=300,
             memory_mb=512,
-            environment={"EMAIL_RECIPIENT": "awsdev@mattsusername.com", "EMAIL_SENDER": "awsdev@mattsusername.com"},
             custom_policies=rp.operational_pip_audit(),
             table=local_table,
             bucket=local_bucket,
@@ -599,6 +604,8 @@ class OperationalStack(Stack):
         )
 
         # ── 8. Data Reconciliation — Monday 12:30 AM PT
+        # #2835: no longer sends its own email — it writes reconciliation/latest.json,
+        # which the 16:00 UTC Monday ops pack (traffic-digest) embeds.
         create_platform_lambda(
             self,
             "DataReconciliation",
@@ -608,7 +615,6 @@ class OperationalStack(Stack):
             schedule="cron(30 7 ? * MON *)",
             timeout_seconds=120,
             memory_mb=256,
-            environment={"EMAIL_RECIPIENT": "awsdev@mattsusername.com", "EMAIL_SENDER": "awsdev@mattsusername.com"},
             custom_policies=rp.operational_data_reconciliation(),
             # #498: expected-days derive from source_registry (shared layer).
             table=local_table,
