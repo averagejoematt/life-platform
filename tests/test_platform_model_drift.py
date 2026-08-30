@@ -13,8 +13,23 @@ changed": if ``day_grade`` stops showing its two writers, the extractor broke.
 
 Run:  python3 -m pytest tests/test_platform_model_drift.py -v
 Fix:  python3 scripts/generate_platform_model.py   (then commit both artifacts)
+
+#3265: `_built()` used to re-run `gen.build_model()` — a scan of the whole
+lambdas/mcp/cdk tree — on EVERY call with no memoization: once per test (5 tests) plus
+a SECOND time inside `test_generation_is_deterministic` itself (which exists purely to
+prove the two builds are byte-identical), 6 full builds total against the unmutated
+repo tree every run. None of the five tests below mutate `model`/`gen` state — the one
+that plants a defect (`test_mutation_a_hand_edit_is_detected`) does so on a fresh
+`json.loads()` copy, never on the cached object — so caching is sound. Measured locally
+(this file alone, `-p no:randomly`, before vs after this change, 2-run mean before /
+3-run mean after — durations under 0.005s round to 0 in pytest's own report):
+file total 40.21s -> 6.91s (-33.30s, -82.8%). Only the first test to run pays the one
+real build (~6.5-7.0s, six builds collapsed to one); the other four are cache hits
+(<0.005s each, `--durations=0` confirms 14 of the file's 15 timed phases fall below
+pytest's own reporting floor).
 """
 
+import functools
 import json
 import pathlib
 import sys
@@ -27,6 +42,7 @@ import generate_platform_model as gen  # noqa: E402
 _REGEN = "run: python3 scripts/generate_platform_model.py and commit the result"
 
 
+@functools.lru_cache(maxsize=1)
 def _built():
     model = gen.build_model()
     return model, gen.serialize(model), gen.render_doc(model)

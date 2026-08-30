@@ -388,15 +388,29 @@ def test_the_one_hop_blind_spot_stays_measured():
     both certifications were true of the matcher and false of the code. This one names
     what it cannot see and fails when that set changes, so a new delegating-handler test
     gets a ruling instead of inheriting a false green.
+
+    #3265: the DIRECT-set membership check used to re-run `pt_paired_utc_today_sites`
+    (an `ast.parse` + full `ast.walk` of `utc_day_semantics_sites`) against all ~1,036
+    files in `_test_files()` a SECOND time — `_measure()` above already computed the
+    identical direct-set pairing for the ratchet tests, and is itself `lru_cache`d, so
+    the second pass was pure duplication of the exact same class `tests/repo_scan_cache.py`
+    (#3224) exists for, just in-process instead of a subprocess spawn. Reusing `_measure()`
+    turns that whole-tree AST re-scan into a dict lookup; the WIDE pass below is a
+    genuinely different computation (a different module set) and still runs once, which
+    is the minimum this test needs. Measured locally (3-run mean, this file alone,
+    `-p no:randomly`, before vs after this change): file total 32.83s -> 23.56s
+    (-9.27s, -28.2%); this test 20.99s -> 11.25s (-9.74s, -46.4%) — the removed pass
+    was roughly half this test's own cost, matching one full whole-tree scan eliminated
+    out of the two it used to run.
     """
-    direct = pt_clock_modules()
+    direct_hits = _measure()
     wide = _one_hop_pt_modules()
     surfaced = set()
     for path in _test_files():
         rel = str(path.relative_to(ROOT))
+        if rel in direct_hits:
+            continue  # the guard already catches it (see test_no_pt_paired_utc_today_outside_the_residue)
         src = path.read_text(encoding="utf-8")
-        if pt_paired_utc_today_sites(src, rel, direct):
-            continue  # the guard already catches it
         if pt_paired_utc_today_sites(src, rel, wide):
             surfaced.add(rel)
     assert (

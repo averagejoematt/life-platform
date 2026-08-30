@@ -166,11 +166,15 @@ def evaluate_duration(measured_seconds: Optional[float], budget_seconds: float) 
         return (
             f"Unit Tests job took {measured_seconds:.0f}s, over the {budget_seconds:.0f}s budget "
             f"({measured_seconds - budget_seconds:.0f}s over). This is a RECURRING class: 157s -> 294s -> 688s -> "
-            f"830s -> 1507s -> 1994s, answered by a budget raise every time up to #3106 "
-            f"(#1349/#1966/#2152/#3025/#3106/#3224). This run's /wrap must triage it (scripts/check_ci_warnings.py, "
-            f"step (e11)). START FROM #3224's measurement, do not re-derive a raise: the dominant term is duplicated "
-            f"whole-repo scans, not test count, so shed first (tests/repo_scan_cache.py is the worked example) and "
-            f"read the class record + hard ceiling in tests/test_duration_budget_ratchet.py before touching the number."
+            f"830s -> 1507s -> 1994s -> 2244s, raised every time up to #3106 then SHED twice running "
+            f"(#1349/#1966/#2152/#3025/#3106/#3224/#3265). This run's /wrap must triage it (scripts/check_ci_warnings.py, "
+            f"step (e11)). START FROM MEASUREMENT, do not re-derive a raise on a single reading: sample the surrounding "
+            f"green-main runs for spread before attributing it to growth (#3265 found an 88.5% wall-clock spread against "
+            f"3.3% test growth, r=0.257 — mostly CI-queueing noise), then decompose new-test time vs existing-test "
+            f"slowdown the way #3224/#3265 both did. The dominant term has twice been duplicated whole-repo scans, not "
+            f"test count — tests/repo_scan_cache.py (#3224) and the two in-process scan caches #3265 added are the "
+            f"worked examples. Read the class record + hard ceiling in tests/test_duration_budget_ratchet.py before "
+            f"touching the number."
         )
     return None
 
