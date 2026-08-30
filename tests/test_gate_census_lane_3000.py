@@ -269,7 +269,16 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # moved); its fail path has a scripted positive control in tests/test_permalink_blackhole_3284.py,
 # and its first LIVE verdict is designed-in: the live leg is expected-red on the first nightly
 # after deploy until Matthew publishes the regenerated v4-redirects CloudFront function.
-BASELINE_TOTAL_GATES = 566
+# 566 -> 569 (2026-08-29, #3279): THREE real gates from the sentinel's first events
+# client — verified by id-set diff, each tree's own scripts/gate_census.py --json
+# (pre-#3284 main 565, this branch 568): ADDED exactly
+# {sentinel::deploy/sentinel_events.py::check_eventbridge_rules,
+#  registry::deploy/sentinel_events.py::KNOWN_OUT_OF_IAC_RULES::life-platform-mcp-canary-15min,
+#  registry::deploy/sentinel_events.py::KNOWN_OUT_OF_IAC_RULES::life-platform-nightly-warmer},
+# REMOVED {}. Stacked on #3284's one-gate raise above: 565 + 1 + 3 = 569. The sentinel
+# check arrives PROVEN (three-mutation record); the two registry ids are the allowlist's
+# own family-3 mint. BASELINE_UNPROVEN_GATES stays where its owner set it.
+BASELINE_TOTAL_GATES = 569
 BASELINE_UNPROVEN_GATES = 541
 
 
