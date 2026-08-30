@@ -584,7 +584,14 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
             # Water: logged in-app most days — 3d dark means the habit lapsed.
             {"key": "water", "label": "Water", "fields": ["water_intake_ml", "water_intake_oz"], "stale_days": 3, "manual": True},
             # Steps: passive device activity — a 413-dropped stream is a pipe fault, not a lapse.
-            {"key": "steps", "label": "Steps / activity", "fields": ["steps"], "stale_days": 2, "manual": False, "evidence_for": ("steps",)},
+            {
+                "key": "steps",
+                "label": "Steps / activity",
+                "fields": ["steps"],
+                "stale_days": 2,
+                "manual": False,
+                "evidence_for": ("steps",),
+            },
         ],
     },
     "todoist": {
