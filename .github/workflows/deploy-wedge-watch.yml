@@ -79,6 +79,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # #3315: this job used to run the runner's SYSTEM python with nothing installed.
+      # `--head-coverage-check` below parses ci-cd.yml's `paths:` filter through PyYAML on
+      # the `uncovered` branch — the one branch where its verdict matters. Without PyYAML
+      # the import raised inside diagnose_uncovered_head's try/except, `ci_paths` fell back
+      # to [] ("could not read the filter" ⇒ everything matches), and every docs-only push
+      # with a sibling workflow run would have paged as a SWALLOWED push — the naive
+      # "uncovered ⇒ page" behaviour the header above says would be muted inside a week,
+      # reached by a missing import instead of a design choice. Declare the interpreter and
+      # the one dependency (setup-ci installs no packages — #3234). Still no AWS.
+      - uses: ./.github/actions/setup-ci
+
+      - name: Install PyYAML (the head-coverage `paths:` filter parser)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py pyyaml)   # version from requirements-dev.txt (CQ-01)
+          pip install --quiet $PINS
+
       - name: Classify the in-flight deploy state
         id: classify
         env:
