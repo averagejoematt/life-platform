@@ -63,11 +63,18 @@ __all__ = [
 
 def _price_for_model(model_id: str):
     """Match against the governor's own family keys (imported, not copied — #1997).
-    Returns None — never a fallback price — for a model outside those families (e.g.
-    amazon.titan-embed-text-v2, an embedding model with no verified per-token price
-    anywhere in this codebase). ADR-104 forbids inventing a number we can't ground;
-    the old Sonnet-rate fallback was exactly that. Callers treat None as: show token
-    counts, omit the dollar estimate — never silently price it."""
+    Returns None — never a fallback price — for a model outside those families. ADR-104
+    forbids inventing a number we can't ground; the old Sonnet-rate fallback was exactly
+    that. Callers treat None as: show token counts, omit the dollar estimate — never
+    silently price it.
+
+    #2883: `amazon.titan-embed-text-v2` used to be the worked example of "no verified
+    per-token price anywhere in this codebase". That is no longer true and had not been
+    since #1384 — `ai.bedrock_client.PRICES["titan"]` carries the published $0.02/1M
+    input rate and `deploy/backfill_recall_embeddings.py` already prices a backfill from
+    it. The governor's table is now that same object, so Titan resolves here to its real
+    rate instead of being dropped from the receipt. The None contract is unchanged and
+    still covers what it was written for: a genuinely unrecognised model id."""
     m = (model_id or "").lower()
     for k, p in _BEDROCK_PRICES.items():
         if k in m:

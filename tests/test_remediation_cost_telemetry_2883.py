@@ -60,6 +60,10 @@ def _find(entries, name, dimensioned):
     return None
 
 
+def _has_dim(entry, name):
+    return any(d.get("Name") == name for d in entry.get("Dimensions", []))
+
+
 # ── Shape: namespace, dimensionless series, LambdaFunction dimension ─────────
 
 
@@ -99,6 +103,75 @@ def test_emit_cost_telemetry_caller_dimension_matches_module_constant(monkeypatc
     # Pin the literal so a future rename of the caller tag can't silently split the
     # per-caller table into two rows without a deliberate edit here.
     assert agent._REMEDIATION_CALLER == "remediation-agent"
+
+
+# ── #2883: the CallerClass copy — the third series, missing since #3070 ──────
+
+
+def test_emit_cost_telemetry_also_emits_callerclass_dimensioned_cost(monkeypatch):
+    """`cost_governor_lambda._self_reported_cost_by_class()` queries FOUR named series,
+    one per CallerClass. #3070 gave this emitter the bare and `LambdaFunction` copies but
+    not this one, so the agent's spend was invisible to the split by construction —
+    measured live 2026-08-30, `LambdaFunction=remediation-agent` summed $1.60 MTD while
+    `CallerClass=remediation` had no dimension set in `list-metrics` at all and summed
+    $0.00. `remediation` is one of PROJECTED_CALLER_CLASSES, i.e. a class the month-end
+    projection extrapolates, so a permanently-zero series under-projects a real
+    recurring cost."""
+    cw = _CWStub()
+    monkeypatch.setattr(agent, "_cw", cw)
+    agent._emit_cost_telemetry(4.5, None)
+    entries = _entries(cw.calls[0])
+    tagged = [e for e in entries if e["MetricName"] == "EstimatedCostUSD" and _has_dim(e, "CallerClass")]
+    assert len(tagged) == 1, "exactly one CallerClass-dimensioned EstimatedCostUSD datapoint"
+    assert tagged[0]["Dimensions"] == [{"Name": "CallerClass", "Value": "remediation"}]
+    assert tagged[0]["Value"] == 4.5
+
+
+def test_callerclass_copy_is_additive_not_a_replacement(monkeypatch):
+    """The bare series is what the drift ratio's denominator sums and what the G2
+    ai-daily-spend-high alarm watches. Adding a third copy must not change either."""
+    cw = _CWStub()
+    monkeypatch.setattr(agent, "_cw", cw)
+    agent._emit_cost_telemetry(4.5, None)
+    entries = _entries(cw.calls[0])
+    bare = _find(entries, "EstimatedCostUSD", dimensioned=False)
+    assert bare is not None and bare["Value"] == 4.5
+    fn = [e for e in entries if e["MetricName"] == "EstimatedCostUSD" and _has_dim(e, "LambdaFunction")]
+    assert len(fn) == 1 and fn[0]["Value"] == 4.5
+    # Three copies of the SAME number — never a re-split of it.
+    assert len([e for e in entries if e["MetricName"] == "EstimatedCostUSD"]) == 3
+
+
+def test_remediation_class_literal_matches_the_chokepoints_registry():
+    """`remediation/` runs from a bare GitHub Actions checkout and must not import the
+    Lambda bundle tree, so the class name is a literal here. Pin it to
+    `ai.bedrock_client.CALLER_CLASS_REMEDIATION` — a rename on one side that misses the
+    other produces a fifth class value, which `cost_governor` never queries and which the
+    #2892 four-value cardinality contract forbids."""
+    sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
+    from ai.bedrock_client import CALLER_CLASS_DIMENSION, CALLER_CLASS_REMEDIATION, CALLER_CLASSES
+
+    assert agent._REMEDIATION_CALLER_CLASS == CALLER_CLASS_REMEDIATION
+    assert agent._REMEDIATION_CALLER_CLASS in CALLER_CLASSES
+    assert CALLER_CLASS_DIMENSION == "CallerClass"
+
+
+def test_cache_token_metrics_carry_a_dimensionless_twin(monkeypatch):
+    """#2883: this agent is 4.49M of the platform's 5.66M self-reported cache-read tokens
+    MTD. Box 4 reconciles the platform-wide cache-token total against Cost Explorer, and
+    CloudWatch does not roll a custom metric up across dimension sets, so the bare series
+    has to be written explicitly (the #3260 shape)."""
+    cw = _CWStub()
+    monkeypatch.setattr(agent, "_cw", cw)
+    agent._emit_cost_telemetry(
+        0.02, {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 900, "cache_creation_input_tokens": 40}
+    )
+    entries = _entries(cw.calls[0])
+    for name, value in (("AnthropicCacheReadTokens", 900), ("AnthropicCacheWriteTokens", 40)):
+        dimensioned = _find(entries, name, dimensioned=True)
+        bare = _find(entries, name, dimensioned=False)
+        assert dimensioned is not None and dimensioned["Value"] == value
+        assert bare is not None and bare["Value"] == value
 
 
 # ── Skip on no/zero cost — never emit a bogus zero-cost datapoint ────────────

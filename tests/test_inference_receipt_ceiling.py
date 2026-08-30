@@ -184,13 +184,31 @@ def test_receipt_safety_buffer_is_the_governors_safety_buffer():
 
 
 def test_price_for_model_never_guesses_for_an_unmatched_model():
-    """#1997 acceptance bullet 2: an unmatched model (e.g. Titan/embeddings) must
-    return None — never a fallback price (the old bug silently priced it at Sonnet)."""
-    assert sad._price_for_model("amazon.titan-embed-text-v2:0") is None
+    """#1997 acceptance bullet 2: an unmatched model must return None — never a fallback
+    price (the old bug silently priced it at Sonnet).
+
+    #2883 amended the worked example, not the contract. Titan used to stand in for
+    "unmatched" here because the governor's hand-maintained price table had no `titan`
+    row — but `ai.bedrock_client.PRICES` has carried the published $0.02/1M rate since
+    #1384, and the governor now imports that registry instead of copying it. So Titan is
+    a KNOWN family and resolves (see the next test); "unmatched" means a model id no
+    family key matches, which is what these assertions now use."""
     assert sad._price_for_model("some-future-unknown-model") is None
     assert sad._price_for_model("") is None
+    assert sad._price_for_model("meta.llama3-70b-instruct-v1:0") is None
     # known families still resolve correctly.
     assert sad._price_for_model("us.anthropic.claude-sonnet-4-6-v1:0") == cg._PRICES["sonnet"]
+
+
+def test_titan_resolves_to_its_grounded_rate_rather_than_being_dropped():
+    """#2883: the receipt omitted the dollar column for embedding tokens on the stated
+    grounds that no verified per-token price existed in this codebase. One did (#1384),
+    and the governor was meanwhile pricing the same tokens at the fable tier — 500x —
+    into `CostMetricDriftRatio`'s numerator. Both halves now read the same $0.02/1M."""
+    price = sad._price_for_model("amazon.titan-embed-text-v2:0")
+    assert price is not None
+    assert price["in"] == 0.02
+    assert price is cg._PRICES["titan"]
 
 
 # ── 2. bedrock_client message carries no literal figure ───────────────────────

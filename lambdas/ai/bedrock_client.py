@@ -176,20 +176,42 @@ _SELF_DECLARED_DEV_VALUES = frozenset({"dev", "dev-session", "interactive", "loc
 # `name: Remediation Agent` (.github/workflows/remediation-agent.yml), which GHA
 # exports as GITHUB_WORKFLOW (and inside GITHUB_WORKFLOW_REF as the file path).
 _REMEDIATION_WORKFLOW_MARKER = "remediation"
-# $/1M tokens, keyed by a substring of the resolved model id. Mirrors
-# cost_governor._PRICES; an unmapped model prices as the most expensive tier so
-# a new/unknown model can never under-report spend.
-_PRICES = {
-    "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50},
-    "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25},
-    "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75},
-    "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25},
-    # #1384: Amazon Titan Text Embeddings V2 — input-only, ~$0.02/1M tokens, no output/
+# $/1M tokens, keyed by a substring of the resolved model id. An unmapped model
+# prices as the most expensive tier so a new/unknown model can never under-report
+# spend.
+#
+# #2883: this table is now the PLATFORM'S ONE price registry, not a mirror.
+# `cost_governor_lambda` imports it (as `_PRICES`) instead of hand-maintaining a
+# second copy, and `site_api_budget` already imports the governor's name. That
+# matters because the governor's numerator (AWS/Bedrock token metrics x price) and
+# this module's denominator (estimate_cost_usd -> LifePlatform/AI::EstimatedCostUSD)
+# are the two halves of `CostMetricDriftRatio`: if they price the same model
+# differently, the ratio measures a TABLE MISMATCH rather than an attribution gap.
+# It did — see the `titan` note below.
+#
+# `cache_write` is the 5-minute-TTL rate (1.25x base input). `cache_write_1h` is the
+# one-hour-TTL rate (2x base input) — `prompt_cache.cached_block(ttl="1h")` can ask
+# for it, and only this chokepoint can see which TTL was actually billed (the nested
+# `usage.cache_creation` breakdown). Without the second rate a 1h write meters at
+# 62.5% of what it costs.
+PRICES = {
+    "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50, "cache_write_1h": 20.00},
+    "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25, "cache_write_1h": 10.00},
+    "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75, "cache_write_1h": 6.00},
+    "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25, "cache_write_1h": 2.00},
+    # #1384: Amazon Titan Text Embeddings V2 — input-only, $0.02/1M tokens, no output/
     # cache tiers. Keyed by the "titan" substring of amazon.titan-embed-text-v2:0 so
     # embed_text() spend meters correctly instead of defaulting to the most-expensive tier.
-    "titan": {"in": 0.02, "out": 0.00, "cache_read": 0.00, "cache_write": 0.00},
+    # #2883: the governor's copy of this table had NO titan row, so its `_price_for`
+    # fell through to the fable tier and priced embedding tokens at $10/1M — 500x. That
+    # inflated only the drift ratio's NUMERATOR, which is why the ratio read as an
+    # attribution gap. Measured 2026-08-30: 576,561 Titan input tokens MTD metered as
+    # $5.77 against $0.0115 of real cost.
+    "titan": {"in": 0.02, "out": 0.00, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
 }
-_DEFAULT_PRICE = _PRICES["fable"]
+# Back-compat alias: ~8 modules/scripts/tests already read `_PRICES` from here.
+_PRICES = PRICES
+_DEFAULT_PRICE = PRICES["fable"]
 
 # ── Titan-v2 embeddings (semantic recall #1384) ─────────────────────────────
 # Amazon Titan is NOT an inference profile: a bare foundation-model id, on-demand,
@@ -260,15 +282,58 @@ def _price_for(model_id: str) -> dict:
     return _DEFAULT_PRICE
 
 
+def cache_write_split(usage: dict) -> tuple[int, int]:
+    """(5-minute-TTL tokens, 1-hour-TTL tokens) from a Messages `usage` block (#2883).
+
+    The wire shape — Bedrock returns the Anthropic Messages `usage` object verbatim —
+    carries the cache-write total as a flat `cache_creation_input_tokens` AND, when the
+    request used an explicit TTL, a nested breakdown:
+
+        "usage": {"input_tokens": 12, "output_tokens": 87,
+                  "cache_read_input_tokens": 0,
+                  "cache_creation_input_tokens": 10000,
+                  "cache_creation": {"ephemeral_5m_input_tokens": 4000,
+                                     "ephemeral_1h_input_tokens": 6000}}
+
+    The flat total is authoritative — it is what was billed — so the 1h leg is CARVED
+    OUT of it rather than added to it, and a nested breakdown that disagrees with the
+    total can never make this function drop billed tokens. When the flat total is
+    absent but the breakdown is present (a shape older clients did not emit), the total
+    is derived from the breakdown, which is the same never-under-count direction.
+
+    A response with no nested `cache_creation` — every in-repo caller today, since all
+    of them take `cached_block`'s "5m" default — returns `(total, 0)` and prices
+    exactly as it did before this function existed.
+    """
+    total = int(usage.get("cache_creation_input_tokens", 0) or 0)
+    detail = usage.get("cache_creation")
+    one_hour = 0
+    if isinstance(detail, dict):
+        one_hour = int(detail.get("ephemeral_1h_input_tokens", 0) or 0)
+        if not total:
+            total = one_hour + int(detail.get("ephemeral_5m_input_tokens", 0) or 0)
+    one_hour = max(0, min(one_hour, total))
+    return total - one_hour, one_hour
+
+
 def estimate_cost_usd(usage: dict, model_id: str) -> float:
     """Estimated USD for one Claude call from its usage dict + resolved model.
-    Pure — no I/O — so it is unit-testable without AWS."""
+    Pure — no I/O — so it is unit-testable without AWS.
+
+    All four billed token legs are priced: uncached input, output, cache READ (a
+    ~90% discount on base input) and cache WRITE (a 1.25x premium at 5m TTL, 2x at
+    1h). Cache tokens dominate the token volume on a caching workload — 60.9M of the
+    account's 111M Bedrock tokens MTD on 2026-08-30 — so an estimate that priced only
+    input+output would be a different number, not a rounding error.
+    """
     p = _price_for(model_id)
+    write_5m, write_1h = cache_write_split(usage)
     return (
         int(usage.get("input_tokens", 0) or 0) * p["in"]
         + int(usage.get("output_tokens", 0) or 0) * p["out"]
         + int(usage.get("cache_read_input_tokens", 0) or 0) * p["cache_read"]
-        + int(usage.get("cache_creation_input_tokens", 0) or 0) * p["cache_write"]
+        + write_5m * p["cache_write"]
+        + write_1h * p.get("cache_write_1h", p["cache_write"])
     ) / 1_000_000.0
 
 
@@ -313,6 +378,18 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
         if cache_read or cache_write:
             md.append({"MetricName": "AnthropicCacheReadTokens", "Dimensions": fn_dim, "Value": cache_read, "Unit": "Count"})
             md.append({"MetricName": "AnthropicCacheWriteTokens", "Dimensions": fn_dim, "Value": cache_write, "Unit": "Count"})
+            # #2883: THE DIMENSIONLESS TWINS. CloudWatch does not roll a custom metric
+            # up across dimension sets, so the platform-wide self-reported cache-token
+            # total was only obtainable by enumerating every LambdaFunction value and
+            # summing — which is exactly what three separate hand audits of this issue
+            # had to do, and is the #3260 shape (an alarm/consumer reading the bare
+            # series sees a series nothing writes). Cache tokens are the largest single
+            # component of the drift gap (60.9M native cache-read MTD vs 5.7M
+            # self-reported on 2026-08-30), so box 4's reconciliation to Cost Explorer
+            # must be ONE query against the same bare series `_self_reported_cost_mtd`
+            # already uses for dollars. Two new series, no new dimension cardinality.
+            md.append({"MetricName": "AnthropicCacheReadTokens", "Value": cache_read, "Unit": "Count"})
+            md.append({"MetricName": "AnthropicCacheWriteTokens", "Value": cache_write, "Unit": "Count"})
         _cw().put_metric_data(Namespace=_CW_NAMESPACE, MetricData=md)
     except Exception as e:  # never break an AI call on telemetry
         # ERROR, not WARN — a fail-open side channel that fails 100% of the time is

@@ -115,10 +115,20 @@ except ImportError:  # pragma: no cover - packaging drift; fail safe = gauge rea
 
 
 try:
-    from ai.bedrock_client import CALLER_CLASS_DIMENSION, CALLER_CLASSES
+    from ai.bedrock_client import CALLER_CLASS_DIMENSION, CALLER_CLASSES, PRICES as _BEDROCK_PRICES
 except ImportError:  # pragma: no cover - packaging drift; the class split degrades to "no signal"
     CALLER_CLASS_DIMENSION = "CallerClass"
     CALLER_CLASSES = ("prod-cron", "ci", "dev-session", "remediation")
+    # #2883: the degraded-packaging copy. tests/test_price_registry_lockstep_2883.py
+    # AST-parses this literal and asserts it equals ai.bedrock_client.PRICES, so the
+    # fallback cannot become the second hand-maintained table this issue was caused by.
+    _BEDROCK_PRICES = {
+        "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50, "cache_write_1h": 20.00},
+        "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25, "cache_write_1h": 10.00},
+        "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75, "cache_write_1h": 6.00},
+        "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25, "cache_write_1h": 2.00},
+        "titan": {"in": 0.02, "out": 0.00, "cache_read": 0.00, "cache_write": 0.00, "cache_write_1h": 0.00},
+    }
 
 # ── #2892: which caller classes the month-end projection extrapolates ────────
 # The projection multiplies a trailing daily rate by the days REMAINING in the
@@ -245,12 +255,22 @@ OBSERVE_MODE = os.environ.get("OBSERVE_MODE", "true").lower() in ("1", "true", "
 # Bedrock on-demand prices, USD per 1M tokens (us cross-region inference profiles).
 # VERIFY against the Bedrock pricing page on model changes. We bias conservative
 # (a buffer below) so the estimate never under-counts the real bill.
-_PRICES = {
-    "fable": {"in": 10.00, "out": 50.00, "cache_read": 1.00, "cache_write": 12.50},
-    "sonnet": {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write": 3.75},
-    "haiku": {"in": 1.00, "out": 5.00, "cache_read": 0.10, "cache_write": 1.25},
-    "opus": {"in": 5.00, "out": 25.00, "cache_read": 0.50, "cache_write": 6.25},
-}
+#
+# #2883: IMPORTED, never hand-copied — `ai.bedrock_client.PRICES` is the registry, and
+# `site_api_budget` in turn imports this name, so the whole platform prices a model in
+# exactly one place. It used to be a second literal here, and it had drifted: it carried
+# no `titan` row, so `_price_for("amazon.titan-embed-text-v2:0")` fell through to
+# _DEFAULT_PRICE (the fable tier, $10/1M input) while the chokepoint priced the same
+# tokens at the verified $0.02/1M (#1384). Because `_ai_cost()` is the NUMERATOR of
+# CostMetricDriftRatio and `_self_reported_cost_mtd()` is the denominator, that one
+# missing dict key inflated the ratio and read as an attribution gap. Measured
+# 2026-08-30: 576,561 Titan input tokens MTD priced at $5.77 against $0.0115 of real
+# cost — $5.76 of the $22.92 total MTD drift gap was this bug, not unattributed spend.
+#
+# "Bias conservative" is about the ±buffer and about UNKNOWN models (_DEFAULT_PRICE),
+# not about known models: pricing a $0.02/1M embedding model at 500x is not caution,
+# it is a wrong number in the input to a ceiling decision (epic #2801).
+_PRICES = _BEDROCK_PRICES
 _DEFAULT_PRICE = _PRICES["fable"]  # unknown model → price as the most expensive tier
 _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never overshoot
 
