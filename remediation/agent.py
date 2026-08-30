@@ -736,15 +736,38 @@ async def run_agent(prompt):
 # emission is invisible at WARN, the exact #2974 lesson for the visual-qa CI role.
 _REMEDIATION_CALLER = "remediation-agent"
 
+# #2883: the `CallerClass` value this agent's spend belongs to. Pinned as a literal
+# rather than imported because `remediation/` runs on a GitHub Actions runner from a
+# bare checkout and must not take an import dependency on the Lambda bundle tree;
+# tests/test_remediation_cost_telemetry_2883.py asserts it equals
+# `ai.bedrock_client.CALLER_CLASS_REMEDIATION`, so the two literals cannot drift.
+#
+# WHY IT WAS MISSING AND WHAT IT COST: #3070 gave this emitter the dimensionless and
+# `LambdaFunction`-dimensioned copies (the two the drift ratio's denominator reads) but
+# not the third, `CallerClass`-dimensioned copy that `bedrock_client._emit_usage_metrics`
+# has emitted since #2892. `cost_governor_lambda._self_reported_cost_by_class()` queries
+# exactly four series by class name, so this agent's spend was invisible to the split BY
+# CONSTRUCTION — and `remediation` is one of PROJECTED_CALLER_CLASSES, i.e. a class the
+# month-end projection is supposed to extrapolate. Measured live 2026-08-30:
+# `LambdaFunction=remediation-agent` = $1.60 MTD while `CallerClass=remediation` had
+# **no dimension set at all** in `list-metrics` and summed $0.00. That is the whole of
+# the residual class-coverage gap: over the trailing 5 days the CallerClass split covers
+# 96.4% of the dimensionless total, and this emitter is what the other 3.6% is.
+_REMEDIATION_CALLER_CLASS = "remediation"
+
 
 def _emit_cost_telemetry(cost_usd, usage) -> None:
     if not cost_usd:
         return
     try:
         fn_dim = [{"Name": "LambdaFunction", "Value": _REMEDIATION_CALLER}]
+        class_dim = [{"Name": "CallerClass", "Value": _REMEDIATION_CALLER_CLASS}]
         data = [
             {"MetricName": "EstimatedCostUSD", "Dimensions": fn_dim, "Value": float(cost_usd), "Unit": "None"},
             {"MetricName": "EstimatedCostUSD", "Value": float(cost_usd), "Unit": "None"},
+            # ADDITIVE, exactly like #2892's copy at the chokepoint: the two series above
+            # are untouched, so nothing the drift ratio or the G2 alarm reads changes value.
+            {"MetricName": "EstimatedCostUSD", "Dimensions": class_dim, "Value": float(cost_usd), "Unit": "None"},
         ]
 
         def _tok(key):
@@ -761,8 +784,14 @@ def _emit_cost_telemetry(cost_usd, usage) -> None:
                 data.append({"MetricName": "AnthropicOutputTokens", "Value": out_tok, "Unit": "Count"})
             if cache_read:
                 data.append({"MetricName": "AnthropicCacheReadTokens", "Dimensions": fn_dim, "Value": cache_read, "Unit": "Count"})
+                # #2883: the dimensionless twin, same as bedrock_client now emits. This
+                # agent is 4.49M of the platform's 5.66M self-reported cache-read tokens
+                # MTD (2026-08-30), so a bare series without it would under-report the
+                # very quantity box 4 reconciles against Cost Explorer.
+                data.append({"MetricName": "AnthropicCacheReadTokens", "Value": cache_read, "Unit": "Count"})
             if cache_write:
                 data.append({"MetricName": "AnthropicCacheWriteTokens", "Dimensions": fn_dim, "Value": cache_write, "Unit": "Count"})
+                data.append({"MetricName": "AnthropicCacheWriteTokens", "Value": cache_write, "Unit": "Count"})
         _cw.put_metric_data(Namespace="LifePlatform/AI", MetricData=data)
     except Exception as e:
         print(f"[error] remediation cost telemetry emit failed (dropped ${cost_usd:.4f}, #2883): {e}")

@@ -385,3 +385,113 @@ already complete, and boxes 2/4 are measurement, not implementation, until the
 out-of-repo dev-session/remediation-scale residual gets a fix candidate. This PR is
 docs/audit-only: the IAM status correction (real drift between docs and live state)
 and a fresh, cited re-measurement for whoever picks this up next. Issue stays open.
+
+---
+
+## Addendum 2026-08-30 — the numerator was wrong, and the biggest single error was a missing dict key
+
+Every prior pass of this audit treated the drift ratio's numerator (`_ai_cost()`, AWS/Bedrock
+token metrics × price) as ground truth and searched the denominator for missing emitters. It
+isn't ground truth: it is an estimate built from a **second, hand-maintained price table**, and
+that table had drifted from the one the chokepoint prices with.
+
+### 1. Titan embeddings were metered at 500× (numerator)
+
+`cost_governor_lambda._PRICES` carried four Claude families and no `titan` row, so
+`_price_for("amazon.titan-embed-text-v2:0")` fell through to `_DEFAULT_PRICE` — the **fable**
+tier, $10.00/1M input. `ai/bedrock_client.py` has carried the published Titan Text Embeddings V2
+rate of **$0.02/1M** since #1384, and `deploy/backfill_recall_embeddings.py` already prices a
+backfill from it. The two halves of a ratio disagreed about the same model by a factor of 500.
+
+Measured live 2026-08-30 (CloudWatch `AWS/Bedrock`, MTD):
+
+| | tokens | metered as | real cost |
+|---|---:|---:|---:|
+| `amazon.titan-embed-text-v2:0` input | 576,561 | **$5.77** | $0.0115 |
+
+The volume is a one-off: the #1384 semantic-recall backfill ran early in the month. Steady-state
+Titan traffic is ~4–5.5k tokens/day, so the ongoing overstatement is ~$1.35/month — but for the
+month whose numbers price the September base (epic #2801), it was $5.76.
+
+### 2. What that does to the ratio
+
+Recomputed from the same live token metrics under both tables, self-reported MTD $80.42:
+
+| | numerator | drift ratio | gap to self-report |
+|---|---:|---:|---:|
+| old table (titan → fable tier) | $103.34 | **1.2849** | $22.92 |
+| corrected table | $97.58 | **1.2134** | $17.16 |
+
+**$5.75 = 25.1% of the MTD gap, and 53.0% of the remaining distance to the 1.15 bar** (0.1349 →
+0.0634). The correction applies retroactively the moment it deploys: the numerator is recomputed
+from raw token metrics on every 8h cycle, so it does not have to accumulate.
+
+### 3. The cache-token hypothesis, tested and mostly disconfirmed in-repo
+
+The 2026-08-26 sizing found the gap concentrated in prompt-cache tokens (~94% of cache-read
+unattributed) and the working hypothesis was that the chokepoint fails to extract or price them.
+Read directly: it does both, and has since G1 —
+`bedrock_client.estimate_cost_usd` prices `cache_read_input_tokens` and
+`cache_creation_input_tokens` at the correct per-model rates, and `_emit_usage_metrics` folds the
+result into `EstimatedCostUSD`. There is exactly one `invoke_model(` chokepoint in the repo
+(`bedrock_batch.py` remains dormant), so no in-repo path bypasses it.
+
+The residual cache-read volume is therefore out-of-repo, and its **shape** confirms which
+out-of-repo source. Live MTD 2026-08-30:
+
+| leg | native (AWS/Bedrock) | self-reported | attributed |
+|---|---:|---:|---:|
+| input | 40.1M | 36.5M | 91% |
+| output | 4.45M | 3.69M | 83% |
+| cache read | 60.9M | 5.66M | **9.3%** |
+| cache write | 5.14M | 1.47M | **28.6%** |
+
+55M unattributed cache-read tokens against only 3.5M unattributed input tokens is the signature
+of long interactive sessions re-reading a large cached prefix every turn — Claude Code / MCP on
+Bedrock — not of a platform cron losing a field. Nothing at the ADR-062 chokepoint can see it.
+
+Two real defects were found in that area and fixed anyway:
+
+- **1h-TTL cache writes were priced at the 5m rate.** `prompt_cache.cached_block(ttl="1h")` bills
+  2× base input; both price tables carried only the 1.25× 5m rate, a silent 37.5% under-count for
+  any caller that asks. No in-repo caller does today (CE shows $0.21 of 1h writes MTD), so this is
+  a latent trap closed, not a number moved. The flat `cache_creation_input_tokens` is the total of
+  both TTLs; the split is only visible in the nested `usage.cache_creation` object, which only the
+  chokepoint sees.
+- **Cache-token metrics had no dimensionless twin** (the #3260 shape). A platform-wide
+  self-reported cache-token total could only be obtained by enumerating every `LambdaFunction`
+  value and summing — which is literally what three passes of this audit did by hand.
+
+### 4. The `CallerClass` coverage gap was a measurement artifact plus one emitter
+
+The 2026-08-28 reading — "~36% of real Bedrock spend carries a `CallerClass` dimension" — compared
+a 7-day class sum against a *buffered native* daily rate that includes out-of-repo spend, over a
+window in which #3089 had only been deployed for part. Measured against the quantity it is
+actually a share of (the dimensionless self-report):
+
+```
+last 7d: bare=$26.09  class=$20.46 (78.4%)  LambdaFunction=$26.09 (100.0%)
+last 5d: bare=$17.33  class=$16.71 (96.4%)  LambdaFunction=$17.33 (100.0%)
+last 3d: bare=$ 8.89  class=$ 8.59 (96.6%)  LambdaFunction=$ 8.89 (100.0%)
+last 1d: bare=$ 2.96  class=$ 2.81 (95.0%)  LambdaFunction=$ 2.96 (100.0%)
+```
+
+`LambdaFunction` coverage is **100%**; `CallerClass` is **~95–96%** now and the 7d figure is the
+#3089 deploy straddling the window. The residual is one emitter, exactly as flagged on 08-24:
+`remediation/agent.py::_emit_cost_telemetry` emitted the bare and `LambdaFunction` copies but not
+the `CallerClass` one, so `CallerClass=remediation` had **no dimension set at all** in
+`list-metrics` and summed $0.00 while `LambdaFunction=remediation-agent` summed $1.60 MTD. That
+matters beyond bookkeeping: `remediation` is one of `PROJECTED_CALLER_CLASSES`, so a permanently
+zero series under-projects a genuinely recurring cost. Fixed.
+
+Also closed since the last pass: `LambdaFunction=unknown`, which was 41% of self-reported spend
+MTD ($33.19), stopped accruing on 2026-08-26 — #2888's `attributed_to()` landed and the two CI
+gates now emit under their own names. The residual `unknown` in an MTD sum is history, not a live
+hole.
+
+### 5. What is left
+
+$17.16 of a $97.58 corrected numerator (17.6%), dominated by interactive dev-session cache reads
+that are out-of-repo by construction. That is unchanged as a *conclusion* from the 08-26 pass; what
+changed is that a quarter of what was being attributed to it was never dev-session spend at all —
+it was a price-table typo in the measuring instrument.

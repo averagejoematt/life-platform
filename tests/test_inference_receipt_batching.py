@@ -198,12 +198,21 @@ def test_empty_metrics_makes_no_batched_call(monkeypatch):
 
 # ── #1997: cache pricing, Titan exclusion, and the 1.15x buffer ────────────────
 _SONNET_ID = "us.anthropic.claude-sonnet-4-6-v1:0"  # substring-matches "sonnet"
-_TITAN_ID = "amazon.titan-embed-text-v2:0"  # matches no family key — must stay unpriced
+# #2883: Titan is a PRICED family now. `ai.bedrock_client.PRICES["titan"]` has carried the
+# published $0.02/1M input rate since #1384, and the governor imports that registry instead
+# of the hand-maintained copy that had no `titan` row (and therefore priced embedding tokens
+# at the fable tier, $10/1M — 500x — into CostMetricDriftRatio's numerator).
+_TITAN_ID = "amazon.titan-embed-text-v2:0"
+# The unmatched-model negative control the Titan row used to provide. It has to be a model
+# id that genuinely matches no family key, or "unmatched models stay unpriced" is asserted
+# by nothing — a vacuous negative control passes exactly like a real one.
+_UNPRICED_ID = "meta.llama3-70b-instruct-v1:0"
 
 # Governor prices as of this writing (lambdas/operational/cost_governor_lambda.py
 # _PRICES["sonnet"] + _AI_SAFETY_BUFFER) — hand-copied here deliberately so this test
 # fails loudly if either drifts, rather than silently tracking a moving target.
 _SONNET_IN, _SONNET_OUT, _SONNET_CR, _SONNET_CW = 3.00, 15.00, 0.30, 3.75
+_TITAN_IN = 0.02  # #1384, published Titan Text Embeddings V2 rate
 _BUFFER = 1.15
 
 _TOKENS = {
@@ -215,11 +224,16 @@ _TOKENS = {
     (_TITAN_ID, "OutputTokenCount"): 0.0,
     (_TITAN_ID, "CacheReadInputTokenCount"): 10.0,
     (_TITAN_ID, "CacheWriteInputTokenCount"): 0.0,
+    (_UNPRICED_ID, "InputTokenCount"): 700.0,
+    (_UNPRICED_ID, "OutputTokenCount"): 90.0,
+    (_UNPRICED_ID, "CacheReadInputTokenCount"): 0.0,
+    (_UNPRICED_ID, "CacheWriteInputTokenCount"): 0.0,
 }
 
 
 class _PricingCW:
-    """One sonnet-family model + one unmatched (Titan) model, no lambda features."""
+    """One sonnet-family model + Titan (priced since #2883) + one genuinely unmatched
+    model, no lambda features."""
 
     def __init__(self):
         self.calls = {"list_metrics": 0, "get_metric_data": 0, "get_metric_statistics": 0}
@@ -227,7 +241,7 @@ class _PricingCW:
     def list_metrics(self, Namespace, MetricName, **kw):
         self.calls["list_metrics"] += 1
         if Namespace == "AWS/Bedrock":
-            return {"Metrics": [{"Dimensions": [{"Name": "ModelId", "Value": m}]} for m in (_SONNET_ID, _TITAN_ID)]}
+            return {"Metrics": [{"Dimensions": [{"Name": "ModelId", "Value": m}]} for m in (_SONNET_ID, _TITAN_ID, _UNPRICED_ID)]}
         return {"Metrics": []}
 
     def get_metric_statistics(self, **kw):  # pragma: no cover
@@ -269,33 +283,53 @@ def test_cache_tokens_and_buffer_priced_into_sonnet_row(pricing_cw):
     assert sonnet_row["today"]["cache_write_tokens"] == 50
 
 
-def test_titan_shows_tokens_with_no_fabricated_price(pricing_cw):
-    """Acceptance bullet 2: an unmatched model (Titan/embeddings) shows real token
-    counts but est_cost_usd is None — never a silent Sonnet-rate guess."""
+def test_unmatched_model_shows_tokens_with_no_fabricated_price(pricing_cw):
+    """Acceptance bullet 2 (#1997), on a model that is actually unmatched: real token
+    counts, `est_cost_usd is None` — never a silent Sonnet-rate guess."""
+    body = _payload(sad.handle_inference_receipt())
+    row = next(r for r in body["models"] if r["model"] == _UNPRICED_ID)
+
+    assert row["today"]["input_tokens"] == 700
+    assert row["today"]["est_cost_usd"] is None
+    assert row["month"]["est_cost_usd"] is None
+
+
+def test_titan_is_priced_at_its_published_rate(pricing_cw):
+    """#2883: Titan stopped being the worked example of "unpriced". The rate is grounded
+    (#1384, $0.02/1M input, embeddings have no output or cache tier) and the governor now
+    imports the same registry the chokepoint prices with, so the receipt and
+    CostMetricDriftRatio's two halves all agree on this model instead of disagreeing 500x."""
     body = _payload(sad.handle_inference_receipt())
     titan_row = next(r for r in body["models"] if r["model"] == _TITAN_ID)
 
     assert titan_row["today"]["input_tokens"] == 400
     assert titan_row["today"]["cache_read_tokens"] == 10
-    assert titan_row["today"]["est_cost_usd"] is None
-    assert titan_row["month"]["est_cost_usd"] is None
+    expected = round((400.0 * _TITAN_IN) / 1_000_000 * _BUFFER, 4)
+    assert titan_row["today"]["est_cost_usd"] == expected
+    assert titan_row["month"]["est_cost_usd"] == expected
+    # 400 embedding tokens is genuinely sub-cent. The point is the RATE, not the row:
+    # at the fable tier the governor was using, the same tokens metered 500x higher.
+    assert expected < round((400.0 * 10.00) / 1_000_000 * _BUFFER, 4)
 
 
 def test_month_total_reflects_only_priced_rows(pricing_cw):
-    """ai_month_to_date_usd must never carry a Sonnet-rate guess for Titan's tokens —
-    it should equal exactly the sonnet row's contribution (month_total is rounded to
-    2dp for display, the per-row figure to 4dp — round before comparing)."""
+    """ai_month_to_date_usd must never carry a guessed rate for an unmatched model's
+    tokens — the llama row contributes nothing (month_total is rounded to 2dp for
+    display, the per-row figures to 4dp — round before comparing)."""
     body = _payload(sad.handle_inference_receipt())
-    sonnet_row = next(r for r in body["models"] if r["model"] == _SONNET_ID)
-    assert body["ai_month_to_date_usd"] == round(sonnet_row["month"]["est_cost_usd"], 2)
+    priced = [r for r in body["models"] if r["month"]["est_cost_usd"] is not None]
+    assert {r["model"] for r in priced} == {_SONNET_ID, _TITAN_ID}
+    assert body["ai_month_to_date_usd"] == round(sum(r["month"]["est_cost_usd"] for r in priced), 2)
 
 
 def test_note_is_honest_about_unpriced_models(pricing_cw):
     """Acceptance bullet 2: the note must say, in-line, that an unpriced model was
-    excluded and why — not silently omit it."""
+    excluded and why — not silently omit it. #2883: it must name the model that is
+    ACTUALLY unpriced and must no longer claim that of Titan."""
     body = _payload(sad.handle_inference_receipt())
-    assert _TITAN_ID in body["note"]
+    assert _UNPRICED_ID in body["note"]
     assert "no verified per-token price" in body["note"]
+    assert _TITAN_ID not in body["note"]
     # the ceiling-figure substrings other tests pin must survive this change.
     assert "$75" not in body["note"]
 
