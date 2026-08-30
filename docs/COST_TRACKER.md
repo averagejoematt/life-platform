@@ -267,8 +267,9 @@ sentinel step in `remediation-agent.yml` — no new cron. It:
    run-rate regression to a specific workflow.
 
 Both land in the remediation agent's one curated weekly email
-(`remediation/drift_report.quota_html()`, called from both `remediation/agent.py`
-and `remediation/automerge.py`) alongside the existing infra-drift status line — see
+(`remediation/drift_report.quota_html()`, called from `remediation/agent.py`; the
+retired `automerge.py` email path went with `auto` mode, #2833) alongside the existing
+infra-drift status line — see
 `docs/RUNBOOK.md` §"GitHub Actions quota glance" for the manual fallback command.
 
 **CI-minutes run-rate levers already in place:** `concurrency: cancel-in-progress:

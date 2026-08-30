@@ -233,9 +233,11 @@ the repo: a session could find *how* to deploy and not *whether it may* (#3264).
    separate act with its own authority question — and note the site rollback's scope does not
    reach DynamoDB-sourced content or `/api/*`.
 
-7. **Auto-merge never auto-deploys.** `remediation/automerge.py` merges a narrow allowlisted
-   class without a human; CI's production approval gate stays intact behind it (ADR-065). A
-   merged PR is not a deployed one, and "it merged" is never evidence that it shipped.
+7. **A merge is never a deploy.** The remediation agent's deterministic auto-merge gate
+   (`remediation/automerge.py`, ADR-065) was retired 2026-08-30 (#2833) — every PR, agent-
+   authored or not, is merged by a human, and CI's production approval gate stays intact
+   behind that merge. A merged PR is not a deployed one, and "it merged" is never evidence
+   that it shipped.
 
 ---
 

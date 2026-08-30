@@ -49,7 +49,7 @@ ALLOWLIST = {
     # --- Sanctioned support (each carries a README.md explaining why it is kept) ---
     "ci": "CI support data — lambda_map.json (source-file -> function -> stack mapping) + related CI manifests.",
     "handovers": "The LIVE session pointer only (HANDOVER_LATEST.md + README.md) — prior sessions moved to the session-archive branch (#1650).",
-    "remediation": "Self-healing agent (agent.py/automerge.py) driven by .github/workflows/remediation-agent.yml.",
+    "remediation": "Triage agent (agent.py + drift_report.py + track_record.py) driven by .github/workflows/remediation-agent.yml; shadow permanently (#2833).",
     "assets": "Repo-level static asset(s) — the platform icon (site/OG images live under the S3 generated/ prefix, not here).",
     "ingest": "Local macOS launchd drop-folder watchers for manual data uploads (operator-machine tooling).",
     "setup": "One-time OAuth/credential setup scripts per integration — the DR/operator toolkit.",

@@ -11,10 +11,13 @@ checked those sentences against the machine:
   * ``/method/build`` and the org-chart essay both describe the remediation agent's merge
     authority. The agent was demoted to ``shadow`` on 2026-07-06 (ADR-129). The essay
     still read as if the gate self-merged until someone hand-edited a parenthetical into
-    it. Nothing would have caught the next demotion, or the re-promotion.
-  * The org-chart essay quotes ``remediation/automerge.py``'s caps **verbatim** — "a
-    60-line diff cap", "a three-merges-a-day cap". Those are two integers in a Python
-    file that a PR may change without anyone opening an HTML file in ``site/journal/``.
+    it. Nothing would have caught the next demotion — or, until #2833 retired the gate
+    outright on 2026-08-30, a re-promotion.
+  * The org-chart essay quoted the auto-merge gate's caps **verbatim** — "a 60-line diff
+    cap", "a three-merges-a-day cap" — two integers in a Python file that a PR could
+    change without anyone opening an HTML file in ``site/journal/``. (The gate is retired
+    and the essay now describes it in the past tense, so that claim left the registry
+    with it — a comparator over a deleted module would guard nothing.)
   * ``site/privacy/index.html`` promises a reader that unsubscribing anonymizes their
     address "on the spot" and that a hard delete happens "within 7 days". #3044 changed
     the signed retention policy underneath that page nine days ago.
@@ -47,7 +50,7 @@ FIXTURE MUST BE THE WIRE
 ------------------------
 Every comparator reads the **shipped** surfaces — ``site/**/index.html`` as published,
 ``CONTRIBUTING.md`` as committed, the generator source as it renders — and the **real**
-source of truth (``remediation/automerge.py``, ``deploy/github_posture.json``,
+source of truth (``remediation/agent.py``, ``deploy/github_posture.json``,
 ``lambdas/content/subscriber_retention.py``, the workflow files). No comparator reads a
 copy of a claim, and none reads a fixture that restates one. A comparator that compared
 two copies of the prose would pass forever and check nothing.
@@ -102,21 +105,6 @@ EXCLUDED_TREES = {
 }
 
 
-def _word_to_int(word: str) -> int | None:
-    return {
-        "one": 1,
-        "two": 2,
-        "three": 3,
-        "four": 4,
-        "five": 5,
-        "six": 6,
-        "seven": 7,
-        "eight": 8,
-        "nine": 9,
-        "ten": 10,
-    }.get(word.strip().lower())
-
-
 def _read(path: str | Path) -> str:
     return (REPO / path).read_text(encoding="utf-8")
 
@@ -124,7 +112,7 @@ def _read(path: str | Path) -> str:
 def _module_constants(rel_path: str) -> dict[str, object]:
     """Module-level literal assignments from `rel_path`, by AST.
 
-    AST, never import: `remediation/automerge.py` constructs boto3 clients at module
+    AST, never import: `remediation/agent.py` constructs boto3 clients at module
     scope, so importing it in CI would need a region and credentials — and a comparator
     that needs AWS to read a Python constant is a comparator that will be skipped.
     """
@@ -146,8 +134,8 @@ def _module_constants(rel_path: str) -> dict[str, object]:
 def _default_of_param_call(rel_path: str, func: str, first_arg: str) -> object | None:
     """The literal 2nd argument of `func(<first_arg>, <literal>)` in `rel_path`.
 
-    This is how the shipped fallback is read rather than assumed: `automerge.py` calls
-    `_param(MODE_PARAM, "shadow")`, so an unreadable SSM leaves the gate in the safe
+    This is how the shipped fallback is read rather than assumed: `agent.py` calls
+    `_param(MODE_PARAM, "shadow")`, so an unreadable SSM leaves the agent in the safe
     mode. That fallback is part of the claim and must be checked, not trusted.
     """
     for node in ast.walk(ast.parse(_read(rel_path))):
@@ -173,11 +161,12 @@ RECORDED_RUNTIME = {
     "remediation_mode": {
         "param": "/life-platform/remediation-mode",
         "value": "shadow",
-        "recorded": "2026-08-23",
+        "recorded": "2026-08-30",
         "source": (
-            "ADR-129 (demoted 2026-07-06 on zero merged safe-class PRs in ~6 weeks). Re-promotion to "
-            "`auto` requires the numeric 10-consecutive-clean-run bar in the 2026-07-20 amendment (#1337) "
-            "plus an explicit operator SSM flip — never automatic, so a recorded value has a real shelf life."
+            "ADR-129 (demoted 2026-07-06 on zero merged safe-class PRs in ~6 weeks) + its 2026-08-30 amendment "
+            "(#2833): shadow is PERMANENT. `auto` is a retired value — remediation/agent.py coerces it to shadow "
+            "and reports it — and the numeric re-promotion bar (#1337) was retired with it. The recorded value "
+            "still has a shelf life in the other direction: an operator can flip it to `off`."
         ),
     },
 }
@@ -195,44 +184,66 @@ def recorded_runtime(key: str) -> str:
 
 
 def compare_remediation_mode(runtime_mode: str | None = None) -> list[str]:
-    """CLAIM: the merge gate runs in shadow — every fix, safe class included, lands as a
-    pull request a human merges.
+    """CLAIM: the remediation agent has no self-merge path — every fix, safe class
+    included, lands as a pull request a human merges.
 
     READS   the recorded SSM value for `/life-platform/remediation-mode` (injectable, so
-            a live or mutated value can be passed straight in) + `remediation/automerge.py`.
-    COMPARES the mode against the gate's own precondition: `automerge.py` no-ops unless
-            mode == "auto", so "a human merges" is true exactly while mode != "auto".
-            Also checks the shipped SSM-unreadable fallback still lands on the same side.
+            a live or mutated value can be passed straight in), `remediation/agent.py`
+            (the mode gate + the in-band merge prohibition) and
+            `.github/workflows/remediation-agent.yml` (the only thing that runs it).
+    COMPARES the claim against the facts that make it true BY CONSTRUCTION since #2833
+            retired the auto-merge gate (ADR-129 amendment 2026-08-30): the gate module is
+            absent, the workflow has no merge step, the agent's disallowed_tools forbids
+            `gh pr merge`, and the mode gate's live values are exactly `off|shadow` — a
+            live `auto` (the retired value) is a stale parameter the code refuses, not a
+            grant. Also checks the SSM-unreadable fallback still lands on `shadow`.
     """
     mode = runtime_mode if runtime_mode is not None else recorded_runtime("remediation_mode")
-    consts = _module_constants("remediation/automerge.py")
-    src = _read("remediation/automerge.py")
+    consts = _module_constants("remediation/agent.py")
+    agent_src = _read("remediation/agent.py")
+    workflow = _strip_yaml_comments(_read(".github/workflows/remediation-agent.yml"))
     findings: list[str] = []
 
     if consts.get("MODE_PARAM") != RECORDED_RUNTIME["remediation_mode"]["param"]:
         findings.append(
-            f"automerge.py reads mode from {consts.get('MODE_PARAM')!r}, but the registry records "
+            f"agent.py reads mode from {consts.get('MODE_PARAM')!r}, but the registry records "
             f"{RECORDED_RUNTIME['remediation_mode']['param']!r} — the recorded value describes a different parameter"
         )
 
-    # The gate's own precondition, read from source rather than restated here.
-    if not re.search(r"if\s+mode\s*!=\s*\"auto\"", src):
+    if (REPO / "remediation" / "automerge.py").exists():
         findings.append(
-            'automerge.py no longer carries the `if mode != "auto"` no-op guard — the published claim '
-            "'a human merges' is derived from that guard, so it can no longer be derived at all"
+            "remediation/automerge.py is back on disk — #2833 retired the self-merge gate, and the published claim "
+            "'a human merges' is derived from there being no merge path at all"
         )
 
-    if mode == "auto":
+    if re.search(r"automerge|gh pr merge", workflow):
         findings.append(
-            f"remediation mode is {mode!r}: the gate CAN self-merge, but /method/build and the org-chart essay "
-            "both tell readers every fix lands as a pull request a human merges. Prose and machine disagree."
+            ".github/workflows/remediation-agent.yml runs a merge step again — the agent's workflow can self-merge, "
+            "contradicting 'lands as a pull request a human merges'"
         )
 
-    fallback = _default_of_param_call("remediation/automerge.py", "_param", "MODE_PARAM")
-    if fallback == "auto":
+    if '"Bash(gh pr merge *)"' not in agent_src:
+        findings.append("remediation/agent.py no longer disallows `gh pr merge` in-band — the agent itself could self-merge a proposal")
+
+    live_modes = consts.get("_LIVE_MODES")
+    if live_modes != ("off", "shadow"):
         findings.append(
-            f"automerge.py falls back to {fallback!r} when SSM is unreadable — an SSM outage would silently "
-            "grant self-merge, contradicting the published claim without any parameter ever being flipped"
+            f"remediation/agent.py's live mode set is {live_modes!r}, not ('off', 'shadow') — a mode outside those two "
+            "is exactly what the published claim says cannot exist"
+        )
+
+    if mode not in ("off", "shadow"):
+        findings.append(
+            f"remediation mode is {mode!r}: the parameter asks for self-merge, but /method/build and the org-chart "
+            "essay both tell readers every fix lands as a pull request a human merges. `auto` was retired by #2833 — "
+            "agent.py coerces it to shadow and reports it — so the parameter is stale: reset it to `shadow`."
+        )
+
+    fallback = _default_of_param_call("remediation/agent.py", "_param", "MODE_PARAM")
+    if fallback != "shadow":
+        findings.append(
+            f"remediation/agent.py falls back to {fallback!r} when SSM is unreadable — the safe default the published "
+            "claim relies on is `shadow`"
         )
     return findings
 
@@ -368,71 +379,6 @@ def _sweep_cadence_days() -> int | None:
     return 1 if day_of_month in ("*", "?") else None
 
 
-def compare_automerge_caps() -> list[str]:
-    """CLAIM (org-chart essay, quoting the gate verbatim): an exact-file allowlist, a
-    denylist of substrings covering auth/secrets/budget/deploy/the gate itself, a
-    60-line diff cap, a lint-and-test run, and a three-merges-a-day cap.
-
-    READS   `remediation/automerge.py`'s MAX_LINES / MAX_PER_DAY / ALLOWLIST /
-            DENYLIST_SUBSTR by AST + the essay body as published.
-    COMPARES the numerals the essay quotes against the constants, and each denylist
-            CATEGORY the essay names against a real DENYLIST_SUBSTR entry.
-    """
-    findings: list[str] = []
-    consts = _module_constants("remediation/automerge.py")
-    essay = _read("site/journal/essays/org-chart-of-one/body.html")
-
-    line_cap = re.search(r"a (\d+)-line diff cap", essay)
-    if not line_cap:
-        findings.append(
-            "the org-chart essay no longer quotes a '<N>-line diff cap' — the quoted cap the comparator derives has gone missing"
-        )
-    elif int(line_cap.group(1)) != consts.get("MAX_LINES"):
-        findings.append(
-            f"the org-chart essay tells readers the gate caps diffs at {line_cap.group(1)} lines, but "
-            f"remediation/automerge.py's MAX_LINES is {consts.get('MAX_LINES')!r}"
-        )
-
-    per_day = re.search(r"a ([a-z]+)-merges-a-day cap", essay)
-    if not per_day:
-        findings.append(
-            "the org-chart essay no longer quotes a '<n>-merges-a-day cap' — the quoted cap the comparator derives has gone missing"
-        )
-    else:
-        spelled = _word_to_int(per_day.group(1))
-        if spelled is None:
-            findings.append(
-                f"the org-chart essay's merges-a-day cap reads {per_day.group(1)!r}, which is not a number this comparator can resolve"
-            )
-        elif spelled != consts.get("MAX_PER_DAY"):
-            findings.append(
-                f"the org-chart essay tells readers the gate merges at most {spelled} PRs a day, but "
-                f"remediation/automerge.py's MAX_PER_DAY is {consts.get('MAX_PER_DAY')!r}"
-            )
-
-    allowlist = consts.get("ALLOWLIST")
-    if "exact-file allowlist" in essay and not (isinstance(allowlist, tuple) and allowlist):
-        findings.append(f"the essay describes an 'exact-file allowlist', but automerge.py's ALLOWLIST is {allowlist!r}")
-
-    # The essay names the denylist by CATEGORY, so the comparator checks categories.
-    # A category with no matching substring entry is a promise with nothing behind it.
-    denylist = consts.get("DENYLIST_SUBSTR") or ()
-    if "a denylist of substrings" in essay:
-        for category, needles in (
-            ("auth", ("auth",)),
-            ("secrets", ("secret", "credential")),
-            ("budget", ("budget_guard", "budget")),
-            ("deploy", ("deploy/",)),
-            ("the gate itself", ("remediation/",)),
-        ):
-            if not any(any(n in entry for n in needles) for entry in denylist):
-                findings.append(
-                    f"the org-chart essay tells readers the denylist covers {category!r}, but no DENYLIST_SUBSTR "
-                    f"entry in remediation/automerge.py matches it. Entries: {list(denylist)}"
-                )
-    return findings
-
-
 # ── The registry ─────────────────────────────────────────────────────────────
 #
 # `stated` globs are the SET of public surfaces permitted to assert this claim.
@@ -458,15 +404,18 @@ CLAIMS: dict[str, dict] = {
         ),
         "derived_from": (
             "SSM /life-platform/remediation-mode (recorded; reconciled live when reachable)",
-            "remediation/automerge.py",
+            'remediation/agent.py (_LIVE_MODES, the `_param(MODE_PARAM, "shadow")` fallback, the gh-pr-merge disallow)',
+            ".github/workflows/remediation-agent.yml",
         ),
         "comparator": "compare_remediation_mode",
         "runtime": True,
         "reason": (
-            "The one claim here whose truth is live state rather than repo state, and the one that already went "
-            "stale once: ADR-129 demoted the agent on 2026-07-06 and the essay was corrected by hand afterwards. "
-            "Re-promotion to `auto` is an operator SSM flip with no repo diff at all, so nothing but a recorded "
-            "value plus a live reconciliation can catch the prose going wrong in that direction."
+            "The one claim here whose truth is partly live state, and the one that already went stale once: ADR-129 "
+            "demoted the agent on 2026-07-06 and the essay was corrected by hand afterwards. Since #2833 (2026-08-30) "
+            "the claim is structural — no gate module, no merge step, `gh pr merge` disallowed, live modes off|shadow "
+            "— so the comparator guards the SHAPE against a PR that quietly reintroduces a merge path, and the "
+            "recorded SSM value against an operator flip to the retired `auto`, which the code refuses but the prose "
+            "would still contradict."
         ),
     },
     "deploy_approval_lanes": {
@@ -519,27 +468,6 @@ CLAIMS: dict[str, dict] = {
             "sentence a broken promise rather than a documentation defect. The section is hand-authored and sits "
             "OUTSIDE the generated permanence-terms markers on the same page, so #1400's generator gives it no "
             "cover — and #3044 rewrote the signed policy underneath it on 2026-08-23."
-        ),
-    },
-    "automerge_caps": {
-        "subject": "the auto-merge gate's caps — exact-file allowlist, substring denylist, 60-line diff, 3/day",
-        "stated": (
-            "site/journal/essays/org-chart-of-one/body.html",
-            "site/journal/essays/org-chart-of-one/index.html",
-        ),
-        "phrases": (
-            r"a \d+-line diff cap",
-            r"a [a-z]+-merges-a-day cap",
-            r"an exact-file allowlist",
-        ),
-        "derived_from": ("remediation/automerge.py (MAX_LINES, MAX_PER_DAY, ALLOWLIST, DENYLIST_SUBSTR)",),
-        "comparator": "compare_automerge_caps",
-        "runtime": False,
-        "reason": (
-            "The essay quotes two integers out of a Python file verbatim, in prose, in a different tree. Retuning a "
-            "cap is a one-character diff in remediation/automerge.py that no reviewer would connect to an essay in "
-            "site/journal/, and #2611 is the proof the gate's contents really do move: the IAM family was removed "
-            "from the ALLOWLIST on 2026-08-13 while the essay's description of the gate stayed put."
         ),
     },
 }

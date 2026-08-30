@@ -154,7 +154,6 @@ _DYNAMIC_REFERENCES: dict[str, str] = {
     "ssm:lambdas.operational.hevy_routine_cron_lambda._ssm_get": "param name is the wrapper's argument",
     "ssm:remediation.agent._param": "kill-switch/mode reader — param name is the wrapper's argument "
     "(the remediation role holds `parameter/life-platform/*`, so the whole namespace is granted)",
-    "ssm:remediation.automerge._param": "same wrapper in the deterministic auto-merge gate",
 }
 
 #: `config/` objects with no repo file behind them, and why that is correct.

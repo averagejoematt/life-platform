@@ -8,6 +8,12 @@
 > outline follow the draft. **Ready-to-paste submission copy for each venue
 > (HN title, CFP abstracts, pitch text) is in
 > `docs/content/CAREER_ARTIFACT_SUBMISSION_KIT.md` (#741).**
+>
+> **Editor's note (2026-08-30, #2833):** the auto-merge gate this draft quotes was
+> demoted to shadow on 2026-07-06 (ADR-129) and **retired outright on 2026-08-30** — a
+> human merges every remediation PR, permanently. The published copy
+> (`site/journal/essays/org-chart-of-one/body.html`) carries the correction; the draft
+> below is left as the receipt-dated 2026-07-06 snapshot it says it is.
 
 ---
 
@@ -20,7 +26,7 @@ agent. The interesting part is the sentence at the top of the merge gate's sourc
 file:
 
 > "This gate is the ONLY thing that merges, and it is intentionally NOT an LLM —
-> every decision here is deterministic and auditable." (`remediation/automerge.py:7`)
+> every decision here is deterministic and auditable." (`remediation/automerge.py:7` — retired 2026-08-30, #2833)
 
 That sentence is the whole org chart, compressed. I run a production AWS platform —
 104 Lambda functions, 10 CDK stacks, ~76 MCP tools, a public website, a hard monthly
@@ -67,7 +73,7 @@ The morning remediation agent proposes fixes; the thing that merges is a gate th
 checks an exact-file allowlist, a denylist of substrings (anything touching auth,
 secrets, budget, deploy, or the gate itself), a 60-line diff cap, a lint-and-test run,
 and a three-merges-a-day cap — and writes every decision, merge or refusal, to an
-audit log in S3 (`remediation/automerge.py`; the agent itself runs on read-only
+audit log in S3 (`remediation/automerge.py`, retired 2026-08-30; the agent itself runs on read-only
 credentials).
 
 The AI that writes daily narrative about my health data cannot publish a number I
@@ -209,7 +215,7 @@ I've come to think, the most transferable thing the whole experiment will produc
 
 ## Receipt index (for the edit pass)
 
-- Automerge gate constants + docstring — `remediation/automerge.py` (:7-24, :52-80)
+- Automerge gate constants + docstring — `remediation/automerge.py` (:7-24, :52-80; module retired 2026-08-30 by #2833 — read it from git history)
 - Number-gate + 11/112 baseline — ADR-104, `docs/DECISIONS.md`; `lambdas/ai/grounded_generation.py`
 - Budget tiers, readers-last, June $79.80 — `lambdas/ai/budget_guard.py`; ADR-100
 - CI chain + gating visual/vision QA — `.github/workflows/ci-cd.yml`; ADR-076

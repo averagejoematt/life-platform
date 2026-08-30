@@ -59,8 +59,9 @@ if you have the budget.
   Make the fix on a new branch `remediation/<short-slug>`, commit (**no
   tool-attribution trailers** — owner authorship decision 2026-08-12, see
   CLAUDE.md "Authorship"), push, and `gh pr create` **labeled `auto-fix-safe`** with
-  a body explaining root cause + the template matched. Do NOT merge — the workflow
-  decides auto-merge.
+  a body explaining root cause + the template matched. Do NOT merge — nothing in
+  this pipeline merges: the label is a triage class, and a human merges every PR
+  (the auto-merge gate was retired 2026-08-30, #2833).
 - **B — FIX-VIA-PR**: same as A but label `needs-review`. Use this whenever the
   change touches behavior/logic/prompts/schema, exceeds the size bound, or you're
   unsure. **When in doubt, choose B over A.**
@@ -112,8 +113,8 @@ first write. Schema:
   "untriaged":  [{"kind": "alarm", "id": "..."}]
 }
 ```
-In `shadow` mode, `auto_fixed` stays empty — list every PR you opened under
-`prs` (note its intended label in the summary). Be concise and specific.
+`auto_fixed` ALWAYS stays empty (the key survives for the audit-log readers) — list
+every PR you opened under `prs` (note its label in the summary). Be concise and specific.
 **Include the exact alarm name in each item's issue/summary text** — the
 harness's acknowledgement ledger matches on it so the next run doesn't
 re-investigate. Classify ALL signals you were given: each alarm/CI-failure/DLQ

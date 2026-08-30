@@ -1660,15 +1660,15 @@ aws lambda update-function-configuration --function-name life-platform-cost-gove
 
 ## Remediation Agent (ADR-064/065)
 
-Self-healing triage agent runs ~07:45 PT on Mon/Wed/Fri (cron `45 14 * * 1,3,5`) via `.github/workflows/remediation-agent.yml`. Auto-fixes the safe class via PR, opens PRs for the rest, emails what needs the operator. Replaces the raw `[LP digest]` noise.
+Triage agent runs ~07:45 PT on Mon/Wed/Fri (cron `45 14 * * 1,3,5`) via `.github/workflows/remediation-agent.yml`, plus on-demand urgent dispatch. Proposes the safe class and the rest as PRs a human merges, emails what needs the operator. Replaces the raw `[LP digest]` noise. **Shadow permanently** (#2833, ADR-129 amendment 2026-08-30) — it merges nothing.
 
 **Mode kill-switch (SSM `/life-platform/remediation-mode`):**
 
 | Value | Behavior |
 |---|---|
 | `off` | workflow no-ops immediately |
-| `shadow` | diagnoses + opens PRs, never auto-merges (validation mode) |
-| `auto` | `automerge.py` gate merges `auto-fix-safe` PRs that pass all guards (see ADR-065) |
+| `shadow` | diagnoses + opens PRs + emails; a human merges every PR (the only live running mode) |
+| `auto` | **retired 2026-08-30 (#2833)** — not honoured: `agent.py::gate()` runs as `shadow` and adds a needs-human line telling you to reset the parameter |
 
 **Check mode:**
 ```bash
@@ -1676,7 +1676,7 @@ aws ssm get-parameter --name /life-platform/remediation-mode --region us-west-2 
   --query Parameter.Value --output text
 ```
 
-**Switch mode (panic-off, or back to shadow for validation):**
+**Switch mode (panic-off, or back to shadow):**
 ```bash
 aws ssm put-parameter --name /life-platform/remediation-mode --value shadow \
   --type String --overwrite --region us-west-2
@@ -1689,13 +1689,13 @@ gh workflow run remediation-agent.yml
 
 **Audit logs:**
 - Agent decisions: `s3://matthew-life-platform/remediation-log/YYYY/MM/DD/HHMMSS.json`
-- Auto-merge gate decisions: `s3://matthew-life-platform/remediation-log/automerge/YYYY/MM/DD/pr{N}-{HHMMSS}.{merged|held}.json`
+- `remediation-log/automerge/` — the retired auto-merge gate's decision prefix (ADR-065; 0 objects ever written). Kept as history; nothing writes it since #2833.
 
 **Budget Tier-3 pauses remediation automatically** — the agent's `gate()` reads `/life-platform/budget-tier` and skips the run if ≥ 3.
 
 **Classifier rubric:** `docs/REMEDIATION_TAXONOMY.md` (A=auto-fix-safe, B=fix-via-pr, C=needs-human, D=stale).
 
-**The merge gate is deterministic, not the agent.** The agent opens PRs labeled `auto-fix-safe`; `remediation/automerge.py` (separate workflow step) verifies allowlist/denylist/diff-bound/lint/unit-tests and merges if all green. The gate does NOT bypass `ci-cd.yml`'s production approval gate — even merged code needs manual deploy approval. Infra (`cdk/`) merges are flagged "needs cdk deploy."
+**Nothing merges.** The agent opens PRs labeled `auto-fix-safe` (template-shaped, low-risk) or `needs-review`; a human merges both. The deterministic auto-merge gate (`remediation/automerge.py`, a separate workflow step that merged only in `auto`) was retired 2026-08-30 with the mode (#2833) — `gh pr merge` stays in the agent's `disallowed_tools` and the workflow has no merge step. `ci-cd.yml`'s production approval gate is untouched; a PR touching `cdk/` still needs an operator `cdk deploy` after merge.
 
 ## QA Depth Dial (#1452)
 

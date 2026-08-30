@@ -17,11 +17,13 @@ The watchdog agents each persist dated, durable records to S3:
         in the canonical facts gets caught — the honesty machinery made visible.
   • Remediation Agent   → remediation-log/{YYYY}/{MM}/{DD}/{HHMMSS}.json
         (.github/workflows/remediation-agent.yml, remediation/agent.py) —
-        triages CloudWatch alarms, failed CI, DLQ depth; auto-fixes the safe
-        class, opens PRs for the rest, escalates needs-human.
+        triages CloudWatch alarms, failed CI, DLQ depth; proposes the safe
+        class and the rest as PRs a human merges, escalates needs-human.
   • Auto-merge Gate     → remediation-log/automerge/{YYYY}/{MM}/{DD}/pr{N}-*.json
-        (remediation/automerge.py) — the deterministic merge gate for
-        auto-fix-safe PRs (ADR-065).
+        the deterministic merge gate for auto-fix-safe PRs (ADR-065), RETIRED
+        2026-08-30 (#2833, ADR-129 amendment — shadow is permanent). Kept on the
+        roster because its audit prefix is a historical record the feed still
+        reads; it recorded zero decisions in its lifetime.
 
 Every free-text fragment lifted from an artifact (finding detail, PR title,
 triage reason, agent narrative) can quote model output, so it passes the same
@@ -97,8 +99,8 @@ ROSTER = [
         "detail": (
             "Reads CloudWatch alarms, failed CI runs, and dead-letter-queue depth, "
             "then auto-fixes the safe class, opens PRs for the rest, and escalates "
-            "what needs a human — one curated report a day. Read-only role; it can "
-            "propose but never deploy."
+            "what needs a human — one curated report a run. Read-only role; it can "
+            "propose but never merge or deploy (shadow, permanently — ADR-129)."
         ),
         "cadence": "daily",
         "source": "remediation-log/",
@@ -106,14 +108,15 @@ ROSTER = [
     {
         "id": "automerge_gate",
         "name": "Auto-merge Gate",
-        "role": "Merges only the provably safe fixes.",
+        "role": "Retired 2026-08-30 — it never merged anything.",
         "detail": (
-            "A deterministic gate — not the agent — that merges an auto-fix-safe PR "
-            "only if every file is on a narrow allowlist, the diff is small, and lint "
-            "plus the offline test subset pass. It never auto-deploys; CI's production "
-            "approval stays intact."
+            "A deterministic gate — not the agent — that could merge an auto-fix-safe PR "
+            "only if every file was on a narrow allowlist, the diff was small, and lint "
+            "plus the offline test subset passed. Demoted to shadow in July 2026 and "
+            "retired outright on 2026-08-30 (ADR-129 amendment): a human merges every "
+            "proposal. Its audit log stays readable here as history."
         ),
-        "cadence": "as needed",
+        "cadence": "retired",
         "source": "remediation-log/automerge/",
     },
 ]

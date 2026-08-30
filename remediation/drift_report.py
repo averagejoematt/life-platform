@@ -4,8 +4,8 @@ curated report.
 
 The drift sentinel (deploy/drift_sentinel.py) runs as a weekly step in the remediation
 workflow and persists its findings to s3://<bucket>/drift-log/latest.json. This module
-is the read side, shared by both email paths (agent.py in shadow/off, automerge.py in
-auto) so the drift status lands in the ONE curated report:
+is the read side for agent.py's one curated report (the auto-mode email path in the
+retired automerge.py went with the mode, #2833), so the drift status lands there:
 
   * as_signal(record)  → a needs-human signal when there is real drift (never auto-fix:
     infra drift is resolved by a human running `cdk deploy`, on the denylist by design).

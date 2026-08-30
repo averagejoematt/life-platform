@@ -16,14 +16,14 @@ pages — a registry naming one page would have described one instance of a clai
 exists in dozens. That is the "guard the SET, not the instance" rule, and (b) is the set.
 
 Direction (b) also catches the quieter failure: a claim whose phrase STOPS matching. If
-someone rewrites the essay so "a 60-line diff cap" becomes something else, the comparator
-loses its anchor. `test_the_sweep_is_not_vacuous` treats a claim with zero discovered
+someone rewrites the essay so "lands as a pull request a human merges" becomes something
+else, the comparator loses its anchor. `test_the_sweep_is_not_vacuous` treats a claim with zero discovered
 surfaces as a failure, so a reworded claim forces re-registration instead of silently
 disarming its own comparator.
 
 MUTATION PROOFS RUN EVERY TIME. Three of the tests below deliberately falsify a claim —
-a flipped runtime mode, a rogue generator in a synthetic tree, a retuned cap — and assert
-the machinery reds. A guard that has never been shown to fail is indistinguishable in CI
+a flipped runtime mode, a rogue generator in a synthetic tree, a merge step slipped back
+into the agent's workflow — and assert the machinery reds. A guard that has never been shown to fail is indistinguishable in CI
 from a guard that cannot.
 """
 
@@ -180,23 +180,38 @@ def test_an_excluded_tree_is_actually_skipped(tmp_path):
     assert reg.discover_claim_statements(root=tmp_path) == {}
 
 
-def test_the_cap_comparator_reads_the_real_constants(monkeypatch):
-    """Fixture must be the wire, proven. Retune the gate's real constant and the essay's
-    quoted numeral must stop agreeing — which shows the comparator reads
-    remediation/automerge.py rather than a copy of the number kept next to the prose."""
-    real = reg._module_constants
+def test_a_merge_step_back_in_the_workflow_reds_the_comparator(monkeypatch):
+    """Fixture must be the wire, proven. Since #2833 the 'a human merges' claim is derived
+    from the workflow having no merge step. Plant one and the comparator must red — which
+    shows it reads `.github/workflows/remediation-agent.yml` rather than a recorded
+    assertion about it."""
+    real = reg._read
 
-    def retuned(rel_path):
-        consts = dict(real(rel_path))
-        if rel_path == "remediation/automerge.py":
-            consts["MAX_LINES"] = 400
-            consts["MAX_PER_DAY"] = 99
-        return consts
+    def with_merge_step(path):
+        text = real(path)
+        if str(path).endswith("remediation-agent.yml"):
+            text += "\n      - name: Merge safe PRs\n        run: gh pr merge --squash 1\n"
+        return text
 
-    monkeypatch.setattr(reg, "_module_constants", retuned)
-    findings = reg.compare_automerge_caps()
-    assert any("MAX_LINES" in f for f in findings), f"the diff-cap quote was not compared against the real constant: {findings}"
-    assert any("MAX_PER_DAY" in f for f in findings), f"the merges-a-day quote was not compared against the real constant: {findings}"
+    monkeypatch.setattr(reg, "_read", with_merge_step)
+    findings = reg.compare_remediation_mode("shadow")
+    assert any("merge step" in f for f in findings), f"a planted merge step did not red the comparator: {findings}"
+
+
+def test_the_agent_merge_prohibition_is_load_bearing(monkeypatch):
+    """Same proof for the in-band guard: strip `gh pr merge` from the agent's disallowed
+    tools and the comparator must red."""
+    real = reg._read
+
+    def without_disallow(path):
+        text = real(path)
+        if str(path).endswith("remediation/agent.py"):
+            text = text.replace('"Bash(gh pr merge *)"', '"Bash(gh pr view *)"')
+        return text
+
+    monkeypatch.setattr(reg, "_read", without_disallow)
+    findings = reg.compare_remediation_mode("shadow")
+    assert any("gh pr merge" in f for f in findings), f"removing the in-band merge prohibition did not red: {findings}"
 
 
 def test_the_deletion_comparator_reads_the_signed_policy(monkeypatch):
