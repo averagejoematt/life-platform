@@ -114,7 +114,7 @@ PRESERVED_RULESET_ID = 19162901
 # parity pinned by tests/test_posture_pending_marker.py. `applied`/`blocked_on`/
 # `ledger_row` are the #3207 declared-but-not-yet-applied marker; PATCHing `applied`
 # to /repos/{owner}/{repo} would be nonsense, so it must never reach diff or payload.
-POSTURE_META_KEYS = ("source", "applied", "blocked_on", "ledger_row")
+POSTURE_META_KEYS = ("source", "applied", "applied_on", "blocked_on", "ledger_row")
 
 # Rule types that would put a human approval in the loop. Solo operator — see ADR-148.
 FORBIDDEN_RULE_TYPES = ("pull_request", "required_deployments", "required_signatures")
