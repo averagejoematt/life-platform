@@ -3324,6 +3324,29 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3243"
         }
       ]
+    },
+    {
+      "id": "2026-08-30-the-check-that-never-reached",
+      "date": "2026-08-30",
+      "title": "The check existed, was green, and never reached the sentence it existed to stop",
+      "shipped": "The public board told readers I had logged no food, no training, no habits, and no journal entries since the cycle began. Two of those four were false — a run had synced from Strava inside that exact window, and the habit tracker held twelve records. The strange part: a check built to catch exactly this claim already existed and was passing. It just never ran on the path that wrote the sentence. The board derived each 'quiet' label from one source per category — training meant the lifting app, so a synced run couldn't count — and no instrument could see the denominator was short. The fix makes 'which sources could have known?' a question the registry answers, never a hand-typed list, and every surface that says something is absent now consults it: the board's prompt, the weekly narration, the coach brief, even the two-word training glyph on the pulse API, which now discloses on the wire which sources it checked. An enumeration test walks the codebase for every reader of the raw quiet-channel field and fails if a new one appears unwired — so 'the check exists' and 'the check reaches this surface' are finally two different claims, both tested. The same night, the week-one chronicle article stopped 301-redirecting every reader to a hub that didn't contain it — a one-way redirect ratchet from a prior cycle had blackholed a published article, and the forward exposure had already claimed week two.",
+      "why_it_mattered": "This platform's one promise is that what it publishes about me is true. A false absence is the worst kind of lie for a health experiment — it tells readers I quit when the data says I moved. And the failure shape matters more than the failure: a green check that never reaches the surface it guards is indistinguishable from working, which is why the fix ships with an enumeration that makes unreached surfaces fail loudly, not a memo asking future code to please consult the check.",
+      "gotcha": "The stored artifact regenerated daily, so editing it was pointless, and the judge that catches false claims had correctly flagged it — which froze every site deploy behind an auto-rollback until the generation path itself was fixed. Landing the fix took four CI rounds: two test files had pinned the old false wording as expected output, the module that got the fix was one line under its size ceiling, and a file from the rescued work-in-progress had never met the pinned formatter.",
+      "honest_miss": "One of the eight board narratives still carries the old phrasing: the sleep expert's regeneration was discarded twice by the grounding gate for hallucinating a number, so its stale card persists — vintage-labeled — until a groundable draft lands. The gate failing closed there is the system working, but the reader still sees an old sentence with an honest date on it.",
+      "prs": [
+        {
+          "label": "PR #3295",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3295"
+        },
+        {
+          "label": "PR #3298",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3298"
+        },
+        {
+          "label": "PR #3302",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3302"
+        }
+      ]
     }
   ]
 }

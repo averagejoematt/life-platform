@@ -208,32 +208,24 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-28 (Opus 5, **Session I**, autonomous with merge+deploy authority, ALL-OPUS —
-the plan `~/.claude/plans/twinkling-noodling-treehouse.md` plus two owner-directed extensions, a
-rituals run and a bug-bash sweep; twelve agent lanes). **Main ends RED for a PROVEN live defect** — the gating Visual QA reproduced a `/method/board/` coach read asserting four absences of which **two are false** (strava 2, habitify 12), and #3276's fix deployed hours BEFORE the board regenerated, so the check is not reaching that surface (#3294). Do not clear it with a no-op dispatch: that greens `check_main_green` while skipping the very QA job that fails (#2578).** Open 51 → 55,
-**net +4, stated not suppressed**: the drain took it 51 → 45, then the sweep found eleven real
-defects that survived verification. **Three issues deliberately NOT closed despite their PRs
-merging** (#3252, #3250, #2801) — `Fixes` downgraded to `Refs` on two PRs; a merge is not a closure.
-**The September ceiling is re-derived and live: $150/$176 → $215/$252** (ADR-133 amendment, #2801),
-chosen by *executing* `_decide_tier` over a simulated September at three burn rates — the lowest base
-that never reaches tier 2 in any of them, against a measured $5.74/day (sd $4.32, n=25). **The plan's
-own premise was false**: "doing nothing selects tier 3 on 09-01" priced September against August's
-*month-end projection*; `_project_month_end` is month-scoped and `_decide_tier` caps at
-`actual_mtd_tier + 1`, so $150 reaches tier 3 on **~Sep 21** — the cliff was real, its date wrong by
-twenty days. Because $215 exceeds the August window's own ceiling, **the 09-01 revert is now a
-RAISE**. Four
-deploys, every one verified by CONTENT; the invisible one (`cdk deploy LifePlatformCore`, **zero CDK
-file changes**) moved the AWS Budget 150.0 → 215.0. Six leases disposed, one **rejected** because it
-carried `MONTHLY_CEILING = "150"` — *strictly newer than live yet older than main on the one number
-the session existed to change*. **Through-line: the stated mechanism and the actual mechanism had
-diverged** — a metric clearing by dilution while its comment credited a retirement job; an alarm
-citing an expired window; five rulings expressing "never gating" as a value that gates; and **`main`
-has no branch protection and zero required checks** (#3288), so eleven merges were gated solely by
-`wait_pr_green.sh` and an unpiped exit code. **#3245 landed** — the 102-file skills-corpus PR, with
-its worktree reaper. **Both NEVER-RUN rituals actually ran and landed**: craft-review (B overall, 23 findings)
-and the proportionality re-read (73 rows, 11 corrected, **two demote triggers already fired
-unnoticed**); the calendar now reports every ritual has run at least once. Owner decisions taken: #3083 **decided hold**, #2883 **re-measure at n=30**, and
-**auto-synced sources count as "logging"** (ADR-104 amendment), which unblocked #3252's dead box.
-**Needs the owner's hands: #3284** — the cycle's chronicle article is unreachable to every reader and
-the fix requires a manual CloudFront function publish. **Session ended on a monthly spend limit, not a stopping point.** #3294 (P1) is **blocking every `site/**` deploy** — the visual QA gates every site deploy and auto-rolls-back on red, and #3286/#3287's front-ends are already sitting reverted because of it. Its half-finished work is on `issue-3294-absence-sourcing-coverage`, unverified, DO NOT MERGE AS-IS. **Start there.** Full narrative:
+**Verified:** 2026-08-30 (FABLE 5, **Session J** — autonomous, then owner co-working; the session
+three sessions banked for this model). **Main GREEN at b60db50b (deploying runs green twice).**
+**10 closed / 0 filed — open 54 → 44**, 10 PRs merged, 2 fleet + 2 site deploys. **The site is
+UNFROZEN**: #3294 landed with a derived surface enumeration + mutation-proven census gate, the board
+regenerated clean on deployed code (wire re-read: licensed = food/journal, withheld = training/habits),
+visual QA green on a run that actually deployed, and #3286/#3287's front-ends re-landed (markers ×4/×2
+live). **Branch protection is ON** (#3288 — ruleset live, auto-merge on, --check clean) and the **#3021
+lease janitor is armed** — both unblocked by owner-minted tokens in-session. **The Architect operator
+leg is LIVE** (routine `architect-operator-2849`, weekly, report-only; first real ritual 09-08 =
+#2849's reopen trigger). The Fable re-grade delivered #3042's box-4 verdict honestly: 4/9 domains ≥9,
+gap list by leverage, register made 52/52. **The defining incident: a 9h stranded-lease stall** (two
+runs minted 8s apart; the older held the lease while the watch polled the newer) — INCIDENT_LOG row
+189, land §3 now enumerates ALL leases, janitor token is the machine fix. Four owner decisions
+executed (#3251→C1 shipped · #2833→shadow-permanent · #2883→block · #3083→fail-closed shipped).
+Session finds: pip-audit had audited NOTHING since inception (fixed); the judge has two REPRODUCING
+false-positive shapes (both TRUE claims, folded to #3251); fixture-was-reality broke four tests in one
+night. **The approved week plan is the driver** (`~/.claude/plans/snug-coalescing-music.md`): #2845
+system model ~25% Fable · promotions #2363→Now then #1365→Next (dated ADR-099 owner exception) ·
+#2883 Monday for the soak · drain #3250/#3265/#3293/#3289/#3262/#3277/#3278/#2833/#3251 via lanes.
+Monday verifications: first ops pack 16:00Z, governor tier 0, first graded predictions. Full narrative:
 `handovers/HANDOVER_LATEST.md`.
