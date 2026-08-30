@@ -134,6 +134,23 @@ jobs:
       - uses: ./.github/actions/setup-ci
         if: steps.supersede.outputs.superseded != 'true'
 
+      # #3315: the canonical build (deploy_site.sh → sync_site_to_s3.sh) runs every site
+      # generator, and three of them need packages this job never installed — each behind
+      # a `|| echo "… skipped"` fallback. So on EVERY CI site deploy the run log read
+      # `ModuleNotFoundError: No module named 'boto3'` (stack manifest, theme river) and
+      # `No module named 'PIL'` (portrait PNGs) and shipped the committed artifacts
+      # unchanged, green (observed run 33336278287, 2026-08-30). The eight stdlib-only
+      # builders in the same script already regenerate at deploy time, so these were dark
+      # by dependency accident, not by design. Installed before the build, pinned via
+      # ci_pins.py (CQ-01). The config-twin step below used to install boto3 for itself —
+      # same pins, moved up so the whole build shares one declared set. Guarded by
+      # scripts/ci_dark_flag_sweep.py.
+      - name: Install build-path dependencies (boto3, botocore, pillow)
+        if: steps.supersede.outputs.superseded != 'true'
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore pillow)
+          pip install --quiet $PINS
+
       # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
       - name: Configure AWS credentials (OIDC)
         if: steps.supersede.outputs.superseded != 'true'
@@ -183,8 +200,8 @@ jobs:
         # backported S3→repo first (the live object was v2, newer than the repo's v1;
         # a blind apply would have reverted an owner-approved correction).
         run: |
-          PINS=$(python3 scripts/ci_pins.py boto3 botocore)   # versions from requirements-dev.txt (#2760)
-          pip install --quiet $PINS
+          # boto3/botocore come from "Install build-path dependencies" above (#3315; this
+          # used to be the job's ONLY install — after the build that needed the packages).
           python3 deploy/config_twin_sync.py --apply --strict
 
   # ════════════════════════════════════════════════════════════════
@@ -318,6 +335,13 @@ jobs:
 
       # setup-python (v7.0.0) via the shared composite (#1655)
       - uses: ./.github/actions/setup-ci
+
+      # #3315: rollback_site.sh re-runs the same canonical build as deploy-site, so it
+      # needs the same declared set (see that job's install step for the why).
+      - name: Install build-path dependencies (boto3, botocore, pillow)
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3 botocore pillow)
+          pip install --quiet $PINS
 
       # configure-aws-credentials (v6.2.2, OIDC) via the shared composite (#1655)
       - name: Configure AWS credentials (OIDC)
