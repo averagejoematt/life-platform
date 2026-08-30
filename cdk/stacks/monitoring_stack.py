@@ -35,6 +35,8 @@ Covers:
       qa-smoke-failures    FailCount Max >= 1, 86400s (digest)
       qa-smoke-warnings    WarnCount Max >= 1, 86400s (digest) — a warnings-only
                             run is now visible in the daily digest, not fully silent.
+      #3317 (2026-08-30): all three reviewed against 30d live history — KEEP, shapes
+                            unchanged; the evidence sits at the definitions.
 
   #1455 (heartbeat completeness, 2026-07-19): the compute-output check's gauge is
   now alarmed (it had emitted unalarmed since Phase 3.2):
@@ -464,6 +466,34 @@ class MonitoringStack(Stack):
         # designed — see docs/alarm_citations.json's qa-smoke-warnings entry for the full reconciliation
         # and the currently-owned non-chronic source (`reader_truth`, real content-truth findings that
         # SHOULD stay alarmed — #1958's chronic contract deliberately does not cover them).
+        #
+        # #3317 — REVIEWED 2026-08-30 (#2670's post-closure scope: drain or re-justify the set).
+        # All three KEEP, shapes UNCHANGED. Evidence, read-only, 30d window 2026-07-31..08-30
+        # (describe-alarm-history + filter-log-events on /aws/lambda/life-platform-qa-smoke):
+        #   qa-smoke-heartbeat — 0 transitions since creation (07-18), RunCompleted landed on every
+        #     one of the 37 runs logged 08-18..08-30. A dead-man that has never fired is the
+        #     expected record; it is the ONLY detector of "the QA layer stopped running" and
+        #     tests/test_heartbeat_completeness.py requires it. KEEP.
+        #   qa-smoke-failures — 3 OK->ALARM transitions, 3/3 true positives, 0 unexplained.
+        #     Every FAIL line in the window (46) maps to a since-closed issue: #2921 (sleep_detail
+        #     device interleave), #2977 (recall corpus miss), #3083 (cross_surface:weight), #3204
+        #     (glucose as_of_date), #2880/#2741 (Day-2 home copy), plus the 08-17 trio (#1934-class
+        #     Whoop latch, redirect_spotcheck, #2705 recurrence). One false-positive DATAPOINT in
+        #     the whole window (08-16 off-schedule dashboard:date, fixed by #2785). Time-in-ALARM
+        #     26.8d/30d, but 7.8d of the 11d since the #2670 drain, all of it cited. OK since
+        #     2026-08-28T14:05Z; 0 FAIL lines in the ~25 runs since 08-27T14:05Z. KEEP.
+        #   qa-smoke-warnings — 4 organic OK->ALARM transitions since the drain (08-20, 08-22,
+        #     08-24, 08-27), each mapped: fcd7d5 -> #2921, e5eafd -> #3204, 539c6d x2 -> #3258
+        #     (the judge counting its own retraction — a QA-pipeline defect the alarm surfaced).
+        #     Plus 33 SYNTHETIC OK->ALARM flaps 08-20 15:34..18:03Z off the ONE planted datapoint
+        #     (#2912); no organic datapoint has ever flapped — every organic episode is exactly one
+        #     fire and one clear ~24h later. OK since 2026-08-28T18:31Z; 0 alarmed warns in the 22
+        #     runs / 3 scheduled nightlies since 08-27T18:50Z (the #3258 deploy). KEEP.
+        # The #2670 residual — "should WarnCount >= 1-in-24h become sustained N-of-M?" — is answered
+        # by the data, not by preference: post-#3258 ambient non-chronic warn traffic is ZERO, so an
+        # N-of-M shape has no noise left to remove and would only have delayed #3204's 08-24
+        # single-night signal by a day. Threshold, period and statistic stay as declared. A re-light
+        # after the registry entries' prune dates is a NEW cause and needs a new citation.
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",
