@@ -659,6 +659,7 @@ from operational.qa_check_content_cadence import (  # noqa: F401,E402
     assess_content_cadence,
     check_content_cadence,
 )
+from operational.qa_check_permalink_blackhole import check_published_permalink_reachable  # noqa: E402 — CHECK 10f (#3284, see module)
 
 # ---------------------------------------------------------------------------
 # CHECK 10d — Podcast read-aloud orphan guard (#1243)
@@ -1005,8 +1006,8 @@ def check_steps():
         ("content_cadence", check_content_cadence),
         # #1951: the /subscribe/ weekly-send promise must agree with each sender's live kill switch
         ("subscriber_promise_truth", check_subscriber_promise_truth),
-        # #1243: a same-title episode in podcast/episodes.json must date-match its journal article
-        ("podcast_parity", check_podcast_parity),
+        ("podcast_parity", check_podcast_parity),  # #1243: a same-title podcast episode must date-match its journal article
+        ("published_permalink_reachable", check_published_permalink_reachable),  # #3284: no published post url may be a redirect source
         ("weight_truth", lambda: weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)),  # #1894: home/cockpit vs coaching
         ("receipt_replay", check_receipt_replay),  # #1373: progression-receipt drift alarm (deterministic replay)
         ("redirect_spotcheck", check_redirect_spotcheck),  # #1430: weekly legacy-redirect sample, rotates over redirects.map

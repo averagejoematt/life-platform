@@ -256,7 +256,20 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # structural::test_absence_coverage_3294.py` (ARMED 1/1 on the recording run), so the
 # live unproven count does not move and BASELINE_UNPROVEN_GATES stays where its owner
 # set it.
-BASELINE_TOTAL_GATES = 565
+# 565 -> 566 (2026-08-29, #3284): ONE real gate —
+#   qa::lambdas/operational/qa_check_permalink_blackhole.py::check_published_permalink_reachable
+# the nightly cross-check that no URL published in the live /journal/posts.json is also a
+# redirect source (map leg: the bundled redirects.map; live leg: a no-redirect-follow GET of
+# each permalink). It exists because the one redirect gate that DID exist (redirect_spotcheck,
+# #1430) *confirmed* the week-04 blackhole as correct behaviour — the direction was missing,
+# not the coverage. Verified the #3260 way: both trees ran their OWN scripts/gate_census.py
+# --json (the new files `git add`ed first — an untracked guard measures as absent), id SETS
+# diffed: ADDED exactly the one id above, REMOVED {} (pre-train main 564, branch 565; re-based onto the merged #3294 raise, so the running total is 566). It arrives
+# UNPROVEN by the census (live unproven 521 -> 522, under the committed 541, which is NOT
+# moved); its fail path has a scripted positive control in tests/test_permalink_blackhole_3284.py,
+# and its first LIVE verdict is designed-in: the live leg is expected-red on the first nightly
+# after deploy until Matthew publishes the regenerated v4-redirects CloudFront function.
+BASELINE_TOTAL_GATES = 566
 BASELINE_UNPROVEN_GATES = 541
 
 
