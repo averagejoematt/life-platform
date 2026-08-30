@@ -158,6 +158,18 @@ NOT git-tracked and is a separate step from the commit in (f).
   `STALE_STACK_CLAIMS` in the script when a new ownership move needs policing) before
   closing (c). The script no-ops harmlessly if the memory dir isn't present (e.g. a
   fresh machine) — it is a session reflex, not something repo CI can enforce.
+- **Operating-knowledge ledger check (#2848) — run this every wrap; every hit gets a row.**
+  Every rule-class memory file (`reference_*`, `feedback_*`, `security_*`) has a row in
+  `docs/OPERATING_KNOWLEDGE_LEDGER.md` naming its repo home or the reason it has none. CI
+  holds that ledger consistent with its own committed snapshot but cannot see this
+  directory, so a memory file written this session is invisible to it until the row exists:
+  ```bash
+  python3 scripts/check_operating_knowledge_ledger.py --live   # --memory-dir <dir> to override
+  ```
+  (the default memory dir is derived from the primary checkout's path, the same way Claude
+  Code names it). Any `UNLEDGERED:` line means a rule was written
+  to memory and not homed — add the row (and the rule, in its home) in the same wrap, or
+  record the row's reason as `narrative`. Exit 2 means it could not look; that is not a pass.
 - **Rule of placement:** session-specific narrative → `HANDOVER_LATEST.md` → the
   `session-archive` branch at the next wrap (step a). Durable
   lessons/reflexes → memory topic files (this step) or `docs/CONVENTIONS.md` if it's a

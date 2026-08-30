@@ -2,7 +2,11 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-18
 
-Last updated: 2026-08-26 (v8.6.0)
+Last updated: 2026-08-30 (v8.6.0)
+
+> The Secrets rate-card row and the `Last updated` line above are **sync-owned literals**
+> (`deploy/sync_doc_metadata.py` RULES): a hand-edit must keep the rule's exact phrasing or
+> the Wiki-drift gate reds `main` — the pre-commit hook only WARNS, docs-ci FAILS.
 
 > Budget ceiling: **$215/month all-in** base, floating to **$252 in surge mode** on real
 > reader traffic (≥900 trailing-7d uniques — ADR-133). **August 2026 ONLY: a dated

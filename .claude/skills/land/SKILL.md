@@ -40,6 +40,11 @@ Use the **full 40-char sha** — a short sha misses `pull_request` runs (#3103).
 at a sha means **swallowed**, never "done". Recovery ladder: close/reopen the PR →
 supersede-PR → integration train.
 
+**Delay is not swallow.** Event minting has run ~10 minutes behind for a whole night: a
+merge showed zero runs at its head sha for 6+ minutes and then the real run arrived. Wait
+~10–15 min and re-query before invoking the ladder — escalating early mints a
+`workflow_dispatch` twin, which is two runs at one sha and therefore two leases (§3).
+
 *Discriminator:* a `GITHUB_TOKEN` reconcile push legitimately mints zero runs and touches
 `lambdas/**`, so it looks identical. Without that distinction a detector pages after every
 merge and gets ignored.
@@ -83,6 +88,10 @@ job, the issue reads closed while prod runs the old code. 116 incident rows are 
 "deployment error". A deploy timestamp is not a commit. A deploy from a worktree branch
 shows a deceptive **0-diff** and ships stale content; deploy from `main`, after merge.
 
+A run **cancelled at its Deploy step** because a newer reconcile run superseded it is not a
+missed deploy: the newer run's diff is *accumulated* and carries it. Do not re-dispatch on
+run topology — verify by bundle content below, which is the only question that matters.
+
 So: unzip the deployed bundle, grep for the shipped module, **and confirm its caller is
 wired**. Presence of a file is not proof it is reached — a transform can be correct and
 unreachable, and 15 documented fields sat dark for six days behind a green fixture test.
@@ -106,4 +115,6 @@ boxes.
 
 And note the case no test covers: **a green suite is necessary and not sufficient for a
 timing or performance fix.** `#3231` shipped half-broken with all twelve of its own tests
-green; the only symptom was one line in a durations block.
+green; the only symptom was one line in a durations block. Lambda CPU is memory-fractional
+and boto3 sessions are GIL-bound, so a performance change validated on a laptop can invert
+live — measure at origin, post-deploy.

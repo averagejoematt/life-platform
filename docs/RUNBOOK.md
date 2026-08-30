@@ -1502,6 +1502,21 @@ nonzero aborts the run and prints what already ran; `--continue-on-error` is the
       so gap-filled `no_data` rows can never group)
 18. `--close-cycle`: appends one line to `docs/restart/RESET_LOG.md` (the human-readable reset ledger)
 
+**Two reset reflexes the steps above do not spell out.** (1) **Check the archive before
+regenerating anything.** A tombstoned record carries an `archived_to` pointer
+(`deploy/restart_chronicle_handler.py`, `deploy/restart_media_reset.py` and
+`deploy/curate_prelaunch_leadins.py` all write it); the original asset is usually still there,
+and resurrecting it is cheaper and more honest than regenerating a new one under an old date.
+(2) **When only the rendered gate (step 15) fails on a small-gap reset, the semantic gate
+(step 16) is authoritative.** The rendered gate scans public surfaces for the *outgoing*
+genesis literal; move genesis by only a few days and that literal collides with dates that
+are legitimately correct in the new cycle (a last-complete-data `as_of_date`, a genesis−2
+prequel episode). Read the rendered-gate report it writes under `docs/restart/`, `curl` each
+flagged URL, and if the literal is a real new-cycle date, record the false positive in the
+reset log and proceed — do **not** run `deploy/restart_rollback.py`. The apply still exits
+nonzero, which also skips the post-verify hooks; run
+`deploy/fix_prologue_cycle_and_subscribe_ttl.py` standalone afterward (idempotent).
+
 **The one-command contract (#1092):** everything above is one `restart_pipeline.py --apply`
 invocation. The ONLY steps that deliberately stay outside it (each a verified exclusion, not
 an omission):

@@ -62,12 +62,33 @@ moment someone actually looked at it.
   reproduces after a browser restart), the tell is a **stale intra-module import / dynamic `import()` path** —
   an ES module graph fails atomically when one dependency is a cache-skewed version. Don't reach for the SW
   or an HTML ref first. (Memory: `reference_asset_hashing_full_graph`; INCIDENT_LOG 2026-07-03.)
+  The hasher also counts an `/assets/...` path inside a **comment** as a dependency edge — a
+  prose back-reference can hard-fail the deploy as a false import cycle; keep asset paths out
+  of comments, or break them.
+- **"The data is fixed" is not "the reader can see it" — check the renderer's filters.** 23
+  withdrawn citations were live in `/api/supplements` and structurally invisible on the page,
+  because a withdrawn source carries no `url` by design and `renderSupplements` filtered on
+  `x.url`. Both halves were individually correct. After any data-level correction, render the
+  surface (headless is enough) and `curl` the page for the correction's own words.
+- **An `fs-ok: floored by svgtype.js` sanction is a claim the token guard cannot check.** The
+  floor only engages when the selector is in `SVG_TYPE_FLOORS` (`site/assets/js/svgtype.js`)
+  AND the CSS consumes its `--fs-*` cssVar AND the token's base is in `tokens.css`; a static
+  `font-size: 11px` under that comment measured 5.1px effective at 390px. Verify with
+  render-QA at 390px (computed size × `getScreenCTM().a` ≥ 11), and give floored SVGs a
+  `min-width` inside an `overflow-x:auto` wrap so glyphs that grow scroll instead of clipping.
+- **Verify generated PNGs, not just live pages.** Every OG/social card rendered `.notdef` tofu
+  for months because the bundled card font was a subset with no basic-Latin glyphs — and
+  visual-QA inspects pages, never the cards, which only surface when a link is shared. After
+  touching `lambdas/web/card_engine.py` or a bundled font, open the generated PNGs.
 
 ## Verification checklist (per change)
 - Python: `py_compile` + `black --check --line-length 140` (the format gate **reds main** otherwise) + `flake8`.
 - JS: full-parse via `node scripts/import_site_js_graph.mjs` (#1432 — `node --check` alone can MISS a
   real SyntaxError buried in a function body, see the gotcha above) + the unit tests, `node --test`
   (#1431 — see "JS unit-test harness" below). CSS: brace-balance.
+- CSS, additionally: `python3 -m pytest tests/test_css_tokens.py` on ANY `site/**/*.css` diff —
+  the gating visual-QA passes a raw `font-size` (the pixels are fine) and then the Unit Tests
+  job reds `main`. Use a `--fs-*` token or an inline `/* fs-ok: <reason> */` sanction.
 - Render: screenshot the changed page (desktop + mobile); confirm no content stuck hidden, no overflow.
 - Tests: the relevant subset **creds-blanked** (some pass locally on ambient creds but fail in CI on
   `NoCredentialsError`). Memory: `reference_ci_masking_and_creds`.

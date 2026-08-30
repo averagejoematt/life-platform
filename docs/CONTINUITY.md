@@ -160,12 +160,16 @@ four families:
 (git, DynamoDB with PITR, GitHub). This directory exists on one laptop. If the laptop
 dies, the incident narratives and preference memory die with it — the *rules* survive in
 `docs/CONVENTIONS.md` and `docs/OPERATING_DISCIPLINE.md`, but the *why* behind them does
-not. **#2848 audited the review-discipline half of this corpus on 2026-08-27** (154
-entries, classified one by one — the record is `docs/OPERATING_DISCIPLINE.md` Appendix A)
-and migrated the durable rules that had no repo home. What that audit did **not** move,
-and what a successor consequently still cannot learn from this repo, is listed in that
-page's §6 — including the standing deploy-authorization boundary, which lives only in
-`feedback_*` memory. Recommended operator habit — back it up to the private S3 bucket:
+not. **#2848 audited this corpus** — the review-discipline half on 2026-08-27 (154 entries,
+the frozen record is `docs/OPERATING_DISCIPLINE.md` Appendix A) and the whole index on
+2026-08-30. The maintained answer to *which entry is homed where* is
+**`docs/OPERATING_KNOWLEDGE_LEDGER.md`**: one row per memory file, with its repo home or the
+stated reason it has none (session narrative, security detail, tooling that lives outside
+the repo, the owner's own profile). What a successor consequently still cannot learn from
+this repo is `docs/OPERATING_DISCIPLINE.md` §7 — the per-rule incident narrative, by design,
+and the multi-lane concurrency *pattern*; the deploy-authorization boundary that used to be
+on that list is now §5 of that page. Recommended operator habit — back it up to the private
+S3 bucket:
 
 ```bash
 aws s3 sync ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ \
@@ -180,9 +184,10 @@ belt-and-suspenders. The `datadrops/` → `datadrops-archive/` leg is a **manual
 grant on bash we deliberately don't make; datadrops is low-churn historical originals, so a
 manual push when you add one is enough (`docs/NEW_MACHINE_BOOTSTRAP.md` §3c).
 
-**Never commit this directory (or its export) to the repo** — even though the repo went
-private 2026-07-13, memory files contain personal detail and security-incident narrative
-by design and must stay out of git (visibility can flip back; the discipline is permanent).
+**Never commit this directory (or its export) to the repo** — whatever the repo's
+visibility at the time (it has been public, private and public again), memory files contain
+personal detail and security-incident narrative by design and must stay out of git; the
+discipline is permanent.
 
 ## 5. `.claude/skills/` — the skills are human runbooks
 

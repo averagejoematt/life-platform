@@ -205,6 +205,49 @@ for the plane below it:
 
 ## Writing new tests
 
+### Traps that have redded main — read before adding a test
+
+Each of these was green alone and red in CI, or green everywhere and wrong. They are the
+*test-authoring* half of the instrument rules the `/prove-it` skill carries.
+
+- **An import-time, env-derived module global is order-fragile.** `S3_BUCKET = os.environ.get(...)`
+  freezes at *first* import; in the full suite another test usually imported the module
+  earlier under a different env, so an assertion on it passes solo and fails in CI — and a
+  red Unit Tests job skips Deploy for the real Lambda. Pin the global inside the test
+  (`monkeypatch.setattr(mod, "S3_BUCKET", ...)`) and reproduce the ordering before trusting green.
+- **A packaged module ignores `sys.modules` stubs.** After `lambdas/` became packages (ADR-146),
+  `monkeypatch.setitem(sys.modules, "bedrock_client", fake)` silently stopped applying —
+  CPython's `from PKG import MOD` prefers the parent package's bound attribute — and eight
+  "unit" tests began issuing real inference calls, failing only for want of credentials. Use
+  `stub_bundled_module` in `tests/bundle_stubs.py`, which patches both; grep the suite for
+  `setitem(sys.modules` and `types.ModuleType(` whenever a module moves.
+- **After a split, the old module is a re-export, not a patch point.** `monkeypatch.setattr(old_module, "helper", fake)`
+  patches the re-export while the moved function resolves `helper` in its own globals, so
+  the real path runs. Repoint every `setattr`/`patch.object` at the symbol's real home, and
+  run `ruff` (F821) after trimming a re-export list — a symbol another check still reads
+  fails at call time, not import time.
+- **A substring asserted absent from `json.dumps(result)` flakes about one run in ten** when
+  the result carries `isoformat()` timestamps — microseconds alone will eventually contain
+  the digits. Scrub volatile keys first (the `_semantic_blob` pattern) and sweep with
+  `grep -rn 'not in json.dumps' tests/`.
+- **The orphan-partition gate resolves writers by AST, not dataflow.** A `lambdas/web/` write
+  whose `pk` is built outside the `put_item`/`update_item` call reads as writerless and reds
+  `tests/test_site_partition_orphans.py`. Put conditional destinations inline in the call.
+  And run the full suite **without `-x`** before pushing — `-x` hid this red behind an
+  unrelated one.
+- **A fixture's clock is the handler's clock.** A fixture computing its expectation from
+  `datetime.now(timezone.utc).date()` for a handler on `pacific_today()` is one day ahead
+  between 17:00 PT and midnight; the test shipped green because CI ran at 13:00 PT and broke
+  `main` 24h later on someone else's commit. Derive the expectation through the handler's
+  own clock helper, and if a check can only fail during part of the day, something must
+  exercise it there (a faked clock or a dated re-run) — `/prove-it`, "a window it never
+  runs in".
+- **API schema baselines are captured wholesale.** `deploy/capture_api_schemas.py`
+  re-snapshots every endpoint and rewrites `tests/api_schemas/_exemptions.json` in one run;
+  run against a freshly reset platform it codifies Day-1 shapes as the baseline. Leave a
+  single `capture-failed` exemption standing until a deliberately timed capture on stable
+  data, and say so in the PR.
+
 ### Pattern for a new Lambda test
 
 ```python
