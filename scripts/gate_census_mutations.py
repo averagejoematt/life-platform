@@ -209,6 +209,18 @@ _OVERSIZE_LAMBDA_PY = '"""probe."""\n\n' + "".join(f"X{i} = {i}\n" for i in rang
 # split so a sweep of scripts/ can never mistake this spec for a consumer.
 _RAW_QUIET_READER_PY = '"""probe."""\n\n\ndef probe(sig):\n    return sig.get(' + _lit('"channels_qu', 'iet"') + ")\n"
 
+# Assembled: tests/test_direction_of_travel_ruling_3293.py sweeps lambdas/ + scripts/ +
+# mcp/ for every module that reaches for the shared direction-of-travel ruling and is not
+# named in its surface registry. `scripts/` is inside that sweep, so writing the module
+# name verbatim here would make this harness a permanently-unregistered importer — the
+# file would plant its own defect and never be able to revert it.
+_UNREGISTERED_DIRECTION_SURFACE_PY = (
+    '"""probe."""\n\n'
+    "from web." + _lit("journey_", "direction") + " import classify_delta\n\n\n"
+    "def probe(lost_lbs):\n"
+    "    return classify_delta(lost_lbs)\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_no_conflict_markers.py": MutationSpec(
         gate_id="structural::test_no_conflict_markers.py",
@@ -321,6 +333,16 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         target="tests/test_absence_coverage_3294.py",
         detects="a NEW consumer of the raw channels_quiet list with no disposition — the unwired-surface class that published two false absences (#3294)",
         plants=(("lambdas/common/_census_probe_2999.py", _RAW_QUIET_READER_PY),),
+        track=False,
+    ),
+    "structural::test_direction_of_travel_ruling_3293.py": MutationSpec(
+        gate_id="structural::test_direction_of_travel_ruling_3293.py",
+        target="tests/test_direction_of_travel_ruling_3293.py",
+        detects=(
+            "a NEW surface reaching for the direction-of-travel ruling without joining the registry that "
+            "watches it — the shape that left three of the family unfixed after #3285 (#3293)"
+        ),
+        plants=(("lambdas/web/_census_probe_2999.py", _UNREGISTERED_DIRECTION_SURFACE_PY),),
         track=False,
     ),
 }
@@ -525,6 +547,25 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
             "surfaces published all four labels, `NOTHING has been logged` included.",
         ),
         proved_on="2026-08-29",
+    ),
+    "structural::test_direction_of_travel_ruling_3293.py": dict(
+        _proof(
+            "structural::test_direction_of_travel_ruling_3293.py",
+            "baseline: 33 passed | mutated: 1 failed, 32 passed :: "
+            "test_the_registry_covers_every_module_that_imports_the_ruling | reverted: 33 passed",
+            "SCOPED BY DESIGN, and the limit is stated in the guard file itself. The registry watches a "
+            "hand-listed FIVE surfaces plus a staleness sweep for modules that name `journey_direction` "
+            "in lambdas/ + scripts/ + mcp/. A brand-new surface that states a direction of travel WITHOUT "
+            "touching the shared ruling — the exact shape of both #3293 defects — is invisible to it; "
+            "catching that needs a direction-word lexicon, which is phrase-matching, and "
+            "site_api_pulse.py already contains a CORRECT static 'up' next to a formatted number that "
+            "such a scan would flag on day one. What this gate does cover is regression: any of the five "
+            "ceasing to route through classify_delta. The behavioural half of the file (the recap card's "
+            "three surfaces, the served /api/pulse payload) was separately watched failing against "
+            "pre-fix main 2026-08-30: 24 failed / 9 passed, including the filed `direction: 'up'` with a "
+            "null weigh-in and the `-5.2 lbs down` unfurl.",
+        ),
+        proved_on="2026-08-30",
     ),
 }
 

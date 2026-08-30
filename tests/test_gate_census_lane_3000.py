@@ -278,7 +278,18 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # REMOVED {}. Stacked on #3284's one-gate raise above: 565 + 1 + 3 = 569. The sentinel
 # check arrives PROVEN (three-mutation record); the two registry ids are the allowlist's
 # own family-3 mint. BASELINE_UNPROVEN_GATES stays where its owner set it.
-BASELINE_TOTAL_GATES = 569
+# 569 -> 570 (2026-08-30, #3293): ONE real gate,
+# `structural::test_direction_of_travel_ruling_3293.py` — the direction-of-travel surface
+# registry (family 5; registering it in _PREMERGE_EXTRA_FILES is part of the same PR).
+# Verified by id-set diff, not count delta: each tree ran its OWN scripts/gate_census.py
+# --json with the new file `git add`ed first (an untracked guard measures as absent);
+# ADDED exactly {structural::test_direction_of_travel_ruling_3293.py}, REMOVED {} (main
+# 569, branch 570). It arrives PROVEN — the mutation is a planted unregistered importer
+# in lambdas/web/, re-runnable via `gate_census_mutations.py --run --gate
+# test_direction_of_travel_ruling_3293.py` (ARMED 1/1 on the recording run) — so the live
+# unproven count does not move (524 -> 524) and BASELINE_UNPROVEN_GATES stays where its
+# owner set it.
+BASELINE_TOTAL_GATES = 570
 BASELINE_UNPROVEN_GATES = 541
 
 
