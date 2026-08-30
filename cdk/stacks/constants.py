@@ -47,6 +47,7 @@ TABLE_TTL_ATTRIBUTE = os.environ.get("TABLE_TTL_ATTRIBUTE", "ttl")
 RAW_BACKUP_BUCKET = os.environ.get("RAW_BACKUP_BUCKET", "matthew-life-platform-raw-backup")
 RAW_BACKUP_REGION = os.environ.get("RAW_BACKUP_REGION", "us-east-2")
 RAW_REPLICATION_ROLE_NAME = os.environ.get("RAW_REPLICATION_ROLE_NAME", "life-platform-raw-replication")
+RAW_BATCH_REPLICATION_ROLE_NAME = os.environ.get("RAW_BATCH_REPLICATION_ROLE_NAME", "life-platform-raw-batch-replication")
 # The ONLY prefix replicated. Widening this is a deliberate cost + privacy decision,
 # not a convenience edit — everything outside raw/ is recomputable by definition.
 RAW_REPLICATION_PREFIX = "raw/"
