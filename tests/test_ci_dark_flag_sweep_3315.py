@@ -18,12 +18,16 @@ keeps the class closed:
     future edit that quietly weakens the detector reds here.
 
 PyYAML is imported lazily by the sweep and is absent from the deploy-critical lane, so
-this module importorskips it (the #2699/#2732 shape) — it runs in the full suite and the
-pre-merge full-suite job, both of which install pyyaml.
+this module importorskips it (the #2699/#2732 shape). It sweeps `.github/workflows/`
+itself (every file on disk must be in the evaluation), so it is a structural gate in the
+census's sense: registered in `tests/conftest.py::_PREMERGE_EXTRA_FILES` (runs in the
+pre-merge fast lane, which installs pyyaml) and proved in
+`scripts/gate_census_mutations.py` as `structural::test_ci_dark_flag_sweep_3315.py`.
 """
 
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -70,6 +74,17 @@ def test_coverage_is_reported_with_n_and_names_what_it_could_not_evaluate(live_r
     # The unevaluated list is an explicit artefact, never an implicit skip.
     assert isinstance(cov["unevaluated"], list)
     assert cov["unresolved_scripts"] == [], cov["unresolved_scripts"]
+
+
+def test_every_workflow_file_on_disk_is_in_the_sweep(live_results):
+    """The inventory is the directory, not a hand-kept list: every `*.yml` under
+    .github/workflows/ must appear in the evaluation, and the sweep must not report a
+    workflow that is not on disk. n is the file count, stated in the failure."""
+    on_disk = {p.name for p in Path(_REPO, ".github", "workflows").rglob("*.yml")}
+    swept = {r.workflow for r in live_results}
+    assert (
+        on_disk and on_disk == swept
+    ), f"{len(on_disk)} workflow file(s) on disk, {len(swept)} swept — missing {sorted(on_disk - swept)}, phantom {sorted(swept - on_disk)}"
 
 
 def test_the_known_instances_are_evaluated_not_skipped(live_results):

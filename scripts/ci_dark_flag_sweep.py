@@ -181,7 +181,9 @@ _SHELL_WORDS = {
     "function",
 }
 # Tools a step may install in-line and then invoke; when invoked they must be installed.
-_GATE_TOOLS = ("mypy", "black", "ruff", "flake8", "pip-audit", "pip-licenses")
+# (Named so scripts/gate_census.py's registry discovery — `.*_GATES|GATE_.*` — does not read
+# a list of lint-tool names as six gates; it did, on this PR's first push.)
+_LINT_TOOL_DISTS = ("mypy", "black", "ruff", "flake8", "pip-audit", "pip-licenses")
 # A distribution that hard-depends on another: installing the left makes the right
 # importable, and a waiver on the left covers the right. (boto3 pins botocore exactly.)
 IMPLIES = {"boto3": ("botocore",), "aws-cdk-lib": ("constructs",), "pytest-cov": ("pytest",)}
@@ -676,7 +678,7 @@ def tool_requirements(run_text: str) -> list:
             reqs.append(("pytest --timeout", "pytest-timeout"))
         for m in re.finditer(r"(?:^|\s)-p\s+(?!no:)([A-Za-z_][\w.]*)", text):
             reqs.append((f"pytest -p {m.group(1)}", "?" + m.group(1)))
-    for tool in _GATE_TOOLS:
+    for tool in _LINT_TOOL_DISTS:
         if re.search(rf"(?:^|[\s;(])(?:python3?\s+-m\s+)?{re.escape(tool)}(?=\s|$)", text, re.M):
             reqs.append((tool, tool))
     return reqs

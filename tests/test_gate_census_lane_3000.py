@@ -289,7 +289,21 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # test_direction_of_travel_ruling_3293.py` (ARMED 1/1 on the recording run) — so the live
 # unproven count does not move (524 -> 524) and BASELINE_UNPROVEN_GATES stays where its
 # owner set it.
-BASELINE_TOTAL_GATES = 570
+# 570 -> 571 (2026-08-30, #3315): ONE real gate, `structural::test_ci_dark_flag_sweep_3315.py`
+# — the dark-flag sweep (no CI step may reach a dependency its job never installs;
+# registering it in _PREMERGE_EXTRA_FILES is part of the same PR). Verified by id-set
+# diff (each tree ran its OWN scripts/gate_census.py --json; main from a `git archive`
+# export): ADDED {structural::test_ci_dark_flag_sweep_3315.py}, REMOVED {}, plus the
+# count-neutral index rename of deploy-wedge-watch.yml's `ci::…::watch::N` ids (two setup
+# steps inserted ahead of them: {9,10} in, {1,2} out — no proof or attempt keys on those
+# ids). It arrives PROVEN — the mutation is a planted probe workflow carrying the
+# pre-#3315 fresh-eyes install line, re-runnable via `gate_census_mutations.py --run
+# --gate test_ci_dark_flag_sweep_3315.py` — so the live unproven count does not move and
+# BASELINE_UNPROVEN_GATES stays where its owner set it. NOT counted, deliberately: this
+# PR's first push showed 576 because the sweep's `_GATE_TOOLS` tuple matched the census's
+# registry-name pattern and entered as six `registry::` phantom gates — the #3220
+# name-only misfire, cured by renaming the constant, not by bumping onto noise.
+BASELINE_TOTAL_GATES = 571
 BASELINE_UNPROVEN_GATES = 541
 
 
