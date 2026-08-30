@@ -235,5 +235,5 @@ and the proportionality re-read (73 rows, 11 corrected, **two demote triggers al
 unnoticed**); the calendar now reports every ritual has run at least once. Owner decisions taken: #3083 **decided hold**, #2883 **re-measure at n=30**, and
 **auto-synced sources count as "logging"** (ADR-104 amendment), which unblocked #3252's dead box.
 **Needs the owner's hands: #3284** — the cycle's chronicle article is unreachable to every reader and
-the fix requires a manual CloudFront function publish. Full narrative:
+the fix requires a manual CloudFront function publish. **Session ended on a monthly spend limit, not a stopping point.** #3294 (P1) is **blocking every `site/**` deploy** — the visual QA gates every site deploy and auto-rolls-back on red, and #3286/#3287's front-ends are already sitting reverted because of it. Its half-finished work is on `issue-3294-absence-sourcing-coverage`, unverified, DO NOT MERGE AS-IS. **Start there.** Full narrative:
 `handovers/HANDOVER_LATEST.md`.

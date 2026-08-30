@@ -211,6 +211,19 @@ attribute before touching the number. `--decoded` after naming it.
 **Ledger:** the `proportionality-reread` in #3275 *is* this session's ledger work — 11 rows corrected
 **Stash/hooks:** clean
 
+## The session ended on a spend limit, not a stopping point
+
+The lane implementing **#3294** — the P1 that is blocking every site deploy — was terminated
+mid-implementation by a **monthly spend-limit API error**. It had written 442 lines across six files
+and was starting the coverage enumeration when it stopped.
+
+That work is **committed and pushed to `issue-3294-absence-sourcing-coverage`**, with no PR, marked
+`WIP … DO NOT MERGE AS-IS`. It has no must-fail proof, no finished enumeration, and no regression
+test. It is a starting point, not a fix — verify it against the acceptance boxes rather than
+trusting it.
+
+**Nothing else was in flight**: 0 open PRs, 0 waiting leases, working tree clean, doc-sync clean.
+
 ## Residual / next picks
 
 - **#3284 — needs the owner's hands.** The current cycle's chronicle article (24 KB, real, in the
@@ -223,8 +236,11 @@ attribute before touching the number. `--decoded` after naming it.
 - ~~**#3285**~~ **CLOSED and verified live** — the card now reads 0 GREEN / 1350 AMBER in the delta
   tile, re-sampled from the deployed PNG.
 - **#3283 #3277 #3278 #3279 #3288** — filed, verified, on `Later`. #3286/#3287 are CLOSED.
-- **#3294** — the board asserts two false absences; the #3276 check is deployed but not reaching that
-  surface. `Now`. **This is why main is red.**
+- **#3294 — P1, START HERE. It blocks every `site/**` deploy.** The board asserts four absences and
+  two are false (strava 2, habitify 12); #3276's check is deployed but does not reach that surface.
+  The visual QA gates every site deploy and auto-rolls-back on red, so the site is frozen and
+  **#3286/#3287's front-ends are already sitting reverted** because of it. WIP on
+  `issue-3294-absence-sourcing-coverage` (unverified). **This is why main is red.**
 - **#3293** — two more surfaces state a direction from a signed value; `site_api_pulse.py:301`
   asserts `"up"` on absent/zero data while `:412` in the same file already does it correctly.
 - **#3289** — the worktree reaper cannot tell a live lane from a finished one.
