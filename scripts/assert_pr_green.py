@@ -329,7 +329,39 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Skip the expected-check assertion — run only assertion 1 (total>0, 0 not-green).",
     )
     parser.add_argument("--repo", default=REPO, help=f"owner/repo for `gh pr view -R` (default: {REPO})")
+    parser.add_argument(
+        "--no-closing-set",
+        action="store_true",
+        help="Skip the #3318 closing-set assertion (scripts/check_pr_closing_set.py) that runs on a green verdict.",
+    )
     return parser
+
+
+# #3318: the hook layer (scripts/hooks/guard_bash.py) accepts EITHER this script OR
+# deploy/wait_pr_green.sh as the assertion before `gh pr merge`, so both must carry the
+# closing-set check or the stray-`Fixes` class walks through whichever one skipped it.
+# Not reimplemented here — the grammar and the verdict vocabulary live in
+# scripts/check_pr_closing_set.py (derived from scripts/closure_contract.py); this runs
+# it as a subprocess and forwards its output. Advisory (`warn`) posture exits 0; the
+# documented flip to `block` turns a NONGREEN closing set into this script's exit 1.
+_CLOSING_SET_SCRIPT = os.path.join(_REPO_ROOT, "scripts", "check_pr_closing_set.py")
+
+
+def run_closing_set_check(pr: str, repo: str) -> int:
+    """Forward scripts/check_pr_closing_set.py's lines; UNAVAILABLE is printed, never silent."""
+    try:
+        p = subprocess.run(
+            [sys.executable, _CLOSING_SET_SCRIPT, "--repo", repo, "--pr", str(pr)], capture_output=True, text=True, timeout=120
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"CLOSING-SET VERDICT UNAVAILABLE — could not run {_CLOSING_SET_SCRIPT}: {e} (#3318)")
+        return 1
+    out = (p.stdout or "") + (p.stderr or "")
+    if not out.strip():
+        print(f"CLOSING-SET VERDICT UNAVAILABLE — {_CLOSING_SET_SCRIPT} printed nothing (exit {p.returncode}) (#3318)")
+        return 1
+    print(out.rstrip())
+    return 0 if p.returncode == 0 else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -354,6 +386,10 @@ def main(argv: list[str] | None = None) -> int:
     state = classify_rollup(entries, expected)
     code, message = render(state)
     print(message)
+    if code == 0 and not args.no_closing_set:
+        # #3318: green is the merge-eligible verdict — assert the closing set here, last.
+        if run_closing_set_check(args.pr, args.repo) != 0:
+            return 1
     return code
 
 

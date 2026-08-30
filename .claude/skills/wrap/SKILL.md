@@ -401,6 +401,33 @@ health one.
 - The handover carries one line either way: `**Closures:** #N, #M commented` or
   `**Closures:** none — no issues closed this session`.
 
+**The closure DoD (#3318) — the same closures, audited against the contract.** Session K's
+audit found 5 escapes in ~60 closes that the (e8) comment alone cannot catch: a stray
+`Fixes` closing an issue whose author then wrote "stays OPEN" *after* `closedAt` (#2848), a
+scope assertion posted hours after the close (#2670), and closing comments naming a
+residual with no carrier (#2938, #2921, #3208 — the #2845 shape). The rules are the
+registry `scripts/closure_contract.py` (rendered into `docs/CONVENTIONS.md` §4a2, never
+copied); this step applies them to THIS session's closures only — no new standing ritual.
+
+- The Phase 1 batch already ran `python3 scripts/closure_sweep.py --session` (the window is
+  `closed:>=` today UTC, the same list as above). Before the (e8) comments exist, every
+  issue it lists as `no-outcome-verdict` is simply the (e8) to-do; **after** commenting,
+  re-run it and read the other codes: `unhomed-residual` means a closing comment named a
+  residual and disposed it nowhere — fix the comment (carrier `#N`, fold onto a named open
+  issue `#N`, or `not-work — <home>`); `post-close-comment` / `post-close-assertion` means
+  the issue was still being worked after it closed — reopen it or disposition it (a dated
+  `DISPOSITIONED_ESCAPES` entry in the registry, with a reason); `epic-children-open` means
+  an epic closed over an open child — reopen the epic or re-home the child.
+- Posture is **advisory** (`warn`: the sweep exits 0 whatever it finds) until the flip bar
+  in the registry docstring is met on real wraps; a printed hit on an issue this session
+  closed may still not be left undispositioned — the exit code is not the contract, the
+  line is.
+- The sweep's verdict rides the (e8) line above rather than adding a thirteenth marker: after
+  the comments, the `**Closures:**` line reads `#N, #M commented · DoD: scanned N, hits K —
+  <each hit's disposition>` (or `· DoD: unverified — GitHub unreachable`, the (e7) degrade
+  shape). The battery itself is the dead-man for the machinery: `wrap_gates.py` cannot
+  complete its gather phase if `scripts/closure_sweep.py` is missing or crashes.
+
 ### (e9) Now-refill + `Later` sweep — a wrap gate, same shape as (d)/(e)/(e2)–(e8) (#1870)
 
 ADR-099's own maintenance rule (3) — "a monthly ~10-minute triage sweep closes-or-demotes

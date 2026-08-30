@@ -1,0 +1,41 @@
+{
+ "issues": [
+  {
+   "number": 3289,
+   "title": "workflow: the worktree reaper would delete LIVE lane worktrees — clean-and-merged cannot tell 'finished' from 'just started'",
+   "state": "CLOSED",
+   "closedAt": "2026-08-30T20:17:46Z",
+   "stateReason": "COMPLETED",
+   "labels": {
+    "nodes": [
+     {
+      "name": "area:claude-workflow"
+     },
+     {
+      "name": "model:opus"
+     },
+     {
+      "name": "prio:P2"
+     },
+     {
+      "name": "type:bug"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "createdAt": "2026-08-30T21:18:35Z",
+      "author": {
+       "login": "averagejoematt"
+      },
+      "body": "**Shipped:** the reaper reads a LEADING liveness signal — git worktree lock from creation (lane_worktree.py creates-and-locks; git itself refuses to remove locked trees), a 120-min idle floor as backstop (admin index deliberately excluded — the reaper's own status probe rewrites it, which would make the floor unable to fail), main tree excluded by INODE never string · PR #3312 (merged 0c806b2de) · must-fail watched first: 5/6 new tests red on the pre-fix module, the key one exactly on the incident shape; live dry-run kept all five running lanes, named 7 long-merged trees reapable\n**Outcome:** realized — a live lane in the checkout→first-write or push→merge window can no longer be judged finished; the clean-and-merged heuristic is demoted to a lagging co-signal"
+     }
+    ]
+   }
+  }
+ ],
+ "open_issues": [],
+ "_source": "gh api graphql — #3289 captured 2026-08-30; a clean close under the contract"
+}

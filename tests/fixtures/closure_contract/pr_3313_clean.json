@@ -1,0 +1,43 @@
+{
+ "body": "## What\n\n#3285 introduced `lambdas/web/journey_direction.py` — one ruling on the SIGN of the weight-journey delta — and adopted it on the home share card and the home `og:description`. Two siblings of the same family were deliberately left out of that PR and were still live on `main`. This adopts the ruling on both.\n\n**1. `lambdas/web/og_moments.py` — the weekly-recap moment (og-image-generator)**\n\n```python\nbits.append(f\"{round(journey['lost_lbs'], 1)} lbs down\")   # before\n```\n\nA static direction word over a signed value. `lost_lbs` is `start − current`, so a gain published as **\"-5.2 lbs down\"** — on the recap card's meta line, its `og:description`, and its page body (all three read the same `meta` string). Now routed through a `_weight_bit()` helper that takes its direction from `classify_delta`: a gain reads \"5.2 lbs up\", a zero delta reads \"weight even\", and an absent / non-numeric / non-finite delta contributes **no clause at all** rather than a guessed one (ADR-104). It also no longer raises on a non-numeric payload, which the old `round()` did.\n\n**2. `lambdas/web/site_api_pulse.py` — the `scale` glyph (`/api/pulse`)**\n\n```python\n\"direction\": \"down\" if w_val and w_val < start_weight else \"up\",   # before\n```\n\nTwo faults in one line. No flat case (a delta of exactly zero asserted `\"up\"`), and a falsy collapse — an absent weigh-in short-circuited the `and` and **also** asserted `\"up\"`, a direction claim with no data behind it. The same module's narrative `dir_word` 100+ lines later was already three-way and already guarded on `is not None`.\n\nBoth call sites now go through one module-level `weight_direction(w_val, start_weight)`, which defers to `classify_delta` and holds the sign conversion (`classify_delta` rules on `start − current`; this module's `delta` fields run the other way) in exactly one place. A non-positive weight is UNKNOWN, deliberately — nobody weighs 0 lb, and ruling on a 0 would turn a broken record into a 315 lb \"loss\", which is the falsy collapse wearing the other sign. The glyph publishes `direction: null` for UNKNOWN, matching its sibling `value`/`delta`/`delta_label`, which are already null in that case.\n\nAdjudicated out, per the issue and recorded so a later sweep does not reopen them: `og_image_lambda.py`'s \"TIER-0 STREAK\" and `card_engine.py`'s \"LEVEL · <tier>\" paint a static success colour over counts that cannot go negative, under captions that are not directional.\n\n## The guard, and its stated limit\n\n`tests/test_direction_of_travel_ruling_3293.py` carries a registry of the **five** surfaces that state a direction of travel about the weight journey, each AST-verified to reach `classify_delta()` from its own entry point, plus a staleness sweep that fails if a module imports the ruling and is not listed.\n\nThe issue's fourth acceptance box offers a fork, and this takes the second branch **explicitly, with the limit stated in-file**: the \"fail if ANY new surface states a direction\" guard reduces to scanning for a direction lexicon next to a formatted value, which is phrase-matching — and `site_api_pulse.py` already contains\n\n```python\nf\"Weight up {_wt_d:.1f} lbs from yesterday. Likely water retention …\"\n```\n\nwhich is a static direction word immediately after a formatted signed number and is **correct** (it is only reached under `if _wt_d > 3`). A lexicon scan flags it on day one, in the very file it is meant to guard. So the guard is structural but scoped: it cannot discover a sixth surface; it fails the moment one of the five stops routing through the ruling, which is exactly how #3293 happened.\n\n## Verification\n\n**Mutation-proven, watched failing.** With `main`'s `og_moments.py` and `site_api_pulse.py` checked back in under the new test file: **24 failed / 9 passed**, including the two filed symptoms verbatim —\n\n```\nE   AssertionError: -5.2 lbs down · HRV 52 ms · streak 3d · day 21\nE   AssertionError: a direction published with no weigh-in behind it: 'up'\n```\n\nand both `#3293` registry rows red while the three `#3285` rows stayed green — the exact state the issue describes. Restored: **33 passed**.\n\n- `tests/test_direction_of_travel_ruling_3293.py` — 33 passed. Both surfaces driven end-to-end (the recap sweep reads the bytes written to S3; the pulse tests drive the routed `/api/pulse` handler and read the served payload), not the helper alone.\n- Targeted suites — 222 passed (`test_og_moments`, `test_card_engine`, `test_og_home_delta_direction_3285`, `test_wrong_feed_1377`, `test_pulse_since_yesterday_1813`, `test_vitals_today_frame_3287`, `test_vitals_truth_spine`, `test_pre_start_countdown`, `test_cross_phase_framing_2957`, `test_absence_coverage_3294`, census + premerge + module-size + mypy-clean guards).\n- Pre-merge lane (`pytest -m \"premerge and not integration\"`) — **9732 passed, 42 skipped, 35 xfailed** in 314s.\n- `black` + `ruff` via `deploy/agent_commit.sh` (pinned 26.3.1 / 0.14.14) clean; `flake8` clean on every changed file.\n\n**Census (#3000):** `BASELINE_TOTAL_GATES` 569 → 570. Verified by id-set diff, not count delta — each tree ran its own `scripts/gate_census.py --json` with the new file `git add`ed first: ADDED exactly `{structural::test_direction_of_travel_ruling_3293.py}`, REMOVED `{}`. It arrives **PROVEN** (`gate_census_mutations.py --run --gate test_direction_of_travel_ruling_3293.py` → ARMED 1/1, plant = an unregistered importer in `lambdas/web/`), so live unproven does not move (524 → 524) and `BASELINE_UNPROVEN_GATES` is untouched. Registered in `_PREMERGE_EXTRA_FILES` (#2372 classification).\n\n## Post-merge ops\n\nTwo different deploy paths — **both are needed**, neither is automatic:\n\n1. **`og_moments.py` → the og-image-generator Lambda.** It is bundled with `og_image_lambda.py`:\n   `bash deploy/deploy_lambda.sh og-image-generator lambdas/web/og_image_lambda.py`\n   The recap card/shell is only rewritten by the daily 11:30 AM PT sweep, so the corrected `/moments/week/<ISO-week>/` artifact appears on the next scheduled run (or a manual invoke). Nothing is deleted in the meantime — the sweep overwrites in place.\n2. **`site_api_pulse.py` → the site-api Lambda, full-tree bundle (never single-file):**\n   `bash deploy/deploy_site_api.sh`\n   `/api/pulse` is cached 300s at CloudFront; no invalidation is required, the next cache fill serves it.\n\nNo CDK change, no site/ change, so `site-deploy.yml` will not fire and no `cdk deploy` is needed.\n\n## Risks / left open\n\n- **API shape change.** `glyphs.scale.direction` gains `\"even\"` and `null` alongside `\"down\"`/`\"up\"`. The only consumer anywhere in the tree is `site/legacy/assets/js/engagement.js:363`, which falls through to \"Holding steady\" for both — correct for `\"even\"`, imprecise for `null`. `site/legacy/**` is the frozen verbatim rollback copy with no UI links (ADR-071), so it is deliberately not edited here. No non-legacy front-end reads the field.\n- The guard cannot discover a **sixth** surface built without touching the ruling; that limit is stated in the guard file and in the census scope record rather than papered over.\n\nFixes #3293\n",
+ "closingIssuesReferences": [
+  {
+   "id": "I_kwDORVwPus8AAAABOrZkow",
+   "number": 3293,
+   "repository": {
+    "id": "R_kgDORVwPug",
+    "name": "life-platform",
+    "owner": {
+     "id": "U_kgDOCm0j2Q",
+     "login": "averagejoematt"
+    }
+   },
+   "url": "https://github.com/averagejoematt/life-platform/issues/3293"
+  }
+ ],
+ "commits": [
+  {
+   "authoredDate": "2026-08-30T19:56:17Z",
+   "authors": [
+    {
+     "email": "integration@local",
+     "id": "",
+     "login": "",
+     "name": "integration"
+    }
+   ],
+   "committedDate": "2026-08-30T19:56:20Z",
+   "messageBody": "…the one ruling (#3293)",
+   "messageHeadline": "fix(og/api): the last two direction-of-travel surfaces route through …",
+   "oid": "c528996532da1ebff5fe6fe9b5d5a683c1509a09"
+  }
+ ],
+ "headRefName": "issue-3293-direction-of-travel",
+ "number": 3313,
+ "issue_labels": {
+  "3293": [
+   "type:story"
+  ]
+ },
+ "_source": "gh pr view 3313 --json number,body,headRefName,commits,closingIssuesReferences — captured 2026-08-30"
+}

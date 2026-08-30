@@ -74,7 +74,12 @@ the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
 
 1. **Partial acceptance is not a close.** A merged PR that satisfies *part* of an issue's
    acceptance closes the PR, not the issue. Merge the work, reopen the issue, and name
-   which boxes are unmet. (Three issues were wrongly closed this way in one day.)
+   which boxes are unmet. (Three issues were wrongly closed this way in one day.) The
+   full definition-of-done for a close — the verdict comment, every named residual
+   disposed to exactly one home, nothing said after `closedAt`, epics after their
+   children, the PR's closing set equal to the lane's declared target — is the registry
+   `scripts/closure_contract.py` (#3318), rendered in `docs/CONVENTIONS.md` §4a2 and
+   enforced (advisory) by its two detectors; it is not restated here.
 
 2. **An epic is judged by its Outcome sentence, never by its child count.** An epic can
    have every child closed and every acceptance box verifiably true while its stated

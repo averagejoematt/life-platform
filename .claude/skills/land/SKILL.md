@@ -104,6 +104,14 @@ Per ADR-099, the session that merges owns the closing comment:
 **Partial acceptance is not a close** — merge the PR, reopen the issue, name the unmet
 boxes.
 
+The full definition-of-done for a close is the registry `scripts/closure_contract.py`
+(#3318; rendered in `docs/CONVENTIONS.md` §4a2). Two of its rules bite here: a `partial` /
+`not-realized` verdict, or any residual the comment names, must be disposed to exactly one
+home — a carrier `#N`, a fold onto a named open issue `#N`, or `not-work — <home>`; and the
+PR's closing set is asserted before the merge — `deploy/wait_pr_green.sh` prints
+`CLOSING-SET …` on its green verdict (advisory today; a `declared-target-mismatch` or a
+`partial-acceptance-close` there is the stray-`Fixes` class that closed #3222 and #2848).
+
 And note the case no test covers: **a green suite is necessary and not sufficient for a
 timing or performance fix.** `#3231` shipped half-broken with all twelve of its own tests
 green; the only symptom was one line in a durations block.
