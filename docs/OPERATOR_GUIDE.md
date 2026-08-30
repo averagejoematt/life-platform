@@ -36,7 +36,7 @@ Before you can operate the platform, you need:
    ```bash
    aws configure set cli_pager ""
    ```
-3. **Git clone**: `~/Documents/Claude/life-platform/` is the canonical workdir.
+3. **Git clone**: `~/dev/life-platform/` is the canonical workdir.
 4. **Read `docs/RUNBOOK.md`** end-to-end at least once.
 5. **Bookmark these**:
    - https://averagejoematt.com/status/ — system health dashboard

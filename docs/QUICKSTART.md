@@ -33,8 +33,8 @@ OIDC federation — no long-lived keys in GitHub; roles inventoried in AWS_ACCES
 ### Clone + install
 
 ```bash
-git clone git@github.com:averagejoematt/life-platform.git ~/Documents/Claude/life-platform
-cd ~/Documents/Claude/life-platform
+git clone git@github.com:averagejoematt/life-platform.git ~/dev/life-platform
+cd ~/dev/life-platform
 python3 -m venv .venv                 # python3 must be 3.12.x — see table above
 source .venv/bin/activate
 pip install -r requirements-dev.txt   # pytest, black, ruff, flake8, playwright, boto3 — pinned to match CI's gates

@@ -4,7 +4,7 @@
 # CoreStack: SQS DLQ + SNS topic imported, Lambda Layer created new
 # McpStack: Function URL imported
 set -euo pipefail
-cd ~/Documents/Claude/life-platform/cdk
+cd ~/dev/life-platform/cdk
 
 echo "═══════════════════════════════════════════════════════════════"
 echo " CDK Core + Function URL Migration"

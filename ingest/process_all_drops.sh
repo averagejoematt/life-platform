@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # Life Platform — Master Drop Folder Processor
-# /Users/matthewwalker/Documents/Claude/life-platform/ingest/process_all_drops.sh
+# /Users/matthewwalker/dev/life-platform/ingest/process_all_drops.sh
 #
 # Triggered by launchd WatchPaths on any of the drop folders.
 # Scans each folder in turn and routes files to the correct backfill script.
@@ -15,7 +15,7 @@
 # Failed files are left in place for retry.
 # ============================================================
 
-LIFE_PLATFORM="/Users/matthewwalker/Documents/Claude/life-platform"
+LIFE_PLATFORM="/Users/matthewwalker/dev/life-platform"
 BASE="$LIFE_PLATFORM/datadrops"
 LOG="$LIFE_PLATFORM/ingest/ingest.log"
 MAX_LOG_LINES=5000

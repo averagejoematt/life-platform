@@ -1,7 +1,7 @@
 #!/bin/bash
 # deploy_cdk_core.sh — Import SQS+SNS into CoreStack + create Lambda Layer
 set -euo pipefail
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 
 echo "═══════════════════════════════════════════════════════════════"
 echo " CDK Core Stack — Import SQS+SNS + Create Lambda Layer"

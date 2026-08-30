@@ -1,7 +1,7 @@
 # Restart Discovery Report — 2026-05-18 Genesis
 
 **Produced:** 2026-05-20 by Claude Code, per `CLAUDE_CODE_RESTART_2026_05_18.md` §3
-**Scope:** Read-only scan of `~/Documents/Claude/life-platform`
+**Scope:** Read-only scan of `~/dev/life-platform`
 **Status:** Discovery complete. **Pausing at GATE 1 per spec §12 step 1.**
 
 ---
@@ -297,7 +297,7 @@ Then we proceed to §3-of-runbook (which is the *fourth* gate, since we've now f
 
 - Raw scans: `_grep_anchors.txt`, `_grep_307.txt`, `_grep_dayn.txt`, `_grep_streaks.txt`, `_chronicle_files.txt`, `_grep_site_copy.txt` (all in this directory)
 - Spec: `~/Desktop/CLAUDE_CODE_RESTART_2026_05_18.md`
-- Repo CLAUDE.md (architecture context): `~/Documents/Claude/life-platform/CLAUDE.md`
+- Repo CLAUDE.md (architecture context): `~/dev/life-platform/CLAUDE.md`
 
 ---
 

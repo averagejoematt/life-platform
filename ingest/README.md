@@ -15,7 +15,7 @@ A single macOS launchd agent watches three drop folders. Any time a file lands i
 ## Setup (one time)
 
 ```bash
-cd /Users/matthewwalker/Documents/Claude/life-platform/ingest
+cd /Users/matthewwalker/dev/life-platform/ingest
 chmod +x install.sh process_all_drops.sh
 ./install.sh
 ```

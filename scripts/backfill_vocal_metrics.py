@@ -18,7 +18,7 @@ USAGE
     python3 scripts/backfill_vocal_metrics.py <srt-dir> --channel solo_recording --apply
 
 <srt-dir> is ALWAYS an explicit argument — this script never hardcodes a path to the
-private studio tree (e.g. ~/Documents/Claude/vlog/sessions), and that tree is never
+private studio tree (e.g. ~/dev/vlog/sessions), and that tree is never
 committed to this repo. Every *.srt file found recursively under <srt-dir> is a
 candidate.
 

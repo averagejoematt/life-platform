@@ -17,7 +17,7 @@ PARSE (this module)   `parse_srt()` takes SRT text and returns a metrics dict. N
 
 BACKFILL/WRITE (scripts/backfill_vocal_metrics.py, NOT a Lambda)
                        The raw SRT files live outside this repo, in the private studio
-                       tree (`~/Documents/Claude/vlog/sessions/<session>/transcript/*.srt`
+                       tree (`~/dev/vlog/sessions/<session>/transcript/*.srt`
                        — see `docs/PLATFORM_NORTH_STAR.md`'s vlog-studio note). The vlog
                        upload path goes through Notion, which does NOT carry the SRT — so
                        there is no ingest-time Lambda hook that could ever see this file;

@@ -63,7 +63,7 @@ channel stays on the staging module. Full rule: `docs/CONVENTIONS.md` §1.
 
 ```bash
 # Correct
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 bash deploy/deploy_lambda.sh daily-brief lambdas/emails/daily_brief_lambda.py
 
 # Wrong — relative paths will break

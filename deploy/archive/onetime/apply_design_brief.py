@@ -12,7 +12,7 @@ import re
 import sys
 import argparse
 
-PROJECT_ROOT = os.path.expanduser("~/Documents/Claude/life-platform")
+PROJECT_ROOT = os.path.expanduser("~/dev/life-platform")
 SITE_DIR = os.path.join(PROJECT_ROOT, "site")
 
 # ── Page reading order (linear sequence through the site) ──

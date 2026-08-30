@@ -329,7 +329,7 @@ def main():
     print("=" * 60)
     print("LOCAL FILES UPDATED. Next steps (run in terminal):")
     print()
-    print("  cd ~/Documents/Claude/life-platform")
+    print("  cd ~/dev/life-platform")
     print("  bash deploy/sync_site_to_s3.sh")
     print("  aws cloudfront create-invalidation \\")
     print("    --distribution-id E3S424OXQZ8NBE \\")

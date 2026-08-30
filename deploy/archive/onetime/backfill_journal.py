@@ -3,7 +3,7 @@
 backfill_journal.py — Convert existing blog/week-*.html posts to
 Signal-themed site/journal/posts/week-{nn}/index.html format.
 
-Run from: /Users/matthewwalker/Documents/Claude/life-platform
+Run from: /Users/matthewwalker/dev/life-platform
 Requires: aws CLI configured, blog posts already in s3://matthew-life-platform/blog/
 
 What it does:

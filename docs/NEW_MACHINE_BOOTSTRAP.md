@@ -78,18 +78,18 @@ the versions QUICKSTART pins, never "whatever npm resolves as latest".
 
 ## Step 1 — Clone the repo
 
-The canonical clone path is `~/Documents/Claude/life-platform` (the memory-dir slug,
+The canonical clone path is `~/dev/life-platform` (the memory-dir slug,
 several scripts, and the launchd plists all encode this exact path — cloning elsewhere
 breaks the drop folders and the memory-dir location).
 
 ```bash
 gh auth login                                   # or: use an SSH key with github.com:averagejoematt
 git clone https://github.com/averagejoematt/life-platform.git \
-  ~/Documents/Claude/life-platform
-cd ~/Documents/Claude/life-platform
+  ~/dev/life-platform
+cd ~/dev/life-platform
 ```
 
-(SSH form: `git clone git@github.com:averagejoematt/life-platform.git ~/Documents/Claude/life-platform` — same as `docs/QUICKSTART.md` §1.)
+(SSH form: `git clone git@github.com:averagejoematt/life-platform.git ~/dev/life-platform` — same as `docs/QUICKSTART.md` §1.)
 
 ---
 
@@ -169,7 +169,7 @@ repo root. Its `api_key` is the `life-platform/mcp-api-key` secret, so regenerat
 Secrets Manager rather than restoring a copy:
 
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 KEY=$(aws secretsmanager get-secret-value --secret-id life-platform/mcp-api-key \
   --region us-west-2 --query SecretString --output text)
 cat > .config.json <<JSON
@@ -228,7 +228,7 @@ of git (`docs/CONTINUITY.md` §4; visibility can flip back).
 # datadrops lands under the TOP-LEVEL, delete-protected datadrops-archive/ prefix
 # (NOT uploads/ — that expires in 30 days). Restore into the repo's datadrops/:
 aws s3 sync s3://matthew-life-platform/datadrops-archive/ \
-  ~/Documents/Claude/life-platform/datadrops/ --region us-west-2
+  ~/dev/life-platform/datadrops/ --region us-west-2
 ```
 
 **The archive fills from a manual push, not the daily job (see §3c).** `datadrops/` is
@@ -253,7 +253,7 @@ laptop — treat an empty archive as "the manual push was never run," not a bug.
 > the current posture, **ingest is manual**: drop your CSV/zip, then process it from a
 > Terminal (which has disk access via your login session):
 > ```bash
-> cd ~/Documents/Claude/life-platform && bash ingest/process_all_drops.sh
+> cd ~/dev/life-platform && bash ingest/process_all_drops.sh
 > ```
 > Installing the agent below is still fine (harmless, and it works instantly if you ever
 > do relocate the drop folders out of `~/Documents`), but don't rely on it auto-firing.
@@ -262,7 +262,7 @@ The ingest agent is installed with **one command** (`docs/CONTINUITY.md` §7,
 `ingest/README.md`):
 
 ```bash
-cd ~/Documents/Claude/life-platform/ingest
+cd ~/dev/life-platform/ingest
 chmod +x install.sh process_all_drops.sh
 ./install.sh
 ```
@@ -291,7 +291,7 @@ is in use.
 the daily agent that snapshots the step-4 state into versioned, private S3:
 
 ```bash
-cd ~/Documents/Claude/life-platform/backup
+cd ~/dev/life-platform/backup
 bash install.sh   # copies backup.sh → ~/.local/bin, loads the launchd plist
 ```
 
@@ -338,7 +338,7 @@ head -20 ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/
 # One manual drop round-trips end-to-end (ingest runtime is live):
 #   drop a small MacroFactor CSV into ~/Documents/Claude/macrofactor_drop/
 #   → within seconds it moves to processed/ and appears in ingest.log
-tail -20 ~/Documents/Claude/life-platform/ingest/ingest.log
+tail -20 ~/dev/life-platform/ingest/ingest.log
 ```
 
 If `aws sts get-caller-identity` returns the right account, the pytest suite is green,

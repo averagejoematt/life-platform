@@ -523,6 +523,6 @@ else:
 print(f"\n{'='*60}")
 print("NEXT STEPS:")
 print("  1. git rm lambdas/mcp_server.py")
-print("  2. cd ~/Documents/Claude/life-platform")
+print("  2. cd ~/dev/life-platform")
 print("  3. python3 -m flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics")
 print("  4. Review output — then git add -A && git commit -m 'fix: resolve all CI F821 lint failures'")

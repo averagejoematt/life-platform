@@ -1,7 +1,7 @@
 #!/bin/bash
 # warmup_lambdas.sh — Ping all homepage API endpoints to prevent cold starts
 # Run this 5 minutes before launch: bash deploy/warmup_lambdas.sh
-# Schedule via: echo "bash ~/Documents/Claude/life-platform/deploy/warmup_lambdas.sh" | at 11:55pm March 31
+# Schedule via: echo "bash ~/dev/life-platform/deploy/warmup_lambdas.sh" | at 11:55pm March 31
 
 BASE="https://averagejoematt.com"
 ENDPOINTS=(

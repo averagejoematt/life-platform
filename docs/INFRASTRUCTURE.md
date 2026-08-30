@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-08-26 (v8.6.0 — 104 Lambdas, 26 active secrets, 76 MCP tools, ~116 alarms)
+> Last updated: 2026-08-30 (v8.6.0 — 104 Lambdas, 26 active secrets, 76 MCP tools, ~116 alarms)
 
 ---
 
@@ -242,7 +242,7 @@ See `deploy/p1_kms_dynamodb.sh` for creation script.
 ## Local Project Structure
 
 ```
-~/Documents/Claude/life-platform/
+~/dev/life-platform/
 ├── mcp_server.py          # MCP Lambda source
 ├── mcp_bridge.py          # Local Claude Desktop bridge
 ├── mcp/                   # 26 tool modules + helpers

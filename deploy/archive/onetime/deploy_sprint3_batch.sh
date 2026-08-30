@@ -2,7 +2,7 @@
 # deploy_sprint3_batch.sh — Deploy Sprint 3 remaining items (v3.7.67)
 set -e
 
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 echo "=== Sprint 3 Batch Deploy (v3.7.67) ==="
 echo ""
 

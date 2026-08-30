@@ -2,7 +2,7 @@
 # deploy_cdk_iam_roles.sh — Migrate all Lambda IAM roles to CDK-managed
 # Deploy ONE stack at a time. Wait for each to succeed before proceeding.
 set -euo pipefail
-cd ~/Documents/Claude/life-platform/cdk
+cd ~/dev/life-platform/cdk
 
 echo "═══════════════════════════════════════════════════════════════"
 echo " CDK IAM Role Migration — v3.4.0"

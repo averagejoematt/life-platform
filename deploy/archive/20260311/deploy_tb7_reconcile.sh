@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # TB7-3 + TB7-10: CDK reconcile + reserved concurrency for 13 ingestion Lambdas
-# Run from: ~/Documents/Claude/life-platform/cdk/
+# Run from: ~/dev/life-platform/cdk/
 set -euo pipefail
 
 echo "=== CDK Reconcile: LifePlatformIngestion + LifePlatformOperational ==="

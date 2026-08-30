@@ -2,7 +2,7 @@
 # deploy_site_quick_wins.sh — One-shot deploy for website review quick wins
 set -e
 
-PROJ="/Users/matthewwalker/Documents/Claude/life-platform"
+PROJ="/Users/matthewwalker/dev/life-platform"
 cd "$PROJ"
 
 echo "=== Step 1: Install Pillow in project venv ==="

@@ -2,7 +2,7 @@
 """Prepend v3.9.35 changelog entry"""
 import os
 
-CHANGELOG = os.path.expanduser("~/Documents/Claude/life-platform/docs/CHANGELOG.md")
+CHANGELOG = os.path.expanduser("~/dev/life-platform/docs/CHANGELOG.md")
 
 ENTRY = """## v3.9.35 — 2026-03-26: Signal Doctrine Tier 1 Rollout + Arena Voting + Experiments
 

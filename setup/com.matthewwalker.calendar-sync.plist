@@ -8,7 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/matthewwalker/Documents/Claude/life-platform/setup/run_calendar_sync.sh</string>
+        <string>/Users/matthewwalker/dev/life-platform/setup/run_calendar_sync.sh</string>
     </array>
 
     <!-- Run every 4 hours (14400 seconds).
@@ -23,8 +23,8 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/matthewwalker/Documents/Claude/life-platform/setup/calendar_sync_launchd.log</string>
+    <string>/Users/matthewwalker/dev/life-platform/setup/calendar_sync_launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/matthewwalker/Documents/Claude/life-platform/setup/calendar_sync_launchd.log</string>
+    <string>/Users/matthewwalker/dev/life-platform/setup/calendar_sync_launchd.log</string>
 </dict>
 </plist>

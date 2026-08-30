@@ -3,7 +3,7 @@
 # BS-11, WEB-CE, BS-BM2 (site pages + site_api), BS-14 (design doc only)
 set -e
 
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 echo "=== Sprint 4 Deploy (v3.7.68) ==="
 echo ""
 

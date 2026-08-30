@@ -13,7 +13,7 @@ set -euo pipefail
 # Usage: bash setup_habitify.sh
 # ══════════════════════════════════════════════════════════════════════════════
 
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 
 echo "═══════════════════════════════════════════════════"
 echo "  Habitify Integration — Full Setup"

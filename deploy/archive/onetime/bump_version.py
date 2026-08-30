@@ -2,7 +2,7 @@
 """Bump version in sync_doc_metadata.py from v3.9.34 → v3.9.35"""
 import os
 
-f = os.path.expanduser("~/Documents/Claude/life-platform/deploy/sync_doc_metadata.py")
+f = os.path.expanduser("~/dev/life-platform/deploy/sync_doc_metadata.py")
 with open(f) as fh:
     content = fh.read()
 

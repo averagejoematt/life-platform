@@ -12,6 +12,7 @@
 line-length = 140
 target-version = ["py312"]
 extend-exclude = '''/(\.venv|cdk\.out|layer-build|site|node_modules|archive|datadrops)/'''
+force-exclude = '''/(\.venv|cdk\.out|layer-build|site|node_modules|archive|datadrops)/'''
 
 [tool.ruff]
 line-length = 140
@@ -23,6 +24,7 @@ target-version = "py312"
 # local run that disagrees with CI is no longer a curiosity: it is an agent chasing
 # errors that cannot exist on the runner.
 extend-exclude = [".venv", "cdk.out", "cdk/_bundle_staging", "layer-build", "site", "node_modules", "archive", "datadrops", "_mcp_staging"]
+force-exclude = true
 
 [tool.ruff.lint]
 # pycodestyle (E/W) + pyflakes (F) + isort (I) + flake8-bandit (S, security/SAST).

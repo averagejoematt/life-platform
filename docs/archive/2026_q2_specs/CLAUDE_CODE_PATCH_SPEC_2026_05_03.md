@@ -4,7 +4,7 @@
 
 **Sequence matters:** Apply TD-21 first (unblocks experiments). Apply TD-23 first (unblocks Todoist tasks). After both deploy, run the operationalization scripts at the bottom of this file. Then attack TD-15, TD-19, TD-22.
 
-**Repo root:** `/Users/matthewwalker/Documents/Claude/life-platform/`
+**Repo root:** `/Users/matthewwalker/dev/life-platform/`
 
 ---
 
@@ -44,7 +44,7 @@ After the module-level fix, three local imports become redundant. Remove for cle
 MCP Lambda requires full package zip per `userMemories` operational notes:
 
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 ZIP=/tmp/mcp_server_$(date +%s).zip
 zip -j $ZIP mcp_server.py mcp_bridge.py
 zip -r $ZIP mcp/
@@ -221,7 +221,7 @@ There's no live integration test, so do this:
 Use `deploy/deploy_lambda.sh`:
 
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 bash deploy/deploy_lambda.sh health-auto-export-webhook
 ```
 

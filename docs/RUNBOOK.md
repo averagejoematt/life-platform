@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-08-26 (v8.6.0 — 76 MCP tools, 39-module package, 104 Lambdas, 20 data sources)
+Last updated: 2026-08-30 (v8.6.0 — 76 MCP tools, 39-module package, 104 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 104 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -740,7 +740,7 @@ Garmin OAuth1 has a ~30-day lifetime; after the gap or rate-limit storm, the Lam
 
 **Step 1 — Re-auth via browser flow (Playwright):**
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 python3 setup/setup_garmin_browser_auth.py
 # Walks through Garmin login + MFA in headed Chromium
 # Writes fresh garth tokens to life-platform/garmin
@@ -1200,7 +1200,7 @@ aws lambda update-function-configuration \
 If the Withings refresh token expires (cascading failure from extended Lambda downtime):
 
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 python3 setup/fix_withings_oauth.py
 ```
 

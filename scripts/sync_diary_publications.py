@@ -16,7 +16,7 @@ anywhere" — the studio desk's standing rule). A human posts a cut, logs it, an
 this. There is no schedule and no auto-invoke.
 
 USAGE
-    python3 scripts/sync_diary_publications.py ~/Documents/Claude/vlog/PUBLISH_LOG.md
+    python3 scripts/sync_diary_publications.py ~/dev/vlog/PUBLISH_LOG.md
     python3 scripts/sync_diary_publications.py <log> --apply
     python3 scripts/sync_diary_publications.py <log> --verify
 

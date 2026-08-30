@@ -8,7 +8,7 @@
 #
 # Safe to run at night — no scheduled triggers fire until morning.
 set -euo pipefail
-cd ~/Documents/Claude/life-platform/cdk
+cd ~/dev/life-platform/cdk
 
 echo "═══════════════════════════════════════════════════════════════"
 echo " CDK EventBridge + Unmanaged Lambda Migration — v3.4.0"

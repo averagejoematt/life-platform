@@ -9,7 +9,7 @@ that a published clip existed, which entry it came from, or what happened to it.
 
 THE LOOP (three hops, each one deterministic)
 ─────────────────────────────────────────────
-1. PUBLISH   The studio desk (Cowork, ``~/Documents/Claude/vlog``) appends one row to
+1. PUBLISH   The studio desk (Cowork, ``~/dev/vlog``) appends one row to
              ``PUBLISH_LOG.md`` per post: date · session · cut · surface · link · entry.
              ``parse_publish_log()`` reads that markdown table by its HEADER (not by
              column position), so the studio may add columns without breaking this side,

@@ -8,7 +8,7 @@ giving the observatory pages a human voice before the data.
 """
 import os
 
-SITE = os.path.expanduser("~/Documents/Claude/life-platform/site")
+SITE = os.path.expanduser("~/dev/life-platform/site")
 
 NARRATIVES = {
     "sleep": {

@@ -1,6 +1,6 @@
 #!/bin/bash
 # PULSE-A: Sprint 1 deployment — API + Data Pipeline
-# Run from: ~/Documents/Claude/life-platform/
+# Run from: ~/dev/life-platform/
 # 
 # This script applies 3 changes:
 #   1. Adds write_pulse_json() to site_writer.py (PULSE-A1/A2/A3)

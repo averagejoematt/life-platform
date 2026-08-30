@@ -29,7 +29,7 @@ These changes are in the local filesystem but need `bash deploy/deploy_lifecycle
 
 **Deploy command** (run MCP registry test first):
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 python3 -m pytest tests/test_mcp_registry.py -v
 bash deploy/deploy_lifecycle_gaps.sh
 ```

@@ -7,7 +7,7 @@ Run: python3 deploy/patch_character_ring.py
 """
 import os
 
-PROJECT_ROOT = os.path.expanduser("~/Documents/Claude/life-platform")
+PROJECT_ROOT = os.path.expanduser("~/dev/life-platform")
 CHAR_PAGE = os.path.join(PROJECT_ROOT, "site", "character", "index.html")
 
 # CSS for the pillar ring chart

@@ -108,7 +108,7 @@ When he calls it (or the arc completes):
 3. Nominate 0–2 quote-worthy lines for `mark_journal_quote` (V3) — his exact words,
    consent per line, ADR-142 taboo gate applies; nomination is an offer, silence means no.
 3b. **Emit the TAPE NOTE** — the handoff the post-production desk (Cowork,
-   `~/Documents/Claude/vlog/STUDIO.md`) string-matches into the whisper SRT to get real
+   `~/dev/vlog/STUDIO.md`) string-matches into the whisper SRT to get real
    clip timecodes. 3–5 moments quoted VERBATIM (his words, never paraphrase — an
    approximate quote won't match the transcript and the timecode is lost), each with a
    surface suggestion; a `hold:` block for anything gate-relevant (third parties,

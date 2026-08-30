@@ -42,7 +42,7 @@ Also ensure:
 ### Step 2: Generate the pre-compiled review bundle
 
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 python3 deploy/generate_review_bundle.py
 ```
 

@@ -7,7 +7,7 @@
 # Run from project root: bash deploy/post_hygiene_v344.sh
 
 set -euo pipefail
-cd /Users/matthewwalker/Documents/Claude/life-platform
+cd /Users/matthewwalker/dev/life-platform
 ROOT="$(pwd)"
 DEPLOY="$ROOT/deploy"
 

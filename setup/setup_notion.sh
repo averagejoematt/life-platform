@@ -23,7 +23,7 @@ set -euo pipefail
 # Usage: bash setup_notion.sh
 # ══════════════════════════════════════════════════════════════════════════════
 
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 
 echo "═══════════════════════════════════════════════════"
 echo "  Notion Journal Integration — Full Setup"

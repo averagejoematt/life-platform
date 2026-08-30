@@ -2,7 +2,7 @@
 """Fix nav.js BADGE_MAP: Follow key /chronicle/ → /subscribe/."""
 import os
 
-FPATH = os.path.expanduser("~/Documents/Claude/life-platform/site/assets/js/nav.js")
+FPATH = os.path.expanduser("~/dev/life-platform/site/assets/js/nav.js")
 
 with open(FPATH, "r") as f:
     content = f.read()

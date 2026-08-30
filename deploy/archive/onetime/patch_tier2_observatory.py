@@ -12,7 +12,7 @@ Maps:
 """
 import os, re, sys
 
-SITE = os.path.expanduser("~/Documents/Claude/life-platform/site")
+SITE = os.path.expanduser("~/dev/life-platform/site")
 
 PAGES = {
     "sleep":     ("--pillar-sleep",     "#818cf8"),

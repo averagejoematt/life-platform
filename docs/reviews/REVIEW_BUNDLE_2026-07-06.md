@@ -1302,7 +1302,7 @@ aws lambda update-function-code --function-name life-platform-mcp --zip-file fil
 
 ## 8. INTELLIGENCE LAYER
 
-[ERROR reading /Users/matthewwalker/Documents/Claude/life-platform/docs/INTELLIGENCE_LAYER.md: [Errno 2] No such file or directory: '/Users/matthewwalker/Documents/Claude/life-platform/docs/INTELLIGENCE_LAYER.md']
+[ERROR reading /Users/matthewwalker/dev/life-platform/docs/INTELLIGENCE_LAYER.md: [Errno 2] No such file or directory: '/Users/matthewwalker/dev/life-platform/docs/INTELLIGENCE_LAYER.md']
 
 
 ---

@@ -2,7 +2,7 @@
 # deploy_site_all.sh — Full website enhancement deploy (all 5 builds)
 set -e
 
-PROJ="/Users/matthewwalker/Documents/Claude/life-platform"
+PROJ="/Users/matthewwalker/dev/life-platform"
 cd "$PROJ"
 
 echo "=== Full Website Enhancement Deploy ==="

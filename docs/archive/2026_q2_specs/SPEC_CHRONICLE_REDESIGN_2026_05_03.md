@@ -234,7 +234,7 @@ The script does NOT execute deploys. It prints:
 ```
 LOCAL MIGRATION COMPLETE. To deploy:
 
-  cd ~/Documents/Claude/life-platform
+  cd ~/dev/life-platform
   bash deploy/sync_site_to_s3.sh
   aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE \\
     --paths '/chronicle/*' '/journal/*' '/blog/*' '/rss.xml' '/sitemap.xml'

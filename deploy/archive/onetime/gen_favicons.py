@@ -13,7 +13,7 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow", "-q"])
     from PIL import Image, ImageDraw
 
-OUT = "/Users/matthewwalker/Documents/Claude/averagejoematt-site/assets/icons"
+OUT = "/Users/matthewwalker/dev/averagejoematt-site/assets/icons"
 os.makedirs(OUT, exist_ok=True)
 
 # ── Write SVG (browsers use this natively — crisp at any resolution) ──────────

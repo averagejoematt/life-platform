@@ -2,7 +2,7 @@
 # deploy_site_phase2.sh — Deploy all Phase 2 website enhancements
 set -e
 
-PROJ="/Users/matthewwalker/Documents/Claude/life-platform"
+PROJ="/Users/matthewwalker/dev/life-platform"
 cd "$PROJ"
 
 echo "=== Phase 2: Website Enhancement Deploy ==="

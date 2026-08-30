@@ -1,6 +1,6 @@
 #!/bin/bash
 # test_dashboard_local.sh — Open dashboard locally for visual verification
-# Run from: ~/Documents/Claude/life-platform/
+# Run from: ~/dev/life-platform/
 # Uses Python's built-in HTTP server to serve the dashboard files
 
 set -euo pipefail

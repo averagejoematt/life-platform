@@ -248,7 +248,7 @@ recording (two takes in a day is legal, and guessing between them would attach e
 to the wrong entry).
 
 **Owner follow-up (Matthew-side, one edit):** the studio folder is deliberately outside
-this repo, so add the `entry` column to `~/Documents/Claude/vlog/PUBLISH_LOG.md`'s header
+this repo, so add the `entry` column to `~/dev/vlog/PUBLISH_LOG.md`'s header
 and note it in `STUDIO.md` §Job 4. The five-column log still parses (the entry pointer is
 simply absent), so nothing breaks before you do.
 
@@ -256,11 +256,11 @@ Then, after posting:
 
 ```bash
 # Dry run — parse, validate, print what would be written, touch nothing:
-python3 scripts/sync_diary_publications.py ~/Documents/Claude/vlog/PUBLISH_LOG.md
+python3 scripts/sync_diary_publications.py ~/dev/vlog/PUBLISH_LOG.md
 # Write the publication rows:
-python3 scripts/sync_diary_publications.py ~/Documents/Claude/vlog/PUBLISH_LOG.md --apply
+python3 scripts/sync_diary_publications.py ~/dev/vlog/PUBLISH_LOG.md --apply
 # Check the log and the ledger still agree:
-python3 scripts/sync_diary_publications.py ~/Documents/Claude/vlog/PUBLISH_LOG.md --verify
+python3 scripts/sync_diary_publications.py ~/dev/vlog/PUBLISH_LOG.md --verify
 ```
 
 Each admitted row becomes one `DIARY_PUBLISH#{channel}` / `POST#{post_id}` row —

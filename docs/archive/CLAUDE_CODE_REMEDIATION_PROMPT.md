@@ -106,7 +106,7 @@ Then: `git add -A && git commit -m "v4.5.2: phase 6 complete — all dimensions 
 
 ### Key Platform Facts (for reference)
 
-- **Project root:** `~/Documents/Claude/life-platform/`
+- **Project root:** `~/dev/life-platform/`
 - **AWS region:** us-west-2 (all resources except Lambda@Edge in us-east-1)
 - **DynamoDB table:** `life-platform` (us-west-2)
 - **S3 bucket:** `matthew-life-platform`

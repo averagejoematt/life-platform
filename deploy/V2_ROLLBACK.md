@@ -30,7 +30,7 @@ Probably 2-4 hours. Doable, but on a one-user platform with a "build for Matthew
 
 ```bash
 # Serve site/ locally with python's built-in server
-cd ~/Documents/Claude/life-platform/site
+cd ~/dev/life-platform/site
 python3 -m http.server 8000
 # → http://localhost:8000/observatory/, etc.
 ```

@@ -10,7 +10,7 @@ Changes:
 """
 import os, re
 
-SITE = os.path.expanduser("~/Documents/Claude/life-platform/site")
+SITE = os.path.expanduser("~/dev/life-platform/site")
 HOME = os.path.join(SITE, "index.html")
 
 with open(HOME, "r") as f:

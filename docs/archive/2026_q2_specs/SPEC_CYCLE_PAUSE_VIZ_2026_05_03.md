@@ -410,7 +410,7 @@ The chart IDs and viewBox dimensions vary per page. Inspect each page's HTML to 
 ### 7a. Local sanity (before deploy)
 
 ```bash
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 
 # 1. Sync site to S3 (or push to a preview branch first if available)
 bash deploy/sync_site_to_s3.sh

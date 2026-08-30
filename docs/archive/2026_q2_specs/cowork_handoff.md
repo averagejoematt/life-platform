@@ -1,7 +1,7 @@
 # AJM Re-Entry — Session Handoff to Cowork
 **Date:** Sat May 2, 2026, ~6:15pm PDT
 **Handoff from:** claude.ai web (Opus 4.7), no project, no repo access
-**Handoff to:** Cowork session with `/Users/matthewwalker/Documents/Claude/life-platform/` filesystem access
+**Handoff to:** Cowork session with `/Users/matthewwalker/dev/life-platform/` filesystem access
 
 ---
 
@@ -9,7 +9,7 @@
 
 Matthew did a house move in mid-March 2026 and effectively went silent on the AJM platform and his P40 framework for ~4 weeks (April 2 → May 1). One journal entry exists from April 1 ("Day 1") and nothing since. Most of the platform is still standing — Whoop, Eight Sleep, weather, Todoist, Apple Health webhook are flowing — but several OAuth-based integrations have died silently during the gap (known issue BUG-005 from Feb 22 docs: ingestion Lambdas don't auto-refresh tokens). New Function Health labs are pending upload. Today we built a 75-step weekend re-entry plan and started executing Phase 1 (connector sweep). Got blocked on Withings re-auth and the user is moving to Cowork so the new Claude can read the actual repo and debug the auth script directly.
 
-The full re-entry plan is at `/Users/matthewwalker/Documents/Claude/life-platform/` — was generated as a markdown + PDF earlier today. If not saved there yet, the user has it as `ajm_reentry_plan.pdf` from the claude.ai web session.
+The full re-entry plan is at `/Users/matthewwalker/dev/life-platform/` — was generated as a markdown + PDF earlier today. If not saved there yet, the user has it as `ajm_reentry_plan.pdf` from the claude.ai web session.
 
 ---
 
@@ -63,7 +63,7 @@ RuntimeError: requesttoken failed: {'status': 503, 'body': {}, 'error': 'Invalid
 
 ## Architecture context (from Feb 22 2026 docs, surfaced via past chat search)
 
-- **Repo location:** `/Users/matthewwalker/Documents/Claude/life-platform/`
+- **Repo location:** `/Users/matthewwalker/dev/life-platform/`
 - **Auth scripts location:** `setup/` subdirectory
 - **Withings is polling-based, not webhook-based.** Lambda `withings-data-ingestion` runs on cron `30 14 * * ? *` (14:30 UTC daily). Last successful run dated 2026-04-27.
 - **Secrets:** AWS Secrets Manager. Withings token in `life-platform/withings`. Region us-west-2.
@@ -126,16 +126,16 @@ These were generated during today's planning session and should be added to the 
 
 ## Things the user mentioned but I haven't dug into
 
-- User typed `ls /Users/matthewwalker/Documents/Claude/life-platform/datadrops/functionhealth_drop` earlier — looks like the FH lab files are staged there or expected to be. Phase 3 will load these.
+- User typed `ls /Users/matthewwalker/dev/life-platform/datadrops/functionhealth_drop` earlier — looks like the FH lab files are staged there or expected to be. Phase 3 will load these.
 - User has `python@3.14` via Homebrew on Mac.
-- Repo path confirmed: `/Users/matthewwalker/Documents/Claude/life-platform/`.
+- Repo path confirmed: `/Users/matthewwalker/dev/life-platform/`.
 
 ---
 
 ## What I'd do first in Cowork
 
 ```bash
-cd /Users/matthewwalker/Documents/Claude/life-platform
+cd /Users/matthewwalker/dev/life-platform
 cat setup/withings_auth.py
 ```
 

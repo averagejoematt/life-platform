@@ -6,7 +6,7 @@ Run: python3 deploy/add_experiments.py
 import json
 import os
 
-PROJECT_ROOT = os.path.expanduser("~/Documents/Claude/life-platform")
+PROJECT_ROOT = os.path.expanduser("~/dev/life-platform")
 LIB_PATH = os.path.join(PROJECT_ROOT, "config", "experiment_library.json")
 
 NEW_EXPERIMENTS = [

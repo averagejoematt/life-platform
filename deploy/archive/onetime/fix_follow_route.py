@@ -2,7 +2,7 @@
 """Fix bottom nav Follow route: /chronicle/ → /subscribe/ with mail icon."""
 import os
 
-FPATH = os.path.expanduser("~/Documents/Claude/life-platform/site/assets/js/components.js")
+FPATH = os.path.expanduser("~/dev/life-platform/site/assets/js/components.js")
 
 with open(FPATH, "r") as f:
     content = f.read()

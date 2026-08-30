@@ -45,7 +45,7 @@
 
 **Deploy sequence (Matthew runs in terminal):**
 ```bash
-cd ~/Documents/Claude/life-platform/cdk
+cd ~/dev/life-platform/cdk
 npx cdk diff LifePlatformIngestion
 npx cdk diff LifePlatformCompute
 npx cdk diff LifePlatformOperational

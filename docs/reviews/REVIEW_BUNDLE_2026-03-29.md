@@ -706,7 +706,7 @@ Target: under $25/month | Current: ~$13/month
 ## Local Project Structure
 
 ```
-~/Documents/Claude/life-platform/
+~/dev/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
   mcp/                            ← MCP server package (32 modules)

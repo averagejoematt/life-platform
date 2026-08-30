@@ -6,7 +6,7 @@ set -euo pipefail
 echo "═══ v3.9.36: Signal Doctrine Tier 2 + Podcast Scanner ═══"
 echo ""
 
-cd ~/Documents/Claude/life-platform
+cd ~/dev/life-platform
 
 # 1. Product Board fixes — Follow→/subscribe/ (8-0 vote)
 echo "── 1/8: Product Board fix — Follow → /subscribe/ ──"

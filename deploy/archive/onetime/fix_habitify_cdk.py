@@ -111,7 +111,7 @@ if "Covers 15 Lambdas" in stack:
 print("""
 ============================================================
 NEXT STEPS:
-  1. cd ~/Documents/Claude/life-platform/cdk
+  1. cd ~/dev/life-platform/cdk
   2. source .venv/bin/activate
   3. npx cdk diff LifePlatformIngestion
   4. Review — should show HabitifyIngestion Lambda + updated IAM role

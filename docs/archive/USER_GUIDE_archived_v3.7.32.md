@@ -655,7 +655,7 @@ All infrastructure runs in `us-west-2` (account 205930651321). Budget target: un
 
 ## Local Project Files
 
-Located at `~/Documents/Claude/life-platform/`
+Located at `~/dev/life-platform/`
 
 | File | Purpose |
 |------|---------|

@@ -3,7 +3,7 @@
 
 **Goal:** Redesign the subscriber email experience across all four touchpoints: confirmation, welcome, weekly digest, and a new Day 2 bridge email.
 
-**Project root:** `/Users/matthewwalker/Documents/Claude/life-platform/`
+**Project root:** `/Users/matthewwalker/dev/life-platform/`
 
 **Board Session Reference:** Joint Product Board + Board of Directors session produced a unanimous recommendation. See `joint-board-email-review.md` for the full strategic rationale.
 
