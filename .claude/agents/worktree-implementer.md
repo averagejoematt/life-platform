@@ -21,12 +21,18 @@ write surface is your own worktree and your own branch.
    `Fixes` line falsely auto-closed #3222 while that issue's work sat unmerged. Put your
    issue number in every scratch filename, or pipe content via stdin.
 
-0b. **Your worktree lives OUTSIDE the repo** — not the .claude/worktrees or .worktrees
-   directories inside the checkout.
-   An in-repo worktree is a full second checkout that every repo-wide sweep walks: it has
-   red-mained the suite twice (#953), and it makes local runs disagree with CI in BOTH
-   directions. Beware the macOS case-twin — `~/Documents/Claude` and `~/documents/claude`
-   are the same directory, and edits through one leak into the tree the other names.
+0b. **Create your worktree with `python3 scripts/lane_worktree.py new <issue-N> <slug>`.**
+   That is the only path that sets the liveness lock, and the lock is what stops
+   `scripts/worktree_reaper.py` deleting your working directory mid-task — it listed three
+   *running* lanes as reapable on its first real use, because a lane is clean between
+   checkout and its first edit (#3289). Do not hand-roll `git worktree add`; do not
+   `git worktree unlock` your own lane (the driver releases it after the merge).
+   The script also enforces the two placement rules: **OUTSIDE the repo** — not
+   .claude/worktrees or .worktrees inside the checkout, an in-repo worktree is a full
+   second checkout that every repo-wide sweep walks (it has red-mained the suite twice,
+   #953, and makes local runs disagree with CI in BOTH directions) — and the canonical
+   spelling, because on macOS `~/Documents/Claude` and `~/documents/claude` are the same
+   directory and edits through one leak into the tree the other names.
 
 1. **Stay in your assigned worktree.** Never `cd` into the main checkout and never use a
    different-case path variant of it — on macOS the case-insensitive "twin" path leaks
