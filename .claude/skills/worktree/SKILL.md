@@ -24,18 +24,38 @@ in a single session (2026-08-27), from 93 worktrees across 12 parent directories
 
 ## Mode: `new <issue-N>`
 
+```bash
+python3 scripts/lane_worktree.py new <issue-N> <slug>     # creates, and LOCKS
+```
+
+This is the only sanctioned way to make a lane worktree, because it is the only one that
+sets the liveness signal (#3289 — the reaper listed three *running* lanes as reapable, and
+a lock each agent has to remember is a lock that is missing on exactly the lane that gets
+deleted). It enforces rules 1–3 below rather than asking you to recall them.
+
 1. **Outside the repo.** One canonical parent, never a path inside the checkout. An
-   in-repo worktree is walked by every repo-wide sweep.
+   in-repo worktree is walked by every repo-wide sweep. `lane_worktree.py` refuses.
 2. **One canonical spelling.** `git worktree list` currently shows both
    `~/Documents/Claude/…` and `~/documents/claude/…`. On macOS those are the *same*
    directory, and edits through one leak into the tree the other names — which reads as
-   the main checkout mutating itself.
+   the main checkout mutating itself. `lane_worktree.py` resolves the parent to its true
+   on-disk case, so invoking it through the twin spelling still lands in the canonical tree.
 3. **Lane-unique name**, `issue-<N>-<slug>`, off up-to-date `origin/main`.
 4. **Lane-unique scratch filenames.** Concurrent agents share one scratchpad: two lanes
    both wrote `pr_body.md`, clobbered each other in both directions, and a stray `Fixes`
    falsely auto-closed #3222 while its work sat unmerged.
 5. **Never deploy from a worktree branch** — the tell is a deceptive 0-diff. Deploy from
    `main`, after merge.
+
+**Release when the lane is done** (after the PR merges — not when the PR opens; a pushed
+branch awaiting merge is still live work):
+
+```bash
+python3 scripts/lane_worktree.py release <path>    # == git worktree unlock <path>
+```
+
+Until it is released the reaper keeps the worktree, by design, and prints this command on
+the kept row.
 
 ## Mode: `list`
 
@@ -53,10 +73,20 @@ python3 scripts/worktree_reaper.py            # dry run — always read this fir
 python3 scripts/worktree_reaper.py --apply    # remove only the reapable ones
 ```
 
-Every check fails closed. A worktree is a candidate only when it is not the main checkout
-or the current tree, has **no** uncommitted changes, and every commit is either already in
-`origin/main` or belongs to a PR GitHub reports as `MERGED`. A `CLOSED` PR is *not* merged
-and is kept; an ambiguous or unknowable verdict is kept; a detached HEAD is kept.
+Every check fails closed. A worktree is a candidate only when it is not the main working
+tree or the current tree, is **not locked**, has been **idle longer than the floor**
+(`--min-idle-minutes`, default 120), has **no** uncommitted changes, and every commit is
+either already in `origin/main` or belongs to a PR GitHub reports as `MERGED`. A `CLOSED`
+PR is *not* merged and is kept; an ambiguous or unknowable verdict is kept; a detached HEAD
+is kept.
+
+**Why lock and idle, and not dirtiness (#3289).** Dirtiness *lags*: a lane is clean between
+checkout and its first write, and again between its push and its merge, so a clean-and-merged
+test cannot tell "finished" from "started ninety seconds ago". It is a race, and the run ten
+minutes later that sees three dirty trees concludes the tool is safe. The lock *leads* — it
+exists from creation — and git itself refuses to remove a locked worktree without force,
+which this tool never passes. The main working tree is identified by inode, not by string,
+so a case-twin spelling cannot smuggle the primary clone into the candidate list.
 
 Read the kept list before applying — the reasons are the point, and a row you disagree
 with is a bug in the classifier, not a nuisance to override. There is no flag that skips

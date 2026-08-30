@@ -20,19 +20,25 @@ repo has already paid for (#2578).
 
 import importlib.util
 import os
+import subprocess
+import time
+from pathlib import Path
+
+import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 
 
-def _load():
-    spec = importlib.util.spec_from_file_location("_reaper", os.path.join(REPO, "scripts", "worktree_reaper.py"))
+def _load(name: str = "worktree_reaper", alias: str = "_reaper"):
+    spec = importlib.util.spec_from_file_location(alias, os.path.join(REPO, "scripts", f"{name}.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
 r = _load()
+lane = _load("lane_worktree", "_lane")
 
 
 def test_pr_state_fails_closed_on_unknown_branch():
@@ -98,6 +104,192 @@ def test_the_main_checkout_is_never_reapable():
     assert main and not main[0]["reapable"], "the main checkout must never be reapable"
 
 
+# ── #3289: liveness — the reaper must not eat a lane that is running ──────────
+#
+# The tool's first real use listed three RUNNING lanes plus the primary clone as reapable.
+# They were clean because they had been checked out ninety seconds earlier. Everything below
+# runs against a THROWAWAY repo built here — never the shared checkout, which at any moment
+# has live lanes in it. The wire is real git: real `worktree add`, real `worktree lock`, real
+# `git worktree list --porcelain` parsed by the shipped parser.
+
+
+def _run(args, cwd):
+    p = subprocess.run(args, cwd=str(cwd), capture_output=True, text=True, timeout=120)
+    assert p.returncode == 0, f"{' '.join(args)} failed in {cwd}: {p.stdout}{p.stderr}"
+    return p.stdout
+
+
+@pytest.fixture
+def sandbox(tmp_path, monkeypatch):
+    """A self-contained repo with a real `origin`, so `origin/main` ancestry is real."""
+    origin = tmp_path / "origin.git"
+    _run(["git", "init", "--quiet", "--bare", "-b", "main", str(origin)], tmp_path)
+    repo = tmp_path / "life-platform"
+    _run(["git", "clone", "--quiet", str(origin), str(repo)], tmp_path)
+    _run(["git", "config", "user.email", "t@example.com"], repo)
+    _run(["git", "config", "user.name", "t"], repo)
+    (repo / "a.txt").write_text("hi\n", encoding="utf-8")
+    _run(["git", "add", "-A"], repo)
+    _run(["git", "commit", "--quiet", "-m", "init"], repo)
+    _run(["git", "push", "--quiet", "-u", "origin", "main"], repo)
+    monkeypatch.setattr(r, "ROOT", repo)
+    return repo
+
+
+def _backdate(path: Path, seconds: int = 86400):
+    """Age every mtime under the worktree's admin dir, so the idle floor is truly cleared.
+
+    Deliberately independent of the reaper's own helpers: this file is watched failing
+    against the PRE-FIX module, and a helper that reaches into the fix would turn that
+    demonstration into an import error instead of a verdict.
+    """
+    old = time.time() - seconds
+    targets = [path, path / ".git"]
+    text = (path / ".git").read_text(encoding="utf-8").strip() if (path / ".git").is_file() else ""
+    if text.startswith("gitdir:"):
+        admin = Path(text.split(":", 1)[1].strip())
+        targets += [admin] + [admin / n for n in ("HEAD", "logs/HEAD", "ORIG_HEAD", "gitdir", "index")]
+    for t in targets:
+        if t.exists():
+            os.utime(t, (old, old))
+
+
+def _row(rows, path: Path):
+    hit = [x for x in rows if os.path.realpath(x["path"]) == os.path.realpath(str(path))]
+    assert hit, f"{path} missing from {[x['path'] for x in rows]}"
+    return hit[0]
+
+
+def test_a_live_lane_is_not_reapable_while_locked_and_is_once_released(sandbox):
+    """THE #3289 must-fail test.
+
+    The lane below is the exact shape that would have been deleted: created seconds ago,
+    working tree completely clean, branch off origin/main with zero commits of its own — so
+    "clean + every commit already in origin/main" says reap, and it is a live agent.
+    Watched to fail against the pre-fix reaper, which called it reapable.
+    """
+    path = lane.new_lane("3289", "live-lane", repo=sandbox)
+    assert not r._is_dirty(path), "fixture invalid: the lane must be CLEAN, that is the whole point"
+    assert r._unmerged_commits("issue-3289-live-lane") == 0, "fixture invalid: the lane must look fully merged"
+
+    # Backdated first, so the idle floor is NOT what is doing the work here — the lock is.
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert not row["reapable"], f"a LOCKED live lane was marked reapable: {row['reasons']}"
+    assert row["locked"] is True, "the lock is not being parsed off `git worktree list --porcelain`"
+    assert any("unlock" in x for x in row["reasons"]), "a kept-because-locked row must print how to release it"
+
+    lane.release_lane(path, repo=sandbox)
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert row["locked"] is False
+    assert row["reapable"], f"a released, clean, merged, idle lane must be reapable: {row['reasons']}"
+
+
+def test_the_idle_floor_backstops_a_lane_created_without_the_lock(sandbox):
+    """A forgotten lock must not be fatal. Fresh + clean = KEEP; genuinely idle = candidate."""
+    path = sandbox.parent / "manual-lane"
+    _run(["git", "worktree", "add", "--quiet", "-b", "manual", str(path), "origin/main"], sandbox)
+
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert not row["reapable"], f"a worktree touched seconds ago was marked reapable: {row['reasons']}"
+    assert any("idle floor" in x for x in row["reasons"]), row["reasons"]
+
+    _backdate(path)
+    row = _row(r.classify(sandbox, Path(os.getcwd())), path)
+    assert row["reapable"], f"an idle, clean, merged worktree must still be reapable: {row['reasons']}"
+
+
+def test_the_dirtiness_probe_cannot_refresh_the_idle_clock(sandbox):
+    """`git status` (the reaper's own probe) rewrites the admin index — measured.
+
+    If the index were an activity source, every worktree would read 'active seconds ago'
+    forever and the floor could never fail. The negative control for the floor itself.
+    """
+    path = sandbox.parent / "probe-lane"
+    _run(["git", "worktree", "add", "--quiet", "-b", "probe", str(path), "origin/main"], sandbox)
+    _backdate(path)
+    r._is_dirty(path)  # the exact call classify makes
+    assert "index" not in r._ADMIN_ACTIVITY_FILES
+    assert time.time() - r._last_activity(path) > 3600, "the status probe refreshed the activity clock"
+
+
+def test_the_main_working_tree_is_excluded_even_when_the_path_hint_is_wrong(sandbox):
+    """The primary clone appeared in a reapable list because the main path was compared as a
+    STRING. Here the hint is deliberately wrong; git's own `--git-common-dir` must still
+    identify the main tree, and it must never be probed or listed as a candidate."""
+    rows = r.classify(Path("/nonexistent/hint-that-matches-nothing"), Path(os.getcwd()))
+    main = _row(rows, sandbox)
+    assert main["is_main"] is True, "the main working tree was not recognised"
+    assert not main["reapable"]
+    assert main["dirty"] is None, "the main working tree must not even be probed"
+    assert any("main working tree" in x for x in main["reasons"]), main["reasons"]
+
+
+def test_same_dir_sees_through_a_case_twin(tmp_path):
+    """`~/Documents/Claude` and `~/documents/claude` are ONE directory on macOS."""
+    d = tmp_path / "Documents"
+    d.mkdir()
+    twin = tmp_path / "documents"
+    if not twin.exists():  # a case-SENSITIVE filesystem — the twin class cannot occur
+        pytest.skip("case-sensitive filesystem")
+    assert r._same_dir(d, twin), "case-twin paths must compare equal (they share an inode)"
+    assert not r._same_dir(d, tmp_path)
+
+
+def test_the_lock_is_git_enforced_too(sandbox):
+    """Defence in depth: even if the classifier were wrong, `git worktree remove` refuses a
+    locked tree without force — and this tool never passes force."""
+    path = lane.new_lane("3289", "enforced", repo=sandbox)
+    p = subprocess.run(["git", "worktree", "remove", str(path)], cwd=str(sandbox), capture_output=True, text=True)
+    assert p.returncode != 0 and path.exists(), "git no longer refuses to remove a locked worktree"
+    assert "locked" in (p.stdout + p.stderr).lower()
+    src = Path(REPO, "scripts", "worktree_reaper.py").read_text(encoding="utf-8")
+    assert '"worktree", "remove", r["path"]' in src, "the removal call must stay force-free"
+
+
+def test_the_porcelain_parser_reads_both_locked_shapes():
+    """Real git emits `locked` bare and `locked <reason>` — captured from git 2.55."""
+    fixture = (
+        "worktree /repo\nHEAD 527faf3386404335da9e7c30a3f4938b5a502fbf\nbranch refs/heads/main\n\n"
+        "worktree /lane1\nHEAD 527faf3386404335da9e7c30a3f4938b5a502fbf\nbranch refs/heads/lane1\n"
+        "locked lane issue-3289 in use\n\n"
+        "worktree /lane2\nHEAD 527faf3386404335da9e7c30a3f4938b5a502fbf\nbranch refs/heads/lane2\nlocked\n"
+    )
+    import unittest.mock as mock
+
+    with mock.patch.object(r, "_git", return_value=(0, fixture)):
+        parsed = r.worktrees()
+    assert [x["locked"] for x in parsed] == [False, True, True]
+    assert parsed[1]["lock_reason"] == "lane issue-3289 in use"
+    assert parsed[2]["lock_reason"] == ""
+
+
+# ── #3289 box 4: creation sets the signal, so the protection is automatic ─────
+def test_lane_creation_locks_the_worktree_without_being_asked(sandbox):
+    path = lane.new_lane("3289", "auto", repo=sandbox)
+    porcelain = _run(["git", "worktree", "list", "--porcelain"], sandbox)
+    block = [b for b in porcelain.split("\n\n") if str(path) in b]
+    assert block and "locked" in block[0], f"lane_worktree.new_lane must lock at creation: {porcelain}"
+
+
+def test_lane_creation_refuses_to_build_inside_the_repo(sandbox, monkeypatch):
+    """The #953 class, enforced rather than remembered."""
+    monkeypatch.setattr(lane, "lane_parent", lambda repo: Path(repo) / ".worktrees")
+    with pytest.raises(SystemExit) as e:
+        lane.new_lane("3289", "in-repo", repo=sandbox)
+    assert "INSIDE the repo" in str(e.value)
+
+
+def test_the_creation_path_is_the_one_the_lane_agent_is_told_to_use():
+    """A liveness signal set by a script nobody is pointed at is not automatic."""
+    agent = Path(REPO, ".claude", "agents", "worktree-implementer.md").read_text(encoding="utf-8")
+    skill = Path(REPO, ".claude", "skills", "worktree", "SKILL.md").read_text(encoding="utf-8")
+    for body, who in ((agent, "worktree-implementer"), (skill, "/worktree")):
+        assert "lane_worktree.py" in body, f"{who} must send lanes through scripts/lane_worktree.py"
+        assert "unlock" in body, f"{who} must say how the lane is released when it is done"
+
+
 # ── The /worktree skill's own contract ────────────────────────────────────────
 def test_worktree_skill_documents_the_rules_that_cost_something():
     """The skill is the durable home for these rules; memory prose is not procedure.
@@ -115,6 +307,7 @@ def test_worktree_skill_documents_the_rules_that_cost_something():
         ("lane-unique", "a shared scratchpad filename falsely auto-closed #3222"),
         ("0-diff", "deploying from a worktree branch shows a deceptive 0-diff"),
         ("fails closed", "the reaper's safety posture must be stated where people read it"),
+        ("lock", "the liveness signal that stops the reaper eating a running lane (#3289)"),
     ):
         assert needle in body, f"/worktree must document: {why}"
 
