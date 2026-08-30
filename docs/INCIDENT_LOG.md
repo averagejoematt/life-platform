@@ -24,6 +24,7 @@ Last updated: 2026-08-27 Session G cost-cliff + class-fix session (#1332 gate; *
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-08-30 | **P2** | **A production deploy stalled ~9 hours behind a stranded lease the session could not see — two CI/CD runs minted 8 seconds apart at a merge train, the OLDER reached the `production` gate first and sat `waiting` holding the deploy-group lease, while the newer (union) run's Deploy job sat `pending` behind it, structurally unable to mint its own approval request.** The session's gate-watch polled `pending_deployments` on the NEWER run — an empty list, forever — and its until-loop was silent by construction, so 'blocked' was indistinguishable from 'still waiting'. Found only when the owner asked why running items showed 9 hours. Disposed in minutes once seen: older lease rejected with decode (strict ancestor of the union sha), union approved, deploy+smoke+visual-QA green same hour. | Two gaps stacked: (1) the land ritual said dispose 'the' lease, singular — nothing instructed enumerating ALL non-completed CI/CD runs at merge time, and a train that pushes N squashes seconds apart mints up to N runs; (2) **the #3021 lease janitor — built, running, and the exact machine fix for this case — has been dark on its rejection path since it shipped**: every attempted rejection 4xxes for want of `DEPLOY_GATE_JANITOR_TOKEN` (a fine-grained PAT of the required reviewer, Actions read/write), loudly redding its own job each sweep. Detection existed twice over; disposal existed zero times. | ~9h (owner-initiated: 'are we stalled?'). | Same hour once seen. Class fixes same session: land skill §3 rewritten to enumerate-ALL-runs-after-every-merge (structural — a run count, not a phrase); janitor token surfaced to the owner with click-path while they were already in the PAT UI; watch-hygiene rule recorded (no silent until-loops on external conditions — bounded timeout that escalates). | No. |
 | 2026-08-27 | **P2** | **A site auto-rollback fired, reported success, deleted a wanted content change, and could not possibly have fixed the failure that triggered it.** Site deploy `33079187092` on Session F's wrap commit `da1f9dd5`. Deploy succeeded; the commit touched exactly ONE file under `site/` — `site/story/build/beats.json`, +31 lines, Session F's own published build beat. Visual+AI QA then failed on one REPRODUCED high: `/coaching/by-coach/` showed Dr. Max Reyes saying "I'm ten days into this restart with you — Day 10 as of today" on Day 11. Auto-rollback ran `git checkout <ref> -- site/` + `sync_site_to_s3.sh`, reported success on every step, and reverted the build beat. Live `/version.json` read `1d5513b` for ~2.5h. The failing narrative is served from **DynamoDB** via `/api/coach_analysis`; the rollback's entire mutation surface is `site/` objects in S3. Disjoint. Re-pulled after the rollback completed: still `regeneration_paused: true`, still `generated_at 2026-08-26T17:02:28Z`, still Day 10 — **the defect was live throughout.** | ADR-125 tier 2 pauses narrative regeneration, and the frozen text carries an ABSOLUTE day number plus the words "as of today", so it goes stale by one more day for every day the pause holds — a self-worsening ADR-104 violation. The rollback's scope is `site/` by construction, so for any failure sourced from `/api/*` it is structurally incapable of remediation while still reporting success. Worse and unfixed: the deploy ALSO syncs bucket-root `config/` (`config_twin_sync.py --apply --strict`), which the site-api reads at runtime, and the rollback does not cover it — so a bad `config/` twin survives a "successful" rollback, and unlike the DynamoDB case `config/` IS repo-versioned and WAS shipped by that same workflow. | ~14h (the gate itself; nobody was looking for the underlying defect). | Trigger fixed same session in PR #3243 (merged `fe698334e`) by datelining the paused read in the frame its own prose uses — the pause untouched, nothing regenerated, zero Bedrock spend. Build beat confirmed back on the live site. Rollback-scope class folded to #2799 as two checkboxes; OPEN. | No — content only, self-healed on the next deploy from newer main. |
 | 2026-08-27 | **P3** | **Main was red at session boot while the outgoing handover declared it green, and the docs-only fix could not clear it.** The latest completed CI/CD run on `main` had FAILED at the coverage-gate step; all **10** full-suite failures traced to ONE root cause — `check_doc_facts` exiting 1 because Session F's own wrap prose in `CLAUDE.md:238` read "#3231 shipped half-broken with all 12 tests green", which the gate parsed as a live claim that the suite holds 12 tests (truth: 17,664). A second, independent residual rode along: the INCIDENT_LOG Patterns block was stale at 184 dated / 149 post-June while F's gate line claimed the derived block had been regenerated. | Two Session-F wrap residuals. The reason it persisted is the more useful half: **#1908's trap, live.** The fix is by definition a `docs/**` edit, `docs/**` is not in `ci-cd.yml`'s `paths:` filter, so the docs-only fix at `25205ce5` did not re-run CI/CD and the stale red stood until diagnosed by hand. Hours later a lane's first attempt at the #3234 class fix reintroduced that exact trap by adding a doc gate to the reconcile job, and #1908's own guard (`test_docs_ci_owns_doc_gates.py`) caught it. | ~6h (found by the boot gate pre-flight, not by a page). | ~15 min: prose reworded to drop the bare number, Patterns block regenerated via `scripts/incident_log_patterns.py --apply`; Docs CI green on the wire at `25205ce5`. | No. |
 | 2026-08-27 | **P3** | **Two production deploy leases rejected as stale; approving the second would have REGRESSED live Lambdas.** Lease 1 (`33094047251`, sha `d2c8ce27`) sat 6 commits behind main and would have shipped a tree without #3239's CGM absence semantics. Lease 2 (`33094295362`, sha `69a35909`) was found by the wrap's own (e2) gate at 1.3h, approaching the #1901 stranded class — and was **older than the manual deploys already live at `e06d88dc`**, so approving it would have shipped an older tree over current code. Both rejected with a written decode; a third lease at current main (`6a6ef3a1f`) was APPROVED rather than left waiting. | The same #1901 class as Session F's 7.5h stranded lease, twice in one session. Root shape: a lease is minted per merge, so a session that merges 8 PRs and deploys manually in between accumulates leases that are stale by construction — and the default posture (leave it waiting) is the one that strands them. Standing rule reaffirmed: approve or REJECT on sight, never leave waiting, and always decode the sha against what is actually live. | Lease 1 immediately; lease 2 at 1.3h by the wrap gate. | Same session — both rejected with decodes naming the sha delta and the regression risk. DEPLOY_GATE_JANITOR_TOKEN (#3021) remains the standing fix and is still unissued. | No — rejection is the safe direction. |
@@ -234,7 +235,7 @@ Last updated: 2026-08-27 Session G cost-cliff + class-fix session (#1332 gate; *
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 188 dated rows, 153 post-June** (newest row 2026-08-27):
+**Distribution — 189 dated rows, 154 post-June** (newest row 2026-08-30):
 
 | month | rows |
 |---|---|
@@ -244,22 +245,22 @@ Last updated: 2026-08-27 Session G cost-cliff + class-fix session (#1332 gate; *
 | 2026-05 | 1 |
 | 2026-06 | 2 |
 | 2026-07 | 36 |
-| 2026-08 | 117 |
+| 2026-08 | 118 |
 
-**By severity:** P1 4 · P2 27 · P3 66 · P4 86 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 4 · P2 28 · P3 66 · P4 86 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 21 match none):
 
 | n | class |
 |---|---|
-| 119 | deployment error |
+| 120 | deployment error |
 | 50 | stale config / literal drift |
 | 40 | QA-oracle false positive |
 | 36 | QA false positive — deploy-race (#2978) |
-| 29 | lane-subset / union-breach main red |
-| 26 | secret / credential |
-| 25 | deploy-plane wedge / strand / race |
+| 30 | lane-subset / union-breach main red |
+| 27 | secret / credential |
+| 26 | deploy-plane wedge / strand / race |
 | 18 | QA false positive — semantic oracle (#2959) |
 | 16 | timezone / wallclock |
 | 15 | IAM / permission |
@@ -277,7 +278,7 @@ than one, and 21 match none):
 > 2026-08-22: 14 rows in July (1 per 2.2 days), 15 in 2026-08-01→22 (1 per 1.5 days).
 
 <!-- INCIDENT-PATTERNS:TOPCLASSES:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-The three classes the old list omitted entirely — **QA-oracle false positives (40)**, **lane-subset/union-breach main reds (29)** and **deploy-plane wedges/strands/races (25)** — are now the 3rd, 5th and 7th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
+The three classes the old list omitted entirely — **QA-oracle false positives (40)**, **lane-subset/union-breach main reds (30)** and **deploy-plane wedges/strands/races (26)** — are now the 3rd, 5th and 7th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
 <!-- INCIDENT-PATTERNS:TOPCLASSES:END -->
 
 ### Silence is an axis, not a class
@@ -290,17 +291,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**51 of 188 rows are silent.**
+**52 of 189 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 51 | 137 |
-| TTD parseable | 38 | 86 |
-| median TTD | **23.5 min** | 10 min |
-| mean TTD | 1,857 min | 1,593 min |
-| exceeded 1 day | 6 (16% of parsed) | 7 (8% of parsed) |
+| rows | 52 | 137 |
+| TTD parseable | 39 | 86 |
+| median TTD | **28 min** | 10 min |
+| mean TTD | 1,823 min | 1,593 min |
+| exceeded 1 day | 6 (15% of parsed) | 7 (8% of parsed) |
 
-Silent rows take **~2.4× longer to detect at the median** and are **~2.0× more likely to run past a day**. But the *means* are only 14% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (3 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **64 of 188 TTD cells (34%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~2.8× longer to detect at the median** and are **~1.9× more likely to run past a day**. But the *means* are only 13% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (3 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **64 of 189 TTD cells (34%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -311,7 +312,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July and 117 in August. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July and 118 in August. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)

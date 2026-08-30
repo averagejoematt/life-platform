@@ -44,15 +44,35 @@ supersede-PR → integration train.
 `lambdas/**`, so it looks identical. Without that distinction a detector pages after every
 merge and gets ignored.
 
-## 3. Dispose the deploy lease — approve or REJECT, never leave waiting
+## 3. Dispose EVERY deploy lease — enumerate first, then approve or REJECT, never leave waiting
 
 A gated run holds a **lease on the whole deploy group**; every later run queues behind it.
-Found every session: 16.4h, 15.5h, 7.5h. And in three separate sessions **approving the
-stranded lease would have rolled back live-deployed fixes.**
+Found every session: 16.4h, 15.5h, 7.5h — and 2026-08-30's worst instance, **~9h**, was a
+lease the session never enumerated: a merge train's squash pushes minted TWO runs 8 seconds
+apart, the OLDER reached the gate first and held the lease `waiting`, and the session
+watched the NEWER run's gate — which was `pending` behind it and structurally could never
+open. A watch on the wrong member of the set is silence, and silence reads as patience.
+
+So the step is a SET operation, immediately after every merge push (and again after every
+train):
+
+```bash
+gh run list --workflow ci-cd.yml --limit 10 \
+  --json databaseId,status,headSha -q '.[] | select(.status != "completed")'
+```
+
+**More than one non-completed run = multiple leases in flight.** Dispose each NOW: reject
+every run whose head sha is an ancestor of the newest one (record the decode), approve
+the union. Do not arm a watch until the set has exactly one live member — and any watch
+you do arm must have a bounded timeout that ESCALATES (re-enumerate + report), never a
+silent until-loop: 'blocked' must be distinguishable from 'still waiting'.
 
 Decode before deciding: **reject any lease whose sha is already an ancestor of `main`** —
 approving it deploys a tree missing every later merge. The auto-filed wedge alert advises
-*approve* with no ancestry check; do not follow it blindly.
+*approve* with no ancestry check; do not follow it blindly. The machine half of this step
+is the #3021 janitor (`deploy-wedge-watch.yml`): it auto-rejects superseded waiting leases
+once `DEPLOY_GATE_JANITOR_TOKEN` exists — if its job is red on a 4xx, the token is missing
+and this whole section is running on manual reflexes.
 
 ## 4. Verify by CONTENT, not by sha
 
