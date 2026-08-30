@@ -470,7 +470,13 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
     unproven = [g for g in gates if g["verdict"] == "unproven"]
     assert len(proven) + len(attempted) + len(unproven) == len(gates)
     assert (
-        3 <= len(proven) <= 40
+        # Upper bound raised 40 → 45 (2026-08-29, #3294): the 41st proof is
+        # `structural::test_absence_coverage_3294.py`, mutation-backed via the
+        # re-runnable harness (ARMED 1/1) — the bound exists to catch proofs that
+        # stop being mutation-backed, and this one is.
+        3
+        <= len(proven)
+        <= 45
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

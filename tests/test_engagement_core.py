@@ -287,7 +287,12 @@ def test_never_logged_this_cycle_is_stated_as_absence_not_a_pause():
     from content.engagement_core import presence_prompt_block
 
     block = presence_prompt_block(_never_logged_sig())
-    assert "NOTHING has been logged this cycle" in block
+    # #3294: the sentence is scoped to FOOD — the only category this branch's fact
+    # covers. The old "NOTHING has been logged" wording asserted a platform-wide
+    # absence off a single-source derivation, and the board published it widened to
+    # four channels, two of which had records in the window.
+    assert "NO FOOD has been logged this cycle" in block
+    assert "NOTHING has been logged" not in block, "the unscoped form is the #3294 defect"
     assert "predates this cycle" in block
     assert "since his last food log" not in block, "there is no last food log this cycle to count from"
 

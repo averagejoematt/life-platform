@@ -32,6 +32,139 @@ from web.site_api_common import (
 from web.site_api_phase_frame import label_with_span, spans_cycle  # #2957 — cross-phase framing
 from web.vitals_resolver import reached_in_pacific  # #3287 — the ONE "has PT reached this DATE# day" predicate
 
+# #3294: the lift glyph published "No training logged — N days" — a CATEGORY-level
+# absence measured from ONE source. The number was right for Hevy and wrong for the
+# word "training": Strava had logged training inside the window, and under ADR-104's
+# 2026-08-28 ruling an auto-synced source counts as logging. The denominator is the
+# registry's, never this module's.
+_WORKOUT_CATEGORY = "workout"
+# How far back to look for the FIRST workout evidence when no source has any record at
+# all. Only reached in the empty-history case; the normal path bounds each infrastructure
+# query by the best behavioral date already in hand, so it reads a handful of rows.
+_WORKOUT_COLD_LOOKBACK_DAYS = 400
+
+
+def _workout_evidence(table, today_pt):
+    """Last date each `workout`-evidence source recorded training, and who was consulted.
+
+    Returns ``(last_iso_or_None, consulted, source_liveness)`` where `consulted` is the
+    registry source ids actually queried and `source_liveness` maps each to the newest
+    DATE# row it has at all — the vintage `ai.absence_sourcing` needs to tell a live pipe
+    reporting "no workouts" apart from a dark one (#3268). Never raises: a source whose
+    query fails simply does not join `consulted`, which makes the grading below UNSOURCED
+    and withholds the claim, rather than shortening the denominator in silence.
+
+    The per-source predicate is derived, not chosen here:
+      * a `behavioral: True` source (Hevy, Strava) writes a row only when Matthew did
+        something, so the ROW is the evidence — that is what the facet means;
+      * an infrastructure source shares one partition across every stream, so its rows
+        exist regardless and only the `evidence_field_predicates()` FIELDS answer.
+    """
+    from ai.absence_sourcing import evidence_sources
+    from ingestion.source_registry import SOURCE_REGISTRY, evidence_field_predicates
+
+    def _q(src, lo, hi, projection):
+        return table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{src}") & Key("sk").between(f"DATE#{lo}", f"DATE#{hi}~"),
+            ScanIndexForward=False,
+            ProjectionExpression=projection,
+        ).get("Items", [])
+
+    def _shift(days):
+        return (datetime.strptime(today_pt, "%Y-%m-%d").date() - timedelta(days=days)).isoformat()
+
+    denominator = evidence_sources(_WORKOUT_CATEGORY)
+    consulted, liveness, evidence = [], {}, {}
+
+    # Pass 1: the behavioral sources. One descending Limit=1 read each, exact, unbounded.
+    field_sources = []
+    for src in denominator:
+        fields = evidence_field_predicates(src, _WORKOUT_CATEGORY)
+        if fields:
+            field_sources.append((src, fields))
+            continue
+        if not (SOURCE_REGISTRY.get(src) or {}).get("behavioral"):
+            continue  # neither a row predicate nor a field predicate — cannot be consulted
+        try:
+            items = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{src}") & Key("sk").begins_with("DATE#"),
+                ScanIndexForward=False,
+                Limit=1,
+                ProjectionExpression="sk",
+            ).get("Items", [])
+        except Exception:
+            continue
+        consulted.append(src)
+        if items:
+            evidence[src] = liveness[src] = str(items[0].get("sk", ""))[5:15]
+
+    best = max(evidence.values(), default=None)
+
+    # Pass 2: the field-predicate sources. Bounded by the best behavioral date already in
+    # hand — only a row NEWER than that could change the answer, so the usual read is a
+    # few days wide even though the partition holds years.
+    for src, fields in field_sources:
+        lo = _shift(_WORKOUT_COLD_LOOKBACK_DAYS) if best is None else best
+        try:
+            items = _q(src, lo, today_pt, ", ".join(("sk",) + tuple(fields)))
+        except Exception:
+            continue
+        consulted.append(src)
+        if items:
+            liveness[src] = str(items[0].get("sk", ""))[5:15]
+        for it in items:
+            if any(_positive(it.get(f)) for f in fields):
+                evidence[src] = str(it.get("sk", ""))[5:15]
+                break
+
+    return max(evidence.values(), default=None), tuple(consulted), liveness
+
+
+def _absence_licensed(category, consulted, source_liveness, window_start) -> bool:
+    """Does the registry denominator license a category-level absence claim here? (#3294)
+
+    A thin, total wrapper over `ai.absence_sourcing.absence_sourcing` so a read path can
+    never publish an unlicensed absence because the AI package was missing from a bundle:
+    an import or grading failure returns False, which withholds the claim. Fail-closed in
+    the same direction as `sourced_availability` — the failure this guards against is a
+    false absence reaching a reader, and a permissive default reinstates it.
+    """
+    try:
+        from ai.absence_sourcing import absence_sourcing
+
+        return absence_sourcing(
+            category,
+            sources_observed=consulted,
+            source_last_dates=source_liveness,
+            window_start=window_start,
+        ).licenses_absence
+    except Exception:
+        return False
+
+
+def _lift_absence_label(days_since, last_date, licensed, pulse_day, experiment_start):
+    """The lift glyph's no-session label, gated on the absence-sourcing verdict (#3294).
+
+    Pure and total so it can be driven directly by a test. Licensed ⇒ the category claim
+    with #2957's cross-cycle frame, unchanged. Unlicensed ⇒ the glyph states what the
+    RECORD holds ("Last session <date>") instead of what Matthew did — a positive fact
+    that stays true no matter how short the denominator is. With no date anywhere it says
+    so about the file, never about him.
+    """
+    if not licensed:
+        return f"Last session {last_date}" if last_date else "No session on file"
+    if days_since is None:
+        return "No training logged"
+    return label_with_span(f"No training logged — {days_since} days", days_since, pulse_day, experiment_start)
+
+
+def _positive(value):
+    """True when a DDB numeric attribute is present and greater than zero. Never raises."""
+    try:
+        return value is not None and float(value) > 0
+    except (TypeError, ValueError):
+        return False
+
 
 def pulse(*, _g) -> dict:
     """
@@ -156,24 +289,20 @@ def pulse(*, _g) -> dict:
     except Exception:
         pass
     # Staleness honesty (truth audit 2026-07-10): "Rest day" on day 15 of a training
-    # blackout is fiction. Days since the last logged strength session (Hevy is the
-    # strength log of record) drives the honest label below.
+    # blackout is fiction. Days since the last logged session drives the honest label
+    # below. #3294: that count used to be Hevy-only while the LABEL said "training" —
+    # a category-level absence measured from one source. The denominator is now the
+    # registry's `evidence_for` set for `workout`, and the label is gated on whether
+    # that denominator was fully consulted.
     days_since_workout = None
-    try:
-        _hevy_last = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False,
-            Limit=1,
-            ProjectionExpression="sk",
-        )
-        _hl_items = _hevy_last.get("Items", [])
-        if _hl_items:
-            _last_lift_date = _hl_items[0].get("sk", "")[5:15]
+    _last_workout_date, _workout_consulted, _workout_liveness = _workout_evidence(table, today_pt)
+    if _last_workout_date:
+        try:
             days_since_workout = max(
-                0, (datetime.strptime(today_pt, "%Y-%m-%d").date() - datetime.strptime(_last_lift_date, "%Y-%m-%d").date()).days
+                0, (datetime.strptime(today_pt, "%Y-%m-%d").date() - datetime.strptime(_last_workout_date, "%Y-%m-%d").date()).days
             )
-    except Exception:
-        pass
+        except ValueError:
+            days_since_workout = None
     if not trained_today:
         try:
             _strava_today = table.query(
@@ -302,6 +431,14 @@ def pulse(*, _g) -> dict:
     # Day 1) and the label wears the parenthetical only then — an always-on badge would
     # train the reader to skip it.
     _lift_spans = spans_cycle(days_since_workout, _pulse_day)
+    # #3294: does the registry denominator license a CATEGORY-level "no training" claim?
+    # `sourced_availability`/`sourced_transitions` are the fail-closed halves on the
+    # narrative path; this is the same ruling applied to a two-word LABEL, which is a
+    # claim about Matthew in exactly the way a paragraph is. `source_last_dates` carries
+    # each source's LIVENESS (its newest row of any kind), not its workout evidence —
+    # #3268's question is "can this pipe speak for the window", and an Apple Health that
+    # reports daily and shows no workout minutes has spoken.
+    _lift_licensed = _absence_licensed(_WORKOUT_CATEGORY, _workout_consulted, _workout_liveness, EXPERIMENT_START)
     _journal_spans = spans_cycle(journal_gap_days, _pulse_day)
 
     glyphs = {
@@ -383,8 +520,13 @@ def pulse(*, _g) -> dict:
             "workout_type": workout_type,
             "days_since_last": days_since_workout,
             "spans_cycles": _lift_spans,  # #2957
+            # #3294: the sources actually consulted, on the wire. "The check exists" and
+            # "the check reached this surface" are different claims, and a reader (or the
+            # reader-truth judge) can now tell them apart from the payload itself.
+            "absence_sources_checked": list(_workout_consulted),
+            "absence_licensed": _lift_licensed,
             # "Rest day" is only honest for a beat or two after a session; past that it's
-            # a layoff and the glyph says how long. No hevy record at all reads unlogged.
+            # a layoff and the glyph says how long.
             "label": workout_type
             or (
                 "Trained"
@@ -392,16 +534,7 @@ def pulse(*, _g) -> dict:
                 else (
                     "Rest day"
                     if days_since_workout is not None and days_since_workout <= 3
-                    else (
-                        label_with_span(
-                            f"No training logged — {days_since_workout} days",
-                            days_since_workout,
-                            _pulse_day,
-                            EXPERIMENT_START,
-                        )
-                        if days_since_workout is not None
-                        else "No training logged"
-                    )
+                    else _lift_absence_label(days_since_workout, _last_workout_date, _lift_licensed, _pulse_day, EXPERIMENT_START)
                 )
             ),
         },

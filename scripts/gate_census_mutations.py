@@ -203,6 +203,12 @@ _HARDCODED_TIER_PY = (
 
 _OVERSIZE_LAMBDA_PY = '"""probe."""\n\n' + "".join(f"X{i} = {i}\n" for i in range(2400))
 
+# Assembled: tests/test_absence_coverage_3294.py sweeps lambdas/ + mcp/ for any module
+# whose AST reads the raw `channels_quiet` field — the presence signal's unlicensed
+# category-level absence list — and refuses a reader with no disposition. The literal is
+# split so a sweep of scripts/ can never mistake this spec for a consumer.
+_RAW_QUIET_READER_PY = '"""probe."""\n\n\ndef probe(sig):\n    return sig.get(' + _lit('"channels_qu', 'iet"') + ")\n"
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_no_conflict_markers.py": MutationSpec(
         gate_id="structural::test_no_conflict_markers.py",
@@ -308,6 +314,13 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         target="tests/test_site_orphans.py",
         detects="a site/ page reachable by URL but linked from nowhere and not declared unlisted",
         plants=(("site/_census_probe_2999/index.html", _ORPHAN_PAGE_HTML),),
+        track=False,
+    ),
+    "structural::test_absence_coverage_3294.py": MutationSpec(
+        gate_id="structural::test_absence_coverage_3294.py",
+        target="tests/test_absence_coverage_3294.py",
+        detects="a NEW consumer of the raw channels_quiet list with no disposition — the unwired-surface class that published two false absences (#3294)",
+        plants=(("lambdas/common/_census_probe_2999.py", _RAW_QUIET_READER_PY),),
         track=False,
     ),
 }
@@ -496,6 +509,22 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
         "site/assets/js — a page linked only through a computed path is 'orphaned' to this gate, and a "
         "page linked only from a dead page still counts as linked (there is no transitive walk from the "
         "home page). site/legacy/** is excluded on purpose (#1237).",
+    ),
+    "structural::test_absence_coverage_3294.py": dict(
+        _proof(
+            "structural::test_absence_coverage_3294.py",
+            "baseline: 20 passed | mutated: 1 failed, 19 passed :: "
+            "TestCoverageEnumeration::test_every_reader_has_a_disposition | reverted: 20 passed",
+            "The enumeration is keyed on the FIELD NAME `channels_quiet` as an AST string constant in "
+            "lambdas/ + mcp/ — a consumer that receives the list through an intermediary variable or a "
+            "**kwargs projection never names the field and is invisible to it. Absence claims built from "
+            "OTHER raw fields (channel_detail arithmetic, per-source gap_days) are out of this gate's "
+            "scope; the licensing check itself adjudicates only what flows through sourced_quiet. The "
+            "wire-replay half of the file (the four-absences artifact, the lift-glyph labels) was "
+            "separately watched failing behaviourally against pre-fix main 2026-08-29: all three wired "
+            "surfaces published all four labels, `NOTHING has been logged` included.",
+        ),
+        proved_on="2026-08-29",
     ),
 }
 

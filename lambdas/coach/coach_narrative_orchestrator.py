@@ -832,14 +832,15 @@ def _engagement_for_brief(signal):
         return None
     presence = signal.get("presence_class")
     returned = bool(signal.get("returned"))
-    # #914: severity travels with the signal (derived for pre-ladder records) so
-    # generation + the acknowledgment gate key off one field.
+    # #914: severity travels with the signal (one field for generation + the ack gate).
+    # #3294: quiet labels via the ONE address; an unrunnable check licenses NOTHING.
     try:
-        from content.engagement_core import severity_of as _severity_of
+        from content.engagement_core import quiet_fields_for_brief, severity_of as _severity_of
 
         severity = _severity_of(signal)
+        quiet_fields = quiet_fields_for_brief(signal)
     except ImportError:  # pragma: no cover — bundle always ships engagement_core
-        severity = signal.get("severity")
+        severity, quiet_fields = signal.get("severity"), {"channels_unverified": [str(c) for c in (signal.get("channels_quiet") or [])]}
     if presence not in _ENGAGEMENT_LOUD and not returned and severity not in ("loud", "alarm"):
         return None  # present + no return → nothing to say
     out = {
@@ -847,7 +848,7 @@ def _engagement_for_brief(signal):
         "severity": severity,
         "gap_days": signal.get("gap_days"),
         "last_food_log_date": signal.get("last_food_log_date"),
-        "channels_quiet": signal.get("channels_quiet") or [],
+        **quiet_fields,
         "passive_still_flowing": signal.get("passive_still_flowing"),
         "planned_pause": bool(signal.get("planned_pause")),
         "planned_pause_reason": signal.get("planned_pause_reason") or "",

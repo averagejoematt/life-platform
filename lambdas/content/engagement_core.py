@@ -486,6 +486,44 @@ def _food_absence_transition(sig):
         return None
 
 
+def sourced_quiet(sig):
+    """The signal's quiet channels split by the #3252/#3276 absence-sourcing check (#3294).
+
+    THE ONE ADDRESS for "which of this record's quiet channels may be said out loud".
+    `channels_quiet` is a raw field on the stored presence record and three surfaces used
+    to read it straight off: this module's prompt block, `coach_narrative_orchestrator`'s
+    per-card presence payload, and `state_of_matthew_lambda`'s weekly narration payload.
+    Three readers of one unlicensed list is how a single short denominator reached three
+    audiences; they now share this function, so a fourth consumer cannot fork the idiom.
+
+    Same fail-soft import idiom and the same reason as `_food_absence_transition`: this
+    module is imported by the site API and by non-AI renderers, so it must not hard-depend
+    on the `ai` package being in a given bundle. The degradation is FAIL-CLOSED and
+    deliberately asymmetric to that helper's — a check that cannot run licenses NOTHING,
+    because the failure this exists to prevent is a false absence being published, and
+    passing the raw list through on an ImportError would reinstate exactly that.
+    """
+    try:
+        from ai.absence_sourcing import sourced_quiet_channels
+
+        return sourced_quiet_channels(sig)
+    except Exception:  # pragma: no cover - defensive; the fail-closed branch is asserted in tests
+        from collections import namedtuple
+
+        labels = tuple(str(q).strip() for q in (sig.get("channels_quiet") or ()) if str(q).strip())
+        return namedtuple("QuietChannelsFallback", "licensed withheld notes")((), labels, ())
+
+
+def quiet_fields_for_brief(sig):
+    """The two brief-facing fields every narrative surface carries (#3294):
+    `channels_quiet` = labels whose absence the registry denominator licenses;
+    `channels_unverified` = labels the denominator cannot carry — withheld, and
+    named so a card can say "cannot be established" instead of inferring silence.
+    Fail-closed by construction: `sourced_quiet` licenses nothing on any failure."""
+    split = sourced_quiet(sig if isinstance(sig, dict) else {})
+    return {"channels_quiet": list(split.licensed), "channels_unverified": list(split.withheld)}
+
+
 def presence_prompt_block(sig):
     """A steering block for when Matthew's OWN logging has gone quiet (or he just
     returned). Empty string when he's present. This is what stops a narrative
@@ -536,14 +574,28 @@ def presence_prompt_block(sig):
             # one door away said the source was 44 days quiet.
             win = food_transition.window_start or sig.get("experiment_window_start")
             gap_txt = f" — the window opened {f'{gap:g} days ago' if gap is not None else 'recently'}" + (f" ({win})" if win else "")
+            # #3294: scoped to FOOD, deliberately. This branch is derived from
+            # `_food_absence_transition` — one channel, one category — and the old
+            # wording ("NOTHING has been logged this cycle") stated a platform-wide
+            # absence off a single-source fact. That is the same short-denominator
+            # defect the quiet-channel list below carries, in its most absolute form:
+            # a reader has no way to hear "no food log" in a sentence that begins
+            # "nothing". Which OTHER channels may be called quiet is decided by the
+            # registry denominator a few lines down, never by this sentence.
             lines.append(
-                f"NOTHING has been logged this cycle{gap_txt}, with no food log at any point in it. "
-                "His last food log predates this cycle."
+                f"NO FOOD has been logged this cycle{gap_txt} — no food log at any point in it. "
+                "His last food log predates this cycle. This sentence is about FOOD only; "
+                "do not widen it to 'he logged nothing' — other channels are ruled on separately below."
             )
             lines.append(
-                "Say THAT — 'nothing logged yet this cycle'. Do NOT say his logging 'paused', 'stopped', or "
+                # #3294: "nothing logged yet this cycle" was a direct instruction to publish
+                # the unbounded form of a single-channel fact, and the board published it —
+                # widened to four channels, two of which had records. The instruction is the
+                # same shape as the sentence above it and is scoped the same way.
+                "Say THAT — 'no food logged yet this cycle'. Do NOT say his logging 'paused', 'stopped', or "
                 "'went silent N days ago': no pause happened this cycle, there was nothing to pause. Do NOT "
-                "date a transition ('since Tuesday', 'around August 2nd') — no such event exists."
+                "date a transition ('since Tuesday', 'around August 2nd') — no such event exists. Do NOT "
+                "generalise it to 'he has logged nothing' — that is a claim about channels this fact does not cover."
             )
             if food_transition is not None:
                 # The deterministic input itself, verbatim (ADR-105) — computed from the
@@ -553,12 +605,30 @@ def presence_prompt_block(sig):
         else:
             gap_txt = f"~{gap} days" if gap is not None else "several days"
             lines.append(f"Matthew's OWN logging has gone quiet — it has been {gap_txt} since his last food log (last logged {last}).")
-        quiet = sig.get("channels_quiet") or []
-        if quiet:
+        # #3294: the quiet-channel list is a CATEGORY-LEVEL ABSENCE ASSERTION, and it
+        # used to be published raw. Its denominator is the `engagement_channel` facet —
+        # one source per label — while the question "could anything have recorded this?"
+        # is the `evidence_for` facet, a deliberately different axis (see the registry's
+        # own facet docs). Strava carries `evidence_for: ("workout",)` and NO
+        # `engagement_channel`, so "training" here was Hevy alone and the board published
+        # "he has not logged any food, training, habits, or journal entries" over a window
+        # that held Strava activity. Every label now goes through the #3252/#3276
+        # absence-sourcing check first; an unlicensed one is WITHHELD, not softened.
+        quiet_split = sourced_quiet(sig)
+        if quiet_split.licensed:
             # #2382: "gone silent" is a TRANSITION, and this list includes channels that
             # never logged in the window at all — the block's own guard flags its own
             # sentence. State the standing condition, which is true either way.
-            lines.append(f"Channels with no current logs: {', '.join(str(q) for q in quiet)}.")
+            lines.append(f"Channels with no current logs: {', '.join(quiet_split.licensed)}.")
+        if quiet_split.withheld:
+            lines.append(
+                f"UNVERIFIED — do NOT say he logged nothing for: {', '.join(quiet_split.withheld)}. "
+                "The platform cannot establish those absences from the sources it consulted, so any "
+                "sentence asserting them would be a claim the data does not carry. Omit them entirely; "
+                "do not hedge them, and never fold them into a list with the confirmed ones above."
+            )
+            for note in quiet_split.notes:
+                lines.append(f"GROUND TRUTH (derived, not narrated): {note}")
         if sig.get("passive_still_flowing"):
             lines.append(
                 "His WEARABLES are still reporting — the passive data (sleep/recovery/RHR) keeps flowing even though he stopped logging, so you can see the consequences but not the cause."

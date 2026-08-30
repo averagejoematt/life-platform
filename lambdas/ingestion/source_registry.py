@@ -266,6 +266,14 @@ DEFAULT_STALE_HOURS = 48
 #                  BP/State of Mind) vs the passive device streams (steps/workouts)
 #                  — only the manual ones are nudge-eligible. Read by
 #                  hae_datatype_thresholds().
+#                  `evidence_for` (#3294) is the SUB-datatype's answer to the same
+#                  question the source-level facet asks, and apple_health is the one
+#                  source that needs both: every HAE stream shares ONE partition, so a
+#                  DATE# row exists whether or not a workout happened. "When did this
+#                  source last evidence a workout?" is answerable only from the FIELDS.
+#                  Read by evidence_field_predicates(); a behavioral source needs no
+#                  entry because its row IS the evidence (that is what `behavioral`
+#                  means), which is why this facet lives on apple_health alone.
 #                  `reader_surface` (#3204) is a SECOND, tighter threshold answering
 #                  a DIFFERENT question. `stale_days` asks "has the capture habit
 #                  lapsed?" — behavioural, deliberately lenient, it narrates and
@@ -567,11 +575,23 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "fields": ["recovery_workout_minutes", "breathwork_minutes"],
                 "stale_days": 10,
                 "manual": False,
+                # #3294: apple_health carries `evidence_for: ("steps", "workout")` at the
+                # SOURCE level, but its rows are one shared partition — a row exists every
+                # day whether or not a workout happened. A consumer asking "when did this
+                # source last evidence a workout?" therefore needs the FIELDS, not the row.
+                "evidence_for": ("workout",),
             },
             # Water: logged in-app most days — 3d dark means the habit lapsed.
             {"key": "water", "label": "Water", "fields": ["water_intake_ml", "water_intake_oz"], "stale_days": 3, "manual": True},
             # Steps: passive device activity — a 413-dropped stream is a pipe fault, not a lapse.
-            {"key": "steps", "label": "Steps / activity", "fields": ["steps"], "stale_days": 2, "manual": False},
+            {
+                "key": "steps",
+                "label": "Steps / activity",
+                "fields": ["steps"],
+                "stale_days": 2,
+                "manual": False,
+                "evidence_for": ("steps",),
+            },
         ],
     },
     "todoist": {
@@ -1457,6 +1477,35 @@ def evidence_sources_by_category() -> dict:
         for category in cast("tuple[str, ...]", row.get("evidence_for") or ()):
             out.setdefault(str(category), []).append(key)
     return {c: tuple(sorted(v)) for c, v in sorted(out.items())}
+
+
+def evidence_field_predicates(source: str, category: str) -> tuple:
+    """The FIELDS on `source`'s DATE# rows whose presence evidences `category` (#3294).
+
+    An empty tuple means "this source needs no field predicate" and has exactly two
+    causes, which the caller must tell apart with `SOURCE_REGISTRY[source]["behavioral"]`:
+
+      * a BEHAVIORAL source (Hevy, Strava, MacroFactor, Notion) — a row exists only
+        when Matthew did the thing, so the ROW is the evidence and asking for a field
+        would narrow the denominator all over again;
+      * a source that does not answer for `category` at all — check
+        `evidence_sources_by_category()` first, which is the denominator of record.
+
+    Only apple_health carries the sub-facet today, because it is the only source whose
+    streams share one partition: /api/pulse asked "when did he last train?" of Hevy
+    alone precisely because a bare apple_health row-existence query answers "every day"
+    and is therefore useless (#3294). Derived from the `hae_datatypes` entries' own
+    `evidence_for`; never hand-listed at a consumer.
+    """
+    cat = str(category or "").strip().lower()
+    row = SOURCE_REGISTRY.get(str(source or ""))
+    if not isinstance(row, dict):
+        return ()
+    fields: list[str] = []
+    for d in cast("list[dict[str, Any]]", row.get("hae_datatypes", []) or []):
+        if cat in tuple(cast("tuple[str, ...]", d.get("evidence_for") or ())):
+            fields.extend(str(f) for f in cast("list[str]", d.get("fields", []) or []))
+    return tuple(sorted(set(fields)))
 
 
 def engagement_primary_channel() -> str:

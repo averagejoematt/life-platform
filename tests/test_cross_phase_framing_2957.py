@@ -168,6 +168,11 @@ def _pulse(monkeypatch, *, day_n, last_lift_days_ago=None, last_journal_days_ago
     monkeypatch.setattr(intel, "_latest_item", lambda *a, **k: None)
     monkeypatch.setattr(intel, "_get_profile", lambda: {"journey_start_weight_lbs": 315.0})
     by_pk = {}
+    # #3294: the lift label licenses a category-level "no training" claim only when
+    # every workout-evidence source could speak. Give apple_health a live pipe (steps
+    # today, no workout minutes) so the infrastructure leg of the denominator is
+    # answered and these fixtures keep testing the FRAME, not the licensing gate.
+    by_pk["USER#matthew#SOURCE#apple_health"] = [{"sk": f"DATE#{_iso(_today_pt())}", "steps": 5000}]
     if last_lift_days_ago is not None:
         d = _iso(_today_pt() - timedelta(days=last_lift_days_ago))
         by_pk[_HEVY_PK] = [{"sk": f"DATE#{d}", "routine_name": None}]
