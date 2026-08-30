@@ -12,7 +12,7 @@ set -e
 set -u
 set -o pipefail
 
-PROJECT_ROOT="${HOME}/Documents/Claude/life-platform"
+PROJECT_ROOT="${HOME}/dev/life-platform"
 cd "${PROJECT_ROOT}"
 
 CHRONICLE_MD="${PROJECT_ROOT}/docs/elena_special_edition_chronicle_2026_05_03.md"

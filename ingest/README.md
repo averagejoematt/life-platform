@@ -6,16 +6,24 @@ Automated drop-folder processing for all manual health data uploads.
 
 A single macOS launchd agent watches three drop folders. Any time a file lands in one, processing starts within seconds — no manual steps needed.
 
+The drop folders live **inside the checkout**, under `datadrops/` — they are not siblings
+of the repo and never were under `~/Documents`. `datadrops/` is gitignored, so a fresh
+clone has none of them: create them before installing the agent (see Setup). launchd
+cannot watch a directory that does not exist, and a watcher with no folder to watch fails
+silently — the scan runs, finds nothing, and exits 0.
+
 | Drop Folder | What to drop | Processed by | Status |
 |---|---|---|---|
-| `~/Documents/Claude/habits_drop/` | Chronicling CSV export | `backfill_chronicling.py` | **ARCHIVED** — Chronicling replaced by Habitify (v2.7.0); folder still works for historical backfills |
-| `~/Documents/Claude/macrofactor_drop/` | MacroFactor nutrition or workout CSV | `backfill_macrofactor.py` / `backfill_macrofactor_workouts.py` | Active |
-| `~/Documents/Claude/apple_health_drop/` | Apple Health `.zip` or `export.xml` | `backfill_apple_health.py` | Active |
+| `datadrops/habits_drop/` | Chronicling CSV export | `backfill_chronicling.py` | **ARCHIVED** — Chronicling replaced by Habitify (v2.7.0); folder still works for historical backfills |
+| `datadrops/macrofactor_drop/` | MacroFactor nutrition or workout CSV | `backfill_macrofactor.py` / `backfill_macrofactor_workouts.py` | Active |
+| `datadrops/apple_health_drop/` | Apple Health `.zip` or `export.xml` | `backfill_apple_health.py` | Active |
 
 ## Setup (one time)
 
 ```bash
-cd /Users/matthewwalker/dev/life-platform/ingest
+cd /Users/matthewwalker/dev/life-platform
+mkdir -p datadrops/{habits,macrofactor,apple_health}_drop   # gitignored; absent on a fresh clone
+cd ingest
 chmod +x install.sh process_all_drops.sh
 ./install.sh
 ```
@@ -27,17 +35,17 @@ This registers the launchd agent and disables the old `macrofactor-drop` watcher
 **Chronicling (habits) — ARCHIVED:**
 Chronicling has been replaced by Habitify as of v2.7.0. Habitify syncs automatically via API (6:15 AM PT daily). The habits_drop folder still works if you need to backfill historical Chronicling data:
 1. Open Chronicling → Settings → Export Data → **Events CSV** (not groups or categories)
-2. Drop the file into `~/Documents/Claude/habits_drop/`
+2. Drop the file into `datadrops/habits_drop/`
 3. Script is incremental: only dates newer than your last upload are written
 
 **MacroFactor:**
 1. More → Data Management → Data Export
-2. Drop CSV into `~/Documents/Claude/macrofactor_drop/`
+2. Drop CSV into `datadrops/macrofactor_drop/`
 3. Script auto-detects nutrition vs workout format
 
 **Apple Health:**
 1. Health app → profile pic → Export All Health Data → share the zip
-2. Drop the `.zip` into `~/Documents/Claude/apple_health_drop/`
+2. Drop the `.zip` into `datadrops/apple_health_drop/`
 3. Script unzips and processes
 
 ## Checking status

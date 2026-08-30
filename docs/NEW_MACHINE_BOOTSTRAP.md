@@ -271,15 +271,25 @@ This registers `com.matthewwalker.life-platform-ingest` with launchd and starts 
 
 | Drop folder | Source | Status |
 |---|---|---|
-| `~/Documents/Claude/habits_drop/` | Chronicling CSV | archived (Habitify replaced it; still works for historical backfills) |
-| `~/Documents/Claude/macrofactor_drop/` | MacroFactor nutrition/workout CSV | active |
-| `~/Documents/Claude/apple_health_drop/` | Apple Health `.zip` / `export.xml` | active |
+| `datadrops/habits_drop/` | Chronicling CSV | archived (Habitify replaced it; still works for historical backfills) |
+| `datadrops/macrofactor_drop/` | MacroFactor nutrition/workout CSV | active |
+| `datadrops/apple_health_drop/` | Apple Health `.zip` / `export.xml` | active |
 
-**Re-point the drop folders:** the watched folders are siblings of the repo under
-`~/Documents/Claude/`. `install.sh` creates the launchd agent, but if you cloned to the
-canonical path they resolve automatically; recreate the three folders if the fresh Mac
-doesn't have them (`mkdir -p ~/Documents/Claude/{habits,macrofactor,apple_health}_drop`).
-Confirm with `./install.sh status`.
+**Create the drop folders BEFORE installing the agent.** They live *inside* the checkout
+at `<repo>/datadrops/`, and `datadrops/` is gitignored — so a fresh clone has none of
+them, and the plist's `WatchPaths` point at three directories that do not yet exist:
+
+```bash
+mkdir -p ~/dev/life-platform/datadrops/{habits,macrofactor,apple_health}_drop
+```
+
+This ordering is load-bearing, not tidiness. **launchd cannot watch a directory that does
+not exist, and it does not report that it isn't watching.** The agent still loads, still
+runs at login, still exits 0, and `ingest.log` still ends with `── Scan complete ──` —
+having scanned nothing. On 2026-08-30 exactly this happened: `datadrops/` was moved out of
+the repo and the watcher went silently inert with a green log. Confirm with
+`./install.sh status`, then prove it by dropping a file and watching it move to
+`processed/`.
 
 There is a second launchd plist — the calendar-sync agent
 (`setup/com.matthewwalker.calendar-sync.plist`); install it the same way if calendar sync
@@ -336,7 +346,7 @@ cd cdk && npx cdk diff LifePlatformCore   # synth + diff works → CDK toolchain
 head -20 ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/MEMORY.md
 
 # One manual drop round-trips end-to-end (ingest runtime is live):
-#   drop a small MacroFactor CSV into ~/Documents/Claude/macrofactor_drop/
+#   drop a small MacroFactor CSV into ~/dev/life-platform/datadrops/macrofactor_drop/
 #   → within seconds it moves to processed/ and appears in ingest.log
 tail -20 ~/dev/life-platform/ingest/ingest.log
 ```

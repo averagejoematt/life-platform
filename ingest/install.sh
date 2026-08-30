@@ -13,6 +13,7 @@
 #   ./install.sh status   Show current status
 # ============================================================
 
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST_NAME="com.matthewwalker.life-platform-ingest"
 PLIST_SRC="$(dirname "$0")/$PLIST_NAME.plist"
 PLIST_DEST="$HOME/Library/LaunchAgents/$PLIST_NAME.plist"
@@ -36,9 +37,9 @@ case "${1:-install}" in
         echo "  ✓ Installed and running: $PLIST_NAME"
         echo ""
         echo "Drop folders being watched:"
-        echo "  ~/Documents/Claude/habits_drop/       → Chronicling habits CSV"
-        echo "  ~/Documents/Claude/macrofactor_drop/  → MacroFactor nutrition or workout CSV"
-        echo "  ~/Documents/Claude/apple_health_drop/ → Apple Health export.xml or .zip"
+        echo "  ${REPO_ROOT}/datadrops/habits_drop/       → Chronicling habits CSV"
+        echo "  ${REPO_ROOT}/datadrops/macrofactor_drop/  → MacroFactor nutrition or workout CSV"
+        echo "  ${REPO_ROOT}/datadrops/apple_health_drop/ → Apple Health export.xml or .zip"
         echo ""
         echo "Log: $(dirname "$0")/ingest.log"
     else
