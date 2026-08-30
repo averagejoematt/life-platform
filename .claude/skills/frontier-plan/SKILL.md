@@ -139,10 +139,13 @@ n stated). An idea that needs dishonest data to be impressive is dead on arrival
    a promise to a persona, not a tech theme).
 4. **Present the plan** (plan-mode exit): the coverage map, the ranked list with scores, the
    epic structure, and what you'd ship first and why.
-5. **On approval, file to GitHub** per ADR-099 via the issue-filer contract: `type:epic` per
-   outcome, `type:story` per idea with score line, Now/Next/Later milestones matching the
-   ranking, cost flags in-body, links to the research artifacts. Upgrade/dedupe against
-   existing open issues rather than double-filing.
+5. **On approval, file to GitHub via the `issue-filer` agent.** The ADR-099 filing contract
+   lives in exactly ONE place — `.claude/agents/issue-filer.md` — and is deliberately not
+   restated here (six paraphrases of it were the #3250 finding; a paraphrase is where a
+   contract goes to drift). Hand the agent the ranked list and this lens's disposition: one
+   epic per outcome, one story per idea, milestones matching the ranking, cost flags in-body,
+   and links to the research artifacts. Upgrade or dedupe against existing open issues rather
+   than double-filing.
 
 Deliverables: the ranked backlog live in GitHub Issues, plus one synthesis document —
 **canonically `docs/reviews/FRONTIER_REVIEW_<YYYY-MM-DD>.md`** (the #2832 operating

@@ -67,25 +67,24 @@ def _registry():
 # name here is a deliberate act with a date attached, and the count may never rise.
 # 17 of 23 at adoption (2026-08-27) — the six that had one were exactly the six that had
 # been rewritten after an incident.
+# 2026-08-30 (#3250): six rows pruned — accuracy-review, craft-review, journey-review,
+# platform-review, sdlc-review and site-review were folded into the one `/review` spine and no
+# longer exist as skills. The ceiling drops with them (17 -> 10, the exact remaining count): a
+# ratchet whose ceiling stays put while the corpus shrinks is headroom nobody voted for. The
+# replacement, `review`, is NOT added here — it ships with a contract test.
 NO_CONTRACT_TEST: dict[str, str] = {
-    "accuracy-review": "2026-08-27",
     "cost-diligence": "2026-08-27",
-    "craft-review": "2026-08-27",
     "daily-debrief": "2026-08-27",
     "design-implement": "2026-08-27",
     "design-sync": "2026-08-27",
     "frontier-plan": "2026-08-27",
     "interview": "2026-08-27",
-    "journey-review": "2026-08-27",
     "open-checkin": "2026-08-27",
-    "platform-review": "2026-08-27",
-    "sdlc-review": "2026-08-27",
-    "site-review": "2026-08-27",
     "speak-to-coaches": "2026-08-27",
     "team-meeting": "2026-08-27",
     "uplevel": "2026-08-27",
 }
-RATCHET_CEILING = 17
+RATCHET_CEILING = 10
 
 MIN_DESCRIPTION = 80
 
@@ -361,6 +360,7 @@ def lint(online: bool = True) -> tuple[list[Finding], dict]:
     for dupe in reg.duplicates():
         findings.append(Finding("shadow", dupe, "exists in BOTH .claude/skills/ and .claude/commands/ — one silently shadows the other"))
 
+    reference_files = 0
     for name, path in reg.skills().items():
         rel = reg.rel(path)
         text = path.read_text(encoding="utf-8")
@@ -368,6 +368,21 @@ def lint(online: bool = True) -> tuple[list[Finding], dict]:
         findings += check_frontmatter(name, rel, fields, is_agent=False)
         findings += check_references(rel, body)
         findings += check_pointers(rel, body, cache, online)
+        # Progressive-disclosure content is instruction too, and #3250 moved the bulk of the
+        # review corpus into it: seven rubrics, carrying nearly every path citation and every
+        # stale-pointer risk those files ever had. A lint whose scope stops at SKILL.md would
+        # have kept reporting a clean corpus over exactly the text that decayed before —
+        # the scope has to follow the content, or the gate quietly starts measuring nothing.
+        # Frontmatter is deliberately NOT required here: a reference is loaded by name from
+        # its skill, never selected by a model reading descriptions.
+        for ref in reg.skill_references(name):
+            if ref.suffix != ".md":
+                continue
+            reference_files += 1
+            ref_rel = reg.rel(ref)
+            ref_text = ref.read_text(encoding="utf-8")
+            findings += check_references(ref_rel, ref_text)
+            findings += check_pointers(ref_rel, ref_text, cache, online)
 
     for name, path in reg.agents().items():
         rel = reg.rel(path)
@@ -396,6 +411,7 @@ def lint(online: bool = True) -> tuple[list[Finding], dict]:
 
     stats = {
         "skills": len(reg.skills()),
+        "references": reference_files,
         "agents": len(reg.agents()),
         "exempt": len(NO_CONTRACT_TEST),
         "ceiling": RATCHET_CEILING,
@@ -420,7 +436,8 @@ def main() -> int:
 
     findings, stats = lint(online=online)
     print(
-        f"skill-lint: {stats['skills']} skills, {stats['agents']} agents, {stats['exempt']}/{stats['ceiling']} on the contract-test ratchet"
+        f"skill-lint: {stats['skills']} skills ({stats['references']} reference files), "
+        f"{stats['agents']} agents, {stats['exempt']}/{stats['ceiling']} on the contract-test ratchet"
     )
     if stats["can_retire"]:
         print(f"  [ratchet] these now HAVE a contract test and should be removed from NO_CONTRACT_TEST: {', '.join(stats['can_retire'])}")
@@ -491,6 +508,36 @@ def self_test() -> int:
     finally:
         shutil.copy2(backup, victim)
         os.unlink(backup)
+
+    # #3250: the scope now includes progressive-disclosure references, where the review corpus
+    # actually lives. Scope that was never watched failing is scope nobody can trust — so plant
+    # a dead reference in a real reference file and assert this gate reports it.
+    refs = [r for name in reg.skills() for r in reg.skill_references(name) if r.suffix == ".md"]
+    if not refs:
+        print("  MISSED  reference-file scope  ->  no reference files exist to prove it on")
+        failures.append("reference-file scope (no fixture)")
+    else:
+        ref_victim = refs[0]
+        ref_original = ref_victim.read_text(encoding="utf-8")
+        fd2, ref_backup = tempfile.mkstemp(suffix=".skill-lint-ref-backup.md")
+        os.close(fd2)
+        shutil.copy2(ref_victim, ref_backup)
+        try:
+            ref_victim.write_text(ref_original + "\n\nSee `docs/NO_SUCH_REFERENCE_DOC.md`.\n", encoding="utf-8")
+            findings, _ = lint(online=False)
+            hit = [f for f in findings if f.kind == "dead-ref" and f.target == reg.rel(ref_victim)]
+            print(f"  {'CAUGHT' if hit else 'MISSED':7} dead reference in {reg.rel(ref_victim)}  ->  dead-ref")
+            if not hit:
+                failures.append("reference-file scope")
+            ref_victim.write_text(ref_original, encoding="utf-8")
+            findings, _ = lint(online=False)
+            residual = [f for f in findings if f.target == reg.rel(ref_victim)]
+            print(f"  {'CLEAN' if not residual else 'DIRTY':7} positive control (unmutated reference reports nothing)")
+            if residual:
+                failures.append("reference positive control")
+        finally:
+            shutil.copy2(ref_backup, ref_victim)
+            os.unlink(ref_backup)
     if failures:
         print(f"\n❌ self-test: {len(failures)} case(s) the gate did NOT catch: {', '.join(failures)}")
         return 1

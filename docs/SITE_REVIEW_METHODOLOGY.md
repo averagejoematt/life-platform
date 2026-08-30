@@ -6,7 +6,7 @@
 > not "did it render" (that's the gating `tests/visual_qa.py`), but "does each page's
 > story land, does the site cohere into one throughline, and does the data corroborate
 > and tell the right story." Runs as a human-in-the-loop pass in Claude Code via the
-> `/site-review` skill (Claude Code sees the screenshots directly).
+> `/review site` lens (Claude Code sees the screenshots directly).
 > First review: 2026-06-20. Cadence: weekly through the first 3 months, then monthly.
 > Findings stored in `docs/site-reviews/`. Tooling: `tests/site_review.py` (capture +
 > data corroboration), `tests/site_review_bindings.py` (page→endpoint map).
@@ -91,8 +91,8 @@ Produces `qa-screenshots/<date>/`: screenshots (full + mobile + chart crops), `a
 ### Step 2 — (optional) Point at specifics
 Drop marked-up screenshots into `qa-screenshots/<date>/annotations/`, named `<slug>-<label>.png` (e.g. `now-font.png`). The skill reads them and treats your markup as **directed, top-priority** findings — this is how you "show exactly what you mean."
 
-### Step 3 — Review (the `/site-review` skill, in Claude Code)
-`/site-review review <date>` (defaults to the latest packet, one door per run for the weekly cadence). Claude reads `manifest.json` + `consistency.json` + this doc + the constitution, then walks the pages in `narrative_order`, **reading each screenshot**, and for every page asks:
+### Step 3 — Review (the `/review site` lens, in Claude Code)
+`/review site review <date>` (defaults to the latest packet, one door per run for the weekly cadence). Claude reads `manifest.json` + `consistency.json` + this doc + the constitution, then walks the pages in `narrative_order`, **reading each screenshot**, and for every page asks:
 1. **What is this page trying to say** — for Matt-daily, the circle, the discoverer, commercialization. Does it land? (the audience-hierarchy + Sofia/Raj lenses)
 2. **Visual / type / IA** — Tyrell + Mara lenses; restraint-reads-as-credibility; mobile parity.
 3. **Narrative / throughline** — Ava lens + the §0 archetype; does this page advance the one story.

@@ -110,7 +110,7 @@ surfaces is generated 1:1 from these filenames).
 | **Milestone interview** | `.claude/skills/interview/SKILL.md` | The longform biographical deep interview (#1576 — the March-2026 pattern made repeatable). Brief uses the prequel-brief structure and lands in PRIVATE S3 (`raw/matthew/interviews/`) — NEVER in git while the repo is public. Feeds the essay generator (#1566) via its what-to-abstract section only. | Monthly + cycle events (genesis eve, day 30, cycle close) |
 | **Vlog / video diary** | `.claude/skills/vlog/SKILL.md` | Claude as live interviewer for the Insta360 Luna video diaries (#1571, epic #1564). Zero-setup open — the priming bundle also loads the diary's own memory: previous entry, due on-tape claims, pending coach reactions (#1841). Seven-format library incl. `micro` (the days-1–7 wall floor + 30s bad-day floor, ADR-104 framing; day-30/60/90 rewatch retro). Route-the-takeaways close → Notion `Video Diary` template (`channel: video_diary`, #1572 — the Template select options themselves were only added 2026-07-26, #1840) **+ the TAPE NOTE**: 3–5 verbatim moments the post-production desk (`~/Documents/Claude/vlog/`, outside the repo) string-matches into the whisper SRT for real clip timecodes. Studio kit in private S3 `config/studio/`. | Whenever the Luna comes out |
 
-One further command, `.claude/skills/journey-review/SKILL.md`, is not a capture mode — it's the
+One further ritual, the `/review journey` lens (`.claude/skills/review/references/journey.md`), is not a capture mode — it's the
 periodic ritual that audits these seven for drift (MCP inventory sweep, stale-channel
 check, prompt/config parity against the claude.ai Project prompts). See its own file for
 scope.
@@ -189,7 +189,7 @@ never the reverse.** Concretely:
   that condensation step is Matthew's, not automated (no MCP write path pushes prompt
   text into claude.ai). It happens on Matthew's own cadence, not per-commit.
 - Because the condensation is manual and out-of-band, the two surfaces **can drift**.
-  `.claude/skills/journey-review/SKILL.md` is the periodic check for that drift — it doesn't
+  `.claude/skills/review/references/journey.md` (`/review journey`) is the periodic check for that drift — it doesn't
   fix it (it can't reach the claude.ai side), it flags it so Matthew can re-condense.
 - For `/vlog` specifically that check is now mechanical: **`python3
   scripts/check_vlog_prompt_parity.py`** (#1571) diffs the load-bearing rules of
