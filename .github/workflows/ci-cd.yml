@@ -503,6 +503,11 @@ jobs:
       has_deploys: ${{ steps.plan.outputs.has_deploys }}
       fleet_changed: ${{ steps.plan.outputs.fleet_changed }}
       mcp_changed: ${{ steps.plan.outputs.mcp_changed }}
+      # #2834: the additive-IAM gate's verdict (ALLOW-ADDITIVE / NO-IAM-CHANGE / OWNER-REQUIRED)
+      # and the stacks it admitted. The Deploy job asserts the verdict EXISTS (dead-man) and
+      # runs `cdk deploy` ONLY for iam_additive_stacks, after re-evaluating at apply time.
+      iam_gate_verdict: ${{ steps.cdk_diff.outputs.iam_gate_verdict }}
+      iam_additive_stacks: ${{ steps.cdk_diff.outputs.iam_additive_stacks }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -536,6 +541,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: CDK diff — detect IAM/infra drift
+        id: cdk_diff
         run: |
           echo "::group::CDK diff"
           node --version
@@ -582,14 +588,33 @@ jobs:
             exit 1
           fi
 
-          if grep -qi 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt; then
-            echo "::error::CDK diff detected IAM/policy changes — R8-ST6 gate: review and approve manually before deploying."
-            echo "Changes detected:"
-            grep -i 'iam\|policy\|role\|permission' /tmp/cdk_diff.txt | head -20
-            echo ""
-            echo "If these changes are intentional, run 'cdk deploy' locally and verify with post_cdk_reconcile_smoke.sh before re-pushing."
+          # ── R8-ST6, structural form (#2834; ADR-065 amendment 2026-08-30) ──────────
+          # This used to be a case-insensitive grep for iam/policy/role/permission over the
+          # prose transcript — right to exist, wrong in shape: it stranded the code pipeline ~14h
+          # on one sqs:SendMessage grant (INCIDENT_LOG 2026-08-15), left a fail-closed
+          # privacy screen no-op'd five days because its fix was an IAM grant CI could not
+          # ship (2026-08-14 P1), and fired on CloudFront::ResponseHeadersPolicy for
+          # containing the word "Policy". deploy/iam_additive_gate.py reads the TEMPLATE
+          # diff instead (cdk.out vs each stack's live Original template, read-only) and
+          # returns per stack: NO-IAM-CHANGE (proceed exactly as before), ALLOW-ADDITIVE
+          # (the Deploy job may `cdk deploy` that stack — new Allow statements on
+          # life-platform-namespace resources only, nothing else riding along) or
+          # OWNER-REQUIRED (exit 1 — the same stranded-Plan shape as before, now naming
+          # every offending statement). Unparseable → OWNER-REQUIRED, exit 2: fail closed.
+          echo "::group::IAM additive gate (#2834)"
+          npx cdk synth --all --quiet
+          cd "$GITHUB_WORKSPACE"
+          set +e
+          python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live \
+            --json /tmp/iam_gate_2834_plan.json --github-output "$GITHUB_OUTPUT"
+          GATE_EXIT=$?
+          set -e
+          echo "::endgroup::"
+          if [ "$GATE_EXIT" -ne 0 ]; then
+            echo "::error::IAM change is OWNER-REQUIRED (outside the additive-only shape, or the gate could not evaluate it — exit $GATE_EXIT). R8-ST6 gate (#2834): nothing deploys until the owner runs 'bash deploy/cdk_deploy.sh <Stack>' from main; the offending statements are named above."
             exit 1
           fi
+          cd cdk
 
           if grep -qi 'InlinePolicy\|inline_policy\|QaSmokeKmsAccess\|CanaryKmsAccess' /tmp/cdk_diff.txt; then
             echo "::warning::CDK diff detected inline policy drift — a manual console fix may not be in CDK yet"
@@ -816,7 +841,9 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     needs: [reconcile, plan]   # #1173: reconcile listed to read build_sha
-    if: needs.plan.outputs.has_deploys == 'true'
+    # #2834: an IAM-only merge changes cdk/ alone (has_deploys=false) and must still reach
+    # the additive-IAM step below — the code-deploy steps handle an empty matrix already.
+    if: needs.plan.outputs.has_deploys == 'true' || needs.plan.outputs.iam_additive_stacks != ''
     environment: production   # ← Manual approval gate
     # The real invariant, moved here from the workflow level (2026-08-02, 4th
     # phantom-queue wedge): never two concurrent deploys of the same ref. A
@@ -933,6 +960,68 @@ jobs:
             echo "::error::$FAILED Lambda(s) failed to deploy"
             exit 1
           fi
+
+      # ── #2834: the additive-IAM deploy (ADR-065 amendment 2026-08-30) ──────────
+      # Owner decision on #2834, option (b): CI may apply an IAM change ONLY when the
+      # synthesized template diff is additive-only (deploy/iam_additive_gate.py decides).
+      # Two steps, deliberately: a dead-man that reds if the Plan verdict is ABSENT
+      # (absence must be louder than failure), then the deploy itself, which re-evaluates
+      # at apply time and deploys the exact cloud assembly it evaluated.
+      - name: IAM gate verdict present (dead-man, #2834)
+        run: |
+          VERDICT='${{ needs.plan.outputs.iam_gate_verdict }}'
+          if [ -z "$VERDICT" ]; then
+            echo "::error::Plan produced NO iam_gate_verdict output — deploy/iam_additive_gate.py did not run (step removed, output renamed, or it crashed before writing). Absence is a failure, not a pass (#2834 dead-man)."
+            exit 1
+          fi
+          echo "iam_gate_verdict=$VERDICT  iam_additive_stacks='${{ needs.plan.outputs.iam_additive_stacks }}'"
+
+      - name: Additive IAM deploy — evaluated == deployed (#2834)
+        if: needs.plan.outputs.iam_additive_stacks != ''
+        run: |
+          set -euo pipefail
+          PLAN_STACKS="${{ needs.plan.outputs.iam_additive_stacks }}"
+          echo "═══ Additive IAM deploy (#2834): Plan admitted [$PLAN_STACKS] ═══"
+          # The same toolchain Plan synthesized with (cdk/package.json CLI pin + cdk/requirements.txt).
+          CDK_CLI_VERSION=$(node -p "require('./cdk/package.json').devDependencies['aws-cdk']")
+          npm install -g "aws-cdk@${CDK_CLI_VERSION}" --quiet
+          cd cdk
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt --quiet
+          npx cdk synth --all --quiet
+          cd "$GITHUB_WORKSPACE"
+          # Re-evaluate at APPLY time against the live templates. The Plan verdict is a plan,
+          # not a licence: an owner deploy in between changes the deployed side. What ships
+          # below is the exact cloud assembly (--app cdk.out) this evaluation read.
+          python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live --stacks $PLAN_STACKS \
+            --json /tmp/iam_gate_2834_apply.json --github-output /tmp/iam_gate_2834_apply.out
+          DEPLOY_STACKS=$(grep '^iam_additive_stacks=' /tmp/iam_gate_2834_apply.out | cut -d= -f2-)
+          AUDIT_BASE="remediation-log/iam-additive-gate/$(date -u +%Y/%m/%d)/run-${GITHUB_RUN_ID}-${GITHUB_SHA:0:12}"
+          if [ -z "$DEPLOY_STACKS" ]; then
+            echo "Nothing left to deploy — the stacks converged since Plan (an owner deploy landed in between)."
+            aws s3 cp /tmp/iam_gate_2834_apply.json "s3://matthew-life-platform/${AUDIT_BASE}-decision.json" \
+              --content-type application/json --region ${{ env.AWS_REGION }}
+            exit 0
+          fi
+          cd cdk
+          for STACK in $DEPLOY_STACKS; do
+            echo "→ cdk deploy $STACK (additive IAM only; --exclusively so no dependency stack rides along)"
+            npx cdk deploy "$STACK" --app cdk.out --exclusively --require-approval never --progress events
+          done
+          cd "$GITHUB_WORKSPACE"
+          # Convergence proof: the admitted IAM diff must now be GONE from the live template.
+          python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live --stacks $DEPLOY_STACKS \
+            --expect-converged --json /tmp/iam_gate_2834_converged.json
+          # The ledger — the automerge audit pattern (remediation/automerge.py::audit, ADR-065):
+          # every ALLOW-ADDITIVE decision that shipped, with the admitted statements and the
+          # registry fingerprint that admitted them. A failed put fails the step: an
+          # unrecorded deploy is a failure, not a quiet success.
+          aws s3 cp /tmp/iam_gate_2834_apply.json "s3://matthew-life-platform/${AUDIT_BASE}-decision.json" \
+            --content-type application/json --region ${{ env.AWS_REGION }}
+          aws s3 cp /tmp/iam_gate_2834_converged.json "s3://matthew-life-platform/${AUDIT_BASE}-converged.json" \
+            --content-type application/json --region ${{ env.AWS_REGION }}
+          echo "✅ additive IAM deployed: $DEPLOY_STACKS · ledger s3://matthew-life-platform/${AUDIT_BASE}-*.json"
 
       # ── Public site deploy: NOT here anymore (#750) ────────────────────────
       # #393 shipped the site inside this approval-gated job; #750 moved it to

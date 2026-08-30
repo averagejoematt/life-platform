@@ -47,7 +47,7 @@ IAM included, permanently.
 ## Bucket B — FIX-VIA-PR (open a PR; human merges, never auto)
 
 Anything that changes **behavior**, not just config/permissions:
-- **Missing IAM grant** — an IAM change is exactly the class worth a human glance (#2611).
+- **Missing IAM grant** — an IAM change is exactly the class worth a human glance (#2611). Since #2834 (2026-08-30) the *deploy* of an additive grant no longer needs the owner: once a human merges it, CI's additive-IAM gate (`deploy/iam_additive_gate.py`) ships it if it is in shape. The merge stays human; only the `cdk deploy` moved.
 - Lambda business logic, retries, data transforms.
 - AI/coach **prompts**, model choice, `max_tokens`, caching structure.
 - DynamoDB schema / access patterns, new GSIs.

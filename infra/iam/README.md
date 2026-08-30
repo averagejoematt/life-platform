@@ -444,3 +444,45 @@ python3 deploy/verify_oidc_iam.py   # expect CLEAN (the MISSING finding disappea
 Validate by dispatching `.github/workflows/golden-brief-eval.yml` with `run_judge: true` and
 watching the judge step emit `LifePlatform/GoldenBrief` metrics, then dispatching
 `.github/workflows/eval-harvest.yml` and confirming the candidate artifact uploads.
+
+---
+
+## #2834 — CI's additive-IAM deploy needs NO new grant (2026-08-30; staged diff: EMPTY)
+
+> **Status: nothing to apply.** The additive-IAM gate (`deploy/iam_additive_gate.py`,
+> ADR-065 amendment 2026-08-30) lets the Deploy job run `cdk deploy <Stack> --exclusively`
+> for a stack whose synthesized template diff is additive-only IAM. That deploy needs no
+> change to `github-actions-deploy-role.permissions.json`, and this section exists so the
+> reviewer can see *why* the staged diff is empty rather than assume it was forgotten.
+
+**The permission chain `cdk deploy` actually uses** (CDK v2, bootstrap v6+, read live
+2026-08-30 with `iam:GetRole` / `iam:GetRolePolicy` / `iam:ListAttachedRolePolicies` — no
+mutation):
+
+| Hop | Principal | What it needs | Held? |
+| --- | --- | --- | --- |
+| CI → CDK deploy role | `github-actions-deploy-role` | `sts:AssumeRole` on `arn:aws:iam::<acct>:role/cdk-*` (statement `CDKBootstrapRoleAssume`) | **yes**, since #401 |
+| CDK deploy role → CloudFormation | `cdk-hnb659fds-deploy-role-<acct>-<region>` (trusts the account root) | `cloudformation:CreateChangeSet/ExecuteChangeSet/…`, `iam:PassRole` on the cfn-exec role, `ssm:GetParameter` on `/cdk-bootstrap/hnb659fds/version` — all in its bootstrap `default` policy | yes (bootstrap) |
+| asset upload | `cdk-hnb659fds-file-publishing-role-*` (assumed, same `cdk-*` grant) | S3 put to the bootstrap assets bucket | yes (bootstrap) |
+| CloudFormation → resources | `cdk-hnb659fds-cfn-exec-role-<acct>-<region>` | **`AdministratorAccess`** (the CDK bootstrap default) | yes (bootstrap) |
+| the gate's read side | `github-actions-deploy-role` | `cloudformation:GetTemplate` (statement `CloudFormationDiff`) | yes |
+| the ledger | `github-actions-deploy-role` | `s3:PutObject` on `matthew-life-platform/*` (statement `S3DeployArtifacts`) — writes `remediation-log/iam-additive-gate/YYYY/MM/DD/` | yes |
+
+`tests/test_iam_additive_gate_guards_2834.py::test_deploy_role_needs_no_new_grant_for_the_additive_deploy`
+pins the three deploy-role statements from the committed JSON, so a future shed of any of
+them reds before it silently breaks the additive deploy.
+
+**What this means for the threat model, stated plainly.** "CI cannot mutate IAM" was never a
+permission property of this role: the bootstrap chain above has been assumable by the
+deploy role since the role was codified, and `ci-cd.yml` simply never contained a `cdk
+deploy` step. #2834 adds the step behind a fail-closed, statement-level gate — it changes
+what CI *exercises*, not what CI *could* do. The proportionate next tightening (a separately
+priced decision, not part of #2834) is to scope the bootstrap's execution policy
+(`cdk bootstrap --cloudformation-execution-policies …`) or add a permissions boundary on
+the CI path so that CFN-via-CI cannot exceed the namespace the gate's registry names.
+
+**Verify (read-only), before and after the #2834 merge — expect NO change here:**
+
+```bash
+python3 deploy/verify_oidc_iam.py --strict     # deploy-role: CLEAN (or only the already-staged #903 shed)
+```
