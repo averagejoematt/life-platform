@@ -817,6 +817,25 @@ def _protocols_for_brief(protocols):
 _ENGAGEMENT_LOUD = {"light", "quiet", "dark"}
 
 
+def _quiet_split(signal):
+    """The presence record's quiet channels, split by the #3252/#3276 check (#3294).
+
+    Delegates to the ONE address, `content.engagement_core.sourced_quiet`, which is
+    itself fail-closed: a bundle missing the `ai` package licenses nothing rather than
+    passing the raw list through. Import is local for the same reason the rest of this
+    module's cross-package imports are.
+    """
+    try:
+        from content.engagement_core import sourced_quiet
+
+        return sourced_quiet(signal if isinstance(signal, dict) else {})
+    except Exception:  # pragma: no cover — defensive; fail CLOSED, never pass through
+        from collections import namedtuple
+
+        labels = tuple(str(c) for c in ((signal or {}).get("channels_quiet") or ()))
+        return namedtuple("QuietChannelsFallback", "licensed withheld notes")((), labels, ())
+
+
 def _engagement_for_brief(signal):
     """Trim the engagement_state STATE#current record to the fields a coach needs
     to VOICE the gap — and nothing that would let it fabricate the CAUSE. Returns
@@ -830,6 +849,7 @@ def _engagement_for_brief(signal):
     the story, not invent it)."""
     if not isinstance(signal, dict):
         return None
+    _qs = _quiet_split(signal)
     presence = signal.get("presence_class")
     returned = bool(signal.get("returned"))
     # #914: severity travels with the signal (derived for pre-ladder records) so
@@ -847,7 +867,13 @@ def _engagement_for_brief(signal):
         "severity": severity,
         "gap_days": signal.get("gap_days"),
         "last_food_log_date": signal.get("last_food_log_date"),
-        "channels_quiet": signal.get("channels_quiet") or [],
+        # #3294: the LICENSED quiet channels only. The raw field's denominator is the
+        # `engagement_channel` facet — one source per label — and the board published
+        # four of them as "he has not logged any …" while two had records in the window.
+        # `channels_unverified` travels beside it so a card knows the difference between
+        # "confirmed quiet" and "cannot be established", instead of inferring silence.
+        "channels_quiet": list(_qs.licensed),
+        "channels_unverified": list(_qs.withheld),
         "passive_still_flowing": signal.get("passive_still_flowing"),
         "planned_pause": bool(signal.get("planned_pause")),
         "planned_pause_reason": signal.get("planned_pause_reason") or "",

@@ -96,6 +96,17 @@ def evidence_sources(category) -> tuple:
     return evidence_sources_by_category().get(cat, ())
 
 
+def evidence_categories(source) -> tuple:
+    """The registry `evidence_for` facet of ONE source — the categories its records
+    can substantiate. () when the registry has no opinion about this source at all.
+
+    The inverse direction of `evidence_sources()`, and the one a CHANNEL-shaped caller
+    needs: a presence signal knows which sources it consulted, not which categories
+    those sources answer for.
+    """
+    return tuple(str(c).strip().lower() for c in (_facet(str(source or ""), "evidence_for") or ()))
+
+
 def _facet(source: str, name: str, default=None):
     row = SOURCE_REGISTRY.get(source)
     return row.get(name, default) if isinstance(row, Mapping) else default
@@ -355,3 +366,119 @@ def unsourced_absence_findings(
             }
         )
     return findings
+
+
+# ── #3294: the CHANNEL-shaped caller (the board narrative's own input) ─────────
+#
+# WHY THIS EXISTS, AND WHY THE #3276 CHECK DID NOT ALREADY REACH THE BOARD.
+#
+# #3252/#3276 armed the two FAIL-CLOSED halves above on the two `behavior_logs`
+# derivations, and both are wired: `available_logs_from_presence` and
+# `available_logs_from_recency` each hand their result to `sourced_availability`
+# before anyone sees it. But those derivations feed the POST-HOC text gate
+# (`grounding_findings` → `ungrounded_behavioral_findings`), which grades claims that
+# a behaviour HAPPENED against `present`. Nothing on that path grades the sentence
+# that says a behaviour did NOT happen, and nothing on it can: the gate's only input
+# is the finished text, and detecting "an absence claim" in English is exactly the
+# phrase-matching the #2959/#3003/#3199 family proved cannot hold.
+#
+# Meanwhile the false sentence was licensed one layer EARLIER, upstream of every gate,
+# by `content.engagement_core.presence_prompt_block` — which hands the model a bare
+# list of quiet channel LABELS ("food, training, habits, journal") taken straight off
+# the presence signal. That list's denominator is the `engagement_channel` facet: ONE
+# source per label. The registry's own facet documentation says in as many words that
+# `engagement_channel` ("does it stop when he disengages?") and `evidence_for` ("if he
+# HAD done it, would this source know?") are DIFFERENT axes — and Strava is the
+# standing proof, carrying `evidence_for: ("workout",)` and no `engagement_channel`.
+# So the board's training-absence claim was derived from Hevy alone, by construction,
+# on a code path that never touched `absence_sourcing`.
+#
+# This function is that missing edge. It is the only new judgement in the fix, and it
+# makes no list of its own: the sources CONSULTED are the presence record's own
+# `channel_detail` keys, and the categories each one answers for are the registry's
+# `evidence_for` facet. A channel whose category-level absence the denominator cannot
+# carry is WITHHELD, with the deterministic reason attached.
+
+
+class QuietChannels(NamedTuple):
+    """A presence signal's quiet channel labels, split by whether the absence is licensed.
+
+    `licensed` — labels whose category denominator was fully consulted and reported
+    nothing. These are sayable as "no logs".
+    `withheld` — labels whose absence the registry cannot carry. NOT sayable.
+    `notes`    — one deterministic ground-truth sentence per withheld label, in the
+    same `AbsenceSourcing.narrative_input()` voice the rest of this module speaks, so
+    the caller can hand the model the REASON instead of silently dropping a channel.
+    """
+
+    licensed: tuple
+    withheld: tuple
+    notes: tuple
+
+
+_UNSOURCEABLE_CHANNEL_NOTE = (
+    "{label}: no source in the evidence registry answers whether this happened "
+    "(the channel's source records a row either way), so its absence cannot be "
+    "established. Say nothing about whether he did it."
+)
+
+
+def sourced_quiet_channels(signal) -> QuietChannels:
+    """Grade a presence signal's `channels_quiet` labels against the registry denominator.
+
+    Pure, total, never raises — a malformed signal yields an empty split, which is the
+    fail-closed answer (nothing licensed) rather than a pass-through.
+
+    `sources_observed` is derived from the signal's own `channel_detail` keys: those ARE
+    the sources the presence computation consulted, and reading them here is what keeps
+    the denominator from being hand-typed a second time. `channel_detail` also carries
+    each channel's `last_log_date`, which is what lets an INFRASTRUCTURE source in the
+    denominator grade `stale` rather than silently counting as consulted (#3268).
+    """
+    signal = signal if isinstance(signal, Mapping) else {}
+    detail = signal.get("channel_detail")
+    detail = detail if isinstance(detail, Mapping) else {}
+    quiet = [str(q).strip() for q in (signal.get("channels_quiet") or ()) if str(q).strip()]
+    if not quiet:
+        return QuietChannels((), (), ())
+
+    observed, last_dates = [], {}
+    label_sources: dict = {}
+    for src, entry in detail.items():
+        src = str(src)
+        observed.append(src)
+        if isinstance(entry, Mapping):
+            last_dates[src] = _iso(entry.get("last_log_date"))
+            label = str(entry.get("label") or "").strip()
+            if label:
+                label_sources.setdefault(label, []).append(src)
+    window_start = _iso(signal.get("experiment_window_start"))
+
+    licensed, withheld, notes = [], [], []
+    for label in quiet:
+        categories = []
+        for src in label_sources.get(label, ()):
+            categories.extend(evidence_categories(src))
+        if not categories:
+            # The channel's source carries no `evidence_for` facet: the registry has no
+            # way to answer "did he do it?" from it. Habitify is the live case — its
+            # scheduled pull writes a row every day regardless of behaviour, so the row
+            # is not evidence either way, and a quiet reading of that channel comes from
+            # a completion PREDICATE rather than from the absence of data. Whether that
+            # predicate licenses a public "he logged no habits" is an owner ruling
+            # (ADR-104's auto-synced-counts-as-logging cuts against it); until it is
+            # made, the claim is withheld rather than guessed.
+            withheld.append(label)
+            notes.append(_UNSOURCEABLE_CHANNEL_NOTE.format(label=label))
+            continue
+        gradings = [
+            absence_sourcing(cat, sources_observed=observed, source_last_dates=last_dates, window_start=window_start)
+            for cat in sorted(set(categories))
+        ]
+        blocking = [g for g in gradings if not g.licenses_absence]
+        if blocking:
+            withheld.append(label)
+            notes.extend(g.narrative_input() for g in blocking)
+        else:
+            licensed.append(label)
+    return QuietChannels(tuple(licensed), tuple(withheld), tuple(notes))

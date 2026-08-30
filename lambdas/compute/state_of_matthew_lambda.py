@@ -316,13 +316,30 @@ def gather_presence_section(signal: dict | None) -> dict | None:
         gap = int(gap) if gap is not None else None
     except (TypeError, ValueError):
         gap = None
+    # #3294: the raw `channels_quiet` list is an unlicensed category-level absence —
+    # its denominator is the `engagement_channel` facet (one source per label), not the
+    # registry's `evidence_for` set. Same list, same defect, a different audience from
+    # the board's. `sourced_quiet` is the ONE address that splits it; the withheld half
+    # travels named so the narration cannot read the shorter list as "everything else".
+    try:
+        from content.engagement_core import sourced_quiet
+
+        _qs = sourced_quiet(signal)
+        licensed, withheld = list(_qs.licensed), list(_qs.withheld)
+    except Exception:  # pragma: no cover — defensive; fail CLOSED, never pass through
+        licensed, withheld = [], [str(c) for c in (signal.get("channels_quiet") or [])]
     return {
         "presence_class": signal.get("presence_class"),
         "severity": severity,
         "gap_days": gap,
         "last_food_log_date": signal.get("last_food_log_date"),
-        "channels_quiet": [str(c) for c in (signal.get("channels_quiet") or [])],
-        "note": "Matthew's own manual logging has been quiet — every number above is computed over an INCOMPLETE window.",
+        "channels_quiet": licensed,
+        "channels_unverified": withheld,
+        "note": (
+            "Matthew's own manual logging has been quiet — every number above is computed over an INCOMPLETE window. "
+            "`channels_quiet` is confirmed; `channels_unverified` is NOT — the platform cannot establish those "
+            "absences from the sources it consulted, so never assert them and never fold them into the quiet list."
+        ),
     }
 
 
