@@ -27,7 +27,12 @@ write surface is your own worktree and your own branch.
    *running* lanes as reapable on its first real use, because a lane is clean between
    checkout and its first edit (#3289). Do not hand-roll `git worktree add`; do not
    `git worktree unlock` your own lane (the driver releases it after the merge).
-   The script also enforces the two placement rules: **OUTSIDE the repo** — not
+   Pass the BARE issue number (`3315`, not `issue-3315`) — the leaf is built from it and
+   a prefixed argument yields an `issue-issue-3315` lane.
+   The script also enforces the two placement rules: **OUTSIDE the repo, and inside the
+   ONE canonical parent** `<repo>/../worktrees/<repo-name>` (defined in
+   `scripts/worktree_paths.py`; `worktree_reaper.py --check` fails on anything outside
+   it) — not
    .claude/worktrees or .worktrees inside the checkout, an in-repo worktree is a full
    second checkout that every repo-wide sweep walks (it has red-mained the suite twice,
    #953, and makes local runs disagree with CI in BOTH directions) — and the canonical

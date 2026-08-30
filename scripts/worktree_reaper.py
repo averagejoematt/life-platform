@@ -19,6 +19,12 @@ THE PROBLEM (measured 2026-08-27)
   Both are the same shape and it is the worse direction: the polluted developer machine
   is the one that looks clean.
 
+  PLACEMENT IS ALSO CHECKED (2026-08-30). The parent directories are where the sprawl
+  starts, so this reports — and `--check` fails on — any worktree outside the canonical
+  parent from `scripts/worktree_paths.py`, the same registry `lane_worktree.py` creates
+  into. Placement is reported, never reaped: where a worktree sits says nothing about
+  whether its work is finished.
+
 LIVENESS — WHY `git worktree lock` AND NOT DIRTINESS (#3289, measured 2026-08-28)
   On its first real use this tool listed three RUNNING implementation lanes as reapable,
   plus the primary clone. The lanes were clean because they had been checked out ninety
@@ -75,6 +81,10 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from worktree_paths import canonical_parent, is_canonical  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -255,6 +265,7 @@ def probe(wt: dict, main_path: Path, cwd: Path, git_main: Path | None = None) ->
         exists=p.exists(),
         is_main=_same_dir(p, main_path) or bool(git_main is not None and _same_dir(p, git_main)),
         is_cwd=False,
+        off_canonical=False,
         last_activity=None,
         dirty=None,
         unmerged=None,
@@ -262,6 +273,9 @@ def probe(wt: dict, main_path: Path, cwd: Path, git_main: Path | None = None) ->
     )
     if row["is_main"]:
         return row
+    # Placement, not liveness: a lane outside the canonical parent is reported, never
+    # reaped for it. Where a worktree sits says nothing about whether its work is done.
+    row["off_canonical"] = not is_canonical(p, main_path)
     row["is_cwd"] = _is_within(cwd, p)
     row["in_repo"] = _is_within(p, main_path)
     if not row["exists"]:
@@ -396,6 +410,7 @@ def main() -> int:
     reaped_ids = {id(r) for r in reapable}
     kept = [r for r in rows if id(r) not in reaped_ids]
     in_repo = [r for r in rows if r["in_repo"]]
+    off_canonical = [r for r in rows if r.get("off_canonical")]
 
     print(f"{len(rows)} worktrees across {len(parents(rows))} parent directories")
     for parent, n in parents(rows).items():
@@ -412,6 +427,13 @@ def main() -> int:
         for r in in_repo:
             print(f"     {r['path']}")
 
+    if off_canonical:
+        print(f"\n⚠️  {len(off_canonical)} worktree(s) OUTSIDE the canonical parent {canonical_parent(main_path)}:")
+        for r in off_canonical:
+            print(f"     {r['path']}")
+        print("     Parent sprawl is how 93 worktrees ended up across 12 directories (#3289).")
+        print("     Create lanes with: python3 scripts/lane_worktree.py new <issue-N> <slug>")
+
     locked = [r for r in rows if r["locked"]]
     print(f"\nliveness: {len(locked)} locked (in use, never candidates); idle floor {args.min_idle_minutes} min")
 
@@ -427,7 +449,10 @@ def main() -> int:
         if in_repo:
             print(f"\n❌ {len(in_repo)} worktree(s) inside the repo.")
             return 1
-        print("\n✅ no worktree inside the repo.")
+        if off_canonical:
+            print(f"\n❌ {len(off_canonical)} worktree(s) outside the canonical parent.")
+            return 1
+        print("\n✅ no worktree inside the repo; every lane in the canonical parent.")
         return 0
 
     if not args.apply:

@@ -33,13 +33,22 @@ sets the liveness signal (#3289 — the reaper listed three *running* lanes as r
 a lock each agent has to remember is a lock that is missing on exactly the lane that gets
 deleted). It enforces rules 1–3 below rather than asking you to recall them.
 
-1. **Outside the repo.** One canonical parent, never a path inside the checkout. An
-   in-repo worktree is walked by every repo-wide sweep. `lane_worktree.py` refuses.
-2. **One canonical spelling.** `git worktree list` currently shows both
-   `~/Documents/Claude/…` and `~/documents/claude/…`. On macOS those are the *same*
-   directory, and edits through one leak into the tree the other names — which reads as
-   the main checkout mutating itself. `lane_worktree.py` resolves the parent to its true
-   on-disk case, so invoking it through the twin spelling still lands in the canonical tree.
+1. **Outside the repo, in the ONE canonical parent** — `<repo>/../worktrees/<repo-name>`,
+   i.e. `~/dev/worktrees/life-platform/<branch>` for this checkout. That path is defined
+   once, in `scripts/worktree_paths.py`, and read by BOTH `lane_worktree.py` (which
+   creates into it) and `worktree_reaper.py` (whose `--check` fails on anything outside
+   it). Never a path inside the checkout — an in-repo worktree is walked by every
+   repo-wide sweep and `lane_worktree.py` refuses to make one.
+
+   > Why it is a registry and not a sentence: on 2026-08-30 the worktrees were
+   > consolidated by hand from six parents into one, but `lane_worktree.py` still computed
+   > a different parent — and within the hour five fresh lanes landed in a seventh
+   > directory. The convention has to live where the tools read it, not where people
+   > remember it.
+2. **One canonical spelling.** On macOS `~/Documents/Claude/…` and `~/documents/claude/…`
+   are the *same* directory, and edits through one leak into the tree the other names —
+   which reads as the main checkout mutating itself. The parent is resolved to its true
+   on-disk case, so invoking it through a twin spelling still lands in the canonical tree.
 3. **Lane-unique name**, `issue-<N>-<slug>`, off up-to-date `origin/main`.
 4. **Lane-unique scratch filenames.** Concurrent agents share one scratchpad: two lanes
    both wrote `pr_body.md`, clobbered each other in both directions, and a stray `Fixes`

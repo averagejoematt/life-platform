@@ -14,10 +14,14 @@ WHY THIS EXISTS (#3289)
     * OUTSIDE the repo. An in-repo worktree is a full second checkout that every repo-wide
       sweep walks — it has red-mained the suite twice (#953) and makes local runs disagree
       with CI in both directions. This refuses to create one.
+    * ONE canonical parent, defined ONCE. The parent comes from `scripts/worktree_paths.py`
+      (`<repo>/../worktrees/<repo-name>`), the same registry `worktree_reaper.py` asserts
+      against — so a lane cannot land in a seventh parent directory and restart the sprawl
+      that #3289 and the 2026-08-30 consolidation each had to clean up by hand.
     * ONE canonical spelling. On macOS `~/Documents/Claude` and `~/documents/claude` are the
       same directory, and edits through one leak into the tree the other names. The parent is
-      resolved to its true on-disk case (`_true_case`) before anything is created, so a
-      session invoked through the twin spelling still lands in the canonical tree.
+      resolved to its true on-disk case before anything is created, so a session invoked
+      through the twin spelling still lands in the canonical tree.
 
 USAGE
     python3 scripts/lane_worktree.py new 3289 reaper-liveness      # create + lock
@@ -36,10 +40,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from worktree_paths import canonical_parent, true_case as _true_case  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 
-# Sibling of the checkout, never inside it. One parent, one spelling.
-LANE_PARENT_NAME = "life-platform-worktrees"
 LOCK_REASON_PREFIX = "lane in use"
 
 
@@ -48,33 +54,20 @@ def _git(args: list[str], cwd: Path) -> tuple[int, str]:
     return r.returncode, ((r.stdout or "") + (r.stderr or "")).strip()
 
 
-def _true_case(path: Path) -> Path:
-    """The path as the filesystem actually spells it.
-
-    macOS is case-insensitive but case-PRESERVING: `os.path.realpath` happily returns the
-    case you asked with, so a twin spelling survives every normalization that is not an
-    inode comparison. Walk the components and adopt the real directory entry's case.
-    """
-    p = Path(os.path.realpath(str(path)))
-    out = Path(p.anchor)
-    for part in p.relative_to(p.anchor).parts:
-        try:
-            match = next((e for e in os.listdir(out) if e.lower() == part.lower()), None)
-        except OSError:
-            match = None
-        out = out / (match or part)
-    return out
-
-
 def lane_parent(repo: Path) -> Path:
-    return _true_case(repo).parent / LANE_PARENT_NAME
+    """The canonical parent, read from the ONE registry (`scripts/worktree_paths.py`).
+
+    Kept as a module-level name because `new_lane` looks it up as a global — that is the
+    seam the in-repo-refusal test monkeypatches to prove the guard fires.
+    """
+    return canonical_parent(repo)
 
 
 def new_lane(issue: int | str, slug: str, repo: Path = ROOT, base: str = "origin/main") -> Path:
     """Create the lane worktree off up-to-date `base` and LOCK it. Returns its path."""
     repo = _true_case(repo)
     branch = f"issue-{issue}-{slug}"
-    path = lane_parent(repo) / f"issue-{issue}"
+    path = lane_parent(repo) / branch
 
     # Fails closed on the one placement that has red-mained main twice.
     if _is_within(path, repo):

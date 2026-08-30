@@ -318,3 +318,63 @@ def test_worktree_skill_does_not_tell_anyone_to_build_in_repo():
 
     body = require_skill("worktree").read_text(encoding="utf-8")
     assert "in `.claude/worktrees/`" not in body, "must not instruct an in-repo worktree"
+
+
+# ── The canonical parent: ONE definition, both consumers, asserted ────────────
+# 2026-08-30. The repo moved and the worktrees were consolidated by hand into
+# ~/dev/worktrees/life-platform. Nothing in the repo knew: lane_worktree.py still
+# computed `repo.parent / "life-platform-worktrees"`, and within the hour five fresh
+# lanes landed there — a seventh parent directory, the #3289 sprawl restarting from
+# zero. These tests exist so the definition cannot be spelled twice again.
+paths = _load("worktree_paths", "_wtpaths")
+
+
+def test_canonical_parent_is_derived_from_the_checkout_not_hardcoded():
+    """A literal ~/dev root would have to be edited by hand at the next move — which is
+    exactly the edit the 2026-08-30 move proved gets missed."""
+    src = Path(REPO, "scripts", "worktree_paths.py").read_text(encoding="utf-8")
+    code = "\n".join(ln for ln in src.splitlines() if not ln.strip().startswith("#") and '"""' not in ln)
+    assert "/Users/" not in code, "the canonical parent must be derived, never a hard-coded home path"
+    # Shape, on real directories: a `worktrees/<repo-name>` sibling of the checkout.
+    # (Compared against realpath because macOS /tmp is a symlink to /private/tmp.)
+    for name in ("life-platform", "some-other-clone"):
+        repo = Path(REPO).parent / name
+        got = paths.canonical_parent(repo)
+        assert got.name == repo.name
+        assert got.parent.name == paths.WORKTREE_ROOT_NAME
+        assert os.path.realpath(str(got.parent.parent)) == os.path.realpath(str(repo.parent))
+
+
+def test_lane_creator_and_reaper_read_the_SAME_parent():
+    """The whole point: one registry, so the creator cannot drift from the checker."""
+    reaper = _load()
+    repo = Path("/tmp/alpha/life-platform")
+    assert lane.lane_parent(repo) == paths.canonical_parent(repo)
+    assert reaper.canonical_parent(repo) == paths.canonical_parent(repo)
+
+
+def test_lane_leaf_is_the_branch_name_so_disk_and_git_agree():
+    """The leaf used to be `issue-<N>` while the branch carried the slug, so `git worktree
+    list` and `ls` disagreed and two lanes on one issue collided."""
+    repo = Path("/tmp/alpha/life-platform")
+    assert paths.lane_dir(repo, "issue-3289-reaper-liveness").name == "issue-3289-reaper-liveness"
+
+
+def test_reaper_flags_a_worktree_outside_the_canonical_parent(tmp_path):
+    repo = tmp_path / "life-platform"
+    (repo / ".git").mkdir(parents=True)
+    good = paths.canonical_parent(repo) / "issue-1-ok"
+    stray = tmp_path / "somewhere-else" / "issue-2-stray"
+    for d in (good, stray):
+        d.mkdir(parents=True)
+    assert paths.is_canonical(good, repo) is True
+    assert paths.is_canonical(stray, repo) is False
+
+
+def test_worktree_skill_names_the_canonical_parent():
+    """A convention only a person remembers is one an agent re-fragments next morning."""
+    from skill_paths import require_skill
+
+    body = require_skill("worktree").read_text(encoding="utf-8")
+    assert "worktree_paths.py" in body, "/worktree must point at the ONE parent registry"
+    assert "worktrees/<repo-name>" in body or "worktrees/life-platform" in body, "/worktree must name the canonical parent"
