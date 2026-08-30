@@ -309,7 +309,7 @@ Then `pre-commit install`.
 **Baseline set:** 2026-07-18, by the QA & Testing Strategy review (`review:qa-strategy-2026-07-18`
 label; epic [#1425](https://github.com/averagejoematt/life-platform/issues/1425), a three-agent
 survey with every finding verified against the repo). This is the **durable record** — the
-`/sdlc-review` quarterly checklist step (below, and in `.claude/skills/sdlc-review/SKILL.md`)
+`/review sdlc` quarterly checklist step (below, and in `.claude/skills/review/references/sdlc.md`)
 re-grades against it and overwrites the "Current" column each run so the next re-grade always
 diffs against the *previous* run, not perpetually against 2026-07-18.
 
@@ -349,26 +349,31 @@ vibe. General ladder (apply per-axis with the axis's own coverage denominator):
 A re-grade that can't produce this evidence for a proposed bump leaves the grade where it was —
 "we shipped some of the stories" is not itself a grade change; the coverage/gating facts are.
 
-### Quarterly re-grade checklist (run from `/sdlc-review`)
+### Quarterly re-grade checklist (run from `/review sdlc`)
 
 1. Re-read this table (baseline + target + current) before grading — it is the anchor; do not
    re-derive targets from memory.
 2. For each of the 8 axes, re-grade against **current reality** using the rubric above: state
    the fraction/denominator, whether the check gates or is advisory, and cite the file/command/
-   `gh run` evidence (same evidence rule as the rest of `/sdlc-review`).
+   `gh run` evidence (same evidence rule as the rest of `/review sdlc`).
 3. Diff each axis's new grade against the **Current** column here (not always the 2026-07-18
    baseline) and record the delta: improved / flat / regressed.
 4. Fold the re-graded table + deltas into this run's `docs/reviews/SDLC_REVIEW_<date>.md` as a
    labeled subsection (Phase 3) — it is part of that review's artifact, not a separate doc.
 5. Any axis that **regressed** vs its prior Current grade, or remains **two or more quarters
    short of target with no evidence of movement**, gets a story filed via the `issue-filer`
-   agent per ADR-099 (`type:story`, `area:claude-workflow`, `review:qa-strategy-<date>` label,
-   linked to epic #1425), same as any other `/sdlc-review` finding.
+   agent — its contract (labels, score line, epic linkage) lives in
+   `.claude/agents/issue-filer.md` and is not restated here. Carry the
+   `review:qa-strategy-<date>` batch label. Epic #1425 that owned the original baseline is
+   CLOSED; route the filing to the live class owner per the class-first rule rather than
+   reviving it. Same as any other `/review sdlc` finding.
 6. After the review lands, update the **Current** column in this table (in the same PR as the
    review artifact) so the next quarterly re-grade diffs against this run.
 
-**First scheduled re-grade:** ~2026-10 (next `/sdlc-review` quarterly cadence after this table
-was created), tracked via a comment on epic #1425.
+**First scheduled re-grade:** ~2026-10 (the next `/review sdlc` quarterly cadence after this
+table was created). The clock that enforces it is the `sdlc-review` entry in
+`scripts/operating_calendar.py`, which carries this obligation on the entry itself — it used to
+hang off a comment on epic #1425, which is now closed.
 
 ---
 

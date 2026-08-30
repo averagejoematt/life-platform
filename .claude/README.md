@@ -22,7 +22,7 @@ paragraph itself used to name two of them. A sample rather than an inventory:
 - [`deploy`](skills/deploy/SKILL.md) — the deploy procedure (per-Lambda function-name map, the site-api multi-module caveat, one-bundle rules).
 - [`qa`](skills/qa/SKILL.md) — QA modes (smoke / API freshness / visual / AI-vision).
 - [`wrap`](skills/wrap/SKILL.md) — the session close: an 18-gate battery whose expectations are derived from the skill file itself.
-- [`fullreview`](skills/fullreview/SKILL.md) — the 17-lens expert panel that grades every area A–F.
+- [`review`](skills/review/SKILL.md) — one graded-review spine, seven lenses (`accuracy | craft | sdlc | site | platform | journey | full`), each rubric a [`references/<lens>.md`](skills/review/references/) loaded on dispatch. Nine separate review commands collapsed into it in #3250, and the operating calendar's set guard is now over the lenses, so a rubric added without a registry row is loud rather than green.
 
 `python3 scripts/skill_registry.py` lists the live set; nothing here is hand-maintained.
 

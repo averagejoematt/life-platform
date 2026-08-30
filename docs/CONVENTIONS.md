@@ -882,7 +882,7 @@ AI powered down.** Four layers, each with a named owner-mechanism:
    was already the mechanism actually enforcing this.)
 4. **Periodic verification.** Each canonical page's `> **Status:** … · **Verified:**`
    header records when a human/agent last verified its content against reality; the
-   freshness report is the re-verification worklist. `/accuracy-review` is the deep pass.
+   freshness report is the re-verification worklist. `/review accuracy` is the deep pass.
 5. **The re-stamp rule — the machine is held to it too (#2986, folding #2838).** *A
    sync/apply run may only advance a freshness date on content it actually regenerated or
    verified.* The human rule above ("never bump the stamp alone") had no machine

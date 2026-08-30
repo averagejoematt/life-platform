@@ -4,11 +4,11 @@
 
 > **What this is.** The single, durable source for *how code and the repo should look and hold
 > together* here — the craft an outside engineer judges cold. It is both the **standard new
-> code must meet** and the **rubric `/craft-review` grades against** (the two share this one
+> code must meet** and the **rubric `/review craft` grades against** (the two share this one
 > file so they can never drift). It is scoped to **craft**: cleanliness, structure, naming,
 > aesthetics, trustworthy gates, and standards conformance. It deliberately does **not** cover
 > deploy integrity, product correctness, or the SDLC process — those live in `docs/CONVENTIONS.md`,
-> `docs/DECISIONS.md`, and are graded by `/fullreview` and `/sdlc-review`.
+> `docs/DECISIONS.md`, and are graded by `/review full` and `/review sdlc`.
 >
 > **Posture, not perfectionism (ADR-103).** One person runs this platform. A loose setting that
 > is *documented as a chosen posture* (an ADR that defends it) is an **A**, not a defect. The
@@ -19,7 +19,7 @@
 
 ## The craft rubric — 10 dimensions, A / C / F anchors
 
-`/craft-review` grades each dimension A–F against these anchors. Grades are "A *for a solo
+`/review craft` grades each dimension A–F against these anchors. Grades are "A *for a solo
 public platform's stated postures*," not "A for a 50-engineer org."
 
 | # | Dimension | **A** (an outside panel nods) | **C** (works, but a skeptic frowns) | **F** (a reviewer stops reading) |
@@ -183,7 +183,7 @@ philosophy as the existing `reconcile` / doc-sync anti-drift machinery, extended
 ## How this doc is used
 
 - **Writing code:** meet the standards above; use an escape hatch only by documenting why.
-- **`/craft-review`:** grades the 10 dimensions against the anchors here and files gaps as
+- **`/review craft`:** grades the 10 dimensions against the anchors here and files gaps as
   backlog under the Engineering-excellence epic; any new rule the review implies is written back
   into this doc in the same PR (rubric and grader share this source).
 - **Onboarding / showcase:** this doc is the honest statement of the bar the codebase holds

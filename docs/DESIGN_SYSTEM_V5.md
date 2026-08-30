@@ -167,7 +167,7 @@ faint/ember. Pick the step by job, not taste: a rail behind a fill is toned pape
 ## 6. Verification
 
 `python3 tests/visual_qa.py --screenshot --ai-qa` (gating `visual-qa` CI job) for visual
-coherence; the `/site-review` skill for the holistic "does each page's story land" pass.
+coherence; the `/review site` lens for the holistic "does each page's story land" pass.
 Local render without deploy: Playwright + `http.server` + route-mocked API.
 
 ---

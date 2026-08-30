@@ -1,6 +1,6 @@
 # Site Reviews
 
-Holistic, human-in-the-loop reviews of averagejoematt.com produced by the `/site-review`
+Holistic, human-in-the-loop reviews of averagejoematt.com produced by the `/review site`
 skill. Each file is `SITE_REVIEW_<date>.md` — a story-spine + throughline verdict + a
 prioritized work order, graded against `docs/SITE_REVIEW_METHODOLOGY.md`.
 

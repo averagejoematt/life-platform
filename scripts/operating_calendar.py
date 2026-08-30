@@ -61,6 +61,29 @@ done this" from "somebody stopped doing this"). The anchor still holds the *wind
 it no longer holds the *verdict* green. The only honest clearings are running the ritual
 (its dated artifact) or a dated ``EXEMPT`` row.
 
+THE SET IS LENSES NOW, NOT FILES (#3250, v1.2)
+----------------------------------------------
+The review family was nine separate command files. Three of them had already been retired by
+a dated ``EXEMPT`` row here while their files sat in the tree as orphans; one was strictly
+dominated by another; and the ADR-099 filing contract was restated in six of them. Every one
+of those is the same shape this file exists to detect — **a registry entry greener than the
+ritual it names** — so the fix was structural: one spine (``.claude/skills/review/SKILL.md``)
+with a per-lens rubric in ``.claude/skills/review/references/<lens>.md``.
+
+That moves the unit of ritual from a FILE to a LENS, so the set guard moves with it. Discovery
+(``review_procedures()``) enumerates every lens rubric beside the spine, plus any review-family
+skill still living outside it (``frontier-plan``). Each discovered procedure is either ON the
+calendar below — an entry names it in ``lens`` (or in ``skill``, for a standalone) — or in
+``EXEMPT`` with a dated reason. Both directions are asserted: an unclassified rubric is loud
+rather than green-by-default, and a calendar entry naming a rubric that does not exist is a
+phantom. That second direction is the enforcement half of "every calendar entry names a
+procedure that exists": the phantom-procedure defect (``fullreview-delta`` counting down
+toward a hard date for a mode nothing implemented) can no longer be written in the first place.
+
+An exemption retires a CLOCK, not a capability. ``platform``/``site``/``journey`` are still
+lenses anyone can run on request; what they no longer have — deliberately, with a date and a
+reason — is a cadence and a dead-man.
+
 DEFERRAL IS A DECISION, WITH A DATE AND A REASON (the ``hold`` field, #3250)
 ---------------------------------------------------------------------------
 Sometimes a ritual should *not* run on schedule for a reason that is itself sound — e.g.
@@ -84,7 +107,7 @@ USAGE
 Exit codes: 0 clean · 1 at least one OVERDUE · 2 bad --today · 3 no OVERDUE but at least
 one ritual has never produced its artifact.
 
-v1.1.0 — 2026-08-27 (#3250) · v1.0.0 — 2026-08-22 (#2832)
+v1.2.0 — 2026-08-30 (#3250, lens set) · v1.1.0 — 2026-08-27 (#3250) · v1.0.0 — 2026-08-22 (#2832)
 """
 
 from __future__ import annotations
@@ -120,9 +143,19 @@ OWNER = "owner-attended"
 _DATE_RE_GROUPS = 1  # every probe regex carries exactly one capture group: the date
 
 
-def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None):
+#: The one review spine. Its LENSES are the rituals; the spine itself grades nothing on a
+#: clock, so it is deliberately excluded from the discovered set (see review_procedures()).
+REVIEW_SPINE = "review"
+
+
+def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None, lens=None):
     return {
         "skill": skill,  # resolved via skill_registry.skill_path(), or None for a doc-only ritual
+        # The `/review <lens>` rubric this entry schedules — a name under
+        # .claude/skills/review/references/. The set guard resolves it to a real file, so an
+        # entry can no longer name a procedure nobody wrote (#3250). None for a standalone
+        # skill (frontier-plan) or a doc-only ledger re-read.
+        "lens": lens,
         "cadence_days": cadence_days,
         "grace_days": grace_days,
         "attendance": attendance,
@@ -144,7 +177,8 @@ MAX_HOLD_DAYS = 45
 CALENDAR: dict[str, dict] = {
     # ── Weekly ────────────────────────────────────────────────────────────────
     "fullreview-delta": _entry(
-        skill="fullreview",
+        skill=REVIEW_SPINE,
+        lens="full",
         cadence_days=7,
         grace_days=3,
         attendance=AUTONOMOUS,
@@ -153,16 +187,16 @@ CALENDAR: dict[str, dict] = {
         reason=(
             "The one review family that was still alive at #2832's filing — weekly-ish and "
             "shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to "
-            "session; any fullreview run (full, delta or partial) resets this clock, because "
-            "the weekly claim is 'the platform was looked at', not 'the look was small'. "
-            "Delta mode itself is defined in the fullreview skill § 'Delta mode' "
+            "session; any run of the `full` lens (full, delta or partial) resets this clock, "
+            "because the weekly claim is 'the platform was looked at', not 'the look was "
+            "small'. Delta mode itself is defined in the `full` rubric's § 'Delta mode' "
             "(#3250) — the artifact this probe reads is named there, so the clock and the "
             "procedure cannot drift apart."
         ),
         hold=(
             "2026-08-27",
             "2026-09-06",
-            "#3245 rewrites the review-skill corpus (102 files) — the instrument this clock "
+            "#3245 rewrote the review-skill corpus (102 files) — the instrument this clock "
             "measures. A delta grades the platform against the PREVIOUS run's anchors, so a "
             "delta run across an instrument rewrite produces a number that means nothing: the "
             "movement would be the rubric moving, not the platform. Decision (#3250, Session I): "
@@ -175,7 +209,8 @@ CALENDAR: dict[str, dict] = {
     ),
     # ── Monthly ───────────────────────────────────────────────────────────────
     "fullreview-full": _entry(
-        skill="fullreview",
+        skill=REVIEW_SPINE,
+        lens="full",
         cadence_days=31,
         grace_days=7,
         attendance=SESSION,
@@ -189,7 +224,8 @@ CALENDAR: dict[str, dict] = {
         ),
     ),
     "accuracy-full": _entry(
-        skill="accuracy-review",
+        skill=REVIEW_SPINE,
+        lens="accuracy",
         cadence_days=31,
         grace_days=7,
         attendance=SESSION,
@@ -199,11 +235,15 @@ CALENDAR: dict[str, dict] = {
             "The truth audit of the public surface (does the site say what the data says?). "
             "Last full run 2026-07-10 at #2832's filing — six weeks dark while the nightly "
             "reader-truth oracle only samples. ADR-104/105 are enforced per-surface by gates; "
-            "this is the whole-estate pass."
+            "this is the whole-estate pass. The probe reads the `full` mode's report only — "
+            "the cheap deterministic `axis-a` pass writes no dated artifact and deliberately "
+            "does not advance this clock, because it cannot see the defect class (a computed "
+            "value that is internally consistent and semantically wrong) that `full` exists for."
         ),
     ),
     "craft-review": _entry(
-        skill="craft-review",
+        skill=REVIEW_SPINE,
+        lens="craft",
         cadence_days=31,
         grace_days=7,
         attendance=SESSION,
@@ -212,8 +252,10 @@ CALENDAR: dict[str, dict] = {
         reason=(
             "Had NEVER executed at #2832's filing despite its own instruction to register a "
             "scheduled run — the exact silent-stop this calendar exists to make impossible. "
-            "Its first run creates docs/reviews/craft_grades_<date>.json and starts the clock "
-            "for real; until then the adoption anchor holds the window."
+            "For its first five days on the calendar it read OK purely on the adoption anchor; "
+            "#3250 made that state say NEVER-RUN out loud, and the first real run "
+            "(2026-08-27) is what actually started this clock. The distinction matters: the "
+            "clock is live now because an artifact exists, not because a date was granted."
         ),
     ),
     "managed-where-reverify": _entry(
@@ -238,10 +280,9 @@ CALENDAR: dict[str, dict] = {
         ),
     ),
     "emf-series-census": _entry(
-        # A step OF the monthly cost close, not a ritual of its own — and `skill` is
-        # graded against the review-skill discovery set (names containing "review"),
-        # so naming `cost-diligence` here would register as a phantom skill. The
-        # obligation below carries the wiring instead.
+        # A step OF the monthly cost close, not a ritual of its own — and `skill`/`lens`
+        # are graded against the review-procedure discovery set, so naming `cost-diligence`
+        # here would register as a phantom. The obligation below carries the wiring instead.
         skill=None,
         cadence_days=31,
         grace_days=7,
@@ -265,7 +306,8 @@ CALENDAR: dict[str, dict] = {
     ),
     # ── Quarterly ─────────────────────────────────────────────────────────────
     "sdlc-review": _entry(
-        skill="sdlc-review",
+        skill=REVIEW_SPINE,
+        lens="sdlc",
         cadence_days=92,
         grace_days=14,
         attendance=OWNER,
@@ -318,26 +360,33 @@ CALENDAR: dict[str, dict] = {
 }
 
 # ── The set guard's exemptions ────────────────────────────────────────────────
-# Discovery (see tests/test_operating_calendar_2832.py) enumerates every review-family
-# skill in the skill registry (*review* + frontier-plan). Each one is either ON the
-# calendar above or HERE with a dated reason. An undated or reasonless exemption is the
-# old failure mode — "we'll get to it" with no clock.
+# Discovery (review_procedures() below) enumerates every `/review` lens rubric plus any
+# review-family skill still standing outside the spine. Each one is either ON the calendar
+# above or HERE with a dated reason. An undated or reasonless exemption is the old failure
+# mode — "we'll get to it" with no clock.
+#
+# Keys are LENS names since #3250 (`platform`, not `platform-review`): the three files these
+# rows retired had outlived their entry for six days as orphan commands, which is the
+# registry-greener-than-reality shape one level down. They are deleted as standalone rituals
+# and survive as on-request lenses of the one spine — an exemption retires a clock, not a
+# capability.
 EXEMPT: dict[str, tuple[str, str]] = {
-    "platform-review": (
+    "platform": (
         "2026-08-22",
-        "Not in the #2832 adopted calendar: its ground (full-platform sweep) is covered by "
-        "the monthly fullreview-full entry's panel; it has never run as a command since it "
-        "landed. Revive deliberately with its own entry if the fullreview panel proves too "
-        "narrow — do not let it half-exist off-calendar.",
+        "Not in the #2832 adopted calendar: its ground (a broad defect sweep) is covered by "
+        "the monthly fullreview-full entry's panel, which grades the same surface with "
+        "anchors and a trend line; it never ran as a command in its own right. Revive "
+        "deliberately with its own entry if that panel proves too narrow for a defect hunt — "
+        "do not let it half-exist off-calendar.",
     ),
-    "site-review": (
+    "site": (
         "2026-08-22",
         "Owner-attended editorial walkthrough of the public site — run when the site's "
         "story changes (a redesign, a new door), not on a clock. Cadencing an editorial "
         "judgment would manufacture runs with nothing to judge; the accuracy-full entry "
         "owns the site's monthly truth pass.",
     ),
-    "journey-review": (
+    "journey": (
         "2026-08-22",
         "Re-audits the chat↔platform integration after integration work, event-driven by "
         "construction. The #2832 calendar cadences standing judgment; a ritual whose "
@@ -509,24 +558,63 @@ def _skill_registry():
     return mod
 
 
-def review_skill_files(repo: str = REPO) -> set[str]:
-    """Discovery: every review-family skill name, via scripts/skill_registry.
+def review_lenses(repo: str = REPO) -> dict[str, str]:
+    """Every `/review <lens>` rubric: lens name -> repo-relative rubric path.
 
-    Filename-based on purpose (*review* + frontier-plan): a skill's text can say
-    anything, but its NAME is what sessions invoke. Blind spot, stated: a judgment
-    ritual not named *review* (e.g. cost-diligence) is not discovered — the registry
-    half still catches it the moment an entry or exemption names it.
+    Filesystem-derived through the ONE skill registry, never a hand list: a rubric file is
+    discovered the moment it exists, which is what makes an unclassified lens loud instead
+    of green-by-default. Only `references/*.md` beside the spine count — a nested helper or
+    a non-markdown asset is content, not a lens.
     """
-    names = set(_skill_registry().skill_names())
-    return {n for n in names if "review" in n} | ({"frontier-plan"} & names)
+    reg = _skill_registry()
+    return {p.stem: reg.rel(p) for p in reg.skill_references(REVIEW_SPINE) if p.suffix == ".md" and p.parent.name == "references"}
 
 
-def classification_gaps(calendar: dict, exempt: dict, discovered: set[str]) -> tuple[set[str], set[str]]:
-    """(unclassified, phantom): review skills with no calendar/exempt row, and
-    calendar/exempt rows naming a skill that no longer exists. Both must be empty —
-    guard the SET, not the instance."""
-    classified = {e["skill"] for e in calendar.values() if e["skill"]} | set(exempt)
-    return discovered - classified, {s for s in classified if s not in discovered}
+def standalone_review_skills(repo: str = REPO) -> dict[str, str]:
+    """Review-family skills still living OUTSIDE the spine: name -> repo-relative path.
+
+    Name-based on purpose (*review* + frontier-plan): a skill's text can say anything, but
+    its NAME is what sessions invoke. The spine itself is excluded — it grades nothing on
+    its own clock; its lenses do, and counting it would demand a meaningless calendar row.
+    Blind spot, stated: a judgment ritual named neither *review* nor frontier-plan (e.g.
+    cost-diligence) is not discovered — the registry half still catches it the moment an
+    entry or exemption names it.
+    """
+    reg = _skill_registry()
+    skills = reg.skills()
+    fam = {n for n in skills if "review" in n} | ({"frontier-plan"} & set(skills))
+    return {n: reg.rel(skills[n]) for n in sorted(fam - {REVIEW_SPINE})}
+
+
+def review_procedures(repo: str = REPO) -> dict[str, str]:
+    """The full discovered set: procedure name -> the file that DEFINES it.
+
+    Two namespaces, ONE set, because since #3250 the unit of ritual is a LENS rather than a
+    file. A collision between the two halves would silently hide one of them, so it raises
+    rather than resolving quietly (the `duplicates()` precedent in the skill registry).
+    """
+    lenses, standalone = review_lenses(repo), standalone_review_skills(repo)
+    clash = set(lenses) & set(standalone)
+    if clash:  # pragma: no cover — well-formedness test pins the invariant
+        raise ValueError(f"a /review lens and a standalone review skill share a name: {sorted(clash)}")
+    return {**lenses, **standalone}
+
+
+def classification_gaps(calendar: dict, exempt: dict, discovered) -> tuple[set[str], set[str]]:
+    """(unclassified, phantom): discovered procedures with no calendar/exempt row, and
+    calendar/exempt rows naming a procedure that does not exist. Both must be empty —
+    guard the SET, not the instance.
+
+    `discovered` may be the dict from review_procedures() or a bare set of names. The
+    phantom direction is what enforces "every calendar entry names a procedure that
+    EXISTS" (#3250): a `lens` with no rubric file, or an exemption for a deleted ritual,
+    is a phantom the moment it is written rather than the day someone notices.
+    """
+    classified = {e["lens"] for e in calendar.values() if e.get("lens")}
+    classified |= {e["skill"] for e in calendar.values() if e["skill"] and e["skill"] != REVIEW_SPINE}
+    classified |= set(exempt)
+    found = set(discovered)
+    return found - classified, {s for s in classified if s not in found}
 
 
 # ── The generated doc (#2986 DERIVED: writer --apply, guard --check, lane docs-ci) ──
@@ -548,12 +636,17 @@ def render_doc() -> str:
         "miss louder than the run: each ritual advances its clock only by producing its",
         "dated artifact, and the dead-man reds when a window closes empty.",
         "",
-        "| Ritual | Skill | Cadence | Grace | Attendance | Run artifact (the clock) |",
+        "| Ritual | Procedure | Cadence | Grace | Attendance | Run artifact (the clock) |",
         "|---|---|---|---|---|---|",
     ]
     for name in sorted(CALENDAR, key=lambda n: (CALENDAR[n]["cadence_days"], n)):
         e = CALENDAR[name]
-        skill = f"`/{e['skill']}`" if e["skill"] else "ledger re-read"
+        if e["lens"]:
+            skill = f"`/{e['skill']} {e['lens']}`"
+        elif e["skill"]:
+            skill = f"`/{e['skill']}`"
+        else:
+            skill = "ledger re-read"
         kind, target, pattern = e["probe"]
         probe_s = f"`{target}/` · `{pattern}`" if kind == NEWEST_DATED_FILE else f"dated line in `{target}` · `{pattern}`"
         out.append(f"| {name} | {skill} | {e['cadence_days']}d | +{e['grace_days']}d | {e['attendance']} | {probe_s} |")
@@ -564,7 +657,27 @@ def render_doc() -> str:
     out += ["", "## Why each entry (registry reasons, verbatim)", ""]
     for name in sorted(CALENDAR):
         out.append(f"- **{name}** — {CALENDAR[name]['reason']}")
-    out += ["", "## Off-calendar review skills (dated exemptions, the set guard's other half)", ""]
+    procedures = review_procedures()
+    out += [
+        "",
+        "## The guarded SET — every judgment procedure, classified (#3250)",
+        "",
+        "Discovered from the tree, not hand-listed: each `/review <lens>` rubric beside",
+        "`.claude/skills/review/SKILL.md`, plus any review-family skill still standing outside",
+        "the spine. Every row below is either ON the calendar above or carries a dated exemption",
+        "underneath. Both directions are asserted — an unclassified rubric fails the guard, and",
+        "so does a calendar entry naming a rubric nobody wrote. That second direction is what",
+        "makes the phantom-procedure defect (a clock counting down toward a mode nothing",
+        "implements) unwritable rather than merely noticed.",
+        "",
+        "| Procedure | Defined in | Classified as |",
+        "|---|---|---|",
+    ]
+    for name in sorted(procedures):
+        on_calendar = sorted(n for n, e in CALENDAR.items() if e.get("lens") == name or (e["skill"] == name and not e.get("lens")))
+        where = ", ".join(f"`{n}`" for n in on_calendar) if on_calendar else f"EXEMPT ({EXEMPT[name][0]})"
+        out.append(f"| {name} | `{procedures[name]}` | {where} |")
+    out += ["", "### Dated exemptions (the set guard's other half)", ""]
     for name in sorted(EXEMPT):
         d, reason = EXEMPT[name]
         out.append(f"- **{name}** ({d}) — {reason}")

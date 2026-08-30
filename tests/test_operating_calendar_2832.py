@@ -6,10 +6,17 @@ Layers, matching the charter primitives the calendar is built from:
   * registry well-formedness — every entry parses, points at a real skill and a real
     probe target, and carries a substantive reason (a registry whose reasons are all
     one sentence records that nobody looked);
-  * the SET guard — every review-family skill in .claude/commands is either ON the
+  * the SET guard — every judgment procedure discovered from the tree is either ON the
     calendar or a dated exemption, both directions (guard the set, not the instance:
-    deleting a calendar entry without exempting its skill is a mutation this file
-    catches);
+    deleting a calendar entry without exempting its procedure is a mutation this file
+    catches). Since #3250 the unit is a `/review <lens>` RUBRIC, not a command file, so a
+    new `.claude/skills/review/references/<lens>.md` is unclassified — loud — from the
+    moment it exists, and a calendar entry naming a rubric nobody wrote is a phantom;
+  * **#3250 — the ADR-099 filing contract has exactly ONE home.** Six of the nine review
+    files restated it. The guard is derived, not phrase-matched: it reads the contract's
+    machine-readable mechanics OUT of `.claude/agents/issue-filer.md` and counts how many
+    each review-corpus file reproduces. The real paraphrases measured 3–4; a pointer
+    measures 0–1;
   * dead-man mutation proofs — the sweep is shown FAILING on a stale artifact, on a
     never-ran ritual past its anchor window, and via the CLI exit code. A gate that
     was never watched failing is a green light wired to nothing (#2578);
@@ -86,6 +93,14 @@ def test_entry_well_formed(name):
         # Resolved through the ONE registry, so this assertion survives a layout change
         # (.claude/commands/<n>.md -> .claude/skills/<n>/SKILL.md) instead of pinning one.
         assert _registry().skill_path(e["skill"]) is not None, f"{name}: skill {e['skill']} has no prompt file"
+    if e["lens"]:
+        # #3250: the lens is the PROCEDURE, and a procedure that does not exist is exactly
+        # the defect this issue filed (`fullreview-delta` counting down toward a mode
+        # nothing implemented). Resolved to a real rubric file, never assumed.
+        assert e["skill"] == oc.REVIEW_SPINE, f"{name}: a lens entry must be dispatched by /{oc.REVIEW_SPINE}"
+        lenses = oc.review_lenses()
+        assert e["lens"] in lenses, f"{name}: lens {e['lens']!r} has no rubric file under the review spine"
+        assert os.path.isfile(os.path.join(REPO, lenses[e["lens"]])), f"{name}: rubric {lenses[e['lens']]} missing"
 
 
 @pytest.mark.parametrize("name", sorted(oc.EXEMPT))
@@ -118,26 +133,92 @@ def test_full_probe_rejects_delta_and_partial():
 
 
 # ── The SET guard (both directions) ───────────────────────────────────────────
-def test_every_review_skill_classified():
-    unclassified, phantom = oc.classification_gaps(oc.CALENDAR, oc.EXEMPT, oc.review_skill_files())
+def test_every_review_procedure_classified():
+    unclassified, phantom = oc.classification_gaps(oc.CALENDAR, oc.EXEMPT, oc.review_procedures())
     assert not unclassified, (
-        f"review skill(s) {sorted(unclassified)} are neither on the calendar nor a dated "
+        f"review procedure(s) {sorted(unclassified)} are neither on the calendar nor a dated "
         "exemption — a ritual that half-exists off-calendar is the #2832 failure mode"
     )
-    assert not phantom, f"calendar/exemption row(s) name skills that no longer exist: {sorted(phantom)}"
+    assert not phantom, f"calendar/exemption row(s) name procedures that do not exist: {sorted(phantom)}"
+
+
+def test_the_discovered_set_is_derived_from_the_tree():
+    """The discovery half must actually walk the filesystem, or the SET guard degenerates
+    into 'the registry agrees with itself'. Every discovered name resolves to a real file,
+    every lens is a rubric beside the spine, and the spine itself is deliberately NOT a
+    procedure (it grades nothing on a clock; its lenses do)."""
+    procs = oc.review_procedures()
+    assert procs, "discovery returned nothing — a set guard over an empty set proves nothing"
+    for name, rel_path in procs.items():
+        assert os.path.isfile(os.path.join(REPO, rel_path)), f"{name}: {rel_path} does not exist"
+    lenses = oc.review_lenses()
+    assert set(lenses) >= {"accuracy", "craft", "sdlc", "full"}, "the calendared lenses must be discoverable"
+    for lens, rel_path in lenses.items():
+        assert rel_path == f".claude/skills/review/references/{lens}.md"
+    assert oc.REVIEW_SPINE not in procs, "the spine is a shell, not a ritual — it must not need a calendar row"
 
 
 def test_set_guard_catches_deleted_entry():
-    """Mutation proof: dropping a calendar entry (without exempting its skill) is caught."""
+    """Mutation proof: dropping a calendar entry (without exempting its lens) is caught."""
     mutated = {k: v for k, v in oc.CALENDAR.items() if k != "craft-review"}
-    unclassified, _ = oc.classification_gaps(mutated, oc.EXEMPT, oc.review_skill_files())
-    assert "craft-review" in unclassified
+    unclassified, _ = oc.classification_gaps(mutated, oc.EXEMPT, oc.review_procedures())
+    assert "craft" in unclassified
+
+
+def test_set_guard_catches_a_new_unclassified_lens():
+    """THE 'a future entry cannot drift green' proof. Someone adds a rubric file and forgets
+    the registry: the new lens must come up UNCLASSIFIED, not silently green. Synthesized
+    against the live registry rather than by touching the real tree."""
+    discovered = dict(oc.review_procedures())
+    discovered["a-brand-new-lens"] = ".claude/skills/review/references/a-brand-new-lens.md"
+    unclassified, _ = oc.classification_gaps(oc.CALENDAR, oc.EXEMPT, discovered)
+    assert "a-brand-new-lens" in unclassified, "a new rubric with no registry row must be loud"
+
+
+def test_set_guard_catches_a_calendar_entry_naming_a_missing_procedure():
+    """The other direction, and the one #3250 filed: `fullreview-delta` named a delta mode
+    nothing implemented while its clock counted down toward a hard date. An entry whose
+    procedure does not exist is a PHANTOM the moment it is written."""
+    mutated = dict(oc.CALENDAR)
+    mutated["ghost-review"] = dict(oc.CALENDAR["craft-review"], lens="a-lens-nobody-wrote")
+    _, phantom = oc.classification_gaps(mutated, oc.EXEMPT, oc.review_procedures())
+    assert "a-lens-nobody-wrote" in phantom
 
 
 def test_set_guard_catches_phantom_exemption():
-    mutated = dict(oc.EXEMPT, **{"a-review-skill-that-never-existed": ("2026-08-23", "x" * 40)})
-    _, phantom = oc.classification_gaps(oc.CALENDAR, mutated, oc.review_skill_files())
-    assert "a-review-skill-that-never-existed" in phantom
+    mutated = dict(oc.EXEMPT, **{"a-review-lens-that-never-existed": ("2026-08-23", "x" * 40)})
+    _, phantom = oc.classification_gaps(oc.CALENDAR, mutated, oc.review_procedures())
+    assert "a-review-lens-that-never-existed" in phantom
+
+
+def test_the_spine_dispatches_every_lens_that_exists():
+    """The spine's contract test, and the third face of the SET guard.
+
+    `/review <lens>` only works if the spine's dispatch table names the lens and points at its
+    rubric path. A rubric added without a dispatch row is unreachable prose — the same
+    half-existence the calendar exemptions were papering over, one layer up — so the table is
+    asserted against the DISCOVERED set rather than a hand list.
+    """
+    from skill_paths import require_skill
+
+    spine = require_skill("review").read_text(encoding="utf-8")
+    for lens, rel_path in sorted(oc.review_lenses().items()):
+        assert f"`{rel_path}`" in spine, f"the /review dispatch table never points at the {lens} rubric ({rel_path})"
+        assert re.search(rf"\|\s*`{re.escape(lens)}`\s*\|", spine), f"lens {lens!r} has a rubric but no dispatch row"
+
+
+def test_the_retired_rituals_are_deleted_not_orphaned():
+    """#3250's third defect: three rituals were retired by a dated EXEMPT row on 2026-08-22
+    and their command files were left in the tree for six days. An exemption retires a
+    CLOCK, not a capability — so the standalone skill must be GONE while the lens rubric
+    it became still exists and stays classified."""
+    skills = set(_registry().skill_names())
+    retired = ("platform-review", "site-review", "journey-review", "fullreview", "accuracy-review", "craft-review", "sdlc-review")
+    for name in retired:
+        assert name not in skills, f"{name} still exists as a standalone skill — the orphan-file defect"
+    for lens in ("platform", "site", "journey"):
+        assert lens in oc.EXEMPT, f"{lens} lost its dated exemption"
+        assert lens in oc.review_lenses(), f"{lens} was deleted outright — the exemption retired its clock, not the lens"
 
 
 # ── Dead-man mutation proofs ──────────────────────────────────────────────────
@@ -148,6 +229,7 @@ def _synthetic(tmp_path, artifact_name):
         (d / artifact_name).write_text("{}")
     return {
         "skill": None,
+        "lens": None,
         "cadence_days": 7,
         "grace_days": 3,
         "attendance": oc.SESSION,
@@ -290,16 +372,34 @@ def test_the_fullreview_delta_hold_is_pinned():
 
 
 def test_delta_mode_is_a_defined_procedure():
-    """#3250: the calendar entry named a procedure the skill did not implement. The clock
-    and the procedure must not drift apart, so the skill has to define delta mode AND name
-    the exact artifact filename this entry's probe reads."""
-    from skill_paths import require_skill  # the ONE registry — never a layout literal
-
-    text = open(require_skill("fullreview"), encoding="utf-8").read()
-    assert re.search(r"^##\s+Delta mode", text, re.M), "fullreview.md must define delta mode as its own section"
+    """#3250: the calendar entry named a procedure the rubric did not implement. The clock
+    and the procedure must not drift apart, so the rubric has to define delta mode AND name
+    the exact artifact filename this entry's probe reads. Resolved through the registry's
+    lens discovery, so the assertion follows the rubric wherever it lives."""
+    rel_path = oc.review_lenses()[oc.CALENDAR["fullreview-delta"]["lens"]]
+    text = open(os.path.join(REPO, rel_path), encoding="utf-8").read()
+    assert re.search(r"^##\s+Delta mode", text, re.M), f"{rel_path} must define delta mode as its own section"
     assert "fullreview_grades_<date>_delta.json" in text, "delta mode must name the artifact the calendar probes"
     probe_rx = re.compile(oc.CALENDAR["fullreview-delta"]["probe"][2])
     assert probe_rx.match("fullreview_grades_2026-09-30_delta.json"), "the documented filename must satisfy the probe"
+
+
+def test_every_calendared_rubric_names_the_artifact_its_probe_reads():
+    """Generalized from the delta defect: a rubric that does not name its own artifact
+    filename lets a run land its report where the dead-man cannot see it — and the sweep
+    then reports 'never ran' over a ritual that did. The literal filename stem from each
+    entry's probe regex must appear in the rubric it schedules."""
+    misses = []
+    for name, e in sorted(oc.CALENDAR.items()):
+        if not e["lens"]:
+            continue
+        text = open(os.path.join(REPO, oc.review_lenses()[e["lens"]]), encoding="utf-8").read()
+        # The probe regex's fixed prefix, before the date group — e.g. `craft_grades_`.
+        stem = re.match(r"\^([A-Za-z_]+)", e["probe"][2])
+        assert stem, f"{name}: probe pattern has no literal filename stem to check"
+        if stem.group(1) not in text:
+            misses.append((name, stem.group(1), oc.review_lenses()[e["lens"]]))
+    assert not misses, f"rubric(s) never name the artifact filename their clock probes: {misses}"
 
 
 def test_committed_doc_matches_registry():
@@ -327,17 +427,28 @@ _NOUN_MAGNITUDE = re.compile(
 )
 
 
-def _calendared_skill_paths():
-    """Scope: the skills the calendar actually schedules. An off-calendar (EXEMPT) skill
-    grades nothing on a clock, so its rubric is not load-bearing — and the scope is derived
-    from the registry rather than hand-listed, so adding a ritual adds it to this guard."""
-    # Resolved through the ONE registry, never a layout literal. This line hard-coded
-    # `.claude/commands/<n>.md` and broke on the #3245 skills-corpus rename exactly as
-    # that PR's own note predicted — loudly, which is the design working. `oc.review_skill_files()`
-    # was already registry-aware; only this test half was not.
+def _calendared_rubric_paths():
+    """Scope: the prompt text the calendar actually schedules — the `/review` spine plus each
+    CALENDARED lens rubric, plus any standalone skill an entry names. An off-calendar (EXEMPT)
+    lens grades nothing on a clock, so its rubric is not load-bearing.
+
+    Derived from the registry, never a layout literal. This helper hard-coded
+    `.claude/commands/<n>.md` once and broke on the #3245 rename exactly as that PR's note
+    predicted — loudly, which is the design working. #3250 moved the rubrics again, from
+    `<skill>/SKILL.md` into `review/references/<lens>.md`, and the SCOPE HAS TO FOLLOW THE
+    CONTENT: had it not, the magnitude guard would have kept passing over a spine that no
+    longer contains a single anchor, which is a gate quietly measuring nothing.
+    """
     from skill_paths import skill_path
 
-    return {s: skill_path(s) for e in oc.CALENDAR.values() if (s := e["skill"]) and skill_path(s)}
+    out: dict[str, str] = {}
+    lenses = oc.review_lenses()
+    for e in oc.CALENDAR.values():
+        if e["lens"] and e["lens"] in lenses:
+            out[f"review:{e['lens']}"] = os.path.join(REPO, lenses[e["lens"]])
+        if e["skill"] and skill_path(e["skill"]):
+            out[e["skill"]] = str(skill_path(e["skill"]))
+    return out
 
 
 def _magnitude_hits(text):
@@ -356,7 +467,7 @@ def test_review_skills_carry_no_hand_typed_magnitudes():
     `scripts/review_anchors.py` at run time; a number typed into a calendared rubric is a
     defect the moment it is written, not the moment it drifts."""
     offences = {}
-    for skill, path in sorted(_calendared_skill_paths().items()):
+    for skill, path in sorted(_calendared_rubric_paths().items()):
         if not os.path.isfile(path):
             continue
         hits = _magnitude_hits(open(path, encoding="utf-8").read())
@@ -397,13 +508,149 @@ def test_review_anchors_derives_the_keys_the_rubrics_cite():
     assert values["test_modules"] > 0 and values["deploy_entrypoints"] > 0 and values["adr_records"] > 0
 
     cited = set()
-    for path in _calendared_skill_paths().values():
+    for path in _calendared_rubric_paths().values():
         if not os.path.isfile(path):
             continue
         text = open(path, encoding="utf-8").read()
         cited |= {k for k in mod.DERIVATIONS if f"`{k}`" in text}
     assert cited, "no calendared rubric cites a derived anchor — the derivation is not wired to anything"
     assert cited <= set(values), f"rubric cites anchor key(s) the deriver does not produce: {sorted(cited - set(values))}"
+
+
+# ── #3250: the ADR-099 filing contract has exactly ONE home ───────────────────
+# The finding: six of the nine review files restated the filing contract. Six copies is five
+# opportunities to drift, and the paraphrases had already drifted — one still routed won't-do
+# items at a CLOSED pointer issue, another linked stories to a CLOSED epic.
+#
+# STRUCTURAL, NOT PHRASE-MATCHED (the #2959/#3003/#3199 lesson — every phrase-matched member of
+# that family has failed in the field). The guard does not look for sentences about filing. It
+# reads the contract's MACHINE-READABLE MECHANICS out of the owner file itself — label literals,
+# body-heading literals, score-line field literals, the reconcile query — by SHAPE, and counts how
+# many of them each review-corpus file reproduces. Because the vocabulary is derived from the
+# owner, changing the contract re-arms the guard the same day instead of leaving it pinned to a
+# 2026-08 snapshot.
+ADR099_OWNER = ".claude/agents/issue-filer.md"
+
+#: A backticked literal in the owner file is a contract MECHANIC if it has one of these shapes.
+#: Shapes, not values: `type:story` and a label invented next month both match the first row.
+_MECHANIC_SHAPES = (
+    re.compile(r"^(?:type|area|model|prio|review|gate):"),  # the label taxonomy
+    re.compile(r"^##\s+\S"),  # the required body headings
+    re.compile(r"^\*\*(?:Score|Epic|Shipped|Outcome):"),  # the required body fields
+    re.compile(r"^(?:Impact|Confidence|Effort)\b"),  # the score-line grammar
+    re.compile(r"^P<"),
+    re.compile(r"^→\s*<"),  # the milestone arrow
+    re.compile(r"^gh issue list --label review:"),  # the idempotency reconcile
+    re.compile(r"^Part of #"),  # the retired linkage form
+)
+
+#: Measured, not guessed. On 2026-08-27 the three heaviest paraphrases scored 3, 4 and 3 on this
+#: metric and the two light ones scored 0 (they are caught by the pointer half below); a pointer
+#: scores 0–1. The ceiling is ONE because a lens may legitimately name a single label vocabulary
+#: as a grading SUBJECT — the sdlc rubric grades `model:*` routing accuracy against real usage —
+#: while two or more is a restatement of the contract.
+MAX_MECHANICS_PER_FILE = 1
+
+
+def _contract_mechanics():
+    owner = open(os.path.join(REPO, ADR099_OWNER), encoding="utf-8").read()
+    return {lit.strip() for lit in re.findall(r"`([^`\n]{3,80})`", owner) if any(s.search(lit.strip()) for s in _MECHANIC_SHAPES)}
+
+
+def _mechanic_hits(text, mechanics=None):
+    """Which contract mechanics this text reproduces as literals of its own."""
+    return sorted(m for m in (mechanics or _contract_mechanics()) if f"`{m}`" in text)
+
+
+def _review_corpus():
+    """The prompt files #3250 is about: the spine, every lens rubric (calendared or not — a
+    paraphrase in an off-calendar rubric drifts just as well), and every standalone
+    review-family skill. Derived from the same discovery the SET guard uses."""
+    from skill_paths import require_skill
+
+    out = {oc.REVIEW_SPINE: str(require_skill(oc.REVIEW_SPINE))}
+    for name, rel_path in oc.review_procedures().items():
+        out[name] = os.path.join(REPO, rel_path)
+    return out
+
+
+def test_the_contract_owner_exists_and_is_the_heaviest_statement_of_it():
+    """A single-source rule is only meaningful if the source is real and substantive. If the
+    owner ever scored at or below the ceiling, the metric would be measuring nothing and every
+    file would pass vacuously — a positive control for the guard itself."""
+    mechanics = _contract_mechanics()
+    assert len(mechanics) >= 10, f"only {len(mechanics)} mechanics derived from {ADR099_OWNER} — the shapes stopped matching"
+    owner_text = open(os.path.join(REPO, ADR099_OWNER), encoding="utf-8").read()
+    assert len(_mechanic_hits(owner_text, mechanics)) > MAX_MECHANICS_PER_FILE * 3
+
+
+def test_review_corpus_points_at_the_contract_instead_of_restating_it():
+    """The #3250 acceptance box, both halves.
+
+    (a) No review-corpus file reproduces more than one contract mechanic — that is what a
+        restatement looks like structurally.
+    (b) Any file that NAMES ADR-099 must also name the owner's path. This half catches the
+        light paraphrases the mechanic count cannot see (the old /fullreview line, "ADR-099:
+        epics + ranked stories, Now/Next/Later", named zero literals and was still a second
+        copy of the contract): a mention without a pointer is a paraphrase in the making.
+    """
+    mechanics = _contract_mechanics()
+    restating, unpointed = {}, []
+    for name, path in sorted(_review_corpus().items()):
+        text = open(path, encoding="utf-8").read()
+        hits = _mechanic_hits(text, mechanics)
+        if len(hits) > MAX_MECHANICS_PER_FILE:
+            restating[name] = hits
+        if "ADR-099" in text and ADR099_OWNER not in text:
+            unpointed.append(name)
+    assert not restating, (
+        f"review file(s) restate the ADR-099 filing contract: {restating}. It lives in exactly "
+        f"ONE place ({ADR099_OWNER}) — point at it, do not paraphrase it (#3250)."
+    )
+    assert not unpointed, f"file(s) name ADR-099 without pointing at {ADR099_OWNER}: {unpointed}"
+
+
+# The real paraphrases, verbatim from the 2026-08-27 tree, kept as the must-fail control. A guard
+# nobody watched fail is a green light wired to nothing (#2578) — and these are the actual strings
+# the issue was filed against, not a synthesized approximation of them.
+_REAL_PARAPHRASES_2026_08_27 = {
+    "platform-review": (
+        "**Phase 4 — Rank + file (ADR-099).** Score = (Impact × Confidence) / Effort → Now/Next/Later; one `area:*` + "
+        "one `model:*` label; epic per dimension with ≥3 findings, stories linked `Part of #epic`. Idempotency is the "
+        "`review:*` label, reconciled via `gh issue list --label review:<slug> --state all` before filing."
+    ),
+    "sdlc-review": (
+        "- File via the `issue-filer` agent per ADR-099: one epic per lens with ≥3 confirmed findings, scored stories, "
+        "`area:*` mapping (most SDLC findings → `area:claude-workflow`), privacy discipline. Idempotency is the "
+        "`review:*` label. Any QA-scorecard axis that regressed files a story the same way (`type:story`)."
+    ),
+    "craft-review": (
+        "- File confirmed findings via the `issue-filer` agent per **ADR-099**: `type:story` (3–5 acceptance criteria, "
+        "evidence, score line); `type:epic` when a dimension has ≥3 confirmed. `gate:owner` stamps human-only acts — "
+        "stamp, don't skip filing."
+    ),
+}
+
+
+@pytest.mark.parametrize("origin,text", sorted(_REAL_PARAPHRASES_2026_08_27.items()))
+def test_the_paraphrase_guard_catches_the_real_paraphrases(origin, text):
+    """Must-fail control: each real paraphrase must exceed the ceiling through the SAME
+    function the live test uses."""
+    hits = _mechanic_hits(text)
+    assert len(hits) > MAX_MECHANICS_PER_FILE, f"{origin}: the guard did not catch a REAL paraphrase (hits={hits})"
+
+
+def test_the_paraphrase_guard_does_not_flag_a_pointer_or_a_grading_subject():
+    """The negative controls, without which the test above is just 'any mention of filing'.
+    A pointer names the owner and no mechanics; a rubric grading one label vocabulary as its
+    SUBJECT names exactly one and stays under the ceiling."""
+    pointer = (
+        "Filing is the `issue-filer` agent's contract, and it lives in exactly ONE place: "
+        "`.claude/agents/issue-filer.md`. Read it there and hand the agent the verified findings."
+    )
+    subject = "| 3 | AI-engineering practice | The Claude org | `model:*` routing accuracy vs actual usage |"
+    assert _mechanic_hits(pointer) == [], "a pointer must not trip the guard"
+    assert len(_mechanic_hits(subject)) <= MAX_MECHANICS_PER_FILE, "grading one label vocabulary is not a restatement"
 
 
 def test_anchor_is_not_refloated():
