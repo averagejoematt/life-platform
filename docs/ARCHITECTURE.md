@@ -430,16 +430,7 @@ table and bump `secret_count` when it is created.
 
 Target: within the **$215/mo all-in budget ceiling** (ADR-063; surge-to-$252 per ADR-133). The canonical spend ledger is [COST_TRACKER.md](COST_TRACKER.md) (measured $5.74/day over 2026-08-01..08-25, n=25 -> ~$172/mo); the **live** tier is never stated here — read it from SSM `/life-platform/budget-tier`, which `life-platform-cost-governor` rewrites every 8h.
 
-| Driver | Monthly Cost |
-|---|---|
-| Secrets Manager (26 active secrets) | ~$10.40 |
-| Lambda invocations (~2,000/mo) | ~$0.50 |
-| DynamoDB (on-demand) | ~$1.00 |
-| S3 (~2.5 GB + requests) | ~$0.50 |
-| CloudFront (4 distributions) | ~$1.50 |
-| CloudWatch (~109 alarms + logs) | ~$4-5 |
-| Bedrock — Claude Sonnet/Haiku via `bedrock_client.py`, prompt-cached (ADR-062/049); the dominant driver, governed by `cost_governor` tiering | ~$60-65 |
-| **Total** | **~$78-82** |
+There is deliberately **no per-driver cost table here**: a hand-maintained copy understated CloudWatch ~6x and the monthly total ~2x before it was removed (#3371). The per-driver breakdown lives in [COST_TRACKER.md](COST_TRACKER.md)'s monthly close, measured from Cost Explorer under a 45-day freshness gate — read it there.
 
 ---
 

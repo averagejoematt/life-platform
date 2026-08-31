@@ -757,11 +757,11 @@ RULES = [
         r"\*\*\d+ active secrets\*\*[^\n]*",
         "**{secret_count} active secrets** at $0.40/month each = **~{secrets_cost}/month**",
     ),
-    (
-        "docs/ARCHITECTURE.md",
-        r"Secrets Manager \([^)]+\) \| ~\$[\d.]+",
-        "Secrets Manager ({secret_count} active secrets) | ~{secrets_cost}",
-    ),
+    # RETIRED (#3371): the ARCHITECTURE.md Cost Profile table's Secrets row rule.
+    # The rule refreshed exactly ONE cell of a hand-maintained cost table, giving the
+    # whole table a synced look while every other row rotted (CloudWatch understated
+    # ~6x, the total ~2x). The table itself was deleted in the same PR — the per-driver
+    # breakdown lives in docs/COST_TRACKER.md's measured monthly close.
     # ── INFRASTRUCTURE.md ────────────────────────────────────────────────────
     (
         "docs/INFRASTRUCTURE.md",
