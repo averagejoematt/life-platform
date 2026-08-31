@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-18
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-31
 
 Last updated: 2026-08-30 (v8.6.0)
 
@@ -195,7 +195,7 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 | May 2026 | **$48.19** (CE actual) | 3 (metric began May 29) | + Bedrock $14.29 (Sonnet $9.31 + Haiku $4.98) — Bedrock-cutover marathon + v4 launch. WAF deleted at month end (~−$8/mo). |
 | Jun 2026 | **$79.80** (CE actual, peak) | **19 / 30** | Bedrock $43.98 (Haiku $26.91 + Sonnet $17.07), CloudWatch $14.87, Secrets $7.98, Tax $7.56. Coaching-door launch + QA marathons; tier-2/3 excursion Jun 15–18; 94% of the $85 base — held. |
 | Jul 2026 | **$98.35** (CE actual — first close over the $85 base) | **26 / 31** | Bedrock $49.51 (Haiku $28.47 + Sonnet $21.04), CloudWatch $24.50, Secrets $9.83, Tax $9.26. Continuous tier-1 from Jul 6; surge first activated 2026-07-19 (972 uniques). Cost per reader-week ≈ $98.35 ÷ (972 × 4.43) ≈ **$0.023**. |
-| Aug 2026 (MTD 18d) | **$100.98** (CE actual, interim — month the window raised the base to $200) | **13 / 18** | Bedrock $61.35 (Haiku $31.00 + Sonnet $30.35 — dev spikes 08-10 $18.33, 08-09 $6.49), CloudWatch $19.87, Tax $9.45, Secrets $6.62. Spike-free run-rate $4.12/day (sd 0.66, n=6) ≈ $124/mo. 773 trailing-7d uniques (surge off). Close this row at month end. |
+| Aug 2026 | **$175.85** (CE actual read 08-31 16:00Z — may settle as CE finalizes; month the window held the base at $200) | **26 / 31** (tier 2 from 08-26; 08-31 datapoint pending at close) | Bedrock $109.61 (Haiku $71.22 + Sonnet $38.39 — spikes 08-10 $18.33, 08-23 $9.55; median $2.22/day, mean $3.54), CloudWatch $31.45, Tax $16.47, Secrets $11.44, S3 $3.16 (deploy-version churn + DIL-027 backfill, one-time). CallerClass (#2892, dimension live only from 08-23 — partial-month): ci $14.38 + dev-session $0.20 = 63% of the $23.19 stamped window; prod-cron $8.45. Cost per reader-week ≈ $175.85 ÷ (897 × 4.43) ≈ **$0.044** (uniques mean 897, n=5 daily datapoints; peak 1,011 on 08-30 — first reading above the 900 surge bar). Uncached input was 57% of Bedrock ($62.20 vs $8.10 cache-read). Closed 2026-08-31 by the financial-diligence session. |
 
 ## Current cost structure (rate card, verified 2026-08-18)
 
@@ -318,9 +318,7 @@ Decisions where cost was a factor in the design:
 
 ---
 
-**Verified:** 2026-08-18 (cost-diligence session — July close + Aug MTD + rate card
-re-read from live sources. Sources: `aws ce get-cost-and-usage` Jan–Aug by SERVICE,
-Jul–Aug by USAGE_TYPE (CloudWatch/Secrets/KMS/CE and Bedrock token classes), Aug DAILY
+**Verified:** 2026-08-31 (financial-diligence session — August close row (CE by-service, tier residence, CallerClass split, reader-week), ceiling-revert facts re-read via budget_ceilings.py; rate-card ranges NOT re-verified this run — several no longer contain the Aug actuals, tracked as a filed finding), Aug DAILY
 by Bedrock model; SSM `/life-platform/budget-tier` + `budget-breakdown`;
 `describe-alarms` (103) + `list-metrics` (741 custom series); `list-secrets` both
 regions (29); `LifePlatform/Budget::BudgetTier` daily Jul 1 → Aug 18;
