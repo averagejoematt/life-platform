@@ -71,6 +71,32 @@ Before you can operate the platform, you need:
 | Sunday | Hypothesis engine ran + Weekly Digest sent? (`hypothesis-engine`, `weekly-digest`) |
 | Any time | Glance at CloudWatch dashboard `life-platform-ops`. Investigate any alarms in ALARM state. |
 
+### What the operator actually touches each week (measured, 2026-08)
+
+The table above is the *email-chore* rhythm and reads as ~10–15 min/week. The incident log
+(`docs/INCIDENT_LOG.md`, Patterns section — derived by `scripts/incident_log_patterns.py`,
+119 rows in 2026-08) says the real weekly touch is dominated by unplanned interventions.
+Named here so a successor budgets for them instead of discovering them (epic #2800, the
+`weekly-owner-touch` item). Each row names the tool that makes it a 2-minute act rather
+than a session.
+
+| Recurring intervention | Rate (2026-08 corpus) | The act | Tool / rule |
+|---|---|---|---|
+| **Deploy-lease disposal** — a gated `production` run parked at the gate holds the deploy slot | every merge session; 6 leases disposed on 2026-08-31 alone | approve the main-tip run, REJECT every ancestor run; never leave one waiting | `deploy/approve_deployment.sh` · `deploy/reject_deployment.sh` · `docs/OPERATING_DISCIPLINE.md` §5 |
+| **Deploy-plane wedge / strand / race** | 26 rows | read `check_deploy_wedge`, dispose the zombie lease, re-run the tip | `scripts/check_deploy_wedge.py` · `docs/CONVENTIONS.md` §4d |
+| **Swallowed push / zero-run mint** | recurring since #3219 (three rungs in one night, 2026-08-30) | wait 10–15 min (delay ≠ swallow), then close/reopen → re-mint push → supersede-PR → integration train | `scripts/check_main_green.py --classify-sha` · `/land` §2 |
+| **QA-oracle false positive — deploy race** (#2978) | 36 rows; 1 per 1.5 days in Aug | ground-truth the artifact (`report.json`), never the truncated log line; re-land the wanted build if the rollback ate it | `gh run download <run> -n visual-qa-standalone-screenshots` · `deploy/rollback_site.sh` is a FULL rerun, never `--failed` |
+| **Rollback adjudication** — the site auto-rollback fired | subset of the row above | decide whether the trigger was reachable by `site/**` at all (`/api/*`-served defects are not) | #3268 / #3252 verdicts · `docs/INCIDENT_LOG.md` |
+| **Doc-sync literal reconcile / census stack** | 51 stale-literal rows; every PR that adds a test or gate | run `sync_doc_metadata.py --apply` on main (the driver's job, never a lane's); stack census-bumping PRs in merge order | `docs/CONVENTIONS.md` §3 · `/reconcile-branch` · `deploy/merge_train.sh` |
+| **IAM change** | was owner-only, unpriced (#2834) | **additive** grants now ship through CI behind `deploy/iam_additive_gate.py` (ALLOW-ADDITIVE / OWNER-REQUIRED); everything else stays an attended apply from `infra/iam/*.json` — never a shell twin (#3336) | `deploy/verify_oidc_iam.py --strict` after any apply |
+| **Live re-probe after a fix** | every gate fix (#3277, #3325, #3337 this week) | verify by CONTENT — the deployed bundle or the served asset — never by sha or timestamp | `deploy/verify_deployed_symbol.sh` · `/version.json` + the asset itself |
+| **Budget tier read** | every session boot; tier 2 on 2026-08-30 | read the governor's last cycle and `/life-platform/budget-tier`; the ceiling floats with the calendar (ADR-133) | `aws ssm get-parameter --name /life-platform/budget-tier` · `cost-governor` logs |
+
+The ≤30-min target model is deliberately **not** written yet: it depends on the silent-failure
+floor (epic #2799) landing, so that the rows above stop being surprises. Re-cut this section
+when that epic closes; until then the honest number is "an hour or two per merge session,
+mostly the first three rows."
+
 ---
 
 ## Responding to Failures
