@@ -1,119 +1,147 @@
-# Handover — 2026-08-31 (FABLE 5): Session M — the second drain, 13 closed, one P1 I caused
+# Handover — 2026-08-31 (FABLE 5): Session N — 11 closed, the fence under the belt, and the lease I stranded
 
-**Session:** Claude Fable 5, owner co-working from mobile, Fable orchestrating Opus/Sonnet
-worktree lanes capped at 3–4 per wave (Session L's eight hit the monthly spend limit). Started
-2026-08-31 ~01:15Z, wrapped ~06:30Z.
+**Session:** Claude Fable 5, owner co-working from mobile, Fable orchestrating Opus/Sonnet lanes
+capped at 3–4 per wave (4 lanes total this session: two Sonnet, two Opus). Started 2026-08-31
+06:37Z, worked to ~15:xxZ (a multi-hour idle gap mid-session — see Incidents). The day's through-line, named by the peer
+and true four times over (the #2899 wrap line, the pillow waiver, my global cdk, their LaunchAgent):
+**a stale local copy of a thing the repo thinks it owns, failing in the direction that looks like success.** Each instance
+kept reporting success from a copy of a fact the repo had moved past, because nothing asked the authoritative
+side — and each fix was the same move at a different layer: **make it derive rather than remember** (the peer's
+formulation, worth keeping).
 
 ## The ask and the honest count
 
-Owner: "same brief as last session — close as many issues as possible, Fable orchestrating,
-without risking quality — cap concurrency at 3–4 lanes, check headroom before each wave." Order:
-#3336 → PR #3335 (R1–R5+N1–N3) → un-swallow #3341/#3339 → #2848 cold-read proof → #3277 →
-epic #2799 audit → boot hygiene. Then "if there's more we can squeeze in pre-wrap, let's do it."
+Owner: "same brief as the last two — close as many as possible without risking quality." Then, on
+"what if I want more resolved": *do the recommendation for all five, if (1) it would be endorsed by
+technical experts and (2) no material cost increase.* Applied literally: #2363 (BotFather) is the
+owner's Telegram account, not doable by me; #2883 fails filter 1 today (n=2 post-fix cycles — no bar
+re-derivation); #2578 option (a), #3340, and the evidence-based half of the Roadmap prune passed both.
 
-**Closed 13:** #2848 (cold-read proof, 8/8) · #3336 (PR #3338) · #3318 (PR #3341) · #3325
-(PR #3342) · #3337 (PR #3343) · #3315 (PR #3339) · #2834 (PR #3335) · #3277 (PR #3344) · #3324
-(PR #3347) · #3329 (option B, PR #3348) · **epics #2842 (Kernel) and #2800 (calendar)** on their
-Outcomes · plus #3340 re-homed to #3042. Working set **18 → 9** (4 epics, 5 owner-gated/blocked
-stories). **Filed 3** (#3352 carrier for #2799's rollback-scope tail; #3353, #3354 from residuals
-the closure sweep would not let me leave homeless). **14 PRs merged**, every one with a green-by-name
-verdict + closing-set check; every closure has `**Shipped:**` + `**Outcome:**` with live evidence.
+**Closed 11** (open 37 → 27 at the last count, Roadmap 25 → 21):
+#3354 (PR #3355) · #3353 (PRs #3356 + #3361) · #3352 (PR #3358, live-proved) · #3340 (PR #3360,
+applied + probed live) · #1631 (PR #3357, the ADR-063 do-not-build amendment) · epics **#2578**
+(Outcome amended per the owner's #3329 option B, then closed on it) and **#2799** (on its Outcome,
+after #3352's live proof) · **#1080** (on its own closure rule — every child had shipped by 08-16) ·
+#723 and #1414 (not-planned, executing the 2026-08-09 triage recommendations nobody had acted on) ·
+#3363 (the auto-filed wedge alert, closed by hand with the honest disposition). #3362 was auto-filed
+and auto-closed by the #3352 machinery itself (net 0). **Filed 1** (#3365 — the six standing `Pending owner cdk deploy` warnings' home, evidence-backed, → Now: the sanctioned refill lever). 9 PRs merged, every one on a
+`wait_pr_green` verdict read in its own command; every closure carries `**Shipped:**` +
+`**Outcome:**` with live evidence; closure sweep clean except the two benign Session-L hits.
 
-## What shipped (all merged AND deployed/verified by content)
+## What shipped (merged AND deployed/verified by content)
 
-- **#3336 / PR #3338** — `setup_remediation_role.sh` + `setup_github_oidc.sh` apply `infra/iam/*.json`
-  verbatim (0 inline policy text); `tests/test_iam_twin_free_3336.py` entered the census PROVEN
-  (MutationSpec, ARMED 1/1); `verify_oidc_iam.py --strict` CLEAN live.
-- **#2834 / PR #3335** — the CISO review's R1–R5 + N1–N3 all landed (value-aware Code tolerance,
-  S3 deletes refused on the bucket policy's Deny prefixes + replica dropped, control-plane actions
-  forbidden, human-visible ALLOW record, ADR-anchored baselines, stack-name validation, steps
-  reordered, wildcards an explicit decision); deploy role gained no permission; `guard::deploy/
-  iam_additive_gate.py` proven. Owner-flagged residual: prefix-scoped PUTs on `site/*`/
-  `remediation-log/*`/`raw/*` remain admitted (`S3_MUTABLE_BY_CI_TODAY`) — one Deny line flips them.
-- **#3318 / PR #3341** — the closure contract (registry + detectors A/B, seamed into
-  `wait_pr_green.sh`; `warn` posture). It caught my own three closing comments the same night.
-- **#3315 / PR #3339** — the CI dark-flag sweep; live on main: 39 jobs / 261 steps / 0 violations.
-- **#3337 / PR #3343** — reader-truth rulings decide on structure (13/13; 0 lexical); found and fixed
-  `today_iso=None` on every production run since #2959; deployed to `qa-smoke` via the gated tip run
-  (verified by bundle content: `reader_truth_evidence.py` + `phase["today"]`).
-- **#3277 / PR #3344** — axe at 390px in the gating sweep, mobile ledgers, `role="group"` scroll
-  regions; live re-measure **0/0 nodes across 15 pages × chromium+webkit**; webkit lane surfaces via
-  the #1447 filer (dead SNS step deleted).
-- **#3324 / PR #3347** — nullable-aware `diff_shape`, whole-value leak anchor, dated recapture; live
-  `--check-drift` on main: **0 breaking, 0 leaks**.
-- **#3329 / PR #3348** — the 6 unprovable gates are counted `not-applicable` verdicts with reasons;
-  `BASELINE_UNPROVEN_GATES` is DOWN-ONLY; #2578 box 2 amended (owner: option B).
-- **#3325 / PR #3342** + **PR #3350** — two data-driven contrast defects (FDR-flagged rows; paused
-  supplement cards) fixed at the token level; both live.
-- **PR #3345** — the #2799 folded-items pass: 6 of 7 already fixed by children, 3 false
-  compensating-control claims corrected, visual-qa's dead SNS notifier deleted.
-- **PR #3346** — `docs/OPERATOR_GUIDE.md`'s measured weekly operator touch (#2800's last item).
-- **PR #3349 + PR #3351** — the site sync uploads hashed assets first and HTML last (the 7-second
-  asset race behind 43 false reds), and the Data-JSON sync excludes `*.html` (see Incidents).
+- **#3352 / PR #3358** — the site auto-rollback scope check: `tests/visual_qa_verdict.py` classifies
+  each failed page (`deploy-script` / `hashed-asset` / `api` / `site-shell`), the rollback job declines
+  what a `site/**` revert cannot reach, files via #1447, alerts `SITE ROLLBACK DECLINED`; recovery job
+  auto-closes. **Live proof:** dispatch 33372295160 (`qa_inject_failure=api`) → declined, 0
+  `rollback_site.sh` invocations, `/version.json` unchanged, #3362 filed; recovery 33373714550 closed
+  it. `/api/ai_analysis` `_meta.content_as_of` live. Census 587 → 588 (`ci::site-deploy.yml::visual-qa::6`, entered unproven, named).
+- **#3340 / PR #3360** — the derived permissions boundary on the three CDK cfn-exec roles (16 Denies,
+  5,612/6,144 chars, one registry with the additive-IAM gate). Driver-review narrowing before merge:
+  `dynamodb:UpdateTimeToLive`/`UpdateContinuousBackups` dropped (the only CFN path for TTL/PITR).
+  **Applied 14:24Z** as matthew-admin from the checked-in JSON; `verify_oidc_iam --strict` CLEAN (15);
+  `cdk_deploy.sh LifePlatformCore` no changes; **probe (a)** denied by name (`explicit deny in a
+  permissions boundary: …/cdk-cfn-exec-boundary`), **probe (b)** `CREATE_COMPLETE`. The first probe
+  attempt was VACUOUS (an em dash in a role Description → IAM 400 before the boundary was evaluated;
+  both controls failed identically) — fixed + charset-guarded in PR #3364.
+- **#3353 / PRs #3356 + #3361** — WebKit tiled screenshots past the 32767px cap; first-ever green of
+  the weekly WebKit lane (66/66, run 33371151988) — then the wire gap: the job never installed Pillow,
+  so the tiling had printed `fallback unavailable`; pinned, the stale #3315 waiver deleted, re-run
+  33402608192 green with 16 tiled captures executing.
+- **#3354 / PR #3355** — `diff_shape()` union-with-optionality for heterogeneous arrays; 120 baselines
+  recaptured; `--check-drift` 0/0; the #3324 mutation proof still ARMS.
+- **#1631 / PR #3357** — ADR-063 amendment: off-AWS per-post spend is outside the metered ceiling; X
+  syndication is a recorded do-not-build until a metering amendment exists.
+- **PR #3359** — the CLAUDE.md `$200` line that redded every PR (Incident 2).
+- **PR #3364** — README simulator count 28 → 35; `qa-smoke-failures` citation pruned per its dated note
+  (OK since 08-28 14:05Z); the ASCII-only probe templates + guard test.
+- **Roadmap prune (evidence-based half):** #1080 closed on its rule, #723/#1414 not-planned; the
+  taste half (tick-list of 8 groups) is in the terminal for the owner; #1389 re-homed off the closed epic.
 
 ## Incidents (both rows in `docs/INCIDENT_LOG.md`)
 
-1. **P3 — the asset race:** the #3277 deploy uploaded HTML 7 s before the hashed JS it referenced;
-   the edge cached a 404; ci-cd's un-raced visual QA read 43 pages red. Root-caused from the deploy
-   log timestamps; fixed structurally (#3349) with a mutation-proven order guard.
-2. **P1 — self-inflicted, ~22 min:** that reorder put the Data-JSON sync (stamps
-   `application/json`, no html exclude) ahead of the HTML sync; it also covered
-   `site/data/**/index.html`, so the whole `/data/*` door served JSON. The gate caught it; the
-   auto-rollback **re-ran the same script and re-broke it identically**, then reported success.
-   Restored by an in-place `aws s3 cp --metadata-directive REPLACE` + `/data/*` invalidation; fixed
-   in #3351; the next site deploy (manual dispatch, `3baa9c3`) verified the order
-   (Hashed → Data JSON → HTML) and every door `text/html`. Lesson homed in CONVENTIONS §7 + memory.
+1. **P3 — the lease I stranded (4.9h):** my lease loop EXITED after approving the tip `7edaa94cf`;
+   #3360's run then sat at the gate from ~09:05Z until `deploy-wedge-watch` fired at 13:53Z and
+   dispatched the remediation agent (`stranded-approval`, the "12 need you" email). Rejected with
+   decode at 14:2xZ; a persistent steward (reject ancestors / approve the tip, `Monitor persistent`)
+   replaced the loop. `watch_deploy_gate.sh` would have approved an ancestor — not the answer.
+2. **P4 — docs-only red-in-waiting:** Session M's wrap block (`CLAUDE.md:213: $200`) tripped the
+   as-of-2026-09-02 doc gate on every PR while main's badge stayed green (path-filter skip). Fixed by
+   PR #3359 + `gh pr update-branch` ×4.
 
 ## Verification state
-- Every lease disposed: approved the tips (`53511af98`, `6badbea56`, `253bc2a3e`, `f45ad6db6`),
-  rejected 9 ancestors by name; two runs cancelled by concurrency; `bbd19b112` had no deploy job.
-- Live: site build `3baa9c3` (05:40Z), `qa-smoke` bundle carries #3337, `verify_oidc_iam --strict`
-  CLEAN, `--check-drift` 0/0, dark-flag sweep 0, census 584 → 587 on main with the not-applicable
-  partition printing.
-- Governor at boot: **tier 2** (mtd $176.64 / $200 August ceiling, drift 1.21x); reverts to the
-  $215 base at 00:00Z 09-01 → reads tier 1. The 08:00Z cycle was not read (wrapped before it).
+- Every lease disposed (tip `7edaa94cf` approved; `f0f5526`, `2a22aae`, `cfd7c4d`, `785ef27`,
+  `dfed9ab`, `9507d01`, `c85dfd6` rejected by name); the steward holds the rest.
+- Live: site `7edaa94` (site-deploy self-run + two dispatches green), fleet bundle from
+  `7edaa94cf` (Deploy + I1/I2/I5 + smoke + visual QA green), boundary attached ×3,
+  `verify_oidc_iam --strict` CLEAN, census 588.
+- Governor: 08:00Z cycle mtd $180.03 / projected $182.05, tier 2 against the $200 window, drift
+  **1.21x unchanged** (datum posted on #2883; no re-derivation on n=2).
+- Worktrees 18 → 8 at boot (11 reaped); lanes released after each merge.
 
-## Gotchas (durable ones → memory + CONVENTIONS §7)
-- **Stacked census PRs**: rebase each onto the previous PR's tip (+1 each), run CI concurrently, merge
-  in order — and re-rebase the rest after EACH squash (GitHub reports CONFLICTING; the rebase is clean).
-- **`gh run list --jq` does not take `--arg`**, and the system bash is 3.2 (no `declare -A`) — two
-  of my watcher scripts died silently and produced phantom "no run minted" events. The fixed
-  watcher is `scratchpad/watch_runs.sh`-shaped: inline the jq string, no associative arrays,
-  require 3 consecutive empty reads before calling a swallow.
-- **A resolver whose assert fails must not be chained to `git rebase --continue`** — twice I
-  committed conflict markers that way; the census then "lost" two registry ids. Resolve, `ast.parse`,
-  THEN continue.
-- **Local axe is blind to `color-mix()` contrast** (0 locally, 16 in CI) — prove by arithmetic.
-- **Reordering sync steps changes ownership** — see Incident 2.
+## Gotchas (durable → memory)
+- **A lease steward must outlive the tip** (memory) — one persistent watch per session.
+- **A docs-only commit can red every PR while main reads green** (memory) — run the doc-facts gate
+  on the FINAL wrap tree.
+- **A dark-flag waiver's reason rots when the reach grows** (memory) — grep the waivers for any dist
+  a lane makes newly reachable; the sweep's "N stale waiver(s)" line is a finding.
+- **A probe can be vacuous for a reason unrelated to what it probes** — read the CREATE_FAILED reason
+  before calling a negative control a pass (guard test added).
+- `gh --jq` still takes no `--arg` (killed one waiter); quoting inside `$( )` killed another —
+  write waiters as files, not inline.
+- **A bare `npx cdk diff` is not evidence** — my stale global toolchain rendered a phantom LogRetention
+  runtime DOWNGRADE + dashboard Tags deltas; the chooser is aws-cdk-lib's regionalFact (Python, pinned in
+  `cdk/.venv`), already decoded in ci-cd.yml's #2468 comment and in memory. Synth through `cdk_deploy.sh`, always.
+- **`cdk deploy` stages the working TREE** — with a peer's uncommitted Lambda edit in the shared checkout,
+  a "cosmetic drift" deploy would have silently shipped it (grant not yet deployed). Clean-tree is a deploy
+  precondition, now recorded in #3365's acceptance.
 
 ## Residual / next picks
-- **#2799** stays open on its honest tail: #3352 (rollback scope-check + `/api/ai_analysis`
-  `content_as_of`) and #3353 (WebKit 32767px screenshot cap) — both filed tonight.
-- **#2578**: box 2 re-scoped (owner B); the installed base shrinks opportunistically — #3354 is its
-  newest child. #3040-class hygiene is done.
-- **#3042** (A-Grade): NOT closeable — the 08-29 re-grade's external ≥9/10 box; #3340 now lives here.
-- **Owner-gated, unchanged:** #3340 (cfn-exec boundary — an owner-run re-bootstrap), #2883 (soak;
-  n=30 bar decision), #2978 (30-day re-measure due ~2026-09-2x; two shape-(a)-class datums added
-  tonight), #1407 Roadmap product pick (see Backlog).
-- **Time-gated boot hygiene, not done this session:** governor 08:00Z cycle read (#2883 soak) ·
-  Monday 14:45Z remediation run ends at "Run remediation agent" with a CallerClass=remediation
-  datapoint (#3308 verification) · prune the `qa-smoke-failures` registry entry after 14:06Z if
-  still OK (not-work — registry hygiene per its own dated note) · the `qa-smoke-warnings` alarm is
-  now a self-clearing scale-gap state (re-cited, expiry 09-03 wrap).
-- **BotFather for #2363** — not-work — owner action, 10 minutes.
-- **09-08 Architect ritual runs ITSELF** — not-work — scheduled machinery (#2849 reopen trigger).
-- **Main's last completed run reads red** on the incident-window visual-QA job; the approved
-  `f45ad6db6` run is the green proof in flight — not-work — check its result at next boot.
+- **Owner asks, unanswered this session:** #1407 Roadmap→Now pick; #2363 BotFather (10 min); #1738
+  pick-by-ear (renders gone; re-render ≈ $0.62 on request); the Roadmap taste tick-list (8 groups);
+  #2883 re-derivation waits for the September clean-month read.
+- **#3042** carries the #3340 residuals: `drift_sentinel.check_oidc_iam` runs the verifier without
+  `--strict` (the weekly sweep cannot red on any OIDC/boundary finding); the remediation role cannot
+  read the exec roles (`BOUNDARY-UNREADABLE`); the propagated-boundary non-goal.
+- **`deploy-wedge-watch` has no recovery leg** (not #1447-wired) — a cleared wedge never auto-closes
+  its issue; named on #3363, file if it recurs.
+- **09-01 00:00Z:** the $215 base goes live; read the governor log. **09-03 wrap:** `qa-smoke-warnings`
+  citation expiry. **09-08 16:00Z:** the Architect ritual runs itself. (not-work — standing calendar, each item owned by its own dated machinery)
+- **CI warnings (7 on `236f8d2bc`) triaged:** six `Pending owner cdk deploy` → filed #3365 (Now; clean-window
+  preconditions in its acceptance — no in-flight fleet deploy, clean tree, pinned-venv synth, Web's CloudFront
+  change READ before shipping); the Unit-Tests duration breach (2290s/1950s) → **no action, measured** — 11
+  same-day datapoints span 1198–2298s (92% spread on near-identical trees; the #3265 queue-noise pattern).
+- Monday 14:45Z remediation cron: GitHub-starved through wrap (~15:4xZ; last schedule-event run 08-28) — the CallerClass=remediation datapoint check moves to next boot (not-work — the cron is GitHub's scheduler, the waiter pattern is in this handover, and the #2883 soak record carries the datum when it lands).
+
+## Peer-session interlude (life-platform-a7, owner-directed)
+- Mid-session, local main diverged: two unpushed commits by the peer session (the #1026 memory-backup
+  repair, owner-directed, in the SHARED checkout). Coordinated by SendMessage — no touch, no reset;
+  the peer ran its full suite (23,619 passed), rebased onto the moving tip, resolved the
+  `platform_counts.py` collisions by regeneration, and pushed (`8e8d05708` + `cfb1a7e3c`).
+- **The checkout is now load-bearing for a scheduled job:** LaunchAgent
+  `com.matthewwalker.claude-memory-backup` runs `setup/claude_memory_backup.sh` FROM THIS REPO
+  (the ~/.local/bin staged copy is deleted). Moving or removing the checkout breaks the daily
+  memory backup; and because its two path-contract tests read ~/Library/LaunchAgents and SKIP in CI,
+  **a green CI run is not evidence the backup path is intact** — after any checkout move, a local
+  `pytest tests/test_backup_agent_path_contract.py` is the only thing that will catch the break
+  (peer proved it live: 3 kickstarts, latest 15:12:30Z, 380 memory files, rc=0).
+- The peer's SECOND slice — the memory-backup dead-man (`output_artifact_registry.py` + the freshness-checker
+  wire-in + an s3:GetObject grant) — is committed as `c446c4173`, UNPUSHED at wrap: an ordering decision sits
+  with the owner (deploy `LifePlatformOperational` first = zero window; push first = correct-but-noisy daily
+  alerts until the stack deploys). #3365 carries the ordering box; the commit closes the '#3042
+  LaunchAgent-visibility' residual named on #3340.
+- The peer independently re-verified my boot reap (all five reaped lanes' content on origin via
+  #3339/#3323/#3321/#3320/#3319; the one 7-line delta was a waiver main deliberately removed in #3361).
 
 ## Gate lines
-**Build beat:** 2026-08-31-thirteen-closed-and-the-door-i-broke
-**Docs:** docs/CONVENTIONS.md §7 (+3 gotchas), docs/OPERATING_KNOWLEDGE_LEDGER.md (+3 rows, snapshot 377), docs/alarm_citations.json (qa-smoke-warnings re-cited to its self-clearing data cause), docs/INCIDENT_LOG.md (+2 rows via PRs #3349/#3351), docs/OPERATOR_GUIDE.md (PR #3346), docs/DECISIONS.md ADR-065 amendment (PR #3335), docs/PROPORTIONALITY.md (PRs #3341/#3348), docs/OPERATING_DISCIPLINE.md untouched
-**Decisions:** none needed — governance landed as dated ADR amendments in the merged PRs (ADR-065 2026-08-30 via #3335); the #3329 option-B and #2842 close decisions are recorded on-issue and in #2578's amended box 2
-**Main:** red — the latest completed run (253bc2a3e) failed only its Visual + AI-vision QA job, on 9 /data pages probed inside the 2026-08-31 P1 JSON-door window (INCIDENT_LOG row); its Deploy + smoke succeeded; the tip run f45ad6db6 is approved and in flight as the green proof
-**Incidents:** 2 rows added — the 7-second asset race (P3, 43 false reds, fixed #3349) and the /data door served as JSON for ~22 min (P1, self-inflicted, rollback re-ran the defect, fixed #3351)
+**Build beat:** 2026-08-31-the-rollback-learned-its-reach
+**Docs:** docs/DECISIONS.md (ADR-063 amendment via PR #3357; ADR-065 amendment via PR #3360), docs/PROPORTIONALITY.md (cfn-exec boundary row PR #3360; deploy-guardrails row amended PR #3358), infra/iam/README.md + docs/alarm_citations.json (PR #3364), docs/INCIDENT_LOG.md (+2 rows, this commit), docs/OPERATING_KNOWLEDGE_LEDGER.md (+3 rows, this commit)
+**Decisions:** none needed beyond the dated ADR amendments already landed in merged PRs — ADR-063 (off-AWS spend, #3357) and ADR-065 (boundary = braces, #3360); the #2578 Outcome amendment is recorded on-issue per the owner's #3329 option-B ruling
+**Main:** green (236f8d2b) — the tip run `cfb1a7e3c` (the peer's backup commits) was in flight at wrap with its Deploy lease steward-approved at 15:24Z; every earlier lease disposed by name
+**Incidents:** 2 rows added — the 4.9h stranded lease (caught by deploy-wedge-watch → remediation dispatch, P3) and the docs-only wrap line that redded every PR while main read green (P4)
 **Stash/hooks:** clean
-**Closures:** #2848, #3336, #3318, #3325, #3337, #3315, #2834, #3277, #3324, #3329, #2842, #2800 commented (Shipped + Outcome, live evidence on each); #3251, #3314, #3317, #3327 (Session L's, same UTC day) given the `**Outcome:**` marker over their existing verdicts · DoD: scanned 16, hits 2 — #3317 post-close-comment = Session L's own verdict posted +18m, benign; #3318 post-close-assertion = the closing comment quotes the sweep's own output containing "REOPENED", lexical not an assertion; #2848 dispositioned in the registry
-**Backlog:** Now 2 actionable (filed #3353, #3354 — lever 1 of the refill plan, both evidence-backed from tonight's residuals); NO REMEDY IN THE CORPUS for the third — the sanctioned walk's only pick is the Roadmap product pick #1407 (Monarch, ADR-099 ¶3 one-per-cycle), which is the owner's call, asked and not taken tonight; Later sweep — no stale Later issues printed
-**Alarms:** 4 red >72h, all cited — qa-smoke-warnings re-cited from closed #3337 to its self-clearing data cause (Withings scale gap, expiry 09-03 wrap); ai-tokens-platform-daily-total, compute-pipeline-stale, cost-metric-drift-sustained carry their standing citations
-**CI warnings:** none to triage — the latest completed main run is not green (incident-window visual QA, decoded on the Main line), so the warning triage keys on the last green run (bbd19b112, Deploy skipped) — no warning annotations there
-**Ledger:** rows added via the merged PRs — closure contract (#3341), gate-census posture (B) (#3348), additive-IAM gate (#3335); the two sync-script guards ride the existing site-deploy row
+**Closures:** #3354, #3353, #3352, #3340, #1631, #2578, #2799, #1080, #723, #1414, #3363 commented (Shipped + Outcome with live evidence on each; #3362 given its marker over the machinery's auto-close) · DoD: re-ran `scripts/closure_sweep.py --session` after commenting — scanned=28 hits=2, both pre-existing benign (#3317 = Session L's own verdict +18m; #3318 = lexical quote of the sweep's output), #2848 dispositioned in the registry
+**Backlog:** Now 1 actionable corpus-wide (#3365, sonnet, filed this session — the evidence-backed refill lever); fable-lane 0 — `backlog_next.py --refill-now --lane fable` verdict: the ONLY sanctioned pick is #1407 (ADR-099 ¶3 product pick, the owner's call — asked this session in the numbered asks, unanswered), then NO REMEDY IN THE CORPUS (9 Roadmap stories held by the one-per-cycle cap; unblock levers named on the plan); floor untouched. Later sweep — no stale Later issues printed
+**Alarms:** all cited — 3 red >72h carry standing citations (ai-tokens-platform-daily-total, compute-pipeline-stale, cost-metric-drift-sustained #2883); qa-smoke-warnings rides its self-clearing Withings-gap citation (expiry the 09-03 wrap); qa-smoke-failures citation PRUNED per its own dated note (OK since 08-28 14:05Z; PR #3364)
+**CI warnings:** 7 on 236f8d2b — six `Pending owner cdk deploy` (Web/Serve/Monitoring/Ingestion/Email/Compute) → filed #3365 with clean-window preconditions (plus the Operational ordering box from the peer's slice); Unit-Tests duration 2290s/1950s → deliberate no-action, measured: 11 same-day datapoints span 1198–2298s (92% wall-clock spread on near-identical trees, the #3265 queue-noise pattern) — acknowledged via `check_ci_warnings.py --decoded`
+**Ledger:** rows landed via merged PRs — the cfn-exec permissions-boundary row (PR #3360) and the deploy-guardrails row amended for the rollback scope-check + resolve job (PR #3358); no unledgered standing machinery from this session

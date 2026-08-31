@@ -146,6 +146,8 @@ output may already be live — leaving `main` both behind production and red.
 
 Source: #216, then the 2026-06-29 recurrence (`feedback_squash_merge_drops_unpushed_commits`).
 
+**A docs-only push can red every PR while main's badge stays green (#2899 class, 2026-08-31).** ci-cd.yml's `paths:` filter declines a docs/CLAUDE.md-only commit, so a tree-evaluated gate that the commit trips (the as-of-future-date budget scan, any doc-facts assertion) never runs on main — it runs on every PR's merge ref instead, as one identical red across unrelated PRs. The wrap runs `pytest tests/test_doc_facts_budget_2899.py -q` on the FINAL tree before committing; at boot, several PRs sharing ONE failing test means suspect main's docs-only tail first. `check_main_green`'s GREEN plus a path-filter-skip HEAD vouches for an untested tree, not a clean one.
+
 ## 4. CI gate ordering — one job, independently-reporting gates
 
 CI's `Lint + Syntax Check` job runs its gates in order —
@@ -701,6 +703,10 @@ where an operator will be standing when they hit them.
    `surface_gate_lease_holder` (`deploy/lib/deploy_gate_lease.sh`) on that branch: it
    enumerates every `waiting` run with no recency bound and names the holder, or says
    plainly that nothing holds the lease and points at `check_deploy_wedge.py`.
+
+**A dark-flag waiver's reason rots when the reach GROWS (#3315/#3361, 2026-08-31).** A lane that makes a new import reachable from a CI-invoked script must grep `scripts/ci_dark_flag_sweep.py`'s `ALLOWED_ABSENT` entries for that dist and delete or re-scope the waiver in the same PR — the liveness test proves waivers dead (reach gone or dist installed), never reasons true, so a stale reason ships a fallback that prints 'unavailable' on the wire while every run stays green. The sweep's `N stale waiver(s)` line is a finding, not noise.
+
+**One lease steward per session, and it must OUTLIVE the tip (#2467 recurrence, 2026-08-31).** A gate watcher that exits after actioning the current tip leaves the NEXT merge's lease unwatched — measured: 4.9h stranded, caught by deploy-wedge-watch dispatching the remediation agent, not by the operator. Run ONE persistent steward for the whole session (reject any waiting run whose sha is a proper ancestor of origin/main, with a decode; approve the run AT the tip; print anything else as UNKNOWN), and stop it only at wrap after the last lease is disposed. `watch_deploy_gate.sh` alone is not this — it approves by age and would approve an ancestor after the tip.
 
 #### The recurrence ledger — five wedges, four fixes, what each one bought
 

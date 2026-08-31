@@ -3424,6 +3424,21 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3351"
         }
       ]
+    },
+    {
+      "id": "2026-08-31-the-rollback-learned-its-reach",
+      "date": "2026-08-31",
+      "title": "The site's auto-rollback learned what it cannot fix",
+      "shipped": "The public site's automatic rollback used to have one answer to any failed post-deploy check: revert the static files and report success. Now it first classifies WHICH surface actually failed — the page shells, a hashed asset, the API data behind the page, or the deploy script's own behaviour — and it declines to roll back what a file revert cannot reach, raising a tracked alert instead. The decline path was proven live: a deliberately injected API-class failure made the gate go red, and the rollback printed its refusal, touched nothing, and filed the alert — which the next clean deploy auto-closed.",
+      "why_it_mattered": "Twice this month the old rollback did real damage while reporting success: it deleted a wanted release over a database-side defect it couldn't touch, and — the night before this fix — it re-ran the exact deploy-script bug that had just broken 20 pages, breaking them a second time. A recovery mechanism that acts outside its reach is worse than none, because its green checkmark ends the investigation. A rollback that can say 'this failure is not mine to fix' turns a false all-clear into a named, routable problem.",
+      "gotcha": "Proving the decline path needed a failure on demand, so the deploy workflow gained a dispatch-only switch that injects one synthetic failed page — push events structurally cannot set it. The subtle part was plumbing the verdict out of a FAILED CI job: job outputs from a failed job are documented to work, but nobody here had relied on it, and the whole feature degrades to the old behaviour if that plumbing is ever empty. The live injection run settled it for real.",
+      "honest_miss": "The plain HTTP smoke check still triggers a revert-always rollback — it emits prose, not a classifiable report, and taming it was deliberately left out of scope. And unknown failure text defaults to 'roll back, as before': the safe direction, but it means the classifier only ever narrows the blunt instrument, never silently widens it — new failure shapes must be taught by hand.",
+      "prs": [
+        {
+          "label": "PR #3358",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3358"
+        }
+      ]
     }
   ]
 }
