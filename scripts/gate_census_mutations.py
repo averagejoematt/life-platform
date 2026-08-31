@@ -222,6 +222,21 @@ _UNREGISTERED_DIRECTION_SURFACE_PY = (
     "    return classify_delta(lost_lbs)\n"
 )
 
+# #3336: a deploy/ apply script carrying an inline IAM policy document for a role that has a
+# checked-in infra/iam/*.json twin — the exact shape of the 2026-08-30 incident, where the
+# stale shell copy was the one that ran and widened the remediation role's trust for ~6 min.
+# Planted UNTRACKED because the guard sweeps deploy/ on disk (rglob), not the index.
+_IAM_TWIN_SH = (
+    "#!/usr/bin/env bash\n"
+    "# census probe 2999 (IAM twin)\n"
+    'ROLE="github-actions-remediation-role"\n'
+    "PERM=$(cat <<JSON\n"
+    '{"Version":"2012-10-17","Statement":[{"Sid":"Bedrock","Effect":"Allow","Action":"bedrock:InvokeModel","Resource":"*"}]}\n'
+    "JSON\n"
+    ")\n"
+    'aws iam put-role-policy --role-name "$ROLE" --policy-name remediation-permissions --policy-document "$PERM"\n'
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_no_conflict_markers.py": MutationSpec(
         gate_id="structural::test_no_conflict_markers.py",
@@ -346,6 +361,16 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         plants=(("lambdas/web/_census_probe_2999.py", _UNREGISTERED_DIRECTION_SURFACE_PY),),
         track=False,
     ),
+    "structural::test_iam_twin_free_3336.py": MutationSpec(
+        gate_id="structural::test_iam_twin_free_3336.py",
+        target="tests/test_iam_twin_free_3336.py",
+        detects=(
+            "a deploy/ script embedding an IAM policy document for a role whose canonical document is a "
+            "checked-in infra/iam/*.json — the hand-maintained twin that ran stale on 2026-08-30 (#3336)"
+        ),
+        plants=(("deploy/_census_probe_2999.sh", _IAM_TWIN_SH),),
+        track=False,
+    ),
 }
 
 
@@ -404,6 +429,17 @@ def _proof(gate_id: str, observed: str, scope: str, proved_on: str = _PROVED_ON)
 
 
 STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
+    "structural::test_iam_twin_free_3336.py": _proof(
+        "structural::test_iam_twin_free_3336.py",
+        "baseline: 16 passed | mutated: 1 failed, 15 passed :: test_no_deploy_script_embeds_a_policy_document_for_a_governed_role | reverted: 16 passed",
+        "deploy/ on disk (rglob, .sh + .py), so an UNTRACKED twin is in scope. A document counts only when "
+        'it carries the `"Version": "2012-10-17"` literal AND a Statement AND an Effect AND names a role '
+        "that has an infra/iam/<role>.*.json — a twin for an ungoverned Lambda exec role, a policy the "
+        "script merely READS, or a document assembled from variables without the version literal is "
+        "invisible. A twin outside deploy/ (scripts/, cdk/) is out of scope by design: the verifier's ROLES "
+        "set is the governed set and deploy/ is the only apply surface.",
+        proved_on="2026-08-31",
+    ),
     "structural::test_no_conflict_markers.py": _proof(
         "structural::test_no_conflict_markers.py",
         "baseline: 6 passed | mutated: 1 failed, 5 passed :: test_no_unresolved_conflict_markers_in_tracked_files | reverted: 6 passed",
