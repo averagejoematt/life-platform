@@ -484,9 +484,14 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # test_ci_dark_flag_sweep_3315.py`: ARMED 1/1, planted probe workflow carrying the
         # pre-#3315 fresh-eyes install line). The 45th was #3336's twin guard, landed via
         # PR #3338 the same night, also ARMED 1/1.
+        # Upper bound raised 46 → 47 (2026-08-31, #2834): the 47th proof is
+        # `guard::deploy/iam_additive_gate.py` — a two-direction mutation recorded in
+        # gate_census_proofs.GUARD_PROOFS (six defects planted one at a time into a copy of
+        # the committed synth slice → exit 1/1/1/1/2; clean baseline and revert exit 0; the
+        # 2026-08-14 grant still ALLOW-ADDITIVE). Stacked on #3315's 46th.
         3
         <= len(proven)
-        <= 46
+        <= 47
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
