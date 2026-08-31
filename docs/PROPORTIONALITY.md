@@ -71,6 +71,7 @@ magnitude **and points at the wrong namespaces** (`LifePlatform/SiteAPI`: 288 se
 active — `LifePlatform/IngestLiveness`: 27 series, 22 active).
 
 - EMF census: 2026-08-23 — 703 series / 30 namespaces live (14d), 102 active (PT3H sample, n=1); 0 over budget, 0 unregistered, 2 live-orphan
+- EMF census: 2026-08-31 — 590 series / 30 namespaces live (14d), 204 active (PT3H sample, n=1); 0 over budget, 0 unregistered, 2 live-orphan
 
 ## Active ledger
 
