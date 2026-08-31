@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/calibration",
   "is_prefix_sample": false,
   "path": "/api/calibration",
@@ -26,409 +26,111 @@
         "type": "string"
       },
       "coaches": {
-        "items": [
-          {
-            "keys": {
-              "accuracy_pct": {
-                "type": "null"
-              },
-              "brier": {
-                "type": "null"
-              },
-              "brier_skill": {
-                "type": "null"
-              },
-              "calibration": {
-                "type": "string"
-              },
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confirmed": {
-                "type": "integer"
-              },
-              "label": {
-                "type": "string"
-              },
-              "lifetime": {
-                "keys": {
-                  "accuracy_pct": {
-                    "type": "number"
-                  },
-                  "brier": {
-                    "type": "number"
-                  },
-                  "brier_skill": {
-                    "type": "null"
-                  },
-                  "calibration": {
-                    "type": "string"
-                  },
-                  "confirmed": {
-                    "type": "integer"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "n": {
-                    "type": "integer"
-                  },
-                  "refuted": {
-                    "type": "integer"
-                  },
-                  "reliability_bins": {
-                    "items": {
-                      "keys": {
-                        "hi": {
-                          "type": "number"
-                        },
-                        "lo": {
-                          "type": "number"
-                        },
-                        "mean_confidence": {
-                          "type": "number"
-                        },
-                        "n": {
-                          "type": "integer"
-                        },
-                        "observed_rate": {
-                          "type": "number"
-                        }
+        "items": {
+          "keys": {
+            "accuracy_pct": {
+              "type": "null"
+            },
+            "brier": {
+              "type": "null"
+            },
+            "brier_skill": {
+              "type": "null"
+            },
+            "calibration": {
+              "type": "string"
+            },
+            "coach_id": {
+              "type": "string"
+            },
+            "coach_name": {
+              "type": "string"
+            },
+            "confirmed": {
+              "type": "integer"
+            },
+            "label": {
+              "type": "string"
+            },
+            "lifetime": {
+              "keys": {
+                "accuracy_pct": {
+                  "type": "number"
+                },
+                "brier": {
+                  "type": "number"
+                },
+                "brier_skill": {
+                  "type": "null"
+                },
+                "calibration": {
+                  "type": "string"
+                },
+                "confirmed": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "n": {
+                  "type": "integer"
+                },
+                "refuted": {
+                  "type": "integer"
+                },
+                "reliability_bins": {
+                  "items": {
+                    "keys": {
+                      "hi": {
+                        "type": "number"
                       },
-                      "type": "object"
-                    },
-                    "length_sample": 2,
-                    "type": "array"
-                  },
-                  "score": {
-                    "type": "integer"
-                  },
-                  "skilled": {
-                    "type": "null"
-                  }
-                },
-                "type": "object"
-              },
-              "n": {
-                "type": "integer"
-              },
-              "refuted": {
-                "type": "integer"
-              },
-              "reliability_bins": {
-                "items": null,
-                "length_sample": 0,
-                "type": "array"
-              },
-              "score": {
-                "type": "integer"
-              },
-              "skilled": {
-                "type": "null"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "accuracy_pct": {
-                "type": "null"
-              },
-              "brier": {
-                "type": "null"
-              },
-              "brier_skill": {
-                "type": "null"
-              },
-              "calibration": {
-                "type": "string"
-              },
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confirmed": {
-                "type": "integer"
-              },
-              "label": {
-                "type": "string"
-              },
-              "lifetime": {
-                "keys": {
-                  "accuracy_pct": {
-                    "type": "number"
-                  },
-                  "brier": {
-                    "type": "number"
-                  },
-                  "brier_skill": {
-                    "type": "null"
-                  },
-                  "calibration": {
-                    "type": "string"
-                  },
-                  "confirmed": {
-                    "type": "integer"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "n": {
-                    "type": "integer"
-                  },
-                  "refuted": {
-                    "type": "integer"
-                  },
-                  "reliability_bins": {
-                    "items": {
-                      "keys": {
-                        "hi": {
-                          "type": "number"
-                        },
-                        "lo": {
-                          "type": "number"
-                        },
-                        "mean_confidence": {
-                          "type": "number"
-                        },
-                        "n": {
-                          "type": "integer"
-                        },
-                        "observed_rate": {
-                          "type": "number"
-                        }
+                      "lo": {
+                        "type": "number"
                       },
-                      "type": "object"
-                    },
-                    "length_sample": 1,
-                    "type": "array"
-                  },
-                  "score": {
-                    "type": "integer"
-                  },
-                  "skilled": {
-                    "type": "null"
-                  }
-                },
-                "type": "object"
-              },
-              "n": {
-                "type": "integer"
-              },
-              "refuted": {
-                "type": "integer"
-              },
-              "reliability_bins": {
-                "items": null,
-                "length_sample": 0,
-                "type": "array"
-              },
-              "score": {
-                "type": "integer"
-              },
-              "skilled": {
-                "type": "null"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "accuracy_pct": {
-                "type": "null"
-              },
-              "brier": {
-                "type": "null"
-              },
-              "brier_skill": {
-                "type": "null"
-              },
-              "calibration": {
-                "type": "string"
-              },
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confirmed": {
-                "type": "integer"
-              },
-              "label": {
-                "type": "string"
-              },
-              "lifetime": {
-                "keys": {
-                  "accuracy_pct": {
-                    "type": "number"
-                  },
-                  "brier": {
-                    "type": "number"
-                  },
-                  "brier_skill": {
-                    "type": "number"
-                  },
-                  "calibration": {
-                    "type": "string"
-                  },
-                  "confirmed": {
-                    "type": "integer"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "n": {
-                    "type": "integer"
-                  },
-                  "refuted": {
-                    "type": "integer"
-                  },
-                  "reliability_bins": {
-                    "items": {
-                      "keys": {
-                        "hi": {
-                          "type": "number"
-                        },
-                        "lo": {
-                          "type": "number"
-                        },
-                        "mean_confidence": {
-                          "type": "number"
-                        },
-                        "n": {
-                          "type": "integer"
-                        },
-                        "observed_rate": {
-                          "type": "number"
-                        }
+                      "mean_confidence": {
+                        "type": "number"
                       },
-                      "type": "object"
+                      "n": {
+                        "type": "integer"
+                      },
+                      "observed_rate": {
+                        "type": "number"
+                      }
                     },
-                    "length_sample": 1,
-                    "type": "array"
+                    "type": "object"
                   },
-                  "score": {
-                    "type": "integer"
-                  },
-                  "skilled": {
-                    "type": "boolean"
-                  }
+                  "length_sample": 2,
+                  "type": "array"
                 },
-                "type": "object"
+                "score": {
+                  "type": "integer"
+                },
+                "skilled": {
+                  "type": "null"
+                }
               },
-              "n": {
-                "type": "integer"
-              },
-              "refuted": {
-                "type": "integer"
-              },
-              "reliability_bins": {
-                "items": null,
-                "length_sample": 0,
-                "type": "array"
-              },
-              "score": {
-                "type": "integer"
-              },
-              "skilled": {
-                "type": "null"
-              }
+              "type": "object"
             },
-            "type": "object"
+            "n": {
+              "type": "integer"
+            },
+            "refuted": {
+              "type": "integer"
+            },
+            "reliability_bins": {
+              "items": null,
+              "length_sample": 0,
+              "type": "array"
+            },
+            "score": {
+              "type": "integer"
+            },
+            "skilled": {
+              "type": "null"
+            }
           },
-          {
-            "keys": {
-              "accuracy_pct": {
-                "type": "null"
-              },
-              "brier": {
-                "type": "null"
-              },
-              "brier_skill": {
-                "type": "null"
-              },
-              "calibration": {
-                "type": "string"
-              },
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confirmed": {
-                "type": "integer"
-              },
-              "label": {
-                "type": "string"
-              },
-              "lifetime": {
-                "keys": {
-                  "accuracy_pct": {
-                    "type": "null"
-                  },
-                  "brier": {
-                    "type": "null"
-                  },
-                  "brier_skill": {
-                    "type": "null"
-                  },
-                  "calibration": {
-                    "type": "string"
-                  },
-                  "confirmed": {
-                    "type": "integer"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "n": {
-                    "type": "integer"
-                  },
-                  "refuted": {
-                    "type": "integer"
-                  },
-                  "reliability_bins": {
-                    "items": null,
-                    "length_sample": 0,
-                    "type": "array"
-                  },
-                  "score": {
-                    "type": "integer"
-                  },
-                  "skilled": {
-                    "type": "null"
-                  }
-                },
-                "type": "object"
-              },
-              "n": {
-                "type": "integer"
-              },
-              "refuted": {
-                "type": "integer"
-              },
-              "reliability_bins": {
-                "items": null,
-                "length_sample": 0,
-                "type": "array"
-              },
-              "score": {
-                "type": "integer"
-              },
-              "skilled": {
-                "type": "null"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 8,
         "type": "array"
       },

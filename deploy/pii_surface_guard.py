@@ -333,10 +333,12 @@ def iter_payload_keys(node, path="$"):
 def iter_shape_keys(node, path="$"):
     """Yield (json_path, key) for every payload key in a captured json_shape tree
     (tests/api_schemas/*.json — shape metadata words like 'type'/'keys'/'items'/
-    'length_sample' are structure, not payload keys)."""
+    'length_sample'/'optional' are structure, not payload keys — 'optional' is
+    the #3354 array-union per-key optionality marker, a list of key NAMES, not
+    a shape node)."""
     if isinstance(node, dict):
         for k, v in node.items():
-            if k in ("keys", "items", "type", "length_sample"):
+            if k in ("keys", "items", "type", "length_sample", "optional"):
                 yield from iter_shape_keys(v, path)
             else:
                 p = f"{path}.{k}"

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/wrong",
   "is_prefix_sample": false,
   "path": "/api/wrong",
@@ -117,65 +117,26 @@
             "type": "integer"
           },
           "recent": {
-            "items": [
-              {
-                "keys": {
-                  "archival": {
-                    "type": "null"
-                  },
-                  "coach": {
-                    "type": "string"
-                  },
-                  "date": {
-                    "type": "string"
-                  },
-                  "severity": {
-                    "type": "string"
-                  },
-                  "what": {
-                    "type": "string"
-                  }
+            "items": {
+              "keys": {
+                "archival": {
+                  "type": "null"
                 },
-                "type": "object"
+                "coach": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string"
+                },
+                "what": {
+                  "type": "string"
+                }
               },
-              {
-                "keys": {
-                  "archival": {
-                    "keys": {
-                      "cycle": {
-                        "type": "null"
-                      },
-                      "days_before": {
-                        "type": "integer"
-                      },
-                      "genesis": {
-                        "type": "string"
-                      },
-                      "label": {
-                        "type": "string"
-                      },
-                      "pre_cycle": {
-                        "type": "boolean"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "coach": {
-                    "type": "string"
-                  },
-                  "date": {
-                    "type": "string"
-                  },
-                  "severity": {
-                    "type": "string"
-                  },
-                  "what": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            ],
+              "type": "object"
+            },
             "length_sample": 4,
             "type": "array"
           }

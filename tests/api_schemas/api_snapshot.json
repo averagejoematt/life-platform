@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/snapshot",
   "is_prefix_sample": false,
   "path": "/api/snapshot",
@@ -295,769 +295,140 @@
             "type": "object"
           },
           "pillars": {
-            "items": [
-              {
-                "keys": {
-                  "absent_behaviors": {
-                    "items": null,
-                    "length_sample": 0,
-                    "type": "array"
-                  },
-                  "coverage_hold": {
-                    "type": "boolean"
-                  },
-                  "data_coverage": {
-                    "type": "number"
-                  },
-                  "drivers": {
-                    "keys": {
-                      "absent": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
+            "items": {
+              "keys": {
+                "absence": {
+                  "keys": {
+                    "absent_behaviors": {
+                      "items": {
+                        "type": "string"
                       },
-                      "dragging": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "no_data": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "top": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      }
+                      "length_sample": 4,
+                      "type": "array"
                     },
-                    "type": "object"
-                  },
-                  "emoji": {
-                    "type": "string"
-                  },
-                  "level": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "neglect_decay": {
-                    "type": "null"
-                  },
-                  "not_instrumented": {
-                    "type": "boolean"
-                  },
-                  "not_instrumented_note": {
-                    "type": "null"
-                  },
-                  "raw_score": {
-                    "type": "number"
-                  },
-                  "score_delta": {
-                    "type": "number"
-                  },
-                  "tier": {
-                    "type": "string"
-                  },
-                  "xp_debt": {
-                    "type": "number"
-                  },
-                  "xp_delta": {
-                    "type": "number"
-                  },
-                  "xp_earned": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "absence": {
-                    "keys": {
-                      "absent_behaviors": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "dark_sources": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 1,
-                        "type": "array"
-                      },
-                      "days_dark": {
-                        "type": "integer"
-                      },
-                      "days_since_last_log": {
-                        "type": "integer"
-                      },
-                      "last_log_date": {
+                    "dark_sources": {
+                      "items": {
                         "type": "string"
                       },
-                      "sources": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "stale_hours": {
-                        "type": "integer"
-                      },
-                      "state": {
-                        "type": "string"
-                      },
-                      "transition": {
-                        "type": "string"
-                      }
+                      "length_sample": 1,
+                      "type": "array"
                     },
-                    "type": "object"
-                  },
-                  "absent_behaviors": {
-                    "items": null,
-                    "length_sample": 0,
-                    "type": "array"
-                  },
-                  "coverage_hold": {
-                    "type": "boolean"
-                  },
-                  "data_coverage": {
-                    "type": "number"
-                  },
-                  "drivers": {
-                    "keys": {
-                      "absent": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "dragging": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "no_data": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "top": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      }
+                    "days_dark": {
+                      "type": "integer"
                     },
-                    "type": "object"
-                  },
-                  "emoji": {
-                    "type": "string"
-                  },
-                  "level": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "neglect_decay": {
-                    "type": "null"
-                  },
-                  "not_instrumented": {
-                    "type": "boolean"
-                  },
-                  "not_instrumented_note": {
-                    "type": "null"
-                  },
-                  "raw_score": {
-                    "type": "number"
-                  },
-                  "score_delta": {
-                    "type": "number"
-                  },
-                  "tier": {
-                    "type": "string"
-                  },
-                  "xp_debt": {
-                    "type": "number"
-                  },
-                  "xp_delta": {
-                    "type": "number"
-                  },
-                  "xp_earned": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "absence": {
-                    "keys": {
-                      "absent_behaviors": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 4,
-                        "type": "array"
-                      },
-                      "dark_sources": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 1,
-                        "type": "array"
-                      },
-                      "days_dark": {
-                        "type": "integer"
-                      },
-                      "days_since_last_log": {
-                        "type": "null"
-                      },
-                      "last_log_date": {
-                        "type": "string"
-                      },
-                      "sources": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 1,
-                        "type": "array"
-                      },
-                      "stale_hours": {
-                        "type": "integer"
-                      },
-                      "state": {
-                        "type": "string"
-                      },
-                      "transition": {
-                        "type": "string"
-                      }
+                    "days_since_last_log": {
+                      "type": "integer"
                     },
-                    "type": "object"
-                  },
-                  "absent_behaviors": {
-                    "items": {
+                    "last_log_date": {
                       "type": "string"
                     },
-                    "length_sample": 4,
-                    "type": "array"
-                  },
-                  "coverage_hold": {
-                    "type": "boolean"
-                  },
-                  "data_coverage": {
-                    "type": "number"
-                  },
-                  "drivers": {
-                    "keys": {
-                      "absent": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 4,
-                        "type": "array"
-                      },
-                      "dragging": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 1,
-                        "type": "array"
-                      },
-                      "no_data": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "top": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "emoji": {
-                    "type": "string"
-                  },
-                  "level": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "neglect_decay": {
-                    "keys": {
-                      "applied": {
-                        "type": "boolean"
-                      },
-                      "gap_days": {
-                        "type": "number"
-                      },
-                      "multiplier": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "not_instrumented": {
-                    "type": "boolean"
-                  },
-                  "not_instrumented_note": {
-                    "type": "null"
-                  },
-                  "raw_score": {
-                    "type": "number"
-                  },
-                  "score_delta": {
-                    "type": "number"
-                  },
-                  "tier": {
-                    "type": "string"
-                  },
-                  "xp_debt": {
-                    "type": "number"
-                  },
-                  "xp_delta": {
-                    "type": "number"
-                  },
-                  "xp_earned": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "absent_behaviors": {
-                    "items": null,
-                    "length_sample": 0,
-                    "type": "array"
-                  },
-                  "coverage_hold": {
-                    "type": "boolean"
-                  },
-                  "data_coverage": {
-                    "type": "number"
-                  },
-                  "drivers": {
-                    "keys": {
-                      "absent": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "dragging": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 1,
-                        "type": "array"
-                      },
-                      "no_data": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 3,
-                        "type": "array"
-                      },
-                      "top": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "emoji": {
-                    "type": "string"
-                  },
-                  "level": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "neglect_decay": {
-                    "type": "null"
-                  },
-                  "not_instrumented": {
-                    "type": "boolean"
-                  },
-                  "not_instrumented_note": {
-                    "type": "null"
-                  },
-                  "raw_score": {
-                    "type": "number"
-                  },
-                  "score_delta": {
-                    "type": "number"
-                  },
-                  "tier": {
-                    "type": "string"
-                  },
-                  "xp_debt": {
-                    "type": "number"
-                  },
-                  "xp_delta": {
-                    "type": "number"
-                  },
-                  "xp_earned": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "absence": {
-                    "keys": {
-                      "absent_behaviors": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "dark_sources": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 1,
-                        "type": "array"
-                      },
-                      "days_dark": {
-                        "type": "integer"
-                      },
-                      "days_since_last_log": {
-                        "type": "null"
-                      },
-                      "last_log_date": {
+                    "sources": {
+                      "items": {
                         "type": "string"
                       },
-                      "sources": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 1,
-                        "type": "array"
-                      },
-                      "stale_hours": {
-                        "type": "integer"
-                      },
-                      "state": {
-                        "type": "string"
-                      },
-                      "transition": {
-                        "type": "string"
-                      }
+                      "length_sample": 2,
+                      "type": "array"
                     },
-                    "type": "object"
-                  },
-                  "absent_behaviors": {
-                    "items": {
+                    "stale_hours": {
+                      "type": "integer"
+                    },
+                    "state": {
                       "type": "string"
                     },
-                    "length_sample": 2,
-                    "type": "array"
+                    "transition": {
+                      "type": "string"
+                    }
                   },
-                  "coverage_hold": {
-                    "type": "boolean"
-                  },
-                  "data_coverage": {
-                    "type": "number"
-                  },
-                  "drivers": {
-                    "keys": {
-                      "absent": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "dragging": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "no_data": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 3,
-                        "type": "array"
-                      },
-                      "top": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "emoji": {
-                    "type": "string"
-                  },
-                  "level": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "neglect_decay": {
-                    "keys": {
-                      "applied": {
-                        "type": "boolean"
-                      },
-                      "gap_days": {
-                        "type": "number"
-                      },
-                      "multiplier": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "not_instrumented": {
-                    "type": "boolean"
-                  },
-                  "not_instrumented_note": {
-                    "type": "null"
-                  },
-                  "raw_score": {
-                    "type": "number"
-                  },
-                  "score_delta": {
-                    "type": "number"
-                  },
-                  "tier": {
-                    "type": "string"
-                  },
-                  "xp_debt": {
-                    "type": "number"
-                  },
-                  "xp_delta": {
-                    "type": "number"
-                  },
-                  "xp_earned": {
-                    "type": "number"
-                  }
+                  "type": "object"
                 },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "absent_behaviors": {
-                    "items": null,
-                    "length_sample": 0,
-                    "type": "array"
-                  },
-                  "coverage_hold": {
-                    "type": "boolean"
-                  },
-                  "data_coverage": {
-                    "type": "number"
-                  },
-                  "drivers": {
-                    "keys": {
-                      "absent": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "dragging": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "no_data": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 3,
-                        "type": "array"
-                      },
-                      "top": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "emoji": {
+                "absent_behaviors": {
+                  "items": {
                     "type": "string"
                   },
-                  "level": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "neglect_decay": {
-                    "type": "null"
-                  },
-                  "not_instrumented": {
-                    "type": "boolean"
-                  },
-                  "not_instrumented_note": {
-                    "type": "string"
-                  },
-                  "raw_score": {
-                    "type": "number"
-                  },
-                  "score_delta": {
-                    "type": "number"
-                  },
-                  "tier": {
-                    "type": "string"
-                  },
-                  "xp_debt": {
-                    "type": "number"
-                  },
-                  "xp_delta": {
-                    "type": "number"
-                  },
-                  "xp_earned": {
-                    "type": "number"
-                  }
+                  "length_sample": 4,
+                  "type": "array"
                 },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "absence": {
-                    "keys": {
-                      "absent_behaviors": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "dark_sources": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "days_dark": {
-                        "type": "null"
-                      },
-                      "days_since_last_log": {
-                        "type": "null"
-                      },
-                      "last_log_date": {
+                "coverage_hold": {
+                  "type": "boolean"
+                },
+                "data_coverage": {
+                  "type": "number"
+                },
+                "drivers": {
+                  "keys": {
+                    "absent": {
+                      "items": {
                         "type": "string"
                       },
-                      "sources": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "stale_hours": {
-                        "type": "null"
-                      },
-                      "state": {
+                      "length_sample": 4,
+                      "type": "array"
+                    },
+                    "dragging": {
+                      "items": {
                         "type": "string"
                       },
-                      "transition": {
-                        "type": "null"
-                      }
+                      "length_sample": 2,
+                      "type": "array"
                     },
-                    "type": "object"
-                  },
-                  "absent_behaviors": {
-                    "items": null,
-                    "length_sample": 0,
-                    "type": "array"
-                  },
-                  "coverage_hold": {
-                    "type": "boolean"
-                  },
-                  "data_coverage": {
-                    "type": "number"
-                  },
-                  "drivers": {
-                    "keys": {
-                      "absent": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
+                    "no_data": {
+                      "items": {
+                        "type": "string"
                       },
-                      "dragging": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      },
-                      "no_data": {
-                        "items": null,
-                        "length_sample": 0,
-                        "type": "array"
-                      },
-                      "top": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "length_sample": 2,
-                        "type": "array"
-                      }
+                      "length_sample": 3,
+                      "type": "array"
                     },
-                    "type": "object"
+                    "top": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "length_sample": 2,
+                      "type": "array"
+                    }
                   },
-                  "emoji": {
-                    "type": "string"
-                  },
-                  "level": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "neglect_decay": {
-                    "type": "null"
-                  },
-                  "not_instrumented": {
-                    "type": "boolean"
-                  },
-                  "not_instrumented_note": {
-                    "type": "null"
-                  },
-                  "raw_score": {
-                    "type": "number"
-                  },
-                  "score_delta": {
-                    "type": "number"
-                  },
-                  "tier": {
-                    "type": "string"
-                  },
-                  "xp_debt": {
-                    "type": "number"
-                  },
-                  "xp_delta": {
-                    "type": "number"
-                  },
-                  "xp_earned": {
-                    "type": "number"
-                  }
+                  "type": "object"
                 },
-                "type": "object"
-              }
-            ],
+                "emoji": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "neglect_decay": {
+                  "type": "null"
+                },
+                "not_instrumented": {
+                  "type": "boolean"
+                },
+                "not_instrumented_note": {
+                  "type": "null"
+                },
+                "raw_score": {
+                  "type": "number"
+                },
+                "score_delta": {
+                  "type": "number"
+                },
+                "tier": {
+                  "type": "string"
+                },
+                "xp_debt": {
+                  "type": "number"
+                },
+                "xp_delta": {
+                  "type": "number"
+                },
+                "xp_earned": {
+                  "type": "number"
+                }
+              },
+              "optional": [
+                "absence"
+              ],
+              "type": "object"
+            },
             "length_sample": 7,
             "type": "array"
           }

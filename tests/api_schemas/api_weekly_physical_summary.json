@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/weekly_physical_summary",
   "is_prefix_sample": false,
   "path": "/api/weekly_physical_summary",
@@ -23,62 +23,38 @@
         "type": "object"
       },
       "days": {
-        "items": [
-          {
-            "keys": {
-              "activities": {
-                "items": null,
-                "length_sample": 0,
-                "type": "array"
-              },
-              "date": {
-                "type": "string"
-              },
-              "day_of_week": {
-                "type": "string"
-              },
-              "steps": {
-                "type": "integer"
-              },
-              "total_active_minutes": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "activities": {
-                "items": {
-                  "keys": {
-                    "minutes": {
-                      "type": "integer"
-                    },
-                    "type": {
-                      "type": "string"
-                    }
+        "items": {
+          "keys": {
+            "activities": {
+              "items": {
+                "keys": {
+                  "minutes": {
+                    "type": "integer"
                   },
-                  "type": "object"
+                  "type": {
+                    "type": "string"
+                  }
                 },
-                "length_sample": 3,
-                "type": "array"
+                "type": "object"
               },
-              "date": {
-                "type": "string"
-              },
-              "day_of_week": {
-                "type": "string"
-              },
-              "steps": {
-                "type": "integer"
-              },
-              "total_active_minutes": {
-                "type": "integer"
-              }
+              "length_sample": 3,
+              "type": "array"
             },
-            "type": "object"
-          }
-        ],
+            "date": {
+              "type": "string"
+            },
+            "day_of_week": {
+              "type": "string"
+            },
+            "steps": {
+              "type": "integer"
+            },
+            "total_active_minutes": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
         "length_sample": 7,
         "type": "array"
       }

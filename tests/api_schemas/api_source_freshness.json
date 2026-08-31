@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/source_freshness",
   "is_prefix_sample": false,
   "path": "/api/source_freshness",
@@ -37,258 +37,123 @@
         "type": "string"
       },
       "sources": {
-        "items": [
-          {
-            "keys": {
-              "age_hours": {
-                "type": "number"
-              },
-              "category": {
-                "type": "string"
-              },
-              "desc": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "is_behavioral": {
-                "type": "boolean"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_update": {
-                "type": "string"
-              },
-              "last_update_ts": {
-                "type": "string"
-              },
-              "stale_hours": {
-                "type": "integer"
-              },
-              "status": {
-                "type": "string"
-              }
+        "items": {
+          "keys": {
+            "age_hours": {
+              "type": "number"
             },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "age_hours": {
-                "type": "number"
-              },
-              "capture_channel": {
-                "type": "string"
-              },
-              "category": {
-                "type": "string"
-              },
-              "dark_datatypes": {
-                "items": {
-                  "keys": {
-                    "days_dark": {
-                      "type": "number"
-                    },
-                    "label": {
-                      "type": "string"
-                    },
-                    "manual": {
-                      "type": "boolean"
-                    }
+            "capture_channel": {
+              "type": "string"
+            },
+            "carried": {
+              "type": "boolean"
+            },
+            "carried_from_cycle": {
+              "type": "integer"
+            },
+            "category": {
+              "type": "string"
+            },
+            "dark_datatypes": {
+              "items": {
+                "keys": {
+                  "days_dark": {
+                    "type": "number"
                   },
-                  "type": "object"
-                },
-                "length_sample": 4,
-                "type": "array"
-              },
-              "datatypes": {
-                "items": {
-                  "keys": {
-                    "age_days": {
-                      "type": "number"
-                    },
-                    "dark": {
-                      "type": "boolean"
-                    },
-                    "key": {
-                      "type": "string"
-                    },
-                    "label": {
-                      "type": "string"
-                    },
-                    "last_seen": {
-                      "type": "string"
-                    },
-                    "manual": {
-                      "type": "boolean"
-                    },
-                    "stale_days": {
-                      "type": "number"
-                    }
+                  "label": {
+                    "type": "string"
                   },
-                  "type": "object"
+                  "manual": {
+                    "type": "boolean"
+                  }
                 },
-                "length_sample": 6,
-                "type": "array"
+                "type": "object"
               },
-              "desc": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "is_behavioral": {
-                "type": "boolean"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_update": {
-                "type": "string"
-              },
-              "last_update_ahead_of_pt": {
-                "type": "boolean"
-              },
-              "last_update_frame": {
-                "type": "string"
-              },
-              "last_update_ts": {
-                "type": "string"
-              },
-              "manual": {
-                "type": "boolean"
-              },
-              "stale_hours": {
-                "type": "integer"
-              },
-              "status": {
-                "type": "string"
-              }
+              "length_sample": 4,
+              "type": "array"
             },
-            "type": "object"
+            "datatypes": {
+              "items": {
+                "keys": {
+                  "age_days": {
+                    "type": "number"
+                  },
+                  "dark": {
+                    "type": "boolean"
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "last_seen": {
+                    "type": "string"
+                  },
+                  "manual": {
+                    "type": "boolean"
+                  },
+                  "stale_days": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 6,
+              "type": "array"
+            },
+            "days_dark": {
+              "type": "integer"
+            },
+            "desc": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "is_behavioral": {
+              "type": "boolean"
+            },
+            "label": {
+              "type": "string"
+            },
+            "last_update": {
+              "type": "string"
+            },
+            "last_update_ahead_of_pt": {
+              "type": "boolean"
+            },
+            "last_update_frame": {
+              "type": "string"
+            },
+            "last_update_ts": {
+              "type": "string"
+            },
+            "manual": {
+              "type": "boolean"
+            },
+            "stale_hours": {
+              "type": "integer"
+            },
+            "status": {
+              "type": "string"
+            }
           },
-          {
-            "keys": {
-              "age_hours": {
-                "type": "number"
-              },
-              "carried": {
-                "type": "boolean"
-              },
-              "carried_from_cycle": {
-                "type": "integer"
-              },
-              "category": {
-                "type": "string"
-              },
-              "desc": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "is_behavioral": {
-                "type": "boolean"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_update": {
-                "type": "string"
-              },
-              "last_update_ts": {
-                "type": "string"
-              },
-              "stale_hours": {
-                "type": "integer"
-              },
-              "status": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "age_hours": {
-                "type": "number"
-              },
-              "capture_channel": {
-                "type": "string"
-              },
-              "carried": {
-                "type": "boolean"
-              },
-              "carried_from_cycle": {
-                "type": "null"
-              },
-              "category": {
-                "type": "string"
-              },
-              "days_dark": {
-                "type": "integer"
-              },
-              "desc": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "is_behavioral": {
-                "type": "boolean"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_update": {
-                "type": "string"
-              },
-              "last_update_ts": {
-                "type": "string"
-              },
-              "manual": {
-                "type": "boolean"
-              },
-              "stale_hours": {
-                "type": "integer"
-              },
-              "status": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "age_hours": {
-                "type": "null"
-              },
-              "category": {
-                "type": "string"
-              },
-              "desc": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "is_behavioral": {
-                "type": "boolean"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_update": {
-                "type": "null"
-              },
-              "status": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "optional": [
+            "capture_channel",
+            "carried",
+            "carried_from_cycle",
+            "dark_datatypes",
+            "datatypes",
+            "days_dark",
+            "last_update_ahead_of_pt",
+            "last_update_frame",
+            "last_update_ts",
+            "manual",
+            "stale_hours"
+          ],
+          "type": "object"
+        },
         "length_sample": 13,
         "type": "array"
       },

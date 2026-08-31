@@ -47,10 +47,13 @@ def _schema_files():
 
 
 def _walk_keys(node, path=""):
-    """Yield (json_path, key) for every key in a captured shape tree."""
+    """Yield (json_path, key) for every key in a captured shape tree.
+    'optional' (#3354's array-union per-key optionality marker — a list of key
+    NAMES, not a shape node) is structure, like 'keys'/'items'/'type'/
+    'length_sample'."""
     if isinstance(node, dict):
         for k, v in node.items():
-            if k in ("keys", "items", "type", "length_sample"):
+            if k in ("keys", "items", "type", "length_sample", "optional"):
                 yield from _walk_keys(v, path)
             else:
                 p = f"{path}.{k}" if path else k

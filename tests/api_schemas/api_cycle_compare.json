@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/cycle_compare",
   "is_prefix_sample": false,
   "path": "/api/cycle_compare",
@@ -26,78 +26,41 @@
         "type": "integer"
       },
       "cycles": {
-        "items": [
-          {
-            "keys": {
-              "avg_recovery_pct": {
-                "type": "number"
-              },
-              "avg_sleep_hours": {
-                "type": "number"
-              },
-              "cycle": {
-                "type": "integer"
-              },
-              "days_elapsed": {
-                "type": "integer"
-              },
-              "days_with_data": {
-                "type": "integer"
-              },
-              "genesis": {
-                "type": "string"
-              },
-              "in_progress": {
-                "type": "boolean"
-              },
-              "is_current": {
-                "type": "boolean"
-              },
-              "weight_delta_lbs": {
-                "type": "number"
-              },
-              "weight_start_lbs": {
-                "type": "number"
-              }
+        "items": {
+          "keys": {
+            "avg_recovery_pct": {
+              "type": "number"
             },
-            "type": "object"
+            "avg_sleep_hours": {
+              "type": "number"
+            },
+            "cycle": {
+              "type": "integer"
+            },
+            "days_elapsed": {
+              "type": "integer"
+            },
+            "days_with_data": {
+              "type": "integer"
+            },
+            "genesis": {
+              "type": "string"
+            },
+            "in_progress": {
+              "type": "boolean"
+            },
+            "is_current": {
+              "type": "boolean"
+            },
+            "weight_delta_lbs": {
+              "type": "number"
+            },
+            "weight_start_lbs": {
+              "type": "number"
+            }
           },
-          {
-            "keys": {
-              "avg_recovery_pct": {
-                "type": "number"
-              },
-              "avg_sleep_hours": {
-                "type": "number"
-              },
-              "cycle": {
-                "type": "integer"
-              },
-              "days_elapsed": {
-                "type": "integer"
-              },
-              "days_with_data": {
-                "type": "integer"
-              },
-              "genesis": {
-                "type": "string"
-              },
-              "in_progress": {
-                "type": "boolean"
-              },
-              "is_current": {
-                "type": "boolean"
-              },
-              "weight_delta_lbs": {
-                "type": "null"
-              },
-              "weight_start_lbs": {
-                "type": "number"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 14,
         "type": "array"
       },

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/pulse",
   "is_prefix_sample": false,
   "path": "/api/pulse",
@@ -253,36 +253,20 @@
             "type": "integer"
           },
           "since_yesterday": {
-            "items": [
-              {
-                "keys": {
-                  "delta": {
-                    "type": "integer"
-                  },
-                  "signal": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "type": "string"
-                  }
+            "items": {
+              "keys": {
+                "delta": {
+                  "type": "integer"
                 },
-                "type": "object"
+                "signal": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
               },
-              {
-                "keys": {
-                  "delta": {
-                    "type": "number"
-                  },
-                  "signal": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            ],
+              "type": "object"
+            },
             "length_sample": 2,
             "type": "array"
           },

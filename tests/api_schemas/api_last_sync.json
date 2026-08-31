@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/last_sync",
   "is_prefix_sample": false,
   "path": "/api/last_sync",
@@ -26,86 +26,32 @@
         "type": "string"
       },
       "sources": {
-        "items": [
-          {
-            "keys": {
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_seen": {
-                "type": "string"
-              },
-              "last_write": {
-                "type": "string"
-              },
-              "precision": {
-                "type": "string"
-              },
-              "stale_hours": {
-                "type": "integer"
-              },
-              "status": {
-                "type": "string"
-              }
+        "items": {
+          "keys": {
+            "id": {
+              "type": "string"
             },
-            "type": "object"
+            "label": {
+              "type": "string"
+            },
+            "last_seen": {
+              "type": "string"
+            },
+            "last_write": {
+              "type": "string"
+            },
+            "precision": {
+              "type": "string"
+            },
+            "stale_hours": {
+              "type": "integer"
+            },
+            "status": {
+              "type": "string"
+            }
           },
-          {
-            "keys": {
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_seen": {
-                "type": "string"
-              },
-              "last_write": {
-                "type": "null"
-              },
-              "precision": {
-                "type": "string"
-              },
-              "stale_hours": {
-                "type": "integer"
-              },
-              "status": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_seen": {
-                "type": "null"
-              },
-              "last_write": {
-                "type": "null"
-              },
-              "precision": {
-                "type": "null"
-              },
-              "stale_hours": {
-                "type": "null"
-              },
-              "status": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 13,
         "type": "array"
       }

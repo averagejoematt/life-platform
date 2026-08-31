@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/challenge_catalog",
   "is_prefix_sample": false,
   "path": "/api/challenge_catalog",
@@ -44,105 +44,59 @@
         "type": "array"
       },
       "challenges": {
-        "items": [
-          {
-            "keys": {
-              "board_quote": {
-                "type": "string"
-              },
-              "board_recommender": {
-                "type": "string"
-              },
-              "category": {
-                "type": "string"
-              },
-              "difficulty": {
-                "type": "integer"
-              },
-              "duration_days": {
-                "type": "integer"
-              },
-              "evidence_summary": {
-                "type": "string"
-              },
-              "evidence_tier": {
-                "type": "string"
-              },
-              "icon": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "one_liner": {
-                "type": "string"
-              },
-              "protocol": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "votes": {
-                "type": "integer"
-              }
+        "items": {
+          "keys": {
+            "board_quote": {
+              "type": "string"
             },
-            "type": "object"
+            "board_recommender": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "difficulty": {
+              "type": "integer"
+            },
+            "duration_days": {
+              "type": "integer"
+            },
+            "evidence_summary": {
+              "type": "string"
+            },
+            "evidence_tier": {
+              "type": "string"
+            },
+            "icon": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "one_liner": {
+              "type": "string"
+            },
+            "protocol": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "votes": {
+              "type": "integer"
+            }
           },
-          {
-            "keys": {
-              "board_quote": {
-                "type": "string"
-              },
-              "board_recommender": {
-                "type": "string"
-              },
-              "category": {
-                "type": "string"
-              },
-              "difficulty": {
-                "type": "integer"
-              },
-              "duration_days": {
-                "type": "null"
-              },
-              "evidence_summary": {
-                "type": "string"
-              },
-              "evidence_tier": {
-                "type": "string"
-              },
-              "icon": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "one_liner": {
-                "type": "string"
-              },
-              "protocol": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "type": {
-                "type": "string"
-              },
-              "votes": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "optional": [
+            "type"
+          ],
+          "type": "object"
+        },
         "length_sample": 82,
         "type": "array"
       },

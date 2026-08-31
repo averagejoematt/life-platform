@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/character_receipt",
   "is_prefix_sample": false,
   "path": "/api/character_receipt",
@@ -43,68 +43,21 @@
             "type": "string"
           },
           "input_rows": {
-            "items": [
-              {
-                "keys": {
-                  "pk": {
+            "items": {
+              "keys": {
+                "pk": {
+                  "type": "string"
+                },
+                "sks": {
+                  "items": {
                     "type": "string"
                   },
-                  "sks": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 1,
-                    "type": "array"
-                  }
-                },
-                "type": "object"
+                  "length_sample": 15,
+                  "type": "array"
+                }
               },
-              {
-                "keys": {
-                  "pk": {
-                    "type": "string"
-                  },
-                  "sks": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 12,
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "pk": {
-                    "type": "string"
-                  },
-                  "sks": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 3,
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "pk": {
-                    "type": "string"
-                  },
-                  "sks": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 15,
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              }
-            ],
+              "type": "object"
+            },
             "length_sample": 8,
             "type": "array"
           },

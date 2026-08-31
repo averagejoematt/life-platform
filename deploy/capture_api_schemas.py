@@ -185,13 +185,89 @@ DYNAMIC_PARAM_LOOKUP = {
 # ── shape extraction (privacy: types/keys only, never raw values, #1436 AC3) ──
 
 
+def _merge_shapes(shapes: list):
+    """Merge N shape nodes observed at the SAME logical position (e.g. the same
+    array-element slot, or the same object key across elements that have it)
+    into ONE stable summary shape (#3354).
+
+    Identical shapes collapse to one. Same-typed "object" nodes merge key-by-key
+    via `_merge_object_shapes` (the union-with-optionality rule). Same-typed
+    "array" nodes merge their item shapes the same way, recursively. Anything
+    else (a genuine cross-type difference at this position) keeps the FIRST
+    observed shape — `diff_shape()`'s own per-key recursive compare still
+    reports a real type change against whichever shape ends up compared; this
+    function's job is only to stop *optional-key* variance from masquerading as
+    one."""
+    if not shapes:
+        return {"type": "unknown"}
+    uniq = []
+    seen = set()
+    for s in shapes:
+        j = json.dumps(s, sort_keys=True)
+        if j not in seen:
+            seen.add(j)
+            uniq.append(s)
+    if len(uniq) == 1:
+        return uniq[0]
+    types = {s.get("type") for s in uniq}
+    if types == {"object"}:
+        return _merge_object_shapes(uniq)
+    if types == {"array"}:
+        item_lists = [s.get("items") for s in uniq if s.get("items") is not None]
+        flat_items = []
+        for it in item_lists:
+            flat_items.extend(it if isinstance(it, list) else [it])
+        merged_items = _merge_shapes(flat_items) if flat_items else None
+        length_sample = max((s.get("length_sample") or 0) for s in uniq)
+        return {"type": "array", "items": merged_items, "length_sample": length_sample}
+    return uniq[0]
+
+
+def _merge_object_shapes(shapes: list) -> dict:
+    """Merge N `{"type": "object", ...}` shape nodes into ONE union shape: every
+    key that appears in ANY of them, each recursively merged (`_merge_shapes`)
+    across only the elements that HAVE it, plus an `"optional"` list of key
+    names absent from at least one element (#3354).
+
+    This is what makes an array of objects that legitimately vary in optional
+    keys (`sources[].manual` present on some sources, absent on others) read as
+    ONE union shape instead of N exact-match variants — `diff_shape()`'s
+    ordinary per-key object comparison then reports a key "removed" only when
+    it is gone from the WHOLE union, i.e. from every element, which is still a
+    genuine break and still reported."""
+    n = len(shapes)
+    all_keys: set = set()
+    for s in shapes:
+        all_keys.update((s.get("keys") or {}).keys())
+    merged_keys = {}
+    optional = set()
+    for k in sorted(all_keys):
+        present = [s["keys"][k] for s in shapes if k in (s.get("keys") or {})]
+        if len(present) < n:
+            optional.add(k)
+        merged_keys[k] = _merge_shapes(present)
+    result: dict = {"type": "object", "keys": merged_keys}
+    if optional:
+        result["optional"] = sorted(optional)
+    return result
+
+
 def json_shape(node):
     """Recursively reduce a JSON value to its shape: {"type": ..., ...}.
 
-    Objects keep their key set (recursing per key); arrays record the DISTINCT
-    item shapes observed in the first 20 elements (usually 1, for a homogeneous
-    list) plus a length sample; scalars record only their type. No string/number/
-    bool VALUE is ever retained — this is the "shape not values" contract."""
+    Objects keep their key set (recursing per key); scalars record only their
+    type. No string/number/bool VALUE is ever retained — this is the "shape not
+    values" contract.
+
+    Arrays record a shape for the first 20 elements. When every sampled element
+    is an object, the array's `"items"` is the single UNION shape produced by
+    `_merge_object_shapes` — every key seen on ANY element, with an `"optional"`
+    list naming the keys not present on ALL of them (#3354: an array of objects
+    that legitimately vary in optional keys, e.g. `/api/source_freshness`'s
+    `sources[].manual`, must never read as a shape change depending on which
+    element got sampled/ordered first). Any other array (scalars, mixed types,
+    an array of arrays) keeps the prior behavior: the DISTINCT item shapes
+    observed, usually 1 for a homogeneous list, plus a length sample."""
     if node is None:
         return {"type": "null"}
     if isinstance(node, bool):  # must precede the int check — bool is an int subclass
@@ -205,13 +281,17 @@ def json_shape(node):
     if isinstance(node, list):
         if not node:
             return {"type": "array", "items": None, "length_sample": 0}
-        seen = {}
-        for item in node[:20]:
-            shape = json_shape(item)
-            key = json.dumps(shape, sort_keys=True)
-            seen.setdefault(key, shape)
-        uniq = list(seen.values())
-        return {"type": "array", "items": uniq[0] if len(uniq) == 1 else uniq, "length_sample": len(node)}
+        shapes = [json_shape(item) for item in node[:20]]
+        if all(s.get("type") == "object" for s in shapes):
+            items = _merge_object_shapes(shapes)
+        else:
+            seen = {}
+            for shape in shapes:
+                key = json.dumps(shape, sort_keys=True)
+                seen.setdefault(key, shape)
+            uniq = list(seen.values())
+            items = uniq[0] if len(uniq) == 1 else uniq
+        return {"type": "array", "items": items, "length_sample": len(node)}
     if isinstance(node, dict):
         return {"type": "object", "keys": {k: json_shape(v) for k, v in node.items()}}
     return {"type": "unknown"}
@@ -227,7 +307,12 @@ def is_valid_shape_node(node) -> bool:
         return True
     if t == "object":
         keys = node.get("keys")
-        return isinstance(keys, dict) and all(is_valid_shape_node(v) for v in keys.values())
+        if not isinstance(keys, dict) or not all(is_valid_shape_node(v) for v in keys.values()):
+            return False
+        optional = node.get("optional")
+        if optional is None:
+            return True
+        return isinstance(optional, list) and all(isinstance(k, str) and k in keys for k in optional)
     if t == "array":
         items = node.get("items")
         if items is None:
@@ -251,7 +336,15 @@ def diff_shape(old, new, path="$") -> list:
     type across two captures with no code change at all. `null | <type>` is
     therefore treated as ONE shape in both directions — informational, not
     breaking — while a genuine cross-type flip (`string` -> `number`, etc.)
-    still fails."""
+    still fails.
+
+    Array-union-aware (#3354): for an array of objects, `json_shape()` already
+    reduces `"items"` to ONE merged union shape (`_merge_object_shapes`) rather
+    than per-element exact-match variants, so the ordinary object-comparison
+    branch below does the right thing automatically once it recurses into an
+    array's `items`: a key reads "removed" only when it is absent from the
+    WHOLE union — i.e. gone from every element — never merely because one
+    sampled element happened to omit an optional key another element carries."""
     diffs = []
     if not (isinstance(old, dict) and isinstance(new, dict)):
         return [f"{path}: not comparable (malformed shape node)"]

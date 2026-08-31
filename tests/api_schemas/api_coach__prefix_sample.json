@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/coach/sleep_coach",
   "is_prefix_sample": true,
   "path": "/api/coach/",
@@ -257,78 +257,24 @@
         "type": "null"
       },
       "recent_outputs": {
-        "items": [
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "summary": {
-                "type": "string"
-              },
-              "themes": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 8,
-                "type": "array"
-              }
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
             },
-            "type": "object"
+            "summary": {
+              "type": "string"
+            },
+            "themes": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 11,
+              "type": "array"
+            }
           },
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "summary": {
-                "type": "string"
-              },
-              "themes": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 7,
-                "type": "array"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "summary": {
-                "type": "string"
-              },
-              "themes": {
-                "items": null,
-                "length_sample": 0,
-                "type": "array"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "summary": {
-                "type": "string"
-              },
-              "themes": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 11,
-                "type": "array"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 9,
         "type": "array"
       },
@@ -414,138 +360,39 @@
             "type": "object"
           },
           "tuning_log": {
-            "items": [
-              {
-                "keys": {
-                  "change_type": {
-                    "type": "string"
-                  },
-                  "coach": {
-                    "type": "string"
-                  },
-                  "date": {
-                    "type": "string"
-                  },
-                  "observed_effect": {
-                    "type": "null"
-                  },
-                  "rationale": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  }
+            "items": {
+              "keys": {
+                "change_type": {
+                  "type": "string"
                 },
-                "type": "object"
+                "coach": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                },
+                "observed_effect": {
+                  "type": "null"
+                },
+                "rationale": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
               },
-              {
-                "keys": {
-                  "change_type": {
-                    "type": "string"
-                  },
-                  "coach": {
-                    "type": "string"
-                  },
-                  "date": {
-                    "type": "string"
-                  },
-                  "observed_effect": {
-                    "type": "null"
-                  },
-                  "rationale": {
-                    "type": "string"
-                  },
-                  "ref": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "change_type": {
-                    "type": "string"
-                  },
-                  "coach": {
-                    "type": "string"
-                  },
-                  "date": {
-                    "type": "string"
-                  },
-                  "evidence": {
-                    "type": "string"
-                  },
-                  "observed_effect": {
-                    "type": "string"
-                  },
-                  "rationale": {
-                    "type": "string"
-                  },
-                  "ref": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "change_type": {
-                    "type": "string"
-                  },
-                  "coach": {
-                    "type": "string"
-                  },
-                  "date": {
-                    "type": "string"
-                  },
-                  "evidence": {
-                    "type": "string"
-                  },
-                  "observed_effect": {
-                    "type": "null"
-                  },
-                  "rationale": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "change_type": {
-                    "type": "string"
-                  },
-                  "coach": {
-                    "type": "string"
-                  },
-                  "date": {
-                    "type": "string"
-                  },
-                  "evidence": {
-                    "type": "string"
-                  },
-                  "observed_effect": {
-                    "type": "string"
-                  },
-                  "rationale": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            ],
+              "optional": [
+                "evidence",
+                "ref"
+              ],
+              "type": "object"
+            },
             "length_sample": 10,
             "type": "array"
           }

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/survival",
   "is_prefix_sample": false,
   "path": "/api/survival",
@@ -32,66 +32,35 @@
         "type": "integer"
       },
       "cycles": {
-        "items": [
-          {
-            "keys": {
-              "censored": {
-                "type": "boolean"
-              },
-              "collapse_day": {
-                "type": "integer"
-              },
-              "cycle": {
-                "type": "integer"
-              },
-              "engaged_days": {
-                "type": "integer"
-              },
-              "genesis": {
-                "type": "string"
-              },
-              "is_current": {
-                "type": "boolean"
-              },
-              "strip": {
-                "type": "string"
-              },
-              "window_days": {
-                "type": "integer"
-              }
+        "items": {
+          "keys": {
+            "censored": {
+              "type": "boolean"
             },
-            "type": "object"
+            "collapse_day": {
+              "type": "integer"
+            },
+            "cycle": {
+              "type": "integer"
+            },
+            "engaged_days": {
+              "type": "integer"
+            },
+            "genesis": {
+              "type": "string"
+            },
+            "is_current": {
+              "type": "boolean"
+            },
+            "strip": {
+              "type": "string"
+            },
+            "window_days": {
+              "type": "integer"
+            }
           },
-          {
-            "keys": {
-              "censored": {
-                "type": "boolean"
-              },
-              "collapse_day": {
-                "type": "null"
-              },
-              "cycle": {
-                "type": "integer"
-              },
-              "engaged_days": {
-                "type": "integer"
-              },
-              "genesis": {
-                "type": "string"
-              },
-              "is_current": {
-                "type": "boolean"
-              },
-              "strip": {
-                "type": "string"
-              },
-              "window_days": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 14,
         "type": "array"
       },
