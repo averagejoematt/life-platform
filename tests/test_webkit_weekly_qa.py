@@ -17,8 +17,12 @@ Two guards:
      - drives tests/visual_qa.py with --browser webkit --mobile --max-tier 2
      - ADVISORY: no rollback scripts, no deploy scripts, no cdk deploy —
        a red here must never be able to roll back or mutate anything
-     - failure surfaces loudly (if: failure() -> SNS publish; the visual-qa.yml
-       pattern until the #1447 issue-on-failure helper exists)
+     - failure surfaces loudly: since #3277 a red run files a tracked issue
+       through the #1447 advisory-failure-issue helper (own slug, issues:write,
+       last step, if: always() so a green run closes it). The pre-#3277 `aws sns
+       publish` is GONE, not fixed: it failed AuthorizationError on every run
+       (the diagnosis role has no sns: grant) and six weekly reds — each carrying
+       the 390px scrollable-region-focusable finding — reached nobody
      - upload-artifact carries continue-on-error: true (an account-wide
        artifact-quota exhaustion must not red the QA verdict —
        reference_ci_artifact_quota_rollback / #1331 class)
@@ -114,12 +118,39 @@ def test_workflow_is_advisory_no_rollback_no_deploy():
 
 
 def test_workflow_failure_surfaces_loudly():
-    """#1434 AC3: a red run must notify (SNS digest — the visual-qa.yml pattern),
-    not just sit in the Actions history nobody reads. Replace with the #1447
-    issue-on-failure helper when that lands."""
+    """#1434 AC3, re-satisfied by #3277: a red run must reach someone, not just sit
+    in the Actions history nobody reads. The original surface was an `aws sns
+    publish` and it never delivered once — this workflow's OIDC role
+    (github-actions-diagnosis-role) has no sns:Publish, so the call failed
+    AuthorizationError and `|| echo ::warning::` swallowed that too, across six
+    consecutive reds. The surface is now the #1447 filer; the assertion moved with
+    it rather than being deleted."""
     text = _workflow_text()
-    assert "if: failure()" in text, "no failure-only step — a red run would surface nowhere"
-    assert "sns publish" in text, "failure step doesn't notify (sns publish missing)"
+    assert "uses: ./.github/actions/advisory-failure-issue" in text, "a red run would surface nowhere (#1447 filer missing)"
+    # comments narrate the deletion; the assertion is about what the runner EXECUTES.
+    executable = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+    assert "aws sns publish" not in executable, (
+        "the SNS publish is deliberately DELETED (#3277) — the diagnosis role cannot execute it, "
+        "and a notify path that has never delivered makes a failure LOOK surfaced"
+    )
+
+
+def test_workflow_red_files_a_tracked_issue_not_just_a_swallowed_publish():
+    """#3277: the run had been red every week with the exact mobile a11y finding and
+    surfaced nowhere. The fix is the #1447 filer, not an IAM grant: wired as the
+    LAST step, `if: always()` (so a green run auto-closes the tracker), under its
+    own dedup slug, with the issues:write the composite action documents as its
+    precondition."""
+    text = _workflow_text()
+    assert "uses: ./.github/actions/advisory-failure-issue" in text, "webkit-mobile-qa.yml does not use the #1447 filer"
+    step = text[text.index("uses: ./.github/actions/advisory-failure-issue") - 400 :]
+    assert "if: always()" in step.split("uses: ./.github/actions/advisory-failure-issue")[0], "filer step must run always() (recover path)"
+    assert "workflow-slug: webkit-mobile-qa" in text, "filer needs its own stable dedup slug"
+    assert re.search(r"^permissions:(?:\n  .+)*\n  issues: write", text, re.M), "permissions block must grant issues: write for the filer"
+    executable = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+    assert "sns" not in executable.lower(), "no SNS notify path and no IAM grant belong here — the tracked issue is the surface"
+    # the filer must be the last step, so nothing after it can be skipped on failure
+    assert text.rstrip().endswith("investigate and fix forward."), "the advisory-failure-issue step must be the workflow's last step"
 
 
 def test_workflow_artifact_upload_cannot_flip_the_verdict():

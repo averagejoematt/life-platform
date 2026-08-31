@@ -183,17 +183,23 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "the cron as the sole scan trigger.",
     },
     "webkit-mobile-qa.yml": {
-        "watched": False,
-        "grace_hours": None,
-        "basis": None,
-        "reason": "DELIBERATELY UNWATCHED — it is advisory by construction (#1434: gates nothing, "
-        "deploys nothing, nothing `needs:` it) AND its coverage is a strict subset of a "
-        "watched row: the same tests/visual_qa.py harness over the same qa_manifest "
-        "pages, differing only in the browser engine. A silent stop costs one weekly "
-        "WebKit-only sweep while the daily Chromium sweep (visual-qa.yml, watched) "
-        "keeps reporting. Watching it would raise the false-positive rate of this "
-        "instrument for a signal the platform can lose for a week without harm. "
-        "RE-RULE IF: WebKit ever becomes the gating engine for site-deploy.",
+        "watched": True,
+        "grace_hours": 24.0,
+        "basis": "weekly (Tue 21:37Z) -> derived 168h cadence; grace 24h = one day, same as the other "
+        "weekly rows (golden-brief-eval, fresh-eyes), so a wholly skipped Tuesday reports "
+        "on Wednesday rather than waiting a second week.",
+        "reason": "RE-RULED 2026-08-30 (#3277). The 2026-08-27 ruling called its coverage 'a strict "
+        "subset of a watched row' — false: it was the ONLY sweep that ever ran axe in a "
+        "390px context (every gating Chromium run audited desktop only), and it had been "
+        "reporting exactly the 390px scrollable-region-focusable finding every week to "
+        "a surface that swallowed it (SNS publish failing AuthorizationError — the "
+        "diagnosis role has no sns: grant, deliberately not added — and no #1447 filer). "
+        "#3277 wired the filer (a red run now files a tracked issue) and gave the gating "
+        "sweeps their own mobile axe pass, but this lane stays the one place the "
+        "iOS-Safari ENGINE is driven at all; a cron that quietly stops here is a week of "
+        "engine coverage lost with nothing to say so. Enrolled in the #1447 filer, so it "
+        "carries the armed-on-result defect by construction — the reason every enrolled "
+        "row is watched.",
     },
     "eval-harvest.yml": {
         "watched": False,

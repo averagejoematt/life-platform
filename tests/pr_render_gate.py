@@ -50,6 +50,7 @@ Usage:
     python3 tests/pr_render_gate.py                 # gate over site/ (representative pages)
     python3 tests/pr_render_gate.py --site-dir /tmp/broken-site   # gate a copy (demo)
     python3 tests/pr_render_gate.py --keep          # keep the screenshot/prose capture dir
+    python3 tests/pr_render_gate.py --a11y          # + axe at 1440x900 AND 390x844 vs the ledger (#3277)
 Exit 0 = gate passed; exit 1 = a render or accuracy regression blocked the merge.
 """
 
@@ -368,8 +369,15 @@ def _wait_port(host, port, timeout=5.0):
 
 
 # ── Gate ──────────────────────────────────────────────────────────────────────
-def run_gate(site_dir, screenshot_dir, keep=False):
+def run_gate(site_dir, screenshot_dir, keep=False, a11y=False):
     """Serve site_dir, drive the representative pages, run render + accuracy checks.
+
+    a11y (#3277, opt-in): also run capture_page's axe-core pass — at BOTH the
+    desktop context and 390×844 — against the committed tests/a11y_baseline.json,
+    gating on NEW serious/critical exactly as the live sweep does. Off by default
+    so CI's v4-gate is byte-for-byte unchanged (the mocked render can differ from
+    the live surface the ledger was captured on); it is the local proof path for
+    a site change that touches scroll containers, tables or code blocks.
 
     Returns (ok: bool, results: list, accuracy_findings: list).
     """
@@ -394,12 +402,15 @@ def run_gate(site_dir, screenshot_dir, keep=False):
     populated_dir = os.path.join(screenshot_dir, "populated")
     os.makedirs(populated_dir, exist_ok=True)
     results = []
+    # #3277: None keeps capture_page's axe pass off (the pre-#3277 behaviour); a
+    # loaded baseline turns it on at both viewports.
+    a11y_baseline = VQ.a11y_audit.load_baseline() if a11y else None
 
     def _drive(context, pages, out_dir):
         for page_def in pages:
             # capture_prose=True writes <slug>.txt (the visitor-facing text) so
             # the accuracy sentinel scan reads exactly what rendered.
-            res = VQ.capture_page(context, page_def, out_dir, save_screenshots=True, capture_prose=True)
+            res = VQ.capture_page(context, page_def, out_dir, save_screenshots=True, capture_prose=True, a11y_baseline=a11y_baseline)
             results.append(res)
             icon = "✅" if not res["issues"] else "❌"
             print(f"  {icon} {res['page']} ({res['path']})")
@@ -458,6 +469,17 @@ def run_gate(site_dir, screenshot_dir, keep=False):
     print(f"\n{'=' * 60}")
     passed = sum(1 for r in results if not r["issues"])
     print(f"Render: {passed}/{len(results)} pages clean")
+    if a11y:
+        # #3277: state the n — page-passes × viewports actually audited, not assumed.
+        n_desk = sum(1 for r in results if r.get("a11y") is not None)
+        n_mob = sum(1 for r in results if r.get("a11y_mobile") is not None)
+        n_new = sum(len(r["a11y"]["new"]) for r in results if r.get("a11y")) + sum(
+            len(r["a11y_mobile"]["new"]) for r in results if r.get("a11y_mobile")
+        )
+        print(
+            f"a11y (axe): {n_desk} page-pass(es) @1440x900 + {n_mob} @390x844 = {n_desk + n_mob} audits over "
+            f"{len(results)} page-passes; {n_new} NEW serious/critical (gating)"
+        )
     print(f"Accuracy: {len(acc_high)} impossible-number/leak finding(s)")
     for f in acc_high:
         print(
@@ -477,6 +499,11 @@ def main():
     ap.add_argument("--site-dir", default=os.path.join(REPO, "site"), help="Static site dir to serve (default: site/)")
     ap.add_argument("--out", default=None, help="Screenshot/prose capture dir (default: a temp dir)")
     ap.add_argument("--keep", action="store_true", help="Keep the capture dir after the run")
+    ap.add_argument(
+        "--a11y",
+        action="store_true",
+        help="Also run the axe-core pass at 1440x900 AND 390x844 against tests/a11y_baseline.json (#3277; opt-in)",
+    )
     args = ap.parse_args()
 
     site_dir = os.path.abspath(args.site_dir)
@@ -486,7 +513,7 @@ def main():
     out = args.out or tempfile.mkdtemp(prefix="pr-render-gate-")
     print(f"PR render + accuracy gate — serving {site_dir}\n  capture → {out}\n{'=' * 60}")
 
-    ok, results, accuracy = run_gate(site_dir, out, keep=args.keep)
+    ok, results, accuracy = run_gate(site_dir, out, keep=args.keep, a11y=args.a11y)
 
     # CI job summary (same convention as visual_qa).
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
