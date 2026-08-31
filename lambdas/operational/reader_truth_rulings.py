@@ -63,6 +63,7 @@ from operational.reader_truth_evidence import (  # noqa: F401
     cites_payload_date_field,
     cycle_day,
     day_numbers,
+    elapsed_spans,
     evidence_is_phase_anchors_only,
     judge_basis,
     normalize_copy as _normalize_copy,
@@ -73,6 +74,7 @@ from operational.reader_truth_evidence import (  # noqa: F401
     quoted_spans,
     spans_scoped_to_cycle_start,
     tiebreak as _tiebreak,
+    unquoted,
 )
 
 # #2613: the surfaces whose PRE-CYCLE-DATE question is owned by code, not by the
@@ -1054,6 +1056,47 @@ def is_active_vs_passive_objection(finding, start_date=None, today=None):
 # could not have a must-fail case replayed from the wire — which is exactly the
 # unmeasured-prompt-change shape #2613 and #2741 charge a deploy for.
 
+
+# ── an objection that cites no temporal value at all (#3379, 2026-08-31) ──────
+#
+# THE OBSERVED FAILURE (qa-smoke 2026-08-31, finding 539c6d, high, "confirmed on
+# a second pass" — held `qa-smoke-failures` in ALARM): the home page's protagonist
+# copy ("every climb before this one ended the same way…" — TRUE, phase-neutral
+# by design per site/index.html's #732/#1087 comments) was graded high because
+# current editorial voice "should be moved to a labeled 'previous attempts'
+# archive". The note cites no date, no day number, no span — nothing the phase
+# could contradict. It escaped #3337's channel 2 (not grounded in the day
+# counter, so the channel cannot fire) and the tiebreak regex ("ambiguously
+# blurs" carries none of the adjective forms) — the fourth field failure of a
+# lexical member of this family, this time in the demotion-miss direction.
+#
+# THE RULING. The rubric defines the category as an impossibility the judge's
+# own arithmetic establishes, and establishing one requires CITING a temporal
+# value the phase cannot hold. A note whose OWN sentences (quoted page copy
+# excluded — the claim under dispute is not the judge's evidence, the #3258
+# distinction) cite no date, no day number, and no elapsed span has done no
+# arithmetic at all: whatever it objects to, it is not a temporal impossibility.
+# Structural in the #3337 sense — every input is a parsed-evidence ABSENCE; no
+# wording is consulted. Guards, from the live wire notes that must stay
+# flaggable: a note naming a payload date field is a data claim (d1c6a0,
+# e5eafd) and is refused outright; an empty note is refused (fail closed).
+# RESIDUE, named honestly: a real defect the judge describes with zero temporal
+# citation ("entries from before the experiment began", no date given) is
+# demoted — but by the rubric such a note has established nothing, and it stays
+# visible as advisory, recorded, never dropped. DEMOTED to low — unchanged.
+def is_uncited_temporal_objection(finding):
+    """True when a temporal_contradiction's own sentences cite no temporal
+    value at all — no date, day number, or elapsed span — so no impossibility
+    can have been established (#3379)."""
+    if finding.get("category") != "temporal_contradiction":
+        return False
+    note = str(finding.get("note") or "")
+    if not note.strip() or cites_payload_date_field(note):
+        return False
+    own = unquoted(note)
+    return not (note_dates(own) or day_numbers(own) or elapsed_spans(own))
+
+
 RULINGS_FIELD = "rulings"
 
 
@@ -1108,6 +1151,12 @@ def advisory_rulings(start_date, today=None):
             "an active-vs-passive objection",
             lambda f: is_active_vs_passive_objection(f, start_date, today),
             "day arithmetic alone does not disprove it, #3199",
+        ),
+        (
+            "uncited_temporal_objection",
+            "an uncited temporal objection",
+            is_uncited_temporal_objection,
+            "no temporal value is cited, so no impossibility is established, #3379",
         ),
     )
 

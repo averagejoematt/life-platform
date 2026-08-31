@@ -234,7 +234,10 @@ def test_the_ledger_is_consulted_at_low_severity_too():
     assert errors == []
     assert len(findings) == 1, "adjudicated, not dropped — the evidence stays visible"
     assert findings[0]["severity"] == "low", "an already-low finding must not be re-graded"
-    assert findings[0][rtq.RULINGS_FIELD] == ["vagueness_objection"]
+    # #3379: the same note also matches the uncited-temporal-objection ruling —
+    # its OWN sentences cite no temporal value (the "Day-1" is quoted page copy),
+    # the exact shape #3337's comment names. The ledger records every match.
+    assert findings[0][rtq.RULINGS_FIELD] == ["uncited_temporal_objection", "vagueness_objection"]
     assert rtq.is_advisory(findings[0]) is True
 
 
