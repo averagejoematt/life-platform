@@ -302,6 +302,55 @@ CLASSIFY_CMD="${WAIT_PR_GREEN_CLASSIFY_CMD:-python3 ${_WAIT_PR_GREEN_DIR}/../scr
 # suppressor in this repo has failed in the field).
 ZC_SWALLOWED="swallowed"
 
+# ── #3318: the closing set, asserted at the moment before the merge ──────────
+#
+# THE CLASS. A `Fixes #N` closes N on merge whether or not N's work is in the PR:
+# two lanes sharing one `pr_body.md` published each other's `Fixes` (#3222 via PR
+# #3226), and a body that named a box "not satisfied" still carried `Fixes #2848`
+# (PR #3253). Both were found by a human days later.
+#
+# WHY THIS SEAM. This script is the one sanctioned pre-merge watcher (#3103): every
+# merge is preceded by its verdict, so this is the last read of the PR body before
+# `gh pr merge`. pr-checks.yml cannot be the seam — it fires on push, not on a body
+# edit (no `types: [edited]`), and the stray-Fixes class arrives via `gh pr edit`.
+# The check is NOT reimplemented in bash: scripts/check_pr_closing_set.py owns the
+# grammar and the verdict vocabulary (`CLOSING-SET VERDICT OK|NONGREEN|UNAVAILABLE`),
+# derived from scripts/closure_contract.py; this function forwards its output and
+# reads its exit code. Advisory (`warn`) today — exit 0 whatever it finds; the
+# documented flip to `block` (CLOSURE_CONTRACT_MODE, or the registry's DEFAULT_MODE)
+# turns a NONGREEN closing set into this watcher's exit 1. Runs ONLY on the
+# merge-eligible verdicts (0 and 4) — a red or a timeout is not about to merge.
+#
+# ABSENCE IS LOUDER THAN FAILURE: if the script cannot run at all, a
+# `CLOSING-SET VERDICT UNAVAILABLE` line is printed — the line is never silently
+# missing. Overridable for tests (`WAIT_PR_GREEN_CLOSING_SET_CMD`); the PR number is
+# appended as the last argument.
+CLOSING_SET_CMD="${WAIT_PR_GREEN_CLOSING_SET_CMD:-python3 ${_WAIT_PR_GREEN_DIR}/../scripts/check_pr_closing_set.py --repo ${REPO} --pr}"
+
+# _closing_set_check <pr>
+#   Prints the script's CLOSING-SET lines verbatim. Returns 0 when the script exited 0
+#   (OK, or any verdict under the advisory posture), 1 when it exited non-zero (block
+#   posture: NONGREEN or UNAVAILABLE) or could not run at all — in which case the
+#   UNAVAILABLE line is printed HERE, so the closing set is never silently unasserted.
+_closing_set_check() {
+  local pr="$1" out rc
+  out=$(${CLOSING_SET_CMD} "${pr}" 2>&1)
+  rc=$?
+  if [[ "${out}" != *"CLOSING-SET"* ]]; then
+    # The detector's contract is that it ALWAYS prints a CLOSING-SET line; anything else
+    # (command not found = 127, an import error, an empty run) means it did not run.
+    echo "CLOSING-SET VERDICT UNAVAILABLE — '${CLOSING_SET_CMD} ${pr}' exited ${rc} without a verdict line; the closing set was NOT asserted (#3318)"
+    [[ -n "${out}" ]] && echo "  ${out}" | head -5
+    return 1
+  fi
+  echo "${out}"
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "CLOSING-SET blocked the verdict (closure-contract posture is block; script exit ${rc}) — fix the PR's closing set before merging."
+    return 1
+  fi
+  return 0
+}
+
 # classify_zero_check_diagnosis <classifier-json>
 #   Pure — takes the classifier's JSON, prints the operator-facing lines, and
 #   returns 5 for a CONFIRMED swallow (stop, this will never attach) or 0 for
@@ -744,6 +793,9 @@ main() {
       0)
         echo "${out}"
         echo "All ${#expected[@]} expected checks are GREEN (elapsed ${elapsed}s)."
+        # #3318: the merge-eligible verdict is the seam — assert the closing set NOW,
+        # against the body as it stands at this moment, before the caller reads GREEN.
+        _closing_set_check "${pr}" || return 1
         return 0
         ;;
       1)
@@ -773,6 +825,7 @@ main() {
       4)
         echo "${out}"
         echo "GREEN except a classified reconcile-owned red (elapsed ${elapsed}s) — see the RECONCILE-OWNED-RED line(s) above (#3200). This still never merges; the exit code (4) is the caller's own signal to name it and proceed."
+        _closing_set_check "${pr}" || return 1 # #3318: exit 4 is merge-eligible too
         return 4
         ;;
     esac

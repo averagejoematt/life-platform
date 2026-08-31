@@ -87,6 +87,13 @@ Output cap: ≤8 findings per row. The structured shape extends the spine's with
   topology, no staging), ADR-139 (post-merge testing topology, advisory pre-merge lane), ADR-136
   (site auto-deploy without a human click), ADR-057 (single-user data model). A new deviation found
   here files a story whose fix IS the ADR.
+- **Closed-item sample (standing, #3318).** Run `python3 scripts/closure_sweep.py --last 30` and
+  read the hits against the closure contract (`scripts/closure_contract.py`): a `post-close-comment`
+  is an issue still being worked after it closed, an `unhomed-residual` is work that left the board
+  with no carrier, a `no-outcome-verdict` is a silent close. Grade the closing discipline from the
+  hit rate over the 30, not from the anecdotes; a hit on an issue closed more than one session ago is
+  dispositioned in the registry's dated ledger or reopened — never left as a standing red. This is
+  the wrap's session-scoped sweep widened to a sample; it deliberately replaces a standing ritual.
 
 ## Artifacts
 

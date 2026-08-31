@@ -322,7 +322,19 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # naming the remediation role (ARMED: baseline 16 passed / mutated 1 failed / reverted 16
 # passed) and STRUCTURAL_PROOFS records it — so live unproven stays 525 and
 # BASELINE_UNPROVEN_GATES (541) is not moved.
-BASELINE_TOTAL_GATES = 573
+# 573 -> 574 (2026-08-31, #3318; stacked on #3336 — this branch rebased onto PR #3338): ONE real gate, `guard::scripts/check_pr_closing_set.py`
+# — detector B of the closure contract (the PR's closing set asserted against the lane's
+# declared target on deploy/wait_pr_green.sh's merge-eligible verdict). Verified by id-set
+# diff, not count delta: this branch's own scripts/gate_census.py --json with every new
+# file `git add`ed (an untracked guard measures as absent) ADDED exactly that one id,
+# REMOVED {} (#3338 tip b68cba0b6 = 573, branch 574); the registry-family regex matches none of the new
+# module-level names, so scripts/closure_contract.py mints nothing. It arrives UNPROVEN by
+# the census's own ledger (live unproven 525, under the committed 541, which is NOT
+# moved) while its fail path is on record three ways: scripted positive controls in
+# tests/test_closure_contract_3318.py (PR #3226 / PR #3253 fixtures NONGREEN, PR #3313
+# OK, every rule mutation-proven on the control), a live NONGREEN on the real PRs #3226
+# and #3253, and a live NONGREEN on its OWN PR's draft body (#3331) before the merge.
+BASELINE_TOTAL_GATES = 574
 BASELINE_UNPROVEN_GATES = 541
 
 
