@@ -19,12 +19,13 @@ has zero us-east-1 mentions). WebStack is the only stack that deploys to us-east
   life-platform-dash-5xx-rate        orphan — routed live, not in any cdk/stacks file
   life-platform-dash-total-errors    orphan — routed live, not in any cdk/stacks file
   life-platform-cf-auth-errors       orphan — AlarmActions=[], not in any cdk/stacks file
-  life-platform-cost-alert           orphan — AlarmActions=[], not in any cdk/stacks file
-  life-platform-ai-cost-soft-alarm   orphan — routed live (to a DIFFERENT topic,
-                                      life-platform-billing-alerts), not in any
+  life-platform-cost-alert           DELETED 2026-08-31 (#3377) — was: AlarmActions=[],
+                                      not in any cdk/stacks file
+  life-platform-ai-cost-soft-alarm   DELETED 2026-08-31 (#3377) — was: routed to
+                                      life-platform-billing-alerts, not in any
                                       cdk/stacks file
 
-The 5 orphans trace to three archived onetime scripts: deploy/archive/onetime/
+The 5 orphans (2 now deleted, #3377) trace to three archived onetime scripts: deploy/archive/onetime/
 create_cloudfront_5xx_alarm.sh (dash-5xx-rate + dash-total-errors + the
 life-platform-alerts-us-east-1 topic itself), deploy/archive/onetime/
 create_lambda_edge_alarm.sh (cf-auth-errors, deliberately created with NO action per its
@@ -84,9 +85,10 @@ even that script and duplicates its metric/threshold exactly with no action at a
                                        make that false green load-bearing IaC (#3200
                                        class). Owner command recorded in §9a.
 
-  RETIRE → #2962 (decision recorded; NOT executed here — deleting a live alarm is an AWS
-  mutation, out of scope for a read-only worktree; the exact owner-run
-  `aws cloudwatch delete-alarms` command is recorded in #2962):
+  RETIRE → #2962 → EXECUTED 2026-08-31 (#3377, owner-authorized): both alarms deleted
+  (`aws cloudwatch delete-alarms`, us-east-1; post-delete describe-alarms returns 0) and
+  the `life-platform/buddy-auth` secret scheduled-deleted (30-day window, gone
+  2026-09-30). No live orphan remains; kept for the record:
     life-platform-cost-alert          AWS/Billing EstimatedCharges >= $5/mo, unrouted.
     life-platform-ai-cost-soft-alarm  Same metric/threshold/period as cost-alert —
                                        an exact duplicate, just routed to a second
