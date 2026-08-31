@@ -26,6 +26,13 @@ Layers, matching the charter primitives the calendar is built from:
     so the daily sweep reported "✅ no ritual outside its window" over two rituals nobody
     has ever run. These tests pin the state, the exit code, and the rule that a dated
     `hold` may move the CLOCK but never the never-run VERDICT;
+  * **#3378 — a declared future start may move the clock, never the lateness verdict.**
+    The 2026-09-01 launch put three one-time checkpoints on the calendar whose first
+    occurrence is weeks out. `starts` gives them a SCHEDULED state instead of a month of
+    daily NEVER-RUN red, and these tests pin the asymmetry that keeps it honest: SCHEDULED
+    is never OK, it is spent the day the first occurrence passes (DUE, then OVERDUE), it
+    cannot be parked indefinitely ahead, and the checkpoint dates themselves are pinned so
+    a slide is a reviewed edit rather than a quiet cadence bump;
   * **#3250 — no hand-typed magnitudes in a calendared review skill.** The rubric anchors
     in /sdlc-review went 2.7x stale in place (`~380 test files` vs a real 1,015). The
     numbers now come from `scripts/review_anchors.py` at run time; this file fails if one
@@ -342,6 +349,98 @@ def test_hold_expires_and_does_not_renew_itself(tmp_path):
     assert oc.status(ran, today=date(2026, 9, 21), repo=str(tmp_path))["state"] == oc.OK
     assert oc.status(ran, today=date(2026, 9, 28), repo=str(tmp_path))["state"] == oc.DUE
     assert oc.status(ran, today=date(2026, 10, 5), repo=str(tmp_path))["state"] == oc.OVERDUE
+
+
+# ── #3378: a ritual whose FIRST occurrence is in the future ───────────────────
+def test_starts_moves_the_clock_but_never_the_lateness_verdict(tmp_path):
+    """`starts` is the launch-checkpoint case: a row whose clock begins on a dated future
+    day. Before its first occurrence, never-run is a schedule fact (SCHEDULED) rather than
+    an absence (NEVER-RUN) — a checkpoint due in October is not a ritual anybody stopped
+    doing. After it, the row is late like any other: `starts` may not reach DUE or OVERDUE.
+    That asymmetry is the whole safety property, so it is proven in both directions."""
+    e = dict(_synthetic(tmp_path, None), starts="2026-09-01")  # cadence 7 + grace 3
+    assert oc.status(e, today=date(2026, 8, 25), repo=str(tmp_path))["state"] == oc.SCHEDULED
+    assert oc.status(e, today=date(2026, 9, 7), repo=str(tmp_path))["state"] == oc.SCHEDULED
+    assert oc.status(e, today=date(2026, 9, 8), repo=str(tmp_path))["clock"] == date(2026, 9, 1)
+    # first occurrence 2026-09-08: from here the schedule fact is spent and absence is late.
+    assert oc.status(e, today=date(2026, 9, 9), repo=str(tmp_path))["state"] == oc.DUE
+    assert oc.status(e, today=date(2026, 9, 12), repo=str(tmp_path))["state"] == oc.OVERDUE
+
+
+def test_starts_never_prints_ok_and_never_hides_a_run_that_is_missing(tmp_path):
+    """SCHEDULED must be its own word. If it collapsed to OK, `starts` would be the new way
+    to print green over an absence — the exact defect #3250 removed one level down."""
+    e = dict(_synthetic(tmp_path, None), starts="2026-09-01")
+    st = oc.status(e, today=date(2026, 8, 25), repo=str(tmp_path))
+    assert st["state"] != oc.OK and st["never_ran"] is True
+    assert oc.SCHEDULED not in (oc.OK, oc.NEVER, oc.HELD, oc.DUE, oc.OVERDUE)
+    # And a row with NO declared start still reports NEVER-RUN — the default is unchanged.
+    assert oc.status(_synthetic(tmp_path, None), today=oc.ADOPTED + timedelta(days=1), repo=str(tmp_path))["state"] == oc.NEVER
+
+
+def test_a_scheduled_row_does_not_red_the_daily_sweep_but_an_overdue_one_does(tmp_path):
+    """The dead-man's verdict, not just the state: SCHEDULED rows are excluded from the
+    never-run exit (3) — otherwise adding the launch checkpoints would have redded the daily
+    workflow every day for a month, and a gate that reds while nothing is wrong gets muted."""
+    report, overdue, never = oc.due_report(date.today())
+    scheduled = [n for n in oc.CALENDAR if oc.status(oc.CALENDAR[n], date.today())["state"] == oc.SCHEDULED]
+    assert scheduled, "the launch checkpoints are the live instance of this state"
+    for name in scheduled:
+        assert name not in never and name not in overdue
+        assert name in report, "a scheduled row must still be VISIBLE in the sweep, just not red"
+    # Far enough past every first occurrence, the same rows are overdue and DO red it.
+    assert oc.main(["--due", "--today", "2099-01-01"]) == oc.EXIT_OVERDUE
+
+
+@pytest.mark.parametrize("name", sorted(oc.CALENDAR))
+def test_starts_is_dated_bounded_and_stated_in_the_reason(name):
+    """A declared future start is only honest if it is pinned: a real date, a first
+    occurrence that cannot be parked indefinitely ahead, and the first-occurrence date
+    written into the entry's own reason so the registry and the prose cannot drift."""
+    starts = oc.CALENDAR[name]["starts"]
+    if starts is None:
+        return
+    d = oc._parse_date(starts)
+    assert d, f"{name}: starts must be YYYY-MM-DD"
+    assert d >= oc.ADOPTED, f"{name}: a clock cannot start before the calendar was adopted"
+    first = d + timedelta(days=oc.CALENDAR[name]["cadence_days"])
+    ahead = (first - oc.ADOPTED).days
+    assert ahead <= oc.MAX_SCHEDULE_AHEAD_DAYS, f"{name}: first occurrence {first} is {ahead}d past adoption — a row that can never be late"
+    assert first.isoformat() in oc.CALENDAR[name]["reason"], f"{name}: the reason must state the first-occurrence date {first}"
+
+
+def test_the_launch_checkpoints_are_pinned():
+    """Same shape as test_anchor_is_not_refloated: the 30/60/90-day checkpoints of the
+    2026-09-01 launch are one-time dated commitments (docs/OPERATING_RHYTHM.md). Sliding one
+    must be a deliberate, reviewed edit rather than a quiet cadence bump — that is the only
+    thing standing between 'the checkpoint moved' and 'the checkpoint never happened'."""
+    expected = {
+        "rhythm-checkpoint-30d": date(2026, 10, 1),
+        "rhythm-checkpoint-60d": date(2026, 10, 31),
+        "rhythm-checkpoint-90d": date(2026, 11, 30),
+    }
+    for name, first in expected.items():
+        e = oc.CALENDAR[name]
+        assert e["starts"] == "2026-09-01", f"{name}: the launch is the clock's start"
+        assert oc._parse_date(e["starts"]) + timedelta(days=e["cadence_days"]) == first
+        assert e["attendance"] == oc.OWNER, f"{name}: every question in a checkpoint is the owner's judgment"
+        kind, target, _pattern = e["probe"]
+        assert (kind, target) == (oc.REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md"), f"{name}: the checkpoint log is the artifact"
+
+
+@pytest.mark.parametrize("name", sorted(n for n in oc.CALENDAR if oc.CALENDAR[n]["starts"]))
+def test_the_checkpoint_log_documents_the_line_its_probe_reads(name):
+    """The #3250 lesson generalized: a ritual whose doc does not name the artifact format
+    lands its record where the dead-man cannot see it, and the sweep then says 'never ran'
+    over a checkpoint that happened. The rhythm doc must state the format, and the format
+    must satisfy the probe — while the doc's own placeholder text must NOT."""
+    doc = open(os.path.join(REPO, "docs", "OPERATING_RHYTHM.md"), encoding="utf-8").read()
+    assert "Checkpoint log" in doc, "the rhythm doc must carry the log this probe reads"
+    assert "`- <N>-day checkpoint: YYYY-MM-DD" in doc, "the doc must state the exact line format"
+    rx = re.compile(oc.CALENDAR[name]["probe"][2])
+    days = name.split("-")[-1].rstrip("d")
+    assert rx.match(f"- {days}-day checkpoint: 2026-10-01 — verdict"), f"{name}: the documented format must satisfy the probe"
+    assert oc.newest_run(oc.CALENDAR[name]) is None, f"{name}: no checkpoint has run — a placeholder line must not fake one"
 
 
 @pytest.mark.parametrize("name", sorted(oc.CALENDAR))
