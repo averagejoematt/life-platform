@@ -236,6 +236,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-range { color: var(--ink-faint); }
 .rd-tbl .provenance { margin-top: 0; font-size: inherit; letter-spacing: normal; text-transform: none; } /* #589: fits the kit's byline inline in a table cell */
 .rd-tbl tr.rd-flag td { background: var(--ember-wash); }
+/* #3325: a flagged row's faint readouts (p-value, n-dots count, evidence-bar score, unit glyph) sat
+   at 4.34:1 on the ember wash in light theme — the daily sweep read 16 NEW serious color-contrast
+   nodes on /method/intelligence/ the day 16 correlations went FDR-significant (a data-driven state:
+   the row only exists when the data flags it; /data/labs/ carried the same class as baselined debt).
+   Flagged rows are the emphasised rows, so their readouts take primary ink (12.9:1 light, 13.3:1 dark). */
+.rd-tbl tr.rd-flag :is(.rd-range, .rd-unit, .ndots-n, .evb-score, .ndots.cf-med, .ndots.cf-low, .ndots--none) { color: var(--ink); }
 .rd-flagmark { color: var(--ember); font-weight: var(--weight-med); }
 .rd-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, transparent); }
 
