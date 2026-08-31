@@ -41,12 +41,12 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-08-31 (Session L: +3 reference files)
+## Coverage — 2026-08-31 (Session M: +3 reference files; Session L: +3)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 374** — feedback 22 · reference 205 · security 1 · project 143 · user 1 · index 2
+**Files in the memory index snapshot: 377** — feedback 22 · reference 208 · security 1 · project 143 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 228** — homed-here 50 · already-homed 158 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 231** — homed-here 53 · already-homed 158 · superseded 7 · narrative 11 · off-repo 2
 
 **Program/session files (project): 143** — already-homed 14 · superseded 1 · narrative 125 · off-repo 2 · index 1
 
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-08-30
+## Snapshot of the memory index — 2026-08-31
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -358,6 +358,7 @@ reference_lane_branch_must_not_carry_counter_file.md
 reference_launchd_tcc_documents.md
 reference_layer_shipped_deps_dependabot_blind.md
 reference_llm_json_maxtokens_truncation.md
+reference_local_axe_blind_to_color_mix_contrast.md
 reference_local_black_vs_pinned_black.md
 reference_local_render_qa.md
 reference_magicmock_pagination_oom_runner_shutdown.md
@@ -399,6 +400,7 @@ reference_reexport_is_not_a_patch_point.md
 reference_regen_invoke_email_lambda_trap.md
 reference_reject_a_gated_run_pinned_to_a_stale_sha.md
 reference_removing_a_confound_reveals_the_second_defect.md
+reference_reordering_sync_steps_changes_what_each_step_owns.md
 reference_reset_pipeline_owned_manifest_clobber.md
 reference_rollback_partial_fires_mixed_fleet.md
 reference_ruff_full_dir_set.md
@@ -417,6 +419,7 @@ reference_site_rollback_rerun_full_not_failed.md
 reference_site_smoke_transient_timeout_rollback.md
 reference_small_gap_reset_false_positive.md
 reference_smoke_invalidation_race.md
+reference_stack_census_prs_on_a_nonstrict_ruleset.md
 reference_stale_behind_a_fresh_timestamp.md
 reference_stale_data_row_reverts_code_deploy.md
 reference_strptime_is_the_inverse_of_a_clock.md
@@ -674,6 +677,9 @@ user_who_is_matthew.md
 | `reference_workflow_step_deps_and_first_apply.md` | reference | `.claude/skills/prove-it/SKILL.md` § dark: a missing dependency; the first-apply half in `docs/OPERATING_DISCIPLINE.md` §5.8 | already-homed |
 | `reference_worktree_agent_path_reuse.md` | reference | `.claude/agents/worktree-implementer.md` 0b + `scripts/lane_worktree.py` | already-homed |
 | `reference_worktree_case_insensitive_pollution.md` | reference | `docs/CONVENTIONS.md` §7 | already-homed |
+| `reference_local_axe_blind_to_color_mix_contrast.md` | reference | `docs/CONVENTIONS.md` §7 (local axe blind to color-mix contrast — prove by arithmetic, read CI's report.json) | homed-here |
+| `reference_reordering_sync_steps_changes_what_each_step_owns.md` | reference | `docs/CONVENTIONS.md` §7 (reordering a sync changes ownership — assert include sets disjoint); INCIDENT_LOG 2026-08-31 P1 | homed-here |
+| `reference_stack_census_prs_on_a_nonstrict_ruleset.md` | reference | `docs/CONVENTIONS.md` §7 (stack census-bumping PRs; re-rebase after each squash) | homed-here |
 | `security_r22_mcp_token_exposure.md` | security | — off-repo by design: security-incident detail stays out of the public repo (`docs/CONTINUITY.md` §4); the fixes are recorded on #779/#780/#893 and in `docs/DECISIONS.md` | off-repo |
 
 ## Program and session records — `project_*`

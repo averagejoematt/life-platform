@@ -3389,6 +3389,41 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3323"
         }
       ]
+    },
+    {
+      "id": "2026-08-31-thirteen-closed-and-the-door-i-broke",
+      "date": "2026-08-31",
+      "title": "Thirteen issues closed in one session — and the twenty pages I broke on the way",
+      "shipped": "A second drain session, this time with the lanes capped at three or four at once instead of eight. Thirteen issues closed, fourteen pull requests merged, two whole epics retired on their stated outcomes rather than on their checklists: the architecture is now enforced by machinery rather than remembered (a stale hand-copy of an IAM policy can no longer exist in the deploy folder — a planted one fails the pre-merge suite by name), and the platform's judgment rituals run on a calendar that screams when a week is missed. An additive IAM grant ships through CI behind a data-driven, fail-closed gate that a security review narrowed five times before it landed; a session with no memory ran the platform from the repo alone and answered eight operator questions with citations; the mobile viewport is now audited for keyboard reach on every deploy; and the reader-truth judge decides on structure instead of on how it happened to phrase an objection.",
+      "why_it_mattered": "The closing side of the backlog got a contract this session — a definition of done with detectors behind it — and the first thing it caught was my own three closing comments, written minutes earlier with the wrong marker. That is what an enforced rule looks like from the inside: it does not care who wrote the thing. The same discipline is why the epics closed honestly: every child verified from live state, every inline claim re-checked, one tail left open on purpose with a carrier issue rather than waved through.",
+      "gotcha": "Fixing one deploy race caused a worse one. Uploading the site's hashed assets before its HTML (so a page can never reference a file that is not there yet) moved a step that stamps everything under /data as JSON ahead of the step that uploads pages — and twenty reader pages under /data were served as JSON for about twenty-two minutes. The gate caught it in three minutes; the automatic rollback then re-ran the same script and broke it the same way, and reported success. Restored by hand, fixed at the cause with a test that fails if the exclude ever disappears, and the rule written where the next person will read it: reordering sync steps changes which step owns a file, not just when it runs.",
+      "honest_miss": "The rollback that re-ran its own defect is the silent-failure class this platform's biggest open epic exists to end, and it is still open — filed as its last tail rather than closed over. Two owner decisions are parked on purpose: a permissions boundary on the CI deploy role that only the owner can re-bootstrap, and a product pick from the roadmap that would refill the queue but is not mine to make. And the session's deploy-lease discipline cost real time: nine superseded leases rejected by name, each one a run that will read as a red in the history it never had.",
+      "prs": [
+        {
+          "label": "PR #3335",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3335"
+        },
+        {
+          "label": "PR #3338",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3338"
+        },
+        {
+          "label": "PR #3341",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3341"
+        },
+        {
+          "label": "PR #3343",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3343"
+        },
+        {
+          "label": "PR #3344",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3344"
+        },
+        {
+          "label": "PR #3351",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3351"
+        }
+      ]
     }
   ]
 }

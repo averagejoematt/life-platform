@@ -929,6 +929,29 @@ a grant that moved.
   falls back silently** — the parser sees malformed JSON and the caller takes the fallback
   branch with no error. Size the cap from the *accrued* input (it grows as the platform's
   context grows) and treat a missing closing fence as a failure to log, never as "no result".
+- **Reordering a multi-step S3 sync changes which step OWNS a file, not just when it runs.**
+  `aws s3 sync` is idempotent on content: whichever step uploads a changed file first stamps
+  its Content-Type, and later steps skip it. On 2026-08-31 the assets-first reorder of
+  `deploy/sync_site_to_s3.sh` (#3349) put the "Data JSON" sync ahead of the HTML sync; that
+  step also covered `site/data/**/index.html`, so the whole `/data/*` door served
+  `application/json` for ~22 min — and the auto-rollback re-ran the same script and re-broke
+  it (INCIDENT_LOG 2026-08-31 P1; fix PR #3351). Before reordering, assert every step's
+  include set is disjoint over the real build tree (`aws s3 sync --dryrun` per step), or
+  make them disjoint with explicit excludes; a metadata-only defect is fixed live with an
+  in-place `aws s3 cp --metadata-directive REPLACE`, not a redeploy.
+- **A local axe run reports 0 color-contrast violations on `color-mix()` / oklch-alpha
+  backgrounds that CI's Chromium fails.** The local Chromium hands axe an `oklch(… / 0.09)`
+  it cannot blend and the node is skipped; CI's serialises the same wash to sRGB and computes
+  the real ratio (#3325: 16 nodes on `/method/intelligence/`, 0 locally). Prove contrast on a
+  wash by WCAG luminance arithmetic on the blended colours, and read CI's `report.json`
+  artifact for which nodes failed — a local 0 on a wash background measured nothing.
+- **Several PRs that each bump `BASELINE_TOTAL_GATES` collide on the same line — stack them.**
+  Rebase each onto the previous PR's tip in merge order (+1 each, verified by
+  `scripts/gate_census.py --json` id-set diff against the PREVIOUS PR's tree), push all, let
+  CI run concurrently, merge lowest first; after EACH squash the next PR needs a clean
+  `git rebase --onto origin/main <previous PR's old tip>` and one more CI cycle (the ruleset is
+  non-strict, but GitHub still reports the stacked branch CONFLICTING after the squash).
+  `deploy/merge_train.sh` cannot resolve the baseline file; the stack resolves each hunk once.
 
 ---
 

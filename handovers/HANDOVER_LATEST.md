@@ -1,125 +1,119 @@
-# Handover — 2026-08-31 (FABLE 5): Session L — the ambitious drain, Fable orchestrating
+# Handover — 2026-08-31 (FABLE 5): Session M — the second drain, 13 closed, one P1 I caused
 
 **Session:** Claude Fable 5, owner co-working from mobile, Fable orchestrating Opus/Sonnet
-worktree lanes (up to 8 concurrent). Started 2026-08-30 ~22:20Z. **The subagent fleet was cut
-off by the MONTHLY spend limit at ~00:20Z** (429, resets 5:20pm PT) — four lanes and the
-cold-read proof died mid-flight; the main session finished the deterministic tail by hand.
+worktree lanes capped at 3–4 per wave (Session L's eight hit the monthly spend limit). Started
+2026-08-31 ~01:15Z, wrapped ~06:30Z.
 
 ## The ask and the honest count
 
-Owner: "as many open issues closed as possible, Fable orchestrating, without risking quality."
-Pre-session estimate: realistic 12, stretch 15 (working set 21 non-Roadmap; epic checklists
-turned out to be stale by construction, see gotchas). **Closed 10:** #3316 #3278 #2833 #3328
-#3327 #3251 #3317 **#3314** (on its boot proof, not its merge), plus #2848 merged as `Refs`
-pending its cold-read proof. **Filed 8 carriers** (#3324 #3327 #3328 #3329 #3336 #3337 #3340
-+ the two owner-decision records) because the verification kept surfacing real residuals —
-every one now has an owner. Net working set: 21 → 18, with 4 open PRs carrying more.
+Owner: "same brief as last session — close as many issues as possible, Fable orchestrating,
+without risking quality — cap concurrency at 3–4 lanes, check headroom before each wave." Order:
+#3336 → PR #3335 (R1–R5+N1–N3) → un-swallow #3341/#3339 → #2848 cold-read proof → #3277 →
+epic #2799 audit → boot hygiene. Then "if there's more we can squeeze in pre-wrap, let's do it."
 
-## What shipped (11 PRs merged; main-tip deploy lease approved)
+**Closed 13:** #2848 (cold-read proof, 8/8) · #3336 (PR #3338) · #3318 (PR #3341) · #3325
+(PR #3342) · #3337 (PR #3343) · #3315 (PR #3339) · #2834 (PR #3335) · #3277 (PR #3344) · #3324
+(PR #3347) · #3329 (option B, PR #3348) · **epics #2842 (Kernel) and #2800 (calendar)** on their
+Outcomes · plus #3340 re-homed to #3042. Working set **18 → 9** (4 epics, 5 owner-gated/blocked
+stories). **Filed 3** (#3352 carrier for #2799's rollback-scope tail; #3353, #3354 from residuals
+the closure sweep would not let me leave homeless). **14 PRs merged**, every one with a green-by-name
+verdict + closing-set check; every closure has `**Shipped:**` + `**Outcome:**` with live evidence.
 
-- **#3314 (PR #3320) — the system model boots the operator.** The alarm plane held **50 of 116**
-  alarms (explicit `alarm_name=` kwargs only) — the operator would have booted on half the
-  estate. Now seeded from `deploy/alarm_discovery.py` (the #795 authority, one enumeration not
-  two) + composites = **119, 0 unresolved**, routing traced through local factories under each
-  call's own args, composites, helpers the alarm variable is handed to, and the ADR-050
-  constructor contract. Privacy plane from `field_tiers.py` (every partition stamped);
-  schedules flattened with a UTC clock; `blast_radius.py --alarm/--at/--privacy/--lambda`.
-  **The boot contract is executable:** `scripts/boot_brief.py::BOOT_CONTRACT`, printed by the
-  registered SessionStart hook; 19 contract tests incl. the STALE dead-man and prose-may-not-
-  disagree. Generator split into `platform_model_alarms.py` at the #1665 ceiling. **Proof
-  pasted on the issue:** the hook run from main at close printed `model CONSISTENT · fleet 104 ·
-  alarms 119 · privacy 13+2 · data 105/666/8` from the model.
-- **#3278 (PR #3321)** — no security-tier log group anywhere was at the documented 90d (14
-  Lambda@Edge replica groups NEVER-EXPIRE across 5 regions). Declared once in `constants.py`,
-  derived by CDK, applied to all 17 groups (dry-run exit 0), asserted weekly by a new
-  `log_retention` sentinel check. Deployed `LifePlatformOperational` + the edge apply script.
-- **#2833 (PR #3323)** — shadow permanently: auto-merge gate, earn path and re-promotion bar
-  retired; `auto` REJECTED at the kill-switch; re-priced $0.18/run (n=9). ADR-129 amended,
-  ADR-065 Retired.
-- **#3316 (PR #3319)** — `/api/sleep_detail` schema baseline recaptured live; gate proven to
-  fail. Its full-sweep residual (34 endpoints red-for-noise) → #3324.
-- **#3327 (PR #3334)** — grounding_guard: 7 phantom fabrication flags in 10 ordinary phrases on
-  a BLOCKING gate; fixed with lookahead on all three metrics; 1,387 corpus tests, no golden edited.
-- **#3251 (PR #3332)** — C1 measured: pair $0.239 → $0.048/run (n=16/11); ADR-125 amended;
-  daily standalone priced; adjudicator scope → #3337.
-- **#3328 (PR #3330)** — attribution guard matches all 3 banned forms + a PR-body sweep.
-- **#3317 (PR #3326)** — qa-smoke set 3/3 KEEP from 30d live history; + `telegram-webhook-errors`
-  (digest — owner Q4) live after a `LifePlatformServe` deploy.
-- **#2848 (PR #3333, `Refs`)** — 48 rules homed, 157 already-homed cited, a committed
-  operating-knowledge ledger + guard; closes on a cold-read proof (#2848).
+## What shipped (all merged AND deployed/verified by content)
 
-## Owner decisions (2026-08-30, all recorded on-issue)
-- **#2834 → option (b)**: scoped additive-only CI IAM grant, conditioned on a CISO-grade review.
-  PR #3335 built it; the review verdict (posted on the PR) is **APPROVE-WITH-REQUIRED-CHANGES
-  R1–R5** — Code-tolerance shape, S3 mutating actions on `raw/*`/the replica/the ledger,
-  in-namespace control-plane actions, a human-visible ALLOW record, the ratchet anchored to the
-  ADR text. Key fact: CI gains **no** permission it lacks today (the deploy role already holds
-  the CDK admin path) — the changes are narrowings. Declining R1/R2 → (c). Follow-up: #3340.
-- **#3251 → C1** (done). **Q4 `telegram-webhook-errors` → digest** (done).
-- BotFather for #2363: "at another time" — the epic stays open on the owner's 10 minutes.
+- **#3336 / PR #3338** — `setup_remediation_role.sh` + `setup_github_oidc.sh` apply `infra/iam/*.json`
+  verbatim (0 inline policy text); `tests/test_iam_twin_free_3336.py` entered the census PROVEN
+  (MutationSpec, ARMED 1/1); `verify_oidc_iam.py --strict` CLEAN live.
+- **#2834 / PR #3335** — the CISO review's R1–R5 + N1–N3 all landed (value-aware Code tolerance,
+  S3 deletes refused on the bucket policy's Deny prefixes + replica dropped, control-plane actions
+  forbidden, human-visible ALLOW record, ADR-anchored baselines, stack-name validation, steps
+  reordered, wildcards an explicit decision); deploy role gained no permission; `guard::deploy/
+  iam_additive_gate.py` proven. Owner-flagged residual: prefix-scoped PUTs on `site/*`/
+  `remediation-log/*`/`raw/*` remain admitted (`S3_MUTABLE_BY_CI_TODAY`) — one Deny line flips them.
+- **#3318 / PR #3341** — the closure contract (registry + detectors A/B, seamed into
+  `wait_pr_green.sh`; `warn` posture). It caught my own three closing comments the same night.
+- **#3315 / PR #3339** — the CI dark-flag sweep; live on main: 39 jobs / 261 steps / 0 violations.
+- **#3337 / PR #3343** — reader-truth rulings decide on structure (13/13; 0 lexical); found and fixed
+  `today_iso=None` on every production run since #2959; deployed to `qa-smoke` via the gated tip run
+  (verified by bundle content: `reader_truth_evidence.py` + `phase["today"]`).
+- **#3277 / PR #3344** — axe at 390px in the gating sweep, mobile ledgers, `role="group"` scroll
+  regions; live re-measure **0/0 nodes across 15 pages × chromium+webkit**; webkit lane surfaces via
+  the #1447 filer (dead SNS step deleted).
+- **#3324 / PR #3347** — nullable-aware `diff_shape`, whole-value leak anchor, dated recapture; live
+  `--check-drift` on main: **0 breaking, 0 leaks**.
+- **#3329 / PR #3348** — the 6 unprovable gates are counted `not-applicable` verdicts with reasons;
+  `BASELINE_UNPROVEN_GATES` is DOWN-ONLY; #2578 box 2 amended (owner: option B).
+- **#3325 / PR #3342** + **PR #3350** — two data-driven contrast defects (FDR-flagged rows; paused
+  supplement cards) fixed at the token level; both live.
+- **PR #3345** — the #2799 folded-items pass: 6 of 7 already fixed by children, 3 false
+  compensating-control claims corrected, visual-qa's dead SNS notifier deleted.
+- **PR #3346** — `docs/OPERATOR_GUIDE.md`'s measured weekly operator touch (#2800's last item).
+- **PR #3349 + PR #3351** — the site sync uploads hashed assets first and HTML last (the 7-second
+  asset race behind 43 false reds), and the Data-JSON sync excludes `*.html` (see Incidents).
+
+## Incidents (both rows in `docs/INCIDENT_LOG.md`)
+
+1. **P3 — the asset race:** the #3277 deploy uploaded HTML 7 s before the hashed JS it referenced;
+   the edge cached a 404; ci-cd's un-raced visual QA read 43 pages red. Root-caused from the deploy
+   log timestamps; fixed structurally (#3349) with a mutation-proven order guard.
+2. **P1 — self-inflicted, ~22 min:** that reorder put the Data-JSON sync (stamps
+   `application/json`, no html exclude) ahead of the HTML sync; it also covered
+   `site/data/**/index.html`, so the whole `/data/*` door served JSON. The gate caught it; the
+   auto-rollback **re-ran the same script and re-broke it identically**, then reported success.
+   Restored by an in-place `aws s3 cp --metadata-directive REPLACE` + `/data/*` invalidation; fixed
+   in #3351; the next site deploy (manual dispatch, `3baa9c3`) verified the order
+   (Hashed → Data JSON → HTML) and every door `text/html`. Lesson homed in CONVENTIONS §7 + memory.
 
 ## Verification state
-- Governor 2026-08-31T00:00Z (first post-#3308 cycle): titan **$5.77 → $0.01**, drift
-  **1.29x → 1.21x** — the prediction to the cent; posted on #2883. Soak clock honest.
-- Main tip `3fae71b4d`'s ci-cd run: lease **approved** (the union of every merge); six superseded
-  leases rejected by ancestry (`dda8ffce` `72556168` `d73aaf0d` `3d398fc7` `6f86302e` `0c4c4885`
-  `54453a63`). **Its Deploy job completed success during the wrap** and was verified by content (the live
-  `ai-expert-analyzer` bundle carries grounding_guard's `_NUM_VALUE`/`_NOT_A_COUNT`). The later run for `b4dab61b` (#3320,
-  scripts/tests/docs only) will reach the gate after it — approve it, it is main's new tip.
-- `deploy/verify_oidc_iam.py` **CLEAN**; log retention 17/17 at 90d; `telegram-webhook-errors`
-  live and digest-routed.
+- Every lease disposed: approved the tips (`53511af98`, `6badbea56`, `253bc2a3e`, `f45ad6db6`),
+  rejected 9 ancestors by name; two runs cancelled by concurrency; `bbd19b112` had no deploy job.
+- Live: site build `3baa9c3` (05:40Z), `qa-smoke` bundle carries #3337, `verify_oidc_iam --strict`
+  CLEAN, `--check-drift` 0/0, dark-flag sweep 0, census 584 → 587 on main with the not-applicable
+  partition printing.
+- Governor at boot: **tier 2** (mtd $176.64 / $200 August ceiling, drift 1.21x); reverts to the
+  $215 base at 00:00Z 09-01 → reads tier 1. The 08:00Z cycle was not read (wrapped before it).
 
-## Open PRs at close (next session's merge queue)
-- **#3335** (#2834) — implement R1–R5 + N1–N3 from the CISO review comment, then merge.
-- **#3341** (#3318 closure contract, supersedes #3331) and **#3339** (#3315 dark-CI-flags sweep,
-  supersedes #3322) — both green locally; **GitHub minted ZERO workflow runs for their pushes
-  for 40+ minutes** across close/reopen, a re-mint push and supersede-PR (the #3219 class at
-  its third rung). Both carry census bumps (571→57x) and will collide — train them together
-  once minting recovers; if it does not, the integration-train rung.
-
-## Lanes cut off by the spend limit (no PR opened; worktrees under
-`~/dev/worktrees/life-platform/` still LOCKED with work in them — reuse or release)
-- **#3336** IAM shell twin (P1) · **#3277** mobile-viewport axe (+ the webkit surface box) ·
-  **#2834** R1–R5 · **#2848** cold-read proof.
-
-## Gotchas (durable ones → memory)
-- **A lane branch must never carry `lambdas/web/platform_counts.py`** — the pre-commit hook
-  stages it; every later merge to main then conflicts (the train aborted twice on #3320).
-  `git checkout origin/main -- …` and commit `--no-verify`.
-- **Never apply a security document through a hand-maintained twin.** `setup_remediation_role.sh`
-  regressed 4 grants and widened the remediation role's trust to `repo:*` for ~6 min (#3336).
-- **Epic checklists are stale by construction** — all listed children of #2363/#3042/#2801 were
-  CLOSED with their boxes unchecked; audit from live child state, then verify inline bold items.
-- The permission classifier blocked `merge_train.sh` once and allowed it four times — retry, or
-  `gh pr merge --squash` for a single fully-green PR.
-- `lane_worktree.py new` prefixes `issue-` itself — three lanes produced `issue-issue-N` dirs.
-- Eight concurrent lanes + verifiers + a reviewer is what hit the monthly cap; 3–4 per wave.
+## Gotchas (durable ones → memory + CONVENTIONS §7)
+- **Stacked census PRs**: rebase each onto the previous PR's tip (+1 each), run CI concurrently, merge
+  in order — and re-rebase the rest after EACH squash (GitHub reports CONFLICTING; the rebase is clean).
+- **`gh run list --jq` does not take `--arg`**, and the system bash is 3.2 (no `declare -A`) — two
+  of my watcher scripts died silently and produced phantom "no run minted" events. The fixed
+  watcher is `scratchpad/watch_runs.sh`-shaped: inline the jq string, no associative arrays,
+  require 3 consecutive empty reads before calling a swallow.
+- **A resolver whose assert fails must not be chained to `git rebase --continue`** — twice I
+  committed conflict markers that way; the census then "lost" two registry ids. Resolve, `ast.parse`,
+  THEN continue.
+- **Local axe is blind to `color-mix()` contrast** (0 locally, 16 in CI) — prove by arithmetic.
+- **Reordering sync steps changes ownership** — see Incident 2.
 
 ## Residual / next picks
-- **#3336** first — P1 security twin (lane brief on the issue) — and its INCIDENT_LOG row is in
-  (this wrap); the CloudTrail confirmation of the window is the PR's job.
-- Land **#3335** R1–R5 (#2834), un-swallow **#3341/#3339** (#3318, #3315), rerun the **#2848**
-  cold-read proof and close it, finish **#3277**.
-- The `b4dab61b` (#3320) run reaches the deploy gate after the tip — approve it — not-work —
-  lease disposal reflex, main's new tip.
-- Prune the two qa-smoke registry entries after 2026-08-31T14:06Z/18:32Z if OK; the warnings
-  alarm re-lit at 00:44Z on a #3337-class judge shape + a real 6-day scale gap — #3337.
-- Epic closes now in reach: **#2799** (after #3277 + a one-line coach-nudge ledger revisit),
-  **#2800** (after #2834 lands — its 09-08 ritual proof runs itself), **#2363** (owner's
-  BotFather minutes — not-work — owner action). **#2578** cannot close honestly until #3329
-  is decided (43/570 proven).
-- **09-08 Architect ritual runs ITSELF** — not-work — scheduled machinery; it reads the boot
-  brief via the `/review` orient step.
+- **#2799** stays open on its honest tail: #3352 (rollback scope-check + `/api/ai_analysis`
+  `content_as_of`) and #3353 (WebKit 32767px screenshot cap) — both filed tonight.
+- **#2578**: box 2 re-scoped (owner B); the installed base shrinks opportunistically — #3354 is its
+  newest child. #3040-class hygiene is done.
+- **#3042** (A-Grade): NOT closeable — the 08-29 re-grade's external ≥9/10 box; #3340 now lives here.
+- **Owner-gated, unchanged:** #3340 (cfn-exec boundary — an owner-run re-bootstrap), #2883 (soak;
+  n=30 bar decision), #2978 (30-day re-measure due ~2026-09-2x; two shape-(a)-class datums added
+  tonight), #1407 Roadmap product pick (see Backlog).
+- **Time-gated boot hygiene, not done this session:** governor 08:00Z cycle read (#2883 soak) ·
+  Monday 14:45Z remediation run ends at "Run remediation agent" with a CallerClass=remediation
+  datapoint (#3308 verification) · prune the `qa-smoke-failures` registry entry after 14:06Z if
+  still OK (not-work — registry hygiene per its own dated note) · the `qa-smoke-warnings` alarm is
+  now a self-clearing scale-gap state (re-cited, expiry 09-03 wrap).
+- **BotFather for #2363** — not-work — owner action, 10 minutes.
+- **09-08 Architect ritual runs ITSELF** — not-work — scheduled machinery (#2849 reopen trigger).
+- **Main's last completed run reads red** on the incident-window visual-QA job; the approved
+  `f45ad6db6` run is the green proof in flight — not-work — check its result at next boot.
 
 ## Gate lines
-**Build beat:** 2026-08-31-the-operator-boots-from-the-model
-**Docs:** docs/CHARTER.md (boot contract), model/README.md, docs/DEPENDENCY_GRAPH.md (generated §5/§5b/§6), docs/DATA_GOVERNANCE.md + docs/PROPORTIONALITY.md (via #3321/#3323/#3332/#3333), docs/OPERATING_KNOWLEDGE_LEDGER.md (new + 3 rows), docs/INCIDENT_LOG.md (+1 row), docs/alarm_citations.json (qa-smoke-warnings re-cited), .claude/skills/review + uplevel (boot brief in orient), CLAUDE.md status block
-**Decisions:** none needed — governance decisions landed as dated ADR amendments via the merged PRs (ADR-129 + ADR-065 Retired in #3323, ADR-125 in #3332); the #2834 option-(b) decision is recorded on-issue and its ADR-065 amendment ships with PR #3335
-**Main:** green (3fae71b4d) — the tip run completed success (Deploy + smoke) during the wrap; verified by CONTENT: the live `ai-expert-analyzer` bundle (LastModified 2026-08-31T00:30:50Z) carries grounding_guard's new `_NUM_VALUE`/`_NOT_A_COUNT` regexes and `privacy/field_tiers.py`
-**Incidents:** 1 row added — the remediation-role trust policy widened to any-branch for ~6 min by applying a grant through the stale shell twin (#3336)
+**Build beat:** 2026-08-31-thirteen-closed-and-the-door-i-broke
+**Docs:** docs/CONVENTIONS.md §7 (+3 gotchas), docs/OPERATING_KNOWLEDGE_LEDGER.md (+3 rows, snapshot 377), docs/alarm_citations.json (qa-smoke-warnings re-cited to its self-clearing data cause), docs/INCIDENT_LOG.md (+2 rows via PRs #3349/#3351), docs/OPERATOR_GUIDE.md (PR #3346), docs/DECISIONS.md ADR-065 amendment (PR #3335), docs/PROPORTIONALITY.md (PRs #3341/#3348), docs/OPERATING_DISCIPLINE.md untouched
+**Decisions:** none needed — governance landed as dated ADR amendments in the merged PRs (ADR-065 2026-08-30 via #3335); the #3329 option-B and #2842 close decisions are recorded on-issue and in #2578's amended box 2
+**Main:** red — the latest completed run (253bc2a3e) failed only its Visual + AI-vision QA job, on 9 /data pages probed inside the 2026-08-31 P1 JSON-door window (INCIDENT_LOG row); its Deploy + smoke succeeded; the tip run f45ad6db6 is approved and in flight as the green proof
+**Incidents:** 2 rows added — the 7-second asset race (P3, 43 false reds, fixed #3349) and the /data door served as JSON for ~22 min (P1, self-inflicted, rollback re-ran the defect, fixed #3351)
 **Stash/hooks:** clean
-**Closures:** #3316, #3278, #2833, #3328, #3327, #3251, #3317, #3314 commented (Shipped + Outcome on each); #2848 merged as Refs, verdict deferred to its proof
-**Backlog:** Now refilled to 3 stories by promoting #3337 (opus, by stored rank 1.50 — both edits: milestone + score arrow); fable-lane startable is 0 (NO REMEDY IN THE CORPUS for fable — #3314 was the last fable story and it closed); Later sweep — no stale Later issues printed
-**Alarms:** 1 red — qa-smoke-warnings re-lit 2026-08-31T00:44Z, re-cited to #3337 (judge temporal_contradiction shape on /api/sleep_detail wake-date + a real 6-day weight gap); qa-smoke-failures OK; no uncited flaps
-**CI warnings:** none to triage — check_ci_warnings found the latest completed main run not yet green at gather time (the tip run was mid-deploy); no warning annotations on the last green run (0449f12c)
-**Ledger:** rows added via the merged PRs this session — log_retention sentinel (#3321), remediation agent re-priced as a triage instrument (#3323), AI CI QA gates re-priced under C1 (#3332), operating-knowledge guard (#3333); the boot brief rides the existing system-model row
+**Closures:** #2848, #3336, #3318, #3325, #3337, #3315, #2834, #3277, #3324, #3329, #2842, #2800 commented (Shipped + Outcome, live evidence on each); #3251, #3314, #3317, #3327 (Session L's, same UTC day) given the `**Outcome:**` marker over their existing verdicts · DoD: scanned 16, hits 2 — #3317 post-close-comment = Session L's own verdict posted +18m, benign; #3318 post-close-assertion = the closing comment quotes the sweep's own output containing "REOPENED", lexical not an assertion; #2848 dispositioned in the registry
+**Backlog:** Now 2 actionable (filed #3353, #3354 — lever 1 of the refill plan, both evidence-backed from tonight's residuals); NO REMEDY IN THE CORPUS for the third — the sanctioned walk's only pick is the Roadmap product pick #1407 (Monarch, ADR-099 ¶3 one-per-cycle), which is the owner's call, asked and not taken tonight; Later sweep — no stale Later issues printed
+**Alarms:** 4 red >72h, all cited — qa-smoke-warnings re-cited from closed #3337 to its self-clearing data cause (Withings scale gap, expiry 09-03 wrap); ai-tokens-platform-daily-total, compute-pipeline-stale, cost-metric-drift-sustained carry their standing citations
+**CI warnings:** none to triage — the latest completed main run is not green (incident-window visual QA, decoded on the Main line), so the warning triage keys on the last green run (bbd19b112, Deploy skipped) — no warning annotations there
+**Ledger:** rows added via the merged PRs — closure contract (#3341), gate-census posture (B) (#3348), additive-IAM gate (#3335); the two sync-script guards ride the existing site-deploy row
