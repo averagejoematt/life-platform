@@ -244,8 +244,12 @@ def _auto_discover_alarm_count() -> int | None:
       3. `create_platform_lambda(...)` (cdk/stacks/lambda_helpers.py) — creates ONE
          per-Lambda error alarm via `.create_alarm(...)`, but ONLY when `alerts_topic`
          resolves non-None AND `error_alarm` isn't explicitly False (the ingestion fleet
-         sets `error_alarm=False` via a `shared = dict(...)` kwargs spread, consolidating
-         ~46 per-Lambda alarms into one metric-math aggregate, 2026-05-29). This function
+         sets `error_alarm=False` via a `shared = dict(...)` kwargs spread, RETIRING
+         ~46 per-Lambda alarms outright, 2026-05-29 — corrected 2026-08-30, epic #2799:
+         this line used to say "consolidating ... into one metric-math aggregate" and
+         no such aggregate exists (monitoring_stack.py:926: "No aggregate replaces
+         them"); the compensating controls are the shared ingestion DLQ alarm, the
+         freshness-checker and ER-01 ingest-liveness). This function
          is auto-detected as a single-alarm helper the same way as #2 (its one
          `.create_alarm(` sits inside an `if` guard) but resolved specially per call site
          because its alarm is conditional, not unconditional — see

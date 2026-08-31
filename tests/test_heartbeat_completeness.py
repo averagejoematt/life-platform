@@ -529,8 +529,14 @@ COVERAGE = {
         "#1623: sends are rare by design (>=10-14 day ledger cooldown) and most daily runs are honest no-ops (quiet/disarmed), "
         "so an absence alarm cannot distinguish 'dead cron' from 'nothing to celebrate'. #3161: corrected — this Lambda uses "
         "email_stack.py's shared kwargs spread (error_alarm=False, COST-01), so there is no dedicated per-Lambda 'digest error "
-        "alarm'; error-mode is covered by the shared ingestion DLQ, alarmed by life-platform-ingestion-dlq-messages. Revisit "
-        "when the recipient secret is provisioned and the first real send lands.",
+        "alarm'; error-mode is covered by the shared ingestion DLQ, alarmed by life-platform-ingestion-dlq-messages. "
+        "#2799 hygiene sweep, RE-EVALUATED 2026-08-30 — the revisit condition is HALF met and the exemption STANDS. "
+        "Measured, not assumed: the recipient secret life-platform/digest IS provisioned (created 2026-07-26, "
+        "LastAccessedDate 2026-08-29 — the daily cron is reading it), but ZERO real sends have ever landed "
+        "(send_ledger pk USER#matthew#SOURCE#email_log#milestone_digest: Count=0). With no send history at all, an "
+        "absence alarm would fire every single day on the designed no-op. Revisit narrows to the remaining half: the "
+        "FIRST real send. At that point the honest signal is the #2490 shape — have the run emit a per-run completed "
+        "metric so a quiet day is a datapoint of 0, not an absence — not an Invocations alarm.",
         "life-platform-ingestion-dlq-messages",
     ),
     "nutrition-review": (EXEMPT, "2026-07-19", "Operator email (Saturday nutrition review); a missing issue is noticed by its reader."),
@@ -547,7 +553,15 @@ COVERAGE = {
         "2026-07-25",
         "Proactive coach nudge (#1382): most hourly ticks legitimately send nothing (deterministic triggers + 1/day cap), "
         "so no-invocation alarms would be noise at the send layer; the observatory proactivity card surfaces sent/graded "
-        "counts, and a dead cron shows as a permanently-stale card. Revisit once nudges have a real send history.",
+        "counts, and a dead cron shows as a permanently-stale card. #2799 hygiene sweep, RE-EVALUATED 2026-08-30 (the "
+        "revisit condition was 'once nudges have a real send history'; Telegram delivery went live 2026-08-09) — the "
+        "condition is MET and the exemption STANDS, now for a measured reason instead of an assumed one. Live count "
+        "from the ledger partition COACH#nudge_ledger: 4 sends in the 36 days 2026-07-26 -> 2026-08-30 (07-26, 08-06, "
+        "08-07, 08-30), i.e. ~1 per 9 days, and the most recent is same-day. So a send-layer absence alarm at any "
+        "usable window would fire on ordinary quiet days — exactly the premise the exemption was written on, now "
+        "confirmed against real traffic rather than predicted. The upgrade path is the #2490 telegram-coach-worker "
+        "shape (emit a per-tick completed metric so a no-send tick is a datapoint of 0 and only a dead cron is "
+        "silent); that needs a Lambda code change plus a new CDK alarm, so it is NOT this sweep's work.",
     ),
     # #2490 promoted this from a dated exemption to a real signal. The exemption's
     # premise was that no absence alarm was POSSIBLE here — invocation counts can't

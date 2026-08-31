@@ -88,8 +88,19 @@ class IngestionStack(Stack):
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
-            # 2026-05-29: per-Lambda ingestion-error-* alarms consolidated into one
-            # metric-math aggregate (LifePlatformMonitoring). Saves ~$4.60/mo.
+            # 2026-05-29 (COST-01, #790): the ~46 per-Lambda ingestion-error-*
+            # first-error alarms are RETIRED. Saves ~$4.60/mo.
+            # Corrected 2026-08-30 (epic #2799 hygiene sweep): this comment used to
+            # say they were "consolidated into one metric-math aggregate
+            # (LifePlatformMonitoring)". No such aggregate exists, and none can —
+            # monitoring_stack.py:926 states it outright ("No aggregate replaces
+            # them": CloudWatch rejects SEARCH in alarms and caps metric-math alarms
+            # at ~10 metrics against 19 ingestion fns). What actually covers this
+            # fleet is the same set email_stack/compute_stack cite: terminal async
+            # failures route to the shared ingestion DLQ (dlq=local_dlq), alarmed by
+            # life-platform-ingestion-dlq-messages, plus the freshness-checker,
+            # ER-01 ingest-liveness and the canary. #2822 carves out the ONE
+            # near-real-time exception with a real alarm: hae-webhook-errors.
             error_alarm=False,
         )
 
