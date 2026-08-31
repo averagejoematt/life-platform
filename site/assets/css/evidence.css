@@ -183,7 +183,13 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-evlinks { overflow-wrap: anywhere; }
 /* Paused supplements: dimmed + an honest badge, so a compound Matthew stopped
    taking can't read as part of the active stack (truth-audit Phase 4b). */
-.supp--paused { opacity: 0.62; }
+/* 2026-08-31: `opacity: 0.62` dimmed the whole card, and with it every text node — the faint-ink
+   "paused" badge fell to 2.9:1 (dark) / 2.4:1 (light) the day three compounds were paused, and the
+   gating sweep read 24 NEW serious color-contrast nodes on /protocols/supplements/ (a data-driven
+   state: the cards exist only while something is paused). Grayscale keeps luminance — and so
+   contrast — exactly where the tokens put it (faint ink 5.7:1 dark / 4.9:1 light) while the ember
+   accents lose their colour, which is the de-emphasis the audit asked for. */
+.supp--paused { filter: grayscale(1); }
 .supp-flag { grid-column: 2; justify-self: end; color: var(--ink-faint); border: 1px solid currentColor; border-radius: var(--radius-xs); padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .supp-paused-note { margin-top: var(--sp-1); color: var(--ink-faint); font-style: italic; }
 .supp-ev { margin-top: var(--sp-3); display: flex; align-items: center; gap: var(--sp-3); }
