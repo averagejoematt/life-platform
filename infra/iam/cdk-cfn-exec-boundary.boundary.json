@@ -1,0 +1,270 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowEverythingTheFenceDoesNotRefuse",
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyOutsidePlatformRegions",
+      "Effect": "Deny",
+      "NotAction": [
+        "iam:*",
+        "sts:*",
+        "cloudfront:*",
+        "route53:*",
+        "budgets:*"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": [
+            "us-west-2",
+            "us-east-1",
+            "us-east-2"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyProtectedObjectDestruction",
+      "Effect": "Deny",
+      "Action": [
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion",
+        "s3:PutObjectRetention",
+        "s3:PutObjectLegalHold",
+        "s3:BypassGovernanceRetention"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/blog/*",
+        "arn:aws:s3:::matthew-life-platform/buddy/*",
+        "arn:aws:s3:::matthew-life-platform/claude-memory-backup/*",
+        "arn:aws:s3:::matthew-life-platform/cloudtrail/*",
+        "arn:aws:s3:::matthew-life-platform/config/*",
+        "arn:aws:s3:::matthew-life-platform/dashboard/*",
+        "arn:aws:s3:::matthew-life-platform/datadrops-archive/*",
+        "arn:aws:s3:::matthew-life-platform/deploys/*",
+        "arn:aws:s3:::matthew-life-platform/exports/*",
+        "arn:aws:s3:::matthew-life-platform/generated/*",
+        "arn:aws:s3:::matthew-life-platform/imports/*",
+        "arn:aws:s3:::matthew-life-platform/mcp-audit/*",
+        "arn:aws:s3:::matthew-life-platform/raw/*",
+        "arn:aws:s3:::matthew-life-platform/uploads/*",
+        "arn:aws:s3:::matthew-life-platform-raw-backup/*"
+      ]
+    },
+    {
+      "Sid": "DenyPlatformBucketControlPlane",
+      "Effect": "Deny",
+      "Action": [
+        "s3:DeleteBucket",
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy",
+        "s3:PutLifecycleConfiguration",
+        "s3:PutBucketVersioning",
+        "s3:PutReplicationConfiguration",
+        "s3:PutEncryptionConfiguration",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:PutBucketAcl"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform"
+      ]
+    },
+    {
+      "Sid": "DenyBackupBucketDestruction",
+      "Effect": "Deny",
+      "Action": [
+        "s3:DeleteBucket",
+        "s3:DeleteBucketPolicy",
+        "s3:PutReplicationConfiguration"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform-raw-backup"
+      ]
+    },
+    {
+      "Sid": "DenyIamPrincipalMinting",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateUser",
+        "iam:CreateAccessKey",
+        "iam:CreateLoginProfile",
+        "iam:UpdateLoginProfile",
+        "iam:AttachUserPolicy",
+        "iam:PutUserPolicy",
+        "iam:AddUserToGroup",
+        "iam:CreateGroup",
+        "iam:AttachGroupPolicy",
+        "iam:PutGroupPolicy",
+        "iam:CreateSAMLProvider",
+        "iam:CreateOpenIDConnectProvider",
+        "iam:UpdateOpenIDConnectProviderThumbprint",
+        "iam:UpdateAccountPasswordPolicy"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyIamWritesOutsideEnrolledFamilies",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:UpdateRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:PassRole",
+        "iam:CreatePolicy",
+        "iam:DeletePolicy",
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicyVersion",
+        "iam:SetDefaultPolicyVersion"
+      ],
+      "NotResource": [
+        "arn:aws:iam::205930651321:policy/LifePlatform*",
+        "arn:aws:iam::205930651321:policy/life-platform-*",
+        "arn:aws:iam::205930651321:role/LifePlatform*",
+        "arn:aws:iam::205930651321:role/life-platform-*"
+      ]
+    },
+    {
+      "Sid": "DenyIamOnProtectedIdentities",
+      "Effect": "Deny",
+      "Action": "iam:*",
+      "Resource": [
+        "arn:aws:iam::205930651321:group/*",
+        "arn:aws:iam::205930651321:policy/cdk-*",
+        "arn:aws:iam::205930651321:role/aws-reserved/*",
+        "arn:aws:iam::205930651321:role/cdk-*",
+        "arn:aws:iam::205930651321:role/github-actions-*",
+        "arn:aws:iam::205930651321:user/*"
+      ]
+    },
+    {
+      "Sid": "DenyBoundarySelfMutation",
+      "Effect": "Deny",
+      "Action": [
+        "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicy",
+        "iam:DeletePolicyVersion",
+        "iam:SetDefaultPolicyVersion"
+      ],
+      "Resource": [
+        "arn:aws:iam::205930651321:policy/cdk-cfn-exec-boundary",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-cfn-exec-role-205930651321-us-east-1",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-cfn-exec-role-205930651321-us-east-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-cfn-exec-role-205930651321-us-west-2"
+      ]
+    },
+    {
+      "Sid": "DenyAccountAndOrganizationControlPlane",
+      "Effect": "Deny",
+      "Action": [
+        "organizations:*",
+        "account:*",
+        "aws-portal:*",
+        "iam:CreateAccountAlias",
+        "budgets:DeleteBudget"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyAuditAndDetectionTampering",
+      "Effect": "Deny",
+      "Action": [
+        "cloudtrail:StopLogging",
+        "cloudtrail:DeleteTrail",
+        "cloudtrail:UpdateTrail",
+        "cloudtrail:PutEventSelectors",
+        "config:DeleteConfigurationRecorder",
+        "config:DeleteDeliveryChannel",
+        "config:StopConfigurationRecorder",
+        "guardduty:DeleteDetector",
+        "guardduty:UpdateDetector",
+        "securityhub:DisableSecurityHub",
+        "access-analyzer:DeleteAnalyzer"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyKeyDestruction",
+      "Effect": "Deny",
+      "Action": [
+        "kms:ScheduleKeyDeletion",
+        "kms:DisableKey",
+        "kms:PutKeyPolicy",
+        "kms:DeleteAlias"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenySecretMutation",
+      "Effect": "Deny",
+      "Action": [
+        "secretsmanager:DeleteSecret",
+        "secretsmanager:PutSecretValue",
+        "secretsmanager:UpdateSecret",
+        "secretsmanager:RotateSecret",
+        "secretsmanager:PutResourcePolicy"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:*:205930651321:secret:life-platform/*"
+      ]
+    },
+    {
+      "Sid": "DenyDataStoreDestruction",
+      "Effect": "Deny",
+      "Action": [
+        "dynamodb:DeleteTable",
+        "dynamodb:DeleteBackup",
+        "backup:DeleteBackupVault",
+        "backup:DeleteRecoveryPoint",
+        "backup:DeleteBackupPlan"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyServingSurfaceDestruction",
+      "Effect": "Deny",
+      "Action": [
+        "cloudfront:DeleteDistribution",
+        "acm:DeleteCertificate",
+        "route53:DeleteHostedZone"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenySsmPlatformParameterDeletion",
+      "Effect": "Deny",
+      "Action": [
+        "ssm:DeleteParameter",
+        "ssm:DeleteParameters"
+      ],
+      "Resource": [
+        "arn:aws:ssm:*:205930651321:parameter/life-platform/*"
+      ]
+    },
+    {
+      "Sid": "DenyRoleAssumptionOutsideThisAccount",
+      "Effect": "Deny",
+      "Action": [
+        "sts:AssumeRole",
+        "sts:AssumeRoleWithSAML",
+        "sts:AssumeRoleWithWebIdentity"
+      ],
+      "NotResource": [
+        "arn:aws:iam::205930651321:role/*"
+      ]
+    }
+  ]
+}

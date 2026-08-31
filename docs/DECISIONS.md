@@ -2333,6 +2333,96 @@ Concretely:
 
 **Revisit trigger.** Two consecutive quarterly proportionality re-reads with zero `ALLOW-ADDITIVE` ledger entries → fold the gate back to a warning (it would be the old grep with more code). Any admitted deploy later judged out of shape → option (c) immediately, per the review condition.
 
+### Amendment 2026-08-31 (#3340) — the gate is the belt; a permissions boundary on the CDK cfn-exec role is the braces
+
+**What the 2026-08-30 amendment above left open, in its own words:** *"The real perimeter of CI is the CDK bootstrap chain's Administrator exec role… The proportionate next tightening is a separately priced decision, not a rider on this one."* The CISO review filed it as the one required follow-up. This is that decision.
+
+**Context — read live, read-only, 2026-08-31.** `cdk-hnb659fds-cfn-exec-role-205930651321-{us-west-2,us-east-1,us-east-2}` all exist, all carry `AdministratorAccess`, and all three report `PermissionsBoundary: None`. CloudFormation acts as that role for every resource in the platform's ten stacks; `github-actions-deploy-role` has held `sts:AssumeRole` on `role/cdk-*` since #401. So `deploy/iam_additive_gate.py` — a parser over a synthesized template — is the only thing between a template and an account-wide change. A parser bug, a template it mis-slices, or a workflow edit that skips the step leaves nothing.
+
+**Decision.** A single customer-managed policy, `cdk-cfn-exec-boundary`, is attached as the **permissions boundary** on all three regional cfn-exec roles. It is **derived**, not hand-written: `deploy/derive_cfn_exec_boundary.py` renders it from `deploy/iam_additive_registry.py` — the same registry the additive gate reads — and the render is committed as `infra/iam/cdk-cfn-exec-boundary.boundary.json` and applied verbatim (#3336: IAM documents never travel through inline shell text). One source, two consumers.
+
+**Why a guardrail and not a name allow-list — the measurement that decided it.** Resource naming in this account is not `life-platform*`-uniform: 113 of 147 IAM roles are CDK auto-named `LifePlatform<Stack>-<Construct><Hash>`, only three are `life-platform*`, and most Lambda functions carry no platform prefix at all (`coach-nudge`, `weekly-plate`, `ai-expert-analyzer`, `site-stats-refresh`, the CDK `LogRetention` singletons). A boundary that only *Allowed* `life-platform*` ARNs would have refused every stack deploy on the first attempt — the acceptance box's literal reading was not implementable, and pretending otherwise would have shipped an outage. The implemented shape is the expert-standard one: **one broad `Allow`, then explicit `Deny` statements IAM enforces regardless of what the gate parses.**
+
+**The Deny inventory** (16 statements, `deploy/derive_cfn_exec_boundary.py::build_policy`):
+
+| Sid | What it refuses |
+| --- | --- |
+| `DenyOutsidePlatformRegions` | every action outside `us-west-2 / us-east-1 / us-east-2`, except the five global services the role has actually used or needs (`iam`, `sts`, `cloudfront`, `route53`, `budgets`) |
+| `DenyProtectedObjectDestruction` | `s3:DeleteObject*` / object-lock edits on all **14** prefixes `deploy/bucket_policy.json` protects (`raw/ config/ uploads/ generated/ blog/ buddy/ claude-memory-backup/ cloudtrail/ dashboard/ datadrops-archive/ deploys/ exports/ imports/ mcp-audit/`) **and** on the whole DIL-027 replica bucket |
+| `DenyPlatformBucketControlPlane` | bucket deletion, bucket policy, lifecycle, versioning, replication, encryption, public-access and ACL edits on `matthew-life-platform` — which is **imported** into CDK (`Bucket.from_bucket_name`, every stack), so CloudFormation never legitimately touches any of them |
+| `DenyBackupBucketDestruction` | `s3:DeleteBucket` / `DeleteBucketPolicy` / `PutReplicationConfiguration` on the replica. Its versioning, lifecycle and encryption stay writable because that bucket **is** CDK-owned |
+| `DenyIamPrincipalMinting` | users, groups, access keys, login profiles, SAML/OIDC providers, the account password policy |
+| `DenyIamWritesOutsideEnrolledFamilies` | the 16 privilege-changing IAM writes (`CreateRole`, `PutRolePolicy`, `AttachRolePolicy`, `UpdateAssumeRolePolicy`, `PassRole`, the policy-version set, both boundary verbs …) on anything outside `role/LifePlatform*`, `role/life-platform-*` and their policy siblings |
+| `DenyIamOnProtectedIdentities` | **any** `iam:*` on `role/cdk-*`, `policy/cdk-*`, `role/github-actions-*`, `role/aws-reserved/*`, every user and every group |
+| `DenyBoundarySelfMutation` | the fence removing itself: `Put/DeleteRolePermissionsBoundary` on the three exec roles, and `CreatePolicyVersion` / `DeletePolicy` / `DeletePolicyVersion` / `SetDefaultPolicyVersion` on this document's own ARN |
+| `DenyAccountAndOrganizationControlPlane` | `organizations:*`, `account:*`, `aws-portal:*`, account aliases, and `budgets:DeleteBudget` (the ADR-133 cost backstop) |
+| `DenyAuditAndDetectionTampering` | CloudTrail stop/delete/update/event-selectors, Config recorder delete/stop, GuardDuty detector delete/update, Security Hub disable, Access Analyzer delete |
+| `DenyKeyDestruction` | `kms:ScheduleKeyDeletion`, `DisableKey`, `PutKeyPolicy`, `DeleteAlias` — free to deny, because no CDK stack creates a KMS key or alias |
+| `DenySecretMutation` | `DeleteSecret` / `PutSecretValue` / `UpdateSecret` / `RotateSecret` / `PutResourcePolicy` under `life-platform/` |
+| `DenyDataStoreDestruction` | `dynamodb:DeleteTable` / `DeleteBackup` (the table is imported too) and AWS Backup vault / plan / recovery-point deletion — **destruction only**, see the narrowing note below |
+| `DenyServingSurfaceDestruction` | `cloudfront:DeleteDistribution`, `acm:DeleteCertificate`, `route53:DeleteHostedZone` |
+| `DenySsmPlatformParameterDeletion` | `ssm:DeleteParameter(s)` under `/life-platform/` — the remediation kill-switch, the budget tier, the experiment cycle |
+| `DenyRoleAssumptionOutsideThisAccount` | `sts:AssumeRole*` on any role ARN outside account `205930651321` |
+
+**What is deliberately NOT denied, and why.** IAM **reads** (`Get*`/`List*`/`Simulate*`) — they grant nothing and CloudFormation issues them constantly; denying them turns a fence into an outage. `iam:TagRole`/`UntagRole`/`UpdateRoleDescription` — `cdk.Tags.of(app)` tags every role CDK creates. `iam:CreateServiceLinkedRole` — its resource is always `role/aws-service-role/<service>/…`, out of every family by construction, and it can only mint the role the named service principal is entitled to. `kms:PutKeyPolicy` is denied but `s3:PutBucketPolicy` on the **replica** is not, because that bucket's policy is CDK-owned. **`dynamodb:UpdateTimeToLive` and `dynamodb:UpdateContinuousBackups` were in this Deny in the first draft and were removed on driver review (2026-08-31): they are the only calls CloudFormation has for SETTING a table's TTL and PITR — CDK's `Table(time_to_live_attribute=…, point_in_time_recovery=…)` is implemented through exactly them, on create and on every change — and IAM has no condition key that separates “enable” from “disable”, so denying them would have failed the first stack update that touched either (and every future CDK-owned table) with an explicit deny and a rollback, while #2799's TTL-parity item wants TTL *more* CloudFormation-managed, not less; PITR disablement is left instead to the AWS Backup vault/plan/recovery-point denies plus `dynamodb:DeleteBackup`, which keep the recovery points whether or not the flag is on — a control IAM can actually express.** Each of these is a place where the additive-IAM gate — the belt — remains the control.
+
+**Non-goal, recorded so it is a decision and not an omission: CloudFormation-created roles do NOT have to carry a boundary themselves.** The stronger form (`iam:PermissionsBoundary` as a condition on `iam:CreateRole`, plus CDK's `@aws-cdk/core:permissionsBoundary` context key) would re-template all 113 roles, move the additive-IAM gate's own diff on every stack, and make the first post-attach deploy a 113-resource change instead of a no-op. That is a separate, separately-priced decision. Follow-up: **#3042** (the A-Grade security epic) is the home; the trigger to take it is a second operator or a second AWS account, either of which makes the propagated form cheap.
+
+**Verification, and what it can catch.** `deploy/verify_oidc_iam.py` — the same read-only comparator that already diffs the four OIDC identities — now also asserts, for each of the three roles, that the boundary is attached, that it is *this* policy ARN, and that the live default version equals the committed JSON. Three findings, all red under `--strict`: `BOUNDARY-MISSING`, `BOUNDARY-DRIFT`, `BOUNDARY-UNREADABLE`. `tests/test_cfn_exec_boundary_3340.py` feeds it a role with no boundary, a role with the wrong one, a document with the `raw/` Deny removed, and an `AccessDenied`, and requires a finding from every one — plus a positive control where the correct state produces none.
+
+**Residuals, stated rather than discovered.** (1) `drift_sentinel.check_oidc_iam` invokes the verifier **without** `--strict`, so its exit code is always 0 and its `[DRIFT]` branch is unreachable — the weekly sweep has never been able to red on an OIDC finding, and it cannot red on a boundary one either. (2) The remediation role's `IAMRoleRead` is scoped to the four OIDC roles, so under that identity the boundary check would report `BOUNDARY-UNREADABLE` rather than a verdict. Until both are addressed, the enforcing runner for this assertion is the owner/driver `--strict` invocation (the wrap ritual already runs it). Neither is fixed here: (1) would red the weekly sentinel on unrelated staged applies and belongs with the person who owns that ratchet, and (2) is an IAM grant this lane is not permitted to apply.
+
+**The ratchet baseline (#3340).** `deploy/iam_additive_registry.py::boundary_registry_snapshot()` must equal this block exactly; `tests/test_cfn_exec_boundary_3340.py` parses it from here. The protected S3 prefixes and protected IAM principals may only GROW; the enrolled principals may only SHRINK. Same R5 reasoning as the gate's baseline: a widening of the fence has to appear where the owner reads.
+
+```json cfn-exec-boundary-baseline
+{
+  "cfn_exec_roles": [
+    "cdk-hnb659fds-cfn-exec-role-205930651321-us-east-1",
+    "cdk-hnb659fds-cfn-exec-role-205930651321-us-east-2",
+    "cdk-hnb659fds-cfn-exec-role-205930651321-us-west-2"
+  ],
+  "enrolled_iam_principals": [
+    "arn:aws:iam::205930651321:policy/LifePlatform*",
+    "arn:aws:iam::205930651321:policy/life-platform-*",
+    "arn:aws:iam::205930651321:role/LifePlatform*",
+    "arn:aws:iam::205930651321:role/life-platform-*"
+  ],
+  "protected_iam_principals": [
+    "arn:aws:iam::205930651321:group/*",
+    "arn:aws:iam::205930651321:policy/cdk-*",
+    "arn:aws:iam::205930651321:role/aws-reserved/*",
+    "arn:aws:iam::205930651321:role/cdk-*",
+    "arn:aws:iam::205930651321:role/github-actions-*",
+    "arn:aws:iam::205930651321:user/*"
+  ],
+  "protected_s3_prefixes": [
+    "blog/",
+    "buddy/",
+    "claude-memory-backup/",
+    "cloudtrail/",
+    "config/",
+    "dashboard/",
+    "datadrops-archive/",
+    "deploys/",
+    "exports/",
+    "generated/",
+    "imports/",
+    "mcp-audit/",
+    "raw/",
+    "uploads/"
+  ],
+  "regions": [
+    "us-east-1",
+    "us-east-2",
+    "us-west-2"
+  ]
+}
+```
+
+**Rollback (first, because it is what gets read under pressure).** `aws iam delete-role-permissions-boundary --role-name <each of the three>`, then `aws iam delete-policy --policy-arn arn:aws:iam::205930651321:policy/cdk-cfn-exec-boundary`. The roles return to bare `AdministratorAccess` — exactly the pre-2026-08-31 state — and `git revert` of the PR restores the repo side. No re-bootstrap is involved: `cdk bootstrap --custom-permissions-boundary` was considered and rejected, because it re-runs the bootstrap stack on every region and its rollback is another bootstrap rather than one API call. Full procedure: `infra/iam/README.md`, "#3340".
+
+**Revisit trigger.** A stack deploy blocked by a Deny in this document that is judged legitimate → widen that one clause here, regenerate, re-apply (the boundary is one `create-policy-version` away, not a re-bootstrap). Two consecutive quarterly re-reads in which the boundary has refused nothing AND the additive gate has admitted nothing → the pair is over-built for a single-operator account and the boundary is the half to keep.
+
 **Scope note (ADR-136, 2026-07-18).** "No auto-deploy to prod without a click" describes the **Lambda/CDK deploy path** (`ci-cd.yml`'s `Deploy` job, `environment: production`) only. The static site (`site/**`) deploys automatically on merge with no approval gate — a separate, deliberately chosen posture with its own compensating controls (smoke + visual/AI-QA + auto-rollback). See ADR-136.
 
 ### Rollback

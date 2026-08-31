@@ -1,0 +1,45 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "#3340 MUTATION PROBE (positive control). The same stack shape as the escalation probe, but asking for exactly what the last green additive grant asked for: a role INSIDE the enrolled family (an explicit LifePlatform* name) with the 2026-08-14 P1 grant — s3:GetObject on one config object in the platform bucket. With the boundary attached this MUST still reach CREATE_COMPLETE. Without this control, 'the escalation probe failed' would only prove the boundary denies things, not that it still lets the platform deploy. Delete the stack after the verdict is recorded.",
+  "Resources": {
+    "AdditiveRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "LifePlatformBoundaryProbe3340Role",
+        "Description": "#3340 boundary probe — the admitted shape; delete after the proof",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "lambda.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "the-0814-grant-shape",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ReadOneConfigObject",
+                  "Effect": "Allow",
+                  "Action": "s3:GetObject",
+                  "Resource": "arn:aws:s3:::matthew-life-platform/config/content_filter.json"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "ProbeVerdict": {
+      "Description": "CREATE_COMPLETE here is the positive control: the boundary admits the platform's own additive grants.",
+      "Value": { "Fn::GetAtt": ["AdditiveRole", "Arn"] }
+    }
+  }
+}

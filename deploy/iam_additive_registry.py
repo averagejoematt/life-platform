@@ -27,10 +27,12 @@ where the owner reads, in the same PR, not only in a test file. FORBIDDEN / RESO
 
 from __future__ import annotations
 
+import ast
 import fnmatch
 import hashlib
 import importlib.util
 import json
+import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -526,6 +528,135 @@ IAM_PROPERTY_NAMES: frozenset[str] = frozenset(
         "KeyPolicy",
     }
 )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# THE BRACES (#3340) — the same registry, read by the cfn-exec permissions boundary
+# ═══════════════════════════════════════════════════════════════════════════════
+# Everything above declares what CI's additive-IAM GATE will admit into a template.
+# The gate is a parser: a bug in it, a template it mis-slices, or a workflow edit that
+# skips the step leaves nothing between a synthesized template and an account-wide
+# grant, because `cdk-<qualifier>-cfn-exec-role-<acct>-<region>` carries
+# AdministratorAccess (CDK bootstrap default, verified live 2026-08-31: three roles,
+# `PermissionsBoundary: None` on all three).
+#
+# `deploy/derive_cfn_exec_boundary.py` renders a permissions boundary for those three
+# roles from THIS module — one source, not a second list. It reads:
+#   * S3_PROTECTED            the (action, prefix) pairs derived from deploy/bucket_policy.json
+#   * _C.S3_BUCKET / _C.RAW_BACKUP_BUCKET   the two buckets whose data is irreplaceable
+#   * ENROLLED_IAM_PRINCIPALS the IAM names CloudFormation is allowed to write
+#   * IAM_PROTECTED_PRINCIPALS the IAM names it may never touch, including its own fence
+#   * PLATFORM_REGIONS        the region pin
+#
+# The boundary is a GUARDRAIL, not an allow-list of names: CloudFormation must still be
+# able to create arbitrarily-named resources in ten stacks, so it Allows broadly and
+# Denies explicitly. See the ADR-065 amendment of 2026-08-31 for why that shape and not
+# a scoped `--cloudformation-execution-policies`.
+
+# The bootstrap qualifier this account was bootstrapped with. `bootstrap_qualifier()`
+# above reads it per-template from the synthesized `/cdk-bootstrap/<q>/version` parameter;
+# the boundary needs it before any synth exists, so it is declared here and pinned to the
+# live role names by tests/test_cfn_exec_boundary_3340.py.
+CDK_BOOTSTRAP_QUALIFIER = "hnb659fds"
+BOUNDARY_POLICY_NAME = "cdk-cfn-exec-boundary"
+
+# The three roles the boundary attaches to — one per region CDK is bootstrapped in.
+CFN_EXEC_ROLE_NAMES: tuple[str, ...] = tuple(
+    f"cdk-{CDK_BOOTSTRAP_QUALIFIER}-cfn-exec-role-{ACCOUNT}-{region}" for region in PLATFORM_REGIONS
+)
+
+
+def _iam_arn(kind: str, name: str) -> str:
+    return f"arn:aws:iam::{ACCOUNT}:{kind}/{name}"
+
+
+def _cdk_stack_names() -> tuple[str, ...]:
+    """Every stack id `cdk/app.py` instantiates — AST-parsed, never a hand list.
+
+    CDK names each role it creates `<StackName>-<ConstructId><Hash>-<Suffix>`, so the
+    stack ids ARE the role-name families. Verified against live 2026-08-31: 113 of the
+    account's 147 roles carry one of these prefixes; only three are `life-platform*`
+    and the CI-deployed Lambda functions themselves are mostly bare-named
+    (`coach-nudge`, `weekly-plate`, …), which is why a `life-platform*`-only boundary
+    would have refused every stack deploy.
+    """
+    tree = ast.parse((ROOT / "cdk" / "app.py").read_text(encoding="utf-8"))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or len(node.args) < 2:
+            continue
+        scope, sid = node.args[0], node.args[1]
+        if isinstance(scope, ast.Name) and scope.id == "app" and isinstance(sid, ast.Constant) and isinstance(sid.value, str):
+            names.add(sid.value)
+    if len(names) < 8:
+        raise RuntimeError(f"cdk/app.py yielded {len(names)} stack ids — refusing a truncated role-name family set")
+    return tuple(sorted(names))
+
+
+CDK_STACK_NAMES: tuple[str, ...] = _cdk_stack_names()
+
+# The shared prefix of every stack id in cdk/app.py — `LifePlatform` today, and whatever
+# app.py says tomorrow. CDK names every role it creates `<StackName>-<Construct><Hash>`,
+# so this prefix is the role-name family, derived rather than typed.
+CDK_STACK_NAME_PREFIX: str = os.path.commonprefix(CDK_STACK_NAMES)
+
+# The IAM names CloudFormation MAY write: the CDK stack-name family and the
+# `life-platform-*` roles whose physical names are pinned in constants.py (the DIL-027
+# replication pair, the edge auth role). Policy ARNs are listed for completeness — CDK's
+# inline `AWS::IAM::Policy` resources are written with PutRolePolicy (covered by the role
+# patterns) and the account holds no CDK-created MANAGED policy at all today.
+#
+# WHY THE COMMON PREFIX AND NOT ONE PATTERN PER STACK. The per-stack form was rendered
+# first and the boundary came out 6,470 characters — over IAM's 6,144 managed-policy
+# limit. The precision it bought was small and never adversarial: a stack id is chosen by
+# whoever runs the deploy, so `LifePlatformEvil` would have satisfied a per-stack list as
+# easily as this one. What both forms actually refuse is the same thing, and it is the
+# thing that matters: an IAM write on a name outside the platform's own family at all —
+# which is exactly what the #3340 mutation probe deploys.
+ENROLLED_IAM_PRINCIPALS: tuple[str, ...] = (
+    _iam_arn("role", f"{CDK_STACK_NAME_PREFIX}*"),
+    _iam_arn("role", f"{PLATFORM_SLUG}-*"),
+    _iam_arn("policy", f"{CDK_STACK_NAME_PREFIX}*"),
+    _iam_arn("policy", f"{PLATFORM_SLUG}-*"),
+)
+
+# The IAM names CloudFormation may NEVER touch, in any way. `role/cdk-*` and
+# `policy/cdk-*` are the self-protection clause: without them CloudFormation can call
+# `iam:DeleteRolePermissionsBoundary` on its own exec role, or publish a new default
+# version of this very document, and the fence removes itself.
+IAM_PROTECTED_PRINCIPALS: tuple[str, ...] = (
+    _iam_arn("role", "cdk-*"),
+    _iam_arn("policy", "cdk-*"),
+    _iam_arn("role", "github-actions-*"),
+    _iam_arn("role", "aws-reserved/*"),
+    _iam_arn("user", "*"),
+    _iam_arn("group", "*"),
+)
+
+
+def boundary_protected_s3_prefixes() -> tuple[str, ...]:
+    """The key prefixes on the platform bucket whose objects the boundary refuses to delete.
+
+    Derived from S3_PROTECTED, which is itself derived from `deploy/bucket_policy.json`
+    — so a prefix added to the bucket policy is fenced here on the next render, and the
+    committed-JSON-equals-derivation test is what makes "on the next render" a gate
+    rather than a hope. ADR-032/033/046: `raw/`, `config/`, `uploads/` and `generated/`
+    are the named four; the bucket policy protects ten more.
+    """
+    return tuple(sorted({prefix for _action, prefix, _sid in S3_PROTECTED}))
+
+
+def boundary_registry_snapshot() -> dict[str, Any]:
+    """The #3340 ratchet's view — compared against the ```json cfn-exec-boundary-baseline```
+    fenced block in the ADR-065 amendment of 2026-08-31, the same R5 shape the gate uses:
+    a widening has to appear where the OWNER reads, in the same PR."""
+    return {
+        "cfn_exec_roles": sorted(CFN_EXEC_ROLE_NAMES),
+        "enrolled_iam_principals": sorted(ENROLLED_IAM_PRINCIPALS),
+        "protected_iam_principals": sorted(IAM_PROTECTED_PRINCIPALS),
+        "protected_s3_prefixes": sorted(boundary_protected_s3_prefixes()),
+        "regions": sorted(PLATFORM_REGIONS),
+    }
 
 
 def registry_fingerprint() -> str:
