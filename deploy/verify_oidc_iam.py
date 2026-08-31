@@ -16,6 +16,19 @@ It is STRICTLY READ-ONLY. It only calls:
 It never mutates anything. Applying a trust change is a separate, deliberate,
 watched step — see infra/iam/README.md.
 
+ONE SOURCE (#3336). The checked-in JSON is applied VERBATIM by the operator scripts
+`deploy/setup_remediation_role.sh` and `deploy/setup_github_oidc.sh`
+(`aws iam update-assume-role-policy … --policy-document file://infra/iam/<role>.trust.json`,
+`aws iam put-role-policy … --policy-document file://infra/iam/<role>.permissions.json`,
+create-role-if-missing from the trust file). Until 2026-08-30 both scripts carried
+their OWN inline copies of these documents — a hand-maintained shell twin with no
+derivation guard — and the remediation one, run post-merge, put 15 of the JSON's 17
+statements and a repo-wide (any-ref) trust subject live for ≈6 minutes before this
+verifier caught it (docs/INCIDENT_LOG.md). The shell twins are gone:
+`tests/test_iam_twin_free_3336.py` fails the suite if an inline policy document for
+any role in ROLES reappears under deploy/. This script therefore guards ONE source
+against live, not two repo copies against each other.
+
 Comparison is SEMANTIC, not byte-for-byte: policy documents are canonicalised
 (dict keys sorted, string lists sorted, statement lists order-normalised) so that
 cosmetic ordering differences between the checked-in JSON and what IAM returns do

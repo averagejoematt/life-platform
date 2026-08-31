@@ -2,91 +2,70 @@
 # setup_remediation_role.sh — create/update the OIDC role for the self-healing
 # remediation agent (.github/workflows/remediation-agent.yml). Idempotent.
 #
-# This is a HIGH-SEVERITY IAM change (new principal + OIDC trust + Bedrock/KMS/SES),
-# so it's intentionally operator-run, not agent-run. Run once:
-#   bash deploy/setup_remediation_role.sh
+# ONE SOURCE (#3336). This script carries NO policy text. It applies the two
+# checked-in documents under infra/iam/ VERBATIM, via file:// — nothing else can
+# reach the live role from this repo:
+#   infra/iam/github-actions-remediation-role.trust.json        → the role's trust policy
+#   infra/iam/github-actions-remediation-role.permissions.json  → inline policy `remediation-permissions`
+# To change a grant: edit the JSON in a PR (git revert = rollback), merge, re-run
+# this. tests/test_iam_twin_free_3336.py fails the suite if an inline IAM policy
+# document for any infra/iam-governed role ever reappears under deploy/.
 #
-# Reuses the existing GitHub OIDC provider (created by setup_github_oidc.sh).
+# WHY (incident 2026-08-30, docs/INCIDENT_LOG.md). The previous version of this
+# file was a hand-maintained TWIN of those two documents. Its header said "the
+# JSON wins", nothing enforced it, and the twin was the copy that ran: it carried
+# 15 of the JSON's 17 statements and the pre-#687 repo-wide trust subject, so one
+# run regressed four grants and let ANY ref of this public repo assume the role
+# for ≈6 minutes, until deploy/verify_oidc_iam.py --strict caught it.
+#
+# HIGH-SEVERITY IAM change (OIDC trust + Bedrock/KMS/SES) → operator-run, never
+# agent-run. Reuses the GitHub OIDC provider created by setup_github_oidc.sh:
+#   bash deploy/setup_remediation_role.sh
+# Ends with the read-only verifier so the apply proves itself against live
+# before the prompt returns.
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+IAM_DIR="${REPO_ROOT}/infra/iam"
+
 ACCOUNT="205930651321"
-REGION="us-west-2"
 ROLE="github-actions-remediation-role"
-REPO="averagejoematt/life-platform"
+# Must equal deploy/verify_oidc_iam.py ROLES[ROLE]["inline_policy_name"] — the
+# verifier reads the live policy under this name.
+POLICY_NAME="remediation-permissions"
+TRUST_FILE="${IAM_DIR}/github-actions-remediation-role.trust.json"
+PERMS_FILE="${IAM_DIR}/github-actions-remediation-role.permissions.json"
 
-TRUST=$(cat <<JSON
-{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
-  "Principal":{"Federated":"arn:aws:iam::${ACCOUNT}:oidc-provider/token.actions.githubusercontent.com"},
-  "Action":"sts:AssumeRoleWithWebIdentity",
-  "Condition":{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com"},
-    "StringLike":{"token.actions.githubusercontent.com:sub":"repo:${REPO}:*"}}}]}
-JSON
-)
-
-# Read-only diagnosis + Bedrock + scoped audit-log write + SES report. NO deploy,
-# NO lambda update, NO IAM write — the agent proposes fixes via PR; humans/CI deploy.
-#
-# Must stay statement-for-statement identical to the CANONICAL source of truth:
-#   infra/iam/github-actions-remediation-role.permissions.json (#401)
-# deploy/verify_oidc_iam.py diffs that JSON against the live role; this script is
-# just the operator convenience that applies it. If they disagree, the JSON wins.
-PERM=$(cat <<JSON
-{"Version":"2012-10-17","Statement":[
- {"Sid":"Bedrock","Effect":"Allow",
-   "Action":["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],
-   "Resource":[
-   "arn:aws:bedrock:*:${ACCOUNT}:inference-profile/us.anthropic.claude-*",
-   "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"]},
- {"Sid":"Diagnose","Effect":"Allow","Action":["logs:FilterLogEvents","logs:GetLogEvents",
-   "logs:DescribeLogGroups","logs:DescribeLogStreams","cloudwatch:DescribeAlarms",
-   "cloudwatch:DescribeAlarmHistory","cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics",
-   "cloudwatch:ListMetrics","lambda:GetFunction","lambda:GetFunctionConfiguration",
-   "lambda:ListFunctions","ec2:DescribeRegions"],"Resource":"*"},
- {"Sid":"DriftSentinel","Effect":"Allow","Action":["cloudformation:DetectStackDrift",
-   "cloudformation:DescribeStackDriftDetectionStatus","cloudformation:DescribeStackResourceDrifts",
-   "cloudformation:ListStackResources"],"Resource":"*"},
- {"Sid":"IAMRoleRead","Effect":"Allow","Action":["iam:GetRole","iam:GetRolePolicy"],
-   "Resource":["arn:aws:iam::${ACCOUNT}:role/github-actions-deploy-role",
-               "arn:aws:iam::${ACCOUNT}:role/github-actions-remediation-role",
-               "arn:aws:iam::${ACCOUNT}:role/github-actions-golden-eval-role",
-               "arn:aws:iam::${ACCOUNT}:role/github-actions-diagnosis-role"]},
- {"Sid":"OIDCProviderRead","Effect":"Allow","Action":"iam:GetOpenIDConnectProvider",
-   "Resource":"arn:aws:iam::${ACCOUNT}:oidc-provider/token.actions.githubusercontent.com"},
- {"Sid":"DDB","Effect":"Allow","Action":["dynamodb:GetItem","dynamodb:Query"],
-   "Resource":"arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/life-platform"},
- {"Sid":"KMS","Effect":"Allow","Action":"kms:Decrypt",
-   "Resource":"arn:aws:kms:${REGION}:${ACCOUNT}:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"},
- {"Sid":"S3Read","Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::matthew-life-platform/*"},
- {"Sid":"S3BucketPolicyRead","Effect":"Allow","Action":"s3:GetBucketPolicy","Resource":"arn:aws:s3:::matthew-life-platform"},
- {"Sid":"S3List","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::matthew-life-platform",
-   "Condition":{"StringLike":{"s3:prefix":"remediation-log/*"}}},
- {"Sid":"S3Log","Effect":"Allow","Action":"s3:PutObject",
-   "Resource":["arn:aws:s3:::matthew-life-platform/remediation-log/*",
-               "arn:aws:s3:::matthew-life-platform/drift-log/*"]},
- {"Sid":"SQS","Effect":"Allow","Action":["sqs:ReceiveMessage","sqs:GetQueueAttributes"],
-   "Resource":"arn:aws:sqs:${REGION}:${ACCOUNT}:life-platform-ingestion-dlq"},
- {"Sid":"SSM","Effect":"Allow","Action":"ssm:GetParameter",
-   "Resource":"arn:aws:ssm:${REGION}:${ACCOUNT}:parameter/life-platform/*"},
- {"Sid":"SES","Effect":"Allow","Action":["ses:SendEmail","sesv2:SendEmail"],"Resource":"*"},
- {"Sid":"SecretsDescribe","Effect":"Allow","Action":"secretsmanager:DescribeSecret",
-   "Resource":["arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/ai-keys*",
-               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/site-api-ai-key*",
-               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/eightsleep-client*",
-               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/notion*",
-               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/todoist*",
-               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/ingestion-keys*"]}
-]}
-JSON
-)
+for f in "$TRUST_FILE" "$PERMS_FILE"; do
+  if [[ ! -r "$f" ]]; then
+    echo "❌ missing source document: $f" >&2
+    exit 2
+  fi
+  if ! python3 -m json.tool "$f" >/dev/null; then
+    echo "❌ not valid JSON, refusing to apply: $f" >&2
+    exit 2
+  fi
+done
 
 if aws iam get-role --role-name "$ROLE" >/dev/null 2>&1; then
-  echo "Updating trust policy on $ROLE..."
-  aws iam update-assume-role-policy --role-name "$ROLE" --policy-document "$TRUST"
+  echo "Updating trust policy on ${ROLE} from ${TRUST_FILE#"${REPO_ROOT}"/}..."
+  aws iam update-assume-role-policy --role-name "$ROLE" --policy-document "file://${TRUST_FILE}"
 else
-  echo "Creating $ROLE..."
-  aws iam create-role --role-name "$ROLE" --assume-role-policy-document "$TRUST" \
+  echo "Creating ${ROLE} from ${TRUST_FILE#"${REPO_ROOT}"/}..."
+  aws iam create-role --role-name "$ROLE" --assume-role-policy-document "file://${TRUST_FILE}" \
     --description "Self-healing remediation agent (GH Actions OIDC; Bedrock + read-only diagnosis)" >/dev/null
 fi
-aws iam put-role-policy --role-name "$ROLE" --policy-name remediation-permissions --policy-document "$PERM"
-echo "✅ $ROLE ready: arn:aws:iam::${ACCOUNT}:role/${ROLE}"
+
+echo "Applying ${PERMS_FILE#"${REPO_ROOT}"/} as inline policy ${POLICY_NAME}..."
+aws iam put-role-policy --role-name "$ROLE" --policy-name "$POLICY_NAME" --policy-document "file://${PERMS_FILE}"
+
+echo "✅ ${ROLE} applied from infra/iam/: arn:aws:iam::${ACCOUNT}:role/${ROLE}"
 echo "   The workflow (.github/workflows/remediation-agent.yml) assumes this role via OIDC."
+echo ""
+echo "Post-apply proof (read-only — iam:GetRole / GetRolePolicy / GetOpenIDConnectProvider):"
+if ! python3 "${REPO_ROOT}/deploy/verify_oidc_iam.py" --strict; then
+  echo "❌ verify_oidc_iam.py --strict reports DRIFT. If the drifted target is ${ROLE}, this apply" >&2
+  echo "   did not land — investigate before leaving. A DRIFT on a DIFFERENT role is a separate" >&2
+  echo "   staged apply (infra/iam/README.md), not a failure of this script." >&2
+  exit 1
+fi

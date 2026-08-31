@@ -23,6 +23,7 @@ The behavioral tests run the retry lib under real bash with `curl` and `sleep` s
 shell functions — no network, no real invalidations, no wall-clock sleeps.
 """
 
+import json
 import os
 import re
 import subprocess
@@ -33,6 +34,7 @@ _SMOKE = os.path.join(_REPO, "deploy", "smoke_test_site.sh")
 _LIB = os.path.join(_REPO, "deploy", "lib", "cache_aware_fetch.sh")
 _SITE_DEPLOY = os.path.join(_REPO, ".github", "workflows", "site-deploy.yml")
 _OIDC_SETUP = os.path.join(_REPO, "deploy", "setup_github_oidc.sh")
+_DEPLOY_ROLE_PERMS = os.path.join(_REPO, "infra", "iam", "github-actions-deploy-role.permissions.json")
 
 
 def _read(path):
@@ -65,13 +67,22 @@ def test_sync_script_waits_for_invalidation_completed():
 
 
 def test_oidc_setup_grants_get_invalidation():
-    """The waiter needs cloudfront:GetInvalidation. The LIVE deploy-role policy already
-    grants it; the repo-side codification (setup_github_oidc.sh) must too, so a re-run
-    of the setup script can never silently drop the waiter's permission."""
-    code = _strip_comments(_read(_OIDC_SETUP))
+    """The waiter needs cloudfront:GetInvalidation. The ONE repo-side codification of the
+    deploy role is infra/iam/github-actions-deploy-role.permissions.json (#3336: the shell
+    twin that used to carry a second copy is gone — setup_github_oidc.sh applies that file
+    verbatim via file://), so a re-run of the setup script can never silently drop the
+    waiter's permission unless the canonical document loses it."""
+    with open(_DEPLOY_ROLE_PERMS, encoding="utf-8") as f:
+        doc = json.load(f)
+    actions = set()
+    for st in doc["Statement"]:
+        act = st.get("Action", [])
+        actions.update([act] if isinstance(act, str) else act)
     assert (
-        "cloudfront:GetInvalidation" in code
-    ), "setup_github_oidc.sh must grant cloudfront:GetInvalidation (the invalidation-completed waiter polls it)"
+        "cloudfront:GetInvalidation" in actions
+    ), "github-actions-deploy-role.permissions.json must grant cloudfront:GetInvalidation (the invalidation-completed waiter polls it)"
+    code = _strip_comments(_read(_OIDC_SETUP))
+    assert "github-actions-deploy-role.permissions.json" in code, "setup_github_oidc.sh must apply the canonical JSON by name (#3336)"
 
 
 # ── Layer 2: cache-aware smoke (bounded retries, no fixed sleeps) ─────────────

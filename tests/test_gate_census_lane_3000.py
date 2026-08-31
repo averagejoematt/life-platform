@@ -312,7 +312,17 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # pinned by test_a_missing_snapshot_block_reds and the module's non-vacuity floors. No
 # PROVEN_CAN_FAIL entry is claimed: its mutation proofs run on synthetic text with an
 # injected `tracked` predicate, not through gate_census_mutations.py.
-BASELINE_TOTAL_GATES = 572
+# 572 -> 573 (2026-08-31, #3336): ONE real gate, `structural::test_iam_twin_free_3336.py` — the
+# derivation guard that no deploy/ script may embed an IAM policy document for a role with a
+# checked-in infra/iam/*.json (the 2026-08-30 shell-twin incident). Registered in
+# _PREMERGE_EXTRA_FILES in the same PR (it rglobs deploy/). Verified by id-set diff: each tree
+# ran its OWN scripts/gate_census.py --json (main b73a0d77e = 572, branch = 573); ADDED exactly
+# {structural::test_iam_twin_free_3336.py}, REMOVED {}. It arrives PROVEN — a MutationSpec in
+# scripts/gate_census_mutations.py plants an untracked deploy/_census_probe_2999.sh heredoc
+# naming the remediation role (ARMED: baseline 16 passed / mutated 1 failed / reverted 16
+# passed) and STRUCTURAL_PROOFS records it — so live unproven stays 525 and
+# BASELINE_UNPROVEN_GATES (541) is not moved.
+BASELINE_TOTAL_GATES = 573
 BASELINE_UNPROVEN_GATES = 541
 
 
