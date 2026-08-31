@@ -33,6 +33,13 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 - `github-actions-remediation-role.trust.json` — remediation role assume-role (trust) policy
 - `github-actions-remediation-role.permissions.json` — remediation role inline policy `remediation-permissions`
 
+> **Apply path (#3336): `bash deploy/setup_remediation_role.sh` / `bash deploy/setup_github_oidc.sh`** —
+> both scripts apply the files above VERBATIM (`--policy-document file://infra/iam/…`) and end with
+> `verify_oidc_iam.py --strict`. They carry no policy text of their own: until 2026-08-30 each was a
+> hand-maintained twin, and running the remediation one put a stale document (15 of 17 statements,
+> any-ref trust) live for ≈6 minutes — `docs/INCIDENT_LOG.md`. `tests/test_iam_twin_free_3336.py`
+> fails the suite if an inline policy document for any role listed here reappears under `deploy/`.
+
 ### Staged, NOT yet applied — the golden-eval role (#812)
 - `github-actions-golden-eval-role.trust.json` — trust policy (main-only subject from day one; no
   repo-wide grant to tighten later)

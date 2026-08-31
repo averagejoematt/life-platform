@@ -454,9 +454,15 @@ def test_json_output_is_valid_json_with_the_observation(monkeypatch, capsys):
 # ═════════════════════════════════════════════════════════════════════════════
 # E. the grant rode in the same PR (#2824 grant-with-consumer)
 # ═════════════════════════════════════════════════════════════════════════════
-def test_remediation_role_declares_the_region_enumeration_grant_in_both_twins():
+def test_remediation_role_declares_the_region_enumeration_grant_in_the_one_canonical_document():
+    """#3336: the grant lives in exactly ONE place — infra/iam/github-actions-remediation-role.
+    permissions.json. The first version of this test also pinned the string inside
+    deploy/setup_remediation_role.sh, which cemented a hand-maintained twin (the twin was
+    the copy that ran, and it put a stale document live on 2026-08-30). The script now
+    applies the JSON verbatim via file://, so it must NOT carry the grant literal itself."""
     canonical = json.loads((ROOT / "infra" / "iam" / "github-actions-remediation-role.permissions.json").read_text())
     diag = [s for s in canonical["Statement"] if s.get("Sid") == "Diagnose"][0]
     assert slr.REGION_ENUMERATION_GRANT in diag["Action"]
     sh = (ROOT / "deploy" / "setup_remediation_role.sh").read_text(encoding="utf-8")
-    assert f'"{slr.REGION_ENUMERATION_GRANT}"' in sh, "setup_remediation_role.sh must stay statement-identical to the canonical JSON"
+    assert "github-actions-remediation-role.permissions.json" in sh, "setup_remediation_role.sh must apply the canonical JSON by name"
+    assert f'"{slr.REGION_ENUMERATION_GRANT}"' not in sh, "setup_remediation_role.sh must not carry a second copy of the grant (#3336)"
