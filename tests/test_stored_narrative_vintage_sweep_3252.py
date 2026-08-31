@@ -322,3 +322,64 @@ def test_served_at_still_carries_the_request_instant_on_a_swept_endpoint(monkeyp
     now = datetime.now(common.timezone.utc)
     served = datetime.fromisoformat(meta["served_at"])
     assert abs((now - served).total_seconds()) < 120
+
+
+# ── /api/ai_analysis — the SEVENTH sibling (#3352) ────────────────────────────
+#
+# Folded onto epic #2799 from #3252 and confirmed by the 2026-08-31 hygiene pass as one
+# of its last two open items. The EXPERT#{expert_key} row is written by
+# intelligence/ai_expert_analyzer_lambda (`"generated_at": now.isoformat()`, line ~1210 —
+# the same writer as EXPERT#integrator above, so the fixture stamp shape is identical).
+# The BODY already exposed `generated_at`; the ENVELOPE wore the request instant, so
+# `_meta` claimed a freshness the prose under it never had (ADR-104).
+
+EXPERT_GENERATED_AT = "2026-08-28T14:03:19.204471+00:00"  # ai_expert_analyzer generate_and_cache
+
+
+def _expert_row(**over):
+    row = {
+        "pk": f"{coach.USER_PREFIX}ai_analysis",
+        "sk": "EXPERT#mind",
+        "expert_key": "mind",
+        "analysis": "Sleep debt is what the mood dips are tracking, not the training load.",
+        "key_recommendation": "Hold the 22:30 lights-out for the rest of the week.",
+        "journaling_prompt": "Which of this week's dips had a short night in front of it?",
+        "week_number": 3,
+        "days_in_experiment": 18,
+        "generated_at": EXPERT_GENERATED_AT,
+    }
+    row.update(over)
+    return row
+
+
+def test_ai_analysis_declares_the_stored_records_generated_at(monkeypatch):
+    _past_genesis(monkeypatch)
+    monkeypatch.setattr(coach, "table", FakeDdbTable(rows=[_expert_row()]))
+    monkeypatch.setattr(coach, "_current_day_n", lambda: 30)
+    body = _body(coach.handle_ai_analysis({"queryStringParameters": {"expert": "mind"}}))
+    assert body["analysis"].startswith("Sleep debt")
+    assert body["generated_at"] == EXPERT_GENERATED_AT
+    assert body["_meta"]["content_as_of"] == EXPERT_GENERATED_AT, "the envelope must carry the record's instant, not the request's"
+    assert body["_meta"]["generated_at"] == EXPERT_GENERATED_AT
+    assert body["_meta"]["served_at"] > EXPERT_GENERATED_AT, "served_at stays the request instant (property 4)"
+
+
+def test_ai_analysis_honest_null_declares_no_vintage(monkeypatch):
+    """No row at all — an honest empty read may not claim a vintage it does not have."""
+    _past_genesis(monkeypatch)
+    monkeypatch.setattr(coach, "table", FakeDdbTable(rows=[]))
+    monkeypatch.setattr(coach, "_current_day_n", lambda: 30)
+    body = _body(coach.handle_ai_analysis({"queryStringParameters": {"expert": "mind"}}))
+    assert body["analysis"] is None and body["generated_at"] is None
+    assert "content_as_of" not in body["_meta"]
+
+
+def test_ai_analysis_withheld_stale_cycle_record_declares_no_vintage(monkeypatch):
+    """The Stage0 freshness guard (a pre-restart record claiming a future day) withholds
+    the narrative — and must not then stamp the envelope with the withheld record's age."""
+    _past_genesis(monkeypatch)
+    monkeypatch.setattr(coach, "table", FakeDdbTable(rows=[_expert_row(days_in_experiment=99)]))
+    monkeypatch.setattr(coach, "_current_day_n", lambda: 30)
+    body = _body(coach.handle_ai_analysis({"queryStringParameters": {"expert": "mind"}}))
+    assert body["stale"] is True and body["analysis"] is None
+    assert "content_as_of" not in body["_meta"]

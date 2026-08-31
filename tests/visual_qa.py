@@ -861,6 +861,12 @@ def capture_page(
     issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
     perf_result = {"lcp_ms": None, "cls": None, "js_bytes": 0}
     _js_bytes = [0]  # mutable box (perf_js_bytes) — total JS response bytes for the page
+    # #3352: the page SHELL's own Content-Type. The ONE signal that separates "the
+    # deploy script stamped the wrong metadata" from "this page is broken" — on
+    # 2026-08-31 the whole /data/* door was served `application/json` (INCIDENT_LOG P1)
+    # and the auto-rollback re-ran the script that did it. Recorded per page, read by
+    # tests/visual_qa_verdict.py; nothing in this module gates on it.
+    _shell_ct = [None]
 
     _noncrit = ["favicon", "sub_count", "subscriber_count"]
     page.on("console", lambda m: js_errors.append(m.text) if m.type == "error" and not any(nc in m.text for nc in _noncrit) else None)
@@ -871,6 +877,10 @@ def capture_page(
             failed_responses.append((r.status, r.url))
         try:
             ct = r.headers.get("content-type", "")
+            # #3352: last same-origin main-document response wins (a retried navigation
+            # must be judged on the attempt that actually rendered, not the first).
+            if r.url.startswith(SITE_URL) and r.request.resource_type == "document":
+                _shell_ct[0] = ct
             if r.url.endswith(".js") or "javascript" in ct:
                 _js_bytes[0] += len(r.body())
         except Exception:
@@ -1160,6 +1170,7 @@ def capture_page(
         "perf": perf_result,
         "a11y": a11y_result,  # #1433: new/baselined/advisory/fixed/observed, or None if the audit didn't run
         "a11y_mobile": a11y_mobile_result,  # #3277: the same shape for the 390px pass, or None if it didn't run
+        "shell_content_type": _shell_ct[0],  # #3352: rollback scope check — None when no document response was seen
     }
 
 
@@ -1485,6 +1496,36 @@ def run_sweep(
                 "screenshots": {},
             }
         )
+
+    # ── #3352 live-proof injection — workflow_dispatch ONLY, never a push ──
+    #
+    # The #3200 lesson: a fail-closed path with green unit tests can be entirely
+    # non-functional, and the only proof is watching it fire. `rollback-site-on-failure`'s
+    # new scope check is exactly that shape, so this env hook lets an operator make a
+    # dispatched site-deploy run red on a CHOSEN surface (against the real site, with a
+    # harmless same-tree redeploy) and watch the rollback decline by name.
+    #
+    # site-deploy.yml passes VISUAL_QA_INJECT_SURFACE only under
+    # `github.event_name == 'workflow_dispatch'` — pinned by
+    # tests/test_site_deploy_workflow.py so a push can never inject. The synthetic result
+    # is classified through the SAME string rules as a real failure (no bypass), and it is
+    # labelled [INJECTED] everywhere it appears.
+    inject_surface = os.environ.get("VISUAL_QA_INJECT_SURFACE", "").strip().lower()
+    if inject_surface and inject_surface != "none":
+        try:
+            from visual_qa_verdict import injected_result
+        except ImportError:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from visual_qa_verdict import injected_result
+
+        synthetic = injected_result(inject_surface)
+        if synthetic is None:
+            print(f"\n⚠ VISUAL_QA_INJECT_SURFACE={inject_surface!r} is not a known surface — nothing injected (#3352)")
+        else:
+            print(f"\n── [INJECTED] #3352 live proof: one synthetic {inject_surface} failure — this run is DELIBERATELY red ──")
+            for x in synthetic["issues"]:
+                print(f"      → {x}")
+            results.append(synthetic)
 
     # #2973: three disjoint buckets — passed + failed + unevaluated == total — so
     # "passed" can never silently absorb a page the AI oracle errored on instead

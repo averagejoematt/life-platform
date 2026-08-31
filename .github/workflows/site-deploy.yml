@@ -48,7 +48,23 @@ on:
       - 'deploy/config_twin_sync.py'
       - 'deploy/config_twin_registry.py'
       - '.github/workflows/site-deploy.yml'   # workflow edits must exercise themselves
-  workflow_dispatch: {}   # manual re-deploy of the current main tree (e.g. after a generated/ data fix)
+  workflow_dispatch:        # manual re-deploy of the current main tree (e.g. after a generated/ data fix)
+    inputs:
+      # #3352 box 3 — the LIVE proof of the rollback scope check. Injects ONE synthetic
+      # failed page of the chosen surface into the visual-QA sweep, so the run goes red
+      # on a known class against the real site with a harmless same-tree redeploy, and
+      # `rollback-site-on-failure` can be watched DECLINING by name. The #3200 lesson:
+      # a fail-closed path with green unit tests can be entirely non-functional.
+      #
+      # Reachable ONLY from workflow_dispatch — the env var below is set from
+      # `github.event.inputs.*`, which is empty on a push, and the guard is pinned in
+      # tests/test_site_deploy_workflow.py so a push can never inject.
+      qa_inject_failure:
+        description: 'Inject one synthetic visual-QA failure of this surface (live proof of the #3352 rollback scope check)'
+        required: false
+        default: none
+        type: choice
+        options: [none, api, deploy-script]
 
 # Never two site syncs racing (each pushes the whole tree + invalidates).
 # cancel-in-progress=false: a sync mid-flight should complete, not be killed halfway.
@@ -252,6 +268,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-site
     if: needs.deploy-site.outputs.superseded != 'true'
+    # #3352: the rollback's scope check reads these. Job outputs survive a FAILED job as
+    # long as the step that set them RAN — which is why the classifier step below is
+    # `if: always()` and never behind the sweep's success.
+    outputs:
+      site_reachable: ${{ steps.verdict.outputs.site_reachable }}
+      surfaces: ${{ steps.verdict.outputs.surfaces }}
+      summary: ${{ steps.verdict.outputs.summary }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -284,6 +307,10 @@ jobs:
 
       - name: Run visual + AI-vision QA sweep
         env:
+          # #3352: the live-proof hook. `github.event.inputs.*` is EMPTY on a push, so a
+          # merge can never inject a failure — only an operator dispatching this workflow
+          # on purpose can, and only with one of the declared choices.
+          VISUAL_QA_INJECT_SURFACE: ${{ github.event.inputs.qa_inject_failure }}
           # #2978: same convergence gate as the smoke job — the sweep refuses to
           # capture a single page until the edge serves THIS build. The 2026-08-25
           # 20:43Z rollback is the counter-case that must keep failing: there every
@@ -298,8 +325,24 @@ jobs:
           python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
+        id: accuracy
         run: |
           python3 tests/accuracy_audit.py --live
+
+      # #3352 — WHICH surface failed, and can a site/** revert even reach it?
+      # `if: always()` on purpose: this step is only interesting when a step above it
+      # failed, and a job output can only be set by a step that RAN. Instrument, never a
+      # gate — it exits 0 whatever it finds (the sweep already decided pass/fail; a second
+      # failure mode here would only give the rollback a new way not to happen).
+      - name: Classify the failing surface (rollback scope check)
+        id: verdict
+        if: always()
+        run: |
+          python3 tests/visual_qa_verdict.py \
+            --report qa-screenshots/report.json \
+            --out qa-screenshots/verdict.json \
+            --accuracy-audit-result "${{ steps.accuracy.outcome }}" \
+            --github-output
 
       - name: Upload screenshots + report
         if: always()
@@ -324,6 +367,13 @@ jobs:
   rollback-site-on-failure:
     name: Auto-rollback site (smoke or visual-QA failure)
     runs-on: ubuntu-latest
+    # #3352: job-level permissions REPLACE the workflow block, so the OIDC/contents
+    # grants are restated. `issues: write` is for the #1447 advisory filer on the
+    # decline path — a GitHub token scope, not an IAM change.
+    permissions:
+      id-token: write
+      contents: read
+      issues: write
     needs: [deploy-site, smoke, visual-qa]
     if: >-
       always() &&
@@ -353,17 +403,77 @@ jobs:
           aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
+      # ── #3352: the SCOPE CHECK ──────────────────────────────────────────────
+      #
+      # Two live incidents where this job reported success and reached nothing:
+      #   • 2026-08-31 P1 — the whole /data/* door was served `application/json`
+      #     because of a step-ordering defect in sync_site_to_s3.sh. The rollback
+      #     re-ran THAT SAME SCRIPT and re-broke the door identically.
+      #   • 2026-08-27 (Session G) — it reverted a wanted, published build beat over a
+      #     DynamoDB-sourced narrative defect it was structurally incapable of fixing.
+      #
+      # The decision is a bash `if` INSIDE the rollback step, deliberately not a job-level
+      # `if:` — a skipped job is indistinguishable from "nothing failed", and the whole
+      # point is that a declined rollback must SAY SO by name.
+      #
+      # Fail-safe direction: only an explicit `false` declines. An empty/absent output
+      # (visual-qa died before the classifier ran, or only the smoke gate failed) rolls
+      # back exactly as it did before this existed.
       - name: Roll back site to previous build + re-invalidate CDN
         id: rollback
+        env:
+          SITE_REACHABLE: ${{ needs.visual-qa.outputs.site_reachable }}
+          QA_SURFACES: ${{ needs.visual-qa.outputs.surfaces }}
+          QA_SUMMARY: ${{ needs.visual-qa.outputs.summary }}
         run: |
+          set -uo pipefail
+          echo "Rollback scope check (#3352): site_reachable='${SITE_REACHABLE:-<unset>}' surfaces='${QA_SURFACES:-<none>}'"
+          echo "  verdict: ${QA_SUMMARY:-<no verdict recorded — the classifier step did not run>}"
+          if [ "${SITE_REACHABLE:-}" = "false" ]; then
+            echo "⛔ ROLLBACK DECLINED — the failing surface is NOT site/**-reachable."
+            echo "   surfaces: ${QA_SURFACES}"
+            echo "   ${QA_SUMMARY}"
+            echo "   Reverting site/** would either re-run the defect (deploy-script) or revert an"
+            echo "   innocent build while the real defect stays live (api). Alerting instead."
+            echo "::warning title=Site rollback DECLINED (#3352)::${QA_SUMMARY}"
+            {
+              echo "declined=true"
+              echo "surfaces=${QA_SURFACES}"
+              echo "verdict=${QA_SUMMARY}"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           PRIOR=$(git rev-parse --short HEAD~1)
-          echo "⚠️  Post-deploy gate failed on a site deploy — rolling back site to $PRIOR"
+          echo "⚠️  Post-deploy gate failed on a site/**-reachable surface — rolling back site to $PRIOR"
           # rollback_site.sh restores site/ from the ref, re-runs the canonical
           # hashing+stamp build (ALLOW_STALE_SITE override for an intentional
           # rollback), re-uploads, and invalidates CloudFront.
           bash deploy/rollback_site.sh "HEAD~1"
-          echo "prior=$PRIOR" >> "$GITHUB_OUTPUT"
+          {
+            echo "declined=false"
+            echo "prior=$PRIOR"
+          } >> "$GITHUB_OUTPUT"
           echo "✅ Site rolled back to $PRIOR — verify https://averagejoematt.com/version.json"
+
+      # The declined path is not a shrug: it files/updates ONE deduped tracked issue via
+      # the #1447 helper (same action every advisory workflow uses), so an out-of-reach
+      # gate failure becomes a work item instead of a line in a run log.
+      - name: File the out-of-reach gate failure (#1447)
+        if: always() && steps.rollback.outputs.declined == 'true'
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: site-deploy-gate-unreachable
+          workflow-name: Site deploy — post-deploy gate red on a surface the rollback cannot reach
+          job-status: failure
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            The site-deploy post-deploy gate failed on a surface a `site/**` revert cannot reach, so
+            the auto-rollback DECLINED (#3352). ${{ steps.rollback.outputs.verdict }}
+            Surfaces: ${{ steps.rollback.outputs.surfaces }}.
+            `deploy-script` = the sync script's own behaviour (2026-08-31 P1 — re-running it re-runs
+            the defect); `api` = DynamoDB/site-api content (2026-08-27 Session G — reverting site/**
+            deletes innocent work and leaves the defect live). Diagnose the named surface; the live
+            site is still on the newly deployed build.
 
       - name: Notify site rollback
         if: always()
@@ -371,20 +481,63 @@ jobs:
           COMMIT="${{ github.sha }}"; SHORT="${COMMIT:0:7}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           GATE="smoke=${{ needs.smoke.result }} visual-qa=${{ needs.visual-qa.result }}"
-          MESSAGE="AUTO-ROLLBACK (site) — public site reverted after a failed post-deploy gate (site-deploy workflow).
+          # #3352: the alert must state which of the two things happened. A declined
+          # rollback that alerted as "AUTO-ROLLBACK" would be the same lie in a new place.
+          if [ "${{ steps.rollback.outputs.declined }}" = "true" ]; then
+            HEADLINE="ROLLBACK DECLINED (site) — the post-deploy gate failed on a surface a site/** revert cannot reach (#3352). NOTHING WAS REVERTED."
+            ACTION="Rollback: DECLINED (surface=${{ steps.rollback.outputs.surfaces }} not site/**-reachable)
+          Verdict:         ${{ steps.rollback.outputs.verdict }}
+          A tracked issue was filed via the #1447 helper (slug site-deploy-gate-unreachable).
+          The live site is STILL on $SHORT — diagnose the named surface, do not re-deploy blindly."
+            SUBJECT="Life Platform SITE ROLLBACK DECLINED [$SHORT]"
+          else
+            HEADLINE="AUTO-ROLLBACK (site) — public site reverted after a failed post-deploy gate (site-deploy workflow)."
+            ACTION="Rolled back to:  ${{ steps.rollback.outputs.prior || 'HEAD~1' }}
+          Verify the site returned to the prior build: curl -s https://averagejoematt.com/version.json"
+            SUBJECT="Life Platform SITE AUTO-ROLLBACK [$SHORT]"
+          fi
+          MESSAGE="$HEADLINE
           Deployed commit: $SHORT (${{ github.ref_name }})
-          Rolled back to:  ${{ steps.rollback.outputs.prior || 'HEAD~1' }}
+          $ACTION
           Failing gate:    $GATE
           Rollback result: ${{ job.status }}
-          Run: $RUN_URL
-
-          Verify the site returned to the prior build: curl -s https://averagejoematt.com/version.json"
+          Run: $RUN_URL"
           aws sns publish \
             --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
-            --subject "Life Platform SITE AUTO-ROLLBACK [$SHORT]" \
+            --subject "$SUBJECT" \
             --message "$MESSAGE" \
             --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — site rollback still completed"
           echo "✅ Site rollback notification sent"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 3b: Close the out-of-reach-gate issue once the gates are green again
+  # (#3352). Without this the #1447 body's "auto-closes on the next green run
+  # of this workflow" close policy would be a claim nothing implements — the
+  # decline path only ever runs on failure. Recover mode is a no-op when no
+  # such issue is open, so on a normal green deploy this job costs one runner
+  # minute and prints "nothing to resolve".
+  # ════════════════════════════════════════════════════════════════
+  resolve-gate-unreachable-issue:
+    name: Resolve out-of-reach gate issue (if any)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    needs: [deploy-site, smoke, visual-qa]
+    if: >-
+      always() &&
+      needs.deploy-site.result == 'success' &&
+      needs.deploy-site.outputs.superseded != 'true' &&
+      needs.smoke.result == 'success' &&
+      needs.visual-qa.result == 'success'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: site-deploy-gate-unreachable
+          workflow-name: Site deploy — post-deploy gate red on a surface the rollback cannot reach
+          job-status: success
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   # ════════════════════════════════════════════════════════════════
   # Job 4: Notify when the DEPLOY itself fails (nothing shipped, or a

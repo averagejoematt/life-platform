@@ -409,7 +409,26 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # (ARMED: baseline 32 passed / mutated 1 failed / reverted 32 passed) — so live unproven
 # moves only by the two registry entries (526 -> 528, still under the committed 541, which
 # is NOT moved).
-BASELINE_TOTAL_GATES = 587
+# 587 -> 588 (2026-08-31, #3352): ONE real gate — `ci::site-deploy.yml::visual-qa::6`, the
+# `Classify the failing surface (rollback scope check)` step. It is the #3352 scope check's
+# reporting half: it runs `tests/visual_qa_verdict.py` over the sweep's own report.json and
+# exports the `site_reachable` job output `rollback-site-on-failure` reads before it decides
+# whether reverting `site/**` can reach the defect at all. Verified by id-set diff, not by
+# count delta (each tree ran its OWN scripts/gate_census.py --json, both fully staged):
+# ADDED exactly {ci::site-deploy.yml::visual-qa::6}, REMOVED {}.
+#
+# It arrives UNPROVEN and that is the honest verdict rather than a gap: the step is an
+# INSTRUMENT, not a gate — `visual_qa_verdict.main()` returns 0 on every input, including a
+# missing or unparseable report, deliberately (the sweep already decided pass/fail; a second
+# failure mode there would only give the rollback a new way not to happen, which is the
+# defect #3352 exists to fix). The census's `not-applicable` verdict is keyed by file path
+# and reaches the `guard` family only, so a ci-step with nothing to fail has no way to say
+# so; recording that here is the next-best thing. The DECISION the step feeds is covered by
+# `tests/test_visual_qa_verdict_3352.py` (16 tests over the two measured incident shapes plus
+# the negative control) and by the workflow-shape assertions in
+# `tests/test_site_deploy_workflow.py`. Live unproven moves 530 -> 531, well under the
+# committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved (down-only, #3329 option B).
+BASELINE_TOTAL_GATES = 588
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was
