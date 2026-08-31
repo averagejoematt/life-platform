@@ -15,21 +15,29 @@ WHAT THIS DECIDES
     * every changed statement is a NEW `Allow` (or an existing Allow that only GREW, which is
       how CDK's `minimizePolicies` merges a new grant into a like-shaped statement);
     * every resource ARN is inside the platform namespace, derived from an explicit registry
-      (`NAMESPACE_FAMILIES` below — built from `cdk/stacks/constants.py` + `ci/lambda_map.json`,
-      never a regex guess);
+      (`deploy/iam_additive_registry.py` — built from `cdk/stacks/constants.py` +
+      `ci/lambda_map.json`, never a regex guess);
     * no `Deny` removed, narrowed, altered — or added;
     * no trust-policy (`AssumeRolePolicyDocument`) edit, no new/removed/changed role;
     * no `iam:*` / `sts:*` / `*` / service-wide wildcard action, no action overlapping
       `FORBIDDEN_ACTION_PATTERNS`;
-    * no wildcard (`*`) resource, no out-of-account or out-of-region ARN;
+    * no wildcard (`*`) resource, no out-of-account or out-of-region ARN, and — review N3 —
+      no wildcard INSIDE an in-namespace ARN unless it matches one of the established
+      data-plane shapes (`WILDCARD_RESOURCE_SHAPES`): `function:life-platform-*` is a grant
+      over every function the platform will ever have, and is refused by name;
+    * no mutating S3 action on the bare bucket / `bucket/*`, and none reaching a prefix
+      `deploy/bucket_policy.json` denies against the same action family (review R2 — that
+      Deny binds `matthew-admin` only, so it is not a backstop for a Lambda role);
     * no managed-policy attachment, no permissions boundary, no resource-based policy
       (Lambda::Permission, BucketPolicy, QueuePolicy, TopicPolicy, KMS key policy …), no
       policy bound to a user/group, no change to which role a policy binds to;
     * and nothing ELSE rides along in the same stack that CI's code path cannot ship — the
       only tolerated non-IAM churn is `TOLERATED_NON_IAM` (Lambda `Code` asset hashes, which
-      move on every commit by construction since #2377; the CDK-internal LogRetention
-      singleton's toolchain-chosen `Runtime`, #2468; `CDKMetadata.Analytics`; resource
-      `Metadata`).
+      move on every commit by construction since #2377 — SHAPE-BOUND since review R1 to
+      `{S3Bucket: the CDK bootstrap assets bucket for this account+region, S3Key:
+      <64-hex>.zip}`, so a foreign bucket / `ImageUri` / inline `ZipFile` is NOT churn; the
+      CDK-internal LogRetention singleton's toolchain-chosen `Runtime`, #2468;
+      `CDKMetadata.Analytics`; resource `Metadata`).
 
   Anything else → OWNER-REQUIRED, every offending statement named, with the owner path
   (`bash deploy/cdk_deploy.sh <Stack>`) printed. A diff this module cannot parse or fetch is
@@ -49,11 +57,16 @@ INPUT — THE TEMPLATE DIFF, NOT PROSE
                     named `<Stack>.template.json`, for tests and offline review).
 
 THE FIVE PRIMITIVES (docs/CHARTER.md) — where each lives
-  registry          NAMESPACE_FAMILIES / FORBIDDEN_ACTION_PATTERNS / TOLERATED_NON_IAM (below)
+  registry          deploy/iam_additive_registry.py — the allowed shape as DATA, extracted
+                    from this module by the 2026-08-30 CISO review so the narrowings fit
+                    under the 1,200-line ceiling (#1665) without a baseline raise
   derivation guard  tests/test_iam_additive_gate_guards_2834.py — namespace values derive from
                     cdk/stacks/constants.py + ci/lambda_map.json; no hand-typed account/table
-  ratchet           same file — forbidden set may only grow, namespace/tolerance sets may only
-                    shrink, each entry dated; widening needs a dated ADR-065 amendment line
+  ratchet           same file, against the fenced ```json iam-additive-gate-baseline``` block
+                    in the ADR-065 amendment (docs/DECISIONS.md) — review R5: the forbidden /
+                    resource-policy / IAM-property sets may only grow and the namespace /
+                    tolerance sets may only shrink, and a widening must appear where the OWNER
+                    reads, not only in a test file
   contract test     tests/test_iam_additive_gate_2834.py — one mutation per forbidden shape on
                     a REAL synthesized template slice (the wire), plus positive controls
   dead-man          exit 2 + OWNER-REQUIRED on anything unevaluable; the Deploy job asserts the
@@ -62,7 +75,7 @@ THE FIVE PRIMITIVES (docs/CHARTER.md) — where each lives
 
 USAGE
   python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live [--stacks A B] \
-      [--json OUT.json] [--github-output FILE] [--expect-converged]
+      [--json OUT.json] [--github-output FILE] [--step-summary FILE] [--expect-converged]
   Exit 0: every evaluated stack is NO-IAM-CHANGE or ALLOW-ADDITIVE.
   Exit 1: ≥1 OWNER-REQUIRED (or, with --expect-converged, ≥1 stack still carries IAM diff).
   Exit 2: usage error / unevaluable input (reported as OWNER-REQUIRED — fail closed).
@@ -72,8 +85,6 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
-import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -85,7 +96,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-GATE_NAME = "iam_additive_gate"
+LEDGER_NAME = "iam_additive_gate"  # the `gate` field of the S3 ledger record
 ISSUE = 2834
 OWNER_PATH = "bash deploy/cdk_deploy.sh <Stack>   # owner-run, from main (docs/CONVENTIONS.md §6)"
 
@@ -95,268 +106,65 @@ OWNER = "OWNER-REQUIRED"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# REGISTRY — the allowed shape, as data. Every entry is dated; the ratchet test pins
-# these sets (forbidden may only grow; namespace + tolerance may only shrink).
+# REGISTRY — imported, not restated. `deploy/iam_additive_registry.py` holds the allowed
+# shape as data (namespace families, forbidden actions, wildcard-resource shapes, the
+# S3 protection derived from deploy/bucket_policy.json, the tolerated non-IAM churn).
+# It was extracted from this file by the 2026-08-30 CISO review (#3335): the review's
+# R1/R2/R3/N3 narrowings would have pushed this module past the 1,200-line ceiling
+# (#1665), and the standing rule is extraction, never a baseline raise.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-def _load_constants():
-    """cdk/stacks/constants.py, loaded by FILE so no aws_cdk import is needed (it only imports os)."""
-    path = ROOT / "cdk" / "stacks" / "constants.py"
-    spec = importlib.util.spec_from_file_location("_lp_cdk_constants", path)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def _lambda_function_names() -> tuple[str, ...]:
-    """The platform's Lambda name vocabulary — ci/lambda_map.json, the one map CI deploys from."""
-    with open(ROOT / "ci" / "lambda_map.json", encoding="utf-8") as fh:
-        lmap = json.load(fh)
-    return tuple(sorted({entry["function"] for entry in lmap["lambdas"].values()}))
-
-
-_C = _load_constants()
-ACCOUNT: str = _C.ACCT
-PLATFORM_SLUG = "life-platform"  # the namespace token; the derivation test pins it to constants.TABLE_NAME
-# Regions the platform's stacks live in: the default (cdk/app.py `region`), the CloudFront
-# stack's us-east-1 (a string literal in app.py by #1816's rule), the backup replica's region.
-PLATFORM_REGIONS: tuple[str, ...] = tuple(dict.fromkeys((_C.REGION, "us-east-1", _C.RAW_BACKUP_REGION)))
-LAMBDA_NAMES: tuple[str, ...] = _lambda_function_names()
-
-
-@dataclass(frozen=True)
-class NamespaceFamily:
-    name: str
-    patterns: tuple[str, ...]  # fnmatchcase patterns over the RESOLVED ARN string
-    since: str
-    why: str
-
-
-def _regional(fmt: str) -> tuple[str, ...]:
-    return tuple(fmt.format(region=r, acct=ACCOUNT) for r in PLATFORM_REGIONS)
-
-
-def _build_namespace() -> tuple[NamespaceFamily, ...]:
-    lam: list[str] = list(_regional(f"arn:aws:lambda:{{region}}:{{acct}}:function:{PLATFORM_SLUG}-*"))
-    logs: list[str] = list(_regional(f"arn:aws:logs:{{region}}:{{acct}}:log-group:/aws/lambda/{PLATFORM_SLUG}-*"))
-    for name in LAMBDA_NAMES:
-        lam += _regional(f"arn:aws:lambda:{{region}}:{{acct}}:function:{name}")
-        lam += _regional(f"arn:aws:lambda:{{region}}:{{acct}}:function:{name}:*")
-        logs += _regional(f"arn:aws:logs:{{region}}:{{acct}}:log-group:/aws/lambda/{name}")
-        logs += _regional(f"arn:aws:logs:{{region}}:{{acct}}:log-group:/aws/lambda/{name}:*")
-    return (
-        NamespaceFamily(
-            "dynamodb-table",
-            (
-                f"arn:aws:dynamodb:{_C.REGION}:{ACCOUNT}:table/{_C.TABLE_NAME}",
-                f"arn:aws:dynamodb:{_C.REGION}:{ACCOUNT}:table/{_C.TABLE_NAME}/index/*",
-            ),
-            "2026-08-30",
-            "the single table (constants.TABLE_NAME) + its two sanctioned GSIs (ADR-097)",
-        ),
-        NamespaceFamily(
-            "s3-platform-bucket",
-            (f"arn:aws:s3:::{_C.S3_BUCKET}", f"arn:aws:s3:::{_C.S3_BUCKET}/*"),
-            "2026-08-30",
-            "the platform bucket (constants.S3_BUCKET); prefix scoping inside it is the grant author's job",
-        ),
-        NamespaceFamily(
-            "s3-raw-backup-bucket",
-            (f"arn:aws:s3:::{_C.RAW_BACKUP_BUCKET}", f"arn:aws:s3:::{_C.RAW_BACKUP_BUCKET}/*"),
-            "2026-08-30",
-            "the DIL-027 cross-region raw/ replica (constants.RAW_BACKUP_BUCKET)",
-        ),
-        NamespaceFamily(
-            "secrets",
-            _regional(f"arn:aws:secretsmanager:{{region}}:{{acct}}:secret:{PLATFORM_SLUG}/*"),
-            "2026-08-30",
-            "every credential lives under the life-platform/ prefix (CLAUDE.md: Secrets Manager only)",
-        ),
-        NamespaceFamily(
-            "lambda-functions",
-            tuple(lam),
-            "2026-08-30",
-            "life-platform-* plus every function name in ci/lambda_map.json (most names are bare, e.g. daily-brief)",
-        ),
-        NamespaceFamily(
-            "sns-topics",
-            _regional(f"arn:aws:sns:{{region}}:{{acct}}:{PLATFORM_SLUG}-*"),
-            "2026-08-30",
-            "life-platform-alerts / -alerts-digest and siblings",
-        ),
-        NamespaceFamily(
-            "sqs-queues",
-            _regional(f"arn:aws:sqs:{{region}}:{{acct}}:{PLATFORM_SLUG}-*"),
-            "2026-08-30",
-            "the ingestion DLQ and the per-function DLQs (#2655 class — the 08-15 strand was exactly this grant)",
-        ),
-        NamespaceFamily(
-            "log-groups",
-            tuple(logs),
-            "2026-08-30",
-            "/aws/lambda/<function> for the same function vocabulary",
-        ),
-        NamespaceFamily(
-            "ssm-parameters",
-            _regional(f"arn:aws:ssm:{{region}}:{{acct}}:parameter/{PLATFORM_SLUG}/*"),
-            "2026-08-30",
-            "/life-platform/budget-tier, /remediation-mode, /experiment-cycle — the platform's own SSM tree",
-        ),
-        NamespaceFamily(
-            "kms-platform-key",
-            (f"arn:aws:kms:{_C.REGION}:{ACCOUNT}:key/{_C.KMS_KEY_ID}",),
-            "2026-08-30",
-            "the one platform CMK (constants.KMS_KEY_ID) every table/secret reader already holds Decrypt on",
-        ),
-    )
-
-
-NAMESPACE_FAMILIES: tuple[NamespaceFamily, ...] = _build_namespace()
-
-# Actions a NEW or GROWN Allow may never carry, lowercase fnmatch patterns keyed to why.
-# Bare "*" and service-wide "svc:*" are a separate rule (`_action_problem`) because a
-# fnmatch pattern of "*" would match everything. A partial-wildcard action (s3:GetObject*,
-# the shape CDK's grant helpers emit) is admitted only if its literal prefix cannot overlap
-# any pattern here — see `_action_problem`.
-FORBIDDEN_ACTION_PATTERNS: dict[str, str] = {
-    "iam:*": "any IAM action is privilege administration (iam:PassRole is the classic escalation)",
-    "sts:*": "role assumption/federation is a lateral-movement primitive",
-    "organizations:*": "account-structure control",
-    "account:*": "account-level settings",
-    "cloudformation:*": "CFN executes as the Administrator cfn-exec role — any stack mutation is admin by proxy",
-    "lambda:createfunction*": "creating a function with a chosen role = arbitrary code under that role",
-    "lambda:updatefunction*": "code/config swap on another function (env vars, handler, role)",
-    "lambda:deletefunction*": "destructive and irreversible",
-    "lambda:addpermission": "resource-based grant to an external principal",
-    "lambda:removepermission": "resource-policy edit",
-    "lambda:putfunction*": "concurrency / event-invoke / code-signing config mutation",
-    "lambda:publishlayerversion": "layer injection into other functions' runtimes",
-    "lambda:addlayerversionpermission": "layer sharing across functions",
-    "lambda:*eventsourcemapping": "wiring another function to a data source",
-    "events:put*": "scheduling arbitrary invocations / rewriting targets",
-    "events:delete*": "destructive and irreversible",
-    "events:remove*": "target removal",
-    "events:disable*": "silently turning a cron off",
-    "events:enable*": "turning a parked cron back on (Garmin, ADR-074)",
-    "kms:putkeypolicy": "key-policy = the key's own IAM",
-    "kms:schedulekeydeletion": "destructive and irreversible",
-    "kms:disablekey": "destructive and irreversible",
-    "kms:createkey": "new key material outside the registry",
-    "kms:creategrant": "delegated key access",
-    "s3:putbucketpolicy": "bucket-policy = resource IAM (ADR-032/046 delete-protection lives there)",
-    "s3:deletebucketpolicy": "removes the delete-protection policy",
-    "s3:putbucketacl": "bucket ACL grant (public-read)",
-    "s3:putobjectacl": "object ACL grant (public-read)",
-    "s3:putbucketpublicaccessblock": "public-access posture",
-    "s3:putaccountpublicaccessblock": "account public-access posture",
-    "s3:deletebucket": "destructive and irreversible",
-    "s3:putbucketversioning": "can suspend versioning under raw/ (the replica's basis)",
-    "s3:putreplicationconfiguration": "rewires the DIL-027 replica",
-    "s3:putlifecycleconfiguration": "can expire raw/ objects",
-    "dynamodb:deletetable": "destructive and irreversible",
-    "dynamodb:updatetable": "GSI/stream/capacity mutation (ADR-097: a new GSI needs an ADR)",
-    "dynamodb:updatecontinuousbackups": "can disable PITR",
-    "dynamodb:deletebackup": "destructive and irreversible",
-    "secretsmanager:deletesecret": "destructive and irreversible",
-    "secretsmanager:putresourcepolicy": "secret resource-policy = resource IAM",
-    "secretsmanager:createsecret": "new credential outside the reviewed set",
-    "sns:addpermission": "topic resource-policy grant",
-    "sns:settopicattributes": "topic policy lives in attributes",
-    "sqs:addpermission": "queue resource-policy grant",
-    "sqs:setqueueattributes": "queue policy lives in attributes",
-    "logs:deleteloggroup": "destructive (audit trail)",
-    "logs:putresourcepolicy": "log resource-policy",
-    "ssm:deleteparameter": "destructive and irreversible",
-}
-
-
-# Non-IAM template churn that may ride alongside an additive IAM change without demoting
-# the stack to OWNER-REQUIRED. Everything not listed here is "CI cannot ship it".
-# (type, property) → dated reason.  `logical_id_prefix` narrows the LogRetention exception.
-@dataclass(frozen=True)
-class Tolerance:
-    resource_type: str
-    prop: str | None  # None = the resource-level `Metadata` block
-    logical_id_prefix: str
-    since: str
-    why: str
-
-
-TOLERATED_NON_IAM: tuple[Tolerance, ...] = (
-    Tolerance(
-        "AWS::Lambda::Function",
-        "Code",
-        "",
-        "2026-08-30",
-        "asset-hash churn — the bundle carries its commit (#2377) so Code moves every commit; "
-        "CI's code path (deploy_lambda.sh / deploy_fleet.sh) ships exactly this class already (#2993)",
-    ),
-    Tolerance(
-        "AWS::Lambda::Function",
-        "Runtime",
-        "LogRetention",
-        "2026-08-30",
-        "the CDK-internal LogRetention singleton's Runtime is chosen by aws-cdk-lib's regionalFact, not by "
-        "any merged config (#2468; classify_cdk_diff.py reports it as a ::notice for the same reason)",
-    ),
-    Tolerance("AWS::CDK::Metadata", "Analytics", "", "2026-08-30", "CDK's construct-usage telemetry string; moves on every synth"),
-    Tolerance("*", None, "", "2026-08-30", "resource-level Metadata (aws:cdk:path, aws:asset:*) is synth bookkeeping, not configuration"),
+from iam_additive_registry import (  # noqa: E402
+    _C,
+    ACCOUNT,
+    FORBIDDEN_ACTION_PATTERNS,
+    IAM_PROPERTY_NAMES,
+    LAMBDA_NAMES,
+    NAMESPACE_FAMILIES,
+    PLATFORM_REGIONS,
+    PLATFORM_SLUG,
+    RESOURCE_POLICY_TYPES,
+    TOLERATED_NON_IAM,
+    baseline_snapshot,
+    bootstrap_qualifier,
+    code_asset_problem,
+    registry_fingerprint,
+    resource_in_namespace,
+    s3_grant_problem,
+    wildcard_resource_shape,
 )
 
-# Resource types whose ANY change is IAM-relevant (a resource-based policy or an identity).
-RESOURCE_POLICY_TYPES: frozenset[str] = frozenset(
-    {
-        "AWS::Lambda::Permission",
-        "AWS::Lambda::LayerVersionPermission",
-        "AWS::Lambda::Url",
-        "AWS::S3::BucketPolicy",
-        "AWS::S3::AccessPoint",
-        "AWS::SQS::QueuePolicy",
-        "AWS::SNS::TopicPolicy",
-        "AWS::KMS::Key",
-        "AWS::KMS::Alias",
-        "AWS::SecretsManager::ResourcePolicy",
-        "AWS::Logs::ResourcePolicy",
-        "AWS::Events::EventBusPolicy",
-    }
-)
-# Property names on ANY resource whose change is an IAM change (role swap, boundary, key policy).
-IAM_PROPERTY_NAMES: frozenset[str] = frozenset(
-    {
-        "Role",
-        "RoleArn",
-        "ExecutionRoleArn",
-        "PermissionsBoundary",
-        "ManagedPolicyArns",
-        "AssumeRolePolicyDocument",
-        "Policies",
-        "PolicyDocument",
-        "KeyPolicy",
-    }
-)
+# Re-exported so a reader (and the guard tests) can reach the whole decision through the
+# one module that makes it. `_C` is the loaded cdk/stacks/constants module — the tests
+# assert the derivation against it, which is the point of the derivation guard.
+__all__ = [
+    "ACCOUNT",
+    "FORBIDDEN_ACTION_PATTERNS",
+    "IAM_PROPERTY_NAMES",
+    "LAMBDA_NAMES",
+    "NAMESPACE_FAMILIES",
+    "PLATFORM_REGIONS",
+    "PLATFORM_SLUG",
+    "RESOURCE_POLICY_TYPES",
+    "TOLERATED_NON_IAM",
+    "_C",
+    "baseline_snapshot",
+    "bootstrap_qualifier",
+    "code_asset_problem",
+    "registry_fingerprint",
+    "resource_in_namespace",
+    "s3_grant_problem",
+    "wildcard_resource_shape",
+]
+
 _ROLE_PROP_CLASS = {
     "AssumeRolePolicyDocument": "trust-policy-edit",
     "ManagedPolicyArns": "managed-policy-attachment",
     "PermissionsBoundary": "permissions-boundary-edit",
     "Policies": "inline-role-policy-edit",
 }
-
-
-def registry_fingerprint() -> str:
-    """sha256 over the registry data — the ledger records WHICH allowed shape admitted a change."""
-    blob = json.dumps(
-        {
-            "namespace": [asdict(f) for f in NAMESPACE_FAMILIES],
-            "forbidden": FORBIDDEN_ACTION_PATTERNS,
-            "tolerated": [asdict(t) for t in TOLERATED_NON_IAM],
-            "resource_policy_types": sorted(RESOURCE_POLICY_TYPES),
-            "iam_property_names": sorted(IAM_PROPERTY_NAMES),
-        },
-        sort_keys=True,
-    )
-    return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -417,6 +225,7 @@ class Ctx:
     region: str
     account: str
     resources: dict[str, Any]  # the synthesized template's Resources (for Ref/GetAtt lookups)
+    bootstrap: str | None = None  # CDK bootstrap qualifier from the template's own BootstrapVersion (review R1)
 
 
 def _literal_name(ctx: Ctx, logical_id: str) -> tuple[str | None, str | None]:
@@ -484,15 +293,6 @@ def resolve_resource(value: Any, ctx: Ctx) -> str | None:
     return None
 
 
-def resource_in_namespace(arn: str) -> str | None:
-    """Return the family name that admits this ARN, else None. Case-sensitive on purpose."""
-    for fam in NAMESPACE_FAMILIES:
-        for pat in fam.patterns:
-            if fnmatch.fnmatchcase(arn, pat):
-                return fam.name
-    return None
-
-
 def _action_problem(action: Any) -> str | None:
     if not isinstance(action, str) or ":" not in action:
         return f"malformed-or-wildcard-action:{action!r}"
@@ -546,10 +346,28 @@ def statement_problems(stmt: Any, ctx: Ctx) -> list[str]:
         rendered = resolve_resource(r, ctx)
         if rendered is None:
             problems.append(f"unresolvable-resource:{_canon(r)}")
-        elif rendered.strip() == "*" or rendered.startswith("*"):
+            continue
+        if rendered.strip() == "*" or rendered.startswith("*"):
             problems.append("wildcard-resource:*")
-        elif resource_in_namespace(rendered) is None:
+            continue
+        if resource_in_namespace(rendered) is None:
             problems.append(f"out-of-namespace-resource:{rendered}")
+            continue
+        # N3 (review): in-namespace is not enough when the ARN itself carries a wildcard.
+        # `function:life-platform-*` is a grant over every function the platform will ever
+        # have; only the established data-plane shapes are admitted, and the refusal is
+        # named rather than silent.
+        if ("*" in rendered or "?" in rendered) and wildcard_resource_shape(rendered) is None:
+            problems.append(f"wildcard-resource-outside-established-shape:{rendered}")
+            continue
+        # R2 (review): an S3 grant inside the namespace still may not be unscoped, and may
+        # not reach a prefix deploy/bucket_policy.json protects against the same action
+        # family. The bucket policy binds matthew-admin only; this re-applies its intent.
+        for a in actions:
+            if isinstance(a, str):
+                s3_problem = s3_grant_problem(a, rendered)
+                if s3_problem:
+                    problems.append(s3_problem)
     if "Condition" in stmt and not isinstance(stmt["Condition"], dict):
         problems.append("malformed-condition")
     return problems
@@ -678,7 +496,20 @@ def is_iam_relevant_type(typ: str) -> bool:
     return any(tok in typ for tok in ("Policy", "Permission"))
 
 
-def _tolerated(typ: str, logical_id: str, prop: str | None) -> bool:
+_NOT_LISTED = "not in TOLERATED_NON_IAM"
+
+
+def _tolerance_problem(typ: str, logical_id: str, prop: str | None, new_value: Any, ctx: Ctx) -> str | None:
+    """None = this non-IAM property change is tolerated churn. A string = why it is not.
+
+    Review R1: the `AWS::Lambda::Function.Code` tolerance used to be SHAPE-BLIND — it
+    matched on (type, property) alone, so an IAM-additive stack whose function Code pointed
+    at a bucket the account does not own, at a foreign `ImageUri`, or at an inline `ZipFile`
+    was `ALLOW-ADDITIVE` and CI shipped code that is not in this repo. It is now bound to the
+    exact churn shape: {S3Bucket = the CDK bootstrap assets bucket for THIS template's
+    account/region/qualifier, S3Key = <64-hex>.zip}. Anything else is `pending_non_iam`,
+    which makes the stack OWNER-REQUIRED as soon as any IAM change rides with it.
+    """
     for t in TOLERATED_NON_IAM:
         if t.resource_type not in ("*", typ):
             continue
@@ -686,8 +517,25 @@ def _tolerated(typ: str, logical_id: str, prop: str | None) -> bool:
             continue
         if t.logical_id_prefix and not logical_id.startswith(t.logical_id_prefix):
             continue
-        return True
-    return False
+        if typ == "AWS::Lambda::Function" and prop == "Code":
+            return code_asset_problem(_resolved_code(new_value, ctx), ctx.account, ctx.region, ctx.bootstrap)
+        return None
+    return _NOT_LISTED
+
+
+def _resolved_code(value: Any, ctx: Ctx) -> Any:
+    """Render an asset `Code` block's intrinsics (an env-agnostic synth writes S3Bucket as
+    an `Fn::Sub`), so the R1 shape check compares plain strings. Unresolvable stays as-is
+    and fails the shape check — never resolves to something friendlier."""
+    if not isinstance(value, dict):
+        return value
+    out = dict(value)
+    for key in ("S3Bucket", "S3Key"):
+        if key in out and not isinstance(out[key], str):
+            resolved = resolve_resource(out[key], ctx)
+            if resolved is not None:
+                out[key] = resolved
+    return out
 
 
 def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str, account: str) -> StackVerdict:
@@ -702,7 +550,7 @@ def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str,
         v.unevaluable = "template has no Resources object"
         v.findings.append(Finding("unevaluable", stack, v.unevaluable))
         return v
-    ctx = Ctx(region=region, account=account, resources=sres)
+    ctx = Ctx(region=region, account=account, resources=sres, bootstrap=bootstrap_qualifier(synthesized))
     iam_touched = False
 
     for section in ("Parameters", "Rules", "Conditions", "Mappings", "Outputs", "Transform"):
@@ -767,10 +615,15 @@ def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str,
             if p in IAM_PROPERTY_NAMES:
                 iam_touched = True
                 v.findings.append(Finding("iam-property-edit", lid, f"{typ}.{p} differs"))
-            elif not _tolerated(typ, lid, p):
-                v.pending_non_iam.append(f"{lid} ({typ}).{p}")
+                continue
+            problem = _tolerance_problem(typ, lid, p, np_.get(p), ctx)
+            if problem is not None:
+                entry = f"{lid} ({typ}).{p}"
+                if problem != _NOT_LISTED:
+                    entry += f" — {problem}"
+                v.pending_non_iam.append(entry)
         for k in changed_attrs:
-            if k == "Metadata" and _tolerated(typ, lid, None):
+            if k == "Metadata" and _tolerance_problem(typ, lid, None, new.get(k), ctx) is None:
                 continue
             v.pending_non_iam.append(f"{lid} ({typ}) attribute {k}")
 
@@ -799,6 +652,19 @@ def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str,
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+# N1 (review): every stack name this module prints on the `iam_additive_stacks=` line is
+# word-split by the Deploy job into `npx cdk deploy "$STACK"`. CloudFormation's own grammar
+# is exactly this — a letter, then letters/digits/hyphens — so anything else is either a
+# corrupt manifest or an attempt to smuggle a shell word, and both fail closed (exit 2).
+STACK_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
+
+
+def validate_stack_name(name: str) -> str:
+    if not STACK_NAME_RE.fullmatch(name):
+        raise ValueError(f"stack name {name!r} is not [A-Za-z][A-Za-z0-9-]* — refusing to pass it to a shell")
+    return name
+
+
 def read_manifest(synth_dir: Path) -> dict[str, tuple[Path, str, str]]:
     """stack name → (template path, account, region) from cdk.out/manifest.json."""
     with open(synth_dir / "manifest.json", encoding="utf-8") as fh:
@@ -807,6 +673,7 @@ def read_manifest(synth_dir: Path) -> dict[str, tuple[Path, str, str]]:
     for name, art in (manifest.get("artifacts") or {}).items():
         if art.get("type") != "aws:cloudformation:stack":
             continue
+        validate_stack_name(str(name))
         env = str(art.get("environment", ""))
         m = re.fullmatch(r"aws://(\d+)/([a-z0-9-]+)", env)
         if not m:
@@ -856,7 +723,12 @@ def evaluate_all(synth_dir: Path, deployed_dir: Path | None, live: bool, only: l
         v = StackVerdict(stack="<manifest>", unevaluable=f"cannot read synth manifest: {exc}")
         v.findings.append(Finding("unevaluable", "<manifest>", v.unevaluable))
         return [v], True
-    names = only or sorted(stacks)
+    try:
+        names = [validate_stack_name(n) for n in (only or sorted(stacks))]
+    except ValueError as exc:
+        v = StackVerdict(stack="<stacks>", unevaluable=str(exc))
+        v.findings.append(Finding("unevaluable", "<stacks>", v.unevaluable))
+        return [v], True
     for name in names:
         if name not in stacks:
             v = StackVerdict(stack=name, unevaluable="stack not in synth manifest")
@@ -907,9 +779,44 @@ def render(verdicts: list[StackVerdict]) -> list[str]:
     return out
 
 
+def render_step_summary(verdicts: list[StackVerdict]) -> str:
+    """R4 (review): the admitted statements, on the page the approver actually reads.
+
+    Before this, an ALLOW-ADDITIVE decision existed only inside a collapsed `::group::` in
+    the Plan log and in an S3 ledger with zero readers — so the `production` click that
+    authorises the deploy was made with no statement of WHAT IAM it authorises. This markdown
+    goes to $GITHUB_STEP_SUMMARY, which renders on the run page above the approval prompt.
+    """
+    lines = [
+        f"### IAM additive gate (#{ISSUE}) — `{overall(verdicts)}`",
+        "",
+        f"Registry fingerprint `{registry_fingerprint()}` · owner path: `{OWNER_PATH.split('#')[0].strip()}`",
+        "",
+        "| Stack | Verdict | Roles | Sid | Actions | Resources | How |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    rows = 0
+    for v in verdicts:
+        for a in v.admitted:
+            rows += 1
+            lines.append(
+                f"| `{v.stack}` | {v.verdict} | {', '.join(f'`{r}`' for r in a.role_refs) or '—'} | `{a.sid or '—'}` | "
+                f"{', '.join(f'`{x}`' for x in a.actions)} | {', '.join(f'`{x}`' for x in a.resources)} | {a.how} |"
+            )
+    if not rows:
+        lines.append("| — | — | — | — | _no statement admitted_ | — | — |")
+    findings = [(v.stack, f) for v in verdicts for f in v.findings]
+    if findings:
+        lines += ["", "**OWNER-REQUIRED findings**", "", "| Stack | Class | Where | Detail |", "|---|---|---|---|"]
+        for stack, f in findings:
+            lines.append(f"| `{stack}` | `{f.kind}` | `{f.logical_id}` | {f.detail} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def to_record(verdicts: list[StackVerdict]) -> dict[str, Any]:
     return {
-        "gate": GATE_NAME,
+        "gate": LEDGER_NAME,
         "issue": ISSUE,
         "evaluated_at": datetime.now(timezone.utc).isoformat(),
         "git_sha": os.environ.get("GITHUB_SHA"),
@@ -938,6 +845,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--stacks", nargs="*", help="evaluate only these stacks (default: every stack in the manifest)")
     ap.add_argument("--json", type=Path, help="write the machine-readable decision record here")
     ap.add_argument("--github-output", type=Path, help="append iam_gate_verdict= and iam_additive_stacks= lines here")
+    ap.add_argument("--step-summary", type=Path, help="append the admitted-statement table here ($GITHUB_STEP_SUMMARY) — review R4")
     ap.add_argument("--expect-converged", action="store_true", help="post-deploy proof: exit 1 unless every stack is NO-IAM-CHANGE")
     args = ap.parse_args(argv[1:])
 
@@ -947,6 +855,9 @@ def main(argv: list[str]) -> int:
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(to_record(verdicts), indent=2, default=str), encoding="utf-8")
+    if args.step_summary:
+        with open(args.step_summary, "a", encoding="utf-8") as fh:
+            fh.write(render_step_summary(verdicts) + "\n")
     allow_stacks = [v.stack for v in verdicts if v.verdict == ALLOW]
     if args.github_output:
         with open(args.github_output, "a", encoding="utf-8") as fh:

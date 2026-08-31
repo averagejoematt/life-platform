@@ -348,7 +348,26 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # PR's first push showed 576 because the sweep's `_GATE_TOOLS` tuple matched the census's
 # registry-name pattern and entered as six `registry::` phantom gates — the #3220
 # name-only misfire, cured by renaming the constant, not by bumping onto noise.
-BASELINE_TOTAL_GATES = 575
+# 575 -> 578 (2026-08-31, #2834; stacked on #3315 — rebased onto PR #3339): THREE real gates, one of them PROVEN. TOTAL only —
+# BASELINE_UNPROVEN_GATES is NOT moved (live unproven 525 -> 527, still 14 under 541).
+# Verified by id-set diff, not count delta: each tree ran its OWN scripts/gate_census.py
+# --json with the new files `git add`ed first (#3339 tip 68d087626 = 575, branch = 578).
+#   ADDED   guard::deploy/iam_additive_gate.py  -> `can-fail (proven)`. The additive-IAM
+#           gate itself, with a real two-direction mutation recorded in
+#           gate_census_proofs.GUARD_PROOFS: six defects planted one at a time into a copy
+#           of the committed synth slice (iam:PassRole; a foreign Code.S3Bucket; s3:DeleteObject
+#           on raw/*; ssm:PutParameter on the remediation kill-switch; the deployed side
+#           removed) -> exit 1/1/1/1/2, clean baseline and revert both exit 0, and the
+#           2026-08-14 grant still ALLOW-ADDITIVE.
+#   ADDED   ci::ci-cd.yml::deploy::2 and ::3 -> unproven, deliberately. They are the Deploy
+#           job's dead-man and the additive-IAM deploy step; proving them means watching an
+#           approval-gated PRODUCTION deploy fail, which is not a local mutation. The
+#           decision they carry IS proven, at the gate above. Recorded rather than absorbed.
+#   ADDED   ci::ci-cd.yml::deploy::6 / REMOVED ci::ci-cd.yml::deploy::4 — index churn, not a
+#           gate: CI-step ids are positional and the two new steps sit ahead of the code
+#           deploys (review N2), sliding the tail by two. Count-neutral, and no proof or
+#           attempt record keys on those ids (orphan_proofs: [], unattached_attempts: []).
+BASELINE_TOTAL_GATES = 578
 BASELINE_UNPROVEN_GATES = 541
 
 

@@ -605,8 +605,13 @@ jobs:
           npx cdk synth --all --quiet
           cd "$GITHUB_WORKSPACE"
           set +e
+          # --step-summary: the admitted statements render on the RUN PAGE, above the
+          # production approval prompt (R4 of the 2026-08-30 CISO review). Before this the
+          # only record of an ALLOW-ADDITIVE decision was a collapsed ::group:: in this log
+          # and an S3 ledger nobody reads — the click authorised IAM it never showed.
           python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live \
-            --json /tmp/iam_gate_2834_plan.json --github-output "$GITHUB_OUTPUT"
+            --json /tmp/iam_gate_2834_plan.json --github-output "$GITHUB_OUTPUT" \
+            --step-summary "$GITHUB_STEP_SUMMARY"
           GATE_EXIT=$?
           set -e
           echo "::endgroup::"
@@ -864,6 +869,82 @@ jobs:
           aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
+      # ── #2834: the additive-IAM deploy (ADR-065 amendment 2026-08-30) ──────────
+      # Owner decision on #2834, option (b): CI may apply an IAM change ONLY when the
+      # synthesized template diff is additive-only (deploy/iam_additive_gate.py decides).
+      # Two steps, deliberately: a dead-man that reds if the Plan verdict is ABSENT
+      # (absence must be louder than failure), then the deploy itself, which re-evaluates
+      # at apply time and deploys the exact cloud assembly it evaluated.
+      # ORDER (CISO review N2, 2026-08-30): both steps run BEFORE the fleet/MCP/per-function
+      # code deploys below. A grant that lands after its code would leave the code live and
+      # unable to do its job for as long as the apply-time evaluation takes to fail; the
+      # 2026-08-14 P1 was exactly a deployed function missing one s3:GetObject.
+      - name: IAM gate verdict present (dead-man, #2834)
+        run: |
+          VERDICT='${{ needs.plan.outputs.iam_gate_verdict }}'
+          if [ -z "$VERDICT" ]; then
+            echo "::error::Plan produced NO iam_gate_verdict output — deploy/iam_additive_gate.py did not run (step removed, output renamed, or it crashed before writing). Absence is a failure, not a pass (#2834 dead-man)."
+            exit 1
+          fi
+          echo "iam_gate_verdict=$VERDICT  iam_additive_stacks='${{ needs.plan.outputs.iam_additive_stacks }}'"
+
+      - name: Additive IAM deploy — evaluated == deployed (#2834)
+        if: needs.plan.outputs.iam_additive_stacks != ''
+        run: |
+          set -euo pipefail
+          PLAN_STACKS="${{ needs.plan.outputs.iam_additive_stacks }}"
+          echo "═══ Additive IAM deploy (#2834): Plan admitted [$PLAN_STACKS] ═══"
+          # The same toolchain Plan synthesized with (cdk/package.json CLI pin + cdk/requirements.txt).
+          CDK_CLI_VERSION=$(node -p "require('./cdk/package.json').devDependencies['aws-cdk']")
+          npm install -g "aws-cdk@${CDK_CLI_VERSION}" --quiet
+          cd cdk
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt --quiet
+          npx cdk synth --all --quiet
+          cd "$GITHUB_WORKSPACE"
+          # Re-evaluate at APPLY time against the live templates. The Plan verdict is a plan,
+          # not a licence: an owner deploy in between changes the deployed side. What ships
+          # below is the exact cloud assembly (--app cdk.out) this evaluation read.
+          python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live --stacks $PLAN_STACKS \
+            --json /tmp/iam_gate_2834_apply.json --github-output /tmp/iam_gate_2834_apply.out
+          DEPLOY_STACKS=$(grep '^iam_additive_stacks=' /tmp/iam_gate_2834_apply.out | cut -d= -f2-)
+          AUDIT_BASE="remediation-log/iam-additive-gate/$(date -u +%Y/%m/%d)/run-${GITHUB_RUN_ID}-${GITHUB_SHA:0:12}"
+          if [ -z "$DEPLOY_STACKS" ]; then
+            echo "Nothing left to deploy — the stacks converged since Plan (an owner deploy landed in between)."
+            aws s3 cp /tmp/iam_gate_2834_apply.json "s3://matthew-life-platform/${AUDIT_BASE}-decision.json" \
+              --content-type application/json --region ${{ env.AWS_REGION }}
+            exit 0
+          fi
+          cd cdk
+          for STACK in $DEPLOY_STACKS; do
+            echo "→ cdk deploy $STACK (additive IAM only; --exclusively so no dependency stack rides along)"
+            npx cdk deploy "$STACK" --app cdk.out --exclusively --require-approval never --progress events
+          done
+          cd "$GITHUB_WORKSPACE"
+          # Convergence proof: the admitted IAM diff must now be GONE from the live template.
+          python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live --stacks $DEPLOY_STACKS \
+            --expect-converged --json /tmp/iam_gate_2834_converged.json
+          # The ledger — the same S3 audit-ledger pattern the remediation agent writes under
+          # remediation-log/ (ADR-065): every ALLOW-ADDITIVE decision that shipped, with the
+          # admitted statements and the registry fingerprint that admitted them. A failed put
+          # fails the step: an unrecorded deploy is a failure, not a quiet success.
+          aws s3 cp /tmp/iam_gate_2834_apply.json "s3://matthew-life-platform/${AUDIT_BASE}-decision.json" \
+            --content-type application/json --region ${{ env.AWS_REGION }}
+          aws s3 cp /tmp/iam_gate_2834_converged.json "s3://matthew-life-platform/${AUDIT_BASE}-converged.json" \
+            --content-type application/json --region ${{ env.AWS_REGION }}
+          # R4 (CISO review): one human-facing line on the alert topic. The S3 ledger has no
+          # readers; the owner reads life-platform-alerts. The deploy role already holds
+          # sns:Publish on this topic (infra/iam/github-actions-deploy-role.permissions.json,
+          # Sid SNS) — this adds NO grant. A failed publish fails the step, same as the ledger.
+          ADMITTED=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print('; '.join(f\"{s}#{a['sid'] or '-'} {','.join(a['actions'])} -> {','.join(a['resources'])}\" for s,v in d['stacks'].items() for a in v['admitted']) or 'none')" /tmp/iam_gate_2834_apply.json)
+          aws sns publish \
+            --topic-arn "arn:aws:sns:${{ env.AWS_REGION }}:${{ env.AWS_ACCOUNT_ID }}:life-platform-alerts" \
+            --subject "IAM additive deploy: $DEPLOY_STACKS" \
+            --message "CI applied additive-only IAM (#2834). Stacks: $DEPLOY_STACKS. Run: ${GITHUB_RUN_ID} sha ${GITHUB_SHA:0:12}. Admitted: ${ADMITTED}. Ledger: s3://matthew-life-platform/${AUDIT_BASE}-*.json" \
+            --region ${{ env.AWS_REGION }} >/dev/null
+          echo "✅ additive IAM deployed: $DEPLOY_STACKS · ledger s3://matthew-life-platform/${AUDIT_BASE}-*.json · notified life-platform-alerts"
+
       - name: Fleet deploy (shared module changed)
         if: needs.plan.outputs.fleet_changed == 'true'
         run: |
@@ -960,68 +1041,6 @@ jobs:
             echo "::error::$FAILED Lambda(s) failed to deploy"
             exit 1
           fi
-
-      # ── #2834: the additive-IAM deploy (ADR-065 amendment 2026-08-30) ──────────
-      # Owner decision on #2834, option (b): CI may apply an IAM change ONLY when the
-      # synthesized template diff is additive-only (deploy/iam_additive_gate.py decides).
-      # Two steps, deliberately: a dead-man that reds if the Plan verdict is ABSENT
-      # (absence must be louder than failure), then the deploy itself, which re-evaluates
-      # at apply time and deploys the exact cloud assembly it evaluated.
-      - name: IAM gate verdict present (dead-man, #2834)
-        run: |
-          VERDICT='${{ needs.plan.outputs.iam_gate_verdict }}'
-          if [ -z "$VERDICT" ]; then
-            echo "::error::Plan produced NO iam_gate_verdict output — deploy/iam_additive_gate.py did not run (step removed, output renamed, or it crashed before writing). Absence is a failure, not a pass (#2834 dead-man)."
-            exit 1
-          fi
-          echo "iam_gate_verdict=$VERDICT  iam_additive_stacks='${{ needs.plan.outputs.iam_additive_stacks }}'"
-
-      - name: Additive IAM deploy — evaluated == deployed (#2834)
-        if: needs.plan.outputs.iam_additive_stacks != ''
-        run: |
-          set -euo pipefail
-          PLAN_STACKS="${{ needs.plan.outputs.iam_additive_stacks }}"
-          echo "═══ Additive IAM deploy (#2834): Plan admitted [$PLAN_STACKS] ═══"
-          # The same toolchain Plan synthesized with (cdk/package.json CLI pin + cdk/requirements.txt).
-          CDK_CLI_VERSION=$(node -p "require('./cdk/package.json').devDependencies['aws-cdk']")
-          npm install -g "aws-cdk@${CDK_CLI_VERSION}" --quiet
-          cd cdk
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install -r requirements.txt --quiet
-          npx cdk synth --all --quiet
-          cd "$GITHUB_WORKSPACE"
-          # Re-evaluate at APPLY time against the live templates. The Plan verdict is a plan,
-          # not a licence: an owner deploy in between changes the deployed side. What ships
-          # below is the exact cloud assembly (--app cdk.out) this evaluation read.
-          python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live --stacks $PLAN_STACKS \
-            --json /tmp/iam_gate_2834_apply.json --github-output /tmp/iam_gate_2834_apply.out
-          DEPLOY_STACKS=$(grep '^iam_additive_stacks=' /tmp/iam_gate_2834_apply.out | cut -d= -f2-)
-          AUDIT_BASE="remediation-log/iam-additive-gate/$(date -u +%Y/%m/%d)/run-${GITHUB_RUN_ID}-${GITHUB_SHA:0:12}"
-          if [ -z "$DEPLOY_STACKS" ]; then
-            echo "Nothing left to deploy — the stacks converged since Plan (an owner deploy landed in between)."
-            aws s3 cp /tmp/iam_gate_2834_apply.json "s3://matthew-life-platform/${AUDIT_BASE}-decision.json" \
-              --content-type application/json --region ${{ env.AWS_REGION }}
-            exit 0
-          fi
-          cd cdk
-          for STACK in $DEPLOY_STACKS; do
-            echo "→ cdk deploy $STACK (additive IAM only; --exclusively so no dependency stack rides along)"
-            npx cdk deploy "$STACK" --app cdk.out --exclusively --require-approval never --progress events
-          done
-          cd "$GITHUB_WORKSPACE"
-          # Convergence proof: the admitted IAM diff must now be GONE from the live template.
-          python3 deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live --stacks $DEPLOY_STACKS \
-            --expect-converged --json /tmp/iam_gate_2834_converged.json
-          # The ledger — the automerge audit pattern (remediation/automerge.py::audit, ADR-065):
-          # every ALLOW-ADDITIVE decision that shipped, with the admitted statements and the
-          # registry fingerprint that admitted them. A failed put fails the step: an
-          # unrecorded deploy is a failure, not a quiet success.
-          aws s3 cp /tmp/iam_gate_2834_apply.json "s3://matthew-life-platform/${AUDIT_BASE}-decision.json" \
-            --content-type application/json --region ${{ env.AWS_REGION }}
-          aws s3 cp /tmp/iam_gate_2834_converged.json "s3://matthew-life-platform/${AUDIT_BASE}-converged.json" \
-            --content-type application/json --region ${{ env.AWS_REGION }}
-          echo "✅ additive IAM deployed: $DEPLOY_STACKS · ledger s3://matthew-life-platform/${AUDIT_BASE}-*.json"
 
       # ── Public site deploy: NOT here anymore (#750) ────────────────────────
       # #393 shipped the site inside this approval-gated job; #750 moved it to

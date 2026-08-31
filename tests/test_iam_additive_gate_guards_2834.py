@@ -24,6 +24,7 @@ importable in the deploy-critical lane (the 2026-08-15 P4 lesson).
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -35,12 +36,19 @@ sys.path.insert(0, str(ROOT / "deploy"))
 sys.path.insert(0, str(ROOT / "cdk"))
 
 import iam_additive_gate as g  # noqa: E402
+import iam_additive_registry as reg  # noqa: E402
 from stacks import constants  # noqa: E402
 
 pytestmark = pytest.mark.deploy_critical
 
 WORKFLOW = ROOT / ".github" / "workflows" / "ci-cd.yml"
-GATE_SRC = (ROOT / "deploy" / "iam_additive_gate.py").read_text(encoding="utf-8")
+DECISIONS = ROOT / "docs" / "DECISIONS.md"
+# Both halves of the gate: the evaluator and the registry it was extracted into (#3335).
+# Named without a `GATE_`/`_BASELINE` prefix on purpose — `scripts/gate_census.py`'s
+# registry family matches those names and would mint one phantom "gate" per entry, the
+# #3220 name-only misfire.
+EVALUATOR_SRC = (ROOT / "deploy" / "iam_additive_gate.py").read_text(encoding="utf-8")
+REGISTRY_SRC = (ROOT / "deploy" / "iam_additive_registry.py").read_text(encoding="utf-8")
 
 
 # ── derivation guard ───────────────────────────────────────────────────────────────
@@ -52,7 +60,9 @@ def test_namespace_derives_from_cdk_constants():
     assert g._C.S3_BUCKET == constants.S3_BUCKET and g._C.KMS_KEY_ID == constants.KMS_KEY_ID
     assert g.resource_in_namespace(f"arn:aws:dynamodb:{constants.REGION}:{constants.ACCT}:table/{constants.TABLE_NAME}") == "dynamodb-table"
     assert g.resource_in_namespace(f"arn:aws:s3:::{constants.S3_BUCKET}/config/x.json") == "s3-platform-bucket"
-    assert g.resource_in_namespace(f"arn:aws:s3:::{constants.RAW_BACKUP_BUCKET}/raw/x") == "s3-raw-backup-bucket"
+    # review R2(a), 2026-08-30: the DIL-027 replica LEFT the namespace — asserted as an
+    # absence so a silent re-admission reds here, not only in the contract test.
+    assert g.resource_in_namespace(f"arn:aws:s3:::{constants.RAW_BACKUP_BUCKET}/raw/x") is None
     assert g.resource_in_namespace(f"arn:aws:kms:{constants.REGION}:{constants.ACCT}:key/{constants.KMS_KEY_ID}") == "kms-platform-key"
     assert (
         g.resource_in_namespace(
@@ -65,7 +75,8 @@ def test_namespace_derives_from_cdk_constants():
 def test_gate_source_hand_types_no_namespace_literal():
     """The one way this registry drifts is a copied literal. Refuse the copy, not the value."""
     for literal in (constants.ACCT, constants.S3_BUCKET, constants.KMS_KEY_ID, constants.RAW_BACKUP_BUCKET):
-        assert literal not in GATE_SRC, f"hand-typed {literal!r} in iam_additive_gate.py — derive it from cdk/stacks/constants.py"
+        for name, src in (("iam_additive_gate.py", EVALUATOR_SRC), ("iam_additive_registry.py", REGISTRY_SRC)):
+            assert literal not in src, f"hand-typed {literal!r} in {name} — derive it from cdk/stacks/constants.py"
 
 
 def test_lambda_vocabulary_derives_from_lambda_map__guard_the_set():
@@ -96,10 +107,25 @@ def test_region_set_covers_every_stack_environment_in_app_py():
     assert constants.REGION in g.PLATFORM_REGIONS and constants.RAW_BACKUP_REGION in g.PLATFORM_REGIONS
 
 
-# ── ratchet ────────────────────────────────────────────────────────────────────────
+# ── ratchet (review R5: the baseline lives where the OWNER reads) ──────────────────
+#
+# As shipped, the baselines below were frozen sets in THIS file, and the ratchet's rule
+# ("widening needs a dated ADR-065 amendment line") was prose — so one commit could widen
+# the registry and its own baseline together and nothing outside the diff would say so.
+# The baseline is now parsed from the fenced ```json iam-additive-gate-baseline``` block
+# in the ADR-065 amendment of 2026-08-30 (docs/DECISIONS.md). A widening still needs a
+# code change AND a baseline edit in the same PR — but the baseline edit is now in the
+# owner-facing decision record, not in a test file.
+#
+# The frozen 2026-08-30 sets stay here too, for DIRECTION: forbidden / resource-policy /
+# IAM-property may only GROW, namespace / tolerance may only SHRINK. The ADR block says
+# what is true today; these say which way today may differ from landing.
+# (The constant names deliberately avoid the `*_BASELINE` / `GATE_*` spellings that
+# `scripts/gate_census.py`'s registry family name-matches — #3220's misfire class.)
 
-# The forbidden set as shipped 2026-08-30 (#2834). It may only grow.
-FORBIDDEN_BASELINE = frozenset(
+_ADR_FENCE = re.compile(r"```json iam-additive-gate-baseline\n(.*?)\n```", re.S)
+
+FORBIDDEN_AS_SHIPPED = frozenset(
     {
         "iam:*",
         "sts:*",
@@ -152,7 +178,9 @@ FORBIDDEN_BASELINE = frozenset(
     }
 )
 # The namespace families as shipped 2026-08-30. May only shrink; adding one = ADR-065 amendment.
-NAMESPACE_BASELINE = frozenset(
+# `s3-raw-backup-bucket` was in the landing set and was REMOVED by the CISO review (R2a) —
+# a shrink, which is the sanctioned direction.
+NAMESPACE_AS_SHIPPED = frozenset(
     {
         "dynamodb-table",
         "s3-platform-bucket",
@@ -167,7 +195,7 @@ NAMESPACE_BASELINE = frozenset(
     }
 )
 # The tolerated non-IAM churn as shipped 2026-08-30 — (type, prop, logical-id prefix). May only shrink.
-TOLERANCE_BASELINE = frozenset(
+TOLERANCE_AS_SHIPPED = frozenset(
     {
         ("AWS::Lambda::Function", "Code", ""),
         ("AWS::Lambda::Function", "Runtime", "LogRetention"),
@@ -178,9 +206,42 @@ TOLERANCE_BASELINE = frozenset(
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+def _adr_baseline() -> dict:
+    """The declared baseline, parsed from the ADR-065 amendment (review R5)."""
+    text = DECISIONS.read_text(encoding="utf-8")
+    hits = _ADR_FENCE.findall(text)
+    assert len(hits) == 1, f"expected exactly one ```json iam-additive-gate-baseline``` block in docs/DECISIONS.md, found {len(hits)}"
+    return json.loads(hits[0])
+
+
+def test_the_registry_equals_the_baseline_the_adr_declares():
+    """R5: a widening cannot land in code alone — the owner-facing ADR block moves with it."""
+    declared = _adr_baseline()
+    shipped = reg.baseline_snapshot()
+    assert set(declared) == set(shipped), set(declared) ^ set(shipped)
+    for key in sorted(shipped):
+        assert declared[key] == shipped[key], (
+            f"{key} differs between deploy/iam_additive_registry.py and the ADR-065 fenced block. "
+            "Regenerate with `python3 deploy/iam_additive_registry.py` and paste it into docs/DECISIONS.md, "
+            "in the SAME PR — that is the whole point of R5."
+        )
+
+
+def test_the_adr_block_is_non_vacuous():
+    """A positive control on the parse itself: an empty or truncated block must not pass as
+    'equal'. Every ratcheted set has a floor, so a block that lost its contents reds."""
+    declared = _adr_baseline()
+    assert len(declared["forbidden_actions"]) >= 70
+    assert len(declared["namespace_families"]) >= 8
+    assert len(declared["resource_policy_types"]) >= 10
+    assert len(declared["iam_property_names"]) >= 8
+    assert len(declared["wildcard_resource_shapes"]) >= 4
+    assert len(declared["tolerated_non_iam"]) == 4
+
+
 def test_forbidden_actions_only_grow():
     shipped = set(g.FORBIDDEN_ACTION_PATTERNS)
-    removed = FORBIDDEN_BASELINE - shipped
+    removed = FORBIDDEN_AS_SHIPPED - shipped
     assert not removed, f"forbidden patterns REMOVED — that widens what CI may grant: {sorted(removed)}"
     for pat, why in g.FORBIDDEN_ACTION_PATTERNS.items():
         assert pat == pat.lower() and ":" in pat, pat
@@ -188,9 +249,44 @@ def test_forbidden_actions_only_grow():
         assert len(why) >= 12, pat
 
 
+def test_the_review_R2_and_R3_narrowings_are_present():
+    """Non-vacuous, one row per required addition: the review's own list, asserted by name.
+
+    `test_forbidden_actions_only_grow` is a direction check — it cannot tell whether the
+    CISO review's specific narrowings ever landed. This can, and it fails if one is dropped.
+    """
+    required = {
+        # R2(c)
+        "s3:putbucket*",
+        "s3:put*configuration",
+        "s3:deleteobjectversion*",
+        "s3:putobjectretention",
+        "s3:putobjectlegalhold",
+        "s3:bypassgovernanceretention",
+        # R3
+        "ssm:putparameter",
+        "sns:subscribe",
+        "sns:unsubscribe",
+        "sns:deletetopic",
+        "dynamodb:updatetimetolive",
+        "secretsmanager:putsecretvalue",
+        "secretsmanager:updatesecret*",
+        "secretsmanager:rotatesecret",
+        "logs:putsubscriptionfilter",
+        "logs:putretentionpolicy",
+        "logs:deletelogstream",
+        "sqs:purgequeue",
+        "sqs:deletequeue",
+        "kms:replicatekey",
+        "lambda:putprovisionedconcurrencyconfig",
+    }
+    missing = required - set(g.FORBIDDEN_ACTION_PATTERNS)
+    assert not missing, f"CISO review R2/R3 narrowings missing from the forbidden set: {sorted(missing)}"
+
+
 def test_namespace_families_only_shrink_and_are_dated():
     names = {f.name for f in g.NAMESPACE_FAMILIES}
-    added = names - NAMESPACE_BASELINE
+    added = names - NAMESPACE_AS_SHIPPED
     assert not added, f"namespace WIDENED without a dated ADR-065 amendment + baseline edit: {sorted(added)}"
     for fam in g.NAMESPACE_FAMILIES:
         assert _DATE.match(fam.since), fam.name
@@ -202,16 +298,40 @@ def test_namespace_families_only_shrink_and_are_dated():
 
 def test_tolerated_churn_only_shrinks_and_is_dated():
     shipped = {(t.resource_type, t.prop, t.logical_id_prefix) for t in g.TOLERATED_NON_IAM}
-    added = shipped - TOLERANCE_BASELINE
+    added = shipped - TOLERANCE_AS_SHIPPED
     assert not added, f"non-IAM tolerance WIDENED — CI would ship a class it may not: {sorted(map(str, added))}"
     for t in g.TOLERATED_NON_IAM:
         assert _DATE.match(t.since) and len(t.why) >= 40, (t.resource_type, t.prop)
+
+
+def test_resource_policy_types_and_iam_property_names_only_grow():
+    """R5's second half: these two sets decide which template changes are IAM-relevant AT
+    ALL. Shrinking either makes a whole class invisible to the gate, which is the quietest
+    possible widening — so they were unratcheted and are not any more."""
+    declared = _adr_baseline()
+    for key, live in (
+        ("resource_policy_types", g.RESOURCE_POLICY_TYPES),
+        ("iam_property_names", g.IAM_PROPERTY_NAMES),
+    ):
+        missing = set(declared[key]) - set(live)
+        assert not missing, f"{key} SHRANK — those changes become invisible to the gate: {sorted(missing)}"
+    # non-vacuity: the two entries that carry the escalation shapes must be there
+    assert "AssumeRolePolicyDocument" in g.IAM_PROPERTY_NAMES and "PermissionsBoundary" in g.IAM_PROPERTY_NAMES
+    assert "AWS::Lambda::Permission" in g.RESOURCE_POLICY_TYPES and "AWS::S3::BucketPolicy" in g.RESOURCE_POLICY_TYPES
 
 
 def test_registry_fingerprint_moves_when_the_registry_moves(monkeypatch):
     before = g.registry_fingerprint()
     monkeypatch.setitem(g.FORBIDDEN_ACTION_PATTERNS, "zzz:test", "mutation")
     assert g.registry_fingerprint() != before
+
+
+def test_the_evaluator_stays_under_the_module_ceiling():
+    """#1665's ceiling is 1,200 lines and the standing rule is extraction, never a raise —
+    which is why the registry is its own module. Asserted here so the next narrowing lands
+    in the registry rather than growing the evaluator past it."""
+    assert len(EVALUATOR_SRC.splitlines()) < 1200
+    assert len(REGISTRY_SRC.splitlines()) < 1200
 
 
 # ── wiring + dead-man (text pins over ci-cd.yml; no yaml import by design) ─────────
@@ -246,6 +366,9 @@ def test_plan_job_runs_the_gate_and_exports_its_verdict(wf):
     assert "id: cdk_diff" in step
     assert "deploy/iam_additive_gate.py --synth-dir cdk/cdk.out --live" in step
     assert '--github-output "$GITHUB_OUTPUT"' in step
+    # R4 (CISO review 2026-08-30): the admitted statements go on the RUN PAGE, where the
+    # production approval prompt is — not only into a collapsed ::group:: and an S3 ledger.
+    assert '--step-summary "$GITHUB_STEP_SUMMARY"' in step
     assert "continue-on-error" not in step
     # exit code is honoured: a non-zero gate reds Plan (the stranded-Plan shape, now named)
     assert re.search(r'if \[ "\$GATE_EXIT" -ne 0 \]; then\n.*?exit 1', step, re.S)
@@ -290,6 +413,37 @@ def test_additive_deploy_step_evaluates_then_deploys_the_evaluated_assembly(wf):
     assert "role/github-actions-deploy-role" in _step(deploy, "Configure AWS credentials (OIDC)")
 
 
+def test_additive_deploy_publishes_one_line_to_the_alert_topic(wf):
+    """R4, the second half: the S3 ledger has no readers; the owner reads life-platform-alerts.
+
+    The line is emitted AFTER convergence is proved, it names the stacks and the admitted
+    statements, and it is not swallowed — a failed publish fails the step exactly like a
+    failed ledger write. The grant it uses is one the deploy role already held (asserted
+    from the committed policy document in the test below).
+    """
+    step = _step(_job(wf, "deploy"), "Additive IAM deploy — evaluated == deployed (#2834)")
+    body = step.split("run:", 1)[1]
+    assert "aws sns publish" in body
+    assert "life-platform-alerts" in body
+    assert "$DEPLOY_STACKS" in body.split("aws sns publish", 1)[1]
+    assert body.index("--expect-converged") < body.index("aws sns publish"), "notify only what actually converged"
+    tail = body[body.index("aws sns publish") :]
+    assert "|| true" not in tail and "continue-on-error" not in tail, "an unannounced deploy is a failure, not a quiet success"
+
+
+def test_the_2834_steps_run_before_any_code_deploy(wf):
+    """N2 (CISO review): a grant that lands AFTER its code leaves the code live and unable to
+    do its job for as long as the apply-time evaluation takes to fail — which is the
+    2026-08-14 P1 shape exactly (a deployed function missing one s3:GetObject)."""
+    deploy = _job(wf, "deploy")
+    i_deadman = deploy.index("IAM gate verdict present (dead-man, #2834)")
+    i_additive = deploy.index("Additive IAM deploy — evaluated == deployed (#2834)")
+    i_creds = deploy.index("name: Configure AWS credentials (OIDC)")
+    for code_step in ("Fleet deploy (shared module changed)", "Deploy MCP server", "Deploy Lambdas"):
+        assert i_additive < deploy.index(code_step), f"the #2834 steps must precede {code_step!r}"
+    assert i_creds < i_deadman < i_additive, "…and must still sit after the OIDC credentials step"
+
+
 def test_deploy_role_needs_no_new_grant_for_the_additive_deploy():
     """The staged IAM diff for #2834 is EMPTY — pinned here so a future reviewer can see why.
 
@@ -308,3 +462,8 @@ def test_deploy_role_needs_no_new_grant_for_the_additive_deploy():
     assert "s3:PutObject" in s3["Action"] and f"arn:aws:s3:::{constants.S3_BUCKET}/*" in s3["Resource"]
     cfn = stmts["CloudFormationDiff"]
     assert "cloudformation:GetTemplate" in cfn["Action"], "the gate's read side (--live) uses GetTemplate"
+    # R4's SNS line rides an EXISTING grant — verified here rather than added. If this ever
+    # fails, the fix is to drop the notification, not to widen the deploy role in this PR.
+    sns = stmts["SNS"]
+    assert "sns:Publish" in sns["Action"]
+    assert f"arn:aws:sns:{constants.REGION}:{constants.ACCT}:life-platform-alerts" in sns["Resource"]

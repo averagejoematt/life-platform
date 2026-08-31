@@ -2150,7 +2150,7 @@ Concretely:
 4. **Nothing else rides along.** The only tolerated non-IAM churn is the Lambda `Code` asset hash (it moves every commit since #2377 and CI's code path already ships that class, #2993), the LogRetention singleton's toolchain-chosen `Runtime` (#2468), `CDKMetadata`, and resource `Metadata`. Additive IAM sharing a stack with an env-var, alarm, queue, or any other change is `OWNER-REQUIRED` — the stack deploy would ship the rest too.
 5. **Fail closed.** Unparseable, unfetchable, foreign-account, or missing input is `OWNER-REQUIRED` with exit 2. A stack with no IAM-relevant change is `NO-IAM-CHANGE`: Plan proceeds exactly as before and non-IAM drift is a `::warning`, never a strand.
 
-**Mechanics.** Plan runs the gate after the destruction check and exports `iam_gate_verdict` + `iam_additive_stacks`; `OWNER-REQUIRED` reds Plan in the same stranded shape as before (CONVENTIONS §4d(2)), now naming every offending statement and the owner path. The Deploy job (still `environment: production`; now also entered for an IAM-only merge, whose `has_deploys` is false) first asserts the verdict output **exists** — absence reds, it is never "nothing additive today" — then, for admitted stacks only, re-synthesizes with the pinned toolchain, **re-evaluates against live at apply time**, deploys the exact evaluated assembly (`cdk deploy <Stack> --app cdk.out --exclusively --require-approval never`), re-runs the gate with `--expect-converged`, and writes the decision + convergence records to `s3://matthew-life-platform/remediation-log/iam-additive-gate/YYYY/MM/DD/` — the automerge ledger pattern (`remediation/automerge.py::audit`). A failed ledger write fails the step.
+**Mechanics.** Plan runs the gate after the destruction check and exports `iam_gate_verdict` + `iam_additive_stacks`; `OWNER-REQUIRED` reds Plan in the same stranded shape as before (CONVENTIONS §4d(2)), now naming every offending statement and the owner path. The Deploy job (still `environment: production`; now also entered for an IAM-only merge, whose `has_deploys` is false) first asserts the verdict output **exists** — absence reds, it is never "nothing additive today" — then, for admitted stacks only, re-synthesizes with the pinned toolchain, **re-evaluates against live at apply time**, deploys the exact evaluated assembly (`cdk deploy <Stack> --app cdk.out --exclusively --require-approval never`), re-runs the gate with `--expect-converged`, and writes the decision + convergence records to `s3://matthew-life-platform/remediation-log/iam-additive-gate/YYYY/MM/DD/` — the same S3 audit-ledger pattern the remediation agent writes under `remediation-log/`. A failed ledger write fails the step, and since the 2026-08-30 review the step also publishes one line to `life-platform-alerts` (the deploy role already held `sns:Publish` there — no grant was added) and Plan writes the admitted statements to `$GITHUB_STEP_SUMMARY`, so the `production` approver reads WHAT IAM the click authorises before clicking it.
 
 **The five primitives.** Registry — `NAMESPACE_FAMILIES` / `FORBIDDEN_ACTION_PATTERNS` / `TOLERATED_NON_IAM`, each entry dated and argued. Derivation guard — `tests/test_iam_additive_gate_guards_2834.py`: namespace from `constants.py` + `lambda_map.json` + `app.py`'s region literals, no literal copies, guard-the-set in both directions. Ratchet — same file: the forbidden set may only grow, the namespace and tolerance sets may only shrink; widening needs a dated line under this amendment AND a baseline edit in the same PR. Contract test — `tests/test_iam_additive_gate_2834.py`: a REAL `cdk synth` slice as the fixture (§9a, the fixture is the wire), one mutation per forbidden shape, positive controls for each admitted shape including both incident grants. Dead-man — exit 2 on unevaluable input, the Deploy job's absent-verdict assertion, and the wiring test that pins both steps with no `continue-on-error` and asserts the old grep is gone (a second, wider gate on the same transcript would re-strand every additive change and make this one dead code).
 
@@ -2159,6 +2159,176 @@ Concretely:
 **Review condition and fallback.** The implementing PR receives a CISO-grade adversarial review before merge (its body carries the security packet: threat model, the empty grant, the forbidden-shape list with test names, and the fallback). A blocking objection → option **(c)**, status quo priced explicitly, recorded on #2834 with the objection; the gate is then demoted to an advisory (never a deploy trigger) rather than deleted.
 
 **Residual, stated so nobody credits the gate with more than it does.** The real perimeter of CI is the CDK bootstrap chain's Administrator exec role, and it was before this amendment. This gate guards against **mistakes and drift** — a well-meant PR that widens IAM, a grant nobody deploys for five days — not against an adversary who can push to `main` or edit the workflow; that adversary could already `cdk deploy` anything, and could already push arbitrary code to every Lambda role. The proportionate next tightening is a separately priced decision, not a rider on this one: scope the bootstrap `--cloudformation-execution-policies` (or a permissions boundary on the CI path) so that CFN-via-CI cannot exceed the namespace this registry names. Until then, "CI cannot mutate IAM" must not be written anywhere as a security property — it never was one.
+
+**CISO review outcome (2026-08-30, condition of the option-(b) decision): APPROVE-WITH-REQUIRED-CHANGES, R1–R5 + N1–N3 landed on the implementing PR before merge.** What the review changed, each one a narrowing:
+
+- **R1 (High).** The `AWS::Lambda::Function.Code` tolerance was SHAPE-BLIND — it matched on (type, property) alone, so an additive grant riding with `Code` pointing at a bucket the account does not own, a foreign `ImageUri`, or an inline `ZipFile` was `ALLOW-ADDITIVE` and CI would have shipped code that is not in this repo. It is now bound to the exact churn shape: `{S3Bucket: cdk-<qualifier>-assets-<account>-<region>, S3Key: <64-hex>.zip}`, with the qualifier read from the template's own `/cdk-bootstrap/<qualifier>/version` parameter. No parameter → no tolerated `Code` change at all.
+- **R2 (High).** The DIL-027 raw/ replica bucket left the namespace entirely (no Lambda role reads or writes it; the replication is an S3 service role, and the replica has no Object Lock). Mutating S3 actions may no longer name the bare bucket or `bucket/*`, and may not reach any prefix `deploy/bucket_policy.json` denies against the same action family — **derived from that file**, so a prefix added there is protected the same day. `s3:putbucket*`, `s3:put*configuration`, `s3:deleteobjectversion*`, `s3:putobjectretention`, `s3:putobjectlegalhold` and `s3:bypassgovernanceretention` joined the forbidden set. The bucket policy's own Deny binds `matthew-admin` only — it never was a backstop for a Lambda role, which is why the gate re-applies its intent rather than relying on it.
+- **R3 (Med-High).** The in-namespace control-plane flips the review enumerated are now forbidden: `ssm:PutParameter` (the remediation kill-switch and the budget tier), `sns:Subscribe/Unsubscribe/DeleteTopic` (the owner's alert delivery), `dynamodb:UpdateTimeToLive`, `secretsmanager:PutSecretValue/UpdateSecret/RotateSecret`, `logs:PutSubscriptionFilter/PutRetentionPolicy/DeleteLogStream`, `sqs:PurgeQueue/DeleteQueue`, `kms:ReplicateKey`, `lambda:PutProvisionedConcurrencyConfig` — plus their near siblings, one parametrised test row each.
+- **R4 (Medium).** An `ALLOW-ADDITIVE` decision now has human readers: Plan writes the admitted statements to `$GITHUB_STEP_SUMMARY` (the page the approval prompt sits on) and the deploy step publishes one line to `life-platform-alerts`. The S3 ledger stays, as the machine-readable record.
+- **R5 (Medium).** The ratchet's baselines are no longer prose in a test file — they are parsed from the fenced block below, so a widening has to appear **here**, where the owner reads, in the same PR. `RESOURCE_POLICY_TYPES` and `IAM_PROPERTY_NAMES` are ratcheted too.
+- **N1.** Stack names are validated against `[A-Za-z][A-Za-z0-9-]*` before they reach `npx cdk deploy "$STACK"` — anything else exits 2. **N2.** Both #2834 Deploy steps now run BEFORE the fleet/MCP/per-function code deploys, so code never lands ahead of the grant it needs. **N3.** A wildcard inside an in-namespace ARN is an explicit, tested decision: the data-plane shapes (S3 object keys, secret version suffixes, the SSM tree, the table's GSIs, one log group's streams) are admitted; name-prefix wildcards across the control plane (`function:life-platform-*`, `life-platform-*` topics/queues, `log-group:/aws/lambda/life-platform-*`) are refused by name.
+- **Not taken as a rider, filed instead:** a permissions boundary or scoped `--cloudformation-execution-policies` on the CDK exec role, so CFN-via-CI cannot exceed this namespace registry — **#3340**. That is the real perimeter, and it deserves its own decision rather than a line in this one.
+
+**The ratchet baseline (review R5).** `deploy/iam_additive_registry.py::baseline_snapshot()` must equal this block exactly; `tests/test_iam_additive_gate_guards_2834.py` parses it from here and fails on any drift, in either direction. `S3_PROTECTED` is deliberately NOT pinned here — it derives from `deploy/bucket_policy.json`, a file the owner already edits, and pinning it would mean a new protected prefix needed an ADR edit before it took effect.
+
+```json iam-additive-gate-baseline
+{
+  "forbidden_actions": [
+    "account:*",
+    "cloudformation:*",
+    "dynamodb:*kinesisstreamingdestination",
+    "dynamodb:createtablereplica",
+    "dynamodb:deletebackup",
+    "dynamodb:deletetable",
+    "dynamodb:importtable",
+    "dynamodb:restoretable*",
+    "dynamodb:updatecontinuousbackups",
+    "dynamodb:updatetable",
+    "dynamodb:updatetimetolive",
+    "events:delete*",
+    "events:disable*",
+    "events:enable*",
+    "events:put*",
+    "events:remove*",
+    "iam:*",
+    "kms:creategrant",
+    "kms:createkey",
+    "kms:disablekey",
+    "kms:putkeypolicy",
+    "kms:replicatekey",
+    "kms:schedulekeydeletion",
+    "kms:updateprimaryregion",
+    "lambda:*eventsourcemapping",
+    "lambda:addlayerversionpermission",
+    "lambda:addpermission",
+    "lambda:createfunction*",
+    "lambda:deletefunction*",
+    "lambda:publishlayerversion",
+    "lambda:putfunction*",
+    "lambda:putprovisionedconcurrencyconfig",
+    "lambda:putruntimemanagementconfig",
+    "lambda:removepermission",
+    "lambda:updatefunction*",
+    "logs:deleteloggroup",
+    "logs:deletelogstream",
+    "logs:deleteretentionpolicy",
+    "logs:putdestination*",
+    "logs:putresourcepolicy",
+    "logs:putretentionpolicy",
+    "logs:putsubscriptionfilter",
+    "organizations:*",
+    "s3:bypassgovernanceretention",
+    "s3:deletebucket",
+    "s3:deletebucketpolicy",
+    "s3:deleteobjectversion*",
+    "s3:put*configuration",
+    "s3:putaccountpublicaccessblock",
+    "s3:putbucket*",
+    "s3:putbucketacl",
+    "s3:putbucketpolicy",
+    "s3:putbucketpublicaccessblock",
+    "s3:putbucketversioning",
+    "s3:putlifecycleconfiguration",
+    "s3:putobjectacl",
+    "s3:putobjectlegalhold",
+    "s3:putobjectretention",
+    "s3:putreplicationconfiguration",
+    "secretsmanager:createsecret",
+    "secretsmanager:deletesecret",
+    "secretsmanager:putresourcepolicy",
+    "secretsmanager:putsecretvalue",
+    "secretsmanager:replicatesecrettoregions",
+    "secretsmanager:restoresecret",
+    "secretsmanager:rotatesecret",
+    "secretsmanager:updatesecret*",
+    "sns:addpermission",
+    "sns:deletetopic",
+    "sns:removepermission",
+    "sns:settopicattributes",
+    "sns:subscribe",
+    "sns:unsubscribe",
+    "sqs:addpermission",
+    "sqs:deletequeue",
+    "sqs:purgequeue",
+    "sqs:removepermission",
+    "sqs:setqueueattributes",
+    "ssm:deleteparameter",
+    "ssm:labelparameterversion",
+    "ssm:putparameter",
+    "sts:*"
+  ],
+  "iam_property_names": [
+    "AssumeRolePolicyDocument",
+    "ExecutionRoleArn",
+    "KeyPolicy",
+    "ManagedPolicyArns",
+    "PermissionsBoundary",
+    "Policies",
+    "PolicyDocument",
+    "Role",
+    "RoleArn"
+  ],
+  "namespace_families": [
+    "dynamodb-table",
+    "kms-platform-key",
+    "lambda-functions",
+    "log-groups",
+    "s3-platform-bucket",
+    "secrets",
+    "sns-topics",
+    "sqs-queues",
+    "ssm-parameters"
+  ],
+  "resource_policy_types": [
+    "AWS::Events::EventBusPolicy",
+    "AWS::KMS::Alias",
+    "AWS::KMS::Key",
+    "AWS::Lambda::LayerVersionPermission",
+    "AWS::Lambda::Permission",
+    "AWS::Lambda::Url",
+    "AWS::Logs::ResourcePolicy",
+    "AWS::S3::AccessPoint",
+    "AWS::S3::BucketPolicy",
+    "AWS::SNS::TopicPolicy",
+    "AWS::SQS::QueuePolicy",
+    "AWS::SecretsManager::ResourcePolicy"
+  ],
+  "s3_mutable_by_ci_today": [
+    "remediation-log/",
+    "site/"
+  ],
+  "tolerated_non_iam": [
+    [
+      "*",
+      "",
+      ""
+    ],
+    [
+      "AWS::CDK::Metadata",
+      "Analytics",
+      ""
+    ],
+    [
+      "AWS::Lambda::Function",
+      "Code",
+      ""
+    ],
+    [
+      "AWS::Lambda::Function",
+      "Runtime",
+      "LogRetention"
+    ]
+  ],
+  "wildcard_resource_shapes": [
+    "dynamodb-index",
+    "log-group-streams",
+    "s3-object-key",
+    "secret-name-or-version",
+    "ssm-parameter-tree"
+  ]
+}
+```
 
 **Revisit trigger.** Two consecutive quarterly proportionality re-reads with zero `ALLOW-ADDITIVE` ledger entries → fold the gate back to a warning (it would be the old grep with more code). Any admitted deploy later judged out of shape → option (c) immediately, per the review condition.
 

@@ -470,6 +470,12 @@ from gate_census_mutations import STRUCTURAL_PROOFS  # noqa: E402
 
 PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in STRUCTURAL_PROOFS.items()})
 
+# Family 2 (guard-script) records that did not fit above — this module is ~1,175 of its
+# 1,200-line ceiling (#1665) and the rule is extraction, never a baseline raise (#2610).
+from gate_census_proofs import GUARD_PROOFS  # noqa: E402
+
+PROVEN_CAN_FAIL.update({gid: Proof(**kwargs) for gid, kwargs in GUARD_PROOFS.items()})
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Gates ATTEMPTED and NOT proved. A first-class result, not an omission: the whole
