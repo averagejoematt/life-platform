@@ -94,7 +94,16 @@ class ComputeStack(Stack):
             function_name="ai-expert-analyzer",
             handler="intelligence.ai_expert_analyzer_lambda.lambda_handler",
             source_file="lambdas/intelligence/ai_expert_analyzer_lambda.py",
-            schedule="cron(0 14 * * ? *)",  # 6:00 AM PT daily (Observatory weekly cadence is enforced in-handler)
+            # #3366: 6:00 AM PT MONDAYS — THIS RULE is what enforces the weekly cadence.
+            # The old daily rule's comment claimed "weekly cadence is enforced in-handler";
+            # that gate never existed (the handler runs every expert on every fire), so a
+            # weekly product regenerated daily at ~7x the designed inference cost. No
+            # second daily arc_only rule: the arc's substantive input (field_notes WEEK#,
+            # written Sundays 18:00 UTC) changes weekly, so Monday 14:00 UTC reads each
+            # new week note at the same first opportunity the daily rule did, and no
+            # serving surface renders the arc with a sub-weekly freshness expectation
+            # (record TTLs are 8-10 days; the weekly surfaces use weeklyAsOf, 8d).
+            schedule="cron(0 14 ? * MON *)",
             # 2026-06-17: 120s → 600s. The handler analyzes ~8 experts sequentially,
             # each a multi-second Bedrock call; 120s timed out mid-run (~15 errors/day),
             # so the async EventBridge events exhausted retries into the ingestion DLQ
