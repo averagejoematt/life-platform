@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-31
 
-Last updated: 2026-08-30 (v8.6.0)
+Last updated: 2026-08-31 (v8.6.0)
 
 > The Secrets rate-card row and the `Last updated` line above are **sync-owned literals**
 > (`deploy/sync_doc_metadata.py` RULES): a hand-edit must keep the rule's exact phrasing or
@@ -210,6 +210,7 @@ Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 
 | **Route 53** | $0.50 | 1 hosted zone — flat fee. |
 | **Lambda / DynamoDB / S3 / CloudFront / SES** | ~$1.1–1.4 | On-demand DDB, 30-day log retention, S3 lifecycle — all well-managed. |
 | **WAF** | $0 | Deleted 2026-06 (was ~$8–9/mo); rate limiting is in-Lambda (DynamoDB-backed). |
+| **QA-depth dial (SSM `/life-platform/qa-level`, #1452)** | ~$9–11/mo **swing** — a lever, not a separate line item (its spend rides the Bedrock line above; added 2026-08-31, #3375 — the dial appeared nowhere on this card) | Per level (standalone-QA Bedrock spend, from the #3251 measurement): `full` ≈ $11 (full-surface AI-vision on every standalone fire + reader-truth) · `standard` (default) ≈ $8–9 (reader-truth daily + Sunday full AI-vision — the 6 × $0.195 daily fires + $0.74 Sunday ≈ $8.3/mo that `lean` strips) · `lean` ≈ $0 (deterministic sweep only — also strips the platform's only CI prose truth-check) · `off` ≈ $0 (standalone QA dark — emergency only). Deploy-gating QA copies are structurally exempt from the dial. Semantics: `docs/RUNBOOK.md` § QA Depth Dial. |
 
 ## GitHub Actions / Repo Hosting (#1334, #1453 — added 2026-07-18)
 

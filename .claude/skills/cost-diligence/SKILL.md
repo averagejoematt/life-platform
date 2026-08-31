@@ -13,7 +13,8 @@ the numbers into a ranked stop/reduce/redesign/merge portfolio with numbered own
 
 `$ARGUMENTS` may name a focus (`ai`, `floor`, `close`, or a service name) to run one
 phase deep instead of the full sweep. `close` = just the COST_TRACKER monthly close
-ritual. Default with no arguments: the full diligence.
+ritual (start from `python3 scripts/monthly_close.py` — Phase 5 item 3). Default with
+no arguments: the full diligence.
 
 ## Posture
 
@@ -64,12 +65,31 @@ python3 deploy/emf_series_census.py --strict                          # EMF esta
 
 # 6. The governor's own view (drift check: its numbers vs CE's)
 aws ssm get-parameter --name /life-platform/budget-breakdown --query Parameter.Value --output text
+
+# 7. CallerClass split — the platform running itself vs a human building it (#2892)
+for c in prod-cron remediation ci dev-session; do
+  printf '%-12s ' "$c"
+  aws cloudwatch get-metric-statistics --namespace LifePlatform/AI \
+    --metric-name EstimatedCostUSD --dimensions Name=CallerClass,Value="$c" \
+    --start-time <window-start>T00:00:00Z --end-time <window-end>T00:00:00Z \
+    --period <window-seconds> --statistics Sum --region us-west-2 \
+    --query 'Datapoints[0].Sum' --output text
+done
+# WINDOW CAVEAT: the CallerClass dimension is live only from 2026-08-23, so any window
+# reaching earlier reads a PARTIAL stamp — the 2026-08-31 panel's read covered only a
+# ~7-day stamped window of August. Always print the effective stamped window next to the
+# split, record the ci+dev SHARE of the stamped dollars, and never present the stamped
+# dollars as the month's AI spend (the self-emitted metric under-counts regardless —
+# the CostMetricDriftRatio caveat). An all-zero split is NO SIGNAL, not "100% prod".
 ```
 
-Also pull: `scripts/ai_spend_attribution.py` for per-feature AI ranking, and the AWS CE
-forecast (`aws ce get-cost-forecast`) **only to distrust it** — record it next to the
-measured spike-free run-rate (mean ± CI of recent clean days); the measured number is
-the forecast of record, the CE forecast is spike-contaminated.
+Also pull: `scripts/ai_spend_attribution.py` for per-feature AI ranking — **run it
+TWICE and diff** (`scripts/monthly_close.py` scripts the diff): its first invocation
+returned partial data on 2026-08-31 (nondeterminism observed n=1, #3375); if the runs
+diverge, trust neither and run a third, using the numbers two runs agree on. And the
+AWS CE forecast (`aws ce get-cost-forecast`) **only to distrust it** — record it next
+to the measured spike-free run-rate (mean ± CI of recent clean days); the measured
+number is the forecast of record, the CE forecast is spike-contaminated.
 
 ## Phase 2 — Decompose
 
@@ -88,6 +108,16 @@ Build the driver tree and diff it against the last close in `docs/COST_TRACKER.m
 - **Drift check**: governor `mtd`/`projected` vs CE actual, and
   `CostMetricDriftRatio` — if the gauge disagrees with the bill, diagnosing the gauge is
   a finding (the #2883 lesson: the 2.44x ratio was mostly the gauge measuring itself).
+- **The platform-vs-feature tree** (the 2026-08-31 panel's decisive cut): split the
+  whole bill down a second axis before sizing anything — **the platform running itself**
+  (the non-AI floor + `prod-cron` + `remediation` AI) vs **a human building it** (`ci` +
+  `dev-session` AI, episodic by construction). August read 63% of stamped AI spend as
+  episodic: the PRODUCT costs ~July money, BUILDING it is what surged. Then, inside the
+  platform branch, attribute to named features (`scripts/ai_spend_attribution.py`
+  per-Lambda, per-feature alarm/EMF rent from the ledger) — a cut proposal must name the
+  feature and audience it degrades, not a vague service line. State the steady-state
+  run-rate (platform branch, spike-free) separately from the headline bill in every
+  report; conflating them is how a dev-heavy month reads as a run-rate change.
 
 ## Phase 3 — Full P&L (the consultant lens, owner-facing)
 
@@ -121,6 +151,18 @@ For each driver, ask all six; write down the "no" answers too:
 6. **Renegotiate the envelope** — the ceiling/tier bands themselves (ADR-133 base,
    surge threshold): is the budget signaling anomaly, or encoding permanent degradation?
 
+**Then inventory the levers** (the toggle menu — a lever nobody names is a lever the
+next panel re-derives): enumerate every dial that trades capability for $/mo, each with
+its switch (SSM param / env var / cadence constant), its measured band, and its CURRENT
+state read live this run. The known set: the QA-depth dial (SSM
+`/life-platform/qa-level`, #1452 — the ~$9–11/mo band in COST_TRACKER's rate card),
+`/life-platform/remediation-mode`, the budget tier itself (`/life-platform/budget-tier`
+— what ADR-125 has already paused is not also a finding), `AI_MODEL` tiering, the
+governor's CE-polling cadence, and the #3373 named postures (full / lean / low-power /
+hibernate) for the product-shape question. The 08-31 measurement to beat: the whole
+toggle menu maxes ~$35/mo and only ~$10 of it had a switch — a proposed cut that has no
+switch is a design story, not a dial flip.
+
 Each finding: **$/mo (± range) · effort S/M/L · risk (what coverage or capability it
 touches) · PROPORTIONALITY rent class**. Check every candidate against the Cost
 Decisions Log and open #2801 stories before writing it down.
@@ -133,9 +175,19 @@ Decisions Log and open #2801 stories before writing it down.
    numbered list): decisions only the owner can make (ceiling changes, coverage
    tradeoffs, revenue posture).
 3. **COST_TRACKER close entry** — run the monthly close ritual in
-   `docs/COST_TRACKER.md` (CE actual, days at tier ≥1, cost per reader-week), append the
-   row, update the Verified stamps **only for numbers actually re-read this run** (#2838:
-   a fresh stamp on unverified prose is the defect, not diligence).
+   `docs/COST_TRACKER.md` via `python3 scripts/monthly_close.py` (PRINT-ONLY: it runs
+   the four ritual queries + the dial states + the run-twice attribution check and
+   prints a candidate row; read its exit code unpiped — 1 means a query was unavailable
+   or the attribution runs diverged). Review, then append the row **by hand** and update
+   the Verified stamps **only for numbers actually re-read this run** (#2838: a fresh
+   stamp on unverified prose is the defect, not diligence — which is why the assembler
+   never writes).
+3b. **Log the rejections too** — every move this run evaluated and REJECTED gets its
+   own dated Cost Decisions Log row in `docs/COST_TRACKER.md` (decision, why, the facts
+   that would have to change to re-propose). The 08-31 do-not-tag-Bedrock rejection
+   originally had nowhere to land; an unrecorded rejection is a cut the next panel
+   re-derives at full price. "At floor — no action" verdicts on a named driver belong
+   here too.
 4. **EMF series-count line** (#2837) — append this run's census line to the *EMF series
    census log* in `docs/PROPORTIONALITY.md`:
    `python3 deploy/emf_series_census.py --line`. That dated line is the only thing that
