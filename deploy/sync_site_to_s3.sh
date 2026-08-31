@@ -240,15 +240,6 @@ echo ""
 
 # ── Phase 2: Sync to S3 ───────────────────────────────────────────────────
 
-# HTML pages — short TTL, references hashed asset filenames
-echo "→ HTML files (max-age=300)..."
-aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
-  --exclude "*" \
-  --include "*.html" \
-  --cache-control "max-age=300, public" \
-  --content-type "text/html; charset=utf-8" \
-  --region "$REGION"
-
 # Hashed CSS/JS — immutable 1-year cache (filename changes when content changes)
 echo "→ Hashed CSS/JS (max-age=31536000, immutable)..."
 aws s3 sync "$BUILD_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
@@ -296,6 +287,21 @@ aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
   --include "*.webmanifest" \
   --include "sw.js" \
   --cache-control "max-age=300, must-revalidate, public" \
+  --region "$REGION"
+
+# HTML pages — short TTL, references hashed asset filenames. UPLOADED LAST (#2978, 2026-08-31):
+# on the 2026-08-31 #3277 deploy the HTML went up at 03:43:18 and the hashed JS it referenced
+# at 03:43:25; every edge request in that 7-second window cached a 404 for the new
+# motion.<hash>.js (text/html → "Refused to execute script"), and the ci-cd visual-QA run
+# read 43 pages red on it. Assets first means a page can never reference a file that is
+# not yet in S3; old hashed files stay until the next --delete-safe prune, so old HTML keeps
+# working during the swap.
+echo "→ HTML files (max-age=300)..."
+aws s3 sync "$BUILD_DIR/" "s3://$BUCKET/$S3_PREFIX/" \
+  --exclude "*" \
+  --include "*.html" \
+  --cache-control "max-age=300, public" \
+  --content-type "text/html; charset=utf-8" \
   --region "$REGION"
 
 # version.json — the deploy fingerprint; never cache it, so QA is always apples-to-apples.

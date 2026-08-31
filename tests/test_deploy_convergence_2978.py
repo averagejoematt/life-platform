@@ -23,6 +23,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -418,3 +419,38 @@ def test_the_taxonomy_renders_for_humans():
     assert table.returncode == 0, table.stderr
     for wid in dc.RACE_WINDOWS:
         assert wid in table.stdout
+
+
+# ── Upload order: hashed assets BEFORE the HTML that references them (#2978 shape (a)) ──
+# 2026-08-31, the #3277 site deploy: HTML uploaded 03:43:18, the hashed motion.<hash>.js it
+# referenced at 03:43:25. Every edge request in that window cached a 404 (served as text/html
+# → "Refused to execute script … MIME type"), and the ci-cd visual-QA run read 43 pages red
+# on a deploy that was correct seven seconds later. The fix is ordering, and ordering is a
+# thing a test can read: the hashed-asset sync must appear in the script BEFORE the HTML sync.
+
+_SYNC_SCRIPT = Path(__file__).resolve().parents[1] / "deploy" / "sync_site_to_s3.sh"
+_HASHED_MARK = 'echo "→ Hashed CSS/JS'
+_HTML_MARK = 'echo "→ HTML files'
+
+
+def upload_order_is_assets_first(script_text: str) -> bool:
+    """Pure decision: True iff the hashed-asset sync precedes the HTML sync in the script."""
+    h, t = script_text.find(_HASHED_MARK), script_text.find(_HTML_MARK)
+    return h != -1 and t != -1 and h < t
+
+
+def test_sync_script_uploads_hashed_assets_before_html():
+    text = _SYNC_SCRIPT.read_text(encoding="utf-8")
+    assert upload_order_is_assets_first(text), (
+        "deploy/sync_site_to_s3.sh syncs HTML before the hashed CSS/JS it references — every edge request "
+        "between the two uploads caches a 404 for the new asset (#2978 shape (a), 2026-08-31 #3277 deploy)"
+    )
+
+
+def test_MUTATION_html_before_assets_reds_the_order_rule():
+    # The rule must be able to fail: swap the two steps on a copy and the decision flips.
+    text = _SYNC_SCRIPT.read_text(encoding="utf-8")
+    h, t = text.index(_HASHED_MARK), text.index(_HTML_MARK)
+    swapped = text[:h] + _HTML_MARK + text[h + len(_HASHED_MARK) : t] + _HASHED_MARK + text[t + len(_HTML_MARK) :]
+    assert not upload_order_is_assets_first(swapped)
+    assert not upload_order_is_assets_first(text.replace(_HASHED_MARK, "echo removed"))
