@@ -34,7 +34,7 @@ Covers:
       qa-smoke-heartbeat   RunCompleted SampleCount < 1, 2 consecutive days, BREACHING (digest)
       qa-smoke-failures    FailCount Max >= 1, 86400s (digest)
       qa-smoke-warnings    WarnCount Max >= 1, 86400s (digest) — a warnings-only
-                            run is now visible in the daily digest, not fully silent.
+                            run is visible in the digest. #3317 review 2026-08-30: docs/reviews/ALARM_REVIEW_QA_SMOKE_2026-08-30.md
 
   #1455 (heartbeat completeness, 2026-07-19): the compute-output check's gauge is
   now alarmed (it had emitted unalarmed since Phase 3.2):
@@ -462,8 +462,8 @@ class MonitoringStack(Stack):
         # chronic / 23 non-chronic) found the metric and each run's own log agree exactly, every time.
         # The split, the 86400s Maximum window, and the single-producer metric are all correct as
         # designed — see docs/alarm_citations.json's qa-smoke-warnings entry for the full reconciliation
-        # and the currently-owned non-chronic source (`reader_truth`, real content-truth findings that
-        # SHOULD stay alarmed — #1958's chronic contract deliberately does not cover them).
+        # and the currently-owned non-chronic source (`reader_truth` findings that SHOULD stay alarmed — #1958's contract does not cover them).
+        # #3317 REVIEWED 2026-08-30 — all three KEEP, shapes unchanged: docs/reviews/ALARM_REVIEW_QA_SMOKE_2026-08-30.md + alarm_citations.json
         _heartbeat_alarm(
             "QaSmokeHeartbeat",
             "qa-smoke-heartbeat",
