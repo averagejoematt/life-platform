@@ -21,7 +21,7 @@ import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || 
 // client literal as its boot fallback (the API payload is the runtime truth).
 // The reset sweep (deploy/restart_site_copy_sync.py rewrite_js_files) follows
 // the quoted ISO form here — keep it a plain quoted literal.
-export const GENESIS_ISO = "2026-08-17";
+export const GENESIS_ISO = "2026-09-01";
 const GENESIS = new Date(`${GENESIS_ISO}T00:00:00`);
 // #2941: the platform's canonical clock is Pacific (#2506/#2675) — Day N must be the
 // PT calendar count for every viewer. Never subtract a local-midnight instant from
@@ -37,7 +37,7 @@ export function genesisCount(now = new Date()) {
   const todayPT = PT_DAY.format(now); // "YYYY-MM-DD"
   const dayN = Math.round((_utcNoon(todayPT) - _utcNoon(GENESIS_ISO)) / 86400000) + 1;
   const weekN = Math.floor((Math.max(1, dayN) - 1) / 7) + 1;
-  return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since August 17 2026` };
+  return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since September 1 2026` };
 }
 
 // Pre-start countdown (#931). A reset can stage a FUTURE genesis (constants + this
