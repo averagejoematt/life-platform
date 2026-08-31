@@ -76,7 +76,16 @@ from typing import Any, Iterable
 #     cannot admit a library to the ratcheted inventory;
 #   gate_census_precision  — the #2639 error-bar machinery.
 # Both re-exported here so the CLI report and tests keep one address.
-from gate_census_enforcement import NAME_ONLY_STATE, VERDICT_UNPROVABLE, classify_candidate  # noqa: F401
+from gate_census_enforcement import (  # noqa: F401
+    NAME_ONLY_STATE,
+    VERDICT_NOT_APPLICABLE,
+    VERDICT_UNPROVABLE,
+    audit_verdicts,
+    classify_candidate,
+    gate_reason,
+    not_applicable_gate_fields,
+    verdict_partition,
+)
 from gate_census_precision import (  # noqa: F401
     FLAG_PRECISION,
     FlagPrecisionSample,
@@ -724,8 +733,9 @@ _NONZERO_EXIT = re.compile(r"sys\.exit\(\s*(?!0\s*\))|SystemExit\(\s*(?!0)|exit\
 # (scripts/gate_census_enforcement.py — extracted, not inlined, because this file
 # sits at the module-size ceiling) decides whether a name-matched file has any
 # structural way to fail. Name-only candidates are collected in NAME_ONLY_CANDIDATES
-# and returned OUT of the gate list, so they cannot enter the ratcheted total or
-# #2578's unproven column — while still being reported, by path.
+# (the detail record the report prints, by path) AND — since #3329 — enter the gate
+# list carrying the `not-applicable` verdict with their recorded reason: counted in
+# the total, never in #2578's unproven column.
 NAME_ONLY_CANDIDATES: list[dict[str, Any]] = []
 
 
@@ -776,6 +786,11 @@ def discover_guard_scripts(root: Path, files: list[Path]) -> tuple[list[Gate], d
             counters["no_nonzero_exit"] += 1
             counters["name_only"] += 1
             NAME_ONLY_CANDIDATES.append(verdict)
+            # #3329(B): INSIDE the total, as an explicit `not-applicable` verdict with
+            # its recorded reason — never in the unproven column, which is the #3220
+            # invariant that actually mattered.
+            fields = not_applicable_gate_fields(verdict)
+            gates.append(Gate(id=f"guard::{rel}", family="guard-script", name=rel, source=rel, screened=True, **fields))
             continue
         if not _NONZERO_EXIT.search(text):
             counters["no_nonzero_exit"] += 1

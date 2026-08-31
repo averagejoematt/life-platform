@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from gate_census_enforcement import VERDICT_ATTEMPTED, VERDICT_NOT_APPLICABLE, VERDICT_PROVEN, audit_verdicts
 from gate_census_precision import _render_error_bars
 
 
@@ -40,8 +41,10 @@ def render_report(census: dict[str, Any]) -> str:
     screened = [g for g in gates if g["screened"]]
     unscreened = [g for g in gates if not g["screened"]]
     flagged = [g for g in screened if g["risk_flags"]]
-    proven = [g for g in gates if g["verdict"] == "can-fail (proven)"]
-    attempted = [g for g in gates if g["verdict"] == "attempted-unproven"]
+    proven = [g for g in gates if g["verdict"] == VERDICT_PROVEN]
+    attempted = [g for g in gates if g["verdict"] == VERDICT_ATTEMPTED]
+    not_applicable = [g for g in gates if g["verdict"] == VERDICT_NOT_APPLICABLE]
+    adjudicated = len(proven) + len(attempted) + len(not_applicable)
     orphan_proofs = census.get("orphan_proofs") or []
     unattached = census.get("unattached_attempts") or []
     name_only = census.get("name_only_candidates") or []
@@ -58,8 +61,8 @@ def render_report(census: dict[str, Any]) -> str:
     add(f"  carrying >=1 risk flag     n = {len(flagged)}")
     add(f"  verdict proven can-fail    n = {len(proven)}   <- each cites the mutation that produced it")
     add(f"  attempted, NOT proved      n = {len(attempted)}   <- recorded with the reason, never skipped")
-    add(f"  UNPROVEN (can fail, proof not written)   n = {n - len(proven) - len(attempted)}   <- real #2578 work")
-    add(f"  UNPROVABLE (nothing to fail, excluded)   n = {len(name_only)}   <- NOT #2578 work, NOT in the total above")
+    add(f"  UNPROVEN (can fail, proof not written)   n = {n - adjudicated}   <- real #2578 work")
+    add(f"  NOT-APPLICABLE (nothing to fail, reason recorded)   n = {len(not_applicable)}   <- INSIDE the total, never #2578 work")
     add("")
     # #2999 box 1/box 4: the number that matters is a FRACTION with an n, printed every
     # run, next to the reading it has to beat. A count of proofs with no denominator is
@@ -67,24 +70,43 @@ def render_report(census: dict[str, Any]) -> str:
     if n:
         add(
             f"VERDICT FRACTION             {len(proven)}/{n} proven ({len(proven) / n:.1%}) "
-            f"+ {len(attempted)} attempted-not-proved = {(len(proven) + len(attempted)) / n:.1%} adjudicated"
+            f"+ {len(attempted)} attempted-not-proved + {len(not_applicable)} not-applicable "
+            f"= {adjudicated / n:.1%} adjudicated"
         )
         add("  reference points             7/490 (1.4%) when #2999 was filed 2026-08-22; 25/561 (4.5%) on main 2026-08-27")
     add("")
 
-    # #3220: the name-only report. These matched `_GUARD_NAME` and have no
-    # structural way to fail, so they are OUT of the count — named here because a
-    # guard that LOSES its enforcement path must surface, not vanish.
-    add("-- NAME-MATCHED, NO ENFORCEMENT PATH (excluded from the total, #3220) " + "-" * 8)
-    if not name_only:
+    # The verdict contract, checked on every run (#3329). Silence here is a result:
+    # the partition accounts for every gate and every not-applicable row says why.
+    violations = audit_verdicts(gates)
+    if violations:
+        add("-- !! VERDICT CONTRACT VIOLATIONS " + "-" * 43)
+        for v in violations:
+            add(f"  {v}")
+        add("")
+
+    # #3220/#3329: the name-only report. These matched `_GUARD_NAME` and have no
+    # structural way to fail. They are IN the count as `not-applicable` (#3329 —
+    # a denominator with a silent asterisk is not a denominator), and printed here
+    # WITH the recorded reason, because a guard that LOSES its enforcement path must
+    # surface as a changed verdict rather than vanish.
+    add("-- NOT-APPLICABLE: name-matched, no enforcement path (counted, #3220/#3329) " + "-" * 2)
+    if not not_applicable:
         add("  (none — every name-matched candidate has structural evidence it can fail)")
-    for c in name_only:
-        add(f"  {c['path']}")
-    if name_only:
-        add("  Each matched the guard-NAME pattern only. If one of these IS a gate whose")
-        add("  caller does the blocking, add `# gate-entrypoint: <why>` in its first 40")
-        add("  lines — that re-admits it, in the file, reviewably. Do NOT bump the census")
-        add("  ceiling to absorb one of these: that trains the next author to bump on noise.")
+    for g in sorted(not_applicable, key=lambda x: x["id"]):
+        add(f"  {g['name']}")
+        reason = (g.get("detail") or {}).get("reason") or g.get("evidence") or ""
+        add(f"      reason    {_wrap(reason) if reason else '!! NONE RECORDED — write one line saying why nothing here can fail'}")
+    missing = sorted({c["path"] for c in name_only} - {g["name"] for g in not_applicable})
+    if missing:
+        add(f"  !! name-matched candidate(s) in NO verdict column at all — the exclusion is back: {missing}")
+    if not_applicable:
+        add("  Each matched the guard-NAME pattern only, and each carries the reason nothing")
+        add("  in it can fail. If one of these IS a gate whose caller does the blocking, add")
+        add("  `# gate-entrypoint: <why>` in its first 40 lines — that re-admits it as a real")
+        add("  gate, in the file, reviewably. Do NOT bump BASELINE_UNPROVEN_GATES to absorb")
+        add("  one of these: a not-applicable row is not unproven work, and moving that")
+        add("  ceiling on noise trains the next author to bump rather than adjudicate.")
     add("")
     add(_render_error_bars(census))
     add("")

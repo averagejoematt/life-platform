@@ -114,9 +114,23 @@ def _tree(tmp_path: pathlib.Path, files: dict[str, str]) -> tuple[pathlib.Path, 
 
 
 def _discover(tmp_path, files):
+    """Names ADMITTED as real gates, the counters, and the name-only candidate records.
+
+    The name set deliberately excludes the #3329 `not-applicable` rows: every assertion
+    below is about whether a file is admitted as something that CAN FAIL, and #3329
+    changed only where an un-admitted row is counted, never whether it is admitted.
+    """
     root, paths = _tree(tmp_path, files)
     gates, counters = gate_census.discover_guard_scripts(root, paths)
-    return {g.name for g in gates}, counters, list(gate_census.NAME_ONLY_CANDIDATES)
+    real = {g.name for g in gates if g.verdict != gce.VERDICT_NOT_APPLICABLE}
+    return real, counters, list(gate_census.NAME_ONLY_CANDIDATES)
+
+
+def _not_applicable_rows(tmp_path, files):
+    """The other half of the same sweep — the rows that entered carrying `not-applicable`."""
+    root, paths = _tree(tmp_path, files)
+    gates, _ = gate_census.discover_guard_scripts(root, paths)
+    return [g for g in gates if g.verdict == gce.VERDICT_NOT_APPLICABLE]
 
 
 # ── The evidence kinds, one at a time (pure, no repo) ─────────────────────────
@@ -173,14 +187,24 @@ def test_an_unparseable_file_stays_in_the_inventory():
 # ── The census-level claim: the total, in both directions ────────────────────
 
 
-def test_a_fail_soft_library_named_gate_does_not_enter_the_total(tmp_path):
+def test_a_fail_soft_library_named_gate_never_enters_the_unproven_column(tmp_path):
     """PRE-FIX THIS FAILED: `discover_guard_scripts` returned this file as a Gate
     on the strength of the substring "gate" in its name, and it counted toward
-    `BASELINE_TOTAL_GATES` and #2578's unproven column."""
+    `BASELINE_TOTAL_GATES` and #2578's unproven column.
+
+    #3329 (owner decision 2026-08-31, option B) moved WHERE it is counted without
+    touching what it is: it now enters the inventory carrying `not-applicable`, so the
+    total has no silent asterisk — but it is still never `unproven`, which is the half
+    of #3220 that protects the epic's pile of real proof work.
+    """
     names, counters, name_only = _discover(tmp_path, {"lambdas/ai/coach_gate_retention.py": FAIL_SOFT_LIBRARY})
-    assert names == set(), f"a fail-soft library entered the inventory: {names}"
+    assert names == set(), f"a fail-soft library was admitted as a gate that can fail: {names}"
     assert counters["name_only"] == 1
     assert [c["path"] for c in name_only] == ["lambdas/ai/coach_gate_retention.py"]
+
+    rows = _not_applicable_rows(tmp_path, {"lambdas/ai/coach_gate_retention.py": FAIL_SOFT_LIBRARY})
+    assert [g.name for g in rows] == ["lambdas/ai/coach_gate_retention.py"], "it must be COUNTED, as not-applicable"
+    assert rows[0].verdict == gce.VERDICT_NOT_APPLICABLE != "unproven"
 
 
 def test_a_genuine_guard_script_still_does(tmp_path):
@@ -213,6 +237,10 @@ def test_a_guard_that_LOSES_its_enforcement_path_is_reported_not_silently_droppe
     quietly shrink by one — that is the same silhouette as the six dark gates it
     exists to find, so making it invisible would be the census committing its own
     subject.
+
+    #3329 strengthens exactly this case. The row no longer leaves the total at all: it
+    stays, at the same id, with its verdict CHANGED from unproven to not-applicable —
+    a state change a diff can see, rather than a disappearance a count has to notice.
     """
     armed = {"scripts/check_thing.py": GENUINE_GUARD}
     names_before, _, _ = _discover(tmp_path, armed)
@@ -221,12 +249,16 @@ def test_a_guard_that_LOSES_its_enforcement_path_is_reported_not_silently_droppe
     disarmed = GENUINE_GUARD.replace("sys.exit(1)", "pass")
     names_after, counters, name_only = _discover(tmp_path, {"scripts/check_thing.py": disarmed})
 
-    assert "scripts/check_thing.py" not in names_after, "it must leave the ratcheted total"
+    assert "scripts/check_thing.py" not in names_after, "it must leave the population of gates that CAN fail"
     paths = [c["path"] for c in name_only]
     assert "scripts/check_thing.py" in paths, "…but it must be REPORTED, by path, not vanish"
     entry = name_only[paths.index("scripts/check_thing.py")]
     assert entry["state"] == gce.NAME_ONLY_STATE
-    assert entry["verdict"] == gce.VERDICT_UNPROVABLE
+    assert entry["verdict"] == gce.VERDICT_NOT_APPLICABLE
+
+    rows = _not_applicable_rows(tmp_path, {"scripts/check_thing.py": disarmed})
+    assert [g.id for g in rows] == ["guard::scripts/check_thing.py"], "the id must be STABLE across the disarming"
+    assert len(_not_applicable_rows(tmp_path, armed)) == 0, "…and absent while the guard is armed, or the flip says nothing"
 
 
 def test_a_declared_entrypoint_marker_readmits_a_computation_module(tmp_path):
@@ -238,13 +270,16 @@ def test_a_declared_entrypoint_marker_readmits_a_computation_module(tmp_path):
     assert name_only == []
 
 
-# ── unproven vs unprovable must be explicit in the OUTPUT ────────────────────
+# ── unproven vs not-applicable must be explicit in the OUTPUT ────────────────
 
 
-def test_report_states_unproven_and_unprovable_as_different_things():
-    """#2578's denominator has to mean what it claims: "proof not written yet" is
-    real work; "nothing to fail" is not work at all."""
-    census = {
+_NA_PATH = "lambdas/ai/coach_gate_retention.py"
+
+
+def _census_with_one_not_applicable(reason: str = "fail-soft retention helper; every write path swallows and returns") -> dict:
+    """A census dict carrying one unproven gate and one not-applicable gate — the two
+    states the report must never blur. Synthetic, so it cannot drift with the repo."""
+    return {
         "gates": [
             {
                 "id": "g::1",
@@ -255,10 +290,21 @@ def test_report_states_unproven_and_unprovable_as_different_things():
                 "risk_flags": [],
                 "verdict": "unproven",
                 "detail": {},
-            }
+            },
+            {
+                "id": f"guard::{_NA_PATH}",
+                "family": "guard-script",
+                "name": _NA_PATH,
+                "source": _NA_PATH,
+                "screened": True,
+                "risk_flags": [],
+                "verdict": gce.VERDICT_NOT_APPLICABLE,
+                "evidence": reason,
+                "detail": {"reason": reason, "state": gce.NAME_ONLY_STATE},
+            },
         ],
         "name_only_candidates": [
-            {"path": "lambdas/ai/coach_gate_retention.py", "state": gce.NAME_ONLY_STATE, "verdict": gce.VERDICT_UNPROVABLE, "evidence": []}
+            {"path": _NA_PATH, "state": gce.NAME_ONLY_STATE, "verdict": gce.VERDICT_NOT_APPLICABLE, "evidence": [], "reason": reason}
         ],
         "shapes": {},
         "counters": {},
@@ -268,31 +314,53 @@ def test_report_states_unproven_and_unprovable_as_different_things():
         "orphan_proofs": [],
         "unattached_attempts": [],
     }
-    report = gate_census.render_report(census)
-    assert "UNPROVEN (can fail, proof not written)" in report
-    assert "UNPROVABLE (nothing to fail, excluded)" in report
-    assert "NAME-MATCHED, NO ENFORCEMENT PATH" in report
-    assert "lambdas/ai/coach_gate_retention.py" in report, "an excluded candidate must still be named, by path"
+
+
+def test_report_states_unproven_and_not_applicable_as_different_things():
+    """#2578's denominator has to mean what it claims: "proof not written yet" is
+    real work; "nothing to fail, and here is why" is not work at all. #3329 put the
+    second one INSIDE the total, so the report must distinguish them by verdict rather
+    than by one of them being missing."""
+    report = gate_census.render_report(_census_with_one_not_applicable())
+    assert "UNPROVEN (can fail, proof not written)   n = 1" in report
+    assert "NOT-APPLICABLE (nothing to fail, reason recorded)   n = 1" in report
+    assert "excluded from the total" not in report, "the exclusion is gone — n is the whole population (#3329)"
+    assert "name-matched, no enforcement path" in report
+    assert _NA_PATH in report, "a not-applicable row must still be named, by path"
+    assert "fail-soft retention helper" in report, "…and with the recorded reason, or the verdict is an assertion"
     assert "gate-entrypoint:" in report, "the report must say how to re-admit a real gate"
 
 
-def test_report_does_not_tell_the_reader_to_bump_the_ceiling_for_a_name_only_match():
-    """The second kind of damage in the issue: bumping `BASELINE_TOTAL_GATES` to
-    absorb a misfire trains the next author to bump on noise and quietly corrupts
-    the ratchet."""
-    census = {
-        "gates": [],
-        "name_only_candidates": [{"path": "x_gate.py", "state": gce.NAME_ONLY_STATE, "verdict": gce.VERDICT_UNPROVABLE, "evidence": []}],
-        "shapes": {},
-        "counters": {},
-        "families_dropped": [],
-        "attempted_unproven": {},
-        "annassign_exposure": {},
-        "orphan_proofs": [],
-        "unattached_attempts": [],
-    }
+def test_report_shouts_when_a_not_applicable_row_has_no_recorded_reason():
+    """The rent, made visible. An exemption whose reasoning nobody wrote down is the
+    artifact this census exists to count, so the report says so on the row itself and
+    in the verdict-contract block."""
+    report = gate_census.render_report(_census_with_one_not_applicable(reason=""))
+    assert "NONE RECORDED" in report
+    assert "VERDICT CONTRACT VIOLATIONS" in report
+    assert f"guard::{_NA_PATH}" in report
+
+
+def test_report_flags_a_name_only_candidate_that_reached_no_verdict_column():
+    """The regression direction: if a future edit stops turning candidates into rows,
+    the census silently sheds them again. The report must not be the quiet one."""
+    census = _census_with_one_not_applicable()
+    census["gates"] = [g for g in census["gates"] if g["verdict"] != gce.VERDICT_NOT_APPLICABLE]
     report = gate_census.render_report(census)
-    assert "Do NOT bump the census" in report
+    assert "the exclusion is back" in report and _NA_PATH in report
+
+
+def test_report_does_not_tell_the_reader_to_bump_the_unproven_ceiling_for_a_name_only_match():
+    """The second kind of damage in the issue: absorbing a misfire by moving a ceiling
+    trains the next author to bump on noise and quietly corrupts the ratchet.
+
+    #3329 changed WHICH ceiling this is about. A not-applicable row is counted, so
+    `BASELINE_TOTAL_GATES` legitimately moves for it (with the reason, in the same PR);
+    `BASELINE_UNPROVEN_GATES` never does, and it is down-only besides.
+    """
+    report = gate_census.render_report(_census_with_one_not_applicable())
+    assert "Do NOT bump BASELINE_UNPROVEN_GATES" in report
+    assert "not unproven work" in report
 
 
 # ── One property assertion against the REAL tree (never a number) ────────────

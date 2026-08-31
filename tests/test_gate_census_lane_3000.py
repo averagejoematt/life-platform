@@ -95,6 +95,10 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # The ten are printed by path under "NAME-MATCHED, NO ENFORCEMENT PATH" in the
 # census report; they are UNPROVABLE, not unproven, and do not belong in #2578's
 # denominator. Re-admitting one is a `# gate-entrypoint:` marker in that file.
+#   [SUPERSEDED 2026-08-31 by the 575 -> 581 entry at the bottom of this block: the
+#   six survivors are now IN the denominator carrying `not-applicable` + a reason.
+#   'not unproven' still holds and is the part that mattered; 'not in the total'
+#   does not. The paragraph is kept as the record of what was true then.]
 #
 #
 # 2026-08-26 (#3222), 551 -> 552. TOTAL only. ONE gate added:
@@ -367,8 +371,46 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 #           gate: CI-step ids are positional and the two new steps sit ahead of the code
 #           deploys (review N2), sliding the tail by two. Count-neutral, and no proof or
 #           attempt record keys on those ids (orphan_proofs: [], unattached_attempts: []).
-BASELINE_TOTAL_GATES = 578
+# 578 -> 584 (2026-08-31, #3329; owner decision of the same date, option B): NOT six new
+# gates and NOT a re-baseline — six gates that were always there and were being held OUT
+# of the denominator. #3220's name-only candidates now enter the inventory carrying the
+# explicit `not-applicable` verdict (the epic's own third term) with a one-line recorded
+# reason each, because "570 gates, plus six we do not count" is a number with a silent
+# asterisk. Verified by id-set diff, not count delta: each tree ran its OWN
+# scripts/gate_census.py --json (main exported with `git archive` at bbd19b112 = 578,
+# branch = 584, both trees fully staged — a mid-rebase reading is +4, see the warning above);
+# ADDED exactly
+#   guard::lambdas/ai/grounding_gate_params.py     guard::lambdas/experiment/experiment_gates.py
+#   guard::lambdas/ai/quality_gate_contract.py     guard::tests/conformance_guard_lib.py
+#   guard::lambdas/common/item_size_guard.py       guard::tests/truth_baseline_audit.py
+# REMOVED {}. BASELINE_UNPROVEN_GATES does NOT move and must not: a not-applicable row is
+# not unproven work, and the live unproven count is unchanged at 528 across the diff
+# (measured both sides). The whole #3220 invariant — a name-only match can never inflate
+# #2578's pile of real proof work — is now enforced by the verdict's TYPE rather than by
+# the row's absence, which is the stronger form.
+BASELINE_TOTAL_GATES = 584
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was
+# re-scoped to the claim this census can verify: every gate entering after
+# 2026-08-24 arrives proven under the #3000 ratchet, and the INSTALLED unproven base
+# is tracked by this number, which may only move DOWN.
+#
+# So the ceiling below is no longer "bump it with a reason" — a new gate arrives with
+# a verdict or it does not land. `UNPROVEN_CEILING_HIGH_WATER` is the structural half
+# of that: raising BASELINE_UNPROVEN_GATES now reds `test_the_unproven_ceiling_is_down_only`
+# as well, so a raise cannot be a one-token edit made at 2am to get a lane green. The
+# sanctioned move is the opposite one — lower BOTH to the live count whenever the
+# measurement allows, which is the progress record the epic asks for.
+UNPROVEN_CEILING_HIGH_WATER = 541
 BASELINE_UNPROVEN_GATES = 541
+
+# The gap this ceiling is allowed to carry before the census says "you can ratchet down".
+# Set from the measurement it describes: 541 committed vs 525–528 live across the last
+# six lanes (528 on 2026-08-31, after #2834), i.e. 16 of headroom, deliberately kept so a lane that
+# legitimately adds one unproven gate does not have to touch this file. More than that
+# and the ceiling has stopped describing the pile — non-fatal, reported, actionable.
+RATCHET_DOWN_SLACK = 16
 
 
 def check_unproven_ceiling(total_gates: int, unproven_gates: int) -> tuple[bool, str]:
@@ -378,9 +420,11 @@ def check_unproven_ceiling(total_gates: int, unproven_gates: int) -> tuple[bool,
         return False, (
             f"{unproven_gates} gates now carry no verdict, above the committed ceiling "
             f"{BASELINE_UNPROVEN_GATES}. A gate entered the platform with no verdict and "
-            "nothing said so out loud: either give it a verdict (PROVEN_CAN_FAIL / "
-            "ATTEMPTED_UNPROVEN in scripts/gate_census.py) or bump BASELINE_UNPROVEN_GATES "
-            "(and BASELINE_TOTAL_GATES) here, in the SAME PR, with a reason (#3000)."
+            "nothing said so out loud: give it a verdict (PROVEN_CAN_FAIL / "
+            "ATTEMPTED_UNPROVEN in scripts/gate_census.py), or — if nothing in it can fail "
+            "— a `not-applicable` reason in gate_census_enforcement.NOT_APPLICABLE_REASONS. "
+            "BASELINE_UNPROVEN_GATES is DOWN-ONLY since the 2026-08-31 owner decision on "
+            "#3329 (option B): it is not raised to absorb a new unproven gate (#3000)."
         )
     if total_gates > BASELINE_TOTAL_GATES:
         return False, (
@@ -388,6 +432,30 @@ def check_unproven_ceiling(total_gates: int, unproven_gates: int) -> tuple[bool,
             "— bump BASELINE_TOTAL_GATES here in the same PR that grew the inventory (#3000)."
         )
     return True, f"{total_gates} gates found ({unproven_gates} unproven), within the committed ceiling."
+
+
+def ratchet_down_available(
+    unproven_gates: int, ceiling: int = BASELINE_UNPROVEN_GATES, slack: int = RATCHET_DOWN_SLACK
+) -> tuple[bool, str]:
+    """Is the committed ceiling further above the live pile than the stated slack?
+
+    NON-FATAL by design (#3329): this reports a move that is available, it does not
+    fail a build for not having made it. A ratchet whose only voice is a red teaches
+    people to raise the number; one that says "you can lower this by N" every run,
+    out loud, is the direction-of-travel record the epic's box 2 was re-scoped to.
+
+    Pure — integers in, verdict out, no repo read, so the RULE is mutation-provable
+    independent of today's count.
+    """
+    gap = ceiling - unproven_gates
+    if gap > slack:
+        return True, (
+            f"RATCHET DOWN AVAILABLE: {unproven_gates} unproven live vs the committed "
+            f"{ceiling} — a gap of {gap}, past the stated slack of {slack}. Lower "
+            f"BASELINE_UNPROVEN_GATES (and UNPROVEN_CEILING_HIGH_WATER with it) to "
+            f"{unproven_gates} here; that edit IS the progress record (#3329)."
+        )
+    return False, f"{unproven_gates} unproven vs ceiling {ceiling} — gap {gap}, within the stated slack of {slack}."
 
 
 # ── The mutation proof (#3000 acceptance: "mutation-proved") ────────────────────────
@@ -421,6 +489,48 @@ def test_baseline_unproven_never_exceeds_baseline_total():
     assert BASELINE_UNPROVEN_GATES <= BASELINE_TOTAL_GATES
 
 
+# ── DOWN-ONLY (#3329) ───────────────────────────────────────────────────────────────
+
+
+def test_the_unproven_ceiling_is_down_only():
+    """The structural half of the owner's (B) decision: BASELINE_UNPROVEN_GATES may
+    fall, never rise. A raise now has to move a SECOND number whose only purpose is to
+    say "someone decided to go backwards", which is the difference between a ratchet
+    and a variable."""
+    assert BASELINE_UNPROVEN_GATES <= UNPROVEN_CEILING_HIGH_WATER, (
+        f"BASELINE_UNPROVEN_GATES was raised to {BASELINE_UNPROVEN_GATES}, above the "
+        f"recorded high water {UNPROVEN_CEILING_HIGH_WATER}. Under the 2026-08-31 owner "
+        "decision on #3329 (option B) this ceiling is DOWN-ONLY: a new gate arrives with a "
+        "verdict (proven / attempted / not-applicable-with-a-reason) rather than widening "
+        "the pile. If a raise is genuinely right, that is an owner call and it re-dates "
+        "the decision — it is not a lane's edit."
+    )
+
+
+def test_ratchet_down_is_reported_when_the_gap_exceeds_the_slack():
+    """The mutation, on integers: one more gate of gap than the stated slack allows and
+    the census says the move is available, by name and by number."""
+    available, msg = ratchet_down_available(BASELINE_UNPROVEN_GATES - RATCHET_DOWN_SLACK - 1)
+    assert available
+    assert "RATCHET DOWN AVAILABLE" in msg and str(BASELINE_UNPROVEN_GATES - RATCHET_DOWN_SLACK - 1) in msg
+
+
+def test_ratchet_down_is_silent_inside_the_stated_slack():
+    """The negative control. Exactly at the slack is NOT a finding — a ratchet that
+    nags at every value is one people learn to ignore."""
+    available, msg = ratchet_down_available(BASELINE_UNPROVEN_GATES - RATCHET_DOWN_SLACK)
+    assert not available
+    assert "within the stated slack" in msg
+
+
+def test_ratchet_down_is_never_fatal_by_construction():
+    """It reports, it does not fail. This is the assertion that keeps a future author
+    from wiring the advisory into the red path: the ONLY fatal rule in this file is
+    `check_unproven_ceiling`, and a gap below the ceiling passes it."""
+    ok, _ = check_unproven_ceiling(BASELINE_TOTAL_GATES, BASELINE_UNPROVEN_GATES - RATCHET_DOWN_SLACK - 50)
+    assert ok
+
+
 # ── The live check — the actual guard over the real, current inventory ──────────────
 
 _ERR_BARS_MODULE = "test_gate_census_error_bars_2639"
@@ -446,3 +556,17 @@ def test_live_unproven_gate_count_is_within_the_committed_ceiling():
     unproven = sum(1 for g in gates if g["verdict"] == "unproven")
     ok, msg = check_unproven_ceiling(total, unproven)
     assert ok, msg
+
+
+def test_the_live_ratchet_down_verdict_is_printed_whichever_way_it_falls(capsys):
+    """The visible direction of travel (#3329's Outcome). Non-fatal, so its whole value
+    is being SAID every run — a silent advisory is the shape this platform keeps finding
+    behind a green board, so the test asserts it printed, not that it passed."""
+    census = _live_census()
+    unproven = sum(1 for g in census["gates"] if g["verdict"] == "unproven")
+    available, msg = ratchet_down_available(unproven)
+    print(f"[#3329] {msg}")
+    assert msg.strip()
+    assert str(unproven) in msg
+    assert ("RATCHET DOWN AVAILABLE" in msg) is available
+    assert capsys.readouterr().out.strip(), "the direction-of-travel line must reach the run's output"

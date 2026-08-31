@@ -20,7 +20,9 @@ Two kinds of damage, and the second is the worse one:
 
   1. It inflates #2578's unproven column with a row whose can-fail proof is
      IMPOSSIBLE BY CONSTRUCTION. Whoever works that epic down eventually reaches
-     the row and has to discover by hand that it is unprovable, not unproven.
+     the row and has to discover by hand that nothing in it can fail. (#3329 makes
+     that discovery a recorded `not-applicable` verdict with a reason, rather than
+     a fact each reader has to re-derive.)
   2. It invites a CEILING BUMP ON NOISE. The ratchet's remediation text says to
      bump `BASELINE_TOTAL_GATES` in the same PR — correct for real inventory
      growth, wrong here. Bumping to absorb a misfire trains the next author to
@@ -98,7 +100,11 @@ IN (4) — verdict computed here, blocking consumer elsewhere, no covering row:
                                           derives from the #2845 model), so nothing
                                           else counts the seam ratchet at all.
 
-OUT (6) — and each for a stated reason, not by omission:
+OUT (6) — and each for a stated reason, not by omission. This block is the ADMISSION
+ruling (Q1/Q2: why the file is not in the can-fail population). Since #3329 the same
+six also carry an executable one-line REASON in `NOT_APPLICABLE_REASONS` below —
+that dict is the operative artifact the census prints; this is the reasoning behind
+it. Two homes, two different questions, and the code only ever reads the dict:
 
   lambdas/ai/grounding_gate_params.py   Q1 no. Returns kwargs. The verdict is
                                         `grounded_generation.grounding_findings`'s,
@@ -125,20 +131,34 @@ OUT (6) — and each for a stated reason, not by omission:
 The asymmetry between the two `*_guard_lib.py` peers is the point, not an oversight:
 one has a covering row and one does not, and Q2 is the only thing that separates them.
 
-UNPROVEN vs UNPROVABLE — the distinction #2578's denominator needs
------------------------------------------------------------------
-  unproven    the gate CAN fail; nobody has watched it fail on purpose yet. Real
-              #2578 work, and the honest default for nearly everything.
-  unprovable  there is nothing to fail. Not #2578 work, and it must not sit in
-              that epic's denominator pretending to be a task.
+UNPROVEN vs NOT-APPLICABLE — the distinction #2578's denominator needs
+----------------------------------------------------------------------
+  unproven        the gate CAN fail; nobody has watched it fail on purpose yet.
+                  Real #2578 work, and the honest default for nearly everything.
+  not-applicable  there is nothing to fail, and the REASON is recorded. Never
+                  #2578 proof work, and it must never sit in that epic's unproven
+                  column pretending to be a task.
 
 A name-only candidate is reported in its own state ("name-matched, no enforcement
-path"), with its path, and does NOT enter the ratcheted total. It is REPORTED, not
-dropped: a guard that LOSES its enforcement path — someone deletes the `sys.exit`
-and the gate goes dark — must show up here rather than silently vanishing from a
-count nobody was watching. That is the same shape as the six dark gates this whole
-census exists to find, so making it invisible would be the census committing its
-own subject.
+path"), with its path. It is REPORTED, not dropped: a guard that LOSES its
+enforcement path — someone deletes the `sys.exit` and the gate goes dark — must
+show up here rather than silently vanishing from a count nobody was watching. That
+is the same shape as the six dark gates this whole census exists to find, so making
+it invisible would be the census committing its own subject.
+
+#3329, owner decision 2026-08-31 (option B) — COUNTED, NOT EXCLUDED. Until now a
+name-only candidate was held OUT of the total entirely, which made the census's
+denominator a number with a silent asterisk ("570 gates, plus six we do not
+count"). The three-verdict vocabulary epic #2578 itself names is proven /
+unproven / not-applicable, so these entries now enter the inventory as an explicit
+`not-applicable` verdict, INSIDE n, each carrying a one-line reason for why nothing
+in it can fail. The invariant #3220 actually bought is untouched and now enforced by
+type rather than by omission: a name-only match still never lands in the UNPROVEN
+column, so it can never inflate the pile of real proof work.
+
+The rent is one line: a NEW not-applicable entry must arrive with its reason.
+`audit_verdicts()` below reds an entry that has none — "excluded for reasons nobody
+wrote down" is the shape this whole census exists to end.
 
 FAIL TOWARD INCLUSION, ALWAYS
 -----------------------------
@@ -169,7 +189,71 @@ EVIDENCE_UNPARSEABLE = "unparseable"
 # the report and the tests (the #1901 lesson: a vocabulary retyped per consumer
 # drifts).
 NAME_ONLY_STATE = "name-matched, no enforcement path"
-VERDICT_UNPROVABLE = "unprovable"
+VERDICT_NOT_APPLICABLE = "not-applicable"
+# Kept as an ALIAS, not a second string (#1901: a vocabulary retyped per consumer
+# drifts). #3329 renamed the verdict to the epic's own third term and put it inside
+# the total; every existing reference keeps resolving, to the same one value.
+VERDICT_UNPROVABLE = VERDICT_NOT_APPLICABLE
+
+VERDICT_PROVEN = "can-fail (proven)"
+VERDICT_ATTEMPTED = "attempted-unproven"
+VERDICT_UNPROVEN = "unproven"
+# The whole verdict vocabulary, in report order. `audit_verdicts` partitions against
+# exactly this tuple, so a verdict string invented anywhere else surfaces as
+# `unrecognised` instead of quietly falling out of the sum.
+VERDICTS = (VERDICT_PROVEN, VERDICT_ATTEMPTED, VERDICT_UNPROVEN, VERDICT_NOT_APPLICABLE)
+
+# ── the recorded reasons (#3329) ─────────────────────────────────────────────
+# One line per not-applicable row, written from that file's own source, saying what
+# it does INSTEAD of failing. Two rules keep this from decaying into the hand-list
+# the census replaces: (1) it is only ever consulted for a candidate the STRUCTURAL
+# classifier has already ruled name-only — it can never re-admit or exclude anything
+# by itself; (2) a candidate with no entry here still enters the census as
+# `not-applicable` with an EMPTY reason, and `audit_verdicts()` reds on it. So the
+# registry cannot silently omit a file; it can only fail loudly to explain one.
+#
+# The name deliberately matches none of `gate_census._REGISTRY_NAME`'s patterns —
+# a dict called `*_RULES`/`*_CHECKS`/`GATE_*` here would be expanded entry-by-entry
+# into phantom gates by the family-3 walk, and this module would inject six of them
+# into the census it is cleaning up.
+NOT_APPLICABLE_REASONS: dict[str, str] = {
+    "lambdas/ai/grounding_gate_params.py": (
+        "Returns kwargs, decides nothing: `cycle_gate_params()` builds the three cycle anchors and its only "
+        "failure branch is `except Exception: return {}` (fail-soft by contract — a grounding gate must never "
+        "take a narrative surface down). The arming verdict is `grounded_generation.grounding_findings()`'s, and "
+        "the wiring that would otherwise drift is the census row `structural::test_grounding_wiring_1967.py`."
+    ),
+    "lambdas/ai/quality_gate_contract.py": (
+        "Owns the wire PAYLOAD, not the verdict: every function here returns a dict/tuple describing the event the "
+        "coach pipeline sends to the `coach-quality-gate` Lambda, and the pass/hold decision is that remote gate's "
+        "(ADR-108). Nothing raises or exits; the drift it exists to prevent is caught by "
+        "`tests/test_judge_calibration_1374.py`, which diffs the live call site against it key-by-key."
+    ),
+    "lambdas/common/item_size_guard.py": (
+        "A mitigation, not a gate: `safe_put_item` writes on EVERY path — under 300KB it puts, at 300KB it puts and "
+        "emits a metric, at 380KB it truncates the largest list field and then puts. 'Never raises — truncation is "
+        "lossy but keeps the pipeline running' is its documented contract and true of every branch, so there is no "
+        "input for which it refuses anything."
+    ),
+    "lambdas/experiment/experiment_gates.py": (
+        "A threshold REGISTRY: `correlation_gates()` / `hypothesis_gates()` / `felt_calibration_gates()` return the "
+        "numbers plus the caller's own n, and each engine makes its own arming decision from them (#1371). The one "
+        "thing that can fail about it — an engine re-hardcoding a literal instead of importing the constant — is "
+        "`tests/test_experiment_gates.py`'s assertion, not this file's."
+    ),
+    "tests/conformance_guard_lib.py": (
+        "The library half of the kernel conformance sweep (#2844): `sweep()` returns {vocab: [site keys]} and no "
+        "function here raises, exits or answers yes/no. Q2 COVERED — the census row "
+        "`structural::test_conformance_guard_2844.py` asserts both directions against the shrink-only ledger, and "
+        "its failure IS this library's verdict, so proving both would count one verdict twice."
+    ),
+    "tests/truth_baseline_audit.py": (
+        "`gate_finding()` returns a STRING classification ('new' / 'baselined' / 'advisory') and nothing here "
+        "raises or exits; the reader-truth sweep is what turns a 'new' into a red. Q2 COVERED — that sweep is the "
+        "census row `visual-qa / Run visual + AI-vision QA sweep`, which is itself PROVEN can-fail, so this "
+        "module's verdict is already reported by a row that was watched failing."
+    ),
+}
 
 _NONZERO_EXIT = re.compile(r"sys\.exit\(\s*(?!0\s*\))|SystemExit\(\s*(?!0)|exit\(1\)")
 _DECLARED_MARKER = re.compile(r"#\s*gate-entrypoint:\s*(\S.+)")
@@ -291,23 +375,88 @@ def classify_candidate(rel: str, text: str) -> dict[str, Any]:
       enforces  bool  — does it enter the ratcheted inventory?
       evidence  list  — why (empty means name-only)
       state     str   — NAME_ONLY_STATE when it does not
-      verdict   str   — VERDICT_UNPROVABLE when it does not; "" otherwise, so the
-                        caller's normal `unproven` default stands
+      verdict   str   — VERDICT_NOT_APPLICABLE when it does not; "" otherwise, so
+                        the caller's normal `unproven` default stands
+      reason    str   — the recorded one-liner for why nothing here can fail, "" when
+                        nobody has written one yet (which `audit_verdicts` reds on)
     """
     evidence = enforcement_evidence(text)
     if evidence:
-        return {"path": rel, "enforces": True, "evidence": evidence, "state": "", "verdict": ""}
+        return {"path": rel, "enforces": True, "evidence": evidence, "state": "", "verdict": "", "reason": ""}
     return {
         "path": rel,
         "enforces": False,
         "evidence": [],
         "state": NAME_ONLY_STATE,
-        "verdict": VERDICT_UNPROVABLE,
+        "verdict": VERDICT_NOT_APPLICABLE,
+        "reason": NOT_APPLICABLE_REASONS.get(rel, ""),
         "note": (
             "matched the guard-name pattern but no nonzero-exit, escaping raise, assert, "
             "bool verdict API or `# gate-entrypoint:` marker was found — nothing here can "
-            "fail, so this is UNPROVABLE, not unproven (#3220). If it IS a real gate whose "
+            "fail, so this is NOT-APPLICABLE, not unproven (#3220/#3329). It is counted "
+            "inside the total and carries a recorded reason. If it IS a real gate whose "
             "caller does the blocking, say so in the file: add `# gate-entrypoint: <why>` "
-            "in its first 40 lines and it re-enters the inventory."
+            "in its first 40 lines and it re-enters the inventory as a real gate."
         ),
     }
+
+
+def not_applicable_gate_fields(candidate: dict[str, Any]) -> dict[str, Any]:
+    """The `Gate(...)` kwargs a name-only candidate enters the census with (#3329).
+
+    Kept here rather than at the call site so the verdict, the reason and the note
+    travel together — `scripts/gate_census.py` sits under the module-size ceiling and
+    a three-field literal inlined there is the shape that drifts from this module's
+    vocabulary the first time one field is renamed.
+    """
+    return {
+        "verdict": candidate.get("verdict") or VERDICT_NOT_APPLICABLE,
+        "evidence": candidate.get("reason", ""),
+        "detail": {"reason": candidate.get("reason", ""), "state": candidate.get("state", ""), "note": candidate.get("note", "")},
+    }
+
+
+def gate_reason(gate: dict[str, Any]) -> str:
+    """The recorded reason on a census gate dict, from either field it may travel in."""
+    return (gate.get("detail") or {}).get("reason") or gate.get("evidence") or ""
+
+
+def verdict_partition(gates: list[dict[str, Any]]) -> dict[str, int]:
+    """Counts per verdict, plus `unrecognised`. Pure — takes gate dicts, reads no repo.
+
+    Every gate lands in exactly one bucket, so `sum(partition.values()) == len(gates)`
+    by construction: a partition that can silently drop a verdict is how "570 gates,
+    plus six we do not count" survived for a week.
+    """
+    out: dict[str, int] = {v: 0 for v in VERDICTS}
+    out["unrecognised"] = 0
+    for g in gates:
+        v = g.get("verdict", "")
+        out[v if v in out else "unrecognised"] += 1
+    return out
+
+
+def audit_verdicts(gates: list[dict[str, Any]]) -> list[str]:
+    """Violations of the verdict contract, as human lines. Empty list == clean. Pure.
+
+    Two rules, both of which have a real failure behind them:
+      * the partition must account for every gate (no silent exclusion, #3329);
+      * a `not-applicable` row must carry a non-empty reason — "nothing to fail" with
+        nobody's reasoning attached is an exemption, and an unexplained exemption is
+        the exact artifact this census was built to count.
+    """
+    violations: list[str] = []
+    part = verdict_partition(gates)
+    if part["unrecognised"]:
+        unknown = sorted({g.get("verdict", "") for g in gates if g.get("verdict", "") not in VERDICTS})
+        violations.append(f"{part['unrecognised']} gate(s) carry a verdict outside the vocabulary {list(VERDICTS)}: {unknown}")
+    if sum(part.values()) != len(gates):  # pragma: no cover — structurally impossible, asserted anyway
+        violations.append(f"the verdict partition sums to {sum(part.values())} but there are {len(gates)} gates")
+    for g in gates:
+        if g.get("verdict") == VERDICT_NOT_APPLICABLE and not gate_reason(g).strip():
+            violations.append(
+                f"{g.get('id', '<no id>')}: verdict `{VERDICT_NOT_APPLICABLE}` with no recorded reason — say in one line "
+                f"why nothing in it can fail (scripts/gate_census_enforcement.py::NOT_APPLICABLE_REASONS), or add a "
+                f"`# gate-entrypoint:` marker so it re-enters as a real gate (#3329)"
+            )
+    return violations
