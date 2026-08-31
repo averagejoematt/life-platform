@@ -226,7 +226,15 @@ def handle_ai_analysis(event, *, _g):
         resp_data["week_number"] = int(ai_item["week_number"])
     if ai_item.get("days_in_experiment"):
         resp_data["days_in_experiment"] = int(ai_item["days_in_experiment"])
-    return _ok(resp_data, cache_seconds=300)
+    return _ok(
+        resp_data,
+        cache_seconds=300,
+        # #3352 (the seventh #3252 sibling): the EXPERT# row is a STORED narrative written
+        # by intelligence/ai_expert_analyzer_lambda. The body already exposed its
+        # `generated_at`; the envelope wore the request instant, so `_meta` claimed a
+        # freshness the prose under it never had (ADR-104). One record, one stamp.
+        content_as_of=content_vintage(ai_item.get("generated_at")),
+    )
 
 
 # #3172: "training" has no dedicated `ai_analysis` EXPERT# row of its own — the
