@@ -1,6 +1,6 @@
 # CONTINUITY — if the AI is gone
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (handovers/ split to the `session-archive` branch, #1650; datadrops backup is a manual push, no FDA grant — §3c posture)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-30 (the datadrops backup leg is AUTOMATED in the same daily job, not a manual push — the `BACKUP_DATADROPS` switch never existed and the §3c TCC posture was resolved by the ~/dev relocation; handovers/ split to the `session-archive` branch, #1650)
 > **Sources of truth:** handovers/HANDOVER_LATEST.md + the `session-archive` branch, .claude/skills/, mcp memory tool code, this repo's git history
 
 This page maps every piece of operational state that lives **outside `docs/`** — where
@@ -177,12 +177,29 @@ aws s3 sync ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ \
 ```
 
 **Automated since 2026-07-11 (#1026):** the daily launchd agent
-`com.matthewwalker.claude-memory-backup` (`backup/install.sh`) runs this memory sync —
-RPO is now ~1 day instead of "whenever the last wrap ran". The wrap-step sync stays as
-belt-and-suspenders. The `datadrops/` → `datadrops-archive/` leg is a **manual push**
-(`BACKUP_DATADROPS=1 …`) by decision — reading `~/Documents` would need a Full Disk Access
-grant on bash we deliberately don't make; datadrops is low-churn historical originals, so a
-manual push when you add one is enough (`docs/NEW_MACHINE_BOOTSTRAP.md` §3c).
+`com.matthewwalker.claude-memory-backup` runs this memory sync at 09:15 (+ RunAtLoad) —
+RPO is ~1 day instead of "whenever the last wrap ran". The wrap-step sync stays as
+belt-and-suspenders.
+
+**The `datadrops/` → `datadrops-archive/` leg runs in the SAME job, unconditionally.** It
+is not a manual push and there is no `BACKUP_DATADROPS` switch — that variable appears
+nowhere in the script and never has. The TCC rationale behind the old "manual by decision"
+framing was retired on 2026-08-30 when the repo moved to `~/dev`, which TCC does not
+protect (`docs/NEW_MACHINE_BOOTSTRAP.md` §3c). To force an off-schedule run:
+`bash ~/.local/bin/claude-memory-backup.sh` — both legs, no flags.
+
+> **Read the log, not the schedule.** That leg ran daily and *failed* daily from
+> 2026-07-11 to 2026-08-30 while these pages described it as deliberately idle. A backup
+> that is failing and a backup that is manual by choice are indistinguishable from the
+> documentation — the only honest check is the `rc=` line in
+> `~/Library/Logs/claude-backup/backup-YYYYMMDD.log`.
+
+> **Where the script lives.** `~/.local/bin/claude-memory-backup.sh`, untracked, with no
+> copy in this repo. Earlier text here cited a `backup/install.sh` as its installer; no
+> such file has ever existed in this tree. The script's own header still describes a
+> repo-copy-plus-installer layout that was never built. How it should be versioned is an
+> open decision — what is recorded here is only where it actually is today: on the single
+> laptop it exists to protect.
 
 **Never commit this directory (or its export) to the repo** — whatever the repo's
 visibility at the time (it has been public, private and public again), memory files contain

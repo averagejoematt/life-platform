@@ -1,6 +1,6 @@
 # Disaster Recovery
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (reconciled #1026 backup status — memory leg automated ≤24h; datadrops leg is a manual push by decision, no FDA grant — see NEW_MACHINE_BOOTSTRAP §3c)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-30 (both #1026 legs — memory AND datadrops — are automated in one daily job; the `BACKUP_DATADROPS` manual trigger described here never existed in the script, and the §3c no-FDA posture was resolved by relocating the repo to ~/dev)
 
 **Last updated:** 2026-07-12 (Scenario 2 swap-back drilled + Path A made executable, #936)
 
@@ -20,7 +20,7 @@
 | S3 bucket deletion (catastrophic) — **`raw/` zone** | Hours (re-create the bucket, copy back from `matthew-life-platform-raw-backup` in us-east-2 — DIL-027, 2026-08-24). **Restore not yet drilled**; owner-present timed drill is a scheduled appointment | Replication lag (seconds–minutes; delete markers deliberately NOT replicated, so a source delete does not reach the replica) |
 | S3 bucket deletion (catastrophic) — **everything except `raw/`** | Hours-days — recompute. `site/` + `generated/` rebuild from git + the generators; `deploys/` rebuild from `deploy/build_bundle.py`; `config/`, `uploads/`, `imports/` have NO replica | ⚠️ `config/` + `uploads/` + `imports/` are **not replicated** — versioning only |
 | Account compromise | Hours (rotate all secrets + audit CloudTrail) | Depends on compromise window |
-| Stolen / lost laptop | Hours (rotate device-resident creds + rebuild on a new machine) | Pushed git = last push; Claude memory ≤24h behind (#1026 daily backup is live); `datadrops/` as fresh as the last manual push (low-churn originals; no-FDA posture, NEW_MACHINE_BOOTSTRAP §3c) — see Scenario 8 |
+| Stolen / lost laptop | Hours (rotate device-resident creds + rebuild on a new machine) | Pushed git = last push; Claude memory AND `datadrops/` both ≤24h behind (#1026 daily backup is live and covers both legs) — but verify the `rc=` line in `~/Library/Logs/claude-backup/`, since the datadrops leg failed silently for 7 weeks — see Scenario 8 |
 | us-west-2 region outage | Hours-days — no warm DR region; the platform still stops. What changed 2026-08-24 (DIL-027): the irreplaceable `raw/` captures remain **readable** in us-east-2 throughout, so an outage is downtime rather than a data horizon | `raw/`: replication lag. Everything else: unchanged (compute stops) |
 | Anthropic API outage | Auto-degrade — see below | — |
 
@@ -363,9 +363,9 @@ FileVault`); confirming it is tracked in the re-entry hardening story #1029.
 ### Recovery Point Objective (what could be lost)
 
 **RPO line:** pushed git is safe to the last push; **Claude memory + `datadrops/`
-originals will be ≤24h behind once the launchd backup job (#1026) is live** — until that
-job lands the backup is manual and the window is unbounded (whatever was last copied by
-hand); **un-pushed git WIP = whatever's on `origin`, everything else is gone.**
+originals are ≤24h behind — the launchd backup job (#1026) is live and covers both legs**,
+with the caveat that a scheduled leg is only as good as its last exit code (see the table
+note); **un-pushed git WIP = whatever's on `origin`, everything else is gone.**
 
 Grounded in what actually lives *only* on the laptop:
 
@@ -374,7 +374,7 @@ Grounded in what actually lives *only* on the laptop:
 | Git-tracked code + docs | GitHub `origin` | Last push (near-zero if you push per session) |
 | Un-pushed commits / working-tree edits / `git stash` entries | **nothing** | Total loss beyond `origin`; today's orphaned commits + stashes are being rescued under #1025 |
 | Claude memory dir (`MEMORY.md` + topic files) | **S3 daily via launchd (#1026 live)** + `/wrap` manual sync | ≤24h (reads `~/.claude`, never TCC-blocked) |
-| `datadrops/` originals (raw source drops) | **manual push** (`BACKUP_DATADROPS=1`, §3c) | as fresh as the last manual push — low-churn historical originals |
+| `datadrops/` originals (raw source drops) | **S3 daily via launchd (#1026)** — the second leg of the same job, unconditional | ≤24h **when the leg is actually succeeding** — it failed daily 2026-07-11→2026-08-30; check the log's `rc=` line, not the schedule |
 | On-device break-glass AWS keys | Secrets/IAM (not a data-loss risk — a *compromise* risk) | n/a — see rotation checklist |
 
 The practical takeaway: **push often, and land #1026** so the two laptop-only data
@@ -433,8 +433,10 @@ key file paths here (defense-in-depth — this doc is exportable and the repo ca
 - Un-pushed git commits, working-tree edits, and `git stash` entries beyond what's on
   `origin` (today's are being rescued under #1025).
 - Claude memory changes since the last backup — bounded to ≤24h (the #1026 daily launchd
-  backup is live). `datadrops/` is as fresh as the last **manual** push (low-churn
-  historical originals; no-FDA posture — see `docs/NEW_MACHINE_BOOTSTRAP.md` §3c).
+  backup is live). `datadrops/` rides the same daily job — but "scheduled" is not
+  "succeeding": that leg failed on every run from 2026-07-11 to 2026-08-30 while the docs
+  called it a deliberate manual push. Confirm freshness from
+  `~/Library/Logs/claude-backup/backup-YYYYMMDD.log`, never from the cron entry.
 - Any purely-local scratch that was never committed or uploaded.
 
 **Cross-refs:** epic #1024 · git-WIP rescue #1025 · launchd backup that sets the RPO

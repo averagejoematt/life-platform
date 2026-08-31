@@ -1,6 +1,6 @@
 # New-Machine Bootstrap — bare metal to operational
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-26 (#1029 — fixed the stale "Identity Center being provisioned" rebuild caveat in §Step 3; the 2026-07-13 reconciliation of #1026 status — memory backup landed + live; datadrops + ingest are manual by decision, no FDA grant, §3c; fixed the datadrops S3 prefix; added .config.json regen §3b — still stands)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-30 (§3c RESOLVED — the ~/dev relocation retired the TCC constraint, so the datadrops backup leg and the ingest watcher are both AUTOMATED, no FDA grant; the `BACKUP_DATADROPS` trigger this page described never existed in the script. Earlier: #1029 Identity Center caveat; #1026 memory backup live; datadrops S3 prefix; .config.json regen §3b — all still stand)
 > **Sources of truth:** `docs/AWS_ACCESS.md` (auth) · `docs/QUICKSTART.md` (toolchain + deploy tree) · `docs/CONTINUITY.md` (the laptop-only state surfaces) · `ingest/README.md` (drop-folder runtime) · `requirements-dev.txt` (pinned dev deps)
 
 This is the **from-zero rebuild runbook**: a fresh Mac, nothing installed, no
@@ -177,25 +177,35 @@ cat > .config.json <<JSON
 JSON
 ```
 
-### 3c. TCC posture — no Full Disk Access grant (by decision, 2026-07-13)
+### 3c. TCC posture — RESOLVED 2026-08-30 by relocation, still no FDA grant
 
 macOS TCC blocks launchd agents from reading `~/Documents` (the launchd-TCC trap). The
-obvious "fix" — granting Full Disk Access to `/bin/bash` — is **rejected**: it would hand
-FDA to *every* shell script on the machine, far too broad. Instead we accept that the two
-things which read `~/Documents` are **low-churn and run manually**, while the one
-high-churn asset (Claude memory) lives in `~/.claude` and backs up automatically with no
-grant at all. So there is **nothing to grant here** — the split is:
+obvious "fix" — granting Full Disk Access to `/bin/bash` — was **rejected** on 2026-07-13:
+it would hand FDA to *every* shell script on the machine, far too broad. That rejection
+still stands and no grant has ever been made.
+
+**The escape hatch this section named was taken.** Its closing line read: "if you later
+decide you *want* these two automated, the secure route is relocating their folders out of
+`~/Documents` — not an FDA grant." On 2026-08-30 the repo moved to `~/dev/life-platform`,
+which TCC does not protect (it covers Documents/Desktop/Downloads/iCloud only). Both
+previously-manual legs are therefore automated now, with no grant:
 
 | Asset | Cadence | How |
 |---|---|---|
 | Claude memory dir | high (every session) | **automated** daily launchd (step 5b) + `/wrap` sync — reads `~/.claude`, never TCC-blocked |
-| `datadrops/` originals | low (new genome/labs/export) | **manual** push from a Terminal (step 4b/5b) |
-| Manual-drop ingest | occasional CSV/zip | **manual** run from a Terminal (step 5a) |
+| `datadrops/` originals | low (new genome/labs/export) | **automated** — same daily launchd job, second leg (step 5b) |
+| Manual-drop ingest | occasional CSV/zip | **automated** — the launchd watcher fires on a drop (step 5a) |
 
-An interactive Terminal launched from Finder already has disk access via your login
-session, so the manual commands "just work" without any standing grant. If you later
-decide you *want* these two automated, the secure route is relocating their folders out of
-`~/Documents` (TCC only protects Documents/Desktop/Downloads/iCloud) — not an FDA grant.
+Verified, not assumed: on 2026-08-30 launchd executed
+`~/dev/life-platform/ingest/process_all_drops.sh` directly and exited 0, and a test CSV
+dropped into `datadrops/macrofactor_drop/` was picked up and logged within seconds.
+
+**The cost of the old posture, recorded so it is not repeated.** Between 2026-07-11 and
+2026-08-30 the datadrops leg ran daily and failed daily — first TCC-blocked, then pointing
+at a path that no longer existed. It wrote a `WARN` line into a per-day log nobody read
+and exited 1. The docs meanwhile described it as "manual by decision", so a leg that was
+silently broken read as a leg that was deliberately idle. **A backup described as manual
+and a backup that is failing look identical from the documentation.**
 
 ---
 
@@ -231,16 +241,20 @@ aws s3 sync s3://matthew-life-platform/datadrops-archive/ \
   ~/dev/life-platform/datadrops/ --region us-west-2
 ```
 
-**The archive fills from a manual push, not the daily job (see §3c).** `datadrops/` is
-low-churn and backed up by running the push from a Terminal whenever you add a drop:
+**The archive fills from the daily launchd job (step 5b), automatically — both legs, every
+run.** There is no separate manual trigger and no environment variable to set; earlier
+revisions of this page described a `BACKUP_DATADROPS=1` switch that has never existed in
+the script. To force an off-schedule run, invoke the script with no arguments — it does the
+memory leg and the datadrops leg unconditionally:
 
 ```bash
-BACKUP_DATADROPS=1 bash ~/.local/bin/claude-memory-backup.sh   # reads ~/Documents; run from Terminal
+bash ~/.local/bin/claude-memory-backup.sh    # both legs; logs to ~/Library/Logs/claude-backup/
 ```
 
-If that push has never been run on the source machine, `datadrops-archive/` may be empty
-and the originals (genome, physicals xlsx, Apple Health exports) live only on the old
-laptop — treat an empty archive as "the manual push was never run," not a bug.
+If `datadrops-archive/` looks emptier than the source machine's `datadrops/`, do **not**
+read that as "the manual push was never run" — that explanation was always fiction. Check
+the per-day log in `~/Library/Logs/claude-backup/` for the `rc=` line: the leg has a
+history of failing daily while the docs implied it was merely idle.
 
 ---
 
@@ -248,15 +262,17 @@ laptop — treat an empty archive as "the manual push was never run," not a bug.
 
 ### 5a. The ingest drop-folder watcher
 
-> **No-FDA posture (§3c):** the watcher's folders live under `~/Documents`, so the launchd
-> agent can't auto-fire without a Full Disk Access grant we deliberately don't make. Under
-> the current posture, **ingest is manual**: drop your CSV/zip, then process it from a
-> Terminal (which has disk access via your login session):
+> **The agent auto-fires (§3c, resolved 2026-08-30).** The drop folders are
+> `<repo>/datadrops/*_drop` under `~/dev`, which TCC does not protect, so the watcher runs
+> without any Full Disk Access grant — verified by a real drop. Install it and rely on it.
+> The manual path still works if you want to force a scan:
 > ```bash
 > cd ~/dev/life-platform && bash ingest/process_all_drops.sh
 > ```
-> Installing the agent below is still fine (harmless, and it works instantly if you ever
-> do relocate the drop folders out of `~/Documents`), but don't rely on it auto-firing.
+> **Create the three drop folders before installing** — `datadrops/` is gitignored, so a
+> fresh clone has none, and launchd cannot watch a directory that does not exist *and does
+> not report that it isn't watching*. The agent loads, exits 0, and logs
+> `── Scan complete ──` having scanned nothing.
 
 The ingest agent is installed with **one command** (`docs/CONTINUITY.md` §7,
 `ingest/README.md`):
@@ -305,10 +321,11 @@ cd ~/dev/life-platform/backup
 bash install.sh   # copies backup.sh → ~/.local/bin, loads the launchd plist
 ```
 
-This registers `com.matthewwalker.claude-memory-backup` (daily + RunAtLoad). The **memory
-leg works immediately** (it reads `~/.claude`, never TCC-blocked). The daily job **skips
-the datadrops leg by design** (§3c) — back that up manually when you add a drop:
-`BACKUP_DATADROPS=1 bash ~/.local/bin/claude-memory-backup.sh` from a Terminal.
+This registers `com.matthewwalker.claude-memory-backup` (daily 09:15 + RunAtLoad). **Both
+legs run on every invocation** — the memory sync (`~/.claude`, never TCC-blocked) and the
+`datadrops/` → `datadrops-archive/` sync. Neither is gated by a flag. The script exits 1 if
+either leg fails, and writes a dated log to `~/Library/Logs/claude-backup/` — read the
+`rc=` line there rather than assuming a silent run succeeded.
 
 ---
 
