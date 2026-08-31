@@ -36,6 +36,7 @@ SICK_SUPPRESS_DAYS = int(os.environ.get("SICK_SUPPRESS_DAYS", "3"))
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 sns = boto3.client("sns", region_name=REGION)
 cw = boto3.client("cloudwatch", region_name=REGION)
+s3 = boto3.client("s3", region_name=REGION)
 
 # #392: source identity, per-source thresholds, and the behavioral-vs-infra
 # classification all derive from the ONE canonical registry. The dicts below
@@ -43,6 +44,7 @@ cw = boto3.client("cloudwatch", region_name=REGION)
 # withings/strava read as infrastructure, so a quiet logging stretch paged.
 # Per-source rationale (thresholds, pause reasons) lives in source_registry.py.
 from ingestion.source_registry import behavioral_source_keys, checker_sources, stale_hours_overrides
+from operational.output_artifact_registry import check_all as check_output_artifacts, not_ok as artifacts_not_ok
 
 SOURCES = checker_sources()
 SOURCE_STALE_HOURS = stale_hours_overrides(SOURCES)
@@ -816,6 +818,33 @@ def lambda_handler(event, context):
             {SOURCES.get(k, k): v for k, v in interior_gaps.items()},
         )
 
+    # ── Output artifacts: dead-man switches on jobs that run OFF-platform ────────
+    # Everything above asks "did data ARRIVE?" of a DynamoDB partition. That question
+    # cannot be asked of the laptop's daily memory backup: it runs under launchd on one
+    # machine and writes to S3. When it dies the symptom is silence — no log line, no test
+    # failure, because nothing runs. So its OUTPUT is aged from here instead.
+    # Derived from lambdas/operational/output_artifact_registry.py; adding a job there
+    # enrolls it in this alert, the email body and the MCP tool at once.
+    artifact_results = []
+    try:
+        artifact_results = check_output_artifacts(s3, now)
+        for r in artifacts_not_ok(artifact_results):
+            # Folded into stale_sources so it rides every existing path — the SNS alert,
+            # the email body, the brief. It is INFRASTRUCTURE staleness, so it is absent
+            # from BEHAVIORAL_SOURCES and therefore counts toward the paging SLO, which is
+            # the point: a dead backup is exactly the silent pipeline death the alarm is for.
+            stale_sources.append((r["label"], r["detail"]))
+        logger.info(
+            "Output artifacts checked: %d total, %d not-ok",
+            len(artifact_results),
+            len(artifacts_not_ok(artifact_results)),
+        )
+    except Exception as e:  # noqa: BLE001
+        # A crash HERE must not read as healthy, and must not take the rest of the run
+        # down either — the source freshness above is already computed and worth sending.
+        logger.error("Output-artifact check failed: %s", e)
+        stale_sources.append(("Output artifact check", f"The check itself failed ({type(e).__name__}: {e}) — status unknown, not fresh."))
+
     # OBS-3: Emit SLO metrics to CloudWatch
     try:
         fresh_count = len(SOURCES) - len(stale_sources)
@@ -1109,5 +1138,9 @@ def lambda_handler(event, context):
         "partial_sources": [s[0] for s in partial_sources],
         "warning_count": len(warning_sources),
         "warning_sources": [s[0] for s in warning_sources],
+        "output_artifacts": [
+            {"key": r["key"], "status": r["status"], "age_hours": r["age_hours"], "threshold_hours": r["threshold_hours"]}
+            for r in artifact_results
+        ],
         "checked_at": now.isoformat(),
     }

@@ -29,7 +29,7 @@ SNS alert is suppressed; without one, an identical stale condition sends it.
 
 import os
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from common.pacific_time import pacific_now  # #2817: the handler derives sick-day windows in the Pacific frame
 
@@ -144,12 +144,36 @@ class FakeSecretsManager:
         raise RuntimeError(f"no such secret in test double: {SecretId}")
 
 
-def _install(monkeypatch, table, sns=None, cw=None):
+class FakeS3Fresh:
+    """A healthy output-artifact heartbeat.
+
+    The handler gained a dead-man switch on off-platform jobs (the laptop memory backup:
+    launchd, one machine, S3 output — invisible to every DynamoDB-shaped check). It ages
+    that job's heartbeat object. Left unstubbed, the read fails and the artifact is
+    correctly reported `unknown` — blindness is never freshness — which adds a row and
+    moves the counts these tests assert. So the tests stub it explicitly: a wiring test
+    should say which world it is asserting over, not inherit whatever the sandbox does.
+    Coverage of the stale/unknown branches lives in tests/test_output_artifact_freshness.py.
+    """
+
+    def head_object(self, Bucket, Key):  # noqa: N803 — mirrors boto3's param casing
+        return {"LastModified": datetime.now(timezone.utc)}
+
+    def get_object(self, Bucket, Key):  # noqa: N803
+        class _B:
+            def read(self):
+                return b'{"memory_files": 380}'
+
+        return {"Body": _B()}
+
+
+def _install(monkeypatch, table, sns=None, cw=None, s3=None):
     sns = sns or FakeSNS()
     cw = cw or FakeCW()
     monkeypatch.setattr(fc, "dynamodb", FakeDynamoDBResource(table))
     monkeypatch.setattr(fc, "sns", sns)
     monkeypatch.setattr(fc, "cw", cw)
+    monkeypatch.setattr(fc, "s3", s3 or FakeS3Fresh())
 
     def _fake_boto_client(service_name, **kwargs):
         if service_name == "secretsmanager":

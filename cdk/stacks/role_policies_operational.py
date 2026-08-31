@@ -131,6 +131,20 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
         iam.PolicyStatement(
+            # Output-artifact dead-man switch (2026-08-31). The checker ages the heartbeat
+            # written by the laptop's daily memory backup — a job that runs under launchd
+            # off-platform, where its death is otherwise silent (no partition to look
+            # stale, no log line, no failing test, because nothing runs).
+            #
+            # Read-only and scoped to the ONE prefix. WITHOUT this grant the check reports
+            # `unknown` rather than green — deliberately honest, but it means a merge of
+            # the checker without `cdk deploy` leaves the switch armed-but-blind and
+            # alerting daily. Deploy the two together.
+            sid="S3ReadOutputArtifactHeartbeats",
+            actions=["s3:GetObject"],
+            resources=[f"{BUCKET_ARN}/claude-memory-backup/*"],
+        ),
+        iam.PolicyStatement(
             # WR-48 root-cause fix (PR-reentry-4, 2026-05-03): the freshness checker
             # was running daily and detecting 4-5 stale sources during the Apr 2 →
             # May 2 silence, but EVERY SNS publish failed with AuthorizationError

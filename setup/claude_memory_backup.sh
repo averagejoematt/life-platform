@@ -106,7 +106,41 @@ elif [ "$mem_count" -eq 0 ]; then
     rc=1
 else
     echo "    memory files: $mem_count"
-    "$AWS" s3 sync "$MEMORY_DIR/" "s3://$BUCKET/claude-memory-backup/" --region "$REGION" || rc=1
+    if "$AWS" s3 sync "$MEMORY_DIR/" "s3://$BUCKET/claude-memory-backup/" --region "$REGION"; then
+        # HEARTBEAT — the only thing that proves this job still runs.
+        #
+        # Nothing off this laptop can see the LaunchAgent. If its path goes stale, or the
+        # agent is unloaded, or a credential is revoked, the job simply stops: no log line,
+        # no test failure, no alarm, because nothing runs. The platform's freshness surface
+        # closes that by checking the AGE of this object from outside
+        # (lambdas/operational/output_artifact_registry.py).
+        #
+        # It has to be a heartbeat rather than the age of MEMORY.md, because `s3 sync`
+        # uploads only CHANGED files — on 2026-08-31 this job ran four times in half an
+        # hour and MEMORY.md's LastModified never moved past the first. A quiet weekend
+        # would then read as a dead job. This object is rewritten on every successful run,
+        # so its age means "the job completed", which is the thing worth alarming on.
+        #
+        # Written ONLY on a successful sync, and only after the liveness gate above has
+        # confirmed a non-empty source — so a fresh heartbeat can never mean "backed up
+        # nothing, successfully".
+        hb=$(printf '{"utc":"%s","memory_files":%s,"memory_dir":"%s","repo":"%s","host":"%s"}' \
+             "$(date -u +%FT%TZ)" "$mem_count" "$MEMORY_DIR" "$REPO" "$(hostname -s 2>/dev/null || echo unknown)")
+        if printf '%s' "$hb" | "$AWS" s3 cp - "s3://$BUCKET/claude-memory-backup/_backup_heartbeat.json" \
+             --region "$REGION" --content-type application/json > /dev/null; then
+            echo "    heartbeat written"
+        else
+            # The backup itself succeeded; only the liveness beacon failed. Say exactly
+            # that, and still fail the run — a missing heartbeat will page tomorrow, and
+            # an operator reading this log should know why before the alarm arrives.
+            echo "WARN: memory sync SUCCEEDED but the heartbeat write FAILED."
+            echo "      The backup is fine; the dead-man switch is not. Expect a stale-artifact"
+            echo "      alert within 36h. Check s3:PutObject on claude-memory-backup/."
+            rc=1
+        fi
+    else
+        rc=1
+    fi
 fi
 
 # 2. datadrops originals (genome, physicals, HAE exports, backfills)

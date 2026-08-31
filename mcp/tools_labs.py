@@ -887,6 +887,65 @@ def tool_get_freshness_status(args):
     else:
         overall = "orange"
 
+    # ── Output artifacts: dead-man switches on jobs that run OFF-platform ────────
+    # Everything above measures whether data ARRIVED in DynamoDB. Some jobs cannot be
+    # measured that way — the laptop's daily memory backup runs under launchd on one
+    # machine and writes to S3, so when it dies there is no partition to look stale, no
+    # log line and no failing test, because nothing runs. Its OUTPUT is aged instead.
+    # Derived from the same registry the freshness-checker Lambda uses; there is no
+    # second list to keep in sync (the #392 mirror class).
+    output_artifacts = []
+    try:
+        from operational.output_artifact_registry import check_all as _check_artifacts, not_ok as _artifacts_not_ok
+
+        from mcp.config import s3_client as _s3
+
+        output_artifacts = _check_artifacts(_s3)
+        _bad = _artifacts_not_ok(output_artifacts)
+    except Exception as _e:  # noqa: BLE001
+        # The check failing is NOT the artifacts being fresh. Surface it as a not-ok row
+        # rather than omitting it — an omission here would restore the silent green that
+        # #2662 was about.
+        logger.warning("output-artifact check failed: %s", _e)
+        output_artifacts = [
+            {
+                "key": "output_artifacts",
+                "label": "Output artifact check",
+                "status": "unknown",
+                "age_hours": None,
+                "threshold_hours": None,
+                "detail": f"The check itself failed ({type(_e).__name__}: {_e}) — status unknown, not fresh.",
+            }
+        ]
+        _bad = list(output_artifacts)
+
+    # A dead backup must move the headline verdict: reporting `green` beside a confirmed
+    # stale artifact is precisely the shape this surface exists to prevent.
+    #
+    # But ONLY a confirmed-stale one. An `unknown` artifact — the check could not read S3 —
+    # is reported in `output_artifacts_not_ok` and pages from the freshness-checker Lambda,
+    # and it deliberately does NOT repaint `status`. Two reasons, and the second is the one
+    # that matters:
+    #
+    #   * `status`'s documented tiers are defined over SOURCE freshness ("green (all fresh)
+    #     / yellow (1 stale <7d) / ..."). Silently widening that to include the reachability
+    #     of a monitoring dependency changes what an existing field means, for every caller
+    #     that already reads it.
+    #   * It made the verdict depend on S3 being reachable from wherever the tool runs. Seven
+    #     test modules call this tool; three of them turned yellow the moment the check
+    #     landed, and the fix each time would have been to stub S3 in one more place. Needing
+    #     to patch the caller repeatedly is the design telling you it is wrong — a blind
+    #     monitoring check is a real problem, but it is not a stale data source, and it
+    #     should not be reported as one.
+    #
+    # The paging path keeps the strict reading: in freshness_checker_lambda both `stale` and
+    # `unknown` land in stale_sources and alert, because there an unreadable check IS the
+    # operator's problem to fix.
+    if _bad:
+        _stale_art = [r for r in _bad if r.get("status") == "stale"]
+        if _stale_art:
+            overall = "red"
+
     # "stale_sources" is the needs-attention bucket; an unreadable source belongs in
     # it, because the one thing it must never do is disappear from the answer.
     stale_sources = [s for s in per_source if s.get("status") in ("stale", "no_data", "unreadable")]
@@ -986,6 +1045,8 @@ def tool_get_freshness_status(args):
         "stale_sources": stale_sources,
         "fresh_sources": fresh_sources,
         "paused_sources": paused_sources,
+        "output_artifacts": output_artifacts,
+        "output_artifacts_not_ok": [r["label"] for r in output_artifacts if r.get("status") != "fresh"],
         "interior_gaps": interior_gaps,
         "interior_gap_count": interior_gap_count,
         "macrofactor_format_drift": macro_drift,

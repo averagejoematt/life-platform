@@ -110,6 +110,39 @@ def frozen_clock(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def healthy_output_artifacts(monkeypatch):
+    """Stub the output-artifact dead-man switch to HEALTHY for this module.
+
+    get_freshness_status gained a check on jobs that run off-platform — the laptop memory
+    backup writes to S3 under launchd, so no DynamoDB partition can ever look stale on its
+    behalf. Unstubbed, the S3 read fails here and the artifact is reported `unknown`, which
+    (correctly — blindness is never freshness) escalates the headline verdict away from
+    green and breaks assertions in this module that are about SOURCE freshness.
+
+    Stubbing it healthy keeps each test about the thing it names. The switch's own
+    behaviour — stale, 404, AccessDenied, and the escalation it causes — is covered in
+    tests/test_output_artifact_freshness.py against both a fake and the real S3 object.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+
+    class _FreshS3:
+        def head_object(self, Bucket, Key):  # noqa: N803
+            return {"LastModified": _dt.now(_tz.utc)}
+
+        def get_object(self, Bucket, Key):  # noqa: N803
+            class _B:
+                def read(self):
+                    return b'{"memory_files": 380}'
+
+            return {"Body": _B()}
+
+    import mcp.config as _cfg
+
+    monkeypatch.setattr(_cfg, "s3_client", _FreshS3())
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _clear_genome_cache():
     """``labs_helpers._GENOME_CACHE_V2`` is a process-lifetime module global.
 
