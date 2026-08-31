@@ -170,7 +170,6 @@ def test_every_populated_mock_names_a_committed_fixture():
     [
         (lambda sd: sd.pop("whoop"), "$.sleep_detail.whoop: key removed"),
         (lambda sd: sd.pop("eightsleep"), "$.sleep_detail.eightsleep: key removed"),
-        (lambda sd: sd.__setitem__("whoop", None), "$.sleep_detail.whoop: type changed 'object' -> 'null'"),
         (lambda sd: sd["whoop"].pop("light_hours"), "$.sleep_detail.whoop.light_hours: key removed"),
     ],
 )
@@ -182,6 +181,19 @@ def test_drift_gate_reports_breaking_drift_when_a_device_block_regresses(mutate,
     mutate(response["sleep_detail"])
     diffs = _breaking(cas.diff_shape(_baseline()["shape"], cas.json_shape(response)))
     assert any(expect_fragment in d for d in diffs), f"expected {expect_fragment!r} in {diffs}"
+
+
+def test_a_device_block_going_null_is_a_nullable_flip_not_breaking_drift():
+    """#3324 (2026-08-31): a device block that is an object one night and null the next is
+    the ABSENCE shape, not a shape change — the drift gate treats `null | <type>` as one
+    shape in both directions and reports the flip as informational. Device-dark is the
+    freshness checker's signal, not the schema gate's. (Until #3324 this case was pinned
+    as BREAKING here, which is why the gate read red on every night Whoop was absent.)"""
+    response = _fixture()
+    response["sleep_detail"]["whoop"] = None
+    diffs = cas.diff_shape(_baseline()["shape"], cas.json_shape(response))
+    assert any("$.sleep_detail.whoop: nullable type flip 'object' <-> 'null' (informational)" in d for d in diffs), diffs
+    assert not any("$.sleep_detail.whoop" in d for d in _breaking(diffs)), _breaking(diffs)
 
 
 def test_drift_gate_reports_breaking_drift_when_a_trend_row_loses_its_whoop_block():
