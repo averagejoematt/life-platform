@@ -248,3 +248,117 @@ def test_shallow_clone_really_does_skip_the_drift_gate():
     assert (
         "FLAGGED 0" in out.stdout and "NOTE True" in out.stdout
     ), f"expected the shallow path to flag nothing and note the skip; got:\n{out.stdout}\n{out.stderr}"
+
+
+# ── #3384: the pull_request exemption for the bot-owned test_count literal ───
+#
+# A mixed code+tests PR enters docs-ci through a code-path trigger (the #2982
+# asymmetry only spares test-ONLY PRs), and `sync_doc_metadata --check` sweeps the
+# whole tree — including `lambdas/web/platform_counts.py::test_count`, the literal
+# the branch is policy-FORBIDDEN to commit (agent_commit.sh refuses the file; the
+# reconcile bot on main is the single writer, #3101). Hit live 2026-08-31 on
+# PR #3383: the branch could not go green either way. The fix: on a `pull_request`
+# event, doc_platform_counts.sync reports that ONE literal's staleness as a visible
+# "  i " INFO line instead of a "  ~" drift line. These tests pin the exemption to
+# exactly that shape — one field, pull_request only, loud, never a write.
+
+
+def _counts_mod():
+    import importlib
+    import sys
+
+    sys.path.insert(0, os.path.join(_REPO, "deploy"))
+    return importlib.import_module("doc_platform_counts")
+
+
+_COUNTS_FILE = os.path.join(_REPO, "lambdas", "web", "platform_counts.py")
+
+
+def _stale_test_count():
+    """A value wrong-by-construction relative to the COMMITTED literal (which is
+    allowed to lag reality between reconcile-bot runs — never assume its value)."""
+    m = re.search(r'"test_count":\s*(\d+)', _read(_COUNTS_FILE))
+    assert m, "no test_count literal in platform_counts.py — the literal shape drifted"
+    return int(m.group(1)) + 1
+
+
+def test_the_pr_exemption_covers_exactly_the_one_bot_owned_literal():
+    """Widening the exempt set is a policy change, not a tweak — every other literal
+    in the generated module IS committable on a branch and must stay enforced."""
+    mod = _counts_mod()
+    assert mod.PR_EXEMPT_FIELDS == frozenset({"test_count"}), (
+        "#3384 licenses the pull_request exemption for the single literal a branch is "
+        f"forbidden to commit (#3101) and nothing else; got {sorted(mod.PR_EXEMPT_FIELDS)}"
+    )
+
+
+def test_pull_request_event_reports_test_count_as_info_not_drift(monkeypatch):
+    mod = _counts_mod()
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    changes = mod.sync({"test_count": _stale_test_count()}, dry_run=True)
+    assert not any(c.startswith("  ~") for c in changes), f"a PR run still counts test_count as drift: {changes}"
+    info = [c for c in changes if c.startswith("  i ")]
+    # Visible, never silent: the skipped literal is NAMED, with both values and the owner.
+    assert (
+        len(info) == 1 and "test_count" in info[0] and "#3101" in info[0]
+    ), f"the exemption must print what it skipped and who owns it: {changes}"
+
+
+@pytest.mark.parametrize("event", ["push", "schedule", "workflow_dispatch", None])
+def test_the_exemption_is_dead_outside_pull_request_events(monkeypatch, event):
+    """push/main runs (and local runs, where GITHUB_EVENT_NAME is absent) keep the
+    literal fully enforced — a wrong count on main still reds main's own run."""
+    mod = _counts_mod()
+    if event is None:
+        monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_EVENT_NAME", event)
+    changes = mod.sync({"test_count": _stale_test_count()}, dry_run=True)
+    assert any(
+        c.startswith("  ~") and "test_count" in c for c in changes
+    ), f"event={event!r} must enforce the test_count literal, got: {changes}"
+    assert not any(c.startswith("  i") for c in changes), f"the exemption fired outside pull_request: {changes}"
+
+
+def test_every_other_literal_stays_enforced_on_pull_request(monkeypatch):
+    """Guard the SET, not the instance: derive the non-exempt fields from the generated
+    module itself, so a counter added later is covered without editing this test."""
+    import sys
+
+    sys.path.insert(0, os.path.join(_REPO, "lambdas"))
+    from web.platform_counts import DISCOVERED_COUNTS
+
+    mod = _counts_mod()
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    stale = {k: v + 1 for k, v in DISCOVERED_COUNTS.items() if k not in mod.PR_EXEMPT_FIELDS}
+    assert stale, "no non-exempt discovered counters found — DISCOVERED_COUNTS drifted"
+    changes = mod.sync(stale, dry_run=True)
+    flagged = {c.split()[2].rstrip(":") for c in changes if c.startswith("  ~")}
+    assert flagged == set(stale), f"every non-exempt literal must still red a PR run: expected {sorted(stale)}, flagged {sorted(flagged)}"
+    assert not any(c.startswith("  i") for c in changes), f"the exemption leaked beyond PR_EXEMPT_FIELDS: {changes}"
+
+
+def test_the_pr_exemption_never_writes_the_counter(tmp_path, monkeypatch):
+    """Even a non-dry-run on a pull_request event must not rewrite the bot-owned file —
+    writing it is exactly what the branch is forbidden to do."""
+    mod = _counts_mod()
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    copy = tmp_path / "platform_counts.py"
+    body = _read(_COUNTS_FILE)
+    copy.write_text(body, encoding="utf-8")
+    mod.sync({"test_count": _stale_test_count()}, dry_run=False, path=copy)
+    assert copy.read_text(encoding="utf-8") == body, "the PR exemption wrote the counter it exists to not write"
+
+
+def test_check_counts_only_tilde_lines_from_the_stats_sync():
+    """The '  i ' prefix is only an exemption because --check's accounting keys on
+    '  ~' for the stats lines — pin the contract between the two files."""
+    src = _read(os.path.join(_REPO, "deploy", "sync_doc_metadata.py"))
+    assert '[c for c in stats_changes if c.startswith("  ~")]' in src, (
+        "#3384: sync_doc_metadata's --check no longer counts stats drift by the '  ~' prefix — "
+        "re-derive whether an '  i ' INFO line is still exempt from failure before changing this"
+    )
+    assert 'any(c.startswith("  ~") for c in stats_changes)' in src, (
+        "#3384: the drifted-docs accounting for platform_counts.py no longer keys on '  ~' — "
+        "the INFO-line exemption contract needs re-deriving"
+    )

@@ -428,7 +428,26 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # the negative control) and by the workflow-shape assertions in
 # `tests/test_site_deploy_workflow.py`. Live unproven moves 530 -> 531, well under the
 # committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved (down-only, #3329 option B).
-BASELINE_TOTAL_GATES = 588
+# 588 -> 589 (2026-08-31, #3384): ONE real gate — `registry::deploy/doc_platform_counts.py::
+# PR_EXEMPT_FIELDS::test_count`. The #3101 platform-counts literal sync was extracted out of
+# zero-headroom sync_doc_metadata.py into the sibling, and the sibling declares the ONE
+# literal `--check` reports as INFO instead of failing on a pull_request event (the counter
+# a branch is policy-forbidden to commit; push/main stays enforced). The census's registry
+# detector correctly reads that frozenset as an exemption registry — the same family as
+# #3324's WRITE_PATH_EXEMPT entries. Verified by id-set diff, not count delta (each tree ran
+# its OWN scripts/gate_census.py --json, branch fully staged; main from a `git archive`
+# export at origin/main 345677877 = 588, branch = 589): ADDED exactly that one id,
+# REMOVED {}.
+#
+# It arrives UNPROVEN by the census's own ledger while its fail path is on record the #3318
+# way — scripted positive controls in tests/test_docs_ci_owns_doc_gates.py: widening the
+# frozenset fails test_the_pr_exemption_covers_exactly_the_one_bot_owned_literal; honouring
+# it outside pull_request fails test_the_exemption_is_dead_outside_pull_request_events;
+# leaking it to any other literal fails test_every_other_literal_stays_enforced_on_
+# pull_request; and a write through the exemption fails test_the_pr_exemption_never_writes_
+# the_counter. Live unproven moves 531 -> 532, well under the committed
+# BASELINE_UNPROVEN_GATES = 541, which is NOT moved (down-only, #3329 option B).
+BASELINE_TOTAL_GATES = 589
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was
