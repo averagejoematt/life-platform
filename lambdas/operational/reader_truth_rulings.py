@@ -11,10 +11,69 @@ tests) keeps one import surface.
 
 Read the per-predicate comment blocks before touching anything here: each one
 is a ruling of record, not dead prose.
+
+────────────────────────────────────────────────────────────────────────────────
+THE BAR FOR ANY FUTURE `is_*` — STRUCTURAL, NEVER PHRASE-MATCHED (#3337).
+────────────────────────────────────────────────────────────────────────────────
+A ruling in this file may decide ONLY on:
+
+  * the finding's `category`;
+  * its `page` / surface, or the claim class the quoted copy belongs to;
+  * PARSED EVIDENCE VALUES — dates, day numbers, claimed spans, quoted payload
+    field values — compared against the phase ground truth
+    (`reader_truth_evidence.py` is the parsing layer; use it, never inline a
+    fresh regex); or
+  * a STRUCTURED FIELD the judge emits because the prompt asks for it
+    (`basis`, below) — a field is data, a sentence is not.
+
+It may NOT decide on how the judge worded itself. A regex over the note's
+adjectives may survive only as a TIEBREAK: it may confirm a decision a
+structural predicate has already made possible, it may never make one alone,
+and when it breaks a tie it PRINTS that it did (`_tiebreak`), so the residue is
+countable in the logs rather than invisible.
+
+WHY, measured — this is not style. #2613: 3 of 3 runs ignored a prompt-only
+ruling clause. #2741: 25 of 60 runs flagged copy the DO-NOT-FLAG list named
+exempt. #3199: a live re-run reproduced the same objection with none of the
+matcher's keywords. #3208: main's visual-qa gated on a finding this ledger had
+already ruled exempt, because the demotion was lexical — the INCIDENT_LOG calls
+it "the third phrase-matched-suppressor instance in one session". The oracle's
+finding population is NON-STATIONARY: one objection wears three phrasings on
+three consecutive nights. A suppressor keyed to one phrasing is therefore both
+one novel wording away from gating a healthy deploy AND one novel wording away
+from silently exempting a real defect. Every rule below is classified
+structural-vs-lexical in #3337's dated sweep, and the mutation tests in
+tests/test_reader_truth_structural_rulings_3337.py hold each one to it.
 """
 
 import re
 from datetime import date
+
+# The evidence layer (#3337) — the parsers and the judge's structured `basis`
+# field that a structural ruling decides on. `quoted_spans`, `normalize_copy`,
+# `note_dates` and the two regexes are re-exported through this module (and onward
+# through reader_truth_qa) because consumers imported them from here before the
+# split; nothing about their behaviour changed.
+from operational.reader_truth_evidence import (  # noqa: F401
+    DAY_N_RE as _DAY_N_RE,
+    ISO_DATE_RE,
+    JUDGE_BASIS_FIELD,
+    JUDGE_BASIS_VALUES,
+    MONTHS as _MONTHS,
+    cites_payload_date_field,
+    cycle_day,
+    day_numbers,
+    evidence_is_phase_anchors_only,
+    judge_basis,
+    normalize_copy as _normalize_copy,
+    note_dates,
+    out_of_phase_quantities,
+    payload_dating_is_the_convention,
+    payload_field_dates,
+    quoted_spans,
+    spans_scoped_to_cycle_start,
+    tiebreak as _tiebreak,
+)
 
 # #2613: the surfaces whose PRE-CYCLE-DATE question is owned by code, not by the
 # rubric. These are exactly the payloads qa_check_reader_truth sweeps STRICTLY
@@ -32,8 +91,8 @@ CODE_OWNED_TEMPORAL_SURFACES = frozenset(
 )
 
 # An ISO date cited as evidence inside a model's note (not a phrase match — the
-# comparison below is a date comparison).
-_NOTE_ISO_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+# comparison below is a date comparison). One copy, in the evidence layer.
+_NOTE_ISO_DATE_RE = ISO_DATE_RE
 
 
 def is_code_owned_temporal(finding, start_date):
@@ -57,7 +116,39 @@ def is_code_owned_temporal(finding, start_date):
 _NIGHT_FRAME_TOKENS = ("night_of", "last_night")
 
 
-def is_wake_frame_correct(finding):
+# ── WIDENED STRUCTURALLY (#3337, 2026-08-30) ──────────────────────────────────
+#
+# THE OBSERVED FAILURE — live, and lighting `qa-smoke-warnings` as this was
+# written. Wire note, `/aws/lambda/life-platform-qa-smoke`, Day 14, finding
+# `fcd7d5`, `/api/sleep_detail`, temporal_contradiction/med (the log's own "full
+# note (551 chars)" record, never the truncated WARN line):
+#
+#   "The payload states 'as_of_date': '2026-08-29' and 'night_of': '2026-08-28',
+#    but today is 2026-08-30 (Day 14). The as_of_date should not be two days in
+#    the past on a daily-computed surface; the design allows as_of_date to be
+#    yesterday (2026-08-29), but this payload is dated to two days ago. The
+#    trend_note acknowledges the wake-date convention and notes that 'sleep_trend
+#    rows are keyed by WAKE date', but the primary sleep_detail object's
+#    as_of_date being 2026-08-29 while the payload was generated 2026-08-31
+#    exceeds the acceptable staleness window."
+#
+# Every field value it quotes is the convention being RIGHT: night_of + 1 =
+# as_of, and as_of = today - 1 (the pipeline publishes through the last COMPLETE
+# day — the rubric's own DO-NOT-FLAG list says so in as many words). The note
+# even states the design allows yesterday, then re-anchors on a THIRD date (the
+# generation timestamp, 08-31) to call yesterday "two days ago". The original
+# 2026-08-16 channel below could not see it: the note cites four dates spanning
+# three days, so the "one single-day span" test fails.
+#
+# THE STRUCTURAL FIX — a second channel that decides on the payload's OWN quoted
+# field values rather than on the spread of every date in the prose. When the
+# note quotes `as_of_date` and `night_of` and those two values satisfy the
+# convention (night_of + 1 == as_of) AND as_of is fresh against the phase clock
+# (today - as_of <= 1 day), the objection restates the convention whatever
+# further dates the note brings in. A genuinely stale payload — as_of three days
+# behind today — fails the freshness test and keeps gating, which is the whole
+# discriminator.
+def is_wake_frame_correct(finding, today=None):
     """True when `finding` restates the wake-date convention as a contradiction (#2780).
 
     The first production run of the confirm-before-FAIL path (#2741, 2026-08-16)
@@ -70,10 +161,19 @@ def is_wake_frame_correct(finding):
     requires these surfaces to name their night; per ADR-105 the LLM does not get to
     overrule the layer that already graded it.
 
-    Structural conditions, all required: temporal_contradiction; a night-scoped
-    surface the deterministic pass grades; night-frame language in the note; and
-    every cited ISO date fitting one single-day span. A >1-day spread (a genuinely
-    stale night), a single-date note, or any other surface survives at full severity.
+    Two structural channels, either sufficient. Both require a
+    temporal_contradiction on a night-scoped surface the deterministic pass grades,
+    with night-frame language in the note.
+
+      1. #2780 — every cited ISO date fits one single-day span. A >1-day spread (a
+         genuinely stale night) or a single-date note survives at full severity.
+      2. #3337 — the note quotes the payload's own `as_of_date` and `night_of`
+         values, night_of + 1 == as_of (the convention), and as_of is no more than
+         one day behind `today` (the design: data through the last COMPLETE day).
+         Needs the phase clock; without `today` this channel is unavailable and the
+         finding survives, which is the fail-closed direction.
+
+    Any other surface, or any other category, survives at full severity.
     """
     if finding.get("category") != "temporal_contradiction":
         return False
@@ -83,9 +183,9 @@ def is_wake_frame_correct(finding):
     if not any(t in note.lower().replace(" ", "_") for t in _NIGHT_FRAME_TOKENS):
         return False
     dates = {date.fromisoformat(d) for d in _NOTE_ISO_DATE_RE.findall(note)}
-    if len(dates) < 2:
-        return False
-    return (max(dates) - min(dates)).days == 1
+    if len(dates) >= 2 and (max(dates) - min(dates)).days == 1:
+        return True
+    return payload_dating_is_the_convention(note, today)
 
 
 # ── the model does UTC→Pacific arithmetic, and gets the DST offset wrong ──────
@@ -229,29 +329,10 @@ DURABLE_DESIGN_COPY = (
     "90-day history predates the cut",
 )
 
-# The model quotes page copy with the page's own typography — the live notes carry
-# U+2011 NON-BREAKING HYPHEN in "Day‑1" while the rubric writes an ASCII hyphen, and
-# curly quotes appear in both directions. Comparing raw strings would silently never
-# match, which is the failure mode where a gate looks wired and is not.
-_DASHES = dict.fromkeys(map(ord, "‐‑‒–—―−"), "-")
-_QUOTED_SPAN_RE = re.compile(r"[‘’']([^‘’']{4,})[‘’']|[“”\"]([^“”\"]{4,})[“”\"]")
-
-
-def _normalize_copy(s):
-    """Casefold, unify every Unicode dash to '-', and collapse whitespace."""
-    return " ".join(str(s or "").translate(_DASHES).casefold().split())
-
-
-def quoted_spans(note):
-    """The quoted page-copy spans inside a model note, in order.
-
-    Apostrophes inside quoted prose ("What's different") make single-quote pairing
-    ambiguous. That is fine and deliberate: an ambiguous parse yields spans that do
-    not match the registry, and the all-spans-must-match rule below then KEEPS the
-    finding. The failure direction preserves the old behaviour rather than silencing
-    it — the same fail-closed posture as `_confirm_high_findings`.
-    """
-    return [m.group(1) if m.group(1) is not None else m.group(2) for m in _QUOTED_SPAN_RE.finditer(note or "")]
+# The quoted-span parser and the dash/case normalizer moved to
+# reader_truth_evidence.py in #3337 (imported above, re-exported unchanged): the
+# typography lesson they carry — live notes quote page copy with U+2011 hyphens and
+# curly quotes, so a raw string compare silently never matches — is recorded there.
 
 
 def is_durable_design_copy(finding):
@@ -312,13 +393,59 @@ def _is_registered_span(span, registry):
 # observation may still be worth a human glance as an advisory warning, it just
 # never gates. Printed, never silently swallowed.
 #
-# SCOPE — narrow on purpose. Fires only on temporal_contradiction, and only when
-# the note EXPLICITLY rests on vagueness ("is vague", "vague about", "ambiguous
-# as to", "unclear whether", …). A note that asserts an impossibility without
-# hedging language survives at full severity. The residue accepted: a note that
-# both proves a real impossibility AND uses this hedging language gets demoted —
-# but a note that hedges its own accusation is the model telling us it is not
-# sure, and per ADR-105 an unsure verdict does not get to fail a gate.
+# ── RESHAPED STRUCTURALLY (#3337, 2026-08-30) ─────────────────────────────────
+#
+# THE DEFECT IN THE RULING ITSELF. As shipped, the only structural condition was
+# `category == "temporal_contradiction"`; the verdict was an adjective regex. Two
+# failure directions, both one wording away and both live:
+#
+#   * a rephrased identical objection ("the wording does not commit to a tense",
+#     "creates ambiguity about which date is current") passes at full severity and
+#     can gate a deploy — the exact non-stationarity #2613/#2741/#3199 measured;
+#   * a GENUINE impossibility that happens to say "unclear whether" is demoted, so
+#     the phrasing hides a real defect.
+#
+# THE STRUCTURAL PREDICATE. The rubric defines this category as "an IMPOSSIBILITY
+# your own arithmetic establishes against the phase". Establishing one requires
+# CITING a value the phase cannot hold: a date outside [cycle start, today], a day
+# number past today's, or a claimed elapsed span longer than the cycle. So the
+# question a ruling can actually decide is arithmetic, not editorial — did the
+# judge assert anything out of phase? `out_of_phase_quantities()` answers it from
+# the judge's OWN prose (quoted page copy excluded: it is the claim under dispute,
+# not the judge's evidence — the #3258 note's quoted "90 consecutive days" goal is
+# why that distinction is load-bearing).
+#
+# Two guards keep the demotion off real findings, both derived from live wire
+# notes rather than imagined:
+#
+#   * A NAMED PAYLOAD DATE FIELD IS A DATA CLAIM, NOT AN EDITORIAL ONE. Two live
+#     wire notes make the point, both citing only in-phase values and both TRUE:
+#     `/api/vitals` d1c6a0 ("weight_as_of is 2026-08-24 (6 days ago), but the API
+#     metadata states as_of_date is 2026-08-30") — a real 6-day scale gap, still
+#     lighting the alarm as this shipped; and `/api/glucose` e5eafd ("as_of_date
+#     is 2026-08-22, but the payload was generated on 2026-08-24 (Day 8)") — which
+#     the deterministic plausibility pass independently FAILED with arithmetic two
+#     days later. A ruling about how page copy READS never adjudicates a note that
+#     names a payload date field.
+#   * IT MUST BE GROUNDED IN TODAY'S COUNTER. The note has to cite the current day
+#     number (±1) — the "on Day 6 …" shape this class always takes. A note that
+#     never places itself on the cycle clock is not this class.
+#
+# The adjective regex survives ONLY as a logged tiebreak for notes that clear the
+# out-of-phase test but are not grounded in the day counter (the #3258 `539c6d`
+# home-page retraction is exactly that shape: it cites "Day-1" and nothing else).
+# It cannot fire alone, and when it decides it says so in the log.
+#
+# DEMOTED to "low" + recorded as adjudicated, never dropped — unchanged.
+#
+# RESIDUE, named honestly (2026-08-30): a temporal_contradiction that cites
+# nothing out of phase, sets no payload fields against each other, and IS grounded
+# in today's day number is demoted to advisory even when its substance is two
+# HTML surfaces disagreeing about the same in-cycle day. That objection is still
+# printed, still travels with its full note, and still lands in the check list and
+# the digest email — it just rides ChronicWarnCount instead of gating. The trade
+# is deliberate: the alternative is deciding "is this an impossibility or an
+# ambiguity?" on the judge's adjectives, which is the thing this issue retires.
 _VAGUENESS_OBJECTION_RE = re.compile(
     r"\b(?:is|are|was|were|being|remains?|seems?|appears?)\s+(?:somewhat\s+|rather\s+|too\s+)?(?:vague|ambiguous|unclear|imprecise)\b"
     r"|\b(?:vague|ambiguous|unclear|imprecise)\s+(?:about|as\s+to|whether|on|regarding)\b",
@@ -326,16 +453,44 @@ _VAGUENESS_OBJECTION_RE = re.compile(
 )
 
 
-def is_vagueness_objection(finding):
-    """True when a temporal_contradiction's note explicitly rests on vagueness (#3003).
+def is_vagueness_objection(finding, start_date=None, today=None):
+    """True when a temporal_contradiction establishes no impossibility (#3003, #3337).
 
-    Structural conditions, both required: the finding is a temporal_contradiction,
-    and its note states that the flagged phrasing is vague/ambiguous/unclear —
-    which is an editorial complaint, not an impossibility, and never `high`.
+    Channels, in order — the first two decide structurally, the third may only
+    break a tie the first two left open, and it prints when it does:
+
+      1. the judge's own `basis` field says "ambiguity" (a field, not a phrase);
+      2. the note asserts nothing out of phase, names no payload date field, and
+         is grounded in today's day number (±1);
+      3. the legacy adjective regex, ALLOWED ONLY when (2)'s out-of-phase test is
+         clean — i.e. the note could not have proved an impossibility anyway.
+
+    Fail-closed: without the phase anchors nothing but channel 1 can fire, so a
+    caller that cannot supply them keeps the finding at full severity.
     """
     if finding.get("category") != "temporal_contradiction":
         return False
-    return bool(_VAGUENESS_OBJECTION_RE.search(finding.get("note") or ""))
+    if judge_basis(finding) == "ambiguity":
+        return True
+    n = cycle_day(start_date, today)
+    if n is None:
+        return False
+    note = finding.get("note") or ""
+    if cites_payload_date_field(note):
+        return False
+    days = day_numbers(note)
+    if not out_of_phase_quantities(note, start_date, today) and days and abs(max(days) - n) <= 1:
+        return True
+    # THE TIEBREAK, and the one place a phrase is admitted. Same out-of-phase test,
+    # with one narrowing: a span the judge never states in its OWN sentences does not
+    # count against it (#3258's note quotes a 90-day GOAL from the page and never
+    # restates it; every impossibility note this must spare says its number out loud
+    # — "A 57-day history is impossible"). Dates and day numbers still bind in full,
+    # so a note citing a pre-genesis date or a day beyond today can never be talked
+    # out of gating by an adjective.
+    if not out_of_phase_quantities(note, start_date, today, spans_in_quotes=False) and _VAGUENESS_OBJECTION_RE.search(note):
+        return _tiebreak("vagueness_objection", finding, "hedged objection, nothing out of phase in the judge's own words")
+    return False
 
 
 # ── the day counter is not a data bound (#2959, 2026-08-23) ───────────────────
@@ -365,7 +520,6 @@ _DAY_BOUND_RE = re.compile(
     r"\b(?:data|entr(?:y|ies)|history|narrative|exist|possible)",
     re.I,
 )
-_DAY_N_RE = re.compile(r"\bday\s+(\d{1,3})\b", re.I)
 
 # ── WIDENED STRUCTURALLY (#3208, 2026-08-26) ───────────────────────────────────
 #
@@ -502,26 +656,19 @@ _WITHDRAWAL_RE = re.compile(
 # /journal/ surface misrepresenting the CURRENT cycle (its notes cite in-cycle
 # dates) stays fully flaggable, as does every other surface.
 
-_TEXT_DATE_RE = re.compile(
-    r"\b(january|february|march|april|may|june|july|august|september|october|november|december)" r"\s+(\d{1,2}),?\s+(\d{4})\b",
-    re.IGNORECASE,
-)
-_MONTHS = {
-    m: i + 1
-    for i, m in enumerate(
-        ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
-    )
-}
 _CYCLE_LABEL_RE = re.compile(r"\bcycle\s+(\d{1,3})\b", re.IGNORECASE)
 _ARCHIVE_PATH_PREFIXES = ("/story/", "/journal/")
 
 
 def _note_dates(note):
-    """Every date the note cites, as ISO strings — ISO literals + 'July 8, 2026' forms."""
-    dates = list(_NOTE_ISO_DATE_RE.findall(note or ""))
-    for mon, day, year in _TEXT_DATE_RE.findall(note or ""):
-        dates.append(f"{year}-{_MONTHS[mon.lower()]:02d}-{int(day):02d}")
-    return dates
+    """Every date the note cites, as ISO strings — ISO literals + 'July 8, 2026' forms.
+
+    Deliberately calls `note_dates` with NO default year, so a yearless "August 16"
+    stays unparsed exactly as it was before the #3337 split. Widening this ruling's
+    date vocabulary is a separate, argued change — not a side effect of extracting
+    the parser.
+    """
+    return note_dates(note)
 
 
 def is_prior_cycle_archive(finding, start_date, cycle=None):
@@ -627,13 +774,62 @@ def is_coach_surface_audience(finding):
     return finding.get("category") == "audience_violation" and str(finding.get("page") or "").startswith("/coaching/")
 
 
-def is_self_refuted(finding):
-    """True when the note's own final sentence withdraws the contradiction (#2959)."""
+# ── RESHAPED STRUCTURALLY (#3337, 2026-08-30) ─────────────────────────────────
+#
+# THE DEFECT IN THE RULING ITSELF. A withdrawal is a speech act, and as shipped
+# this ruling had nowhere to look but the words: a six-phrase list tested against
+# the note's last sentence. #3258 hit its limit head-on — the live `539c6d`
+# retraction ends "No flag warranted on reconsideration", which is not on the
+# list — and refused to add a seventh phrase, naming the real fix instead: "the
+# response contract — a per-finding `verdict: flag|withdrawn` field the judge
+# fills, so a retraction has a structured place to live instead of leaking into
+# prose". #3337 ships that field as `basis: "withdrawn"` (see the top of this
+# file) and it is now the FIRST channel here.
+#
+# The phrase list is not extended — `tests/test_reader_truth_retracted_3258.py`
+# still asserts it was not — but it is no longer allowed to decide alone. It is
+# admitted only for a note that asserts NOTHING out of phase and names no payload
+# date field: a judge that has cited a real out-of-phase value has not withdrawn
+# anything, whatever its last sentence says, and a note objecting to a payload's
+# own dating is a live data finding (the `/api/vitals` d1c6a0 and `/api/glucose`
+# e5eafd shapes, both true, both in phase). This is a DROP ruling, so the narrowing
+# direction matters: every case it stops firing on now keeps gating.
+#
+# RESIDUE, named honestly (2026-08-30): until the judge fills `basis`, a
+# withdrawal worded outside the six phrases still reaches the buckets — the
+# #3258 residue, unchanged and unhidden. What #3337 removes is the other half:
+# a note that proves a real impossibility and happens to close with "internally
+# consistent" is no longer silently dropped.
+
+
+def is_self_refuted(finding, start_date=None, today=None):
+    """True when the finding's own note withdraws the contradiction (#2959, #3337).
+
+    Channel 1 (structural, decides): the judge's `basis` field says "withdrawn".
+    Channel 2 (logged tiebreak): the note's FINAL sentence matches the #2959
+    withdrawal phrases AND the note asserts nothing the phase cannot hold AND it
+    names no payload date field. Only the last sentence
+    counts — a mid-note "internally consistent. But the header …" is a live
+    objection and survives.
+
+    Fail-closed: without the phase anchors only channel 1 can fire, so a caller
+    that cannot supply them keeps the finding.
+    """
+    if judge_basis(finding) == "withdrawn":
+        return True
     note = (finding.get("note") or "").strip()
     if not note:
         return False
+    if cycle_day(start_date, today) is None:
+        return False
+    if out_of_phase_quantities(note, start_date, today):
+        return False
+    if cites_payload_date_field(note):
+        return False
     sentences = [s.strip() for s in re.split(r"[.?!]", note) if s.strip()]
-    return bool(sentences) and bool(_WITHDRAWAL_RE.search(sentences[-1]))
+    if sentences and _WITHDRAWAL_RE.search(sentences[-1]):
+        return _tiebreak("self_refuted", finding, "nothing out of phase; the final sentence withdraws")
+    return False
 
 
 # ── #3199 (2026-08-26): a cross-signal cadence gap is not a temporal_contradiction ─
@@ -722,43 +918,81 @@ def is_sparsity_objection(finding):
 # were touched. DEMOTED to low, never dropped — advisory, printed, never silently
 # swallowed.
 #
-# THE PHRASING IS LOOSELY MATCHED ON PURPOSE (the #3199 sparsity-objection sibling
-# measured, live, that a keyword-matched suppressor does not survive the oracle's
-# rephrasing, #2959): the silence verb and the Day-1/current-cycle clause each
-# tolerate the ordinary paraphrases observed across this file's other #2959
-# members, rather than requiring the wire note's exact word order.
+# ── RESHAPED STRUCTURALLY (#3337, 2026-08-30) ─────────────────────────────────
+#
+# THE DEFECT IN THE RULING ITSELF. As shipped it was anchored on a verb list —
+# "active logging/tracking … went silent | stopped | paused | gone quiet" — with a
+# comment claiming the looseness was protection. It is not: "no entries in the
+# opt-in categories since genesis", "the deliberate-logging surfaces have recorded
+# nothing", "food, training, habits and journal are all empty for the cycle" all
+# state the same claim and none of them match. The ruling was one paraphrase from
+# letting this exact flake auto-roll-back another healthy deploy, which is what it
+# did on 2026-08-25.
+#
+# THE STRUCTURAL PREDICATE — the objection carries NO evidence of its own. Two
+# parsed conditions, and no verbs anywhere:
+#
+#   1. THE CLAIM CLASS, from the quoted copy: the note quotes a page span whose
+#      only date is the cycle start and which states no day number of its own —
+#      i.e. a claim scoped to exactly the cycle window ("… since August 17th").
+#      A banner span ('DAY 9 · WEEK 2, SINCE AUGUST 17 2026') carries its own day
+#      number and is excluded on purpose: a wrong banner day is a real defect
+#      (#2941) and must never be adjudicated here.
+#   2. THE EVIDENCE SET, from the judge's own prose: every value it asserts is one
+#      of the four anchors the prompt itself injected — the cycle start, today,
+#      Day 1, today's day number. Nothing else. An objection whose entire evidence
+#      is the window it is objecting to has disproved nothing; "August 17 is Day 1
+#      and today is Day 9" is elapsed time, not a contradiction.
+#
+# The residue this keeps flaggable is now enforced rather than asserted: a note
+# citing an active-category entry AFTER the since-date introduces a date that is
+# not an anchor and survives; a since-date that is not genesis ("silent since
+# August 16th") is out of phase and survives. Both are covered by the mutation
+# tests. DEMOTED to low, never dropped — unchanged.
+#
+# `_ACTIVE_LOGGING_SILENT_RE` is kept for one job only: naming, in the log, that
+# the classic wording was present. It is never consulted in the verdict.
 _ACTIVE_LOGGING_SILENT_RE = re.compile(
     r"\bactive\s+(?:logging|tracking)\b[^.?!]{0,60}?\b(?:went\s+silent|has\s+been\s+silent|silent|stopped|paused|gone\s+quiet|quiet)\b",
     re.I,
 )
-_SINCE_DAY_ONE_RE = re.compile(r"\bis\s+Day\s+1\b[^.?!]{0,40}?\b(?:cycle|genesis)\b", re.I)
-_TODAY_IS_DAY_N_RE = re.compile(r"\btoday\b[^.?!]{0,20}?\bDay\s+(\d{1,3})\b|\bDay\s+(\d{1,3})\b[^.?!]{0,20}?\btoday\b", re.I)
 
 
-def is_active_vs_passive_objection(finding):
-    """True when a temporal_contradiction objects to an active-logging-silence
-    claim with nothing but a Day-1/today restatement (#3199).
+def is_active_vs_passive_objection(finding, start_date=None, today=None):
+    """True when a temporal_contradiction objects to a whole-cycle-scoped claim
+    with nothing but the phase's own anchors (#3199, reshaped #3337).
 
-    Structural conditions, all required: temporal_contradiction; the note quotes
-    an "active logging/tracking … silent" claim; the note states that the claimed
-    since-date is Day 1 of the current cycle; and the note states today's day
-    number, which must be greater than 1 (the elapsed-time restatement this class
-    is). A note offering any OTHER evidence against the claim (a cited
-    active-category entry after the since-date, a since-date that is NOT Day 1 —
-    the banner-itself-wrong shape, #2941) is a live objection and survives.
+    Structural conditions, all required: temporal_contradiction; the note quotes a
+    claim whose window is exactly the cycle (its only date is the cycle start, and
+    it states no day number of its own); the note asserts nothing out of phase; it
+    names no payload date field; and every value it does
+    assert is one of the four injected anchors (cycle start, today, Day 1, today's
+    day number). Any other cited value is evidence, and the finding survives.
+
+    Fail-closed: without the phase anchors the ruling cannot fire at all.
     """
     if finding.get("category") != "temporal_contradiction":
         return False
+    if cycle_day(start_date, today) is None:
+        return False
     note = finding.get("note") or ""
+    if not spans_scoped_to_cycle_start(note, start_date):
+        return False
+    if out_of_phase_quantities(note, start_date, today):
+        return False
+    if cites_payload_date_field(note):
+        return False
+    if not evidence_is_phase_anchors_only(note, start_date, today):
+        return False
     if not _ACTIVE_LOGGING_SILENT_RE.search(note):
-        return False
-    if not _SINCE_DAY_ONE_RE.search(note):
-        return False
-    m = _TODAY_IS_DAY_N_RE.search(note)
-    if not m:
-        return False
-    today_n = int(m.group(1) or m.group(2))
-    return today_n > 1
+        # Not a verdict — a census. Every line here is a wording the pre-#3337
+        # matcher would have missed, so the paraphrase rate this ruling was
+        # reshaped for is countable in the log group instead of inferred.
+        print(
+            f"  ↩ reader-truth: active_vs_passive caught a PARAPHRASE on {finding.get('page')} "
+            f"(the #3199 wording is absent; decided on the anchors-only evidence set, #3337)"
+        )
+    return True
 
 
 # ── #3258 (2026-08-27): the ledger's ADVISORY verdict, recorded as a FIELD ─────
@@ -860,8 +1094,8 @@ def advisory_rulings(start_date, today=None):
         (
             "vagueness_objection",
             "a vagueness-objection finding",
-            is_vagueness_objection,
-            "'vague' is not a temporal_contradiction, #3003",
+            lambda f: is_vagueness_objection(f, start_date, today),
+            "no impossibility is established against the phase, #3003/#3337",
         ),
         (
             "sparsity_objection",
@@ -872,7 +1106,7 @@ def advisory_rulings(start_date, today=None):
         (
             "active_vs_passive",
             "an active-vs-passive objection",
-            is_active_vs_passive_objection,
+            lambda f: is_active_vs_passive_objection(f, start_date, today),
             "day arithmetic alone does not disprove it, #3199",
         ),
     )
