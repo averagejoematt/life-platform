@@ -65,7 +65,22 @@ def test_agent_does_not_run_a_staged_copy():
     target = Path(_program_arguments(REPO_PLIST)[1])
     parts = {p.lower() for p in target.parts}
     assert ".local" not in parts and "bin" not in parts, f"agent must run the repo copy, not a staged one: {target}"
-    assert str(target).startswith(str(ROOT)), f"agent target must be inside the checkout: {target}"
+
+    # Assert the repo-relative SHAPE, never an absolute prefix.
+    #
+    # The first version of this line read `str(target).startswith(str(ROOT))`, and it
+    # failed on every CI runner by construction: launchd requires an absolute path, so
+    # the plist necessarily carries the OPERATOR's checkout (/Users/...), while ROOT on a
+    # runner is /home/runner/work/.... It passed locally and could never pass in CI —
+    # the exact green-local/red-CI class these tests were written about, introduced while
+    # writing them. Two full-suite runs went red before it was caught.
+    #
+    # What is actually checkable off-machine is the tail: the agent must run
+    # `setup/<script>` from a checkout, whichever machine that checkout lives on. The
+    # binding to THIS machine's path is asserted by test_installed_agent_matches_the_repo_copy,
+    # which is correctly skipped where there is no LaunchAgents directory.
+    assert target.parts[-2:] == ("setup", SCRIPT.name), f"agent target must be <checkout>/setup/{SCRIPT.name}, got {target}"
+    assert target.is_absolute(), "launchd requires an absolute path in ProgramArguments"
 
 
 def test_script_header_does_not_claim_an_installer_that_does_not_exist():
