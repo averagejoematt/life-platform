@@ -491,6 +491,7 @@ user_who_is_matthew.md
 | `reference_a_transform_can_be_correct_and_unreachable.md` | reference | `.claude/skills/new-machinery/SKILL.md` § traps (set equality both directions) + `.claude/skills/land/SKILL.md` §4 | homed-here |
 | `reference_a_vacuous_negative_control.md` | reference | `.claude/skills/prove-it/SKILL.md` Q1 + `.claude/agents/finding-verifier.md` 7 | already-homed |
 | `reference_a_verified_stamp_is_a_human_claim.md` | reference | `docs/OPERATING_DISCIPLINE.md` §4.2 + `.claude/agents/finding-verifier.md` (standing cautions) | already-homed |
+| `reference_absence_read_as_success.md` | reference | `docs/CHARTER.md` (the derivation-guard primitive — derive, never trust a local copy) + the instance guards `tests/test_backup_agent_path_contract.py`, `scripts/check_main_green.py` HEAD-COVERAGE, #3378 | already-homed |
 | `reference_absent_check_invisible_to_fail_filter.md` | reference | `docs/OPERATING_DISCIPLINE.md` §3.7 | already-homed |
 | `reference_accuracy_gate_signed_metrics.md` | reference | `tests/accuracy_audit.py` (signed `progress_pct`) | already-homed |
 | `reference_adr099_score_inverts_priority.md` | reference | `docs/OPERATING_DISCIPLINE.md` §2.7 | already-homed |
@@ -753,6 +754,7 @@ carries an operating rule.
 | `project_fable_week_lane_a_2026_08_22.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_fable_week_session2_2026_08_23.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_frontier_review_2026_07_18.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
+| `project_financial_diligence_2026_08_31.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_fullreview_panel.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_gate_audit_2026_08_13.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_gate_owner_unblock_2026_08_02.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
