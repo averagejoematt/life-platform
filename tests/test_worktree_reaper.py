@@ -378,3 +378,46 @@ def test_worktree_skill_names_the_canonical_parent():
     body = require_skill("worktree").read_text(encoding="utf-8")
     assert "worktree_paths.py" in body, "/worktree must point at the ONE parent registry"
     assert "worktrees/<repo-name>" in body or "worktrees/life-platform" in body, "/worktree must name the canonical parent"
+
+
+# ── The ephemeral exemption is an allow-list, not a loophole ──────────────────
+def test_temp_root_worktrees_are_exempt_from_the_placement_check(tmp_path):
+    """merge-train builds a worktree under $TMPDIR and removes it minutes later; a
+    scratchpad may hold one. Those are not parent sprawl — nothing accumulates, because
+    the OS reclaims the root. Flagging them teaches the reader to ignore the warning."""
+    import tempfile
+
+    tmp_root = Path(tempfile.gettempdir())
+    assert paths.is_ephemeral(tmp_root / "merge-train.INSbPg") is True
+    assert paths.is_ephemeral("/tmp/some-scratch/ciso-3335") is True
+    assert paths.is_ephemeral("/private/tmp/some-scratch/ciso-3335") is True
+
+
+def test_the_exemption_does_NOT_weaken_the_canonical_assertion():
+    """The whole risk of an exemption is that it swallows the thing it was carved out of.
+
+    A stray in a REAL directory — the actual sprawl class, the five lanes that landed in
+    ~/dev/life-platform-worktrees/ on 2026-08-30 — must still be off-canonical. The
+    exemption keys on an explicit list of temp roots, never on a "looks temporary" name.
+
+    Deliberately NOT using pytest's `tmp_path`: it lives under the system temp root, so a
+    "stray" built from it is genuinely ephemeral and the test would pass vacuously.
+    """
+    repo = Path(REPO)  # the real checkout, whatever its location
+    stray = repo.parent / "life-platform-worktrees" / "issue-2833"
+    assert paths.is_canonical(stray, repo) is False, "the real sprawl class must stay off-canonical"
+    assert paths.is_ephemeral(stray) is False, "a real directory must never be exempted"
+
+    # Names that merely LOOK temporary are not exempt — only real temp roots are.
+    for lookalike in ("/Users/x/tmp/lane", "/Users/x/dev/temp-worktrees/lane", "/Users/x/var/folders/lane"):
+        assert paths.is_ephemeral(lookalike) is False, f"{lookalike} must not be exempted by name"
+
+
+def test_reaper_row_carries_both_placement_facts_separately():
+    """`ephemeral` and `off_canonical` are distinct fields: one exempts, the other fails.
+    Collapsing them would make the exemption invisible in the output."""
+    reaper = _load()
+    src = Path(REPO, "scripts", "worktree_reaper.py").read_text(encoding="utf-8")
+    assert 'row["ephemeral"] = is_ephemeral(p)' in src
+    assert 'not row["ephemeral"] and not is_canonical' in src
+    assert hasattr(reaper, "is_ephemeral")

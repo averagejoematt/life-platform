@@ -28,6 +28,7 @@ DERIVED, NOT HARD-CODED
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 # The directory, alongside the checkout, that holds every project's worktrees. The
@@ -71,6 +72,39 @@ def lane_dir(repo: Path | str, branch: str) -> Path:
     number, so `git worktree list` and the on-disk tree read the same and two lanes on the
     same issue cannot collide."""
     return canonical_parent(repo) / branch
+
+
+# ── Ephemeral tooling worktrees ───────────────────────────────────────────────
+# Some tools legitimately make a worktree in a temp directory and remove it minutes
+# later: the merge-train builds one under $TMPDIR, and an agent scratchpad may hold
+# one. Those are not parent sprawl — nothing accumulates, because the OS reclaims the
+# root. Flagging them trains the reader to ignore the placement warning, which is how a
+# gate stops being read at all.
+#
+# This is an ALLOW-LIST of temp roots, deliberately not a "looks temporary" heuristic:
+# a stray worktree in a real directory must keep failing the check. Adding a root here
+# is a decision; matching a name pattern would be an accident waiting to happen.
+_EPHEMERAL_ROOTS = (
+    tempfile.gettempdir(),  # $TMPDIR — /var/folders/... on macOS, /tmp on Linux
+    "/tmp",
+    "/private/tmp",
+    "/var/folders",
+    "/private/var/folders",
+)
+
+
+def is_ephemeral(path: Path | str) -> bool:
+    """True if `path` sits under a temp root the OS reclaims on its own.
+
+    Compared on realpath, because macOS resolves /tmp → /private/tmp and
+    /var/folders → /private/var/folders; a string compare misses half the cases.
+    """
+    p = os.path.realpath(str(path))
+    for root in _EPHEMERAL_ROOTS:
+        r = os.path.realpath(root)
+        if p == r or p.startswith(r.rstrip(os.sep) + os.sep):
+            return True
+    return False
 
 
 def is_canonical(path: Path | str, repo: Path | str) -> bool:

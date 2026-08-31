@@ -84,7 +84,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from worktree_paths import canonical_parent, is_canonical  # noqa: E402
+from worktree_paths import canonical_parent, is_canonical, is_ephemeral  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -275,7 +275,11 @@ def probe(wt: dict, main_path: Path, cwd: Path, git_main: Path | None = None) ->
         return row
     # Placement, not liveness: a lane outside the canonical parent is reported, never
     # reaped for it. Where a worktree sits says nothing about whether its work is done.
-    row["off_canonical"] = not is_canonical(p, main_path)
+    # Temp-root worktrees (merge-train, scratchpads) are exempt — they are reclaimed by
+    # the OS, so they are not sprawl. The exemption is by explicit root, never by a
+    # "looks temporary" name test: a stray in a real directory still fails.
+    row["ephemeral"] = is_ephemeral(p)
+    row["off_canonical"] = not row["ephemeral"] and not is_canonical(p, main_path)
     row["is_cwd"] = _is_within(cwd, p)
     row["in_repo"] = _is_within(p, main_path)
     if not row["exists"]:
@@ -411,6 +415,7 @@ def main() -> int:
     kept = [r for r in rows if id(r) not in reaped_ids]
     in_repo = [r for r in rows if r["in_repo"]]
     off_canonical = [r for r in rows if r.get("off_canonical")]
+    ephemeral = [r for r in rows if r.get("ephemeral")]
 
     print(f"{len(rows)} worktrees across {len(parents(rows))} parent directories")
     for parent, n in parents(rows).items():
@@ -433,6 +438,11 @@ def main() -> int:
             print(f"     {r['path']}")
         print("     Parent sprawl is how 93 worktrees ended up across 12 directories (#3289).")
         print("     Create lanes with: python3 scripts/lane_worktree.py new <issue-N> <slug>")
+
+    if ephemeral:
+        print(f"\n   {len(ephemeral)} ephemeral worktree(s) under a temp root — exempt from the placement check:")
+        for r in ephemeral:
+            print(f"     {r['path']}")
 
     locked = [r for r in rows if r["locked"]]
     print(f"\nliveness: {len(locked)} locked (in use, never candidates); idle floor {args.min_idle_minutes} min")
