@@ -24,16 +24,25 @@
 #
 # Rules (one per managed prefix; declared in deploy/s3_lifecycle.json):
 #   deploys/       expire (current) 30d (rollback artifacts; latest.zip age resets
-#                  each deploy); noncurrent versions 7d (keep 1) — added #2642. The
-#                  bucket is versioned, so `deploy_lambda.sh` copying latest.zip to
-#                  previous.zip creates a NEW current version each deploy and pushes
-#                  the prior previous.zip to noncurrent; deploys/ had NO
+#                  each deploy); noncurrent versions 1d (keep 1) — added at 7d by
+#                  #2642, tightened 7d → 1d by #3368 (fin-diligence 2026-08-31:
+#                  ~72GB of noncurrent bundles nothing reads; one-bundle fleet
+#                  sweeps mint ~1.7GB each). The bucket is versioned, so
+#                  `deploy_lambda.sh` copying latest.zip to previous.zip creates a
+#                  NEW current version each deploy and pushes the prior
+#                  previous.zip to noncurrent; deploys/ originally had NO
 #                  NoncurrentVersionExpiration and 15+ deploys/session made those
 #                  noncurrent versions accumulate forever (85.9 GB measured, #2642
 #                  census). NewerNoncurrentVersions: 1 keeps the newest noncurrent
 #                  generation so `deploys/<fn>/previous.zip` — the CURRENT object,
 #                  unaffected by this rule either way — always resolves; rollback
-#                  reads the current object, never a noncurrent version.
+#                  reads the current object, never a noncurrent version (proved
+#                  again for #3368: zero list-object-versions/VersionId S3 reads
+#                  anywhere in deploy/, scripts/, ci/, .github/workflows/). The
+#                  MANUAL deep-rollback escape (digging older bundles out of S3
+#                  versioning, rollback_lambda.sh's header note) now has a ~1-day
+#                  window + the 1 kept newest noncurrent generation — beyond
+#                  that, re-deploy from a git ref.
 #   site/          keep current forever; noncurrent versions 7d (keep 1) — added
 #                  #2642 (was completely uncovered: 4.42 GB / 276k noncurrent
 #                  objects from every content-hashed redeploy versioning the whole

@@ -5,7 +5,7 @@
       "Status": "Enabled",
       "Filter": {"Prefix": "deploys/"},
       "Expiration": {"Days": 30},
-      "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 1, "NewerNoncurrentVersions": 1}
     },
     {
       "ID": "site-expire-noncurrent-7d",
