@@ -42,7 +42,9 @@ Usage:
                                                     #   what CI runs at deploy time)
     python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
                                                     # + phase-aware truth pass over each
-                                                    #   page's rendered prose (#1095)
+                                                    #   page's rendered prose (#1095; since
+                                                    #   #3251 this runs in the DAILY standalone
+                                                    #   only, never at deploy time)
     python3 tests/visual_qa.py --update-baseline    # rewrite tests/a11y_baseline.json from
                                                     #   this run's axe findings (#1433; deliberate,
                                                     #   review the diff — the run still reds on NEW
@@ -55,12 +57,15 @@ Usage:
                                                     #   WebKit at an iPhone-class profile over the
                                                     #   tier-1/2 manifest pages
 
-Cost: $0 for the browser sweep. --ai-qa adds a few Bedrock vision calls (Haiku,
-~$0.001/image; pennies per run, and it no-ops cleanly if AI is unavailable/budget-paused).
-Tiered by design (#1428): CI's deploy-time gate runs --ai-qa-max-tier 1 (the 6 flagship
-doors only); the full untiered surface runs on the weekly standalone schedule
-(.github/workflows/visual-qa.yml) to keep AI-vision spend bounded — see that
-workflow's header comment for the exact cadence split.
+Cost: $0 for the browser sweep. Measured from the LifePlatform/AI per-gate rows
+(2026-08-27..30, #3249/#3251; every AI layer no-ops cleanly if AI is unavailable or
+budget-paused): --ai-qa --ai-qa-max-tier 1 is 6 Haiku vision calls, ~$0.046/run (n=16,
+stable to the cent); the untiered --ai-qa pass is 92 calls, ~$0.53; --reader-truth is
+~20 calls over the full prose surface, ~$0.19/run — the expensive half, which is why
+#3251 (option C1) moved it out of the per-deploy copies. Cadence by design (#1428 +
+#3251): CI's deploy-time gate runs --ai-qa-max-tier 1 only; the daily standalone
+(.github/workflows/visual-qa.yml) carries --reader-truth on every fire and the full
+untiered --ai-qa on Sundays/manual — see that workflow's header for the split.
 """
 
 import json

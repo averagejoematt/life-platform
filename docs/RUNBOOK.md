@@ -1707,7 +1707,7 @@ kill-switch shape).
 |---|---|---|---|
 | `full` | full-surface AI-vision on EVERY fire (+ reader-truth) | runs | max depth — watching something closely |
 | `standard` (default) | deterministic + reader-truth daily; full AI-vision Sunday/manual (#1428) | runs | today's normal |
-| `lean` | deterministic sweep only — AI-vision + reader-truth stripped ($0 Bedrock) | skipped | cost pressure |
+| `lean` | deterministic sweep only — AI-vision + reader-truth stripped ($0 Bedrock). **Since #3251 (2026-08-30, C1) this strips the platform's ONLY CI prose truth-check** — the deploy copies no longer carry `--reader-truth`; measured saving ~$8.3/mo (6 × $0.195 daily fires + $0.74 Sunday) | skipped | cost pressure |
 | `off` | sweep + accuracy gate skipped entirely | skipped | standalone QA dark — emergency only |
 
 **Structural exemption:** the deploy-gating QA copies (`ci-cd.yml` / `site-deploy.yml`

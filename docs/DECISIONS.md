@@ -3829,6 +3829,23 @@ The pair is ~24 cents a run, not pennies, and the **prose** gate is the expensiv
 
 **Deliberately NOT settled here.** The ceiling-vs-burn decision (#1927 acceptance item 3) is the owner's: this amendment changes *what* pauses, never *how much room* exists before anything has to. At the 2026-08-03 burn the $85 base does not reach tier 3 in August, so that decision is no longer urgent — but tier 1 remains the default state, and only cutting burn or raising the ceiling above ~$101 changes it.
 
+**Amendment 2026-08-30 (#3251 — the cadence decision the 2026-08-27 amendment filed: option C1, prose gate daily, vision gate per-deploy).** Owner decision recorded on #3251 (2026-08-29, re-affirmed 2026-08-30 Session L): `--reader-truth` is **removed from the two per-deploy QA copies** (`ci-cd.yml`, `site-deploy.yml` — landed by #3304); `visual_ai_qa` stays per-deploy and gating; the prose judge runs **once a day, full surface, in the standalone `visual-qa.yml`**, where a finding files an advisory issue and pages SNS but rolls nothing back. Basis, both halves measured: `reader_truth_qa` was 81% of the per-deploy spend while the only recorded catch (the Day-10-on-Day-11 narrative, 2026-08-27) was the vision gate's — and on 2026-08-30 the prose judge produced two reproducing false positives on TRUE claims that auto-rolled-back a healthy site deploy (#3304). Re-measured from `LifePlatform/AI::EstimatedCostUSD` per-gate rows (`LambdaFunction=reader-truth-qa` / `visual-ai-qa`, us-west-2, 1-min `Sum`+`SampleCount` clustered into runs by ≤8-min gaps, single-run clusters only):
+
+| unit | window | n | calls/run | $/run (sd) |
+|---|---|---:|---:|---:|
+| `reader_truth_qa`, per-deploy — **before** | 2026-08-27 16:55Z → 08-30 15:33Z | 16 | 19.8 | **$0.1934** ($0.0055) |
+| `visual_ai_qa`, per-deploy — **before** | same | 16 | 6.0 | **$0.0455** ($0.0009) |
+| `visual_ai_qa`, per-deploy — **after** (C1) | 2026-08-30 17:01Z → 21:39Z | 11 | 6.0 | **$0.0475** ($0.0004) |
+| `reader_truth_qa`, per-deploy — **after** (C1) | same | 0 | — | — |
+| `reader_truth_qa`, daily standalone fire (non-Sunday) | 2026-08-28 → 08-29 | 3 | 20.0 | $0.1948 ($0.0037) |
+| Sunday full-surface `--ai-qa` (+ the same fire's prose pass) | 2026-08-30 22:52Z | 1 | 92 (+21) | $0.5316 (+$0.2043) |
+
+Per deploy run: **$0.239 → $0.048**. At the window's pre-merge cadence (20 deploy runs in 2.99 days, 6.7/day) the per-deploy prose judge was ~$1.29/day ≈ **$39/mo**, inside the "~$25–49/mo" the decision named. Option B (SSM `qa-level=lean`), now priced rather than assumed: it would strip 6 × $0.195 + one Sunday $0.736 = $1.90/wk ≈ **$8.3/mo** — and under C1 it would also strip the platform's *only* CI prose truth-check, so it is a smaller lever with a larger blast radius than it was when #3251 listed it.
+
+*What this does to the placement above: nothing.* The 2026-08-03 sentence "both are per-DEPLOY and bounded" now describes only the vision gate; the prose gate is **per-DAY and bounded** (one full-surface fire — the three fires measured sit within a cent of each other — plus the Sunday pass). "Bounded" was always the load-bearing half: the ladder sacrifices by audience, and the operator deciding whether the deploy that just landed is safe still needs the gate that CAN run at deploy time (vision) to run whenever Bedrock runs at all. Cutoff 3 for both is unchanged; `tests/test_budget_guard_ladder.py`'s `_OPERATOR_TRUTH` band is unchanged; the new cadence split is pinned by `tests/test_ci_ai_gate_cadence_3251.py`, so a `--reader-truth` re-added to a deploy copy (or dropped from the standalone) reds the unit suite instead of silently re-pricing the gate.
+
+*Accepted exposure.* A false narrative can be live for up to ~24h — plus GitHub's schedule drift: the 20:07Z cron fired 2.5–8h late on each of the four fires in the window — before the daily judge reports it, and when it does the response is a human fix-forward, not a rollback. The nightly `qa_smoke` "Reader Truth" category (2 calls, ~$0.015) still runs its 6-surface batch independently. If the daily fire ever records a catch that a per-deploy prose pass would have held inside the deploy window, that is the datum that reopens this; the vision gate's catch rate staying where it is, is what keeps it.
+
 ## ADR-126: Hash-and-reuse unchanged coach generation briefs — stop paying to re-say the same silence (E5.3, #738)
 
 **Date:** 2026-07-06 · **Status:** Accepted · **Story:** #738 (epic #719, "a budget that protects the product")

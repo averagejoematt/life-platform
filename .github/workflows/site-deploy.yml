@@ -225,8 +225,10 @@ jobs:
   # three step lists in sync (same pinned Playwright, same role, same
   # scripts) so a red here means the same thing as a red there.
   # #1428: --ai-qa-max-tier 1 restricts the AI-vision layer to the 6 tier-1
-  # doors at deploy time (deterministic sweep + --reader-truth stay full
-  # surface); the full AI-vision pass runs weekly on visual-qa.yml instead.
+  # doors at deploy time (the deterministic sweep stays full surface); the
+  # full AI-vision pass runs weekly on visual-qa.yml instead. #3251 (C1,
+  # 2026-08-30): --reader-truth no longer runs here at all — the prose judge's
+  # only CI home is the daily standalone (visual-qa.yml).
   # ════════════════════════════════════════════════════════════════
   visual-qa:
     name: Visual + AI-vision QA

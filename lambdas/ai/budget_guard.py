@@ -196,9 +196,10 @@ _FEATURE_CUTOFF = {
     #    2026-08-03 amendment, #1927).
     #
     # reader_truth_qa (#1095/#1096) and visual_ai_qa (#1428) are the AI halves of
-    # the deploy pipeline's own QA: the CI post-deploy prose pass (visual_qa
-    # --reader-truth), the vision pass on the visual-qa job, and the nightly
-    # qa_smoke "Reader Truth" category. They sat at cutoff 1 as "internal QA" and
+    # the deploy pipeline's own QA: the vision pass on the per-deploy visual-qa
+    # job, the prose pass (visual_qa --reader-truth — per-deploy until #3251,
+    # daily-standalone since 2026-08-30, see below), and the nightly qa_smoke
+    # "Reader Truth" category. They sat at cutoff 1 as "internal QA" and
     # were consequently DARK for 26 of 30 days (#1927's measurement) — while still
     # reporting green, because a gate that does not run produces no findings.
     #
@@ -206,20 +207,22 @@ _FEATURE_CUTOFF = {
     # AUDIENCE, and these two serve the OPERATOR — the person deciding whether the
     # deploy that just landed is safe. That answer is upstream of every reader
     # surface below it, so it cannot be the first thing sacrificed. Their cost
-    # profile agrees on the SHAPE — both are per-DEPLOY and bounded, not per-day
-    # and open-ended like their former band-mates, and their value peaks exactly
-    # when shipping, which is when a pause is most likely in force.
+    # profile agrees on the SHAPE — both are bounded (per-run cost stable to the
+    # cent) and cadence-fixed: visual_ai_qa per-DEPLOY, reader_truth_qa once per
+    # DAY since #3251 (C1, 2026-08-30 — per-deploy before that). Neither is
+    # per-day-and-open-ended like their former band-mates, and their value peaks
+    # exactly when shipping, which is when a pause is most likely in force.
     #
     # The MAGNITUDE this comment used to assert ("one Haiku batch over <= 8
     # surfaces; <= 3 images x 6 tier-1 doors at ~$0.001/image — pennies per run")
     # was wrong, and wrong in a specific way worth keeping written down: it is an
     # accurate description of the NIGHTLY qa_smoke Lambda copy of reader-truth,
     # applied by mistake to the CI copy. CI runs --reader-truth over the FULL page
-    # surface (see the comment on ci-cd.yml's sweep step), not over 8 surfaces.
+    # surface (see visual-qa.yml's header + cadence step), not over 8 surfaces.
     # Measured 2026-08-27 via #3240's feature attribution — the first build that
     # could tell the two copies apart — from LifePlatform/AI::EstimatedCostUSD,
     # n=5 deploy-time runs, all Haiku, in the `--ai-qa --ai-qa-max-tier 1
-    # --reader-truth` mode that both ci-cd.yml and site-deploy.yml run:
+    # --reader-truth` mode that both ci-cd.yml and site-deploy.yml ran until #3251:
     #
     #   reader_truth_qa (CI)      ~20 calls  ~156K in tok   ~$0.194/run
     #   visual_ai_qa    (CI)        6 calls   40.4K in tok   ~$0.045/run
@@ -233,9 +236,30 @@ _FEATURE_CUTOFF = {
     # merge-cadence-driven — $0.90-$2.84/day over the only 3 complete UTC days the
     # CallerClass dimension has existed for (2026-08-24..26, mean $1.63, sd $1.06),
     # with 08-27 already at $3.10 partial, and $1.04/day averaged over the cost
-    # governor's own trailing-7d window. Two units this table does NOT price: the
-    # Sunday full-surface --ai-qa pass (visual-qa.yml, no tier cap) and the daily
-    # standalone --reader-truth fire.
+    # governor's own trailing-7d window.
+    #
+    # 2026-08-30, #3251 (owner decision, option C1): --reader-truth was REMOVED
+    # from the two per-deploy copies (#3304); the prose judge now runs ONLY in
+    # the daily standalone (visual-qa.yml, non-gating — it reports, never rolls
+    # back). Basis: the prose gate was 81% of the per-run spend while the one
+    # recorded catch (the Day-10-on-Day-11 narrative, 2026-08-27) was the vision
+    # gate's. Re-measured from the same per-gate rows (LambdaFunction=
+    # reader-truth-qa / visual-ai-qa, 1-min Sum+SampleCount clustered into runs,
+    # single-run clusters only):
+    #
+    #   BEFORE (2026-08-27 16:55Z..08-30 15:33Z, n=16 deploy runs)
+    #     reader_truth_qa   19.8 calls  $0.1934/run (sd $0.0055)
+    #     visual_ai_qa       6.0 calls  $0.0455/run (sd $0.0009)   pair $0.239
+    #   AFTER  (first 11 deploy runs post-merge, 2026-08-30 17:01..21:39Z)
+    #     visual_ai_qa       6.0 calls  $0.0475/run (sd $0.0004)   pair $0.048
+    #     reader_truth_qa    0 deploy-time clusters
+    #   the two units the table above did not price, now measured:
+    #     daily standalone --reader-truth  n=3   20 calls  $0.1948/fire
+    #     Sunday full-surface --ai-qa      n=1   92 calls  $0.5316 (+$0.2043 prose)
+    #
+    # Accepted trade: a bad narrative can be live up to ~24h before the daily
+    # fire reports it. The band-3 placement is unchanged — cadence is a workflow
+    # question, audience is a band question (ADR-125 amendment 2026-08-30).
     # At cutoff 3 they stop precisely when bedrock_client stops everything — "they
     # run whenever Bedrock runs at all" — and the pause is then reported, not
     # inferred: SKIPPED-BY-BUDGET in the run output, the CI job summary + a
