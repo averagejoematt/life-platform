@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -49,6 +50,8 @@ assert _SPEC and _SPEC.loader
 gc = importlib.util.module_from_spec(_SPEC)
 sys.modules["gate_census"] = gc
 _SPEC.loader.exec_module(gc)
+
+import gate_census_enforcement as gce  # noqa: E402  — the #3220/#3329 extraction sibling, same address as the census's own import
 
 
 # ── 1. the AnnAssign proof — taxonomy instance 5, made a mutation ────────────
@@ -462,13 +465,23 @@ def test_a_shifted_id_refuses_its_proof_rather_than_re_attaching(monkeypatch):
 
 
 def test_the_verdict_counts_add_up_and_are_reported(real_census):
-    """No silent caps: proven + attempted + unproven must equal the population, and all
-    three numbers must appear in the human report."""
+    """No silent caps and no silent EXCLUSIONS: proven + attempted + unproven +
+    not-applicable must equal the population, and every number must appear in the human
+    report.
+
+    The fourth term arrived with #3329 (owner decision 2026-08-31, option B). Before it,
+    the six name-only rows were held outside the total and the sum below was true of a
+    denominator that had quietly dropped them — "570 gates, plus six we do not count".
+    A partition that does not account for every row is the census committing its own
+    subject, so the addition is asserted here rather than in the renderer's prose.
+    """
     gates = real_census["gates"]
     proven = [g for g in gates if g["verdict"] == "can-fail (proven)"]
     attempted = [g for g in gates if g["verdict"] == "attempted-unproven"]
     unproven = [g for g in gates if g["verdict"] == "unproven"]
-    assert len(proven) + len(attempted) + len(unproven) == len(gates)
+    not_applicable = [g for g in gates if g["verdict"] == "not-applicable"]
+    assert len(proven) + len(attempted) + len(unproven) + len(not_applicable) == len(gates)
+    assert not_applicable, "zero not-applicable rows — the third verdict has gone dark, or they are excluded again"
     # Upper band 40 → 41 on 2026-08-29: #3279 added sentinel::deploy/sentinel_events.py::
     # check_eventbridge_rules with both halves mutation-proved in tests/test_sentinel_events_3279.py.
     # This band catches BULK marking-proven-without-mutations; move it only with a new proof to cite.
@@ -498,6 +511,51 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
     assert "VERDICTS: proven able to fail" in text
     assert "ATTEMPTED and NOT proved" in text
     assert f"n = {len(proven)}" in text and f"n = {len(attempted)}" in text
+    assert f"NOT-APPLICABLE (nothing to fail, reason recorded)   n = {len(not_applicable)}" in text
+    assert "excluded from the total" not in text, "an exclusion line is back in the report — the total must be the whole population"
+
+
+# ── the not-applicable verdict's own contract (#3329) ────────────────────────
+
+
+def test_every_not_applicable_row_carries_a_reason_on_the_live_census(real_census):
+    """A verdict of "nothing here can fail" is a CLAIM. Unaccompanied by the reason it
+    is an exemption, and an unexplained exemption is the artifact this census counts."""
+    violations = gce.audit_verdicts(real_census["gates"])
+    assert not violations, "verdict-contract violations on the live inventory:\n  " + "\n  ".join(violations)
+
+
+def test_a_not_applicable_row_without_a_reason_reds():
+    """The mutation, on the PURE function and synthetic gates — never the live repo, so
+    it can neither flake nor be satisfied by today's inventory happening to be clean."""
+    clean = [{"id": "guard::x.py", "verdict": "not-applicable", "evidence": "", "detail": {"reason": "returns kwargs; nothing refuses"}}]
+    assert gce.audit_verdicts(clean) == []
+
+    mutated = [{"id": "guard::x.py", "verdict": "not-applicable", "evidence": "", "detail": {"reason": "   "}}]
+    violations = gce.audit_verdicts(mutated)
+    assert violations, "a not-applicable row with a blank reason must red"
+    assert "guard::x.py" in violations[0] and "no recorded reason" in violations[0]
+
+
+def test_a_verdict_outside_the_vocabulary_is_surfaced_not_absorbed():
+    """The other direction: an invented verdict string must not fall out of the sum in
+    silence — that is exactly how six rows lived outside the denominator."""
+    rogue = [{"id": "guard::y.py", "verdict": "probably-fine", "evidence": "", "detail": {}}]
+    part = gce.verdict_partition(rogue)
+    assert part["unrecognised"] == 1 and sum(part.values()) == 1
+    assert any("outside the vocabulary" in v for v in gce.audit_verdicts(rogue))
+
+
+def test_each_recorded_reason_that_cites_a_census_row_cites_a_LIVE_one(real_census):
+    """Two of the six reasons close their case by naming the row that already reports
+    their verdict (the #3220 Q2 rule). A citation that no longer resolves turns a real
+    adjudication into a claim about a gate that does not exist — so it is checked."""
+    live = {g["id"] for g in real_census["gates"]}
+    cited = set()
+    for reason in gce.NOT_APPLICABLE_REASONS.values():
+        cited |= set(re.findall(r"(?:structural|guard|registry|sentinel|qa|ci)::[^\s`,]+", reason))
+    assert cited, "no reason cites a covering census row — the Q2 half of the ruling has gone unwritten"
+    assert not (cited - live), f"recorded reason(s) cite census id(s) that no longer exist: {sorted(cited - live)}"
 
 
 def test_at_least_one_verdict_is_on_a_blocking_ci_gate(real_census):

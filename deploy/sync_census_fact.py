@@ -54,6 +54,16 @@ ROOT = Path(__file__).resolve().parent.parent
 # The (doc, pattern, replacement-template) tuple sync_doc_metadata.py's RULES list needs.
 # Narrow pattern deliberately: only the leading count, not the fixed "with measured error
 # bars" suffix that follows it in docs/PROPORTIONALITY.md — re.sub only touches the match.
+#
+# WHAT THIS RULE OWNS, AND WHAT IT DOES NOT (#3329). It owns exactly one cell of the
+# gate-census row: the integer in "<n> declared gates". The POSTURE half of that row —
+# ratchet / rent / demote trigger, the ADR-103/144 fields — is hand-owned prose and is
+# meant to be: a posture is a judgement someone made on a date, not a derivation, and
+# generating one from a count is how a ledger starts asserting things nobody decided.
+# The posture recorded there on 2026-08-31 is the owner's option-(B) decision on #3329:
+# a DOWN-ONLY ratchet on `BASELINE_UNPROVEN_GATES`, one ratchet line of rent per new
+# gate (its verdict, or the reason nothing in it can fail), and a demote trigger of a
+# `can-fail (proven)` gate later found NOT to fail in the field.
 _RULE = ("docs/PROPORTIONALITY.md", r"\d+ declared gates", "{gate_census_count} declared gates")
 
 
