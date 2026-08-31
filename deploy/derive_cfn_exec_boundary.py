@@ -308,15 +308,23 @@ def build_policy() -> dict[str, Any]:
             "Resource": [f"arn:aws:secretsmanager:*:{ACCOUNT}:secret:{PLATFORM_SLUG}/*"],
         },
         {
-            # The table is imported into CDK too — CloudFormation never legitimately
-            # deletes it, disables PITR, or flips its TTL attribute (#951's class).
+            # The table is imported into CDK today, so CloudFormation never legitimately
+            # deletes it. DESTRUCTION only — narrowed on driver review 2026-08-31:
+            # `dynamodb:UpdateTimeToLive` and `dynamodb:UpdateContinuousBackups` are the
+            # ONLY calls CloudFormation has for SETTING a table's TTL and PITR (CDK's
+            # `Table(time_to_live_attribute=…, point_in_time_recovery=…)` is implemented
+            # through exactly them, on create and on every change), and IAM has no
+            # condition key that separates "enable" from "disable" for either. Denying
+            # them would fail the first stack update that touches TTL/PITR — or any new
+            # CDK-owned table — with an explicit deny and roll the stack back, and #2799's
+            # TTL-parity item wants TTL MORE CFN-managed, not less. PITR disablement is
+            # covered instead by the AWS Backup vault/plan/recovery-point denies below
+            # plus `dynamodb:DeleteBackup`: the backups survive the flag either way.
             "Sid": "DenyDataStoreDestruction",
             "Effect": "Deny",
             "Action": [
                 "dynamodb:DeleteTable",
                 "dynamodb:DeleteBackup",
-                "dynamodb:UpdateContinuousBackups",
-                "dynamodb:UpdateTimeToLive",
                 "backup:DeleteBackupVault",
                 "backup:DeleteRecoveryPoint",
                 "backup:DeleteBackupPlan",
@@ -436,6 +444,10 @@ def simulation_probes() -> tuple[tuple[str, str, str, str], ...]:
         ("s3:DeleteObject", f"arn:aws:s3:::{_C.S3_BUCKET}/site/index.html", HOME, "allowed"),
         ("s3:PutBucketVersioning", f"arn:aws:s3:::{_C.RAW_BACKUP_BUCKET}", "us-east-2", "allowed"),
         ("events:PutRule", f"arn:aws:events:{HOME}:{ACCOUNT}:rule/LifePlatformIngestion-WhoopRule", HOME, "allowed"),
+        # The 2026-08-31 driver-review narrowing, asserted rather than implied: these two
+        # ARE how CloudFormation sets TTL and PITR, so they must read `allowed`.
+        ("dynamodb:UpdateTimeToLive", f"arn:aws:dynamodb:{HOME}:{ACCOUNT}:table/{_C.TABLE_NAME}", HOME, "allowed"),
+        ("dynamodb:UpdateContinuousBackups", f"arn:aws:dynamodb:{HOME}:{ACCOUNT}:table/{_C.TABLE_NAME}", HOME, "allowed"),
         ("acm:DescribeCertificate", f"arn:aws:acm:us-east-1:{ACCOUNT}:certificate/abc", "us-east-1", "allowed"),
         ("ssm:GetParameter", f"arn:aws:ssm:{HOME}:{ACCOUNT}:parameter/cdk-bootstrap/{CDK_BOOTSTRAP_QUALIFIER}/version", HOME, "allowed"),
     )

@@ -227,8 +227,6 @@
       "Action": [
         "dynamodb:DeleteTable",
         "dynamodb:DeleteBackup",
-        "dynamodb:UpdateContinuousBackups",
-        "dynamodb:UpdateTimeToLive",
         "backup:DeleteBackupVault",
         "backup:DeleteRecoveryPoint",
         "backup:DeleteBackupPlan"
