@@ -229,6 +229,99 @@
     }
   }
 
+  // ── Scroll-region keyboard access (#3277) — a self-contained primitive in the
+  //    same shape as the freshness pulse above: it runs REGARDLESS of the
+  //    reduced-motion branch below (keyboard reach is not motion). Below the tablet
+  //    breakpoint the shared table primitive (.rd-tbl / .table-scroll — evidence.css,
+  //    tokens.css) and the code wells (.rd-code, <pre>) become horizontally-scrolling
+  //    boxes; a box that scrolls but cannot take focus cannot be reached or scrolled
+  //    from the keyboard — axe `scrollable-region-focusable` (serious), which 14
+  //    reader pages carried at 390px while no gate measured that viewport.
+  //    Scrollability is a LAYOUT fact, not a markup one (the same table scrolls at
+  //    390px and not at 1440px, and most of these tables are rendered client-side
+  //    by the evidence modules), so it is decided here from the live box rather
+  //    than by a static attribute in 90 shells: an element whose computed
+  //    overflow-x allows scrolling AND whose content is wider than its box gets
+  //    tabindex="0" (Tab reaches it, the arrow keys scroll it) plus an accessible
+  //    name where its role permits one — role="group" for generic elements, never
+  //    the landmark role="region" — and loses all of it again when it stops
+  //    overflowing (rotate, resize, data change). Elements that already contain
+  //    focusable content are left alone — focus lands inside and the arrow keys
+  //    already scroll the container; that is also exactly axe's own pass condition.
+  //    Re-runs on resize/load/fonts and on the same MutationObserver channel the
+  //    evidence pages render their tables through. Fenced so a test can extract it
+  //    (tests/test_scroll_region_focus_3277.py runs this exact block in Node).
+  // SCROLL_REGION_START
+  var SR_GENERIC = { DIV: 1, PRE: 1, SPAN: 1, P: 1, CODE: 1 }; // no implicit role → gets role="group" so a name is permitted
+  var SR_NAMED = { TABLE: 1, FIGURE: 1, SECTION: 1, ARTICLE: 1, ASIDE: 1, UL: 1, OL: 1, DL: 1 }; // implicit role already accepts a name
+  var SR_FOCUSABLE = 'a[href], area[href], button, input, select, textarea, summary, iframe, [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
+  function srIsHScrollable(el) {
+    if (el.scrollWidth <= el.clientWidth + 1) return false; // cheap layout read first
+    var ox = getComputedStyle(el).overflowX;
+    return ox === "auto" || ox === "scroll";
+  }
+  function srHasName(el) {
+    if (el.getAttribute("aria-label") || el.getAttribute("aria-labelledby")) return true;
+    if (el.tagName === "TABLE") return !!el.querySelector(":scope > caption");
+    if (el.tagName === "FIGURE") return !!el.querySelector(":scope > figcaption");
+    return false;
+  }
+  function srName(el) {
+    var tag = el.tagName;
+    var kind = tag === "TABLE" ? "table" : (tag === "PRE" || tag === "CODE" || /\brd-code\b/.test(el.className || "")) ? "code" : tag === "FIGURE" ? "figure" : "content";
+    var scope = el.closest("section, article, .rd-sec, main") || document;
+    var h = scope.querySelector("h1, h2, h3, h4");
+    var t = h && h.textContent ? h.textContent.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+    return "Scrollable " + kind + (t ? ": " + t : "");
+  }
+  function srApply(el) {
+    var on = srIsHScrollable(el);
+    var mine = el.getAttribute("data-scroll-region") === "auto";
+    if (on && !mine) {
+      if (el.hasAttribute("tabindex") || el.querySelector(SR_FOCUSABLE)) return; // already reachable
+      var tag = el.tagName;
+      // role="group", never "region": region is a LANDMARK, and two same-named
+      // landmarks are axe `landmark-unique` — measured, not guessed (2026-08-31:
+      // role="region" here traded 33 serious nodes for 3 new moderate findings on
+      // /method/{verify,predictions,calibration}/). group names the box without
+      // adding anything to the landmark menu.
+      if (SR_GENERIC[tag] && !el.hasAttribute("role")) { el.setAttribute("role", "group"); el.setAttribute("data-sr-role", "1"); }
+      if ((SR_GENERIC[tag] || SR_NAMED[tag]) && !srHasName(el)) { el.setAttribute("aria-label", srName(el)); el.setAttribute("data-sr-label", "1"); }
+      el.setAttribute("tabindex", "0");
+      el.setAttribute("data-scroll-region", "auto");
+    } else if (!on && mine) {
+      el.removeAttribute("tabindex");
+      if (el.getAttribute("data-sr-role")) { el.removeAttribute("role"); el.removeAttribute("data-sr-role"); }
+      if (el.getAttribute("data-sr-label")) { el.removeAttribute("aria-label"); el.removeAttribute("data-sr-label"); }
+      el.removeAttribute("data-scroll-region");
+    }
+  }
+  function srScan() {
+    try {
+      var all = document.body.getElementsByTagName("*");
+      for (var i = 0; i < all.length; i++) {
+        var el = all[i];
+        if (el.namespaceURI !== "http://www.w3.org/1999/xhtml" || el.tagName === "SELECT" || el.tagName === "TEXTAREA") continue;
+        srApply(el);
+      }
+    } catch (e) {}
+  }
+  var srTimer = 0;
+  function srSchedule() { clearTimeout(srTimer); srTimer = setTimeout(srScan, 60); }
+  // SCROLL_REGION_END
+  srScan();
+  window.addEventListener("resize", srSchedule);
+  window.addEventListener("load", srSchedule);
+  try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(srSchedule); } catch (e) {}
+  try {
+    new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        if (muts[i].type === "childList" && muts[i].addedNodes.length) { srSchedule(); return; }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  } catch (e) {}
+  window.__srScan = srScan; // hook for JS that reflows a table after load
+
   var reduce;
   try { reduce = !("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { reduce = true; }
   if (reduce) {

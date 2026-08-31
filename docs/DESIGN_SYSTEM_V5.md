@@ -600,6 +600,24 @@ and blow out the page under real data, which auto-rolled-back a deploy on 2026-0
 cards; it must never squeeze columns until headers truncate. Wide **non-table** content (stat rows,
 strips) relies on the section-level `.rd-sec { overflow-x:auto }` scroll — keep it.
 
+**Keyboard reach (#3277).** A box that scrolls horizontally must be focusable or a keyboard user
+can neither reach nor scroll it (axe `scrollable-region-focusable`, serious — 15 reader pages, 33
+nodes, measured live at 390px on 2026-08-31 while every gate audited desktop only). Scrollability is
+a layout fact, not a markup one (the same `.rd-tbl` scrolls at 390 and not at 1440, and most tables
+are rendered client-side), so it is decided at runtime: `motion.js`'s scroll-region primitive (the
+fenced `SCROLL_REGION_START/END` block, run in Node by `tests/test_scroll_region_focus_3277.py`)
+gives any element whose computed `overflow-x` allows scrolling *and* whose content is wider than its
+box `tabindex="0"` plus an accessible name where its role permits one — `role="group"` on generic
+elements (div/pre/span/p/code), tables and figures keep their own role and get an `aria-label` only
+if they lack a caption/label — and removes all of it again when it stops overflowing. Two rules with
+a measurement behind them: never `role="region"` (it is a LANDMARK; the same sweep with `region`
+traded the 33 serious nodes for 3 new moderate `landmark-unique` findings, `group` introduced zero
+new rules), and never any role on a `<table>` (it destroys table semantics). **Do not hand-add
+`tabindex` to tables or `<pre>` blocks** — the primitive owns them and reverts what it owns. The
+gating sweep now runs axe at 390×844 as well as desktop, against its own ledger (`pages_mobile` /
+`pages_light_mobile` in `tests/a11y_baseline.json`); `python3 tests/pr_render_gate.py --a11y` is the
+local proof at both viewports.
+
 ### 10.7 PWA layer
 
 The Cockpit is an installable PWA: a web manifest + an active service worker (`sw.js`). SW

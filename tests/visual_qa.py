@@ -22,7 +22,11 @@ read-only engine:
      (tests/a11y_baseline.json); baselined + minor/moderate findings are
      recorded honestly as warnings, never hidden, never gating. Baseline
      shrinks/updates DELIBERATELY via --update-baseline (see tests/a11y_audit.py
-     for the full semantics + review discipline).
+     for the full semantics + review discipline). Runs at BOTH viewports (#3277):
+     once post-reveal at the desktop context, once again at 390×844 after the
+     mobile reveal pass, each against its own ledger — a violation that only
+     exists at 390px (scrollable-region-focusable on the block-scroll tables)
+     used to be measured by no gate at all.
   10. Leak-token sweep (#1448, deterministic, no AI, no browser): the SAME
       token-grep deploy/restart_verify_rendered.py runs at reset time
       (tests/leak_token_sweep.py) also runs here on every sweep, so a
@@ -680,6 +684,11 @@ def _write_step_summary(path, passed, failed, warns, results, reader_truth_statu
     # own hard-to-miss section instead of scrolling by folded into per-page
     # `warnings` — the "consumer" #1990's acceptance criteria asks for.
     shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")})
+    # #3277: the mobile ledger has its own shrink signal, keyed with the viewport
+    # so it can never be mistaken for (or silently merged into) the desktop one.
+    shrink_candidates.update(
+        a11y_audit.shrink_candidates({f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")})
+    )
     if shrink_candidates:
         lines.append("\n### a11y ledger — shrink candidates (#1990)\n")
         lines.append(
@@ -776,7 +785,41 @@ def run_leak_token_sweep(base_url=None):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False, a11y_baseline=None, theme="dark"):
+def _a11y_gate(page, path, a11y_baseline, theme, viewport, issues, warnings):
+    """Run axe on the page AS CURRENTLY LAID OUT and fold the verdict into
+    issues/warnings (#1433, extended to a second viewport by #3277).
+
+    `viewport` ("desktop" | "mobile") is the ledger axis — it selects which
+    committed baseline the observed violations are compared against, and tags
+    every message so a 390px-only finding can never read as a desktop one. The
+    caller has already set the page's viewport size and run _scroll_and_reveal;
+    this helper never resizes. Returns gate_findings()' dict, or None if axe
+    failed to inject/run (recorded as a warning — explicitly not a pass).
+    """
+    tag = "" if viewport == "desktop" else f" @{a11y_audit.MOBILE_VIEWPORT['width']}px"
+    try:
+        observed = a11y_audit.run_axe(page)
+    except Exception as e:
+        warnings.append(f"a11y audit{tag} did not run (axe inject/run failed: {str(e)[:100]}) — not a pass (#1433)")
+        return None
+    result = a11y_audit.gate_findings(path, observed, a11y_baseline, theme=theme, viewport=viewport)
+    for v in result["new"]:
+        tgt = f" e.g. {v['targets'][0]}" if v.get("targets") else ""
+        issues.append(f"NEW {v['impact']} a11y violation{tag} (axe: {v['id']}): {v['help']} — {v['nodes']} node(s){tgt} (#1433)")
+    if result["baselined"]:
+        ids = ", ".join(sorted(v["id"] for v in result["baselined"]))
+        warnings.append(f"a11y baseline debt{tag}: {len(result['baselined'])} known violation(s) ({ids}) — recorded, not gating (#1433)")
+    if result["advisory"]:
+        ids = ", ".join(sorted(v["id"] for v in result["advisory"]))
+        warnings.append(f"a11y advisory{tag}: {len(result['advisory'])} new minor/moderate violation(s) ({ids}) — not gating (#1433)")
+    if result["fixed"]:
+        warnings.append(f"a11y fixed vs baseline{tag}: {', '.join(result['fixed'])} — shrink the ledger via --update-baseline (#1433)")
+    return result
+
+
+def capture_page(
+    context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False, a11y_baseline=None, theme="dark", context_mobile=False
+):
     """Drive one page def in an open browser context and return its result dict.
 
     Pure capture: navigate, scroll/reveal, run element/chart/interaction checks,
@@ -799,6 +842,14 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     pre-#1991 call site (context is still opened by the caller; capture_page
     itself never sets color_scheme).
 
+    context_mobile (#3277): True when the CALLER opened `context` at the mobile
+    profile (run_sweep --mobile, the weekly WebKit lane) — then the pre-resize
+    pass is not a desktop pass at all, it is a second 390px render, so it is
+    skipped and only the mobile ledger is exercised. Without this the WebKit
+    lane compared a 390px DOM against the desktop ledger, which is precisely how
+    it reported `scrollable-region-focusable` as a desktop-ledger NEW serious
+    violation for six weeks. Defaults False (the 1440x900 contexts).
+
     Extracted from run_sweep's per-page loop (2026-06-20) so tests/site_review.py
     can reuse identical capture without forking the gating visual-qa harness.
     """
@@ -806,6 +857,7 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     page.add_init_script(_PERF_INIT_SCRIPT)
     path, name = page_def["path"], page_def["name"]
     a11y_result = None
+    a11y_mobile_result = None  # #3277: the 390px pass — None until it runs
     issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
     perf_result = {"lcp_ms": None, "cls": None, "js_bytes": 0}
     _js_bytes = [0]  # mutable box (perf_js_bytes) — total JS response bytes for the page
@@ -943,31 +995,12 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         # Gate: NEW serious/critical vs the committed baseline red the page; every
         # other finding (baselined debt, new minor/moderate, fixed-vs-baseline) is
         # recorded honestly as a warning — visible, never gating, never hidden.
-        if a11y_baseline is not None:
-            try:
-                observed = a11y_audit.run_axe(page)
-            except Exception as e:
-                observed = None
-                warnings.append(f"a11y audit did not run (axe inject/run failed: {str(e)[:100]}) — not a pass (#1433)")
-            if observed is not None:
-                a11y_result = a11y_audit.gate_findings(path, observed, a11y_baseline, theme=theme)
-                for v in a11y_result["new"]:
-                    tgt = f" e.g. {v['targets'][0]}" if v.get("targets") else ""
-                    issues.append(f"NEW {v['impact']} a11y violation (axe: {v['id']}): {v['help']} — {v['nodes']} node(s){tgt} (#1433)")
-                if a11y_result["baselined"]:
-                    ids = ", ".join(sorted(v["id"] for v in a11y_result["baselined"]))
-                    warnings.append(
-                        f"a11y baseline debt: {len(a11y_result['baselined'])} known violation(s) ({ids}) — recorded, not gating (#1433)"
-                    )
-                if a11y_result["advisory"]:
-                    ids = ", ".join(sorted(v["id"] for v in a11y_result["advisory"]))
-                    warnings.append(
-                        f"a11y advisory: {len(a11y_result['advisory'])} new minor/moderate violation(s) ({ids}) — not gating (#1433)"
-                    )
-                if a11y_result["fixed"]:
-                    warnings.append(
-                        f"a11y fixed vs baseline: {', '.join(a11y_result['fixed'])} — shrink the ledger via --update-baseline (#1433)"
-                    )
+        # The SAME pass runs again at 390px below (#3277) against the mobile ledger.
+        # context_mobile (#3277): in a --mobile sweep this render is already 390px —
+        # auditing it against the DESKTOP ledger is the axis error the WebKit lane
+        # shipped with. Skip it; the mobile pass below is the one that applies.
+        if a11y_baseline is not None and not context_mobile:
+            a11y_result = _a11y_gate(page, path, a11y_baseline, theme, "desktop", issues, warnings)
 
         # ── screenshots (full page + chart crops) ──
         slug = path.strip("/").replace("/", "-") or "home"
@@ -1003,6 +1036,18 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         # (a section too tall to reach the threshold never reveals), and some pages
         # only overflow the threshold on desktop. This makes the mobile-only case real.
         _scroll_and_reveal(page)
+        # ── axe-core audit, MOBILE viewport (#3277) — the second pass of the SAME gate ──
+        # Before #3277 axe ran once, at the desktop context above, so a violation that
+        # only exists at 390px — tables/code blocks that become horizontally-scrolling
+        # boxes below the tablet breakpoint and were keyboard-unreachable
+        # (scrollable-region-focusable, serious) — was measured by no gate: 15 reader
+        # pages carried it live (33 nodes, chromium 2026-08-31) and the rule was absent
+        # from the ledger, which read as clean. Same rule set, same NEW-serious/critical gating, compared against the
+        # mobile ledger ("pages_mobile" / "pages_light_mobile") captured at this exact
+        # viewport. Runs after the mobile _scroll_and_reveal so the DOM axe sees is the
+        # revealed 390px page, not the desktop layout re-flowed mid-transition.
+        if a11y_baseline is not None:
+            a11y_mobile_result = _a11y_gate(page, path, a11y_baseline, theme, "mobile", issues, warnings)
         overflow = _mobile_overflow(page)
         if overflow and overflow > 4:
             issues.append(f"Horizontal overflow at 390px — content exceeds viewport by {overflow}px")
@@ -1114,6 +1159,7 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         "screenshots": shots,
         "perf": perf_result,
         "a11y": a11y_result,  # #1433: new/baselined/advisory/fixed/observed, or None if the audit didn't run
+        "a11y_mobile": a11y_mobile_result,  # #3277: the same shape for the 390px pass, or None if it didn't run
     }
 
 
@@ -1224,7 +1270,10 @@ def run_sweep(
     page issue. update_a11y_baseline=True rewrites the baseline from this run's
     observations for the pages actually swept (the deliberate, reviewed update
     path — the run STILL reports new violations red so nothing is silently
-    absorbed; the committed baseline diff is the review surface).
+    absorbed; the committed baseline diff is the review surface). #3277: the
+    audit runs at both the desktop context and 390×844 on every page, so one
+    sweep is n = pages × 2 axe passes, and one --update-baseline run rewrites
+    both this theme's ledgers (desktop + "_mobile").
 
     ai_qa_max_tier (#1428): when set, restricts the Claude-vision assessment to
     pages whose qa_manifest tier is <= this value (deploy-time passes `1` to cover
@@ -1308,6 +1357,7 @@ def run_sweep(
                     capture_prose=reader_truth,
                     a11y_baseline=a11y_baseline,
                     theme=color_scheme,
+                    context_mobile=mobile,  # #3277: a --mobile context has no desktop pass to audit
                 )
 
             # #2978: a deterministic FAIL only gates after it reproduces once.
@@ -1382,16 +1432,29 @@ def run_sweep(
 
     # ── deliberate a11y-baseline rewrite (#1433) — only the pages this run swept ──
     if update_a11y_baseline:
-        observed_by_path = {r["path"]: r["a11y"]["observed"] for r in results if r.get("a11y") is not None}
-        skipped = [r["path"] for r in results if r.get("a11y") is None]
-        if observed_by_path:
-            new_baseline = a11y_audit.update_baseline(observed_by_path, theme=color_scheme)
-            counts = a11y_audit.summarize(new_baseline, theme=color_scheme)
-            counts_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "clean — no violations"
-            print(f"\na11y baseline ({color_scheme}) rewritten ({len(observed_by_path)} page(s) captured) → tests/a11y_baseline.json")
-            print(f"  ledger now: {counts_str} — review + commit the diff deliberately (#1433)")
-        if skipped:
-            print(f"  ⚠ a11y baseline NOT updated for {len(skipped)} page(s) where the audit failed to run: {', '.join(skipped[:5])}")
+        # #3277: one sweep captures BOTH viewports, so one --update-baseline run
+        # rewrites both ledgers for this theme — desktop from "a11y", mobile from
+        # "a11y_mobile" — each from the pass that actually ran at that viewport.
+        # A --mobile sweep opened ONE 390px context, so it can only write the
+        # mobile ledger; it must never touch the desktop one from a 390px render.
+        viewport_keys = (("mobile", "a11y_mobile"),) if mobile else (("desktop", "a11y"), ("mobile", "a11y_mobile"))
+        for viewport, result_key in viewport_keys:
+            observed_by_path = {r["path"]: r[result_key]["observed"] for r in results if r.get(result_key) is not None}
+            skipped = [r["path"] for r in results if r.get(result_key) is None]
+            if observed_by_path:
+                new_baseline = a11y_audit.update_baseline(observed_by_path, theme=color_scheme, viewport=viewport)
+                counts = a11y_audit.summarize(new_baseline, theme=color_scheme, viewport=viewport)
+                counts_str = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) or "clean — no violations"
+                print(
+                    f"\na11y baseline ({color_scheme}, {viewport}) rewritten ({len(observed_by_path)} page(s) captured) "
+                    f"→ tests/a11y_baseline.json"
+                )
+                print(f"  ledger now: {counts_str} — review + commit the diff deliberately (#1433)")
+            if skipped:
+                print(
+                    f"  ⚠ a11y baseline ({viewport}) NOT updated for {len(skipped)} page(s) where the audit failed to run: "
+                    f"{', '.join(skipped[:5])}"
+                )
 
     # ── deterministic leak-token sweep (#1448) — no AI, no browser; reuses the
     # SAME token-grep deploy/restart_verify_rendered.py runs at reset time, so a
@@ -1456,6 +1519,9 @@ def run_sweep(
     # #1990: a dedicated, hard-to-miss tally for baselined a11y debt that's no
     # longer live — the consumer the shrink warnings previously lacked.
     shrink_candidates = a11y_audit.shrink_candidates({r["path"]: r["a11y"] for r in results if r.get("a11y")})
+    shrink_candidates.update(
+        a11y_audit.shrink_candidates({f"{r['path']} @390px": r["a11y_mobile"] for r in results if r.get("a11y_mobile")})
+    )  # #3277: mobile-ledger shrink, viewport-keyed
     if shrink_candidates:
         total_rules = sum(len(v) for v in shrink_candidates.values())
         print(

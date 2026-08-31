@@ -284,7 +284,7 @@ def test_committed_baseline_exists_and_matches_pinned_axe_version():
     )
     # every committed entry is well-formed (the gate reads only these fields) —
     # both the dark 'pages' ledger and the #1991 'pages_light' sibling.
-    for key in ("pages", "pages_light"):
+    for key in a11y_audit.LEDGER_KEYS:  # #3277: all four ledgers, incl. the mobile pair
         for page, rows in base.get(key, {}).items():
             assert page.startswith("/")
             for r in rows:
@@ -312,3 +312,173 @@ def test_visual_qa_color_scheme_defaults_to_dark_everywhere():
     rs = inspect.signature(visual_qa.run_sweep).parameters
     assert rs["color_scheme"].default == "dark"
     assert rs["update_a11y_baseline"].default is False
+
+
+# ── #3277: the viewport axis — the mobile ledgers ────────────────────────────
+# The gate used to run axe once, at the desktop context; a violation that exists
+# only at 390px (scrollable-region-focusable on the block-scroll tables) was
+# measured by no gate and absent from the ledger — indistinguishable from clean.
+
+# The 15 pages the 2026-08-31 live re-measurement (chromium, 390x844, post-reveal,
+# tests/a11y_audit.run_axe over all 92 sweep paths) found carrying
+# scrollable-region-focusable — 33 nodes. WebKit on the same surface: 14 pages / 32
+# nodes (identical except /data/vitals/, whose one node chromium sees and webkit does
+# not) — the class is viewport-driven, not engine-driven.
+MOBILE_SRF_PAGES_LIVE_2026_08_31 = (
+    "/data/vitals/",
+    "/story/attempts/",
+    "/method/",
+    "/method/game/",
+    "/method/grade-your-coach/",
+    "/data/labs/",
+    "/data/habits/",
+    "/method/cycles/",
+    "/method/predictions/",
+    "/method/calibration/",
+    "/method/voicefidelity/",
+    "/method/pipeline/",
+    "/method/wrong/",
+    "/method/verify/",
+    "/method/inference/",
+)
+
+
+def test_viewport_keys_are_the_four_ledgers():
+    assert a11y_audit._baseline_key("dark") == "pages"
+    assert a11y_audit._baseline_key("light") == "pages_light"
+    assert a11y_audit._baseline_key("dark", "mobile") == "pages_mobile"
+    assert a11y_audit._baseline_key("light", "mobile") == "pages_light_mobile"
+    assert a11y_audit._baseline_key("dark", "desktop") == "pages"  # explicit desktop == the default
+    assert set(a11y_audit.LEDGER_KEYS) == {"pages", "pages_light", "pages_mobile", "pages_light_mobile"}
+
+
+def test_mobile_viewport_reuses_the_existing_390_context_not_a_new_one():
+    """Reuse, don't invent: the mobile axe pass runs at the SAME 390x844 every
+    other mobile check in visual_qa (overflow, reveals, app-bar, tap targets) and
+    the weekly WebKit context already use."""
+    assert a11y_audit.MOBILE_VIEWPORT == {"width": 390, "height": 844}
+
+
+def test_viewport_mobile_reads_pages_mobile_not_pages():
+    """A rule baselined on desktop does NOT excuse it at 390px — the ledgers are
+    independent, exactly like the theme axis (#1991)."""
+    base = {"_meta": {}, "pages": {"/method/verify/": [_v("scrollable-region-focusable", "serious")]}, "pages_mobile": {}}
+    out = a11y_audit.gate_findings("/method/verify/", [_v("scrollable-region-focusable", "serious")], base, viewport="mobile")
+    assert [v["id"] for v in out["new"]] == ["scrollable-region-focusable"]
+    # …and the desktop call site (no viewport) still reads "pages": baselined, not gating.
+    out_desk = a11y_audit.gate_findings("/method/verify/", [_v("scrollable-region-focusable", "serious")], base)
+    assert out_desk["new"] == [] and [v["id"] for v in out_desk["baselined"]] == ["scrollable-region-focusable"]
+
+
+def test_viewport_mobile_baselined_entry_does_not_gate():
+    base = {"_meta": {}, "pages": {}, "pages_mobile": {"/data/vitals/": [_v("color-contrast", "serious")]}}
+    out = a11y_audit.gate_findings("/data/vitals/", [_v("color-contrast", "serious")], base, viewport="mobile")
+    assert out["new"] == [] and [v["id"] for v in out["baselined"]] == ["color-contrast"]
+
+
+def test_load_baseline_setdefaults_mobile_ledgers_for_legacy_files(tmp_path):
+    p = tmp_path / "b.json"
+    p.write_text(json.dumps({"_meta": {}, "pages": {"/": [_v("x", "serious")]}, "pages_light": {}}))
+    base = a11y_audit.load_baseline(str(p))
+    assert base["pages_mobile"] == {} and base["pages_light_mobile"] == {}
+    assert a11y_audit.load_baseline(str(tmp_path / "missing.json"))["pages_light_mobile"] == {}
+
+
+def test_update_baseline_mobile_writes_pages_mobile_and_preserves_the_other_three(tmp_path):
+    p = tmp_path / "b.json"
+    p.write_text(
+        json.dumps(
+            {
+                "_meta": {"captured_at": "2026-01-01T00:00:00+00:00", "note": "keep me"},
+                "pages": {"/": [{"id": "keep", "impact": "serious", "help": "", "nodes": 1}]},
+                "pages_light": {"/": [{"id": "keep-light", "impact": "serious", "help": "", "nodes": 1}]},
+                "pages_light_mobile": {"/": [{"id": "keep-lm", "impact": "serious", "help": "", "nodes": 1}]},
+            }
+        )
+    )
+    out = a11y_audit.update_baseline({"/": [_v("color-contrast", "serious", 3)]}, path=str(p), viewport="mobile")
+    assert [r["id"] for r in out["pages_mobile"]["/"]] == ["color-contrast"]
+    assert [r["id"] for r in out["pages"]["/"]] == ["keep"]
+    assert [r["id"] for r in out["pages_light"]["/"]] == ["keep-light"]
+    assert [r["id"] for r in out["pages_light_mobile"]["/"]] == ["keep-lm"]
+    assert out["_meta"]["captured_at"] == "2026-01-01T00:00:00+00:00" and out["_meta"]["note"] == "keep me"
+    assert "captured_at_mobile" in out["_meta"] and "390x844" in out["_meta"]["note_mobile"]
+    # light+mobile gets its own meta pair too
+    out2 = a11y_audit.update_baseline({"/": []}, path=str(p), theme="light", viewport="mobile")
+    assert "captured_at_light_mobile" in out2["_meta"] and "/" not in out2["pages_light_mobile"]
+
+
+def test_summarize_viewport_mobile_counts_pages_mobile_only():
+    base = {"pages": {"/": [{"impact": "serious"}] * 3}, "pages_mobile": {"/": [{"impact": "serious"}, {"impact": "minor"}]}}
+    assert a11y_audit.summarize(base, viewport="mobile") == {"serious": 1, "minor": 1}
+    assert a11y_audit.summarize(base) == {"serious": 3}
+
+
+def test_committed_baseline_has_an_explicit_mobile_section():
+    """#3277 acceptance: the ledger gains an explicit mobile section. Read the raw
+    file, not load_baseline() — setdefault would fabricate the key."""
+    with open(a11y_audit.BASELINE_PATH, encoding="utf-8") as f:
+        raw = json.load(f)
+    assert "pages_mobile" in raw, "tests/a11y_baseline.json has no explicit pages_mobile ledger (#3277)"
+    assert "captured_at_mobile" in raw["_meta"], "the mobile ledger must record when it was captured"
+    assert raw["_meta"].get("note_mobile"), "the mobile ledger must state its own contract"
+
+
+def test_scrollable_region_focusable_is_driven_to_zero_not_baselined():
+    """The class is FIXED (motion.js scroll-region primitive), not accepted as debt:
+    the rule must appear in NO ledger, so a reappearance on any page is a NEW
+    serious violation — the mutation proof below is the armed gate."""
+    base = a11y_audit.load_baseline()
+    ledgers = {k: base[k] for k in a11y_audit.LEDGER_KEYS}  # the rule is NAMED in _meta's note_mobile — scan the ledgers only
+    assert "scrollable-region-focusable" not in json.dumps(ledgers), "scrollable-region-focusable must be fixed, never baselined (#3277)"
+    for page_path in MOBILE_SRF_PAGES_LIVE_2026_08_31:
+        out = a11y_audit.gate_findings(page_path, [_v("scrollable-region-focusable", "serious", 3)], base, viewport="mobile")
+        assert [v["id"] for v in out["new"]] == [
+            "scrollable-region-focusable"
+        ], f"{page_path}: a re-introduced scroll region must gate @390"
+
+
+def test_visual_qa_runs_the_axe_gate_at_both_viewports_in_order():
+    """capture_page must call the shared _a11y_gate helper once for "desktop" and
+    once for "mobile", and the mobile call must come AFTER the 390px viewport is
+    set and the mobile reveal pass has run — otherwise it audits the desktop DOM."""
+    import visual_qa
+
+    src = inspect.getsource(visual_qa.capture_page)
+    i_desk = src.index('_a11y_gate(page, path, a11y_baseline, theme, "desktop"')
+    i_vp = src.index('page.set_viewport_size({"width": 390, "height": 844})')
+    i_mob = src.index('_a11y_gate(page, path, a11y_baseline, theme, "mobile"')
+    assert i_desk < i_vp < i_mob, "mobile axe pass must run after the 390px viewport is set"
+    assert "_scroll_and_reveal(page)" in src[i_vp:i_mob], "mobile axe pass must run after the mobile _scroll_and_reveal"
+    assert '"a11y_mobile": a11y_mobile_result' in src
+
+
+def test_the_three_gating_sweeps_get_the_mobile_pass_with_no_flag_to_forget():
+    """The whole point of #3277 is that the GATING chain measures 390px. The mobile
+    pass is unconditional inside capture_page (not behind --mobile, which only
+    changes what the context is opened as), so all three gating invocations get it
+    with no new workflow line — but only while none of them opts out of the audit."""
+    import visual_qa
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(a11y_audit.__file__)))
+    for wf in ("ci-cd.yml", "site-deploy.yml", "visual-qa.yml"):
+        with open(os.path.join(root, ".github", "workflows", wf), encoding="utf-8") as f:
+            text = f.read()
+        invocations = [ln for ln in text.splitlines() if "tests/visual_qa.py" in ln and ln.strip().startswith("python3")]
+        assert invocations, f"{wf} no longer invokes tests/visual_qa.py — the gating chain moved (#3277)"
+        for ln in invocations:
+            assert "--no-a11y" not in ln, f"{wf} opts out of the axe audit — the 390px pass goes with it (#3277): {ln.strip()}"
+    # the pass itself is not behind a flag: capture_page runs it whenever a baseline
+    # is loaded, and run_sweep loads one unless --no-a11y was passed.
+    src = inspect.getsource(visual_qa.capture_page)
+    guard = src[src.index('page.set_viewport_size({"width": 390, "height": 844})') :]
+    guard = guard[: guard.index('_a11y_gate(page, path, a11y_baseline, theme, "mobile"')]
+    assert "if a11y_baseline is not None:" in guard, "the mobile axe pass must be gated ONLY on having a baseline"
+    assert "mobile_only" not in guard and "--mobile" not in guard
+
+
+def test_visual_qa_update_baseline_writes_both_viewports():
+    import visual_qa
+
+    src = inspect.getsource(visual_qa.run_sweep)
+    assert '("desktop", "a11y"), ("mobile", "a11y_mobile")' in src, "--update-baseline must rewrite the mobile ledger from the mobile pass"

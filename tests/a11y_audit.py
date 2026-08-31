@@ -35,6 +35,27 @@ layer that can see opacity/color-mix composite failures that differ per
 theme, so a page can be clean in one ledger and carry debt in the other; the
 two ledgers are independent per-page, per-rule sets, not a shared one.
 
+Viewport dimension (#3277): every function below ALSO takes a `viewport` param
+("desktop" default, or "mobile") — the second axis of the same additive scheme.
+Before #3277 the audit ran exactly once per page, at the desktop context, so a
+violation that only exists at 390px (the `scrollable-region-focusable` class:
+tables and code blocks that become horizontally-scrolling boxes below the
+tablet breakpoint and were keyboard-unreachable) was measured by no gate at all
+— 15 reader pages carried it live (33 nodes; chromium, 390x844, 2026-08-31 live
+re-measurement over all 92 sweep paths — webkit 14/32, the class is viewport-driven,
+not engine-driven), and the rule appeared nowhere in this
+ledger, because absence-from-the-ledger and never-measured are indistinguishable
+from outside. The four ledgers are:
+
+    theme  × viewport →  "pages"        (dark,  desktop — the #1433 original)
+                          "pages_light"  (light, desktop — #1991)
+                          "pages_mobile" (dark,  mobile  — #3277)
+                          "pages_light_mobile" (light, mobile — #3277)
+
+Same contract as the theme axis: a baseline with no mobile keys loads as empty
+mobile ledgers, and every pre-#3277 call site — which never passes `viewport` —
+reads/writes the desktop ledgers byte-for-byte as before.
+
 Baseline update path (DELIBERATE, REVIEWED — never auto-regenerated):
     python3 tests/visual_qa.py --update-baseline
 rewrites tests/a11y_baseline.json from what the sweep just observed, for the
@@ -64,6 +85,48 @@ AXE_VERSION = "4.12.1"
 
 # The gate is scoped to these axe impact levels (#1433 acceptance criteria).
 GATING_IMPACTS = ("critical", "serious")
+
+# The viewport the mobile pass runs at — the SAME 390×844 every existing mobile
+# check in tests/visual_qa.py (overflow, stuck reveals, app-bar, tap targets) and
+# the weekly WebKit context already use. Reused, not invented (#3277).
+MOBILE_VIEWPORT = {"width": 390, "height": 844}
+
+# Per-ledger `_meta` notes — written by update_baseline so the file states its
+# own contract next to each capture timestamp.
+_LEDGER_NOTES = {
+    "pages": (
+        "Committed a11y debt ledger (#1433) — honest capture of current axe violations per page. "
+        "The visual-qa gate reds only on NEW serious/critical violations vs this file. "
+        "Update DELIBERATELY via `python3 tests/visual_qa.py --update-baseline` and review the diff in the PR; "
+        "added entries are newly accepted debt, removed entries are fixes. Never hand-edit, never auto-regenerate."
+    ),
+    "pages_light": (
+        "Light-theme sibling ledger (#1991) — same honest-capture contract as 'pages'/note above, scoped to "
+        "axe findings observed under a Playwright color_scheme='light' context. Update DELIBERATELY via "
+        "`python3 tests/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone sweep "
+        "alternates dark/light by ISO-week parity so both ledgers stay current without a dedicated job."
+    ),
+    "pages_mobile": (
+        "Mobile-viewport sibling ledger (#3277) — same honest-capture contract as 'pages'/note above, scoped to "
+        "axe findings observed at 390x844 after the mobile scroll/reveal pass (dark theme). Written by the SAME "
+        "`python3 tests/visual_qa.py --update-baseline` run that writes 'pages' (one sweep captures both viewports); "
+        "seeded 2026-08-31 from all 92 sweep paths against live production. Two things it states out loud: (1) "
+        "`scrollable-region-focusable` is deliberately ABSENT — #3277 drove it from 15 pages / 33 nodes to zero "
+        "(the motion.js scroll-region focus primitive), so a reappearance is a NEW serious violation and reds the "
+        "gate; (2) the serious debt it DOES carry (color-contrast on the chart labels of "
+        "/data/{vitals,training,character,badges}/, svg-img-alt on /method/build/) is PRE-EXISTING — re-measured "
+        "unpatched on live at 390px, node-for-node identical, and the same rule set the desktop ledger already "
+        "accepts. It is dated debt seen for the first time at this viewport, not a pass."
+    ),
+    "pages_light_mobile": (
+        "Light-theme mobile-viewport ledger (#3277) — the light sibling of 'pages_mobile', captured at 390x844 under "
+        "color_scheme='light'. Written by `python3 tests/visual_qa.py --color-scheme light --update-baseline`; the "
+        "weekly standalone alternates dark/light by ISO-week parity, so this is the ledger the light run gates "
+        "against. Same two statements as 'pages_mobile': no `scrollable-region-focusable` anywhere, and its serious "
+        "rows (19 pages of color-contrast + svg-img-alt) are the SAME set 'pages_light' already accepts on desktop — "
+        "light theme simply carries more contrast debt than dark, at either viewport."
+    ),
+}
 
 _RUN_AXE_JS = """async () => {
     const r = await axe.run(document, {resultTypes: ['violations']});
@@ -97,45 +160,64 @@ def run_axe(page):
     return page.evaluate(_RUN_AXE_JS)
 
 
-def _baseline_key(theme):
-    """Which top-level baseline dict a theme reads/writes (#1991).
+VIEWPORTS = ("desktop", "mobile")
+
+# The four ledgers, in the order they were added — load_baseline setdefault's
+# every one so a file predating an axis loads with that axis empty, not missing.
+LEDGER_KEYS = ("pages", "pages_light", "pages_mobile", "pages_light_mobile")
+
+
+def _baseline_key(theme, viewport="desktop"):
+    """Which top-level baseline dict a (theme, viewport) pair reads/writes.
 
     "dark" (the default — every pre-#1991 call site) → "pages", the original
-    #1433 ledger. Anything else → "pages_light", the sibling added by #1991.
+    #1433 ledger; anything else → "pages_light" (#1991). `viewport="mobile"`
+    (#3277) appends "_mobile" to either: "pages_mobile" / "pages_light_mobile".
     """
-    return "pages" if theme == "dark" else "pages_light"
+    key = "pages" if theme == "dark" else "pages_light"
+    if viewport == "mobile":
+        key += "_mobile"
+    return key
+
+
+def _meta_suffix(theme, viewport="desktop"):
+    """Suffix for the per-ledger `_meta` capture fields ("" for the dark-desktop
+    original, "_light", "_mobile", "_light_mobile") — mirrors _baseline_key."""
+    return _baseline_key(theme, viewport)[len("pages") :]
 
 
 def load_baseline(path=None):
     """Load the committed baseline; a missing file is an empty baseline.
 
-    "pages_light" (#1991) is setdefault'd alongside "pages" so a legacy
-    baseline file with no light entries yet — or a missing file — loads as an
-    empty light ledger rather than KeyError-ing.
+    Every ledger in LEDGER_KEYS is setdefault'd so a legacy baseline file with
+    no light (#1991) or mobile (#3277) entries yet — or a missing file — loads
+    with those ledgers empty rather than KeyError-ing.
     """
     path = path or BASELINE_PATH
     if not os.path.exists(path):
-        return {"_meta": {}, "pages": {}, "pages_light": {}}
+        return {"_meta": {}, **{k: {} for k in LEDGER_KEYS}}
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    data.setdefault("pages", {})
-    data.setdefault("pages_light", {})
+    for key in LEDGER_KEYS:
+        data.setdefault(key, {})
     return data
 
 
-def gate_findings(page_path, violations, baseline, theme="dark"):
+def gate_findings(page_path, violations, baseline, theme="dark", viewport="desktop"):
     """Classify one page's observed violations against the baseline.
 
     Pure (no I/O). `theme` (#1991) selects which ledger ("pages" for dark,
     "pages_light" for light) the observed violations are compared against —
-    defaults to "dark" so every pre-#1991 call site is unchanged. Returns:
+    defaults to "dark" so every pre-#1991 call site is unchanged. `viewport`
+    (#3277) selects the desktop ledger (default) or its "_mobile" sibling, so
+    the 390px pass gates against what was captured at 390px. Returns:
         {"new":       [violation, …]   # serious/critical, NOT baselined → GATES
          "baselined": [violation, …]   # rule id in the baseline (any impact)
          "advisory":  [violation, …]   # new minor/moderate — recorded, no gate
          "fixed":     [rule_id, …]     # baselined but no longer observed
          "observed":  [violation, …]}  # everything found, for --update-baseline
     """
-    key = _baseline_key(theme)
+    key = _baseline_key(theme, viewport)
     base_ids = {v["id"] for v in baseline.get(key, {}).get(page_path, [])}
     observed_ids = {v["id"] for v in violations}
     return {
@@ -147,7 +229,7 @@ def gate_findings(page_path, violations, baseline, theme="dark"):
     }
 
 
-def update_baseline(observed_by_path, path=None, theme="dark"):
+def update_baseline(observed_by_path, path=None, theme="dark", viewport="desktop"):
     """Rewrite the baseline from a sweep's observations — the DELIBERATE path.
 
     observed_by_path: {page_path: [violation, …]} for the pages the sweep
@@ -155,15 +237,16 @@ def update_baseline(observed_by_path, path=None, theme="dark"):
     clean is removed); pages the run did not sweep are preserved untouched,
     so a --page or --max-tier run can never silently wipe the rest of the
     ledger. Entries are trimmed to the stable gate-relevant fields and sorted
-    for reviewable diffs. `theme` (#1991) selects "pages" vs "pages_light" —
-    only that ledger is touched; the other theme's entries and `_meta` fields
-    are preserved untouched (each theme gets its own captured_at/note pair in
-    `_meta` — see below — so alternating dark/light updates never clobber
-    each other's capture record). Returns the written baseline dict.
+    for reviewable diffs. `theme` (#1991) selects "pages" vs "pages_light" and
+    `viewport` (#3277) selects the desktop ledger vs its "_mobile" sibling —
+    only that ONE ledger is touched; every other ledger's entries and `_meta`
+    fields are preserved untouched (each ledger gets its own captured_at/note
+    pair in `_meta` — see below — so alternating updates never clobber each
+    other's capture record). Returns the written baseline dict.
     """
     path = path or BASELINE_PATH
     baseline = load_baseline(path)
-    key = _baseline_key(theme)
+    key = _baseline_key(theme, viewport)
     for page_path, violations in observed_by_path.items():
         rows = sorted(
             (
@@ -183,24 +266,13 @@ def update_baseline(observed_by_path, path=None, theme="dark"):
             baseline[key].pop(page_path, None)
     baseline[key] = {k: baseline[key][k] for k in sorted(baseline[key])}
 
-    ts_field = "captured_at" if theme == "dark" else "captured_at_light"
-    note_field = "note" if theme == "dark" else "note_light"
+    suffix = _meta_suffix(theme, viewport)
+    ts_field = "captured_at" + suffix
+    note_field = "note" + suffix
     meta = dict(baseline.get("_meta") or {})
     meta["axe_version"] = AXE_VERSION
     meta[ts_field] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    meta[note_field] = (
-        "Committed a11y debt ledger (#1433) — honest capture of current axe violations per page. "
-        "The visual-qa gate reds only on NEW serious/critical violations vs this file. "
-        "Update DELIBERATELY via `python3 tests/visual_qa.py --update-baseline` and review the diff in the PR; "
-        "added entries are newly accepted debt, removed entries are fixes. Never hand-edit, never auto-regenerate."
-        if theme == "dark"
-        else (
-            "Light-theme sibling ledger (#1991) — same honest-capture contract as 'pages'/note above, scoped to "
-            "axe findings observed under a Playwright color_scheme='light' context. Update DELIBERATELY via "
-            "`python3 tests/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone sweep "
-            "alternates dark/light by ISO-week parity so both ledgers stay current without a dedicated job."
-        )
-    )
+    meta[note_field] = _LEDGER_NOTES[key]
     baseline["_meta"] = meta
     with open(path, "w", encoding="utf-8") as f:
         json.dump(baseline, f, indent=2, sort_keys=False)
@@ -228,11 +300,12 @@ def shrink_candidates(gate_results_by_path):
     return {path: g["fixed"] for path, g in gate_results_by_path.items() if g.get("fixed")}
 
 
-def summarize(baseline, theme="dark"):
+def summarize(baseline, theme="dark", viewport="desktop"):
     """{impact: total violation entries} across the baseline — honest numbers.
 
-    `theme` (#1991) selects "pages" (default, dark) vs "pages_light"."""
-    key = _baseline_key(theme)
+    `theme` (#1991) selects "pages" (default, dark) vs "pages_light"; `viewport`
+    (#3277) selects the desktop ledger (default) vs its "_mobile" sibling."""
+    key = _baseline_key(theme, viewport)
     counts = {}
     for rows in baseline.get(key, {}).values():
         for r in rows:
