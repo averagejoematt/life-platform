@@ -546,10 +546,10 @@ python3 -m pytest tests/test_cfn_exec_boundary_3340.py -q
 python3 deploy/derive_cfn_exec_boundary.py --simulate   # iam:SimulateCustomPolicy, read-only
 ```
 
-`--simulate` is the pre-apply evidence: it evaluates the document AWS's own way against 28
+`--simulate` is the pre-apply evidence: it evaluates the document AWS's own way against 35
 probes — the escalation the mutation probe deploys, the fence protecting itself, the
-irreplaceable data zones, the region pin in both directions, and 13 positive controls for
-what an ordinary stack deploy does. Expect `28/28 simulator verdicts as expected`.
+irreplaceable data zones, the region pin in both directions, and 15 positive controls for
+what an ordinary stack deploy does. Expect `35/35 simulator verdicts as expected`.
 
 ### 2. Apply (attended, `matthew-admin`)
 

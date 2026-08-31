@@ -571,3 +571,37 @@ def test_no_other_deploy_file_carries_a_copy_of_the_boundary_document():
     # Non-vacuity: the detector finds the derivation itself when it is not excluded.
     derivation = (ROOT / "deploy" / "derive_cfn_exec_boundary.py").read_text(encoding="utf-8")
     assert marker in derivation and '"Effect"' in derivation
+
+
+# -- the probes must be able to reach the boundary at all --------------------------------
+# 2026-08-31, first live run of both probes: each rolled back with an IAM 400 --
+#   "Value at 'description' failed to satisfy constraint: Member must satisfy regular
+#    expression pattern: [\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF]*"
+# because a role Description carried an em dash. Neither probe evaluated the boundary:
+# a negative control that fails for an unrelated reason is a vacuous control, and the
+# positive control failing the same way looked identical. Every string in a probe
+# template must be a string IAM will accept, or the probe cannot prove anything.
+_IAM_DESCRIPTION_CHARSET = re.compile(r"^[\t\n\r\x20-\x7E\xA1-\xFF]*$")
+
+
+def _probe_strings(node, path="$"):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from _probe_strings(v, f"{path}.{k}")
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from _probe_strings(v, f"{path}[{i}]")
+    elif isinstance(node, str):
+        yield path, node
+
+
+@pytest.mark.parametrize("template", sorted((ROOT / "infra" / "iam" / "boundary_probe").glob("*.template.json")), ids=lambda p: p.name)
+def test_probe_templates_carry_only_iam_legal_characters(template):
+    doc = json.loads(template.read_text())
+    offenders = [(p, s) for p, s in _probe_strings(doc) if not _IAM_DESCRIPTION_CHARSET.match(s)]
+    assert offenders == [], f"{template.name}: strings IAM rejects before the boundary is evaluated (a vacuous probe): {offenders}"
+
+
+def test_probe_charset_guard_can_fail():
+    assert not _IAM_DESCRIPTION_CHARSET.match("#3340 boundary probe \u2014 must never be created")
+    assert _IAM_DESCRIPTION_CHARSET.match("#3340 boundary probe - must never be created")
