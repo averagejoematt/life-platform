@@ -18,8 +18,12 @@
 #
 # The pipeline copy in ci-cd.yml (job `visual-qa`, needs: deploy) is unchanged
 # and still GATES the pipeline post-deploy; this standalone run gates nothing —
-# a failure reds this run and notifies SNS (the remediation agent also triages
-# failed runs). Steps mirror the pipeline job exactly (same pinned Playwright,
+# a failure reds this run and files a deduped advisory issue via the #1447
+# `advisory-failure-issue` helper (the remediation agent also triages failed
+# runs). It does NOT notify SNS — the `aws sns publish` step that claimed to was
+# deleted 2026-08-30 (epic #2799): the diagnosis role has no `sns:*` grant, so
+# every publish returned AuthorizationError into a swallowing `|| echo`.
+# Steps mirror the pipeline job exactly (same pinned Playwright,
 # same OIDC role github-actions-deploy-role, same scripts) so a red here means
 # the same thing as a red there. The AI-vision layer self-skips (SKIPPED-BY-BUDGET
 # warning) when bedrock:InvokeModel is absent or the budget guard is at tier 3
@@ -47,7 +51,7 @@
 # runs): reader_truth_qa $0.193/run = 81% of the $0.239 pair, while the one
 # recorded catch (2026-08-27) was the vision gate's. Accepted trade: a bad
 # narrative can be live up to ~24h before this fire reports it — and it REPORTS
-# (advisory issue + SNS), it never rolls back. Consequently qa-level=lean/off now
+# (the #1447 advisory issue), it never rolls back. Consequently qa-level=lean/off now
 # removes ALL CI prose truth-checking, not merely the standalone copy of it.
 # tests/test_ci_ai_gate_cadence_3251.py pins the split.
 #
@@ -77,10 +81,18 @@ concurrency:
 env:
   AWS_REGION: us-west-2
   AWS_ACCOUNT_ID: "205930651321"
-  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest
+  # No SNS_TOPIC_ARN here on purpose (epic #2799 hygiene sweep, 2026-08-30). This
+  # workflow used to carry an `aws sns publish` failure notifier; it assumed
+  # `github-actions-diagnosis-role`, which has never had an `sns:*` grant
+  # (infra/iam/github-actions-diagnosis-role.permissions.json), so every fire
+  # returned AuthorizationError into a `|| echo "::warning::"` and reached nobody
+  # (live proof: run 33339682758, 2026-08-30T23:01:24Z). The durable failure
+  # surface is the `advisory-failure-issue` helper at the end of this job — it
+  # files/updates ONE deduped issue and auto-closes it on the next green. IAM is
+  # owner-only, so the dead step was deleted rather than granted.
 
 permissions:
-  id-token: write   # OIDC token for AWS (Bedrock vision QA + SNS notify)
+  id-token: write   # OIDC token for AWS (Bedrock vision QA)
   contents: read
   issues: write     # advisory-failure issue filing (#1447)
 
@@ -248,22 +260,6 @@ jobs:
           name: visual-qa-standalone-screenshots
           path: qa-screenshots/
           retention-days: 14
-
-      - name: Notify failure (SNS digest)
-        if: failure()
-        run: |
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MESSAGE="STANDALONE VISUAL-QA FAILURE — the live-site reader-facing sweep found a regression (no deploy involved).
-          Trigger: ${{ github.event_name }}
-          Run: $RUN_URL
-
-          Screenshots + report are attached to the run as the visual-qa-standalone-screenshots artifact.
-          This run gates nothing and rolls back nothing — investigate and fix forward."
-          aws sns publish \
-            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
-            --subject "Life Platform standalone visual-QA FAILED" \
-            --message "$MESSAGE" \
-            --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — the run failure is still visible in Actions"
 
       # #1447 — a red here is advisory (gates nothing), so make it a tracked
       # work item: file/update ONE deduped auto-filed issue on failure, and
