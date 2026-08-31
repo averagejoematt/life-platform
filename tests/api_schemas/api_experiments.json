@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/experiments",
   "is_prefix_sample": false,
   "path": "/api/experiments",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -23,6 +26,12 @@
         "items": [
           {
             "keys": {
+              "citation_note": {
+                "type": "null"
+              },
+              "citation_status": {
+                "type": "string"
+              },
               "difficulty": {
                 "type": "string"
               },
@@ -54,7 +63,7 @@
                 "type": "string"
               },
               "source_url": {
-                "type": "null"
+                "type": "string"
               },
               "status": {
                 "type": "string"
@@ -74,6 +83,12 @@
           },
           {
             "keys": {
+              "citation_note": {
+                "type": "string"
+              },
+              "citation_status": {
+                "type": "string"
+              },
               "difficulty": {
                 "type": "string"
               },
@@ -125,6 +140,12 @@
           },
           {
             "keys": {
+              "citation_note": {
+                "type": "null"
+              },
+              "citation_status": {
+                "type": "string"
+              },
               "difficulty": {
                 "type": "string"
               },
@@ -165,7 +186,7 @@
                 "items": {
                   "type": "string"
                 },
-                "length_sample": 3,
+                "length_sample": 4,
                 "type": "array"
               },
               "votes": {
@@ -176,6 +197,12 @@
           },
           {
             "keys": {
+              "citation_note": {
+                "type": "null"
+              },
+              "citation_status": {
+                "type": "string"
+              },
               "difficulty": {
                 "type": "string"
               },
@@ -207,7 +234,7 @@
                 "type": "string"
               },
               "source_url": {
-                "type": "null"
+                "type": "string"
               },
               "status": {
                 "type": "string"

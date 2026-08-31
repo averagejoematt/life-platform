@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/survival",
   "is_prefix_sample": false,
   "path": "/api/survival",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -89,11 +92,14 @@
             "type": "object"
           }
         ],
-        "length_sample": 11,
+        "length_sample": 14,
         "type": "array"
       },
       "horizon_days": {
         "type": "integer"
+      },
+      "in_progress_note": {
+        "type": "string"
       },
       "method": {
         "type": "string"

@@ -95,6 +95,18 @@ WRITE_PATH_EXEMPT = {
     "/api/challenge_checkin": "POST-only — records a challenge check-in (write)",
     "/api/challenge_follow": "POST-only — follow/unfollow a challenge (write)",
     "/api/challenge_vote": "POST-only — votes on a challenge (write)",
+    # #3324: cohort_submit + replicate_certify were hand-added to _exemptions.json
+    # when their features shipped (#1394, #1393) but never registered HERE — so an
+    # un-scoped `capture_api_schemas.py` full recapture (which rebuilds the entire
+    # ledger from this module's own classification, not from the prior ledger) wiped
+    # both back to a live-probed "capture-failed-405" and failed
+    # test_write_path_exemptions_cover_every_post_only_simple_route. Registering them
+    # here makes a future full recapture idempotent instead of destructive.
+    "/api/cohort_submit": "POST-only — #1394 one-tap weekly cohort single-number submission (write)",
+    "/api/replicate_certify": (
+        "POST-only — #1393 engagement-ladder Replicator self-cert; deduped per "
+        "source, increments the VOTES#ladder_replicator aggregate counter (write)"
+    ),
     "/api/experiment_follow": "POST-only — follow/unfollow an experiment (write)",
     "/api/experiment_suggest": "POST-only — reader-submitted experiment suggestion (write)",
     "/api/experiment_vote": "POST-only — votes on an experiment (write)",
@@ -230,14 +242,27 @@ def diff_shape(old, new, path="$") -> list:
     """Structural diff between two shape nodes. Returns a list of human-readable
     diffs; empty means shape-identical. A KEY ADDED is reported but is not, by
     itself, a breaking change (informational) — key REMOVED and TYPE CHANGED are
-    the drift classes that matter."""
+    the drift classes that matter.
+
+    Nullable-aware (#3324): `json_shape()` renders an absent/None value as
+    `{"type": "null"}`, and a source that is merely absent on ONE capture (a
+    device gap, a genesis-clamped window not yet elapsed, ADR-104 honest-empty)
+    flips a scalar/object/array field between `null` and its normal concrete
+    type across two captures with no code change at all. `null | <type>` is
+    therefore treated as ONE shape in both directions — informational, not
+    breaking — while a genuine cross-type flip (`string` -> `number`, etc.)
+    still fails."""
     diffs = []
     if not (isinstance(old, dict) and isinstance(new, dict)):
         return [f"{path}: not comparable (malformed shape node)"]
-    if old.get("type") != new.get("type"):
-        diffs.append(f"{path}: type changed {old.get('type')!r} -> {new.get('type')!r}")
+    old_type, new_type = old.get("type"), new.get("type")
+    if old_type != new_type:
+        if "null" in (old_type, new_type):
+            diffs.append(f"{path}: nullable type flip {old_type!r} <-> {new_type!r} (informational)")
+            return diffs
+        diffs.append(f"{path}: type changed {old_type!r} -> {new_type!r}")
         return diffs
-    t = old.get("type")
+    t = old_type
     if t == "object":
         old_keys = old.get("keys", {}) or {}
         new_keys = new.get("keys", {}) or {}

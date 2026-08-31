@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/vitals",
   "is_prefix_sample": false,
   "path": "/api/vitals",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -83,6 +86,9 @@
           "night_of": {
             "type": "string"
           },
+          "recovery_as_of": {
+            "type": "string"
+          },
           "recovery_pct": {
             "type": "number"
           },
@@ -93,6 +99,9 @@
             "type": "number"
           },
           "rhr_trend": {
+            "type": "string"
+          },
+          "sleep_as_of": {
             "type": "string"
           },
           "sleep_hours": {
@@ -108,10 +117,10 @@
             "type": "null"
           },
           "weight_delta_lbs": {
-            "type": "number"
+            "type": "null"
           },
           "weight_delta_window_days": {
-            "type": "integer"
+            "type": "null"
           },
           "weight_lbs": {
             "type": "integer"

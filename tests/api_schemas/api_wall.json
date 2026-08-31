@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/wall",
   "is_prefix_sample": false,
   "path": "/api/wall",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -387,7 +390,7 @@
                       },
                       "type": "object"
                     },
-                    "length_sample": 8,
+                    "length_sample": 14,
                     "type": "array"
                   },
                   "ended": {
@@ -403,7 +406,7 @@
                 "type": "object"
               }
             ],
-            "length_sample": 11,
+            "length_sample": 14,
             "type": "array"
           },
           "living_cycle": {

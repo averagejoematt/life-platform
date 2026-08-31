@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/glucose",
   "is_prefix_sample": false,
   "path": "/api/glucose",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -34,10 +37,10 @@
             "type": "null"
           },
           "as_of_date": {
-            "type": "string"
+            "type": "null"
           },
           "avg_mg_dl": {
-            "type": "number"
+            "type": "null"
           },
           "avg_mg_dl_window": {
             "type": "number"
@@ -55,7 +58,18 @@
             "type": "integer"
           },
           "best_day": {
-            "type": "null"
+            "keys": {
+              "avg": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "tir": {
+                "type": "number"
+              }
+            },
+            "type": "object"
           },
           "cgm_source": {
             "type": "string"
@@ -63,26 +77,80 @@
           "days_tracked": {
             "type": "integer"
           },
+          "last_reading": {
+            "keys": {
+              "avg_mg_dl": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "std_dev": {
+                "type": "number"
+              },
+              "time_in_range_pct": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "sensor": {
+            "keys": {
+              "datatype": {
+                "type": "string"
+              },
+              "days_behind": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_reading_date": {
+                "type": "string"
+              },
+              "max_days_behind": {
+                "type": "integer"
+              },
+              "note": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
           "std_dev": {
-            "type": "number"
+            "type": "null"
           },
           "time_above_140_pct": {
             "type": "null"
           },
           "time_in_optimal_pct": {
-            "type": "number"
+            "type": "null"
           },
           "time_in_range_pct": {
-            "type": "number"
+            "type": "null"
           },
           "tir_status": {
-            "type": "string"
+            "type": "null"
           },
           "variability_status": {
-            "type": "string"
+            "type": "null"
           },
           "worst_day": {
-            "type": "null"
+            "keys": {
+              "avg": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "tir": {
+                "type": "number"
+              }
+            },
+            "type": "object"
           }
         },
         "type": "object"
@@ -105,7 +173,7 @@
           },
           "type": "object"
         },
-        "length_sample": 1,
+        "length_sample": 9,
         "type": "array"
       }
     },

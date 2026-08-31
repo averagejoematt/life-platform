@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-08T03:57:06.304856+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/membrane",
   "is_prefix_sample": false,
   "path": "/api/membrane",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -42,7 +45,7 @@
               },
               "type": "object"
             },
-            "length_sample": 3,
+            "length_sample": 6,
             "type": "array"
           },
           "items": {

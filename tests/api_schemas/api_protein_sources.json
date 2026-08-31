@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/protein_sources",
   "is_prefix_sample": false,
   "path": "/api/protein_sources",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -22,10 +25,22 @@
       "as_of_date": {
         "type": "string"
       },
-      "sources": {
+      "days_analyzed": {
+        "type": "integer"
+      },
+      "protein_sources": {
         "items": null,
         "length_sample": 0,
         "type": "array"
+      },
+      "total_protein_30d_avg_g": {
+        "type": "null"
+      },
+      "total_protein_avg_g": {
+        "type": "null"
+      },
+      "total_protein_avg_g_window_days": {
+        "type": "integer"
       }
     },
     "type": "object"

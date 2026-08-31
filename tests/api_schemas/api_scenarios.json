@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/scenarios",
   "is_prefix_sample": false,
   "path": "/api/scenarios",
@@ -10,10 +10,16 @@
           "cache_seconds": {
             "type": "integer"
           },
+          "content_as_of": {
+            "type": "string"
+          },
           "generated_at": {
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },

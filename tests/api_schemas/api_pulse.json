@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/pulse",
   "is_prefix_sample": false,
   "path": "/api/pulse",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -40,6 +43,9 @@
                   "label": {
                     "type": "string"
                   },
+                  "spans_cycles": {
+                    "type": "boolean"
+                  },
                   "state": {
                     "type": "string"
                   },
@@ -54,11 +60,24 @@
               },
               "lift": {
                 "keys": {
+                  "absence_licensed": {
+                    "type": "boolean"
+                  },
+                  "absence_sources_checked": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 3,
+                    "type": "array"
+                  },
                   "days_since_last": {
                     "type": "integer"
                   },
                   "label": {
                     "type": "string"
+                  },
+                  "spans_cycles": {
+                    "type": "boolean"
                   },
                   "state": {
                     "type": "string"
@@ -91,6 +110,9 @@
                   "as_of": {
                     "type": "string"
                   },
+                  "as_of_frame": {
+                    "type": "string"
+                  },
                   "label": {
                     "type": "string"
                   },
@@ -114,10 +136,16 @@
                   "as_of": {
                     "type": "string"
                   },
+                  "delta_1d": {
+                    "type": "integer"
+                  },
                   "hrv_ms": {
                     "type": "number"
                   },
                   "label": {
+                    "type": "string"
+                  },
+                  "night_of": {
                     "type": "string"
                   },
                   "recovery_pct": {
@@ -163,10 +191,16 @@
                   "as_of": {
                     "type": "string"
                   },
+                  "delta_1d": {
+                    "type": "number"
+                  },
                   "hours": {
                     "type": "number"
                   },
                   "label": {
+                    "type": "string"
+                  },
+                  "night_of": {
                     "type": "string"
                   },
                   "state": {
@@ -219,8 +253,37 @@
             "type": "integer"
           },
           "since_yesterday": {
-            "items": null,
-            "length_sample": 0,
+            "items": [
+              {
+                "keys": {
+                  "delta": {
+                    "type": "integer"
+                  },
+                  "signal": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "delta": {
+                    "type": "number"
+                  },
+                  "signal": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ],
+            "length_sample": 2,
             "type": "array"
           },
           "status": {

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/coaching-dashboard",
   "is_prefix_sample": false,
   "path": "/api/coaching-dashboard",
@@ -10,10 +10,16 @@
           "cache_seconds": {
             "type": "integer"
           },
+          "content_as_of": {
+            "type": "string"
+          },
           "generated_at": {
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -22,6 +28,9 @@
       "coaches": {
         "items": {
           "keys": {
+            "analysis_as_of_day_n": {
+              "type": "integer"
+            },
             "analysis_generated_at": {
               "type": "string"
             },
@@ -52,14 +61,51 @@
             "prediction_count": {
               "type": "integer"
             },
+            "published_vitals": {
+              "keys": {
+                "hrv_ms": {
+                  "type": "number"
+                },
+                "recovery_as_of": {
+                  "type": "string"
+                },
+                "recovery_pct": {
+                  "type": "number"
+                },
+                "rhr_bpm": {
+                  "type": "number"
+                },
+                "sleep_as_of": {
+                  "type": "string"
+                },
+                "sleep_hours": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
             "title": {
               "type": "string"
             }
           },
           "type": "object"
         },
-        "length_sample": 8,
+        "length_sample": 7,
         "type": "array"
+      },
+      "content_day_span": {
+        "keys": {
+          "mixed": {
+            "type": "boolean"
+          },
+          "newest_day_n": {
+            "type": "integer"
+          },
+          "oldest_day_n": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
       },
       "open_actions": {
         "items": null,
@@ -76,7 +122,13 @@
       },
       "weekly_priority": {
         "keys": {
+          "as_of_day_n": {
+            "type": "integer"
+          },
           "coach_name": {
+            "type": "string"
+          },
+          "coach_title": {
             "type": "string"
           },
           "generated_at": {

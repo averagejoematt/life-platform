@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/field_notes",
   "is_prefix_sample": false,
   "path": "/api/field_notes",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -23,27 +26,8 @@
         "type": "integer"
       },
       "entries": {
-        "items": {
-          "keys": {
-            "ai_generated_at": {
-              "type": "string"
-            },
-            "ai_tone": {
-              "type": "string"
-            },
-            "has_matthew_response": {
-              "type": "boolean"
-            },
-            "week": {
-              "type": "string"
-            },
-            "week_label": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 1,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       }
     },

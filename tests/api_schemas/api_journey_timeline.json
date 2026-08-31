@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/journey_timeline",
   "is_prefix_sample": false,
   "path": "/api/journey_timeline",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -23,27 +26,66 @@
         "type": "string"
       },
       "events": {
-        "items": {
-          "keys": {
-            "body": {
-              "type": "string"
+        "items": [
+          {
+            "keys": {
+              "body": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
             },
-            "date": {
-              "type": "string"
-            },
-            "link": {
-              "type": "string"
-            },
-            "title": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
-        "length_sample": 1,
+          {
+            "keys": {
+              "body": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              },
+              "meta": {
+                "keys": {
+                  "n": {
+                    "type": "integer"
+                  },
+                  "pair": {
+                    "type": "string"
+                  },
+                  "r": {
+                    "type": "number"
+                  },
+                  "week": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 5,
         "type": "array"
       },
       "total": {

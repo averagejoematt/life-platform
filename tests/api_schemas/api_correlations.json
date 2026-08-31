@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/correlations",
   "is_prefix_sample": false,
   "path": "/api/correlations",
@@ -15,51 +15,319 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
       },
       "correlations": {
-        "items": null,
-        "length_sample": 0,
-        "type": "array"
-      },
-      "count": {
-        "type": "integer"
-      },
-      "end_date": {
-        "type": "null"
-      },
-      "gates": {
         "keys": {
-          "current_n": {
+          "count": {
             "type": "integer"
           },
-          "interp_n": {
-            "keys": {
-              "moderate": {
-                "type": "integer"
+          "end_date": {
+            "type": "string"
+          },
+          "methodology": {
+            "type": "string"
+          },
+          "pairs": {
+            "items": [
+              {
+                "keys": {
+                  "correlation_type": {
+                    "type": "string"
+                  },
+                  "counterintuitive": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "direction": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "keys": {
+                      "ci95": {
+                        "items": {
+                          "type": "number"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      },
+                      "ci_excludes_zero": {
+                        "type": "boolean"
+                      },
+                      "ci_width": {
+                        "type": "number"
+                      },
+                      "fdr_significant": {
+                        "type": "boolean"
+                      },
+                      "level": {
+                        "type": "string"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "n_eff": {
+                        "type": "number"
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "expected_direction": {
+                    "type": "string"
+                  },
+                  "fdr_significant": {
+                    "type": "boolean"
+                  },
+                  "field_a": {
+                    "type": "string"
+                  },
+                  "field_b": {
+                    "type": "string"
+                  },
+                  "label_a": {
+                    "type": "string"
+                  },
+                  "label_b": {
+                    "type": "string"
+                  },
+                  "lag_days": {
+                    "type": "integer"
+                  },
+                  "metric_a": {
+                    "type": "string"
+                  },
+                  "metric_b": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "p": {
+                    "type": "number"
+                  },
+                  "r": {
+                    "type": "number"
+                  },
+                  "source_a": {
+                    "type": "string"
+                  },
+                  "source_b": {
+                    "type": "string"
+                  },
+                  "strength": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
               },
-              "strong": {
-                "type": "integer"
+              {
+                "keys": {
+                  "correlation_type": {
+                    "type": "string"
+                  },
+                  "counterintuitive": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "direction": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "keys": {
+                      "ci95": {
+                        "type": "null"
+                      },
+                      "ci_excludes_zero": {
+                        "type": "null"
+                      },
+                      "ci_width": {
+                        "type": "null"
+                      },
+                      "fdr_significant": {
+                        "type": "boolean"
+                      },
+                      "level": {
+                        "type": "string"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "n_eff": {
+                        "type": "number"
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "expected_direction": {
+                    "type": "string"
+                  },
+                  "fdr_significant": {
+                    "type": "boolean"
+                  },
+                  "field_a": {
+                    "type": "string"
+                  },
+                  "field_b": {
+                    "type": "string"
+                  },
+                  "label_a": {
+                    "type": "string"
+                  },
+                  "label_b": {
+                    "type": "string"
+                  },
+                  "lag_days": {
+                    "type": "integer"
+                  },
+                  "metric_a": {
+                    "type": "string"
+                  },
+                  "metric_b": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "p": {
+                    "type": "null"
+                  },
+                  "r": {
+                    "type": "number"
+                  },
+                  "source_a": {
+                    "type": "string"
+                  },
+                  "source_b": {
+                    "type": "string"
+                  },
+                  "strength": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
               },
-              "weak": {
-                "type": "integer"
+              {
+                "keys": {
+                  "correlation_type": {
+                    "type": "string"
+                  },
+                  "counterintuitive": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "direction": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "keys": {
+                      "ci95": {
+                        "items": {
+                          "type": "number"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      },
+                      "ci_excludes_zero": {
+                        "type": "boolean"
+                      },
+                      "ci_width": {
+                        "type": "number"
+                      },
+                      "fdr_significant": {
+                        "type": "boolean"
+                      },
+                      "level": {
+                        "type": "string"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "n_eff": {
+                        "type": "number"
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "expected_direction": {
+                    "type": "string"
+                  },
+                  "fdr_significant": {
+                    "type": "boolean"
+                  },
+                  "field_a": {
+                    "type": "string"
+                  },
+                  "field_b": {
+                    "type": "string"
+                  },
+                  "label_a": {
+                    "type": "string"
+                  },
+                  "label_b": {
+                    "type": "string"
+                  },
+                  "lag_days": {
+                    "type": "integer"
+                  },
+                  "metric_a": {
+                    "type": "string"
+                  },
+                  "metric_b": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "p": {
+                    "type": "null"
+                  },
+                  "r": {
+                    "type": "number"
+                  },
+                  "source_a": {
+                    "type": "string"
+                  },
+                  "source_b": {
+                    "type": "string"
+                  },
+                  "strength": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
               }
-            },
-            "type": "object"
+            ],
+            "length_sample": 26,
+            "type": "array"
           },
-          "min_n": {
-            "type": "integer"
+          "start_date": {
+            "type": "string"
+          },
+          "week": {
+            "type": "string"
           }
         },
         "type": "object"
-      },
-      "start_date": {
-        "type": "null"
-      },
-      "week": {
-        "type": "null"
       }
     },
     "type": "object"

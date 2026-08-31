@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/inference_receipt",
   "is_prefix_sample": false,
   "path": "/api/inference_receipt",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -25,11 +28,43 @@
       "as_of": {
         "type": "string"
       },
+      "budget_base_ceiling_usd": {
+        "type": "number"
+      },
       "budget_ceiling_usd": {
         "type": "number"
       },
+      "budget_ceiling_window": {
+        "keys": {
+          "base_ceiling": {
+            "type": "number"
+          },
+          "end_exclusive": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reverts_to_base_ceiling": {
+            "type": "number"
+          },
+          "reverts_to_surge_ceiling": {
+            "type": "number"
+          },
+          "start": {
+            "type": "string"
+          },
+          "surge_ceiling": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "budget_surge_active": {
         "type": "boolean"
+      },
+      "budget_surge_ceiling_usd": {
+        "type": "number"
       },
       "budget_tier": {
         "type": "integer"
@@ -49,7 +84,7 @@
           },
           "type": "object"
         },
-        "length_sample": 17,
+        "length_sample": 26,
         "type": "array"
       },
       "models": {
@@ -60,6 +95,12 @@
             },
             "month": {
               "keys": {
+                "cache_read_tokens": {
+                  "type": "integer"
+                },
+                "cache_write_tokens": {
+                  "type": "integer"
+                },
                 "est_cost_usd": {
                   "type": "number"
                 },
@@ -74,6 +115,12 @@
             },
             "today": {
               "keys": {
+                "cache_read_tokens": {
+                  "type": "integer"
+                },
+                "cache_write_tokens": {
+                  "type": "integer"
+                },
                 "est_cost_usd": {
                   "type": "number"
                 },

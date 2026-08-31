@@ -21,10 +21,10 @@ deploy/capture_api_schemas.py --check-drift (run manually / on a schedule — se
 module's docstring for why a live-diff gate isn't wired into this offline suite).
 """
 
-import glob
 import json
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -54,7 +54,13 @@ def _snapshot_paths(snapshot_dir=SNAPSHOT_DIR):
     OUT of each file's own `"path"` field (not guessed from the filename), so a
     rename/slug collision can't silently under- or over-count."""
     paths = set()
-    for fpath in glob.glob(os.path.join(snapshot_dir, "*.json")):
+    # #3324: `.rglob(` (not the non-recursive `glob.glob`) so this walk matches
+    # tests/premerge_derivation.py's `_SWEEP_PATTERN` and the file is correctly
+    # classified as a tree-sweeping structural gate (#2578 family 5) — it enumerates
+    # every committed snapshot to decide coverage, the same shape as the other
+    # sweep gates, and a nested subdirectory under tests/api_schemas/ would silently
+    # escape the non-recursive form.
+    for fpath in sorted(str(p) for p in Path(snapshot_dir).rglob("*.json")):
         if os.path.basename(fpath) == "_exemptions.json":
             continue
         try:
@@ -137,7 +143,7 @@ def test_completeness_gate_catches_a_route_with_neither_snapshot_nor_exemption(t
 
 
 def test_all_snapshot_files_parse_and_match_the_shape_schema():
-    snapshot_files = [f for f in glob.glob(os.path.join(SNAPSHOT_DIR, "*.json")) if os.path.basename(f) != "_exemptions.json"]
+    snapshot_files = [str(p) for p in Path(SNAPSHOT_DIR).rglob("*.json") if os.path.basename(str(p)) != "_exemptions.json"]
     assert len(snapshot_files) >= 50, f"suspiciously few committed snapshot files ({len(snapshot_files)})"
     for fpath in snapshot_files:
         with open(fpath) as f:
@@ -168,8 +174,8 @@ def test_snapshot_files_never_carry_raw_values_only_shape_metadata():
             elif items is not None:
                 _walk(items)
 
-    for fpath in glob.glob(os.path.join(SNAPSHOT_DIR, "*.json")):
-        if os.path.basename(fpath) == "_exemptions.json":
+    for fpath in Path(SNAPSHOT_DIR).rglob("*.json"):
+        if fpath.name == "_exemptions.json":
             continue
         with open(fpath) as f:
             data = json.load(f)
@@ -277,6 +283,63 @@ class TestDiffShape:
         diffs = cas.diff_shape(old, new)
         assert any("vitals.hrv_ms" in d and "type changed" in d for d in diffs)
 
+    # ── #3324: nullable-aware shape rule ──────────────────────────────────────
+
+    def test_null_to_number_is_not_breaking(self):
+        """A source absent on the OLD capture (e.g. Whoop dark that night) reads
+        `null`; present now it's a real number. Not a type change — absence, not
+        a regression."""
+        old = cas.json_shape({"whoop_hrv": None})
+        new = cas.json_shape({"whoop_hrv": 55.0})
+        diffs = cas.diff_shape(old, new)
+        assert any("nullable type flip" in d and "informational" in d for d in diffs)
+        breaking = [d for d in diffs if "informational" not in d]
+        assert breaking == []
+
+    def test_number_to_null_is_not_breaking(self):
+        """The reverse direction: present on the OLD capture, absent now — same
+        nullable class, still not breaking."""
+        old = cas.json_shape({"whoop_hrv": 55.0})
+        new = cas.json_shape({"whoop_hrv": None})
+        diffs = cas.diff_shape(old, new)
+        assert any("nullable type flip" in d and "informational" in d for d in diffs)
+        breaking = [d for d in diffs if "informational" not in d]
+        assert breaking == []
+
+    def test_null_to_object_and_object_to_null_are_not_breaking(self):
+        """Nullable-awareness isn't scalar-only: a whole object/array can be
+        rendered null when its source is absent (e.g. `/api/glucose`'s
+        `best_day`), the same absence semantics one level up."""
+        old = cas.json_shape({"best_day": None})
+        new = cas.json_shape({"best_day": {"date": "2026-08-30", "avg": 95}})
+        diffs = cas.diff_shape(old, new)
+        breaking = [d for d in diffs if "informational" not in d]
+        assert breaking == []
+        # and the reverse
+        diffs2 = cas.diff_shape(new, old)
+        breaking2 = [d for d in diffs2 if "informational" not in d]
+        assert breaking2 == []
+
+    def test_genuine_string_to_number_still_fails(self):
+        """The nullable absorption must not swallow a REAL cross-type flip that
+        has nothing to do with null — a string field that started returning a
+        number is exactly the #3324 Outcome's "the only thing the gate reports"."""
+        old = cas.json_shape({"weight_lbs": "181.4"})
+        new = cas.json_shape({"weight_lbs": 181.4})
+        diffs = cas.diff_shape(old, new)
+        assert any("type changed" in d and "nullable" not in d for d in diffs)
+        breaking = [d for d in diffs if "informational" not in d]
+        assert breaking, "a genuine string -> number flip must still be reported as breaking"
+
+    def test_genuine_boolean_to_integer_still_fails(self):
+        """A second non-null cross-type case, to make sure the nullable carve-out
+        is scoped to `null`, not to "any type mismatch involving a falsy value"."""
+        old = cas.json_shape({"paused": True})
+        new = cas.json_shape({"paused": 1})
+        diffs = cas.diff_shape(old, new)
+        breaking = [d for d in diffs if "informational" not in d]
+        assert breaking, "boolean -> integer is a real type change, not a nullable flip"
+
 
 # ── shared sentinel scan reuse (tests/accuracy_audit.py::scan_json_value_leaks) ──
 
@@ -298,6 +361,91 @@ def test_sentinel_scan_flags_a_leaked_undefined_in_a_live_style_payload():
     findings = aa.scan_json_value_leaks({"vitals": {"note": "value is undefined right now"}}, "test:/api/vitals")
     assert findings
     assert findings[0]["where"] == ".vitals.note"
+
+
+# ── #3324: the sentinel scan is anchored to whole string values for None/null ────
+
+
+def test_sentinel_scan_still_fires_on_a_whole_value_none_leak():
+    """`"value": "None"` — the entire string IS the leaked Python repr, no
+    surrounding sentence. This is the exact leak class #1436 exists to catch."""
+    import accuracy_audit as aa
+
+    findings = aa.scan_json_value_leaks({"labs": {"flag": "None"}}, "test:/api/labs")
+    assert findings
+    assert findings[0]["where"] == ".labs.flag"
+
+
+def test_sentinel_scan_still_fires_on_a_whole_value_null_leak():
+    import accuracy_audit as aa
+
+    findings = aa.scan_json_value_leaks({"labs": {"flag": "null"}}, "test:/api/labs")
+    assert findings
+    assert findings[0]["where"] == ".labs.flag"
+
+
+def test_sentinel_scan_does_not_fire_on_a_sentence_containing_none():
+    """#3324's false-positive: `/api/methods`' `limitations` prose reads "None
+    when |r| >= 1 or n <= 3. ..." — real English describing the ADR-104 absence
+    contract, not a leaked value. The whole string is not just the token "None",
+    so it must not fire."""
+    import accuracy_audit as aa
+
+    findings = aa.scan_json_value_leaks(
+        {"stats": [{"limitations": "None when |r| >= 1 or n <= 3. Supports exactly four confidence levels."}]},
+        "test:/api/methods",
+    )
+    assert findings == []
+
+
+def test_sentinel_scan_does_not_fire_on_null_hypothesis_prose():
+    """#3324's other false-positive source: statistics prose legitimately uses
+    the word "null" ("null hypothesis") inside a longer sentence."""
+    import accuracy_audit as aa
+
+    findings = aa.scan_json_value_leaks(
+        {"supplements": {"measured_by": "The weight-trend rate read against the deficit math; a clear null here retires it."}},
+        "test:/api/supplements",
+    )
+    assert findings == []
+
+
+def test_sentinel_scan_still_fires_on_js_runtime_leaks_mid_sentence():
+    """The JS-runtime-only tokens (undefined/NaN/[object Object]) are NOT common
+    English — a mid-string match still counts, unlike None/null. Re-asserted here
+    (alongside the existing undefined test) for NaN and [object Object]."""
+    import accuracy_audit as aa
+
+    assert aa.scan_json_value_leaks({"a": "score is NaN this week"}, "src")
+    assert aa.scan_json_value_leaks({"a": "rendered [object Object] on the card"}, "src")
+
+
+# ── #2578/#3324: can-it-fail proof for the nullable-aware shape rule ─────────────
+
+_DRIFT_PROBE_PATH = os.path.join(_ROOT, "tests", "fixtures", "_census_probe_2999_api_schema_drift.json")
+
+
+def test_hand_mutated_baseline_reds_on_a_removed_key():
+    """#2578's mutation harness (scripts/gate_census_mutations.py) plants a probe
+    HERE: `reference_shape` is a real committed snapshot's shape (tests/api_schemas/
+    api_vitals.json, copied fresh at plant time, never hand-typed) standing in for
+    "the committed baseline"; `mutated_shape` is the SAME shape with one key hand-
+    removed, standing in for "what a fresh capture just returned" — a captured
+    FIXTURE, not the live site (this suite is offline by design, see the module
+    docstring). The assertion below is the exact offline proxy for what
+    `deploy/capture_api_schemas.py --check-drift` does against the live site:
+    breaking drift between baseline and current capture must fail the run.
+
+    Normally no probe file exists and this test is a no-op PASS — the gate is silent
+    until something is planted. When the probe IS present, this must go RED: the
+    #3324 nullable-flip absorption must not also swallow a genuine key removal."""
+    if not os.path.exists(_DRIFT_PROBE_PATH):
+        return
+    with open(_DRIFT_PROBE_PATH) as f:
+        probe = json.load(f)
+    diffs = cas.diff_shape(probe["reference_shape"], probe["mutated_shape"])
+    breaking = [d for d in diffs if "informational" not in d]
+    assert not breaking, f"check-drift-equivalent: current capture disagrees with the committed baseline: {breaking}"
 
 
 if __name__ == "__main__":

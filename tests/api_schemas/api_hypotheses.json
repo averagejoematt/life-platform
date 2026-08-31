@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/hypotheses",
   "is_prefix_sample": false,
   "path": "/api/hypotheses",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -29,186 +32,95 @@
         "type": "null"
       },
       "hypotheses": {
-        "items": [
-          {
-            "keys": {
-              "check_count": {
-                "type": "number"
-              },
-              "ci95_high": {
-                "type": "null"
-              },
-              "ci95_low": {
-                "type": "null"
-              },
-              "confidence": {
+        "items": {
+          "keys": {
+            "check_count": {
+              "type": "number"
+            },
+            "ci95_high": {
+              "type": "null"
+            },
+            "ci95_low": {
+              "type": "null"
+            },
+            "confidence": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "days_observed": {
+              "type": "number"
+            },
+            "deterministic_verdict": {
+              "type": "string"
+            },
+            "domains": {
+              "items": {
                 "type": "string"
               },
-              "created_at": {
-                "type": "string"
-              },
-              "days_observed": {
-                "type": "null"
-              },
-              "deterministic_verdict": {
-                "type": "null"
-              },
-              "domains": {
-                "items": {
+              "length_sample": 2,
+              "type": "array"
+            },
+            "effect_size": {
+              "type": "null"
+            },
+            "evidence": {
+              "type": "string"
+            },
+            "hypothesis": {
+              "type": "string"
+            },
+            "hypothesis_id": {
+              "type": "string"
+            },
+            "last_checked": {
+              "type": "string"
+            },
+            "last_evidence": {
+              "type": "string"
+            },
+            "n_comparison": {
+              "type": "number"
+            },
+            "n_condition": {
+              "type": "number"
+            },
+            "pre_registered_at": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "test_spec": {
+              "keys": {
+                "condition_metric": {
                   "type": "string"
                 },
-                "length_sample": 2,
-                "type": "array"
-              },
-              "effect_size": {
-                "type": "null"
-              },
-              "evidence": {
-                "type": "string"
-              },
-              "hypothesis": {
-                "type": "string"
-              },
-              "hypothesis_id": {
-                "type": "string"
-              },
-              "last_checked": {
-                "type": "null"
-              },
-              "last_evidence": {
-                "type": "null"
-              },
-              "n_comparison": {
-                "type": "null"
-              },
-              "n_condition": {
-                "type": "null"
-              },
-              "pre_registered_at": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "test_spec": {
-                "keys": {
-                  "condition_metric": {
-                    "type": "string"
-                  },
-                  "condition_op": {
-                    "type": "string"
-                  },
-                  "condition_threshold": {
-                    "type": "number"
-                  },
-                  "direction": {
-                    "type": "string"
-                  },
-                  "lag_days": {
-                    "type": "number"
-                  },
-                  "min_effect": {
-                    "type": "number"
-                  },
-                  "outcome_metric": {
-                    "type": "string"
-                  }
+                "condition_op": {
+                  "type": "string"
                 },
-                "type": "object"
-              }
-            },
-            "type": "object"
+                "condition_threshold": {
+                  "type": "number"
+                },
+                "direction": {
+                  "type": "string"
+                },
+                "lag_days": {
+                  "type": "number"
+                },
+                "min_effect": {
+                  "type": "number"
+                },
+                "outcome_metric": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
           },
-          {
-            "keys": {
-              "check_count": {
-                "type": "number"
-              },
-              "ci95_high": {
-                "type": "null"
-              },
-              "ci95_low": {
-                "type": "null"
-              },
-              "confidence": {
-                "type": "string"
-              },
-              "created_at": {
-                "type": "string"
-              },
-              "days_observed": {
-                "type": "number"
-              },
-              "deterministic_verdict": {
-                "type": "string"
-              },
-              "domains": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 2,
-                "type": "array"
-              },
-              "effect_size": {
-                "type": "null"
-              },
-              "evidence": {
-                "type": "string"
-              },
-              "hypothesis": {
-                "type": "string"
-              },
-              "hypothesis_id": {
-                "type": "string"
-              },
-              "last_checked": {
-                "type": "string"
-              },
-              "last_evidence": {
-                "type": "string"
-              },
-              "n_comparison": {
-                "type": "number"
-              },
-              "n_condition": {
-                "type": "number"
-              },
-              "pre_registered_at": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "test_spec": {
-                "keys": {
-                  "condition_metric": {
-                    "type": "string"
-                  },
-                  "condition_op": {
-                    "type": "string"
-                  },
-                  "condition_threshold": {
-                    "type": "number"
-                  },
-                  "direction": {
-                    "type": "string"
-                  },
-                  "lag_days": {
-                    "type": "number"
-                  },
-                  "min_effect": {
-                    "type": "number"
-                  },
-                  "outcome_metric": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 3,
         "type": "array"
       }

@@ -502,9 +502,16 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # gate_census_proofs.GUARD_PROOFS (six defects planted one at a time into a copy of
         # the committed synth slice → exit 1/1/1/1/2; clean baseline and revert exit 0; the
         # 2026-08-14 grant still ALLOW-ADDITIVE). Stacked on #3315's 46th.
+        # Upper bound raised 47 → 48 (2026-08-31, #3324; rebased after #2834 took 47): the 48th proof is
+        # `structural::test_api_schema_completeness.py` — mutation-backed via the same
+        # re-runnable harness (`gate_census_mutations.py --run --gate
+        # test_api_schema_completeness.py`: ARMED 1/1, planted a captured FIXTURE — a copy
+        # of tests/api_schemas/api_vitals.json's real shape with one key hand-removed,
+        # never the live site — proving the #3324 nullable-aware diff_shape() rule still
+        # catches a genuine key removal).
         3
         <= len(proven)
-        <= 47
+        <= 48
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)

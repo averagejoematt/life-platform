@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/nutrition_overview",
   "is_prefix_sample": false,
   "path": "/api/nutrition_overview",
@@ -15,12 +15,124 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
       },
+      "blueprint_benchmark": {
+        "type": "null"
+      },
       "eating_window": {
         "type": "null"
+      },
+      "electrolytes": {
+        "keys": {
+          "avg_sodium_mg": {
+            "type": "null"
+          },
+          "days_logged": {
+            "type": "integer"
+          },
+          "potassium_pct": {
+            "type": "null"
+          },
+          "sodium_ref_high": {
+            "type": "integer"
+          },
+          "sodium_ref_low": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "food_delivery": {
+        "type": "null"
+      },
+      "lean_mass": {
+        "type": "null"
+      },
+      "loss_rate": {
+        "keys": {
+          "actual_deficit_kcal": {
+            "type": "null"
+          },
+          "deficit_label": {
+            "type": "null"
+          },
+          "deficit_pct": {
+            "type": "null"
+          },
+          "gap_kcal": {
+            "type": "null"
+          },
+          "implied_rate_lb_wk": {
+            "type": "null"
+          },
+          "protein_floor_g": {
+            "type": "number"
+          },
+          "protein_floor_hit_pct": {
+            "type": "null"
+          },
+          "protein_hit_pct": {
+            "type": "null"
+          },
+          "required_deficit_kcal": {
+            "type": "integer"
+          },
+          "target_rate_lb_wk": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "meal_rhythm": {
+        "keys": {
+          "avg_protein_per_meal": {
+            "type": "null"
+          },
+          "days_with_meal_times": {
+            "type": "integer"
+          },
+          "per_day_window": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "protein_distribution_score": {
+            "type": "null"
+          },
+          "reference_window_hrs": {
+            "type": "integer"
+          },
+          "time_distribution": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "micronutrients": {
+        "keys": {
+          "as_of": {
+            "type": "null"
+          },
+          "avg_pct": {
+            "type": "null"
+          },
+          "protein_distribution_score": {
+            "type": "null"
+          },
+          "sufficiency": {
+            "keys": {},
+            "type": "object"
+          }
+        },
+        "type": "object"
       },
       "nutrition": {
         "keys": {
@@ -48,6 +160,12 @@
           "cal_7d_avg": {
             "type": "null"
           },
+          "cal_avg_recent": {
+            "type": "null"
+          },
+          "cal_avg_recent_window_days": {
+            "type": "integer"
+          },
           "days_logged": {
             "type": "integer"
           },
@@ -66,28 +184,37 @@
           "pro_7d_avg": {
             "type": "null"
           },
-          "protein_floor_g": {
+          "pro_avg_recent_g": {
+            "type": "null"
+          },
+          "pro_avg_recent_g_window_days": {
             "type": "integer"
+          },
+          "protein_floor_g": {
+            "type": "number"
           },
           "protein_floor_hit_days": {
             "type": "integer"
           },
           "protein_floor_hit_pct": {
-            "type": "integer"
+            "type": "null"
           },
           "protein_hit_days": {
             "type": "integer"
           },
           "protein_hit_pct": {
-            "type": "integer"
+            "type": "null"
           },
           "protein_target_g": {
-            "type": "integer"
+            "type": "number"
           },
           "stalled": {
             "type": "boolean"
           },
           "tdee": {
+            "type": "null"
+          },
+          "tdee_source": {
             "type": "null"
           },
           "today_pending": {
@@ -127,7 +254,7 @@
                 "type": "integer"
               },
               "protein_hit_pct": {
-                "type": "integer"
+                "type": "null"
               }
             },
             "type": "object"
@@ -156,10 +283,32 @@
                 "type": "integer"
               },
               "protein_hit_pct": {
-                "type": "integer"
+                "type": "null"
               }
             },
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "projection": {
+        "type": "null"
+      },
+      "reconciliation": {
+        "keys": {
+          "days": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "min_days": {
+            "type": "integer"
+          },
+          "overlap_days": {
+            "type": "integer"
+          },
+          "ready": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -215,7 +364,7 @@
                 "type": "integer"
               },
               "protein_hit_pct": {
-                "type": "integer"
+                "type": "null"
               }
             },
             "type": "object"
@@ -244,7 +393,7 @@
                 "type": "integer"
               },
               "protein_hit_pct": {
-                "type": "integer"
+                "type": "null"
               }
             },
             "type": "object"

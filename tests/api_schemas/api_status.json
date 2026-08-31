@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/status",
   "is_prefix_sample": false,
   "path": "/api/status",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -182,68 +185,36 @@
           {
             "keys": {
               "components": {
-                "items": [
-                  {
-                    "keys": {
-                      "comment": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "id": {
-                        "type": "string"
-                      },
-                      "last_sync_relative": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string"
-                      },
-                      "uptime_90d": {
-                        "items": {
-                          "type": "integer"
-                        },
-                        "length_sample": 90,
-                        "type": "array"
-                      }
+                "items": {
+                  "keys": {
+                    "comment": {
+                      "type": "null"
                     },
-                    "type": "object"
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "last_sync_relative": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "uptime_90d": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "length_sample": 90,
+                      "type": "array"
+                    }
                   },
-                  {
-                    "keys": {
-                      "comment": {
-                        "type": "null"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "id": {
-                        "type": "string"
-                      },
-                      "last_sync_relative": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string"
-                      },
-                      "uptime_90d": {
-                        "items": {
-                          "type": "integer"
-                        },
-                        "length_sample": 90,
-                        "type": "array"
-                      }
-                    },
-                    "type": "object"
-                  }
-                ],
+                  "type": "object"
+                },
                 "length_sample": 5,
                 "type": "array"
               },
@@ -342,48 +313,26 @@
           {
             "keys": {
               "components": {
-                "items": [
-                  {
-                    "keys": {
-                      "comment": {
-                        "type": "null"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "id": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string"
-                      }
+                "items": {
+                  "keys": {
+                    "comment": {
+                      "type": "null"
                     },
-                    "type": "object"
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
                   },
-                  {
-                    "keys": {
-                      "comment": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "id": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string"
-                      }
-                    },
-                    "type": "object"
-                  }
-                ],
+                  "type": "object"
+                },
                 "length_sample": 6,
                 "type": "array"
               },

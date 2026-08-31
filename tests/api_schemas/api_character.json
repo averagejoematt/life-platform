@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/character",
   "is_prefix_sample": false,
   "path": "/api/character",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -52,6 +55,15 @@
           "composite_delta_1d": {
             "type": "number"
           },
+          "composite_note": {
+            "type": "string"
+          },
+          "composite_pillar_count": {
+            "type": "integer"
+          },
+          "composite_pillar_total": {
+            "type": "integer"
+          },
           "composite_score": {
             "type": "number"
           },
@@ -72,6 +84,210 @@
           },
           "xp_total": {
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "input_manifest": {
+        "keys": {
+          "as_of_day": {
+            "type": "string"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "degraded": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          },
+          "sources": {
+            "keys": {
+              "apple_health": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "food_delivery": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "habitify": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "hevy": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "macrofactor": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "notion": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "strava": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "todoist": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "whoop": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "withings": {
+                "keys": {
+                  "age_hours": {
+                    "type": "number"
+                  },
+                  "latest_day": {
+                    "type": "string"
+                  },
+                  "stale_after_hours": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "status": {
+            "type": "string"
+          },
+          "unobserved": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
           }
         },
         "type": "object"
@@ -159,6 +375,48 @@
           },
           {
             "keys": {
+              "absence": {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "dark_sources": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "days_dark": {
+                    "type": "integer"
+                  },
+                  "days_since_last_log": {
+                    "type": "integer"
+                  },
+                  "last_log_date": {
+                    "type": "string"
+                  },
+                  "sources": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "stale_hours": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "transition": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "absent_behaviors": {
                 "items": null,
                 "length_sample": 0,
@@ -240,6 +498,50 @@
           },
           {
             "keys": {
+              "absence": {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 4,
+                    "type": "array"
+                  },
+                  "dark_sources": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "days_dark": {
+                    "type": "integer"
+                  },
+                  "days_since_last_log": {
+                    "type": "null"
+                  },
+                  "last_log_date": {
+                    "type": "string"
+                  },
+                  "sources": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "stale_hours": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "transition": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "absent_behaviors": {
                 "items": {
                   "type": "string"
@@ -292,7 +594,18 @@
                 "type": "string"
               },
               "neglect_decay": {
-                "type": "null"
+                "keys": {
+                  "applied": {
+                    "type": "boolean"
+                  },
+                  "gap_days": {
+                    "type": "number"
+                  },
+                  "multiplier": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
               },
               "not_instrumented": {
                 "type": "boolean"
@@ -342,23 +655,23 @@
                     "type": "array"
                   },
                   "dragging": {
-                    "items": null,
-                    "length_sample": 0,
-                    "type": "array"
-                  },
-                  "no_data": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 3,
-                    "type": "array"
-                  },
-                  "top": {
                     "items": {
                       "type": "string"
                     },
                     "length_sample": 1,
                     "type": "array"
+                  },
+                  "no_data": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 3,
+                    "type": "array"
+                  },
+                  "top": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
                   }
                 },
                 "type": "object"
@@ -374,6 +687,146 @@
               },
               "neglect_decay": {
                 "type": "null"
+              },
+              "not_instrumented": {
+                "type": "boolean"
+              },
+              "not_instrumented_note": {
+                "type": "null"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "score_delta": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              },
+              "xp_debt": {
+                "type": "number"
+              },
+              "xp_delta": {
+                "type": "number"
+              },
+              "xp_earned": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "absence": {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "dark_sources": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "days_dark": {
+                    "type": "integer"
+                  },
+                  "days_since_last_log": {
+                    "type": "null"
+                  },
+                  "last_log_date": {
+                    "type": "string"
+                  },
+                  "sources": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "stale_hours": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "transition": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "absent_behaviors": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "coverage_hold": {
+                "type": "boolean"
+              },
+              "data_coverage": {
+                "type": "number"
+              },
+              "drivers": {
+                "keys": {
+                  "absent": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "dragging": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "no_data": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 3,
+                    "type": "array"
+                  },
+                  "top": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "level": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "neglect_decay": {
+                "keys": {
+                  "applied": {
+                    "type": "boolean"
+                  },
+                  "gap_days": {
+                    "type": "number"
+                  },
+                  "multiplier": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
               },
               "not_instrumented": {
                 "type": "boolean"
@@ -483,6 +936,46 @@
           },
           {
             "keys": {
+              "absence": {
+                "keys": {
+                  "absent_behaviors": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "dark_sources": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "days_dark": {
+                    "type": "null"
+                  },
+                  "days_since_last_log": {
+                    "type": "null"
+                  },
+                  "last_log_date": {
+                    "type": "string"
+                  },
+                  "sources": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "stale_hours": {
+                    "type": "null"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "transition": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
               "absent_behaviors": {
                 "items": null,
                 "length_sample": 0,
@@ -509,17 +1002,15 @@
                     "type": "array"
                   },
                   "no_data": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 1,
+                    "items": null,
+                    "length_sample": 0,
                     "type": "array"
                   },
                   "top": {
                     "items": {
                       "type": "string"
                     },
-                    "length_sample": 1,
+                    "length_sample": 2,
                     "type": "array"
                   }
                 },

@@ -388,7 +388,28 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # (measured both sides). The whole #3220 invariant — a name-only match can never inflate
 # #2578's pile of real proof work — is now enforced by the verdict's TYPE rather than by
 # the row's absence, which is the stronger form.
-BASELINE_TOTAL_GATES = 584
+# 584 -> 587 (2026-08-31, #3324; rebased onto main 191c8846b after #3329 took 584; originally measured against PR #3339's
+# merge): THREE real gates. Two registry entries — `WRITE_PATH_EXEMPT[/api/cohort_submit]`
+# and `WRITE_PATH_EXEMPT[/api/replicate_certify]` in deploy/capture_api_schemas.py — restore
+# two POST-only endpoints that were hand-added to tests/api_schemas/_exemptions.json when
+# their features shipped (#1394, #1393) but never registered in the script's own
+# classification dict, so an un-scoped full `capture_api_schemas.py` recapture (this PR's
+# dated #3324 recapture) silently downgraded both to a live-probed "capture-failed-405" and
+# broke test_write_path_exemptions_cover_every_post_only_simple_route; registering them here
+# makes a future full recapture idempotent. The third is `structural::test_api_schema_
+# completeness.py` — the file already enumerated the committed snapshot tree with the
+# non-recursive glob.glob; switching to Path's recursive walk (a genuine improvement: a
+# nested subdir under tests/api_schemas/ was previously invisible to it) matches
+# tests/premerge_derivation.py's `_SWEEP_PATTERN` and correctly joins family 5. Verified
+# by id-set diff (each tree ran its
+# OWN scripts/gate_census.py --json; main from a `git archive` export at this branch's own
+# merge-base, 575): ADDED exactly the three ids above, REMOVED {}. It arrives PROVEN — a
+# MutationSpec plants a captured FIXTURE (a copy of tests/api_schemas/api_vitals.json's real
+# shape with one key hand-removed, never the live site) and STRUCTURAL_PROOFS records it
+# (ARMED: baseline 32 passed / mutated 1 failed / reverted 32 passed) — so live unproven
+# moves only by the two registry entries (526 -> 528, still under the committed 541, which
+# is NOT moved).
+BASELINE_TOTAL_GATES = 587
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was

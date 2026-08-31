@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/diary_shelf",
   "is_prefix_sample": false,
   "path": "/api/diary_shelf",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -25,8 +28,63 @@
             "type": "integer"
           },
           "entries": {
-            "items": null,
-            "length_sample": 0,
+            "items": {
+              "keys": {
+                "channel": {
+                  "type": "string"
+                },
+                "claims": {
+                  "items": null,
+                  "length_sample": 0,
+                  "type": "array"
+                },
+                "claims_on_record": {
+                  "type": "integer"
+                },
+                "cycle": {
+                  "type": "integer"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "day_mark": {
+                  "keys": {
+                    "earned": {
+                      "type": "number"
+                    },
+                    "svg": {
+                      "type": "string"
+                    },
+                    "warming_up": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "day_number": {
+                  "type": "integer"
+                },
+                "format": {
+                  "type": "string"
+                },
+                "quotes": {
+                  "items": null,
+                  "length_sample": 0,
+                  "type": "array"
+                },
+                "quotes_withheld": {
+                  "type": "integer"
+                },
+                "theme": {
+                  "type": "string"
+                },
+                "tier": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 1,
             "type": "array"
           },
           "label": {

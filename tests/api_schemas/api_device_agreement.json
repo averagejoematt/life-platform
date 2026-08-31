@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/device_agreement",
   "is_prefix_sample": false,
   "path": "/api/device_agreement",
@@ -15,6 +15,29 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "archival": {
+        "keys": {
+          "cycle": {
+            "type": "null"
+          },
+          "days_before": {
+            "type": "integer"
+          },
+          "genesis": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "pre_cycle": {
+            "type": "boolean"
           }
         },
         "type": "object"
