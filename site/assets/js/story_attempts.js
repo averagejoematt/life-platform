@@ -114,6 +114,14 @@ async function boot() {
     return;
   }
 
+  // The hero's one number, data-bound. A start count written into the shell goes
+  // stale on the very next re-anchor (it read "Seven" at cycle 15), so the shell
+  // ships a neutral, always-true fallback ("Every start, counted") and the live
+  // count comes from the same /api/survival record the log below renders from —
+  // every start that actually happened, including the live one once it exists.
+  const startsEl = $("[data-att-starts]");
+  if (startsEl) startsEl.textContent = `${n(cycles.length)} start${cycles.length === 1 ? "" : "s"} and counting`;
+
   const closed = cycles.filter((c) => !c.is_current);
   const live = cycles.find((c) => c.is_current) || null;
   const maxCycle = Math.max(...cycles.map((c) => c.cycle));
