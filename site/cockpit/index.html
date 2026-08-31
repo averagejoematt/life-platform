@@ -81,9 +81,14 @@
            function of today's real numbers), injected by cockpit.js from /api/fingerprint.
            Earned glow only; links through to the wall of every attempt. Self-hides. -->
       <div class="cockpit-fingerprint" data-bind="fingerprint" hidden></div>
-      <!-- #1375: attempt framing — day-1 emptiness reads as stakes, not failure.
-           Derived live from /api/survival by cockpit.js; self-hides without data. -->
-      <p class="ph-attempt label" data-bind="attempt" hidden></p>
+      <!-- #1375 RETIRED at the 2026-09-01 launch re-anchor (owner decision, 2026-08-31 —
+           the September 1st launch, Session O Phase D1). The masthead read
+           "Attempt #N — previous best: D days" over the cockpit hero; the launch reads
+           September 1st as THE starting point, so the live instrument no longer opens on
+           a prior-run scoreboard. The record itself is untouched — /api/survival is
+           unchanged and the full history stays on /story/attempts/ (still linked from
+           site-wide chrome), /method/cycles/ and /data/wall/. The renderer
+           (cockpit.js loadAttemptLine) is removed with it. -->
       <nav class="loop-ribbon" aria-label="Where this sits in the loop"><span class="lr-here" aria-current="page">Now</span><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
       <!-- #1106: the instrument strip — the first screen reads as a cockpit. Composed
            from the EXISTING ring() primitive (charts.js) + the instrument mark

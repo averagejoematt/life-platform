@@ -1062,7 +1062,10 @@ def is_active_vs_passive_objection(finding, start_date=None, today=None):
 # THE OBSERVED FAILURE (qa-smoke 2026-08-31, finding 539c6d, high, "confirmed on
 # a second pass" — held `qa-smoke-failures` in ALARM): the home page's protagonist
 # copy ("every climb before this one ended the same way…" — TRUE, phase-neutral
-# by design per site/index.html's #732/#1087 comments) was graded high because
+# by design per site/index.html's #732/#1087 comments; that sentence was later
+# retired from home for the 2026-09-01 launch re-anchor — an editorial call, not a
+# concession, and it changes nothing here: this ruling is structural and reads only
+# the judge's own note) was graded high because
 # current editorial voice "should be moved to a labeled 'previous attempts'
 # archive". The note cites no date, no day number, no span — nothing the phase
 # could contradict. It escaped #3337's channel 2 (not grounded in the day

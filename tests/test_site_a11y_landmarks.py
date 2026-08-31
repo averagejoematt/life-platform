@@ -110,10 +110,14 @@ def test_v4_doors_link_tokens_first():
 # excludes node counts (#1428 anti-flake tradeoff, tests/a11y_audit.py:22-25),
 # so this instance-count growth was invisible to that gate by design — this is
 # a static structural regression guard, not a change to the axe tooling.
+# 2026-08-31 (the September 1st launch, Session O Phase D1): `.ph-attempt` — the
+# "Attempt #N — previous best" masthead — was retired from the cockpit hero with the
+# launch re-anchor, so it is no longer one of the nodes this guard can place. The
+# remaining three are the live ones; the axe finding this guard came from (#1992) was
+# about the .page-hero.cockpit-hero BLOCK's position, which is unchanged.
 COCKPIT_HERO_MARKERS = (
     'class="ph-kicker label"',
     'class="cockpit-fingerprint"',
-    'class="ph-attempt label"',
     'class="hero-instruments"',
 )
 
