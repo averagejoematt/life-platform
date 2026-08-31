@@ -121,7 +121,10 @@ jobs:
           # a different version here would make a red mean "engine version",
           # not "iOS Safari breakage"). Both read the ONE pin in requirements-dev.txt
           # (#2609) — test_webkit_weekly_qa.py enforces that they share the source.
-          PINS=$(python3 scripts/ci_pins.py playwright)
+          # pillow (#3353): the WebKit tiled-screenshot fallback stitches viewport tiles with Pillow;
+          # the first dispatched run after PR #3356 printed "Tiled screenshot fallback unavailable —
+          # Pillow import failed" on /protocols/challenges/ because this job never installed it.
+          PINS=$(python3 scripts/ci_pins.py playwright pillow)
           python -m pip install $PINS
           python -m playwright install --with-deps webkit
 
