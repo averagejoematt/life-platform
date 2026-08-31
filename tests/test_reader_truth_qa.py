@@ -43,6 +43,12 @@ _START = date.fromisoformat(EXPERIMENT_START_DATE)
 _DAY_1 = _START.isoformat()
 _DAY_2 = (_START + timedelta(days=1)).isoformat()
 _PRE_3 = (_START - timedelta(days=3)).isoformat()
+# #3337: the ruling predicates now take the phase anchors, and every wire note below
+# is replayed at the day it was RECORDED on — a fixture judged against the wrong day
+# is not the wire. Derived from EXPERIMENT_START_DATE, never a wall-clock literal.
+_DAY_5 = (_START + timedelta(days=4)).isoformat()
+_DAY_6 = (_START + timedelta(days=5)).isoformat()
+_DAY_9 = (_START + timedelta(days=8)).isoformat()
 
 _PAGES = [
     {"name": "Cockpit", "path": "/now/", "prose": "Day marker here. Your 30-day trend shows steady improvement across every pillar."},
@@ -673,7 +679,7 @@ def test_truth_line_carries_the_full_note():
 
 def test_vagueness_objection_fires_on_the_observed_timeline_note():
     f = {"page": "/story/timeline/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3003}
-    assert rtq.is_vagueness_objection(f) is True
+    assert rtq.is_vagueness_objection(f, _DAY_1, _DAY_6) is True
 
 
 def test_vagueness_objection_spares_a_real_impossibility_claim():
@@ -682,13 +688,13 @@ def test_vagueness_objection_spares_a_real_impossibility_claim():
         "(Day 1 = 2026-08-17). A 57-day history is impossible; the experiment has only existed for 5 days."
     )
     f = {"page": "/data/vitals/", "category": "temporal_contradiction", "severity": "high", "note": note}
-    assert rtq.is_vagueness_objection(f) is False
+    assert rtq.is_vagueness_objection(f, _DAY_1, _DAY_5) is False
 
 
 def test_vagueness_objection_never_touches_other_categories():
     for cat in ("duplicated_narrative", "audience_violation", "other"):
         f = {"page": "/", "category": cat, "severity": "high", "note": _NOTE_3003}
-        assert rtq.is_vagueness_objection(f) is False, cat
+        assert rtq.is_vagueness_objection(f, _DAY_1, _DAY_6) is False, cat
 
 
 def test_assess_prose_demotes_a_vagueness_high_to_low(capsys):
@@ -701,7 +707,7 @@ def test_assess_prose_demotes_a_vagueness_high_to_low(capsys):
         "summary": "x",
     }
     pages = [{"name": "Timeline", "path": "/story/timeline/", "prose": "The logs have gone quiet — 4 days without an entry."}]
-    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_2)
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_6)
     assert errors == []
     assert len(findings) == 1, "demoted, not dropped — it must stay visible as an advisory"
     assert findings[0]["severity"] == "low"
@@ -876,7 +882,7 @@ _NOTE_2959_SURVIVAL = (
 def test_self_refuted_fires_on_both_observed_notes():
     for page, note in (("/data/wall/", _NOTE_2959_WALL), ("/method/survival/", _NOTE_2959_SURVIVAL)):
         f = {"page": page, "category": "temporal_contradiction", "severity": "high", "note": note}
-        assert rtq.is_self_refuted(f) is True, page
+        assert rtq.is_self_refuted(f, _DAY_1, _DAY_6) is True, page
 
 
 def test_self_refuted_spares_a_midnote_consistency_with_live_objection():
@@ -888,12 +894,12 @@ def test_self_refuted_spares_a_midnote_consistency_with_live_objection():
         "consistent. But the header dates the restart 2026-08-16, one day before genesis."
     )
     f = {"page": "/method/postmortems/", "category": "temporal_contradiction", "severity": "high", "note": note}
-    assert rtq.is_self_refuted(f) is False
+    assert rtq.is_self_refuted(f, _DAY_1, _DAY_6) is False
 
 
 def test_self_refuted_spares_an_ordinary_finding():
     f = {"page": "/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_2959_HOME}
-    assert rtq.is_self_refuted(f) is False
+    assert rtq.is_self_refuted(f, _DAY_1, _DAY_6) is False
 
 
 def test_assess_prose_demotes_a_day_counter_bound_high_to_low(capsys):
@@ -923,7 +929,7 @@ def test_assess_prose_drops_a_self_refuted_finding(capsys):
         "summary": "x",
     }
     pages = [{"name": "Wall", "path": "/data/wall/", "prose": "ATTEMPT 14 FROM 2026-08-17 alive · day 6"}]
-    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_2)
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_6)
     assert errors == []
     assert findings == [], "a withdrawn claim must not reach the gate at any severity"
     assert "dropped a self-refuted finding" in capsys.readouterr().out
@@ -940,7 +946,7 @@ def test_self_refuted_fires_on_the_third_deploy_training_note():
         "from 63→67 bpm across this window. This is within phase bounds and internally consistent."
     )
     f = {"page": "/data/training/", "category": "temporal_contradiction", "severity": "high", "note": note}
-    assert rtq.is_self_refuted(f) is True
+    assert rtq.is_self_refuted(f, _DAY_1, _DAY_6) is True
 
 
 def test_harness_threads_the_sweep_clock_to_assess_prose(tmp_path, monkeypatch):
@@ -1294,7 +1300,7 @@ _NOTE_3199_BOARD = (
 
 def test_active_vs_passive_objection_fires_on_the_observed_board_note():
     f = {"page": "/method/board/", "category": "temporal_contradiction", "severity": "high", "note": _NOTE_3199_BOARD}
-    assert rtq.is_active_vs_passive_objection(f) is True
+    assert rtq.is_active_vs_passive_objection(f, _DAY_1, _DAY_9) is True
 
 
 def test_active_vs_passive_objection_spares_a_real_wrong_day_claim():
@@ -1305,7 +1311,7 @@ def test_active_vs_passive_objection_spares_a_real_wrong_day_claim():
         "August 23 is Day 7, not Day 9 — the banner overstates the cycle position."
     )
     f = {"page": "/", "category": "temporal_contradiction", "severity": "high", "note": note}
-    assert rtq.is_active_vs_passive_objection(f) is False
+    assert rtq.is_active_vs_passive_objection(f, _DAY_1, _DAY_7) is False
 
 
 def test_active_vs_passive_objection_spares_a_since_date_that_is_actually_wrong():
@@ -1316,13 +1322,13 @@ def test_active_vs_passive_objection_spares_a_since_date_that_is_actually_wrong(
         "of the current cycle (2026-08-17), and today is Day 9. The cited since-date predates genesis."
     )
     f = {"page": "/method/board/", "category": "temporal_contradiction", "severity": "high", "note": note}
-    assert rtq.is_active_vs_passive_objection(f) is False
+    assert rtq.is_active_vs_passive_objection(f, _DAY_1, _DAY_9) is False
 
 
 def test_active_vs_passive_objection_never_touches_other_categories():
     for cat in ("duplicated_narrative", "audience_violation", "other"):
         f = {"page": "/method/board/", "category": cat, "severity": "high", "note": _NOTE_3199_BOARD}
-        assert rtq.is_active_vs_passive_objection(f) is False, cat
+        assert rtq.is_active_vs_passive_objection(f, _DAY_1, _DAY_9) is False, cat
 
 
 def test_assess_prose_demotes_an_active_vs_passive_objection_high_to_low(capsys):
@@ -1335,9 +1341,15 @@ def test_assess_prose_demotes_an_active_vs_passive_objection_high_to_low(capsys)
         "summary": "x",
     }
     pages = [{"name": "Board", "path": "/method/board/", "prose": "Dr. Eli Marsh: active logging went silent."}]
-    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_7)
+    findings, errors = rtq.assess_prose(pages, _fake_invoke(verdict), today_iso=_DAY_9)
     assert errors == []
     assert len(findings) == 1, "demoted, not dropped — stays visible as advisory"
     assert findings[0]["severity"] == "low"
     assert findings[0]["note"] == _NOTE_3199_BOARD, "demotion must not lose the evidence"
-    assert "demoted an active-vs-passive objection" in capsys.readouterr().out
+    # #3337: the reshaped vagueness ruling (no impossibility established) reaches this
+    # note too and demotes first, so the active-vs-passive ruling adjudicates an
+    # already-low finding. Both ids are recorded — the ledger has always allowed a
+    # finding to match more than one ruling, and the routing key is the FIELD (#3258),
+    # not which line printed. What must not change is that this ruling still fires.
+    assert set(findings[0][rtq.RULINGS_FIELD]) >= {"active_vs_passive", "vagueness_objection"}
+    assert "an active-vs-passive objection" in capsys.readouterr().out

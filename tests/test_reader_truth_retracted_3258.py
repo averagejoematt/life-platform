@@ -39,12 +39,14 @@ rated `low` was never adjudicated at all, and `low` lands in the alarmed WarnCou
 import json
 import sys
 import types
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lambdas"))
 
+from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from operational import (
     qa_check_reader_truth as q,  # noqa: E402
     reader_truth_qa as rtq,  # noqa: E402
@@ -64,6 +66,12 @@ RETRACTED_NOTE = (
     "on reconsideration."
 )
 RETRACTED_NOTE_CHARS = 576  # the log line's own stamp
+
+# The phase the retraction was recorded at (Day 11), derived from the live constant so
+# a reset moves it — the #3337 rulings take the phase anchors, and a wire note judged
+# against the wrong day is no longer the wire.
+_PHASE_START = EXPERIMENT_START_DATE
+_DAY_11 = (date.fromisoformat(EXPERIMENT_START_DATE) + timedelta(days=10)).isoformat()
 
 # "… finding e5eafd · /api/glucose [temporal_contradiction/med] — full note (387 chars): …"
 REAL_NOTE = (
@@ -217,12 +225,12 @@ def test_the_ledger_is_consulted_at_low_severity_too():
     #3003 adjudicated the class two issues ago — but `assess_prose` asked only when
     severity was above `low`, which is the one severity the warnings alarm still
     fires on."""
-    assert rtq.is_vagueness_objection(_RETRACTED) is True
+    assert rtq.is_vagueness_objection(_RETRACTED, _PHASE_START, _DAY_11) is True
 
     def _invoke(body, model_name=None):
         return _verdict_payload([dict(_RETRACTED)])
 
-    findings, errors = rtq.assess_prose([dict(_SURFACES[0])], _invoke, today_iso="2026-08-27")
+    findings, errors = rtq.assess_prose([dict(_SURFACES[0])], _invoke, today_iso=_DAY_11)
     assert errors == []
     assert len(findings) == 1, "adjudicated, not dropped — the evidence stays visible"
     assert findings[0]["severity"] == "low", "an already-low finding must not be re-graded"
@@ -237,7 +245,7 @@ def test_an_unadjudicated_finding_carries_no_rulings_field():
     def _invoke(body, model_name=None):
         return _verdict_payload([dict(_REAL)])
 
-    findings, _ = rtq.assess_prose([dict(_SURFACES[1])], _invoke, today_iso="2026-08-27")
+    findings, _ = rtq.assess_prose([dict(_SURFACES[1])], _invoke, today_iso=_DAY_11)
     assert len(findings) == 1
     assert not findings[0].get(rtq.RULINGS_FIELD)
     assert rtq.is_advisory(findings[0]) is False
@@ -250,7 +258,7 @@ def test_the_withdrawal_phrase_list_was_not_extended():
     finding is NOT caught by the phrase matcher, and that is deliberate — it is
     caught by the ruling FIELD. If a later change makes `is_self_refuted` True
     here, the phrase list grew and this test says so out loud."""
-    assert rtq.is_self_refuted(_RETRACTED) is False, (
+    assert rtq.is_self_refuted(_RETRACTED, _PHASE_START, _DAY_11) is False, (
         "_WITHDRAWAL_RE was extended to cover this note. That is the phrase-matched "
         "suppressor family (#2959/#3003/#3199) — route on the `rulings` field instead."
     )

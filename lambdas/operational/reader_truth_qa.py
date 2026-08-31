@@ -100,6 +100,8 @@ SEVERITIES = ("low", "med", "high")
 from operational.reader_truth_rulings import (  # noqa: F401
     CODE_OWNED_TEMPORAL_SURFACES,
     DURABLE_DESIGN_COPY,
+    JUDGE_BASIS_FIELD,
+    JUDGE_BASIS_VALUES,
     RULINGS_FIELD,
     _is_registered_span,
     _normalize_copy,
@@ -119,6 +121,7 @@ from operational.reader_truth_rulings import (  # noqa: F401
     is_utc_offset_misread,
     is_vagueness_objection,
     is_wake_frame_correct,
+    judge_basis,
     quoted_spans,
 )
 
@@ -463,9 +466,14 @@ _PROMPT_FOOTER = """
 Respond with ONLY a JSON object, no prose, no markdown fences:
 {{"findings": [{{"page": "<path of the surface, exactly as given>", \
 "category": "temporal_contradiction"|"duplicated_narrative"|"audience_violation", \
-"severity": "low"|"med"|"high", "note": "string"}}], \
+"severity": "low"|"med"|"high", "basis": "impossibility"|"ambiguity"|"withdrawn", \
+"note": "string"}}], \
 "severity": "ok"|"low"|"med"|"high", "summary": "one sentence"}}
-Set top-level "severity" to the maximum finding severity, or "ok" if there are no findings."""
+Set top-level "severity" to the maximum finding severity, or "ok" if there are no findings.
+"basis" records what your own note concludes: "impossibility" = the phase makes the copy \
+impossible; "ambiguity" = the copy is unclear/imprecise but not impossible; "withdrawn" = \
+your note re-checked and found no contradiction. Say which — do not drop a retraction or an \
+ambiguity into the prose of a finding you still label an impossibility."""
 
 
 def build_prompt(pages, phase, max_chars=MAX_PROSE_CHARS):
@@ -536,7 +544,13 @@ def _normalize_finding(f, batch_paths):
     # sentence (the [never diagnose from a truncated log line] trap built into the
     # instrument's own record). The note is already bounded by the model's own
     # max_tokens (1500/batch); truncation belongs at PRINT time only.
-    return {"page": page, "category": cat, "severity": sev, "note": str(f.get("note") or "")}
+    out = {"page": page, "category": cat, "severity": sev, "note": str(f.get("note") or "")}
+    # #3337: the judge's own structured basis, kept ONLY when it is one of the three
+    # enum values. Absent or unrecognized → the field is omitted and every ruling
+    # falls back to its structural evidence channel, exactly as before this shipped.
+    if f.get(JUDGE_BASIS_FIELD) in JUDGE_BASIS_VALUES:
+        out[JUDGE_BASIS_FIELD] = f[JUDGE_BASIS_FIELD]
+    return out
 
 
 # ── assessment loop ────────────────────────────────────────────────────────────
@@ -589,7 +603,7 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                     continue
                 # #2780: same discipline for the mid-cycle wake-date frame — printed,
                 # never silently swallowed.
-                if is_wake_frame_correct(f):
+                if is_wake_frame_correct(f, phase["today"]):
                     print(
                         f"  ↩ reader-truth: dropped a wake-frame-correct night finding on {f['page']} "
                         f"(night_of + 1 = as_of IS the convention, #2780): {f['note'][:120]}"
@@ -637,7 +651,7 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                 # contradiction here on rechecking arithmetic" — and it still came
                 # back `high`, run 32618360726). Gating on a claim its own evidence
                 # retracts is gating on nothing. Printed, never silently swallowed.
-                if is_self_refuted(f):
+                if is_self_refuted(f, phase["start_date"], phase["today"]):
                     print(
                         f"  ↩ reader-truth: dropped a self-refuted finding on {f['page']} "
                         f"(its own final sentence withdraws the contradiction, #2959): {f['note'][:120]}"
@@ -665,7 +679,10 @@ def assess_prose(pages, invoke, model_name=None, today_iso=None, batch_size=DEFA
                 # The severity demotion is unchanged and still only applies above
                 # `low` (demoting a low to a low was always a no-op). Every ruling
                 # is printed, never silently swallowed.
-                for ruling_id, label, fires, reason in advisory_rulings(phase["start_date"], today_iso):
+                # #3337: `phase["today"]` (the resolved Pacific date), never the raw
+                # `today_iso` argument — which is None on every production run, so
+                # every today-aware ruling was silently running without a clock.
+                for ruling_id, label, fires, reason in advisory_rulings(phase["start_date"], phase["today"]):
                     if not fires(f):
                         continue
                     f = dict(f, **{RULINGS_FIELD: sorted(set(f.get(RULINGS_FIELD) or ()) | {ruling_id})})
