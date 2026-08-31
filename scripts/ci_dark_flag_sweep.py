@@ -249,13 +249,6 @@ ALLOWED_ABSENT = (
         "the weekly WebKit sweep is deterministic-only and holds no AWS role for it",
     ),
     (
-        "webkit-mobile-qa.yml",
-        "webkit-mobile-qa",
-        "tests/visual_qa.py",
-        "pillow",
-        "PIL is reached only through visual_ai_qa under --ai-qa/--reader-truth; the WebKit sweep passes neither ($0 Bedrock by design)",
-    ),
-    (
         "v4-gate.yml",
         "render-accuracy-gate",
         "tests/pr_render_gate.py",
