@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/habit_registry",
   "is_prefix_sample": false,
   "path": "/api/habit_registry",
@@ -33,76 +33,40 @@
         "type": "array"
       },
       "habits": {
-        "items": [
-          {
-            "keys": {
-              "frequency": {
-                "type": "string"
-              },
-              "group": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "scheduled_today": {
-                "type": "boolean"
-              },
-              "taxonomy": {
-                "keys": {
-                  "derived": {
-                    "type": "boolean"
-                  },
-                  "group": {
-                    "type": "string"
-                  },
-                  "time_of_day": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
+        "items": {
+          "keys": {
+            "frequency": {
+              "type": "string"
             },
-            "type": "object"
+            "group": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "scheduled_today": {
+              "type": "boolean"
+            },
+            "taxonomy": {
+              "keys": {
+                "derived": {
+                  "type": "boolean"
+                },
+                "group": {
+                  "type": "string"
+                },
+                "time_of_day": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
           },
-          {
-            "keys": {
-              "frequency": {
-                "type": "string"
-              },
-              "group": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "scheduled_today": {
-                "type": "boolean"
-              },
-              "taxonomy": {
-                "keys": {
-                  "derived": {
-                    "type": "boolean"
-                  },
-                  "group": {
-                    "type": "null"
-                  },
-                  "time_of_day": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 59,
         "type": "array"
       },

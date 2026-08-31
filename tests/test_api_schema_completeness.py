@@ -161,11 +161,16 @@ def test_snapshot_files_never_carry_raw_values_only_shape_metadata():
 
     def _walk(node):
         assert isinstance(node, dict) and "type" in node
-        allowed_keys = {"type", "keys", "items", "length_sample"}
+        allowed_keys = {"type", "keys", "items", "length_sample", "optional"}
         assert set(node.keys()) <= allowed_keys, f"unexpected key(s) in shape node: {set(node.keys()) - allowed_keys}"
         if node["type"] == "object":
             for v in (node.get("keys") or {}).values():
                 _walk(v)
+            optional = node.get("optional")
+            if optional is not None:
+                # #3354: a list of key NAMES (strings), not shape nodes — the array-
+                # union per-key optionality marker, never a raw payload value.
+                assert isinstance(optional, list) and all(isinstance(k, str) for k in optional)
         elif node["type"] == "array":
             items = node.get("items")
             if isinstance(items, list):
@@ -339,6 +344,112 @@ class TestDiffShape:
         diffs = cas.diff_shape(old, new)
         breaking = [d for d in diffs if "informational" not in d]
         assert breaking, "boolean -> integer is a real type change, not a nullable flip"
+
+
+# ── #3354: array-of-objects union shape + per-key optionality ────────────────
+#
+# Reproduction (#3354, found by the #3324 lane on /api/source_freshness):
+# `sources` is an array of per-source dicts where OPTIONAL keys (e.g. `manual`)
+# vary element-to-element. json_shape() must summarize the array as the UNION
+# of every element's keys (with per-key optionality), and diff_shape() must
+# report a key "removed" only when it is gone from EVERY element — never
+# merely because one sampled element happens to omit a key another carries.
+
+
+class TestArrayUnionShape:
+    def test_array_of_objects_merges_into_one_union_shape_with_optional_keys(self):
+        shape = cas.json_shape(
+            [
+                {"id": "apple_health", "age_hours": 1.0, "manual": True},
+                {"id": "whoop", "age_hours": 2.0},
+            ]
+        )
+        assert shape["type"] == "array"
+        items = shape["items"]
+        assert isinstance(items, dict) and items["type"] == "object", "array-of-objects items must be ONE merged union node"
+        assert set(items["keys"]) == {"id", "age_hours", "manual"}
+        assert items.get("optional") == ["manual"], "a key present on only SOME elements must be named optional"
+
+    def test_a_key_present_on_every_element_is_not_marked_optional(self):
+        shape = cas.json_shape([{"id": "a", "age_hours": 1.0}, {"id": "b", "age_hours": 2.0}])
+        items = shape["items"]
+        assert "optional" not in items, "a key present on ALL elements must not be listed as optional"
+
+    def test_source_freshness_reproduction_varying_optional_key_is_not_breaking(self):
+        """The literal #3354 reproduction: /api/source_freshness's `sources[]`
+        elements differ in whether `manual` is present. Depending on which
+        element a capture happens to sample FIRST, the old exact-shape-match
+        diff read this as a removal in one direction and not the other — under
+        the union rule it must never read as breaking, in EITHER capture
+        order."""
+        with_manual = {"id": "apple_health", "age_hours": 1.0, "category": "wearable", "manual": False}
+        without_manual = {"id": "whoop", "age_hours": 2.0, "category": "wearable"}
+
+        old = cas.json_shape([with_manual, without_manual])
+        new = cas.json_shape([without_manual, with_manual])  # same elements, opposite sample order
+        breaking = [d for d in cas.diff_shape(old, new) if "informational" not in d]
+        assert breaking == [], f"varying optional keys across array elements must never read as breaking: {breaking}"
+
+        # and the reverse order pairing
+        old2 = cas.json_shape([without_manual, with_manual])
+        new2 = cas.json_shape([with_manual, without_manual])
+        breaking2 = [d for d in cas.diff_shape(old2, new2) if "informational" not in d]
+        assert breaking2 == [], f"varying optional keys across array elements must never read as breaking: {breaking2}"
+
+    def test_a_key_removed_from_every_element_still_reads_as_breaking(self):
+        """The positive control the issue names explicitly: a key genuinely gone
+        from EVERY element (not just one sampled element) must still fail."""
+        old = cas.json_shape(
+            [
+                {"id": "apple_health", "age_hours": 1.0, "manual": True},
+                {"id": "whoop", "age_hours": 2.0, "manual": False},
+            ]
+        )
+        new = cas.json_shape(
+            [
+                {"id": "apple_health", "age_hours": 1.0},
+                {"id": "whoop", "age_hours": 2.0},
+            ]
+        )
+        diffs = cas.diff_shape(old, new)
+        breaking = [d for d in diffs if "informational" not in d]
+        assert any("manual" in d and "removed" in d for d in breaking), f"a key gone from EVERY element must still be reported: {diffs}"
+
+    def test_a_key_removed_from_only_some_elements_is_still_not_breaking(self):
+        """A key that regresses from "present on all elements" to "present on
+        SOME elements" (still present on at least one) is optional-key
+        variance, not a removal — the union still names the key."""
+        old = cas.json_shape([{"id": "a", "manual": True}, {"id": "b", "manual": False}])
+        new = cas.json_shape([{"id": "a", "manual": True}, {"id": "b"}])
+        breaking = [d for d in cas.diff_shape(old, new) if "informational" not in d]
+        assert breaking == [], f"a key still present on at least one element must not read as a removal: {breaking}"
+
+    def test_nested_array_of_objects_inside_array_elements_also_unions(self):
+        """The reproduction's real shape is two levels deep — `sources[].
+        dark_datatypes[]` is itself an array of objects whose elements can vary
+        in optional keys the same way. The union rule must apply recursively."""
+        old = cas.json_shape(
+            [
+                {"id": "apple_health", "dark_datatypes": [{"label": "steps", "manual": True}, {"label": "sleep"}]},
+                {"id": "whoop", "dark_datatypes": []},
+            ]
+        )
+        new = cas.json_shape(
+            [
+                {"id": "whoop", "dark_datatypes": []},
+                {"id": "apple_health", "dark_datatypes": [{"label": "sleep"}, {"label": "steps", "manual": True}]},
+            ]
+        )
+        breaking = [d for d in cas.diff_shape(old, new) if "informational" not in d]
+        assert breaking == [], f"a nested array-of-objects must union the same way: {breaking}"
+
+    def test_is_valid_shape_node_accepts_the_optional_field(self):
+        shape = cas.json_shape([{"id": "a", "manual": True}, {"id": "b"}])
+        assert cas.is_valid_shape_node(shape)
+
+    def test_is_valid_shape_node_rejects_an_optional_key_not_in_keys(self):
+        bad = {"type": "object", "keys": {"a": {"type": "string"}}, "optional": ["nonexistent"]}
+        assert not cas.is_valid_shape_node(bad)
 
 
 # ── shared sentinel scan reuse (tests/accuracy_audit.py::scan_json_value_leaks) ──

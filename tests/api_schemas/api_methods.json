@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/methods",
   "is_prefix_sample": false,
   "path": "/api/methods",
@@ -30,172 +30,47 @@
         "type": "array"
       },
       "stats": {
-        "items": [
-          {
-            "keys": {
-              "category": {
-                "type": "string"
-              },
-              "fingerprint": {
-                "type": "string"
-              },
-              "formula": {
-                "type": "string"
-              },
-              "function": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "limitations": {
-                "type": "string"
-              },
-              "min_n": {
-                "type": "integer"
-              },
-              "module": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "recorded_fingerprint": {
-                "type": "string"
-              },
-              "used_by": {
-                "type": "string"
-              },
-              "window": {
-                "type": "string"
-              }
+        "items": {
+          "keys": {
+            "category": {
+              "type": "string"
             },
-            "type": "object"
+            "fingerprint": {
+              "type": "string"
+            },
+            "formula": {
+              "type": "string"
+            },
+            "function": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "limitations": {
+              "type": "string"
+            },
+            "min_n": {
+              "type": "integer"
+            },
+            "module": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "recorded_fingerprint": {
+              "type": "string"
+            },
+            "used_by": {
+              "type": "string"
+            },
+            "window": {
+              "type": "string"
+            }
           },
-          {
-            "keys": {
-              "category": {
-                "type": "string"
-              },
-              "fingerprint": {
-                "type": "string"
-              },
-              "formula": {
-                "type": "string"
-              },
-              "function": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "limitations": {
-                "type": "string"
-              },
-              "min_n": {
-                "type": "null"
-              },
-              "module": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "recorded_fingerprint": {
-                "type": "string"
-              },
-              "used_by": {
-                "type": "null"
-              },
-              "window": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "category": {
-                "type": "string"
-              },
-              "fingerprint": {
-                "type": "string"
-              },
-              "formula": {
-                "type": "string"
-              },
-              "function": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "limitations": {
-                "type": "string"
-              },
-              "min_n": {
-                "type": "null"
-              },
-              "module": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "recorded_fingerprint": {
-                "type": "string"
-              },
-              "used_by": {
-                "type": "string"
-              },
-              "window": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "category": {
-                "type": "string"
-              },
-              "fingerprint": {
-                "type": "string"
-              },
-              "formula": {
-                "type": "string"
-              },
-              "function": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "limitations": {
-                "type": "string"
-              },
-              "min_n": {
-                "type": "integer"
-              },
-              "module": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "recorded_fingerprint": {
-                "type": "string"
-              },
-              "used_by": {
-                "type": "null"
-              },
-              "window": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 21,
         "type": "array"
       }

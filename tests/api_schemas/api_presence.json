@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/presence",
   "is_prefix_sample": false,
   "path": "/api/presence",
@@ -29,54 +29,29 @@
         "type": "boolean"
       },
       "channels": {
-        "items": [
-          {
-            "keys": {
-              "gap_days": {
-                "type": "number"
-              },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_log_date": {
-                "type": "null"
-              },
-              "primary": {
-                "type": "boolean"
-              },
-              "quiet": {
-                "type": "boolean"
-              }
+        "items": {
+          "keys": {
+            "gap_days": {
+              "type": "number"
             },
-            "type": "object"
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "last_log_date": {
+              "type": "null"
+            },
+            "primary": {
+              "type": "boolean"
+            },
+            "quiet": {
+              "type": "boolean"
+            }
           },
-          {
-            "keys": {
-              "gap_days": {
-                "type": "number"
-              },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "last_log_date": {
-                "type": "string"
-              },
-              "primary": {
-                "type": "boolean"
-              },
-              "quiet": {
-                "type": "boolean"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 5,
         "type": "array"
       },

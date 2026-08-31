@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/journey_waveform",
   "is_prefix_sample": false,
   "path": "/api/journey_waveform",
@@ -26,36 +26,20 @@
         "type": "integer"
       },
       "days": {
-        "items": [
-          {
-            "keys": {
-              "color": {
-                "type": "string"
-              },
-              "date": {
-                "type": "string"
-              },
-              "score": {
-                "type": "number"
-              }
+        "items": {
+          "keys": {
+            "color": {
+              "type": "string"
             },
-            "type": "object"
+            "date": {
+              "type": "string"
+            },
+            "score": {
+              "type": "number"
+            }
           },
-          {
-            "keys": {
-              "color": {
-                "type": "string"
-              },
-              "date": {
-                "type": "string"
-              },
-              "score": {
-                "type": "null"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 14,
         "type": "array"
       },

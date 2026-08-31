@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/habits",
   "is_prefix_sample": false,
   "path": "/api/habits",
@@ -93,92 +93,57 @@
         "type": "integer"
       },
       "history": {
-        "items": [
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "groups": {
-                "keys": {
-                  "Recovery": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "groups_cross_page": {
-                "keys": {
-                  "Recovery": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "perfect": {
-                "type": "boolean"
-              },
-              "t0_done": {
-                "type": "integer"
-              },
-              "t0_total": {
-                "type": "integer"
-              },
-              "tier01_pct": {
-                "type": "integer"
-              },
-              "tier0_pct": {
-                "type": "integer"
-              }
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
             },
-            "type": "object"
+            "groups": {
+              "keys": {
+                "Performance": {
+                  "type": "integer"
+                },
+                "Recovery": {
+                  "type": "integer"
+                }
+              },
+              "optional": [
+                "Performance"
+              ],
+              "type": "object"
+            },
+            "groups_cross_page": {
+              "keys": {
+                "Performance": {
+                  "type": "integer"
+                },
+                "Recovery": {
+                  "type": "integer"
+                }
+              },
+              "optional": [
+                "Performance"
+              ],
+              "type": "object"
+            },
+            "perfect": {
+              "type": "boolean"
+            },
+            "t0_done": {
+              "type": "integer"
+            },
+            "t0_total": {
+              "type": "integer"
+            },
+            "tier01_pct": {
+              "type": "integer"
+            },
+            "tier0_pct": {
+              "type": "integer"
+            }
           },
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "groups": {
-                "keys": {
-                  "Performance": {
-                    "type": "integer"
-                  },
-                  "Recovery": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "groups_cross_page": {
-                "keys": {
-                  "Performance": {
-                    "type": "integer"
-                  },
-                  "Recovery": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "perfect": {
-                "type": "boolean"
-              },
-              "t0_done": {
-                "type": "integer"
-              },
-              "t0_total": {
-                "type": "integer"
-              },
-              "tier01_pct": {
-                "type": "integer"
-              },
-              "tier0_pct": {
-                "type": "integer"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 13,
         "type": "array"
       },
@@ -210,90 +175,47 @@
         "type": "integer"
       },
       "per_habit": {
-        "items": [
-          {
-            "keys": {
-              "adherence_pct": {
-                "type": "integer"
-              },
-              "completed_days": {
-                "type": "integer"
-              },
-              "days": {
-                "items": {
-                  "keys": {
-                    "date": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                },
-                "length_sample": 14,
-                "type": "array"
-              },
-              "group": {
-                "type": "string"
-              },
-              "last_completed": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "scheduled_days": {
-                "type": "integer"
-              },
-              "state": {
-                "type": "string"
-              }
+        "items": {
+          "keys": {
+            "adherence_pct": {
+              "type": "integer"
             },
-            "type": "object"
+            "completed_days": {
+              "type": "integer"
+            },
+            "days": {
+              "items": {
+                "keys": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 14,
+              "type": "array"
+            },
+            "group": {
+              "type": "string"
+            },
+            "last_completed": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "scheduled_days": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string"
+            }
           },
-          {
-            "keys": {
-              "adherence_pct": {
-                "type": "integer"
-              },
-              "completed_days": {
-                "type": "integer"
-              },
-              "days": {
-                "items": {
-                  "keys": {
-                    "date": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                },
-                "length_sample": 14,
-                "type": "array"
-              },
-              "group": {
-                "type": "string"
-              },
-              "last_completed": {
-                "type": "null"
-              },
-              "name": {
-                "type": "string"
-              },
-              "scheduled_days": {
-                "type": "integer"
-              },
-              "state": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 59,
         "type": "array"
       },

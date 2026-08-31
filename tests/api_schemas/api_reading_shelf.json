@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/reading_shelf",
   "is_prefix_sample": false,
   "path": "/api/reading_shelf",
@@ -48,196 +48,100 @@
         "type": "array"
       },
       "queue": {
-        "items": [
-          {
-            "keys": {
-              "book": {
-                "keys": {
-                  "author": {
-                    "type": "string"
-                  },
-                  "bookId": {
-                    "type": "string"
-                  },
-                  "coverS3Key": {
-                    "type": "string"
-                  },
-                  "difficulty": {
-                    "keys": {
-                      "composite": {
-                        "type": "number"
-                      },
-                      "density": {
-                        "type": "number"
-                      },
-                      "prose": {
-                        "type": "number"
-                      },
-                      "structure": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "domainTags": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 2,
-                    "type": "array"
-                  },
-                  "era": {
-                    "type": "string"
-                  },
-                  "isbn13": {
-                    "type": "string"
-                  },
-                  "themes": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 4,
-                    "type": "array"
-                  },
-                  "title": {
-                    "type": "string"
-                  }
+        "items": {
+          "keys": {
+            "book": {
+              "keys": {
+                "author": {
+                  "type": "string"
                 },
-                "type": "object"
-              },
-              "notes": {
-                "items": {
+                "bookId": {
+                  "type": "string"
+                },
+                "coverS3Key": {
+                  "type": "string"
+                },
+                "difficulty": {
                   "keys": {
-                    "bookId": {
-                      "type": "string"
+                    "composite": {
+                      "type": "number"
                     },
-                    "createdAt": {
-                      "type": "string"
+                    "density": {
+                      "type": "number"
                     },
-                    "noteId": {
-                      "type": "string"
+                    "prose": {
+                      "type": "number"
                     },
-                    "text": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string"
+                    "structure": {
+                      "type": "number"
                     }
                   },
                   "type": "object"
                 },
-                "length_sample": 1,
-                "type": "array"
+                "domainTags": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "length_sample": 3,
+                  "type": "array"
+                },
+                "era": {
+                  "type": "string"
+                },
+                "isbn13": {
+                  "type": "string"
+                },
+                "themes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "length_sample": 4,
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                }
               },
-              "state": {
+              "type": "object"
+            },
+            "notes": {
+              "items": {
                 "keys": {
                   "bookId": {
                     "type": "string"
                   },
-                  "status": {
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "noteId": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "type": {
                     "type": "string"
                   }
                 },
                 "type": "object"
-              }
+              },
+              "length_sample": 1,
+              "type": "array"
             },
-            "type": "object"
+            "state": {
+              "keys": {
+                "bookId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
           },
-          {
-            "keys": {
-              "book": {
-                "keys": {
-                  "author": {
-                    "type": "string"
-                  },
-                  "bookId": {
-                    "type": "string"
-                  },
-                  "coverS3Key": {
-                    "type": "string"
-                  },
-                  "difficulty": {
-                    "keys": {
-                      "composite": {
-                        "type": "number"
-                      },
-                      "density": {
-                        "type": "number"
-                      },
-                      "prose": {
-                        "type": "number"
-                      },
-                      "structure": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "domainTags": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 3,
-                    "type": "array"
-                  },
-                  "era": {
-                    "type": "string"
-                  },
-                  "isbn13": {
-                    "type": "string"
-                  },
-                  "themes": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 4,
-                    "type": "array"
-                  },
-                  "title": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "notes": {
-                "items": {
-                  "keys": {
-                    "bookId": {
-                      "type": "string"
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    },
-                    "noteId": {
-                      "type": "string"
-                    },
-                    "text": {
-                      "type": "string"
-                    },
-                    "type": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                },
-                "length_sample": 1,
-                "type": "array"
-              },
-              "state": {
-                "keys": {
-                  "bookId": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 5,
         "type": "array"
       },

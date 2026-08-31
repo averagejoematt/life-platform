@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/wall",
   "is_prefix_sample": false,
   "path": "/api/wall",
@@ -28,384 +28,53 @@
             "type": "integer"
           },
           "attempts": {
-            "items": [
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 61,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "string"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
+            "items": {
+              "keys": {
+                "alive": {
+                  "type": "boolean"
                 },
-                "type": "object"
+                "cycle": {
+                  "type": "integer"
+                },
+                "day_count": {
+                  "type": "integer"
+                },
+                "days": {
+                  "items": {
+                    "keys": {
+                      "date": {
+                        "type": "string"
+                      },
+                      "day_number": {
+                        "type": "integer"
+                      },
+                      "earned": {
+                        "type": "number"
+                      },
+                      "svg": {
+                        "type": "string"
+                      },
+                      "warming_up": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "length_sample": 61,
+                  "type": "array"
+                },
+                "ended": {
+                  "type": "string"
+                },
+                "genesis": {
+                  "type": "string"
+                },
+                "staged": {
+                  "type": "boolean"
+                }
               },
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 7,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "string"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 6,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "string"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 28,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "string"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 1,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "string"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 5,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "string"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 2,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "string"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "alive": {
-                    "type": "boolean"
-                  },
-                  "cycle": {
-                    "type": "integer"
-                  },
-                  "day_count": {
-                    "type": "integer"
-                  },
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "date": {
-                          "type": "string"
-                        },
-                        "day_number": {
-                          "type": "integer"
-                        },
-                        "earned": {
-                          "type": "number"
-                        },
-                        "svg": {
-                          "type": "string"
-                        },
-                        "warming_up": {
-                          "type": "boolean"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 14,
-                    "type": "array"
-                  },
-                  "ended": {
-                    "type": "null"
-                  },
-                  "genesis": {
-                    "type": "string"
-                  },
-                  "staged": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              }
-            ],
+              "type": "object"
+            },
             "length_sample": 14,
             "type": "array"
           },

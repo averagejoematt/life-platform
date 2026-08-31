@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/predictions",
   "is_prefix_sample": false,
   "path": "/api/predictions",
@@ -621,131 +621,47 @@
         "type": "object"
       },
       "predictions": {
-        "items": [
-          {
-            "keys": {
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confidence": {
-                "type": "number"
-              },
-              "date": {
-                "type": "string"
-              },
-              "due_date": {
-                "type": "string"
-              },
-              "eval_type": {
-                "type": "string"
-              },
-              "gradeable": {
-                "type": "boolean"
-              },
-              "metric": {
-                "type": "string"
-              },
-              "outcome_notes": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "subdomain": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              }
+        "items": {
+          "keys": {
+            "coach_id": {
+              "type": "string"
             },
-            "type": "object"
+            "coach_name": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "date": {
+              "type": "string"
+            },
+            "due_date": {
+              "type": "string"
+            },
+            "eval_type": {
+              "type": "string"
+            },
+            "gradeable": {
+              "type": "boolean"
+            },
+            "metric": {
+              "type": "string"
+            },
+            "outcome_notes": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "subdomain": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
           },
-          {
-            "keys": {
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confidence": {
-                "type": "number"
-              },
-              "date": {
-                "type": "string"
-              },
-              "due_date": {
-                "type": "null"
-              },
-              "eval_type": {
-                "type": "string"
-              },
-              "gradeable": {
-                "type": "boolean"
-              },
-              "metric": {
-                "type": "string"
-              },
-              "outcome_notes": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "subdomain": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confidence": {
-                "type": "number"
-              },
-              "date": {
-                "type": "string"
-              },
-              "due_date": {
-                "type": "null"
-              },
-              "eval_type": {
-                "type": "string"
-              },
-              "gradeable": {
-                "type": "boolean"
-              },
-              "metric": {
-                "type": "null"
-              },
-              "outcome_notes": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "subdomain": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 50,
         "type": "array"
       },

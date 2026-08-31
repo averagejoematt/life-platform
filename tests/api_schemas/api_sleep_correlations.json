@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/sleep_correlations",
   "is_prefix_sample": false,
   "path": "/api/sleep_correlations",
@@ -26,96 +26,50 @@
         "type": "string"
       },
       "cards": {
-        "items": [
-          {
-            "keys": {
-              "coefficient": {
-                "type": "number"
-              },
-              "confidence": {
-                "type": "string"
-              },
-              "direction": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "lag_days": {
-                "type": "integer"
-              },
-              "n": {
-                "type": "integer"
-              },
-              "noise": {
-                "type": "boolean"
-              },
-              "note": {
-                "type": "string"
-              },
-              "outcome": {
-                "type": "string"
-              },
-              "overlap_weeks": {
-                "type": "number"
-              },
-              "predictor": {
-                "type": "string"
-              },
-              "withheld": {
-                "type": "boolean"
-              }
+        "items": {
+          "keys": {
+            "coefficient": {
+              "type": "number"
             },
-            "type": "object"
+            "confidence": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "lag_days": {
+              "type": "integer"
+            },
+            "n": {
+              "type": "integer"
+            },
+            "noise": {
+              "type": "boolean"
+            },
+            "note": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "overlap_weeks": {
+              "type": "number"
+            },
+            "predictor": {
+              "type": "string"
+            },
+            "withheld": {
+              "type": "boolean"
+            }
           },
-          {
-            "keys": {
-              "coefficient": {
-                "type": "null"
-              },
-              "confidence": {
-                "type": "string"
-              },
-              "direction": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "lag_days": {
-                "type": "integer"
-              },
-              "n": {
-                "type": "integer"
-              },
-              "noise": {
-                "type": "boolean"
-              },
-              "note": {
-                "type": "string"
-              },
-              "outcome": {
-                "type": "string"
-              },
-              "overlap_weeks": {
-                "type": "number"
-              },
-              "predictor": {
-                "type": "string"
-              },
-              "withheld": {
-                "type": "boolean"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 7,
         "type": "array"
       },

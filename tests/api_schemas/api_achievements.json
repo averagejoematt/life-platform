@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/achievements",
   "is_prefix_sample": false,
   "path": "/api/achievements",
@@ -23,95 +23,35 @@
         "type": "object"
       },
       "achievements": {
-        "items": [
-          {
-            "keys": {
-              "category": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "earned": {
-                "type": "boolean"
-              },
-              "earned_date": {
-                "type": "null"
-              },
-              "icon": {
-                "type": "null"
-              },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "unlock_hint": {
-                "type": "string"
-              }
+        "items": {
+          "keys": {
+            "category": {
+              "type": "string"
             },
-            "type": "object"
+            "description": {
+              "type": "string"
+            },
+            "earned": {
+              "type": "boolean"
+            },
+            "earned_date": {
+              "type": "null"
+            },
+            "icon": {
+              "type": "null"
+            },
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "unlock_hint": {
+              "type": "string"
+            }
           },
-          {
-            "keys": {
-              "category": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "earned": {
-                "type": "boolean"
-              },
-              "earned_date": {
-                "type": "string"
-              },
-              "icon": {
-                "type": "null"
-              },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "unlock_hint": {
-                "type": "null"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "category": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "earned": {
-                "type": "boolean"
-              },
-              "earned_date": {
-                "type": "null"
-              },
-              "icon": {
-                "type": "string"
-              },
-              "id": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "unlock_hint": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 40,
         "type": "array"
       },

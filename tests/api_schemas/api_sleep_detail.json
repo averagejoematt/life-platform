@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/sleep_detail",
   "is_prefix_sample": false,
   "path": "/api/sleep_detail",
@@ -232,254 +232,129 @@
         "type": "object"
       },
       "sleep_trend": {
-        "items": [
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "deep_pct": {
-                "type": "number"
-              },
-              "deep_sleep_hours": {
-                "type": "number"
-              },
-              "efficiency": {
-                "type": "number"
-              },
-              "eightsleep": {
-                "keys": {
-                  "as_of_date": {
-                    "type": "string"
-                  },
-                  "deep_hours": {
-                    "type": "number"
-                  },
-                  "deep_pct": {
-                    "type": "number"
-                  },
-                  "light_hours": {
-                    "type": "number"
-                  },
-                  "light_pct": {
-                    "type": "number"
-                  },
-                  "night_of": {
-                    "type": "string"
-                  },
-                  "rem_hours": {
-                    "type": "number"
-                  },
-                  "rem_pct": {
-                    "type": "number"
-                  },
-                  "sleep_efficiency_pct": {
-                    "type": "number"
-                  },
-                  "sleep_score": {
-                    "type": "number"
-                  },
-                  "total_sleep_hours": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              "hours": {
-                "type": "number"
-              },
-              "hrv": {
-                "type": "number"
-              },
-              "light_pct": {
-                "type": "number"
-              },
-              "recovery_score": {
-                "type": "number"
-              },
-              "rem_pct": {
-                "type": "number"
-              },
-              "rem_sleep_hours": {
-                "type": "number"
-              },
-              "rhr": {
-                "type": "number"
-              },
-              "sleep_score": {
-                "type": "number"
-              },
-              "sleep_start": {
-                "type": "string"
-              },
-              "whoop": {
-                "keys": {
-                  "as_of_date": {
-                    "type": "string"
-                  },
-                  "deep_hours": {
-                    "type": "number"
-                  },
-                  "deep_pct": {
-                    "type": "number"
-                  },
-                  "light_hours": {
-                    "type": "number"
-                  },
-                  "light_pct": {
-                    "type": "number"
-                  },
-                  "night_of": {
-                    "type": "string"
-                  },
-                  "quality_score": {
-                    "type": "number"
-                  },
-                  "rem_hours": {
-                    "type": "number"
-                  },
-                  "rem_pct": {
-                    "type": "number"
-                  },
-                  "sleep_start": {
-                    "type": "string"
-                  },
-                  "total_sleep_hours": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              "whoop_quality": {
-                "type": "number"
-              }
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
             },
-            "type": "object"
+            "deep_pct": {
+              "type": "number"
+            },
+            "deep_sleep_hours": {
+              "type": "number"
+            },
+            "efficiency": {
+              "type": "number"
+            },
+            "eightsleep": {
+              "keys": {
+                "as_of_date": {
+                  "type": "string"
+                },
+                "deep_hours": {
+                  "type": "number"
+                },
+                "deep_pct": {
+                  "type": "number"
+                },
+                "light_hours": {
+                  "type": "number"
+                },
+                "light_pct": {
+                  "type": "number"
+                },
+                "night_of": {
+                  "type": "string"
+                },
+                "rem_hours": {
+                  "type": "number"
+                },
+                "rem_pct": {
+                  "type": "number"
+                },
+                "sleep_efficiency_pct": {
+                  "type": "number"
+                },
+                "sleep_score": {
+                  "type": "number"
+                },
+                "total_sleep_hours": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "hours": {
+              "type": "number"
+            },
+            "hrv": {
+              "type": "number"
+            },
+            "light_pct": {
+              "type": "number"
+            },
+            "recovery_score": {
+              "type": "number"
+            },
+            "rem_pct": {
+              "type": "number"
+            },
+            "rem_sleep_hours": {
+              "type": "number"
+            },
+            "rhr": {
+              "type": "number"
+            },
+            "sleep_score": {
+              "type": "number"
+            },
+            "sleep_start": {
+              "type": "string"
+            },
+            "whoop": {
+              "keys": {
+                "as_of_date": {
+                  "type": "string"
+                },
+                "deep_hours": {
+                  "type": "number"
+                },
+                "deep_pct": {
+                  "type": "number"
+                },
+                "light_hours": {
+                  "type": "number"
+                },
+                "light_pct": {
+                  "type": "number"
+                },
+                "night_of": {
+                  "type": "string"
+                },
+                "quality_score": {
+                  "type": "number"
+                },
+                "rem_hours": {
+                  "type": "number"
+                },
+                "rem_pct": {
+                  "type": "number"
+                },
+                "sleep_start": {
+                  "type": "string"
+                },
+                "total_sleep_hours": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "whoop_quality": {
+              "type": "number"
+            }
           },
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "deep_pct": {
-                "type": "null"
-              },
-              "deep_sleep_hours": {
-                "type": "number"
-              },
-              "efficiency": {
-                "type": "number"
-              },
-              "eightsleep": {
-                "keys": {
-                  "as_of_date": {
-                    "type": "string"
-                  },
-                  "deep_hours": {
-                    "type": "number"
-                  },
-                  "deep_pct": {
-                    "type": "null"
-                  },
-                  "light_hours": {
-                    "type": "number"
-                  },
-                  "light_pct": {
-                    "type": "null"
-                  },
-                  "night_of": {
-                    "type": "string"
-                  },
-                  "rem_hours": {
-                    "type": "number"
-                  },
-                  "rem_pct": {
-                    "type": "null"
-                  },
-                  "sleep_efficiency_pct": {
-                    "type": "number"
-                  },
-                  "sleep_score": {
-                    "type": "number"
-                  },
-                  "total_sleep_hours": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              "hours": {
-                "type": "number"
-              },
-              "hrv": {
-                "type": "number"
-              },
-              "light_pct": {
-                "type": "null"
-              },
-              "recovery_score": {
-                "type": "number"
-              },
-              "rem_pct": {
-                "type": "null"
-              },
-              "rem_sleep_hours": {
-                "type": "number"
-              },
-              "rhr": {
-                "type": "number"
-              },
-              "sleep_score": {
-                "type": "number"
-              },
-              "sleep_start": {
-                "type": "string"
-              },
-              "whoop": {
-                "keys": {
-                  "as_of_date": {
-                    "type": "string"
-                  },
-                  "deep_hours": {
-                    "type": "number"
-                  },
-                  "deep_pct": {
-                    "type": "number"
-                  },
-                  "light_hours": {
-                    "type": "number"
-                  },
-                  "light_pct": {
-                    "type": "number"
-                  },
-                  "night_of": {
-                    "type": "string"
-                  },
-                  "quality_score": {
-                    "type": "number"
-                  },
-                  "rem_hours": {
-                    "type": "number"
-                  },
-                  "rem_pct": {
-                    "type": "number"
-                  },
-                  "sleep_start": {
-                    "type": "string"
-                  },
-                  "total_sleep_hours": {
-                    "type": "number"
-                  }
-                },
-                "type": "object"
-              },
-              "whoop_quality": {
-                "type": "number"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 13,
         "type": "array"
       }

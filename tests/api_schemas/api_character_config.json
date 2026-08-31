@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "captured_at": "2026-08-31T06:47:34.497546+00:00",
   "fetch_path": "/api/character_config",
   "is_prefix_sample": false,
   "path": "/api/character_config",
@@ -26,260 +26,106 @@
         "type": "boolean"
       },
       "cross_pillar_effects": {
-        "items": [
-          {
-            "keys": {
-              "condition": {
-                "type": "string"
-              },
-              "fit_badge": {
-                "type": "string"
-              },
-              "fit_ci_95": {
-                "items": {
-                  "type": "number"
-                },
-                "length_sample": 2,
-                "type": "array"
-              },
-              "fit_n_eff": {
+        "items": {
+          "keys": {
+            "condition": {
+              "type": "string"
+            },
+            "fit_badge": {
+              "type": "string"
+            },
+            "fit_ci_95": {
+              "items": {
                 "type": "number"
               },
-              "fit_r": {
-                "type": "number"
-              },
-              "fit_status": {
-                "type": "string"
-              },
-              "fitted_at": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "targets": {
-                "keys": {
-                  "mind": {
-                    "keys": {
-                      "type": {
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "number"
-                      }
+              "length_sample": 2,
+              "type": "array"
+            },
+            "fit_n_eff": {
+              "type": "number"
+            },
+            "fit_r": {
+              "type": "number"
+            },
+            "fit_status": {
+              "type": "string"
+            },
+            "fitted_at": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "targets": {
+              "keys": {
+                "_all": {
+                  "keys": {
+                    "type": {
+                      "type": "string"
                     },
-                    "type": "object"
+                    "value": {
+                      "type": "number"
+                    }
                   },
-                  "movement": {
-                    "keys": {
-                      "type": {
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  }
+                  "type": "object"
                 },
-                "type": "object"
-              }
-            },
-            "type": "object"
+                "consistency": {
+                  "keys": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "metabolic": {
+                  "keys": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "mind": {
+                  "keys": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "movement": {
+                  "keys": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "optional": [
+                "_all",
+                "consistency",
+                "metabolic",
+                "mind",
+                "movement"
+              ],
+              "type": "object"
+            }
           },
-          {
-            "keys": {
-              "condition": {
-                "type": "string"
-              },
-              "fit_badge": {
-                "type": "string"
-              },
-              "fit_ci_95": {
-                "items": {
-                  "type": "number"
-                },
-                "length_sample": 2,
-                "type": "array"
-              },
-              "fit_n_eff": {
-                "type": "number"
-              },
-              "fit_r": {
-                "type": "number"
-              },
-              "fit_status": {
-                "type": "string"
-              },
-              "fitted_at": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "targets": {
-                "keys": {
-                  "metabolic": {
-                    "keys": {
-                      "type": {
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "condition": {
-                "type": "string"
-              },
-              "fit_badge": {
-                "type": "string"
-              },
-              "fit_ci_95": {
-                "items": {
-                  "type": "number"
-                },
-                "length_sample": 2,
-                "type": "array"
-              },
-              "fit_n_eff": {
-                "type": "number"
-              },
-              "fit_r": {
-                "type": "number"
-              },
-              "fit_status": {
-                "type": "string"
-              },
-              "fitted_at": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "targets": {
-                "keys": {
-                  "consistency": {
-                    "keys": {
-                      "type": {
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "condition": {
-                "type": "string"
-              },
-              "fit_badge": {
-                "type": "string"
-              },
-              "fit_ci_95": {
-                "items": {
-                  "type": "number"
-                },
-                "length_sample": 2,
-                "type": "array"
-              },
-              "fit_n_eff": {
-                "type": "number"
-              },
-              "fit_r": {
-                "type": "number"
-              },
-              "fit_status": {
-                "type": "string"
-              },
-              "fitted_at": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "targets": {
-                "keys": {
-                  "_all": {
-                    "keys": {
-                      "type": {
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "condition": {
-                "type": "string"
-              },
-              "fit_badge": {
-                "type": "string"
-              },
-              "fit_ci_95": {
-                "type": "null"
-              },
-              "fit_n_eff": {
-                "type": "integer"
-              },
-              "fit_r": {
-                "type": "null"
-              },
-              "fit_status": {
-                "type": "string"
-              },
-              "fitted_at": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "targets": {
-                "keys": {
-                  "mind": {
-                    "keys": {
-                      "type": {
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 6,
         "type": "array"
       },
