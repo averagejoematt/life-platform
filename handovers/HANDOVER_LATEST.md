@@ -133,6 +133,9 @@ and auto-closed by the #3352 machinery itself (net 0). **Filed 1** (#3365 — th
 - The peer independently re-verified my boot reap (all five reaped lanes' content on origin via
   #3339/#3323/#3321/#3320/#3319; the one 7-line delta was a waiver main deliberately removed in #3361).
 
+
+**Post-wrap addendum (2026-08-31 ~16:10Z, recorded so no stale 'pending' claim outlives the fact):** the peer's slice PUSHED after the wrap (`3b4f70daf`, rebased from c446c4173; owner made the push-first call in that session). Its new contract test asserted the plist's absolute path against the runner's checkout root and redded main's full suite twice (Deploy/smoke/QA green throughout); fixed by the peer in `8599a02aa` (repo-relative shape assertion). `LifePlatformOperational` was then deployed BY THE PEER under its own owner grant (guarded path, pinned CLI, UPDATE_COMPLETE) — the armed-and-blind window closed ~16:05Z, #3365 is back to six stacks, and every lease from the peer's pushes is that session's to dispose (stated explicitly by them; my steward stays retired). The board-bot live proof also landed post-wrap: the owner's first real @ajm_board_bot message got an in-voice tier-2 hold (#2719 verdict upgraded to realized; epic #2363's stale BotFather residual retired — all 10 bots verified wired).
+
 ## Gate lines
 **Build beat:** 2026-08-31-the-rollback-learned-its-reach
 **Docs:** docs/DECISIONS.md (ADR-063 amendment via PR #3357; ADR-065 amendment via PR #3360), docs/PROPORTIONALITY.md (cfn-exec boundary row PR #3360; deploy-guardrails row amended PR #3358), infra/iam/README.md + docs/alarm_citations.json (PR #3364), docs/INCIDENT_LOG.md (+2 rows, this commit), docs/OPERATING_KNOWLEDGE_LEDGER.md (+3 rows, this commit)
