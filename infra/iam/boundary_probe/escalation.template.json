@@ -1,0 +1,44 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "#3340 MUTATION PROBE (negative control). A CloudFormation stack that asks the cfn-exec role to create a role OUTSIDE the enrolled name families, carrying iam:* on Resource '*'. With the permissions boundary attached this MUST fail with AccessDenied naming 'an explicit deny in a permissions boundary'; the stack rolls back and creates nothing. Deploy it ONLY as the cfn-exec role (--role-arn), only after the boundary is attached, and delete the failed stack afterwards. Runbook: infra/iam/README.md.",
+  "Resources": {
+    "EscalationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Description": "#3340 boundary probe — must never be created",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "lambda.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "escalate",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "AccountWideIam",
+                  "Effect": "Allow",
+                  "Action": "iam:*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "ProbeVerdict": {
+      "Description": "If this stack ever reaches CREATE_COMPLETE, the boundary is not doing its job.",
+      "Value": { "Fn::GetAtt": ["EscalationRole", "Arn"] }
+    }
+  }
+}

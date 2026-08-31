@@ -486,3 +486,151 @@ the CI path so that CFN-via-CI cannot exceed the namespace the gate's registry n
 ```bash
 python3 deploy/verify_oidc_iam.py --strict     # deploy-role: CLEAN (or only the already-staged #903 shed)
 ```
+
+---
+
+## #3340 — the CDK cfn-exec permissions boundary (STAGED, owner-run; the braces under #2834's belt)
+
+> **Status: the checked-in JSON is AHEAD of live, by design.** Until the apply below runs,
+> `python3 deploy/verify_oidc_iam.py --strict` reports exactly **three** findings —
+> `[BOUNDARY-MISSING]` on each of `cdk-hnb659fds-cfn-exec-role-205930651321-{us-west-2,us-east-1,us-east-2}`
+> — and **nothing else** (measured 2026-08-31 in the implementing worktree: `12 target(s)
+> compared`, 3 findings, every OIDC identity CLEAN). That is the pending apply, not an
+> out-of-band change, and it is red on purpose: a boundary that reported green while absent
+> would be the exact class of instrument this repo keeps finding (#3200, #3318).
+
+**What it is.** One customer-managed policy, `cdk-cfn-exec-boundary`, attached as the
+**permissions boundary** on the three regional CDK execution roles. Those roles carry
+`AdministratorAccess` (CDK bootstrap default) and are what CloudFormation acts as; since
+#2834 CI exercises that chain on every additive IAM grant, with the gate's parser as the
+only line. The document is **derived** from `deploy/iam_additive_registry.py` — the same
+registry the gate reads — by `deploy/derive_cfn_exec_boundary.py`, and committed as
+`infra/iam/cdk-cfn-exec-boundary.boundary.json`. The full Deny inventory, the shape
+argument, the non-goal and the ratchet baseline are in the **ADR-065 amendment of
+2026-08-31** (`docs/DECISIONS.md`).
+
+**Not a re-bootstrap.** `cdk bootstrap --custom-permissions-boundary` was considered and
+rejected: it re-runs the bootstrap stack in every region, and its rollback is another
+bootstrap. This is three `put-role-permissions-boundary` calls, and its rollback is three
+`delete-role-permissions-boundary` calls.
+
+### 0. ROLLBACK — read this first
+
+If a deploy breaks, if `cdk diff` starts failing, if anything at all looks wrong: take the
+fence off. It is three API calls and it restores the exact pre-2026-08-31 state.
+
+```bash
+for R in us-west-2 us-east-1 us-east-2; do
+  aws iam delete-role-permissions-boundary \
+    --role-name "cdk-hnb659fds-cfn-exec-role-205930651321-$R"
+done
+
+# Then (optional — the policy is inert once detached, and keeping it makes re-apply one call):
+aws iam delete-policy --policy-arn arn:aws:iam::205930651321:policy/cdk-cfn-exec-boundary
+
+# Confirm the roles are bare again (expect PermissionsBoundary: None x3):
+for R in us-west-2 us-east-1 us-east-2; do
+  aws iam get-role --role-name "cdk-hnb659fds-cfn-exec-role-205930651321-$R" \
+    --query 'Role.PermissionsBoundary' --output text
+done
+```
+
+`git revert` of the #3340 PR is the repo-side rollback; the two are independent, and either
+alone is safe.
+
+### 1. Pre-flight (read-only, no credentials needed for the first two)
+
+```bash
+python3 deploy/derive_cfn_exec_boundary.py --check      # committed JSON == derivation
+python3 -m pytest tests/test_cfn_exec_boundary_3340.py -q
+python3 deploy/derive_cfn_exec_boundary.py --simulate   # iam:SimulateCustomPolicy, read-only
+```
+
+`--simulate` is the pre-apply evidence: it evaluates the document AWS's own way against 28
+probes — the escalation the mutation probe deploys, the fence protecting itself, the
+irreplaceable data zones, the region pin in both directions, and 13 positive controls for
+what an ordinary stack deploy does. Expect `28/28 simulator verdicts as expected`.
+
+### 2. Apply (attended, `matthew-admin`)
+
+```bash
+aws iam create-policy \
+  --policy-name cdk-cfn-exec-boundary \
+  --description "#3340 permissions boundary for the CDK cfn-exec roles — derived, see infra/iam/README.md" \
+  --policy-document file://infra/iam/cdk-cfn-exec-boundary.boundary.json
+
+for R in us-west-2 us-east-1 us-east-2; do
+  aws iam put-role-permissions-boundary \
+    --role-name "cdk-hnb659fds-cfn-exec-role-205930651321-$R" \
+    --permissions-boundary arn:aws:iam::205930651321:policy/cdk-cfn-exec-boundary
+done
+```
+
+A later change to the document is `aws iam create-policy-version --policy-arn … \
+--policy-document file://infra/iam/cdk-cfn-exec-boundary.boundary.json --set-as-default`
+— **never** a hand-edited inline document (#3336: the shell twin that ran stale for six
+minutes).
+
+### 3. Verify
+
+```bash
+python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN — the three BOUNDARY-MISSING findings disappear
+```
+
+`BOUNDARY-DRIFT` means a boundary is attached but is not this policy; `BOUNDARY-UNREADABLE`
+means the calling identity cannot read the role or the policy version (run as
+`matthew-admin` — the remediation role's `IAMRoleRead` is scoped to the four OIDC roles).
+
+### 4. The no-op deploy — the real proof it did not break anything
+
+```bash
+bash deploy/cdk_deploy.sh LifePlatformCore     # expect: no changes, or only the changes cdk diff already showed
+```
+
+Then one stack that actually has resources to touch (`LifePlatformCompute` is the largest
+IAM surface). A boundary problem surfaces as `AccessDenied … with an explicit deny in a
+permissions boundary` in the stack events, never as a silent no-op.
+
+### 5. The mutation proof (acceptance box 3) — run AFTER the apply
+
+`infra/iam/boundary_probe/` holds two throwaway CloudFormation templates. Both are deployed
+**as the cfn-exec role** (`--role-arn`), which is the whole point: a deploy under
+`matthew-admin` would not exercise the boundary at all.
+
+```bash
+EXEC=arn:aws:iam::205930651321:role/cdk-hnb659fds-cfn-exec-role-205930651321-us-west-2
+
+# (a) NEGATIVE control — a role outside the enrolled families with iam:* on Resource "*".
+aws cloudformation create-stack --region us-west-2 \
+  --stack-name boundary-probe-3340 \
+  --template-body file://infra/iam/boundary_probe/escalation.template.json \
+  --capabilities CAPABILITY_IAM --role-arn "$EXEC"
+
+aws cloudformation wait stack-create-complete --region us-west-2 --stack-name boundary-probe-3340 \
+  || echo "expected: the wait FAILS because the stack rolled back"
+
+aws cloudformation describe-stack-events --region us-west-2 --stack-name boundary-probe-3340 \
+  --query "StackEvents[?ResourceStatus=='CREATE_FAILED'].ResourceStatusReason" --output text
+# EXPECTED, verbatim shape:
+#   API: iam:CreateRole User: arn:aws:sts::205930651321:assumed-role/
+#   cdk-hnb659fds-cfn-exec-role-205930651321-us-west-2/AWSCloudFormation is not authorized to
+#   perform: iam:CreateRole on resource: arn:aws:iam::205930651321:role/boundary-probe-3340-EscalationRole-…
+#   with an explicit deny in a permissions boundary
+
+aws cloudformation delete-stack --region us-west-2 --stack-name boundary-probe-3340 --role-arn "$EXEC"
+
+# (b) POSITIVE control — the last green additive grant's shape (an in-family role name plus
+#     the 2026-08-14 P1 grant: s3:GetObject on one config object). This MUST reach
+#     CREATE_COMPLETE, or the boundary is refusing the platform's own deploys.
+aws cloudformation create-stack --region us-west-2 \
+  --stack-name boundary-probe-3340-additive \
+  --template-body file://infra/iam/boundary_probe/additive.template.json \
+  --capabilities CAPABILITY_NAMED_IAM --role-arn "$EXEC"
+
+aws cloudformation wait stack-create-complete --region us-west-2 --stack-name boundary-probe-3340-additive
+aws cloudformation delete-stack --region us-west-2 --stack-name boundary-probe-3340-additive --role-arn "$EXEC"
+```
+
+Paste both verdicts — the `AccessDenied` line and the `CREATE_COMPLETE` — into the #3340
+acceptance box. One without the other proves half of it: a fence that denies everything and
+a fence that denies nothing look identical from one probe.
