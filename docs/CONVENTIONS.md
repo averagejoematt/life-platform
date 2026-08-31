@@ -431,6 +431,18 @@ All three step lists must stay in sync — change one, change all three. Run it 
 `gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`,
 add `--ai-qa-max-tier 1` to reproduce exactly what the deploy-time gates run).
 
+**What the site auto-rollback can and cannot reach (2026-08-27).** `deploy/rollback_site.sh`
+is `git checkout <ref> -- site/` plus a sync of the `site/` prefix — it touches no Lambda,
+no DynamoDB row, and not bucket-root `config/`. The gate that fires it judges `/api/*`
+content too, so for any failure sourced from DynamoDB the rollback reverts good static
+content, reports success on every step and leaves the defect live (it did exactly that to a
+wanted build beat). Two reflexes: when a gating copy reds, ask **which storage layer
+produced the failing content** before trusting the remediation — an `/api/`-sourced truth
+finding is a hold-and-page, not a `site/` revert; and after any auto-rollback, **rerun the
+FULL workflow**, never the failed jobs only — a failed-jobs rerun greens against the
+rolled-back content and ships nothing. The `config/` asymmetry (shipped by the same
+workflow, not covered by the rollback) is open on #2799.
+
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 
 Concurrent PRs each commit **generator output** (doc-sync literals in
@@ -734,6 +746,33 @@ check, a fake CFN client for the drift check): `tests/test_check_deploy_drift.py
 
 Source: #382 (epic #342, "live infra matches code").
 
+**Parity is not capability (2026-07-12, #1166).** A repo==live check can codify a *broken*
+live state: the drift sentinel's IAM statements were added to the setup script but never
+applied, the permissions file was then snapshotted **from live**, and the parity check
+reported clean for weeks while the capability was dead behind a `continue-on-error` job.
+When codifying live infra into IaC, first prove the live state delivers its intended
+capability — exercise it, or `aws iam simulate-principal-policy` per action **with the real
+`--resource-arns`** (resource-scoped statements read `implicitDeny` without them) — and when
+a scheduled job is supposed to write an artifact, check the artifact exists: an empty output
+prefix is the loudest failure signal there is.
+
+**Moving a function between stacks — `cdk refactor` (#793, 2026-07-08).**
+`npx cdk refactor --unstable=refactor <Src> <Dst>` moves resources as pure moves: physical
+names and Function URLs survive (delete-and-recreate would mint a new URL subdomain and sever
+the site). The recipe that worked live: `cdk diff` on the source must be clean first (a stale
+bundle hash reads as a forbidden property change); move the construct code verbatim with the
+same construct ids; `--dry-run` and expect *only* moves; execute with `--force`; `cdk diff`
+both stacks to nothing. Four gotchas block it: `Custom::LogRetention` cannot cross stacks
+(strip it from the source first, let a normal deploy recreate it in the destination); the
+LogRetention singleton still sneaks into the destination template and must be removed or the
+refactor rejects it as non-pure; the refactor cannot *create* the destination — deploy an
+empty shell first; and the bootstrap deploy role may lack a read permission the import step
+needs (`lambda:GetFunctionUrlConfig`) — it rolls back cleanly; attach a temporary scoped
+policy and retry. Scope the command to the two stacks (unscoped, it compares every
+environment), then sweep the stack↔lambda maps (`drift_sentinel.STACKS`, the AST tests on
+the old stack file, the `cdk_stacks` doc fact) so nothing keeps deploying the old stack for
+a grant that moved.
+
 ---
 
 ## 7. Hard-won repo gotchas (each one is a past incident)
@@ -815,6 +854,23 @@ Source: #382 (epic #342, "live infra matches code").
   present in both trees, derived from the trees. **Never introduce a JSON registry a
   Lambda reads via a hand `aws s3 cp` from outside `config/`** — put it in `config/` and
   it joins the derived twin set with a real byte assertion. `seeds/` is generators only.
+- **`DATE#` keys and every reader-facing date name a PACIFIC calendar day.** Guarded by
+  `tests/test_pacific_today_guard_2414.py` and `tests/test_utc_day_fleet_ratchet_2811.py` —
+  and both bottom out in "is there a clock in this subtree?", so **`strptime` is invisible
+  to them by construction** (it is the inverse of a clock: a date string in, a time out).
+  `datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)` on a `DATE#` day
+  anchors it 7–8h before the day began and overstated a source's staleness by exactly the
+  offset — a live alert on a healthy source (#2817). A sweep that moves one operand of a
+  comparison to Pacific must rule on the other; a matcher's clean certification is a
+  statement about the matcher, not about the code.
+- **A per-request rate limit on an endpoint that fans out meters nothing.** `board_ask`'s
+  limit of 5/hour permitted **35** Bedrock calls/hour because one request fanned out to N
+  caller-chosen personas. Charge the fan-out, not the request: 1 up front, `N-1` once the
+  list resolves, and never before it does.
+- **An LLM JSON call whose `max_tokens` truncates the response before its closing fence
+  falls back silently** — the parser sees malformed JSON and the caller takes the fallback
+  branch with no error. Size the cap from the *accrued* input (it grows as the platform's
+  context grows) and treat a missing closing fence as a failure to log, never as "no result".
 
 ---
 

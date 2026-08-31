@@ -303,6 +303,16 @@ All Lambdas use `platform_logger.get_logger()` which emits JSON like:
 
 This lets Logs Insights filter by source, correlation_id, etc.
 
+**A bare `logging.getLogger(__name__)` in a bundled module can be dark on the wire** while a
+`caplog` test on the same line passes: `get_logger()` attaches its own handler with
+`propagate=False` and keeps its own singleton map, so a module logger's records never reach
+the function's CloudWatch stream, and `logging.getLogger("daily-brief")` returns a
+*different* object (#3283). Observability lines in `lambdas/` go through
+`platform_logger.get_logger("<function>")`; to test them, attach a recording
+`logging.Handler` to the instance `get_logger` returns — `caplog` structurally cannot capture
+them. A "so a recurrence cannot be dark" acceptance box needs the line proven by an invoke,
+not by a unit test.
+
 ---
 
 ## CloudWatch Logs Insights — useful queries

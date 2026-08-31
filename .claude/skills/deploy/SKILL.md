@@ -75,6 +75,19 @@ CDK — `LifePlatformServe` (`cdk/stacks/serve_stack.py`, split from Operational
 the sanctioned fast code path. `tests/test_deploy_bundle_paths.py` enforces both
 channels stay on `deploy/build_bundle.py`.)
 
+**Special case — a change that touches BOTH the coach specs under `config/coaches/` and
+`lambdas/coach/`:** `deploy/deploy_coach_intelligence.sh` ships the S3 half (coach specs,
+personas, computation configs) and the three *intelligence* Lambdas — it does **not** deploy
+`telegram-coach-worker`, which carries `lambdas/coach/persona_core.py` and the chat path.
+The specs are read S3-first, so running it alone is a half-deploy: new spec fields go live
+with no code to render them (measured twice, 2026-08-10 and 08-11). Ship both halves or
+neither, full-tree bundle only, then verify a symbol from **each** half — never the timestamp:
+```bash
+bash deploy/deploy_coach_intelligence.sh
+bash deploy/deploy_lambda.sh telegram-coach-worker lambdas/coach/telegram_worker_lambda.py
+bash deploy/verify_deployed_symbol.sh telegram-coach-worker <new-symbol>
+```
+
 ## Function Name → Source File Mapping
 
 Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);

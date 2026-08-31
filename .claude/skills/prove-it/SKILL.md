@@ -40,11 +40,33 @@ not a detector; something that never fires is not a gate.
 How many rows, bytes, files did it actually examine? A 401 with no body read as a clean
 PRIVACY verdict. An argv overflow made `grep -c` return a confident, plausible `0`. Ten
 libraries entered a ratcheted gate inventory on a filename substring — the census's own
-denominator was wrong by ten the whole time.
+denominator was wrong by ten the whole time. And ask whether the denominator is the **live
+surface** or the instrument's own registry: a `*_pct in [0,100]` rule was exactly right and
+read two blocks of one document while `148.9%` sat inside a list on an endpoint the scan
+never fetched.
 
 **4. Check the fixture is the wire.**
 A green non-vacuous gate whose fixture encodes a false assumption about the real payload
 guards nothing (#1221). Mutation-provable is not the same as true.
+
+Four siblings of the same question, each paid for:
+- **Is this the code path the running system takes?** Extracting real shipped source into a
+  test proves the unit, never that the unit is reached. A cockpit fix passed four unit tests,
+  CI, the deploy and both QA gates, and the live page never changed — `Promise.allSettled`
+  swallowed the tagged error before the code under test ran. Trace entrypoint to assertion
+  and look for the boundary that swallows, transforms or short-circuits.
+- **Does the harness match the production call site, kwarg by kwarg?** A hand-assembled
+  `run_turn(...)` dropped one argument and manufactured plausible findings about behaviour
+  the product does not have. Diff every kwarg against the real call and write down why any
+  deliberate difference exists.
+- **Does the "after" actually contain the change?** Coach specs load S3-first, so two full
+  harness runs scored production while the edited local file sat unread, and run-to-run
+  variance read as improvement. Assert on the assembled prompt, not on the file you edited.
+- **Is the check applied to the full text, or to a transform that removed the evidence?**
+  `check(truncate(x))` passed on a 200-char slice whose second-person pronoun sat at
+  character 240. Truncation, summarisation and tag-stripping all delete exactly the token a
+  check looks for: check first, transform after, and feed the guard a fixture whose
+  violating token sits past the boundary.
 
 **5. Ask where it is blind, and write that down.**
 Every instrument has a blind spot. One that has never named its own is not a measured
@@ -66,6 +88,11 @@ Green is not the only failure mode. An instrument can also stop running:
   else's commit.
 - **Local-only state.** A check that reads a path present on one machine and no clean
   checkout will pass locally and fail in CI — or worse, the reverse.
+- **A fail-closed path.** It degrades to the status quo, so a broken one looks identical to a
+  working one — no error, no red. Its acceptance needs a live run with the real verdict and
+  the real exit code, not a fixture; merge machinery is dogfooded on the same session's
+  queue, immediately, because "the next real run" is how a dead feature ships. Read exit
+  codes unpiped (`cmd > file; echo $?`).
 
 ## Record it
 

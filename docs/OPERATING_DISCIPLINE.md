@@ -1,6 +1,6 @@
 # OPERATING DISCIPLINE — the reflexes for running the work
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-27
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-30
 
 The canonical home for the reflexes that govern **how work is adjudicated and how a
 session is driven** — believing a finding, closing an issue, judging an epic, running
@@ -20,7 +20,10 @@ is stale: fix it to a one-line pointer.
 
 **What this page is not:** it is not an incident log. Each rule carries only the measured
 evidence that makes it binding. The full narrative of the night each was learned stays in
-the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
+the memory corpus and in `docs/INCIDENT_LOG.md`. **Which memory entry is homed where** —
+every rule-class file in the operator's memory index, with its repo home or the reason it
+has none — is the maintained registry `docs/OPERATING_KNOWLEDGE_LEDGER.md` (#2848);
+Appendix A below is the frozen 2026-08-27 audit it grew from.
 
 ---
 
@@ -50,7 +53,11 @@ the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
 
 5. **An LLM/judge verdict can flake HIGH on a claim that is true.** Ground-truth the
    claim against the data before acting on it — one such flake rolled back the very fix
-   it was judging. The artifact is the evidence; the verdict line is not.
+   it was judging. The artifact is the evidence; the verdict line is not. A verdict that
+   **reproduces** on a second pass is not thereby real either: the confirm pass filters
+   sampling noise, not a systematic misread of a page shape — two shapes (a live window
+   scored out of its own elapsed days; a full meter whose caption already explains the
+   pending output) reproduced HIGH on true claims and rolled back a healthy deploy.
 
 6. **When an LLM gate's findings recur as a class, read the gate's own prompt first.**
    The model may be *obeying* a wrong instruction rather than hallucinating: three
@@ -64,9 +71,20 @@ the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
 8. **An agent's stated reason for its own red check is a hypothesis written before the
    lane finished.** It is not a read lane. See §3.7 for what to do instead.
 
-> Instrument verification — proving a *gate/check/watcher* can fail, its fixture is the
-> wire, and it is not dark — is a different question with a different home:
-> `docs/CONVENTIONS.md` §9a and the gate registry in §9. Do not restate it here.
+9. **A red on your PR is a hypothesis until it reds on pristine `main` too.** Conditional
+   gates and data- or clock-dependent renders surface failures on the *wrong* PR: a render
+   gate that only runs on `site/**` PRs reported a break another PR had shipped a day
+   earlier; a badge style that had shipped weeks before first rendered at a genesis flip
+   and failed visual-QA on an unrelated merge; CI and local disagreed on a date-sensitive
+   page because UTC had crossed midnight and Pacific had not. Run the failing gate against
+   clean `main` (a detached worktree is cheap) before fixing, and when CI and local
+   disagree on anything dated, compare both clocks' calendar dates first.
+
+> Instrument verification — proving a *gate/check/watcher/measurement* can fail, its
+> fixture is the wire, it examined a real denominator, and it is not dark — is a different
+> question with a different home: the `/prove-it` skill (`.claude/skills/prove-it/SKILL.md`,
+> #3245) carries the questions, `docs/CONVENTIONS.md` §9a the fixture-is-the-wire rule and
+> §9 the gate registry. Do not restate it here.
 
 ---
 
@@ -167,6 +185,28 @@ the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
    case-variant twin path resolves to the same directory and leaks edits into the shared
    main tree. Mechanics and the incident record: `docs/CONVENTIONS.md` §7.
 
+### 3a. Working with the owner — the standing preferences
+
+Working-style corrections the owner has made more than once. They are not authority rules
+(that is §5); they are how a session should carry itself.
+
+1. **Post a heartbeat after each discrete step of a long task.** The owner checks progress
+   by interrupting, and an interrupt cancels the in-flight tool call — a one-line "done X,
+   starting Y" makes the interrupt unnecessary.
+2. **Clarify conversationally, one question at a time.** Not a modal form, not a menu of
+   lettered options. When blocked on the owner, state the single ask (§5.1's shape) and
+   keep working on whatever is not blocked.
+3. **Default to continuing.** Do not offer a stopping point every turn; under a standing
+   grant, a merge or a deploy is a step, not a checkpoint (§5.2).
+4. **Check usage headroom before a token-heavy fan-out.** A 17-lens review ritual was killed
+   mid-flight at 95% of the weekly budget; a ritual that cannot finish is worth less than
+   one scheduled for when it can.
+5. **A review ritual's grading model is part of its validity.** If the model runs out
+   mid-ritual, bank the partial as a dated partial — never let a different model finish it
+   and report one grade.
+6. **Ideation includes the off-site channels.** Syndication, messaging surfaces, video and
+   audio formats are in scope for a product ideation pass, not only pages on the site.
+
 ---
 
 ## 4. Reading the record
@@ -187,6 +227,28 @@ the memory corpus (Appendix A) and in `docs/INCIDENT_LOG.md`.
    `docs/CHARTER.md` ("debt counts only ratchet down"); this is the implementer-facing
    form of it. A baseline that legitimately moves because the change *adds a real gate*
    moves in the same PR, with the reason stated.
+
+4. **Write current truth, never intended truth.** A doc that certifies a protection which is
+   still *pending* passes every mechanical gate and is worse than silence — one page
+   recorded the repo as private while it was live-verifiably public. Verify a state claim
+   live at write time (`gh api`, `aws`, the file system); if it is pending, write it as
+   pending with a date; and when claiming a file does *not* exist, search the whole index
+   (`git ls-files | grep`), not the one directory you expected it in.
+
+5. **A frozen artifact keeps its numbers and gains a note.** Pre-registrations, filed plans
+   and published prologues are *supposed* to carry the figure that was current when they
+   were written; editing one is the defect, and the sealed pre-registration is
+   hash-stamped precisely so it cannot be. When a governing figure moves, append a dated
+   editor's note reconciling old and new, and move every surface that quotes it together
+   (the stored record, the published page, the index that lists it). The corollary at the
+   front: a permanent public AI artifact is reviewed as a **dry run** before it is frozen,
+   on the narrative-tier model — the first structured-tier pass at one fabricated its
+   baseline.
+
+6. **A job killed by `timeout-minutes` reports `cancelled`, not `timed_out`.** It reads as an
+   external cancellation and invites a rerun that fails identically. Read the job's
+   annotation before rerunning anything that says cancelled (three PR lanes, ~1.5h of
+   reruns, one evening).
 
 ---
 
@@ -239,6 +301,11 @@ the repo: a session could find *how* to deploy and not *whether it may* (#3264).
    behind that merge. A merged PR is not a deployed one, and "it merged" is never evidence
    that it shipped.
 
+8. **A workflow that runs on merge is a production actor.** A first-run `--apply` mutation
+   wired into an automatic workflow is a deploy — one the PR body may have described as
+   owner-gated. Land the mechanism dry-run by default and let the owner arm it, exactly as
+   §5.1 would require of a session doing the same thing by hand.
+
 ---
 
 ## 6. What deliberately lives elsewhere
@@ -255,6 +322,12 @@ the repo: a session could find *how* to deploy and not *whether it may* (#3264).
 | One issue → one worktree → one PR, end to end | `.claude/agents/worktree-implementer.md` |
 | Backlog contract, labels, milestones, score line | `docs/DECISIONS.md` (ADR-099), `docs/CONTINUITY.md` §6 |
 | State surfaces that are not in `docs/` | `docs/CONTINUITY.md` |
+| Proving an instrument works before trusting it — the five questions, and what makes a gate go dark | `/prove-it` — `.claude/skills/prove-it/SKILL.md` (#3245); the fixture-is-the-wire rule stays in `docs/CONVENTIONS.md` §9a |
+| Turning an incident into procedure — the log row, the class tracker, the skill edit | `.claude/skills/incident/SKILL.md` |
+| Checking new machinery carries the five charter primitives, and the traps specific to it | `.claude/skills/new-machinery/SKILL.md` |
+| Traps when *writing a test* — import-time globals, packaged-module stubs, re-exports, volatile timestamps, the fixture's clock | `docs/TESTING.md` § "Traps that have redded main" |
+| Render and site traps — renderer filters, the SVG type floor, generated PNGs, the asset hasher | `docs/SITE_UPLEVEL_PLAYBOOK.md` § "Hard-won gotchas" |
+| Which memory-corpus rule is homed where, and which deliberately are not | `docs/OPERATING_KNOWLEDGE_LEDGER.md` (the maintained registry; Appendix A below is its frozen origin) |
 
 ---
 
@@ -270,11 +343,11 @@ this page. Each is a real hole, named rather than closed.
    refusing a safe one. Left visible rather than deleted, so the shape of what was missing
    stays legible.
 
-2. **Which instrument-verification rules are binding.** The "an instrument that reports
-   success without doing its job" family — negative controls, denominators, what makes a
-   gate go dark — is roughly half the incident corpus and is currently split between
-   `docs/CONVENTIONS.md` §9a and the operator's memory. A skill-shaped home for it is in
-   flight; until it lands, a fresh session gets the rule only if it reads §9a.
+2. ~~**Which instrument-verification rules are binding.**~~ **CLOSED 2026-08-28 by #3245** —
+   the skill-shaped home landed as `/prove-it` (`.claude/skills/prove-it/SKILL.md`): the five
+   questions and the dark-modes list. The fixture-is-the-wire rule stays in
+   `docs/CONVENTIONS.md` §9a; the remaining members of the family were placed by the
+   2026-08-30 ledger pass (item 5 below).
 
 3. **The concurrency posture of a session.** How many lanes run at once, how a driver
    fans out and collects them, and what a lane may assume about the primary checkout are
@@ -284,11 +357,14 @@ this page. Each is a real hole, named rather than closed.
    The consequence is real and worth stating plainly: a successor can learn *what* the
    rules are from this repo and cannot learn *why* they were expensive.
 
-5. **Thirty-five durable rules with no repo home yet.** Appendix A's `residual` class.
-   They are real rules, not narrative; they were left out of §1–§4 because each belongs
-   to a surface — render QA, module packaging, semantic-gate baselining, and the whole
-   instrument-verification family in gap 2 above — that deserves its own owner rather
-   than a bullet on this page. Naming them is the honest half of §2.10.
+5. ~~**Thirty-five durable rules with no repo home yet.**~~ **CLOSED 2026-08-30 (#2848, the
+   ledger pass)** — each of Appendix A's 35 `residual` entries now has a named repo home
+   or a stated reason it does not, in `docs/OPERATING_KNOWLEDGE_LEDGER.md`; that page also
+   covers the 71 rule-class memory files Appendix A never audited (the top-level index
+   sections, and everything written after 2026-08-27). The ledger is guarded by
+   `tests/test_operating_knowledge_ledger_2848.py` — which checks the *manifest* against
+   its own committed snapshot, never the live memory directory; the live half is a
+   `/wrap` step (c) reflex (`scripts/check_operating_knowledge_ledger.py --live`).
 
 ---
 
@@ -301,7 +377,10 @@ This appendix is a **frozen, dated audit record**, not a maintained registry: th
 names live outside git on one machine, so nothing in CI can re-derive it. It is kept
 because it answers one question a successor will have — *which memory entries are now
 redundant, and which are still the only copy.* The **rules** are maintained in their
-homes; this table is not.
+homes; this table is not. **The maintained registry now exists:**
+`docs/OPERATING_KNOWLEDGE_LEDGER.md` (2026-08-30) carries every memory file — the 154 below
+plus the rest of the index — with a home or a stated reason. Read that page for the current
+answer, and this one for the record of what the 2026-08-27 audit believed.
 
 | Class | n | What it means |
 |---|---|---|
@@ -326,6 +405,7 @@ stripped; each of the 154 appears exactly once.
 
 ---
 
-**Verified:** 2026-08-27 (#2848 - corpus audited at 154 entries; sections 1-4 are the
-rules that had no repo home; section 6 is the measured residual, not a claim of
+**Verified:** 2026-08-30 (#2848 — corpus audited at 154 entries on 08-27; the 08-30 ledger
+pass placed the `residual` class and the 71 un-audited rule files; sections 1-5 are the
+rules that had no repo home; section 7 is the measured residual, not a claim of
 completeness)

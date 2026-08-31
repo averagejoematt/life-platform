@@ -298,7 +298,21 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # branch 571). It arrives PROVEN (both family-6 halves in tests/test_security_log_retention_3278.py,
 # indexed in gate_census_proofs.py) so the live unproven count does not move (524 -> 524) and
 # BASELINE_UNPROVEN_GATES stays where its owner set it.
-BASELINE_TOTAL_GATES = 571
+# 571 -> 572 (2026-08-30, #2848): ONE real gate,
+# `guard::scripts/check_operating_knowledge_ledger.py` — the operating-knowledge ledger guard
+# (family 2, guard-script); its test, tests/test_operating_knowledge_ledger_2848.py, joins
+# _PREMERGE_EXTRA_FILES in the same PR (the census keys the gate on the script, so registering
+# the test minted no second id). Verified by id-set diff, not count delta: each tree ran its
+# OWN gate_census.build_census with the new files `git add`ed first (main 3d398fc75 = 571,
+# branch = 572); ADDED exactly {guard::scripts/check_operating_knowledge_ledger.py},
+# REMOVED {}. It arrives UNPROVEN by the census (live unproven 524 -> 525, under the
+# committed 541, which is NOT moved) and carries the static `exempt-by-incompleteness`
+# flag: the heuristic matches three early `if not X: return` shapes, each of which RETURNS
+# an error — a missing snapshot block or an unparseable table is a red, never a skip —
+# pinned by test_a_missing_snapshot_block_reds and the module's non-vacuity floors. No
+# PROVEN_CAN_FAIL entry is claimed: its mutation proofs run on synthetic text with an
+# injected `tracked` predicate, not through gate_census_mutations.py.
+BASELINE_TOTAL_GATES = 572
 BASELINE_UNPROVEN_GATES = 541
 
 
