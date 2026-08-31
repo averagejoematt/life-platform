@@ -193,6 +193,38 @@ def test_gather_marks_stale_served_coach_rows_with_own_day_facts(monkeypatch):
     assert "served stale" in f.detail
 
 
+def test_gather_marks_stale_served_expert_rows_with_own_day_facts(monkeypatch):
+    # #3366: the experts regenerate WEEKLY (Monday 14:00 UTC — the CDK rule is the
+    # enforcing mechanism), so a served essay is up to ~7 days old BY DESIGN. The
+    # gather must attach an own-day facts override for expert labels the same way
+    # #2792 does for held coach rows — otherwise a Monday essay honestly citing
+    # Monday's canonical recovery reads as a contradiction of Friday's facts.
+    monkeypatch.setattr(sentinel, "_latest", lambda src: {"recovery_pct": 57, "hrv_ms": 39.76, "rhr_bpm": 61})
+    # The essay's own generation day, mid-week in the PT frame (4 days back covers
+    # every weekday the daily sentinel can observe a Monday-written essay on).
+    monday = (pacific_time.pacific_now() - _dt.timedelta(days=4)).strftime("%Y-%m-%d")
+
+    class _T:
+        def get_item(self, Key):
+            if Key.get("sk") == "EXPERT#integrator":
+                return {"Item": {"generated_at": f"{monday}T14:03:00+00:00", "analysis": "Recovery at 40% this week."}}
+            return {}  # the other EXPERT# rows absent in this fixture
+
+        def query(self, **kw):
+            return {"Items": []}  # no V2 coach rows in this fixture
+
+    monkeypatch.setattr(sentinel, "table", _T())
+    monkeypatch.setattr(sentinel, "_facts_as_of_generation", lambda d: {"recovery_pct": 40, "hrv_ms": 35.3, "rhr_bpm": 62})
+    facts, narratives, labels, overrides = sentinel._gather_facts_and_narratives()
+    assert labels == ["expert:integrator"], "fixture produced the wrong narrative set"
+    assert "expert:integrator" in overrides
+    ov = overrides["expert:integrator"]
+    assert ov["as_of"] == monday and ov["facts"]["recovery_pct"] == 40
+    f = sentinel.ci.check_facts_agreement(narratives, facts, surfaces=labels, facts_overrides=overrides)
+    assert f.status == sentinel.ci.OK
+    assert "served stale" in f.detail
+
+
 def test_build_record_is_serializable_and_complete(monkeypatch):
     _patch_bad_state(monkeypatch)
     findings, semantic = sentinel.run_checks()

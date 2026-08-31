@@ -5527,7 +5527,7 @@
       "module": "lambdas/intelligence/ai_expert_analyzer_lambda.py",
       "schedules": [
         {
-          "expr": "cron(0 14 * * ? *)",
+          "expr": "cron(0 14 ? * MON *)",
           "resolution": "constant"
         }
       ],
@@ -7698,7 +7698,7 @@
       "utc": "13:30"
     },
     {
-      "expr": "cron(0 14 * * ? *)",
+      "expr": "cron(0 14 ? * MON *)",
       "lambda": "ai-expert-analyzer",
       "resolution": "constant",
       "stack": "compute_stack",

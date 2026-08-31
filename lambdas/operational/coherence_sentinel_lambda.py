@@ -225,11 +225,19 @@ def _gather_facts_and_narratives():
     """Canonical facts (computed_metrics) + the day's served narratives.
 
     Returns ``(facts, narratives, labels, facts_overrides)`` — the overrides map a
-    stale-served coach label to the facts of ITS OWN generation day (#2792), so a
-    held narrative is judged like-for-like instead of against facts it never saw."""
+    stale-served coach OR weekly-expert label to the facts of ITS OWN generation day
+    (#2792, extended to the experts by #3366 when their cadence went truly weekly), so
+    a held narrative is judged like-for-like instead of against facts it never saw."""
     facts = _facts_from_cm(_latest("computed_metrics"))
     narratives, labels = [], []
     facts_overrides = {}
+    # #2814: the fresh floor and "today" are PACIFIC days — OUTPUT# rows are keyed
+    # by the PT generation day, so the UTC frame called PT-today's row "yesterday's"
+    # every PT evening and routed it into the #2792 stale-served branch below.
+    _now = pacific_time.pacific_now()
+    _fresh_floor = (_now - timedelta(days=1)).strftime("%Y-%m-%d")
+    _today = _now.strftime("%Y-%m-%d")
+    _own_day_cache: dict = {}
     # The served coach essays + the integrator synthesis.
     ai_pk = f"{USER_PREFIX}ai_analysis"
     for key in EXPERTS + ["integrator"]:
@@ -243,18 +251,24 @@ def _gather_facts_and_narratives():
             if txt.strip():
                 narratives.append(txt)
                 labels.append(f"expert:{key}")
+                # #3366: the experts regenerate WEEKLY (Monday 14:00 UTC — the CDK
+                # rule is the enforcing mechanism), so a served essay is up to ~7
+                # days old BY DESIGN. Judge it against the facts of its OWN
+                # generation day (the #2792 like-for-like rule), never against
+                # numbers written after it — the retired daily regen kept these
+                # <24h old, which is the only reason this loop could skip the
+                # override before.
+                _gen_day = str(item.get("generated_at") or "")[:10]
+                if _gen_day and _gen_day < _today:
+                    if _gen_day not in _own_day_cache:
+                        _own_day_cache[_gen_day] = _facts_as_of_generation(_gen_day)
+                    if _own_day_cache[_gen_day]:
+                        facts_overrides[f"expert:{key}"] = {"facts": _own_day_cache[_gen_day], "as_of": _gen_day}
     # ADR-104: the V2 operational-coach narratives (daily brief) — previously the
     # highest-traffic coach surface with NO Sentinel coverage. Latest OUTPUT# per
     # coach, but only if served today/yesterday: the facts are the LATEST record,
     # so checking an old narrative against new facts would manufacture false
     # contradictions (the day-boundary-skew lesson).
-    # #2814: the fresh floor and "today" are PACIFIC days — OUTPUT# rows are keyed
-    # by the PT generation day, so the UTC frame called PT-today's row "yesterday's"
-    # every PT evening and routed it into the #2792 stale-served branch below.
-    _now = pacific_time.pacific_now()
-    _fresh_floor = (_now - timedelta(days=1)).strftime("%Y-%m-%d")
-    _today = _now.strftime("%Y-%m-%d")
-    _own_day_cache: dict = {}
     for coach_id in V2_COACHES:
         try:
             resp = table.query(

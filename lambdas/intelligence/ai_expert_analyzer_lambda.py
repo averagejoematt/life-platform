@@ -28,7 +28,7 @@ Features (V2.1):
   - Integrator synthesis: the board lead's weekly priority + cross-domain notes + disagreements
   - Builder's Paradox: injected into mind coach prompt
 
-Trigger: EventBridge cron — weekly, Monday 6am PT (14:00 UTC)
+Trigger: EventBridge cron — weekly, Mon 14:00 UTC; enforced by the CDK schedule (compute_stack.py), NOT in-handler — every expert runs per fire (#3366).
 Can also be invoked manually with {"expert": "mind"} for a single expert.
 
 v3.0.0 — 2026-04-07 (Intelligence Layer V2.1)
@@ -1811,7 +1811,7 @@ def generate_month_rollup():
 def lambda_handler(event, context):
     try:
         # C-1: refresh just the cross-week arc without re-running the 8 narratives
-        # (manual/test repopulate). The daily 'all' pass also regenerates it.
+        # (manual/test repopulate). The weekly 'all' pass also regenerates it — its input (field_notes WEEK#, Sundays) changes weekly (#3366).
         if event.get("arc_only"):
             arc = generate_experiment_arc()
             return {
