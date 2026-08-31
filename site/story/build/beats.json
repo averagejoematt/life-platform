@@ -3362,6 +3362,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/3307"
         }
       ]
+    },
+    {
+      "id": "2026-08-31-the-operator-boots-from-the-model",
+      "date": "2026-08-31",
+      "title": "The operator now boots from a model of the platform, not from prose",
+      "shipped": "Every session of the operator used to start by reading prose — a hand-written page saying roughly how many Lambdas, alarms and schedules exist. Now it starts by reading a generated model of the platform and printing a boot brief from it: 104 Lambdas, 81 on a clock (88 crons with UTC times), 119 alarms with where each one routes (digest, urgent, paging), which data partitions may never reach a public page, and what runs next. The brief is a contract: a test pins that every number on it comes from the model, that a hand-edited model shows up as STALE on the next boot, and that the prose docs may point at the model but never disagree with it. The same session also closed nine other issues through parallel lanes — log retention actually set to the documented 90 days across seven regions, a false-positive class fixed on the blocking fabrication gate, the self-healing agent priced honestly as a triage tool.",
+      "why_it_mattered": "The model's first version had modelled 50 of the 116 alarms — only the ones declared in the simplest way — so an operator booting from it would have triaged half the estate. That is the failure mode this whole platform exists to kill: a source of truth that is confidently incomplete. Deriving the alarm inventory from the same code that already counted them for the docs, and adding routing on top, means the operator's picture and the documentation's picture are now the same picture.",
+      "gotcha": "Applying one additive IAM grant through a convenience shell script — a hand-maintained twin of the checked-in policy files — silently rolled back four grants and widened a role's trust policy to any branch of the repo for about six minutes. The verifier caught it; the policy files were re-applied directly. Two copies of a security document with nothing comparing them is exactly the pattern the model work is meant to end.",
+      "honest_miss": "The parallel lanes hit the account's monthly spend limit mid-session: four of them died before opening a pull request, including the P1 fix for that shell-script twin. The work is recorded and queued, not done. And GitHub minted zero CI runs for two pull requests across three recovery attempts — they are green locally and unmerged.",
+      "prs": [
+        {
+          "label": "PR #3320",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3320"
+        },
+        {
+          "label": "PR #3321",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3321"
+        },
+        {
+          "label": "PR #3334",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3334"
+        },
+        {
+          "label": "PR #3323",
+          "url": "https://github.com/averagejoematt/life-platform/pull/3323"
+        }
+      ]
     }
   ]
 }

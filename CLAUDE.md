@@ -210,22 +210,4 @@ gate (#736): every wrap either distills ONE public build beat per
 plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
 silent omission is not an outcome.**
 
-**Verified:** 2026-08-30 (FABLE 5, **Session K** — autonomous, then owner co-working). **Main GREEN
-at cb16ef2f (final run green end-to-end incl. Visual+AI QA); ci-cd queue EMPTY, zero leases at close.**
-**8 PRs merged + deployed, 5 closed** (#3265/#3250/#3262/#3289/#3293 — waves 1+2 of the plan's drain).
-**The DIL-027 backfill is DONE**: batch role CDK-owned (#3306), S3 Batch job 41,175/41,175 replicated,
-0 failed, ~$0.49 — `sentinel_replication` **clean** after 6 days honestly red. **#2883's soak clock is
-RUNNING** (#3308 deployed): the governor's own price table had no titan row — a **500× numerator error**
-since #1384; drift 1.2849→~1.2134; verify next 8h cycle (titan ~$0.01, drift ≈1.21). **The board room
-is LIVE** (#3307, epic #2363): Grand Rounds as a real group chat — pure who-speaks rule (mention →
-reply-to → the chair), shared speaker-stamped thread, outbound can never text the room; worker bundle
-verified BY CONTENT; the owner's 10 BotFather minutes is the last mile (checklist on the epic). **The
-closure audit** (owner-prompted): ~60 closures since 08-16 → 5 escapes: #2848 REOPENED (false-close by
-stray Fixes), #3208→folded on #3251, carriers #3315/#3316/#3317 filed; **#3314 filed** — the #2845
-tail (operator facets + boot contract) finally has an open carrier, on Now; **#3318** = the class fix
-(closure DoD + two structural detectors), Later, owner may promote. Gotchas: GitHub event minting ran
-~10min delayed (delay ≠ swallow — check before the ladder); a cancelled superseded Deploy is covered by
-the next run's ACCUMULATED diff (verify by bundle content). Next: Monday verifications (governor tier 0,
-bands 157.67/186.33/209.27, ops pack 16:00Z, first graded predictions) · **#3314 is next session's
-core Fable work** · drain #3277/#3278/#2833/#2848/#3316 via lanes · 09-08 Architect ritual runs ITSELF.
-Full narrative: `handovers/HANDOVER_LATEST.md`.
+**Verified:** 2026-08-31 (FABLE 5, **Session L** — owner co-working, Fable orchestrating Opus/Sonnet lanes; the subagent fleet died on the MONTHLY spend limit at ~00:20Z and the main session finished by hand). **Ask: close as many issues as possible without risking quality. Closed 10** (#3316 #3278 #2833 #3328 #3327 #3251 #3317 **#3314** — the boot proof pasted — + #2848 merged as Refs pending its cold-read proof); **filed 8 carriers** (#3324 #3327 #3328 #3329 #3336 #3337 #3340) because verification kept finding real residuals. **11 PRs merged**; main-tip deploy lease approved (union), 6 superseded leases rejected by ancestry. **#3314 landed the operator's model:** the alarm plane held 50 of 116 alarms — now 119 (#795 inventory + composites), 0 unresolved, routing traced; privacy + schedules planes; `scripts/boot_brief.py` is the executable boot contract and the SessionStart hook prints it — a real boot from main consumed the model (proof on the issue). **Owner decisions:** #2834 → (b) scoped additive IAM CI grant, CISO review verdict APPROVE-WITH-REQUIRED-CHANGES R1–R5 on PR #3335 (lane died before landing them; #3340 follow-up filed); #3251 → C1 (measured $0.239→$0.048/run, closed); telegram-webhook-errors → digest (live). **Incident:** the IAM shell twin widened the remediation role's trust to any-branch for ~6 min (#3336, P1, INCIDENT_LOG row). Governor 00:00Z: titan $5.77→$0.01, drift 1.29→1.21x — #3308 verified to the cent. **Open PRs for next session:** #3335 (R1–R5), #3341 + #3339 (both superseded twice — GitHub minted ZERO runs for their pushes for 40+ min; third rung), plus dead-lane worktrees for #3336 #3277. Gotchas: a lane branch must never carry `platform_counts.py` (the pre-commit stages it; every later merge conflicts); epic checklists are stale by construction — reconcile from live child state. Next: #3336 first (P1) · land #3335 R1–R5 · un-swallow #3341/#3339 · #2848 cold-read proof · #3277 · BotFather (owner) · 09-08 Architect ritual runs ITSELF. Full narrative: `handovers/HANDOVER_LATEST.md`.

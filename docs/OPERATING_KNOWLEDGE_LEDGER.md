@@ -1,6 +1,6 @@
 # OPERATING KNOWLEDGE LEDGER — where every memory-corpus rule lives
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-30
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-31
 
 The operator's Claude Code memory directory (`docs/CONTINUITY.md` §4) is the one asset in
 this system that lives on a single laptop. #2848's thesis is that a fresh session with **no**
@@ -41,12 +41,12 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-08-30
+## Coverage — 2026-08-31 (Session L: +3 reference files)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 371** — feedback 22 · reference 202 · security 1 · project 143 · user 1 · index 2
+**Files in the memory index snapshot: 374** — feedback 22 · reference 205 · security 1 · project 143 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 225** — homed-here 48 · already-homed 157 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 228** — homed-here 50 · already-homed 158 · superseded 7 · narrative 11 · off-repo 2
 
 **Program/session files (project): 143** — already-homed 14 · superseded 1 · narrative 125 · off-repo 2 · index 1
 
@@ -315,6 +315,7 @@ reference_docsync_literal_cross_pr_drift.md
 reference_docsync_stamp_is_utc.md
 reference_driver_commits_strip_hook_literals.md
 reference_enumerate_all_leases_after_every_merge.md
+reference_epic_checklists_stale_by_construction.md
 reference_event_delay_vs_swallow_and_accumulated_deploys.md
 reference_extract_the_right_real_source.md
 reference_extraction_never_baseline_raise.md
@@ -353,6 +354,7 @@ reference_job_timeout_renders_as_cancelled.md
 reference_judge_flake_ground_truth.md
 reference_judge_reproducing_false_positive_shapes.md
 reference_lambda_perf_measure_at_origin.md
+reference_lane_branch_must_not_carry_counter_file.md
 reference_launchd_tcc_documents.md
 reference_layer_shipped_deps_dependabot_blind.md
 reference_llm_json_maxtokens_truncation.md
@@ -403,6 +405,7 @@ reference_ruff_full_dir_set.md
 reference_s3_first_config_invalidates_local_measurement.md
 reference_saturated_alarm_hides_its_own_findings.md
 reference_scratchpad_is_shared_across_concurrent_agents.md
+reference_security_docs_never_via_hand_twin.md
 reference_shallow_clone_git_gates.md
 reference_shared_scratchpad_clobbers_pr_bodies.md
 reference_ship_the_mechanism_print_the_residual.md
@@ -548,6 +551,7 @@ user_who_is_matthew.md
 | `reference_docsync_stamp_is_utc.md` | reference | `deploy/sync_doc_metadata.py` + `docs/CONVENTIONS.md` §4c | already-homed |
 | `reference_driver_commits_strip_hook_literals.md` | reference | `docs/CONVENTIONS.md` § facts that drift (on a branch, none of that applies) + `deploy/agent_commit.sh` | already-homed |
 | `reference_enumerate_all_leases_after_every_merge.md` | reference | `.claude/skills/land/SKILL.md` §3 + `docs/INCIDENT_LOG.md` 2026-08-30 | already-homed |
+| `reference_epic_checklists_stale_by_construction.md` | reference | `.claude/skills/wrap/SKILL.md` (e8)/(e9) + `docs/CONVENTIONS.md` §4a2 closure DoD (lands with #3341; interim: the rule's own body + this row) | homed-here |
 | `reference_event_delay_vs_swallow_and_accumulated_deploys.md` | reference | `.claude/skills/land/SKILL.md` §2 (delay is not swallow) + §4 (a cancelled superseded Deploy) | homed-here |
 | `reference_extract_the_right_real_source.md` | reference | `.claude/skills/prove-it/SKILL.md` Q4 (is this the code path the running system takes?) | homed-here |
 | `reference_extraction_never_baseline_raise.md` | reference | `docs/OPERATING_DISCIPLINE.md` §4.3 | already-homed |
@@ -586,6 +590,7 @@ user_who_is_matthew.md
 | `reference_judge_flake_ground_truth.md` | reference | `docs/OPERATING_DISCIPLINE.md` §1.5 | already-homed |
 | `reference_judge_reproducing_false_positive_shapes.md` | reference | `docs/OPERATING_DISCIPLINE.md` §1.5 (a reproduced verdict is not thereby real) | homed-here |
 | `reference_lambda_perf_measure_at_origin.md` | reference | `.claude/skills/land/SKILL.md` §5 (measure at origin, post-deploy) | homed-here |
+| `reference_lane_branch_must_not_carry_counter_file.md` | reference | `.claude/skills/reconcile-branch/SKILL.md` §0 ("no branch may carry the counter file") + `docs/CONVENTIONS.md` §3 | already-homed |
 | `reference_launchd_tcc_documents.md` | reference | `docs/NEW_MACHINE_BOOTSTRAP.md` §3c | already-homed |
 | `reference_layer_shipped_deps_dependabot_blind.md` | reference | `docs/CONVENTIONS.md` §1 (the layer is retired; the class is gone with it) | already-homed |
 | `reference_llm_json_maxtokens_truncation.md` | reference | `docs/CONVENTIONS.md` §7 (an LLM JSON call whose `max_tokens` truncates falls back silently) | homed-here |
@@ -636,6 +641,7 @@ user_who_is_matthew.md
 | `reference_s3_first_config_invalidates_local_measurement.md` | reference | `.claude/skills/prove-it/SKILL.md` Q4 (does the after actually contain the change?) + `scripts/coach_chat_sim.py` (`--local-specs`) | homed-here |
 | `reference_saturated_alarm_hides_its_own_findings.md` | reference | `docs/CONVENTIONS.md` §9 (fired-and-cleared flap detector, #2912) + `docs/MONITORING.md` | already-homed |
 | `reference_scratchpad_is_shared_across_concurrent_agents.md` | reference | `docs/OPERATING_DISCIPLINE.md` §3.1 + `.claude/agents/worktree-implementer.md` 0 | already-homed |
+| `reference_security_docs_never_via_hand_twin.md` | reference | `docs/INCIDENT_LOG.md` 2026-08-30 row; structural home lands with #3336 (script applies `infra/iam/*.json` verbatim) | homed-here |
 | `reference_shallow_clone_git_gates.md` | reference | `scripts/check_doc_index.py` header (shallow-clone caveat) | already-homed |
 | `reference_shared_scratchpad_clobbers_pr_bodies.md` | reference | `docs/OPERATING_DISCIPLINE.md` §3.1 + `.claude/agents/worktree-implementer.md` 0 | already-homed |
 | `reference_ship_the_mechanism_print_the_residual.md` | reference | `docs/OPERATING_DISCIPLINE.md` §2.10 | already-homed |
