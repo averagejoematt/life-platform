@@ -149,7 +149,7 @@ split/merge decisions are priced in #2890.
 | Secret (us-east-1) | Why it exists there | Consumer |
 |---|---|---|
 | `life-platform/cf-auth` | Lambda@Edge functions MUST be deployed in us-east-1; this is the edge HTML-gate password (`cdk/stacks/constants.py` CF_AUTH_*) | `life-platform-cf-auth` Lambda@Edge (`lambdas/cf-auth/index.mjs`) |
-| `life-platform/buddy-auth` | Buddy accountability page auth, read at the same us-east-1 edge | cf-auth edge function |
+| `life-platform/buddy-auth` | **Scheduled-deleted 2026-08-31 (#3377), gone 2026-09-30.** The prior row claimed cf-auth read it — false: `lambdas/cf-auth/index.mjs` hardcodes `life-platform/cf-auth`, and the buddy distribution has zero Lambda@Edge associations. Recreate (a page password) only if buddy auth is ever re-armed | none (was: nothing) |
 | `life-platform/site-api-origin-secret` | Cross-region twin of the us-west-2 secret: CloudFormation secret dynamic references are region-local, so the us-east-1 stacks need a local copy | CDK-injected origin-header verification |
 
 The #2890 "replicas unjustified" finding resolves to: **one** true twin
