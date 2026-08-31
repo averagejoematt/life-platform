@@ -147,14 +147,35 @@ LEDGER: dict[str, dict] = {
         owner="lambdas/ai + the coach fleet",
         verdict=KEEP,
         cardinality=FAN_OUT,
-        driver="emitting Lambdas x token/cost metric names (dims LambdaFunction, CoachID, Endpoint)",
+        driver=(
+            "emitting Lambdas x token/cost metric names; dim-sets (LambdaFunction,) / (Arm,Surface) / (CoachID,) / "
+            "bare / (CallerClass,) / (Coach,Surface) / (Endpoint,LambdaFunction)"
+        ),
         live_series=89,
-        series_budget=120,
+        series_budget=186,
         note=(
             "The ADR-063/133 budget chain's raw input: 6 alarms, a dashboard, and three code "
             "readers (site_api_budget, ai_spend_attribution, batch_feasibility). Densest "
             "unalarmed-fraction namespace in the estate (16 of 102 active series) and entirely "
-            "load-bearing — this is what a namespace earning its rent looks like."
+            "load-bearing — this is what a namespace earning its rent looks like. "
+            "BUDGET DERIVATION (#3370, 2026-08-31, measured 151): the original 120 was undocumented headroom over the 89 "
+            "above, and it redded when three DESIGNED series classes landed after the measurement (#2892 CallerClass, "
+            "#3086 RegenDiscarded, #2883 cache twins) — the anti-pattern the PROPORTIONALITY row's demote trigger names is "
+            "resolving that red by raising the number, so this budget is built class by class from the driver populations "
+            "instead: (LambdaFunction,) 116 = 26 callers (24 seen incl. the DESIGNED `unknown` fallback of "
+            "bedrock_client.feature_name, +2 new-feature room) x 3 universal metrics (In/Out tokens, EstimatedCostUSD) = 78, "
+            "plus the conditional arms — cache pair on up to 9 engaged callers = 18 (5 today; #3367's cache-adoption push "
+            "GROWS this), PromptCacheNoOp on up to 10 decliners (8 today), truncation pair on up to 5 callers = 10 (4 today); "
+            "(Arm,Surface) 30 = RegenDiscarded, KEPT per #3086 (deliberate pair cardinality, no alarm yet per #3081's rule) — "
+            "24 live combos of a 5-arm x ~15-surface space, and trimming it alone cannot green the census (151-24=127>120), "
+            "so it is priced here rather than smuggled; (CoachID,) 12 = 2 quality-gate metrics across the 10-coach fleet "
+            "(8 live); bare 10 = the 9 nameable dimensionless roll-ups (token/cost/cache/truncation totals + "
+            "TokenAlarmGenesisWindowActive); (CallerClass,) 4 EXACT — bedrock_client.CALLER_CLASSES is a fixed, test-pinned "
+            "4-tuple; (Coach,Surface) 8 = GenerationSkippedUnchanged as generation_cache adoption grows (4 live); "
+            "(Endpoint,LambdaFunction) 6 = 2 token metrics x up to 3 site-api-ai endpoints (4 live); (Context,) 0 DELIBERATE "
+            "— COST-05's dimension was superseded by CallerClass (#2892), nothing in the tree emits it, and its 1 residual "
+            "series ages out of the 14d window on its own. Total 116+30+12+10+4+8+6 = 186. Prune verdict: that (Context,) "
+            "residue is the only dead series and needs no code change; everything else is alarmed, read, or an explicit keep."
         ),
     ),
     # ── the dense, alarmed operational core ──────────────────────────────────
