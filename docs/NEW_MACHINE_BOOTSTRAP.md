@@ -248,7 +248,7 @@ the script. To force an off-schedule run, invoke the script with no arguments �
 memory leg and the datadrops leg unconditionally:
 
 ```bash
-bash ~/.local/bin/claude-memory-backup.sh    # both legs; logs to ~/Library/Logs/claude-backup/
+bash ~/dev/life-platform/setup/claude_memory_backup.sh   # both legs; logs to ~/Library/Logs/claude-backup/
 ```
 
 If `datadrops-archive/` looks emptier than the source machine's `datadrops/`, do **not**
@@ -313,13 +313,22 @@ is in use.
 
 ### 5b. The scheduled backup job (#1026)
 
-**#1026 has landed** (commit `48f635e3`); its installer + plist live in `backup/`. Install
-the daily agent that snapshots the step-4 state into versioned, private S3:
+**#1026 has landed** (commit `48f635e3`). The script and its LaunchAgent are both
+versioned in `setup/`; there is **no installer and no staged copy** — launchd runs the
+repo file directly (2026-08-31). Install the daily agent that snapshots the step-4 state
+into versioned, private S3 by copying the plist and loading it:
 
 ```bash
-cd ~/dev/life-platform/backup
-bash install.sh   # copies backup.sh → ~/.local/bin, loads the launchd plist
+cd ~/dev/life-platform
+cp setup/com.matthewwalker.claude-memory-backup.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.matthewwalker.claude-memory-backup.plist
+launchctl kickstart -p gui/$(id -u)/com.matthewwalker.claude-memory-backup   # prove it
 ```
+
+> **The plist names an absolute path**, so on a machine whose checkout is not at
+> `~/dev/life-platform` you must edit `ProgramArguments` before loading.
+> `tests/test_backup_agent_path_contract.py` fails if the installed agent and the repo
+> copy disagree — run the suite locally after any change here.
 
 This registers `com.matthewwalker.claude-memory-backup` (daily 09:15 + RunAtLoad). **Both
 legs run on every invocation** — the memory sync (`~/.claude`, never TCC-blocked) and the

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.matthewwalker.claude-memory-backup</string>
+
+    <!-- Runs the REPO copy directly. There is no staged copy in ~/.local/bin and no
+         install.sh — staging is what let a hard-coded path outlive the 2026-08-30
+         repo move and fail silently for seven weeks (see the script's header).
+
+         Install/refresh with:
+           cp setup/com.matthewwalker.claude-memory-backup.plist ~/Library/LaunchAgents/
+           launchctl unload ~/Library/LaunchAgents/com.matthewwalker.claude-memory-backup.plist
+           launchctl load   ~/Library/LaunchAgents/com.matthewwalker.claude-memory-backup.plist
+
+         tests/test_backup_agent_path_contract.py asserts this path names a real file in
+         the repo, and that the INSTALLED copy matches this one when it is present. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/matthewwalker/dev/life-platform/setup/claude_memory_backup.sh</string>
+    </array>
+
+    <!-- Daily at 09:15 local; RunAtLoad catches missed windows on wake/login -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- The script redirects its own output to ~/Library/Logs/claude-backup/backup-<date>.log.
+         These two catch only what it never gets far enough to log itself — e.g. bash
+         refusing to execute the file at all. They point at a SEPARATE file on purpose:
+         aiming launchd's stdout at a log the script also writes duplicates every line,
+         which is the bug fixed in the ingest agent on 2026-08-30. -->
+    <key>StandardOutPath</key>
+    <string>/Users/matthewwalker/Library/Logs/claude-backup/backup-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/matthewwalker/Library/Logs/claude-backup/backup-launchd.log</string>
+</dict>
+</plist>

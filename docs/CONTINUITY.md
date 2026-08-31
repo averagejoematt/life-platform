@@ -186,7 +186,7 @@ is not a manual push and there is no `BACKUP_DATADROPS` switch — that variable
 nowhere in the script and never has. The TCC rationale behind the old "manual by decision"
 framing was retired on 2026-08-30 when the repo moved to `~/dev`, which TCC does not
 protect (`docs/NEW_MACHINE_BOOTSTRAP.md` §3c). To force an off-schedule run:
-`bash ~/.local/bin/claude-memory-backup.sh` — both legs, no flags.
+`bash setup/claude_memory_backup.sh` — both legs, no flags.
 
 > **Read the log, not the schedule.** That leg ran daily and *failed* daily from
 > 2026-07-11 to 2026-08-30 while these pages described it as deliberately idle. A backup
@@ -194,12 +194,18 @@ protect (`docs/NEW_MACHINE_BOOTSTRAP.md` §3c). To force an off-schedule run:
 > documentation — the only honest check is the `rc=` line in
 > `~/Library/Logs/claude-backup/backup-YYYYMMDD.log`.
 
-> **Where the script lives.** `~/.local/bin/claude-memory-backup.sh`, untracked, with no
-> copy in this repo. Earlier text here cited a `backup/install.sh` as its installer; no
-> such file has ever existed in this tree. The script's own header still describes a
-> repo-copy-plus-installer layout that was never built. How it should be versioned is an
-> open decision — what is recorded here is only where it actually is today: on the single
-> laptop it exists to protect.
+> **Where the script lives (resolved 2026-08-31).** `setup/claude_memory_backup.sh`, in
+> git, with its LaunchAgent versioned beside it at
+> `setup/com.matthewwalker.claude-memory-backup.plist`. launchd runs the repo file
+> directly: **no staged copy, no installer.** The staged `~/.local/bin` copy has been
+> deleted.
+>
+> That staging is what broke this backup. The header claimed a repo copy was the source
+> and an `install.sh` staged it; neither had ever existed, so the only copy was untracked,
+> carried a hard-coded `~/Documents` path, and went stale when the repo moved — failing
+> every run for seven weeks while reporting a TCC cause that no longer applied. Outside
+> git, nothing could see it. `tests/test_backup_agent_path_contract.py` now asserts the
+> installed agent still names the repo file, and that no staged copy has reappeared.
 
 **Never commit this directory (or its export) to the repo** — whatever the repo's
 visibility at the time (it has been public, private and public again), memory files contain
