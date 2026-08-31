@@ -33,6 +33,9 @@ Two guards:
 import os
 import re
 import sys
+from types import SimpleNamespace
+
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
@@ -42,6 +45,7 @@ _CI_CD = os.path.join(_REPO, ".github", "workflows", "ci-cd.yml")
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
+import visual_qa  # noqa: E402
 from visual_qa import sweep_pages  # noqa: E402
 
 # ── 1. the tier filter ────────────────────────────────────────────────────────
@@ -187,3 +191,285 @@ def test_workflow_playwright_pin_matches_ci_gate():
         assert not literals(
             path
         ), f"{name} hardcodes a playwright version again ({literals(path)}) — resolve it instead, or the two can drift (#2609)"
+
+
+# ── 3. the WebKit 32767px screenshot-cap fix (#3353) ──────────────────────────
+#
+# Every historical webkit-mobile-qa run failed with "Page.screenshot: Cannot
+# take screenshot larger than 32767 pixels on any dimension" on the taller
+# pages — the mobile-Safari profile is 390x844 at device_scale_factor 3, so a
+# page whose CSS scrollHeight exceeds ~10,900px hits the device-pixel cap (the
+# tallest live page measured 2026-08-30: /protocols/challenges/ at 25,243px
+# CSS height / 390x844 dpr3 mobile viewport — 3x that in device pixels, ~2.3x
+# over the 32767 cap; see the PR body for the full measurement). The fix is
+# `visual_qa._capture_full_page`: try the normal full-page screenshot, and on
+# ANY failure fall back to scrolling in viewport-height tiles and stitching
+# with Pillow — never raising, so a capture failure becomes a WARNING, not an
+# aborted page audit.
+#
+# Section (a) exercises `_capture_full_page` directly (success / WebKit-cap
+# fallback / total-failure) with a hand-built fake page — no browser needed.
+# Section (b) is the acceptance-criteria proof: drive the REAL `capture_page`
+# audit function with a fake `page` whose `.screenshot(full_page=True)`
+# succeeds on one instance and raises the exact production WebKit error on
+# the other, across three sample pages, and assert the two runs produce
+# IDENTICAL a11y/gate verdicts (issues + status) — the screenshot mechanism
+# must be provably decoupled from the rest of the audit. A positive control
+# (a planted, non-baselined serious a11y violation) proves the parity check
+# is non-vacuous: both runs must still show the SAME real defect as an issue,
+# not just an empty issues list on each side.
+
+
+class _FakeScreenshotPage:
+    """Minimal `.screenshot()`-only fake for `_capture_full_page` unit tests."""
+
+    def __init__(self, mode="ok", scroll_height=800, viewport=None):
+        self.mode = mode  # "ok" | "webkit_cap" | "always_fail"
+        self.scroll_height = scroll_height
+        self.viewport_size = viewport or {"width": 390, "height": 844}
+        self.full_page_calls = 0
+        self.tile_calls = 0
+
+    def screenshot(self, path=None, full_page=False):
+        if full_page:
+            self.full_page_calls += 1
+            if self.mode in ("webkit_cap", "always_fail"):
+                raise Exception("Page.screenshot: Cannot take screenshot larger than 32767 pixels on any dimension")
+            from PIL import Image
+
+            Image.new("RGB", (self.viewport_size["width"], min(self.scroll_height, 4000)), "white").save(path)
+            return
+        # tile capture (full_page falsy)
+        self.tile_calls += 1
+        if self.mode == "always_fail":
+            raise Exception("simulated engine screenshot failure on tile capture too")
+        from PIL import Image
+
+        Image.new("RGB", (self.viewport_size["width"], self.viewport_size["height"]), "white").save(path)
+
+    def evaluate(self, script, *a, **k):
+        if "scrollHeight" in script:
+            return self.scroll_height
+        return None
+
+    def wait_for_timeout(self, ms):
+        pass
+
+
+def test_capture_full_page_direct_success_never_tiles(tmp_path):
+    pytest.importorskip("PIL")
+    page = _FakeScreenshotPage(mode="ok", scroll_height=1200)
+    warnings = []
+    out = str(tmp_path / "page.png")
+    assert visual_qa._capture_full_page(page, out, warnings) is True
+    assert os.path.exists(out)
+    assert page.full_page_calls == 1
+    assert page.tile_calls == 0
+    assert warnings == []
+
+
+def test_capture_full_page_webkit_cap_falls_back_to_tiled_stitch(tmp_path):
+    """The exact production error string — falls back to tiling, stitches a
+    correctly-sized image, records ONE warning, never raises."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    page = _FakeScreenshotPage(mode="webkit_cap", scroll_height=2500, viewport={"width": 390, "height": 844})
+    warnings = []
+    out = str(tmp_path / "tall.png")
+    assert visual_qa._capture_full_page(page, out, warnings) is True
+    assert page.full_page_calls == 1
+    assert page.tile_calls == 3  # ceil(2500 / 844)
+    assert os.path.exists(out)
+    stitched = Image.open(out)
+    assert stitched.size == (390, 2500)
+    assert len(warnings) == 1
+    assert "falling back to tiled capture" in warnings[0]
+    # no leftover tile artifacts
+    assert not any(f.endswith(".png") and f != "tall.png" for f in os.listdir(tmp_path))
+
+
+def test_capture_full_page_total_failure_returns_false_never_raises(tmp_path):
+    """Even the tiled fallback failing must not raise — it becomes a warning,
+    and the caller (capture_page) must be able to keep going."""
+    pytest.importorskip("PIL")
+    page = _FakeScreenshotPage(mode="always_fail", scroll_height=2500)
+    warnings = []
+    out = str(tmp_path / "broken.png")
+    assert visual_qa._capture_full_page(page, out, warnings) is False
+    assert not os.path.exists(out)
+    assert len(warnings) == 2  # the direct-attempt warning + the tiled-capture-failed warning
+
+
+# ── (b) capture_page parity: screenshot mechanism must not move the verdict ──
+
+
+class _FakeAuditPage:
+    """A capture_page-compatible fake. Every DOM-dependent visual_qa helper
+    (`_scroll_and_reveal`, `_check_sections_for_blank`, etc.) is monkeypatched
+    to a fixed value by the `_isolate_dom_helpers` fixture below — the ONLY
+    thing this class need vary between test instances is `.screenshot()`
+    itself, which is the whole point: capture_page's non-screenshot verdict
+    must be identical regardless of how the screenshot capture behaves.
+    """
+
+    def __init__(self, screenshot_mode="ok", scroll_height=1200):
+        self.screenshot_mode = screenshot_mode  # "ok" | "webkit_cap"
+        self.scroll_height = scroll_height
+        self.viewport_size = {"width": 390, "height": 844}
+
+    def add_init_script(self, *a, **k):
+        pass
+
+    def on(self, *a, **k):
+        pass
+
+    def goto(self, url, wait_until=None, timeout=None):
+        return None
+
+    def wait_for_timeout(self, ms):
+        pass
+
+    def set_viewport_size(self, size):
+        self.viewport_size = size
+
+    def close(self):
+        pass
+
+    def query_selector_all(self, sel):
+        return []
+
+    def query_selector(self, sel):
+        return None
+
+    def evaluate(self, script, *a, **k):
+        if "__perf" in script:
+            return {}
+        if "scrollHeight" in script:
+            return self.scroll_height
+        return None
+
+    def screenshot(self, path=None, full_page=False):
+        from PIL import Image  # caller (the test) already importorskip'd this
+
+        if full_page and self.screenshot_mode == "webkit_cap":
+            raise Exception("Page.screenshot: Cannot take screenshot larger than 32767 pixels on any dimension")
+        Image.new("RGB", (self.viewport_size["width"], 50), "white").save(path)
+
+
+@pytest.fixture
+def _isolate_dom_helpers(monkeypatch):
+    """Neutralize every capture_page helper that would otherwise need a real
+    rendered DOM, so the fake page above only has to answer the handful of
+    calls capture_page itself makes directly. This isolates the ONE variable
+    under test: whether `.screenshot(full_page=True)` succeeds or raises."""
+    for name, value in (
+        ("_scroll_and_reveal", lambda page: None),
+        ("_check_sections_for_blank", lambda page: []),
+        ("_check_stale_text", lambda page: []),
+        ("_mobile_overflow", lambda page: 0),
+        ("_stuck_reveals", lambda page, sel: []),
+        ("_app_bar_overflow", lambda page: 0),
+        ("_viewport_meta_ok", lambda page: True),
+        ("_tap_target_audit", lambda page, sel: []),
+        ("_svg_text_floor_findings", lambda page, w: []),
+        ("_html_text_floor_findings", lambda page, w: []),
+    ):
+        monkeypatch.setattr(visual_qa, name, value)
+
+
+def _run_capture_page_pair(monkeypatch, path, tmp_path, plant_defect):
+    """Drive the real capture_page() twice — once with a screenshot that
+    succeeds directly (the chromium-shaped path), once with one that raises
+    the exact production WebKit 32767px error (the webkit-shaped path) — and
+    return their result dicts. `plant_defect` controls a1ly_audit.run_axe's
+    stub: when True, every call returns one NEW serious violation (not in the
+    empty baseline) so BOTH desktop and mobile a11y passes must gate — the
+    positive control that proves this test can fail."""
+    from visual_qa import a11y_audit as vqa11y
+
+    call_count = {"n": 0}
+
+    def fake_run_axe(page):
+        call_count["n"] += 1
+        if not plant_defect:
+            return []
+        return [
+            {
+                "id": "scrollable-region-focusable",
+                "impact": "serious",
+                "help": "Scrollable region must have keyboard access",
+                "nodes": 1,
+                "targets": ["table"],
+            }
+        ]
+
+    monkeypatch.setattr(vqa11y, "run_axe", fake_run_axe)
+
+    empty_baseline = {"_meta": {}, "pages": {}, "pages_light": {}, "pages_mobile": {}, "pages_light_mobile": {}}
+    page_def = {"path": path, "name": f"Sample {path}", "tier": 2}
+
+    results = {}
+    for mode in ("ok", "webkit_cap"):
+        fake_page = _FakeAuditPage(screenshot_mode=mode, scroll_height=25243)
+        context = SimpleNamespace(new_page=lambda fp=fake_page: fp)
+        screenshot_dir = str(tmp_path / mode / path.strip("/").replace("/", "-"))
+        os.makedirs(screenshot_dir, exist_ok=True)
+        results[mode] = visual_qa.capture_page(
+            context,
+            page_def,
+            screenshot_dir,
+            save_screenshots=True,
+            a11y_baseline=empty_baseline,
+            context_mobile=False,
+        )
+    # both desktop + mobile axe passes ran on both sides (2 calls x 2 modes)
+    assert call_count["n"] == 4, f"expected 4 run_axe calls (desktop+mobile x 2 screenshot modes), got {call_count['n']}"
+    return results
+
+
+_SAMPLE_PAGES = ["/protocols/challenges/", "/data/labs/", "/method/predictions/"]
+
+
+@pytest.mark.parametrize("path", _SAMPLE_PAGES)
+def test_screenshot_path_does_not_change_clean_verdict(monkeypatch, tmp_path, _isolate_dom_helpers, path):
+    """Negative case: no planted defect — both screenshot paths must agree
+    the page is clean (status PASS, no issues)."""
+    pytest.importorskip("PIL")
+    results = _run_capture_page_pair(monkeypatch, path, tmp_path, plant_defect=False)
+    assert results["ok"]["status"] == "PASS"
+    assert results["webkit_cap"]["status"] == "PASS"
+    assert results["ok"]["issues"] == results["webkit_cap"]["issues"] == []
+
+
+@pytest.mark.parametrize("path", _SAMPLE_PAGES)
+def test_screenshot_path_produces_identical_a11y_verdict_positive_control(monkeypatch, tmp_path, _isolate_dom_helpers, path):
+    """Positive control (the acceptance-criteria proof): a REAL a11y defect
+    (planted via a11y_audit.run_axe) must gate identically whether the
+    screenshot capture takes the direct path or the WebKit-cap tiled fallback
+    — proving the two screenshot mechanisms are not coupled to the gate.
+
+    Before #3353's fix, the WebKit-cap screenshot exception happened BEFORE
+    the mobile viewport pass (capture_page resizes to 390px and runs the
+    mobile a11y gate only AFTER the desktop screenshot call) and was caught by
+    the function's outer `except Exception`, which replaced the rest of that
+    page's issues with a single generic "Page load failed" — silently
+    dropping the mobile a11y finding. This test fails exactly that way if the
+    fix is reverted (see the mutation in the PR body: reinstate a bare
+    `page.screenshot(path=full, full_page=True)` in place of the
+    `_capture_full_page` call at the desktop site)."""
+    pytest.importorskip("PIL")
+    results = _run_capture_page_pair(monkeypatch, path, tmp_path, plant_defect=True)
+    ok_result = results["ok"]
+    cap_result = results["webkit_cap"]
+
+    assert ok_result["status"] == "FAIL"
+    assert cap_result["status"] == "FAIL"
+    assert ok_result["issues"] == cap_result["issues"]
+    # Real defect present on BOTH sides — the desktop AND mobile a11y passes.
+    new_violation_issues = [i for i in ok_result["issues"] if "NEW serious a11y violation" in i]
+    assert len(new_violation_issues) == 2, f"expected desktop+mobile a11y issues, got: {ok_result['issues']}"
+    # The screenshot itself must still have been attempted on both sides —
+    # this is not a case where the webkit_cap path silently skipped it.
+    assert any("falling back to tiled capture" in w for w in cap_result["warnings"])
+    assert not any("falling back to tiled capture" in w for w in ok_result["warnings"])

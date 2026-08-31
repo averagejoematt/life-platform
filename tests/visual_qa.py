@@ -731,6 +731,108 @@ def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=2
             return f"Page load failed: {e2}"
 
 
+_MAX_SCREENSHOT_DIM = 32767  # WebKit's hard cap (#3353) — Chromium's is far higher but
+# the tiled path below is engine-agnostic, so both browsers take the same code path
+# whenever a page exceeds this, keeping the mechanism consistent across engines.
+_MAX_SCREENSHOT_TILES = 60  # sanity bound (~60 x 844px mobile viewport ≈ 50,000px of
+# page — already generous for anything the site ships); guards a miscomputed/runaway
+# scrollHeight from turning into an unbounded capture loop.
+
+
+def _capture_full_page(page, out_path, warnings=None):
+    """Full-page screenshot that survives WebKit's 32767px cap (#3353).
+
+    Tries the normal `page.screenshot(full_page=True)` first — the fast path
+    every page under the cap takes on every engine, unchanged from before this
+    fix. On failure (WebKit's `Cannot take screenshot larger than 32767 pixels`,
+    or any other engine-level screenshot error) falls back to scrolling the
+    page in viewport-height increments, screenshotting each slice, and
+    stitching them top-to-bottom with Pillow (already a dev dependency —
+    tests/visual_ai_qa.py's downscale path, requirements-dev.txt pillow==12.3.0).
+
+    A capture failure — direct OR tiled — is recorded as a WARNING and this
+    returns False; it never raises. The caller (capture_page) must be able to
+    keep running its OTHER checks (mobile a11y, tap targets, etc.) regardless
+    of whether the screenshot itself succeeded — a screenshot is diagnostic
+    evidence, not a gating signal, and before this fix a raised screenshot
+    exception aborted the rest of that page's audit (#3353's actual defect:
+    six weeks of WebKit runs failing on their own capture mechanics rather
+    than reporting a real mobile-Safari verdict).
+
+    Returns True iff `out_path` was written.
+    """
+    try:
+        page.screenshot(path=out_path, full_page=True)
+        return True
+    except Exception as e:
+        if warnings is not None:
+            warnings.append(f"Full-page screenshot failed ({e}) — falling back to tiled capture (#3353)")
+
+    try:
+        from PIL import Image
+    except Exception as e:
+        if warnings is not None:
+            warnings.append(f"Tiled screenshot fallback unavailable — Pillow import failed ({e})")
+        return False
+
+    tile_paths = []
+    try:
+        try:
+            height = page.evaluate("() => document.documentElement.scrollHeight")
+        except Exception:
+            height = None
+        viewport = page.viewport_size or {"width": 390, "height": 844}
+        vw = viewport["width"]
+        vh = viewport["height"]
+        total_height = int(height) if height else vh
+
+        offset = 0
+        n = 0
+        while offset < total_height and n < _MAX_SCREENSHOT_TILES:
+            try:
+                page.evaluate(f"() => window.scrollTo(0, {offset})")
+            except Exception:
+                pass
+            page.wait_for_timeout(60)
+            tile_path = f"{out_path}.tile{n}.png"
+            page.screenshot(path=tile_path)
+            tile_paths.append(tile_path)
+            offset += vh
+            n += 1
+
+        if not tile_paths:
+            if warnings is not None:
+                warnings.append("Tiled screenshot fallback captured zero tiles")
+            return False
+
+        images = [Image.open(t) for t in tile_paths]
+        stitched = Image.new("RGB", (vw, sum(im.height for im in images)), "white")
+        y = 0
+        for im in images:
+            stitched.paste(im, (0, y))
+            y += im.height
+            im.close()
+        if total_height and stitched.height > total_height:
+            stitched = stitched.crop((0, 0, vw, total_height))
+        stitched.save(out_path)
+
+        try:
+            page.evaluate("() => window.scrollTo(0, 0)")
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        if warnings is not None:
+            warnings.append(f"Tiled screenshot capture failed ({e}) — page not captured, sweep continues (#3353)")
+        return False
+    finally:
+        for t in tile_paths:
+            try:
+                os.remove(t)
+            except Exception:
+                pass
+
+
 def run_leak_token_sweep(base_url=None):
     """Deterministic, AI-free leak-token sweep (#1448).
 
@@ -1016,8 +1118,8 @@ def capture_page(
         slug = path.strip("/").replace("/", "-") or "home"
         if save_screenshots:
             full = os.path.join(screenshot_dir, f"{slug}.png")
-            page.screenshot(path=full, full_page=True)
-            shots.append({"kind": "page", "path": full})
+            if _capture_full_page(page, full, warnings):
+                shots.append({"kind": "page", "path": full})
             for ci, sel in enumerate(page_def.get("charts", [])):
                 el = page.query_selector(sel)
                 if el:
@@ -1083,8 +1185,8 @@ def capture_page(
             issues.append(f"Tap targets < 44px in both axes @390px (#1010/#1249): {', '.join(small[:5])}")
         if save_screenshots:
             mob = os.path.join(screenshot_dir, f"{slug}-mobile.png")
-            page.screenshot(path=mob, full_page=True)
-            shots.append({"kind": "mobile", "path": mob})
+            if _capture_full_page(page, mob, warnings):
+                shots.append({"kind": "mobile", "path": mob})
         # ── chrome @ 360px: the app-bar is tightest here (#1003 verified at 360) ──
         page.set_viewport_size({"width": 360, "height": 800})
         page.wait_for_timeout(200)
