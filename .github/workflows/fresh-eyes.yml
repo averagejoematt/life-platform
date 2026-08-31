@@ -39,10 +39,16 @@ jobs:
         with:
           python-cache: "pip"
 
-      - name: Install Playwright + Chromium + boto3
+      - name: Install Playwright + Chromium + boto3 + pillow
         run: |
           python -m pip install --upgrade pip
-          PINS=$(python3 scripts/ci_pins.py playwright boto3)   # versions from requirements-dev.txt (CQ-01, #2058/#2609)
+          # #3315: pillow is LOAD-BEARING since #3079 routed this script's captures through
+          # visual_ai_qa._image_blocks — every full-page door is taller than the judge-
+          # legibility bound, so without Pillow each one raises "Pillow is not installed to
+          # tile it" and the run exits non-zero. Never exercised in CI: every fire since
+          # #3079 landed (2026-08-27) skipped at budget tier 2. botocore joins boto3 so this
+          # copy resolves the same explicit pins as the three visual-qa copies (CQ-01).
+          PINS=$(python3 scripts/ci_pins.py playwright boto3 botocore pillow)   # versions from requirements-dev.txt (CQ-01, #2058/#2609)
           python -m pip install $PINS
           python -m playwright install --with-deps chromium
 

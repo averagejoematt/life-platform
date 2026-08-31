@@ -237,6 +237,29 @@ _IAM_TWIN_SH = (
     'aws iam put-role-policy --role-name "$ROLE" --policy-name remediation-permissions --policy-document "$PERM"\n'
 )
 
+# #3315: a workflow whose job installs `playwright boto3` and then runs a script whose
+# capture path needs Pillow — the exact fresh-eyes.yml install line that shipped before
+# #3315 (the sweep's own detector is what turned it up). Planted as a NEW workflow file
+# because the runner refuses to overwrite a tracked one; the gate globs the directory,
+# so an untracked file is in scope.
+_DARK_FLAG_WORKFLOW_YML = (
+    "name: census probe 2999 (dark flag)\n"
+    "on: workflow_dispatch\n"
+    "jobs:\n"
+    "  probe:\n"
+    "    runs-on: ubuntu-latest\n"
+    "    steps:\n"
+    "      - uses: actions/checkout@v7\n"
+    "      - uses: ./.github/actions/setup-ci\n"
+    "      - name: Install Playwright + Chromium + boto3 (the pre-#3315 fresh-eyes line)\n"
+    "        run: |\n"
+    "          PINS=$(python3 scripts/ci_pins.py playwright boto3)\n"
+    "          python -m pip install $PINS\n"
+    "          python -m playwright install --with-deps chromium\n"
+    "      - name: Run discovery\n"
+    "        run: python3 scripts/fresh_eyes_discovery.py\n"
+)
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_no_conflict_markers.py": MutationSpec(
         gate_id="structural::test_no_conflict_markers.py",
@@ -349,6 +372,16 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
         target="tests/test_absence_coverage_3294.py",
         detects="a NEW consumer of the raw channels_quiet list with no disposition — the unwired-surface class that published two false absences (#3294)",
         plants=(("lambdas/common/_census_probe_2999.py", _RAW_QUIET_READER_PY),),
+        track=False,
+    ),
+    "structural::test_ci_dark_flag_sweep_3315.py": MutationSpec(
+        gate_id="structural::test_ci_dark_flag_sweep_3315.py",
+        target="tests/test_ci_dark_flag_sweep_3315.py",
+        detects=(
+            "a CI job invoking a script whose code path needs a package the job never installs — "
+            "#2938's `⚠ unavailable` + exit 0 class, one workflow file away from the sweep's waivers (#3315)"
+        ),
+        plants=((".github/workflows/_census_probe_2999.yml", _DARK_FLAG_WORKFLOW_YML),),
         track=False,
     ),
     "structural::test_direction_of_travel_ruling_3293.py": MutationSpec(
@@ -593,6 +626,26 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
             "surfaces published all four labels, `NOTHING has been logged` included.",
         ),
         proved_on="2026-08-29",
+    ),
+    "structural::test_ci_dark_flag_sweep_3315.py": dict(
+        _proof(
+            "structural::test_ci_dark_flag_sweep_3315.py",
+            "baseline: 13 passed | mutated: 1 failed, 12 passed :: "
+            "test_no_ci_step_reaches_a_dependency_its_job_never_installs | reverted: 13 passed",
+            "The gate compares each job's DECLARED install set (ci_pins.py arguments, `pip install -r`/literal, "
+            "`playwright install <browser>`; a job with no setup-python is modelled as nothing installed) against "
+            "the transitive repo-local import closure of every script its steps reach — through `bash deploy/*.sh`, "
+            "heredocs and `-c` one-liners included — so a reach behind a flag the job never passes is a waiver with a "
+            "reason, keyed by job+script+dist and live-checked (a vanished reach reds as STALE WAIVER). The mutated run "
+            "reds on the planted probe's Pillow reach; the same detector pointed at copies of origin/main's workflows "
+            "(`--workflows-dir`) reported the 22 violations #3315 fixed. NOT covered: what pytest-collected tests import "
+            "(test_deploy_critical_lane_imports_2758 owns module scope; a lazy import inside a test body is outside both); "
+            "a dependency that is present while its IAM permission is absent (site-deploy's theme-river DynamoDB read "
+            "fails AccessDenied with boto3 installed — a different class, named on the PR); runner-image tools "
+            "(aws/gh/jq/node/curl) are assumed present. A script the resolver cannot see surfaces as UNRESOLVED, which "
+            "is itself a violation, never a pass.",
+        ),
+        proved_on="2026-08-30",
     ),
     "structural::test_direction_of_travel_ruling_3293.py": dict(
         _proof(
