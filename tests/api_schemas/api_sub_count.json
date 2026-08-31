@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/sub_count",
   "is_prefix_sample": false,
   "path": "/api/sub_count",
@@ -15,9 +15,15 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
+      },
+      "available": {
+        "type": "boolean"
       },
       "count": {
         "type": "integer"

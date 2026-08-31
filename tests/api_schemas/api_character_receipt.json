@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/character_receipt",
   "is_prefix_sample": false,
   "path": "/api/character_receipt",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -65,37 +68,7 @@
                     "items": {
                       "type": "string"
                     },
-                    "length_sample": 5,
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "pk": {
-                    "type": "string"
-                  },
-                  "sks": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 2,
-                    "type": "array"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "pk": {
-                    "type": "string"
-                  },
-                  "sks": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "length_sample": 7,
+                    "length_sample": 12,
                     "type": "array"
                   }
                 },
@@ -115,9 +88,24 @@
                   }
                 },
                 "type": "object"
+              },
+              {
+                "keys": {
+                  "pk": {
+                    "type": "string"
+                  },
+                  "sks": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 15,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
               }
             ],
-            "length_sample": 9,
+            "length_sample": 8,
             "type": "array"
           },
           "phase": {
@@ -528,24 +516,8 @@
                             "type": "boolean"
                           },
                           "events": {
-                            "items": {
-                              "keys": {
-                                "new_level": {
-                                  "type": "number"
-                                },
-                                "old_level": {
-                                  "type": "number"
-                                },
-                                "pillar": {
-                                  "type": "string"
-                                },
-                                "type": {
-                                  "type": "string"
-                                }
-                              },
-                              "type": "object"
-                            },
-                            "length_sample": 1,
+                            "items": null,
+                            "length_sample": 0,
                             "type": "array"
                           },
                           "level": {

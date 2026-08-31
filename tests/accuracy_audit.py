@@ -42,9 +42,15 @@ DDB_GROUND_TRUTH = [
 ]
 
 # Sentinels in a JSON string value usually mean a Python-repr / serialization leak.
-_LEAK_RE = re.compile(r"\b(undefined|NaN|\[object Object\]|None|null)\b")
-# In rendered prose, "None"/"null" are common English; only the JS-runtime leaks matter.
+# JS-runtime leaks ("undefined"/"NaN"/"[object Object]") never occur as innocent
+# English substrings, so a mid-string match is still a real finding. "None"/"null"
+# ARE common English/statistics vocabulary ("null hypothesis", "None when |r| >= 1",
+# ADR-104 absence prose) — #3324: those two are anchored to the WHOLE string value
+# (the value IS the literal leaked token, not a sentence that happens to use the
+# word), so a genuine leak like `"value": "None"` still fires and a sentence
+# merely containing "none"/"null hypothesis" does not.
 _PROSE_LEAK_RE = re.compile(r"(undefined|NaN|\[object Object\])")
+_WHOLE_VALUE_NULLISH_RE = re.compile(r"^(None|null)$")
 # Strings that look like a raw ISO datetime leaking where a friendly date belongs.
 _RAW_DT_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 
@@ -135,6 +141,13 @@ def scan_json_value_leaks(data, source_label):
     """Walk a parsed JSON value for leaked NaN/undefined/[object Object]/None/null
     inside STRING values (keys named 'null'/'none' are fine — only values matter).
 
+    #3324: "undefined"/"NaN"/"[object Object]" (`_PROSE_LEAK_RE`) are matched as a
+    substring anywhere in the value — they never occur as innocent English. "None"/
+    "null" are common English/statistics words (a `limitations` sentence reading
+    "None when |r| >= 1..." or "null hypothesis"), so they are anchored to the WHOLE
+    string value (`_WHOLE_VALUE_NULLISH_RE`) — a leak looks like `"value": "None"`,
+    not a sentence that happens to use the word.
+
     Extracted (#1436) so this is the ONE leak-scan walk shared by:
       - sanity_scan() below, which reads already-captured api/*.json files off disk
         (the tests/site_review.py capture flow — a curated page-binding subset), and
@@ -157,7 +170,7 @@ def scan_json_value_leaks(data, source_label):
             for i, v in enumerate(node[:50]):
                 _walk(v, f"{path}[{i}]")
         elif isinstance(node, str):
-            if _LEAK_RE.search(node) and len(node) < 200:
+            if len(node) < 200 and (_PROSE_LEAK_RE.search(node) or _WHOLE_VALUE_NULLISH_RE.match(node.strip())):
                 findings.append({"source": source_label, "where": path, "severity": "high", "snippet": node[:120]})
 
     _walk(data)

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/source_freshness",
   "is_prefix_sample": false,
   "path": "/api/source_freshness",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -29,6 +32,9 @@
           }
         },
         "type": "object"
+      },
+      "pacific_today": {
+        "type": "string"
       },
       "sources": {
         "items": [
@@ -93,7 +99,7 @@
                   },
                   "type": "object"
                 },
-                "length_sample": 5,
+                "length_sample": 4,
                 "type": "array"
               },
               "datatypes": {
@@ -139,6 +145,12 @@
                 "type": "string"
               },
               "last_update": {
+                "type": "string"
+              },
+              "last_update_ahead_of_pt": {
+                "type": "boolean"
+              },
+              "last_update_frame": {
                 "type": "string"
               },
               "last_update_ts": {

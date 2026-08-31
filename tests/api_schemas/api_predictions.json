@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/predictions",
   "is_prefix_sample": false,
   "path": "/api/predictions",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -55,6 +58,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -66,6 +72,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -113,6 +122,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -124,6 +136,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -171,6 +186,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -182,6 +200,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -229,6 +250,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -240,6 +264,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -287,6 +314,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -298,6 +328,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -345,6 +378,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -356,6 +392,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -403,6 +442,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -414,6 +456,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -461,6 +506,9 @@
                   "inconclusive": {
                     "type": "integer"
                   },
+                  "observational": {
+                    "type": "integer"
+                  },
                   "pending": {
                     "type": "integer"
                   },
@@ -472,6 +520,9 @@
                   }
                 },
                 "type": "object"
+              },
+              "observational": {
+                "type": "integer"
               },
               "pending": {
                 "type": "integer"
@@ -502,6 +553,20 @@
           "decided": {
             "type": "integer"
           },
+          "due": {
+            "keys": {
+              "as_of": {
+                "type": "string"
+              },
+              "due_now": {
+                "type": "integer"
+              },
+              "earliest_due": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
           "expired": {
             "type": "integer"
           },
@@ -525,6 +590,9 @@
               "inconclusive": {
                 "type": "integer"
               },
+              "observational": {
+                "type": "integer"
+              },
               "pending": {
                 "type": "integer"
               },
@@ -536,6 +604,9 @@
               }
             },
             "type": "object"
+          },
+          "observational": {
+            "type": "integer"
           },
           "pending": {
             "type": "integer"
@@ -565,11 +636,17 @@
               "date": {
                 "type": "string"
               },
+              "due_date": {
+                "type": "string"
+              },
               "eval_type": {
                 "type": "string"
               },
+              "gradeable": {
+                "type": "boolean"
+              },
               "metric": {
-                "type": "null"
+                "type": "string"
               },
               "outcome_notes": {
                 "type": "string"
@@ -600,11 +677,58 @@
               "date": {
                 "type": "string"
               },
+              "due_date": {
+                "type": "null"
+              },
               "eval_type": {
                 "type": "string"
               },
+              "gradeable": {
+                "type": "boolean"
+              },
               "metric": {
                 "type": "string"
+              },
+              "outcome_notes": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "subdomain": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "date": {
+                "type": "string"
+              },
+              "due_date": {
+                "type": "null"
+              },
+              "eval_type": {
+                "type": "string"
+              },
+              "gradeable": {
+                "type": "boolean"
+              },
+              "metric": {
+                "type": "null"
               },
               "outcome_notes": {
                 "type": "string"

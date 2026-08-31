@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/experiment_detail?id=no-screens-before-bed",
   "is_prefix_sample": false,
   "path": "/api/experiment_detail",
@@ -15,12 +15,18 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
       },
       "active_run": {
         "type": "null"
+      },
+      "citation_status": {
+        "type": "string"
       },
       "completed_runs": {
         "items": null,
@@ -101,6 +107,12 @@
         "items": null,
         "length_sample": 0,
         "type": "array"
+      },
+      "source_resolved_title": {
+        "type": "string"
+      },
+      "source_url": {
+        "type": "string"
       },
       "status": {
         "type": "string"

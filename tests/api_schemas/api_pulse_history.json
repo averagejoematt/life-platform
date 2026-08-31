@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/pulse_history",
   "is_prefix_sample": false,
   "path": "/api/pulse_history",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -51,10 +54,10 @@
                 "type": "number"
               },
               "weight_delta": {
-                "type": "number"
+                "type": "null"
               },
               "weight_lbs": {
-                "type": "number"
+                "type": "null"
               }
             },
             "type": "object"
@@ -87,44 +90,6 @@
               },
               "strain": {
                 "type": "number"
-              },
-              "weight_delta": {
-                "type": "null"
-              },
-              "weight_lbs": {
-                "type": "null"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "day_number": {
-                "type": "integer"
-              },
-              "headline": {
-                "type": "string"
-              },
-              "hrv_ms": {
-                "type": "null"
-              },
-              "recovery_pct": {
-                "type": "null"
-              },
-              "rhr_bpm": {
-                "type": "null"
-              },
-              "sleep_hours": {
-                "type": "null"
-              },
-              "steps": {
-                "type": "integer"
-              },
-              "strain": {
-                "type": "null"
               },
               "weight_delta": {
                 "type": "number"
@@ -136,7 +101,7 @@
             "type": "object"
           }
         ],
-        "length_sample": 8,
+        "length_sample": 14,
         "type": "array"
       }
     },

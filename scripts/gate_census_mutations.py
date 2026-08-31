@@ -60,6 +60,8 @@ an un-assembled literal here is a self-inflicted repo-wide failure.
 from __future__ import annotations
 
 import argparse
+import copy
+import json
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -260,6 +262,27 @@ _DARK_FLAG_WORKFLOW_YML = (
     "        run: python3 scripts/fresh_eyes_discovery.py\n"
 )
 
+
+# #3324: the nullable-aware check-drift rule (diff_shape() in
+# deploy/capture_api_schemas.py) must still catch a GENUINE key removal on a hand-
+# mutated baseline. Run against a captured FIXTURE, never the live site (this harness
+# is offline) — the reference shape is copied from a REAL committed snapshot
+# (tests/api_schemas/api_vitals.json) at plant time, not hand-typed, so the proof is
+# against real captured data. `tests/test_api_schema_completeness.py` reads this probe
+# path if (and only if) it exists; normally it does not, so the gate is a silent no-op
+# — the plant is what gives it something to check.
+def _drift_probe_plant() -> tuple[str, str]:
+    ref_path = REPO_ROOT / "tests" / "api_schemas" / "api_vitals.json"
+    reference_shape = json.loads(ref_path.read_text(encoding="utf-8"))["shape"]
+    mutated_shape = copy.deepcopy(reference_shape)
+    # One hand-removed key — the literal "removed a key" mutation the #3324 acceptance
+    # box asks for. `rhr_bpm` is a plain numeric field, unrelated to the nullable rule
+    # being proven correct elsewhere, so this proof cannot be mistaken for that one.
+    del mutated_shape["keys"]["vitals"]["keys"]["rhr_bpm"]
+    body = json.dumps({"reference_shape": reference_shape, "mutated_shape": mutated_shape}, indent=2, sort_keys=True) + "\n"
+    return ("tests/fixtures/_census_probe_2999_api_schema_drift.json", body)
+
+
 MUTATION_SPECS: dict[str, MutationSpec] = {
     "structural::test_no_conflict_markers.py": MutationSpec(
         gate_id="structural::test_no_conflict_markers.py",
@@ -402,6 +425,18 @@ MUTATION_SPECS: dict[str, MutationSpec] = {
             "checked-in infra/iam/*.json — the hand-maintained twin that ran stale on 2026-08-30 (#3336)"
         ),
         plants=(("deploy/_census_probe_2999.sh", _IAM_TWIN_SH),),
+        track=False,
+    ),
+    "structural::test_api_schema_completeness.py": MutationSpec(
+        gate_id="structural::test_api_schema_completeness.py",
+        target="tests/test_api_schema_completeness.py",
+        detects=(
+            "a hand-mutated baseline shape (a real captured snapshot with one key removed) still reading as "
+            "breaking drift under the #3324 nullable-aware rule — the acceptance box's own can-it-fail proof, "
+            "run against a captured FIXTURE (a copy of tests/api_schemas/api_vitals.json's real shape), never "
+            "the live site"
+        ),
+        plants=(_drift_probe_plant(),),
         track=False,
     ),
 }
@@ -665,6 +700,21 @@ STRUCTURAL_PROOFS: dict[str, dict[str, Any]] = {
             "null weigh-in and the `-5.2 lbs down` unfurl.",
         ),
         proved_on="2026-08-30",
+    ),
+    "structural::test_api_schema_completeness.py": _proof(
+        "structural::test_api_schema_completeness.py",
+        "baseline: 32 passed in 0.18s | mutated: 1 failed, 31 passed in 0.21s :: "
+        "tests/test_api_schema_completeness.py::test_hand_mutated_baseline_reds_on_a_removed_key | "
+        "reverted: 32 passed in 0.19s",
+        "The proof runs offline against a captured FIXTURE (a copy of tests/api_schemas/api_vitals.json's "
+        "real shape with one key hand-removed), never the live site — this suite has no network dependency "
+        "by design. It covers exactly the #3324 nullable-aware `diff_shape()` rule: a genuine key removal "
+        "still reads as breaking after the null|<type> absorption. NOT covered by this proof: the live "
+        "`--check-drift` code path itself (the HTTP fetch, the sentinel leak scan, the exemptions-ledger "
+        "merge) — those run only against the real site and are exercised by the unit tests in "
+        "tests/test_api_schema_completeness.py's TestDiffShape/TestJsonShape classes and the "
+        "scan_json_value_leaks tests, not by this mutation.",
+        proved_on="2026-08-31",
     ),
 }
 

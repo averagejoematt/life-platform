@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/recap",
   "is_prefix_sample": false,
   "path": "/api/recap",
@@ -10,17 +10,71 @@
           "cache_seconds": {
             "type": "integer"
           },
+          "content_as_of": {
+            "type": "string"
+          },
           "generated_at": {
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
         "type": "object"
       },
       "recap": {
-        "type": "null"
+        "keys": {
+          "as_of": {
+            "type": "string"
+          },
+          "as_of_week": {
+            "type": "number"
+          },
+          "author": {
+            "type": "string"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "recent_beats": {
+            "items": {
+              "keys": {
+                "beat": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "week": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "regeneration_paused": {
+            "type": "boolean"
+          },
+          "story_so_far": {
+            "type": "string"
+          },
+          "threads_to_watch": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 2,
+            "type": "array"
+          },
+          "where_we_are_now": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "type": "object"

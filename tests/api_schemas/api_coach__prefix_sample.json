@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/coach/sleep_coach",
   "is_prefix_sample": true,
   "path": "/api/coach/",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -98,7 +101,7 @@
         "type": "object"
       },
       "daily": {
-        "type": "null"
+        "type": "string"
       },
       "disclosure": {
         "type": "string"
@@ -167,7 +170,7 @@
               },
               "type": "object"
             },
-            "length_sample": 4,
+            "length_sample": 15,
             "type": "array"
           },
           "degraded": {
@@ -187,7 +190,39 @@
             "type": "array"
           },
           "relationship": {
-            "type": "null"
+            "keys": {
+              "context_summary": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "first_interaction_date": {
+                "type": "string"
+              },
+              "interaction_count": {
+                "type": "integer"
+              },
+              "journey_phase": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "last_interaction_date": {
+                "type": "string"
+              },
+              "rapport_level": {
+                "type": "number"
+              },
+              "record_id": {
+                "type": "string"
+              },
+              "tenure_days": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
           },
           "retracted": {
             "type": "integer"
@@ -232,6 +267,42 @@
                 "type": "string"
               },
               "themes": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 8,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "date": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "themes": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 7,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "date": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "themes": {
                 "items": null,
                 "length_sample": 0,
                 "type": "array"
@@ -256,27 +327,9 @@
               }
             },
             "type": "object"
-          },
-          {
-            "keys": {
-              "date": {
-                "type": "string"
-              },
-              "summary": {
-                "type": "string"
-              },
-              "themes": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 12,
-                "type": "array"
-              }
-            },
-            "type": "object"
           }
         ],
-        "length_sample": 6,
+        "length_sample": 9,
         "type": "array"
       },
       "relationships": {
@@ -361,33 +414,139 @@
             "type": "object"
           },
           "tuning_log": {
-            "items": {
-              "keys": {
-                "change_type": {
-                  "type": "string"
+            "items": [
+              {
+                "keys": {
+                  "change_type": {
+                    "type": "string"
+                  },
+                  "coach": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "observed_effect": {
+                    "type": "null"
+                  },
+                  "rationale": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
                 },
-                "coach": {
-                  "type": "string"
-                },
-                "date": {
-                  "type": "string"
-                },
-                "observed_effect": {
-                  "type": "null"
-                },
-                "rationale": {
-                  "type": "string"
-                },
-                "ref": {
-                  "type": "string"
-                },
-                "summary": {
-                  "type": "string"
-                }
+                "type": "object"
               },
-              "type": "object"
-            },
-            "length_sample": 7,
+              {
+                "keys": {
+                  "change_type": {
+                    "type": "string"
+                  },
+                  "coach": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "observed_effect": {
+                    "type": "null"
+                  },
+                  "rationale": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "change_type": {
+                    "type": "string"
+                  },
+                  "coach": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  },
+                  "observed_effect": {
+                    "type": "string"
+                  },
+                  "rationale": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "change_type": {
+                    "type": "string"
+                  },
+                  "coach": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  },
+                  "observed_effect": {
+                    "type": "null"
+                  },
+                  "rationale": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "change_type": {
+                    "type": "string"
+                  },
+                  "coach": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  },
+                  "observed_effect": {
+                    "type": "string"
+                  },
+                  "rationale": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ],
+            "length_sample": 10,
             "type": "array"
           }
         },
@@ -399,17 +558,26 @@
       "stance": {
         "keys": {
           "as_of": {
+            "type": "null"
+          },
+          "band_metric": {
             "type": "string"
           },
           "confidence_note": {
             "type": "string"
           },
+          "current_value": {
+            "type": "number"
+          },
           "focused_on_now": {
             "items": {
               "type": "string"
             },
-            "length_sample": 4,
+            "length_sample": 3,
             "type": "array"
+          },
+          "graduation_gate": {
+            "type": "string"
           },
           "grounding_flag": {
             "type": "boolean"
@@ -419,6 +587,76 @@
           },
           "how_my_read_changed": {
             "type": "string"
+          },
+          "ladder": {
+            "items": {
+              "keys": {
+                "headline": {
+                  "type": "string"
+                },
+                "stage_id": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "rung": {
+            "keys": {
+              "cares_less_right_now": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "cares_most": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "entry": {
+                "keys": {
+                  "max": {
+                    "type": "null"
+                  },
+                  "metric": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "graduation_gate": {
+                "type": "string"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "plan": {
+                "type": "string"
+              },
+              "read_of_him": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "watches": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              }
+            },
+            "type": "object"
           },
           "set_aside_for_now": {
             "items": {
@@ -445,32 +683,8 @@
         "type": "object"
       },
       "stance_history": {
-        "items": {
-          "keys": {
-            "as_of": {
-              "type": "string"
-            },
-            "headline_read": {
-              "type": "string"
-            },
-            "how_my_read_changed": {
-              "type": "string"
-            },
-            "stage": {
-              "keys": {
-                "label": {
-                  "type": "string"
-                },
-                "rationale": {
-                  "type": "string"
-                }
-              },
-              "type": "object"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 1,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "tier": {

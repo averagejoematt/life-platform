@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/experiment_library",
   "is_prefix_sample": false,
   "path": "/api/experiment_library",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -30,6 +33,9 @@
                 "items": [
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -93,6 +99,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -117,6 +129,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -182,6 +197,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -206,6 +227,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -269,6 +293,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -293,6 +323,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -358,6 +391,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -382,6 +421,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -445,6 +487,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -469,6 +517,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -534,6 +585,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -558,6 +615,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "description": {
                         "type": "string"
                       },
@@ -596,6 +656,12 @@
                         "type": "string"
                       },
                       "protocol_template": {
+                        "type": "string"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
                         "type": "string"
                       },
                       "status": {
@@ -659,6 +725,9 @@
                 "items": [
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -724,6 +793,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -748,6 +823,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -811,6 +889,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -835,6 +919,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -899,6 +986,12 @@
                         },
                         "length_sample": 2,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -924,6 +1017,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -988,6 +1084,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -1013,6 +1115,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1077,6 +1182,12 @@
                         },
                         "length_sample": 2,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -1102,6 +1213,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1167,6 +1281,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -1191,6 +1311,108 @@
                   },
                   {
                     "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
+                      "completed_runs": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "difficulty": {
+                        "type": "string"
+                      },
+                      "duration_tier": {
+                        "type": "string"
+                      },
+                      "evidence_citation": {
+                        "type": "string"
+                      },
+                      "evidence_summary": {
+                        "type": "string"
+                      },
+                      "evidence_tier": {
+                        "type": "string"
+                      },
+                      "experiment_type": {
+                        "type": "string"
+                      },
+                      "hypothesis_template": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "metrics_behavioral": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      },
+                      "metrics_measurable": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "pillar": {
+                        "type": "string"
+                      },
+                      "promoted_date": {
+                        "type": "null"
+                      },
+                      "protocol_template": {
+                        "type": "string"
+                      },
+                      "related_protocols": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "suggested_duration_days": {
+                        "type": "integer"
+                      },
+                      "tags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "votes": {
+                        "type": "integer"
+                      },
+                      "why_it_matters": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "description": {
                         "type": "string"
                       },
@@ -1229,6 +1451,12 @@
                         "type": "string"
                       },
                       "protocol_template": {
+                        "type": "string"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
                         "type": "string"
                       },
                       "status": {
@@ -1292,6 +1520,9 @@
                 "items": [
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1357,6 +1588,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -1381,6 +1618,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1446,6 +1686,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -1470,6 +1716,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1535,6 +1784,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -1559,6 +1814,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1623,6 +1881,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -1648,6 +1912,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1712,6 +1979,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -1737,6 +2010,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1801,6 +2077,12 @@
                         },
                         "length_sample": 2,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -1826,6 +2108,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -1889,6 +2174,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -1913,6 +2204,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "description": {
                         "type": "string"
                       },
@@ -1953,6 +2247,12 @@
                       "protocol_template": {
                         "type": "string"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -1974,6 +2274,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -2038,6 +2341,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -2063,6 +2372,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -2127,6 +2439,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -2195,6 +2513,9 @@
                       "active_experiment_id": {
                         "type": "string"
                       },
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -2231,33 +2552,23 @@
                         "type": "string"
                       },
                       "evidence_for": {
-                        "items": [
-                          {
-                            "keys": {
-                              "title": {
-                                "type": "string"
-                              }
+                        "items": {
+                          "keys": {
+                            "resolved_title": {
+                              "type": "string"
                             },
-                            "type": "object"
+                            "summary": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
                           },
-                          {
-                            "keys": {
-                              "resolved_title": {
-                                "type": "string"
-                              },
-                              "summary": {
-                                "type": "string"
-                              },
-                              "title": {
-                                "type": "string"
-                              },
-                              "url": {
-                                "type": "string"
-                              }
-                            },
-                            "type": "object"
-                          }
-                        ],
+                          "type": "object"
+                        },
                         "length_sample": 2,
                         "type": "array"
                       },
@@ -2310,6 +2621,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -2335,6 +2652,9 @@
                   {
                     "keys": {
                       "active_experiment_id": {
+                        "type": "string"
+                      },
+                      "citation_status": {
                         "type": "string"
                       },
                       "completed_runs": {
@@ -2442,6 +2762,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -2467,6 +2793,9 @@
                   {
                     "keys": {
                       "active_experiment_id": {
+                        "type": "string"
+                      },
+                      "citation_status": {
                         "type": "string"
                       },
                       "completed_runs": {
@@ -2574,6 +2903,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -2599,6 +2934,9 @@
                   {
                     "keys": {
                       "active_experiment_id": {
+                        "type": "string"
+                      },
+                      "citation_status": {
                         "type": "string"
                       },
                       "completed_runs": {
@@ -2716,6 +3054,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -2740,6 +3084,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -2803,6 +3150,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -2827,6 +3180,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -2890,6 +3246,12 @@
                         "length_sample": 2,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -2914,6 +3276,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -2977,6 +3342,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -3001,6 +3372,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3066,6 +3440,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -3090,6 +3470,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3154,6 +3537,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -3219,6 +3608,9 @@
                 "items": [
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3281,6 +3673,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -3306,6 +3704,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3367,6 +3768,12 @@
                         "length_sample": 0,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -3391,6 +3798,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3456,6 +3866,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -3480,6 +3896,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3543,6 +3962,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -3567,6 +3992,106 @@
                   },
                   {
                     "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
+                      "completed_runs": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "difficulty": {
+                        "type": "string"
+                      },
+                      "duration_tier": {
+                        "type": "string"
+                      },
+                      "evidence_citation": {
+                        "type": "string"
+                      },
+                      "evidence_summary": {
+                        "type": "string"
+                      },
+                      "evidence_tier": {
+                        "type": "string"
+                      },
+                      "experiment_type": {
+                        "type": "string"
+                      },
+                      "hypothesis_template": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "metrics_behavioral": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      },
+                      "metrics_measurable": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "pillar": {
+                        "type": "string"
+                      },
+                      "promoted_date": {
+                        "type": "null"
+                      },
+                      "protocol_template": {
+                        "type": "string"
+                      },
+                      "related_protocols": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "suggested_duration_days": {
+                        "type": "integer"
+                      },
+                      "tags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "votes": {
+                        "type": "integer"
+                      },
+                      "why_it_matters": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "description": {
                         "type": "string"
                       },
@@ -3607,6 +4132,12 @@
                       "protocol_template": {
                         "type": "string"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -3628,6 +4159,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3692,6 +4226,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -3717,6 +4257,12 @@
                   },
                   {
                     "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3781,6 +4327,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
                       },
                       "status": {
                         "type": "string"
@@ -3846,6 +4398,9 @@
                 "items": [
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3906,6 +4461,12 @@
                         "items": null,
                         "length_sample": 0,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -3931,6 +4492,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -3992,6 +4556,12 @@
                         "length_sample": 0,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -4016,6 +4586,109 @@
                   },
                   {
                     "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
+                      "completed_runs": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "difficulty": {
+                        "type": "string"
+                      },
+                      "duration_tier": {
+                        "type": "string"
+                      },
+                      "evidence_citation": {
+                        "type": "string"
+                      },
+                      "evidence_summary": {
+                        "type": "string"
+                      },
+                      "evidence_tier": {
+                        "type": "string"
+                      },
+                      "experiment_type": {
+                        "type": "string"
+                      },
+                      "hypothesis_template": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "metrics_behavioral": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      },
+                      "metrics_measurable": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "pillar": {
+                        "type": "string"
+                      },
+                      "promoted_date": {
+                        "type": "null"
+                      },
+                      "protocol_template": {
+                        "type": "string"
+                      },
+                      "related_protocols": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "suggested_duration_days": {
+                        "type": "integer"
+                      },
+                      "tags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "votes": {
+                        "type": "integer"
+                      },
+                      "why_it_matters": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -4081,6 +4754,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -4105,6 +4784,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -4169,6 +4851,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
                       },
                       "status": {
                         "type": "string"
@@ -4234,6 +4922,12 @@
                 "items": [
                   {
                     "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -4295,6 +4989,12 @@
                         "length_sample": 0,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -4319,6 +5019,106 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
+                      "completed_runs": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "difficulty": {
+                        "type": "string"
+                      },
+                      "duration_tier": {
+                        "type": "string"
+                      },
+                      "evidence_citation": {
+                        "type": "string"
+                      },
+                      "evidence_summary": {
+                        "type": "string"
+                      },
+                      "evidence_tier": {
+                        "type": "string"
+                      },
+                      "experiment_type": {
+                        "type": "string"
+                      },
+                      "hypothesis_template": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "metrics_behavioral": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 1,
+                        "type": "array"
+                      },
+                      "metrics_measurable": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "pillar": {
+                        "type": "string"
+                      },
+                      "promoted_date": {
+                        "type": "null"
+                      },
+                      "protocol_template": {
+                        "type": "string"
+                      },
+                      "related_protocols": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "suggested_duration_days": {
+                        "type": "integer"
+                      },
+                      "tags": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "votes": {
+                        "type": "integer"
+                      },
+                      "why_it_matters": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -4384,6 +5184,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -4408,6 +5214,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -4473,6 +5282,12 @@
                         "length_sample": 1,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -4497,6 +5312,9 @@
                   },
                   {
                     "keys": {
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -4558,6 +5376,12 @@
                         "length_sample": 0,
                         "type": "array"
                       },
+                      "source_resolved_title": {
+                        "type": "string"
+                      },
+                      "source_url": {
+                        "type": "string"
+                      },
                       "status": {
                         "type": "string"
                       },
@@ -4582,6 +5406,12 @@
                   },
                   {
                     "keys": {
+                      "citation_note": {
+                        "type": "string"
+                      },
+                      "citation_status": {
+                        "type": "string"
+                      },
                       "completed_runs": {
                         "items": null,
                         "length_sample": 0,
@@ -4646,6 +5476,12 @@
                         },
                         "length_sample": 1,
                         "type": "array"
+                      },
+                      "source_resolved_title": {
+                        "type": "null"
+                      },
+                      "source_url": {
+                        "type": "null"
                       },
                       "status": {
                         "type": "string"

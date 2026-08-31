@@ -1,6 +1,6 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
-  "fetch_path": "/api/changes-since?ts=1785169123",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
+  "fetch_path": "/api/changes-since?ts=1787543189",
   "is_prefix_sample": false,
   "path": "/api/changes-since",
   "shape": {
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -71,30 +74,6 @@
               },
               "trend": {
                 "type": "string"
-              },
-              "unit": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "weight": {
-            "keys": {
-              "change": {
-                "type": "number"
-              },
-              "from": {
-                "type": "number"
-              },
-              "sparkline": {
-                "items": {
-                  "type": "number"
-                },
-                "length_sample": 4,
-                "type": "array"
-              },
-              "to": {
-                "type": "number"
               },
               "unit": {
                 "type": "string"

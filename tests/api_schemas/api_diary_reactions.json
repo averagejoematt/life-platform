@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/diary_reactions",
   "is_prefix_sample": false,
   "path": "/api/diary_reactions",
@@ -15,6 +15,9 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -23,8 +26,68 @@
         "type": "integer"
       },
       "reactions": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "archival": {
+              "keys": {
+                "cycle": {
+                  "type": "null"
+                },
+                "days_before": {
+                  "type": "integer"
+                },
+                "from_cycle": {
+                  "type": "number"
+                },
+                "genesis": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "pre_cycle": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "channel": {
+              "type": "string"
+            },
+            "coach_id": {
+              "type": "string"
+            },
+            "coach_name": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "generated_at": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "reaction": {
+              "type": "string"
+            },
+            "theme": {
+              "type": "string"
+            },
+            "tier": {
+              "type": "string"
+            },
+            "tone": {
+              "type": "string"
+            },
+            "uid": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       }
     },

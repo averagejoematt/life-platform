@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/fulfillment_index",
   "is_prefix_sample": false,
   "path": "/api/fulfillment_index",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -46,7 +49,7 @@
         "type": "string"
       },
       "mean_30d": {
-        "type": "number"
+        "type": "null"
       },
       "mean_7d": {
         "type": "number"
@@ -56,6 +59,12 @@
       },
       "n_scored_7d": {
         "type": "integer"
+      },
+      "recent_month_mean": {
+        "type": "number"
+      },
+      "recent_week_mean": {
+        "type": "number"
       },
       "today": {
         "keys": {
@@ -132,107 +141,80 @@
         "type": "object"
       },
       "trend_7d": {
-        "items": [
-          {
-            "keys": {
-              "coverage": {
-                "type": "number"
-              },
-              "date": {
-                "type": "string"
-              },
-              "reason": {
-                "type": "string"
-              },
-              "resolution": {
-                "keys": {
-                  "level": {
-                    "type": "string"
-                  }
+        "items": {
+          "keys": {
+            "channels": {
+              "keys": {
+                "connection_tap": {
+                  "keys": {
+                    "adopted": {
+                      "type": "boolean"
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "weight": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
                 },
-                "type": "object"
+                "interactions": {
+                  "keys": {
+                    "adopted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                },
+                "journal_presence": {
+                  "keys": {
+                    "adopted": {
+                      "type": "boolean"
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "weight": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "values_todoist": {
+                  "keys": {
+                    "adopted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                }
               },
-              "state": {
-                "type": "string"
-              }
+              "type": "object"
             },
-            "type": "object"
+            "coverage": {
+              "type": "number"
+            },
+            "date": {
+              "type": "string"
+            },
+            "resolution": {
+              "keys": {
+                "level": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "score": {
+              "type": "number"
+            },
+            "state": {
+              "type": "string"
+            }
           },
-          {
-            "keys": {
-              "channels": {
-                "keys": {
-                  "connection_tap": {
-                    "keys": {
-                      "adopted": {
-                        "type": "boolean"
-                      },
-                      "score": {
-                        "type": "number"
-                      },
-                      "weight": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "interactions": {
-                    "keys": {
-                      "adopted": {
-                        "type": "boolean"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "journal_presence": {
-                    "keys": {
-                      "adopted": {
-                        "type": "boolean"
-                      },
-                      "score": {
-                        "type": "number"
-                      },
-                      "weight": {
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "values_todoist": {
-                    "keys": {
-                      "adopted": {
-                        "type": "boolean"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              },
-              "coverage": {
-                "type": "number"
-              },
-              "date": {
-                "type": "string"
-              },
-              "resolution": {
-                "keys": {
-                  "level": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "score": {
-                "type": "number"
-              },
-              "state": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        ],
+          "type": "object"
+        },
         "length_sample": 7,
         "type": "array"
       }

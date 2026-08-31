@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/character_stats",
   "is_prefix_sample": false,
   "path": "/api/character_stats",
@@ -15,21 +15,135 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "served_at": {
+            "type": "string"
           }
         },
         "type": "object"
       },
       "character_stats": {
-        "type": "null"
-      },
-      "computed": {
-        "type": "boolean"
+        "keys": {
+          "as_of_date": {
+            "type": "string"
+          },
+          "level": {
+            "type": "number"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "tier_emoji": {
+            "type": "string"
+          },
+          "xp_total": {
+            "type": "number"
+          }
+        },
+        "type": "object"
       },
       "pillars": {
-        "type": "null"
-      },
-      "reason": {
-        "type": "string"
+        "keys": {
+          "consistency": {
+            "keys": {
+              "level": {
+                "type": "number"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "metabolic": {
+            "keys": {
+              "level": {
+                "type": "number"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "mind": {
+            "keys": {
+              "level": {
+                "type": "number"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "movement": {
+            "keys": {
+              "level": {
+                "type": "number"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "nutrition": {
+            "keys": {
+              "level": {
+                "type": "number"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "relationships": {
+            "keys": {
+              "level": {
+                "type": "number"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "sleep": {
+            "keys": {
+              "level": {
+                "type": "number"
+              },
+              "raw_score": {
+                "type": "number"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
       }
     },
     "type": "object"

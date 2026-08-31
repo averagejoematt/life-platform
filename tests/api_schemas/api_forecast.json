@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/forecast",
   "is_prefix_sample": false,
   "path": "/api/forecast",
@@ -10,10 +10,16 @@
           "cache_seconds": {
             "type": "integer"
           },
+          "content_as_of": {
+            "type": "string"
+          },
           "generated_at": {
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -71,8 +77,36 @@
         "type": "string"
       },
       "forecasts": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "frame": {
+              "type": "string"
+            },
+            "hi": {
+              "type": "number"
+            },
+            "horizon_days": {
+              "type": "number"
+            },
+            "lo": {
+              "type": "number"
+            },
+            "metric": {
+              "type": "string"
+            },
+            "point": {
+              "type": "number"
+            },
+            "target_date": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 6,
         "type": "array"
       },
       "framing": {
@@ -85,8 +119,36 @@
         "type": "boolean"
       },
       "resolutions_today": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "actual": {
+              "type": "number"
+            },
+            "covered": {
+              "type": "boolean"
+            },
+            "hi": {
+              "type": "number"
+            },
+            "horizon_days": {
+              "type": "number"
+            },
+            "lo": {
+              "type": "number"
+            },
+            "metric": {
+              "type": "string"
+            },
+            "point": {
+              "type": "number"
+            },
+            "target_date": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 4,
         "type": "array"
       }
     },

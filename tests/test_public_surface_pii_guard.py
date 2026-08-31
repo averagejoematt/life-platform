@@ -151,10 +151,26 @@ def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
     assert all(arm == "endpoint-not-scanned" for _, arm, _ in res["violations"])
 
 
-def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes():
+def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes(monkeypatch):
     """Two properties through one stubbed sweep: (a) a planted tell in a fetched
     payload reds; (b) POST-only routes — derived from the router's own AST method
-    sets, not a hand-list — are never fetched (the /api/cohort_submit 405 class)."""
+    sets, not a hand-list — are never fetched, even when NEITHER carries an explicit
+    WRITE_PATH_EXEMPT entry (the fallback this branch exists for).
+
+    #3324 closed the exemption gap `/api/cohort_submit` and `/api/replicate_certify`
+    used to sit in (both now have an explicit deploy/capture_api_schemas.py
+    WRITE_PATH_EXEMPT entry, restoring their proper "write-path" reason text) — so
+    this test no longer has a naturally-occurring uncovered example to prove the
+    AST-derived FALLBACK with. Monkeypatching WRITE_PATH_EXEMPT empty for the
+    duration of this one test forces both routes through the fallback branch
+    regardless of which real routes happen to carry an explicit entry, so the
+    assertion keeps proving the mechanism rather than depending on a coincidental
+    gap that a future PR (rightly) closes."""
+    sys.path.insert(0, os.path.join(_ROOT, "deploy"))
+    import capture_api_schemas as cas  # noqa: PLC0415
+
+    monkeypatch.setattr(cas, "WRITE_PATH_EXEMPT", {})
+
     fetched = []
 
     def stub_fetch(fetch_path):

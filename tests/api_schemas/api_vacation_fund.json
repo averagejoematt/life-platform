@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/vacation_fund",
   "is_prefix_sample": false,
   "path": "/api/vacation_fund",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -68,9 +71,6 @@
       },
       "per_sport_type": {
         "keys": {
-          "Golf": {
-            "type": "number"
-          },
           "Walk": {
             "type": "number"
           }
@@ -96,7 +96,7 @@
         "items": {
           "type": "string"
         },
-        "length_sample": 2,
+        "length_sample": 1,
         "type": "array"
       }
     },

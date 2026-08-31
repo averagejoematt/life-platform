@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/autonomic_balance",
   "is_prefix_sample": false,
   "path": "/api/autonomic_balance",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -72,7 +75,7 @@
           },
           "type": "object"
         },
-        "length_sample": 7,
+        "length_sample": 14,
         "type": "array"
       },
       "methodology": {
@@ -159,9 +162,6 @@
               },
               "RECOVERY": {
                 "type": "integer"
-              },
-              "STRESS": {
-                "type": "integer"
               }
             },
             "type": "object"
@@ -184,7 +184,7 @@
           },
           "type": "object"
         },
-        "length_sample": 6,
+        "length_sample": 7,
         "type": "array"
       }
     },

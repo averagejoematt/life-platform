@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/receipts",
   "is_prefix_sample": false,
   "path": "/api/receipts",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -31,6 +34,32 @@
       "ceiling_usd": {
         "type": "number"
       },
+      "ceiling_window": {
+        "keys": {
+          "base_ceiling": {
+            "type": "number"
+          },
+          "end_exclusive": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reverts_to_base_ceiling": {
+            "type": "number"
+          },
+          "reverts_to_surge_ceiling": {
+            "type": "number"
+          },
+          "start": {
+            "type": "string"
+          },
+          "surge_ceiling": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "computed_at": {
         "type": "string"
       },
@@ -46,7 +75,7 @@
           },
           "type": "object"
         },
-        "length_sample": 3,
+        "length_sample": 31,
         "type": "array"
       },
       "month_end_date": {
@@ -84,6 +113,9 @@
       },
       "surge_active": {
         "type": "boolean"
+      },
+      "surge_ceiling_usd": {
+        "type": "number"
       },
       "surge_threshold_uniques": {
         "type": "integer"

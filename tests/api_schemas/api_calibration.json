@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-03T16:18:34.590027+00:00",
+  "captured_at": "2026-08-31T03:46:18.823865+00:00",
   "fetch_path": "/api/calibration",
   "is_prefix_sample": false,
   "path": "/api/calibration",
@@ -14,6 +14,9 @@
             "type": "string"
           },
           "request_id": {
+            "type": "string"
+          },
+          "served_at": {
             "type": "string"
           }
         },
@@ -98,6 +101,111 @@
                       "type": "object"
                     },
                     "length_sample": 2,
+                    "type": "array"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "skilled": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "accuracy_pct": {
+                "type": "null"
+              },
+              "brier": {
+                "type": "null"
+              },
+              "brier_skill": {
+                "type": "null"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "lifetime": {
+                "keys": {
+                  "accuracy_pct": {
+                    "type": "number"
+                  },
+                  "brier": {
+                    "type": "number"
+                  },
+                  "brier_skill": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "reliability_bins": {
+                    "items": {
+                      "keys": {
+                        "hi": {
+                          "type": "number"
+                        },
+                        "lo": {
+                          "type": "number"
+                        },
+                        "mean_confidence": {
+                          "type": "number"
+                        },
+                        "n": {
+                          "type": "integer"
+                        },
+                        "observed_rate": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 1,
                     "type": "array"
                   },
                   "score": {
@@ -263,111 +371,6 @@
               "lifetime": {
                 "keys": {
                   "accuracy_pct": {
-                    "type": "number"
-                  },
-                  "brier": {
-                    "type": "number"
-                  },
-                  "brier_skill": {
-                    "type": "null"
-                  },
-                  "calibration": {
-                    "type": "string"
-                  },
-                  "confirmed": {
-                    "type": "integer"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "n": {
-                    "type": "integer"
-                  },
-                  "refuted": {
-                    "type": "integer"
-                  },
-                  "reliability_bins": {
-                    "items": {
-                      "keys": {
-                        "hi": {
-                          "type": "number"
-                        },
-                        "lo": {
-                          "type": "number"
-                        },
-                        "mean_confidence": {
-                          "type": "number"
-                        },
-                        "n": {
-                          "type": "integer"
-                        },
-                        "observed_rate": {
-                          "type": "number"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 1,
-                    "type": "array"
-                  },
-                  "score": {
-                    "type": "integer"
-                  },
-                  "skilled": {
-                    "type": "null"
-                  }
-                },
-                "type": "object"
-              },
-              "n": {
-                "type": "integer"
-              },
-              "refuted": {
-                "type": "integer"
-              },
-              "reliability_bins": {
-                "items": null,
-                "length_sample": 0,
-                "type": "array"
-              },
-              "score": {
-                "type": "integer"
-              },
-              "skilled": {
-                "type": "null"
-              }
-            },
-            "type": "object"
-          },
-          {
-            "keys": {
-              "accuracy_pct": {
-                "type": "null"
-              },
-              "brier": {
-                "type": "null"
-              },
-              "brier_skill": {
-                "type": "null"
-              },
-              "calibration": {
-                "type": "string"
-              },
-              "coach_id": {
-                "type": "string"
-              },
-              "coach_name": {
-                "type": "string"
-              },
-              "confirmed": {
-                "type": "integer"
-              },
-              "label": {
-                "type": "string"
-              },
-              "lifetime": {
-                "keys": {
-                  "accuracy_pct": {
                     "type": "null"
                   },
                   "brier": {
@@ -431,6 +434,9 @@
       },
       "cycle": {
         "type": "integer"
+      },
+      "cycle_start": {
+        "type": "string"
       },
       "disclosure": {
         "type": "string"
@@ -518,13 +524,13 @@
       "interval_forecasts": {
         "keys": {
           "accuracy_pct": {
-            "type": "null"
+            "type": "number"
           },
           "brier": {
-            "type": "null"
+            "type": "number"
           },
           "brier_skill": {
-            "type": "null"
+            "type": "number"
           },
           "calibration": {
             "type": "string"
@@ -601,15 +607,34 @@
             "type": "integer"
           },
           "reliability_bins": {
-            "items": null,
-            "length_sample": 0,
+            "items": {
+              "keys": {
+                "hi": {
+                  "type": "number"
+                },
+                "lo": {
+                  "type": "number"
+                },
+                "mean_confidence": {
+                  "type": "number"
+                },
+                "n": {
+                  "type": "integer"
+                },
+                "observed_rate": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 1,
             "type": "array"
           },
           "score": {
             "type": "integer"
           },
           "skilled": {
-            "type": "null"
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -617,13 +642,13 @@
       "platform": {
         "keys": {
           "accuracy_pct": {
-            "type": "null"
+            "type": "number"
           },
           "brier": {
-            "type": "null"
+            "type": "number"
           },
           "brier_skill": {
-            "type": "null"
+            "type": "number"
           },
           "calibration": {
             "type": "string"
@@ -700,15 +725,34 @@
             "type": "integer"
           },
           "reliability_bins": {
-            "items": null,
-            "length_sample": 0,
+            "items": {
+              "keys": {
+                "hi": {
+                  "type": "number"
+                },
+                "lo": {
+                  "type": "number"
+                },
+                "mean_confidence": {
+                  "type": "number"
+                },
+                "n": {
+                  "type": "integer"
+                },
+                "observed_rate": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 1,
             "type": "array"
           },
           "score": {
             "type": "integer"
           },
           "skilled": {
-            "type": "null"
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -756,6 +800,15 @@
                 "type": "integer"
               },
               "2026-07-27": {
+                "type": "integer"
+              },
+              "2026-08-03": {
+                "type": "integer"
+              },
+              "2026-08-10": {
+                "type": "integer"
+              },
+              "2026-08-17": {
                 "type": "integer"
               }
             },
