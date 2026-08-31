@@ -12,6 +12,8 @@ import glob
 import os
 import sys
 
+import pytest
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -22,6 +24,7 @@ sys.path.insert(0, os.path.join(_REPO, "deploy"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
+import doc_platform_counts as counts  # noqa: E402 — #3384: the PR-exempt registry (single source, never a second hand-list)
 import sync_doc_metadata as sync  # noqa: E402
 from web.site_api_common import PLATFORM_STATS  # noqa: E402
 
@@ -41,6 +44,14 @@ def test_adr_count_matches_decisions_doc():
 def test_test_count_matches_suite():
     actual = sync._count_test_functions()
     assert actual is not None
+    if "test_count" in counts.PR_EXEMPT_FIELDS and counts._is_pr_event() and PLATFORM_STATS["test_count"] != actual:
+        # #3384: the pytest twin of the Wiki-drift gate. On a pull_request event the
+        # committed literal is bot-owned (#3101) and the branch is policy-forbidden to
+        # update it, so a mixed code+tests PR reds here with no green path. Visible skip,
+        # named values; push/main runs (and any test-neutral PR) still enforce equality.
+        pytest.skip(
+            f"#3384: test_count {PLATFORM_STATS['test_count']} vs actual {actual} — bot-owned literal (#3101), reconciled on main; push runs enforce"
+        )
     assert PLATFORM_STATS["test_count"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
 
 
