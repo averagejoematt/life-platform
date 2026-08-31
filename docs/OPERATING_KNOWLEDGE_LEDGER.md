@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-08-31 (Session M: +3 reference files; Session L: +3)
+## Coverage — 2026-08-31 (Session O reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 380** — feedback 22 · reference 211 · security 1 · project 143 · user 1 · index 2
+**Files in the memory index snapshot: 382** — feedback 22 · reference 212 · security 1 · project 144 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 234** — homed-here 56 · already-homed 158 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 235** — homed-here 56 · already-homed 159 · superseded 7 · narrative 11 · off-repo 2
 
-**Program/session files (project): 143** — already-homed 14 · superseded 1 · narrative 125 · off-repo 2 · index 1
+**Program/session files (project): 144** — already-homed 14 · superseded 1 · narrative 126 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-08-31 (Session N: +3 reference files)
+## Snapshot of the memory index — 2026-08-31 (Session O reconcile: +2)
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -145,6 +145,7 @@ project_fable_r21_batch.md
 project_fable_triage_2026_08_20.md
 project_fable_week_lane_a_2026_08_22.md
 project_fable_week_session2_2026_08_23.md
+project_financial_diligence_2026_08_31.md
 project_frontier_review_2026_07_18.md
 project_fullreview_panel.md
 project_gate_audit_2026_08_13.md
@@ -249,6 +250,7 @@ reference_a_sweep_one_import_away.md
 reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
+reference_absence_read_as_success.md
 reference_absent_check_invisible_to_fail_filter.md
 reference_accuracy_gate_signed_metrics.md
 reference_adr099_score_inverts_priority.md
