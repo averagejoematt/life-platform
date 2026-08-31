@@ -186,6 +186,10 @@ def test_sync_reports_drift_when_a_counter_literal_is_wrong(tmp_path, monkeypatc
     mutated.write_text(body, encoding="utf-8")
 
     monkeypatch.setattr(sync, "_PLATFORM_COUNTS_PATH", mutated)
+    # #3384: test_count is PR-EXEMPT on a pull_request event, so pin the ENFORCED path
+    # explicitly — under ambient CI env this test would otherwise assert different
+    # behaviour on a PR run than on a push run (the time-dependent-gate class).
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     changes = sync._sync_platform_counts(dict(sync.PLATFORM_FACTS), dry_run=True)
     drift = [c for c in changes if c.startswith("  ~") and "test_count" in c]
     assert drift, f"--check would NOT have caught a wrong test_count: {changes}"

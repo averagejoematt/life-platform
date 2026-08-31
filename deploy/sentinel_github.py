@@ -83,6 +83,7 @@ PUSH_TRIGGER_GLOBS = (
     "deploy/sync_doc_metadata.py",
     "deploy/sync_census_fact.py",  # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
     "deploy/doc_restamp_guard.py",  # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
+    "deploy/doc_platform_counts.py",  # #3384 — the #3101 counts sync (+ its PR-event exemption) sync_doc_metadata.py delegates to
     "scripts/check_doc_*.py",
     "scripts/doc_facts_ops.py",
     "scripts/generate_adr_index.py",
