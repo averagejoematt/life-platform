@@ -292,6 +292,7 @@ Decisions where cost was a factor in the design:
 
 | Date | Decision | Cost Impact | Outcome |
 |------|----------|-------------|---------|
+| 2026-08-31 | **Cost-allocation tagging evaluated and REJECTED** (financial-diligence panel): a per-stack `Domain` tag can slice only ~$10–13/mo (~6–7%) — Bedrock carries no taggable resource, CW custom metrics are untaggable, DDB/S3 are `from_*_name` imports outside CDK tag reach | $0 (avoided a dead instrument) | Existing instruments (CE usage-type, EMF ledger, CallerClass #2892, `ai_spend_attribution.py`) are finer-grained at $0. Do not re-propose without a change in the taggability facts. |
 | 2026-07-19 | **Tier-1 residence accepted as the dev-heavy-month norm** (ADR-133 amendment, #1354); tier bands NOT re-derived from the measured ~$40 floor | $0 | Degraded-tier residence became a recorded posture with a days-at-tier≥1 line in the monthly close, instead of an invisible steady state. |
 | 2026-07-08 | Base ceiling $75 → $85 + surge mode to $100 on ≥900 trailing-7d uniques (ADR-133) | headroom, not spend | Reader traffic can never outage reader AI at the moment of success; dev spend can't trigger surge. |
 | 2026-06-16 | cost-governor CE polling every 4h → **every 8h** (second CE-self-cost trim) | ~−$1/mo | AI estimate stays fresh from CloudWatch token metrics; only the slow non-AI half is polled. |
