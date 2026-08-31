@@ -5,7 +5,7 @@
     "EscalationRole": {
       "Type": "AWS::IAM::Role",
       "Properties": {
-        "Description": "#3340 boundary probe — must never be created",
+        "Description": "#3340 boundary probe - must never be created",
         "AssumeRolePolicyDocument": {
           "Version": "2012-10-17",
           "Statement": [
