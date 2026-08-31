@@ -82,6 +82,46 @@ def _spelled_to_digits(low_text: str) -> str:
     return _COMPOUND_RE.sub(_sub, low_text)
 
 
+# ── The numeric token (#3327) ────────────────────────────────────────────────────
+# A number is bound to a metric ONLY when it is the metric's value. Three defects let
+# ordinary duration phrases phantom-flag on this BLOCKING gate (7 of 10 phrases in the
+# issue's set: "Recovery over 12 weeks" → claimed 1; "RHR over 120 days" → 120;
+# "Recovery on 7.5 hours of sleep" → 7):
+#   * RHR and HRV had no unit lookahead at all;
+#   * recovery's lookahead sat AFTER a backtracking `(\d{1,3})`, so "12 weeks" retreated
+#     to "1" and passed it, and a decimal's integer part was captured alone.
+# The fix is structural, not a longer word list: the token is parsed WHOLE — anchored on
+# both sides so the engine cannot retreat "12"→"1", and the decimal is consumed with its
+# integer part so "7.5" can never yield "7" — and only THEN is the unit decided. Because
+# the gap before the token excludes digits, a rejected token has no shorter alternative:
+# the match fails at that keyword and the engine moves to the next occurrence.
+_NUM_VALUE = r"(?<![\d.])(\d{1,3}(?:\.\d+)?)(?![\d.]?\d)"
+# Duration / time / weight / count words: a number wearing one of these is a span or a
+# tally, never an RHR, recovery, or HRV value. Bounded with \b so "hr" rejects "hrs" but
+# not "hrv", and an optional hyphen covers "12-week" / "120-day". Ordinals ("12th week")
+# and the multiplier "x" ("3x") are counts too. Value units stay allowed: bpm, ms, and —
+# for recovery only — "%" (recovery's own unit; on RHR/HRV a percent is a change, not a
+# reading, so those two reject it as well). "points"/"pts" is a delta idiom ("recovery up
+# 12 points") on every one of the three.
+_COUNT_UNITS = (
+    r"weeks?|wks?|days?|months?|years?|yrs?|hours?|hrs?|minutes?|mins?|seconds?|secs?|nights?|mornings?|"
+    r"sessions?|workouts?|reps?|sets?|rounds?|times?|pounds?|lbs?|kgs?|kilos?|grams?|miles?|km|steps?|"
+    r"calories?|kcal|cal|points?|pts?|st|nd|rd|th|x"
+)
+_NOT_A_COUNT = r"(?!\s*(?:-\s*)?(?:" + _COUNT_UNITS + r")\b)"
+_NOT_A_PERCENT = r"(?!\s*(?:%|percent\b|pct\b))"
+
+# "RHR", "resting HR", "resting heart rate" + the value within a short gap. bpm allowed.
+_RHR_RE = _re.compile(r"\b(?:rhr|resting\s+(?:heart\s+rate|hr))\b[^.\d]{0,18}" + _NUM_VALUE + _NOT_A_COUNT + _NOT_A_PERCENT)
+# % optional ("recovery at 86" / "recovery of 30%" / "86% recovery") — the Sentinel's
+# _NO_TIME lesson, now applied to the WHOLE token rather than after a retreating one.
+_RECOVERY_RE = _re.compile(
+    r"recovery[^.\d]{0,14}" + _NUM_VALUE + _NOT_A_COUNT + r"|(?<![\d.])(\d{1,3}(?:\.\d+)?)\s*%\s*recovery",
+)
+# HRV + the value (1-dp allowed: canonical is e.g. 25.2). ms allowed.
+_HRV_RE = _re.compile(r"\bhrv\b[^.\d]{0,20}" + _NUM_VALUE + _NOT_A_COUNT + _NOT_A_PERCENT)
+
+
 def hard_canonical_contradictions(text, facts):
     """Pure: does the narrative state an RHR, recovery, or HRV number that hard-
     contradicts the canonical facts? Returns [{metric, claimed, canonical, detail}].
@@ -105,8 +145,9 @@ def hard_canonical_contradictions(text, facts):
     out = []
     rhr = facts.get("rhr_bpm")
     if rhr is not None and not _mentions(rhr):
-        # "RHR", "resting HR", "resting heart rate" + a 2-3 digit number nearby.
-        m = _re.search(r"\b(?:rhr|resting\s+(?:heart\s+rate|hr))\b[^.\d]{0,18}(\d{2,3})", low)
+        # "RHR", "resting HR", "resting heart rate" + the value nearby (#3327: whole token,
+        # duration/percent rejected — "RHR over 120 days" binds nothing).
+        m = _RHR_RE.search(low)
         if m:
             claimed = float(m.group(1))
             # RHR is physiologically stable; flag a >4 bpm AND >7% miss (kills rounding noise).
@@ -121,12 +162,10 @@ def hard_canonical_contradictions(text, facts):
                 )
     rec = facts.get("recovery_pct")
     if rec is not None and not _mentions(rec):
-        # % optional ("recovery at 86" / "recovery of 30%" / "86% recovery"), but reject a
-        # trailing time/weight word ("recovery over 4 weeks") — the Sentinel's _NO_TIME lesson.
-        m = _re.search(
-            r"recovery[^.\d]{0,14}(\d{1,3})(?!\s*(?:week|day|month|year|pound|lb|hour|min))|(\d{1,3})\s*%\s*recovery",
-            low,
-        )
+        # % optional ("recovery at 86" / "recovery of 30%" / "86% recovery"), a trailing
+        # time/weight/count word rejects the WHOLE token (#3327: "recovery over 12 weeks"
+        # used to retreat to "1"; "on 7.5 hours" to "7").
+        m = _RECOVERY_RE.search(low)
         if m:
             claimed = float(m.group(1) or m.group(2))
             if claimed <= 100 and abs(claimed - rec) > 10:  # recovery 0-100; a >10-pt miss is a real contradiction
@@ -140,7 +179,8 @@ def hard_canonical_contradictions(text, facts):
                 )
     hrv = facts.get("hrv_ms")
     if hrv is not None and not _mentions(hrv):
-        m = _re.search(r"hrv[^.\d]{0,20}(\d{1,3}(?:\.\d+)?)", low)
+        # #3327: whole token, duration/percent rejected — "HRV over the 120 days" binds nothing.
+        m = _HRV_RE.search(low)
         if m:
             claimed = float(m.group(1))
             # HRV swings day-to-day — only flag a gross (>40% AND >8 ms) miss, e.g. 50 vs 25.2.
