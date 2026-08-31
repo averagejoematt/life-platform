@@ -58,7 +58,9 @@ queue before filing or shipping.
 ## Phase 0 — Orient (every lens)
 
 1. Read `docs/CHARTER.md` first — the five-primitive constitution (registry → derivation guard →
-   ratchet → contract → dead-man). For anything architecture-shaped the rubric question is
+   ratchet → contract → dead-man) — and run `python3 scripts/boot_brief.py` (the boot contract,
+   #3314): fleet, schedules, alarm routing, privacy tiers and contracts come from the model, not
+   from prose; `scripts/blast_radius.py --alarm/--at/--privacy/--lambda` answers the follow-ups. For anything architecture-shaped the rubric question is
    *which primitive is missing*, not whether the code is pretty. Then the reading the rubric
    names, plus `handovers/HANDOVER_LATEST.md` and Active Work memory (no stomping in-flight work).
 2. Establish live ground truth: `/version.json` == HEAD, main SHA, repo visibility, the

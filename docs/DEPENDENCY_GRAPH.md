@@ -257,64 +257,215 @@ See `meta.scope_cuts` for why this is not a census of every must-agree pair.
 
 ## 5. Alarms + Routing
 
-| Alarm | Stack | Routing |
-|-------|-------|---------|
-| `ai-tokens-platform-daily-total` | monitoring_stack | unresolved |
-| `between-chronicle-scrub-failed-closed` | monitoring_silence_alarms | digest |
-| `budget-tier-unreadable` | monitoring_budget_alarms | digest |
-| `chronicle-delivery-heartbeat` | email_stack | urgent |
-| `cost-metric-drift-sustained` | operational_stack | digest |
-| `email-subscriber-errors` | web_stack | unresolved |
-| `expert-gate-infra-hold` | monitoring_silence_alarms | digest |
-| `freshness-checker-errors` | operational_stack | digest |
-| `grading-stalled` | monitoring_prediction_alarms | digest |
-| `hae-webhook-errors` | ingestion_stack | digest |
-| `hae-webhook-no-invocations-24h` | monitoring_stack | digest |
-| `hevy-restamp-errors` | operational_stack | digest |
-| `hevy-routine-cron-errors` | operational_stack | digest |
-| `ingest-auth-unhealthy-24h` | monitoring_stack | urgent |
-| `key-rotator-errors` | operational_stack | digest |
-| `life-platform-daily-brief-memory-high` | monitoring_stack | digest |
-| `life-platform-data-export-errors` | operational_stack | digest |
-| `life-platform-delete-user-data-errors` | operational_stack | digest |
-| `life-platform-dlq-depth-warning` | operational_stack | digest |
-| `life-platform-freshness-checker-not-emitting` | operational_stack | digest |
-| `life-platform-insight-email-parser-parse-failure` | operational_stack | digest |
-| `life-platform-og-image-errors` | web_stack | unresolved |
-| `life-platform-recursive-loop` | mcp_stack | digest |
-| `mcp-server-duration-high` | mcp_stack | digest |
-| `mcp-warmer-error` | mcp_stack | digest |
-| `mcp-warmer-no-invocations-24h` | mcp_stack | digest |
-| `paging-budget-tier-3` | monitoring_stack | paging |
-| `paging-pipeline-dead` | monitoring_stack | paging |
-| `permanence-errors` | operational_stack | digest |
-| `permanence-heartbeat` | operational_stack | digest |
-| `prediction-gradable-share-low` | monitoring_prediction_alarms | digest |
-| `recall-index-failed-chronicle-approve` | monitoring_silence_alarms | digest |
-| `recall-index-failed-wednesday-chronicle` | monitoring_silence_alarms | digest |
-| `site-api-ai-errors` | serve_stack | digest |
-| `site-api-ai-throttles` | serve_stack | digest |
-| `site-api-content-filter-fallback` | serve_stack | digest |
-| `site-api-errors` | serve_stack | digest |
-| `site-api-handled-5xx` | serve_stack | digest |
-| `site-api-invocation-spike` | serve_stack | digest |
-| `site-api-p95-latency-high` | serve_stack | digest |
-| `site-api-throttles` | serve_stack | digest |
-| `slo-mcp-availability` | mcp_stack | digest |
-| `slo-warmer-completeness` | mcp_stack | digest |
-| `telegram-coach-hold` | monitoring_silence_alarms | digest |
-| `telegram-event-sweep-heartbeat` | serve_stack | digest |
-| `telegram-webhook-errors` | serve_stack | digest |
-| `telegram-webhook-throttles` | serve_stack | digest |
-| `telegram-worker-errors` | serve_stack | digest |
-| `telegram-worker-throttles` | serve_stack | digest |
-| `token-alarm-genesis-window-active` | monitoring_stack | unresolved |
-| `weekly-signal-delivery-heartbeat` | email_stack | urgent |
+Every alarm whose name is a literal at its declaring call (explicit `alarm_name=`, a
+positional local-factory call, or a `composite_alarm_name=`), with the SNS routing class
+traced through the stack, the factory body under that call's own arguments, or the
+helper the alarm variable is handed to. `via-composite` = the member routes nowhere
+itself; its composite does. `unresolved` is stated, never guessed.
+
+Routing: digest 88 · digest+paging 2 · paging 2 · urgent 25 · via-composite 2 — of 119 alarms (2 composite)
+
+| Alarm | Stack | Kind | Routing | Via |
+|-------|-------|------|---------|-----|
+| `ai-canary-blind` | monitoring_stack | metric | digest | factory:_alarm |
+| `ai-canary-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `ai-canary-overall` | monitoring_stack | metric | digest | factory:_alarm |
+| `ai-daily-spend-high` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ai-tokens-daily-brief-daily` | monitoring_stack | metric | digest | factory:_alarm |
+| `ai-tokens-platform-daily-total` | monitoring_stack | metric | via-composite | declaration |
+| `ai-tokens-platform-daily-total-genesis-window` | monitoring_stack | composite ← `ai-tokens-platform-daily-total`, `token-alarm-genesis-window-active` | digest | declaration |
+| `ai-tokens-platform-daily-total-urgent` | monitoring_stack | composite ← `ai-tokens-platform-daily-total`, `token-alarm-genesis-window-active` | urgent | declaration |
+| `between-chronicle-scrub-failed-closed` | monitoring_silence_alarms | metric | digest | declaration |
+| `budget-tier-hardstop` | monitoring_stack | metric | urgent | factory:_alarm |
+| `budget-tier-sustained-7d` | monitoring_stack | metric | digest | factory:_alarm |
+| `budget-tier-unreadable` | monitoring_budget_alarms | metric | digest | declaration |
+| `chronicle-delivery-heartbeat` | email_stack | metric | urgent | declaration |
+| `coherence-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `coherence-overall` | monitoring_stack | metric | digest | factory:_alarm |
+| `compute-outputs-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `compute-outputs-missing` | monitoring_stack | metric | digest | factory:_alarm |
+| `compute-pipeline-stale` | monitoring_stack | metric | digest | factory:_alarm |
+| `cost-governor-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `cost-metric-drift-sustained` | operational_stack | metric | digest | declaration |
+| `daily-brief-duration-high` | monitoring_stack | metric | digest | factory:_alarm |
+| `daily-brief-no-invocations-24h` | monitoring_stack | metric | urgent | factory:_alarm |
+| `daily-debrief-no-invocations-24h` | monitoring_stack | metric | digest | factory:_alarm |
+| `email-subscriber-errors` | web_stack | metric | urgent | helper:add_web_alarms |
+| `expert-gate-infra-hold` | monitoring_silence_alarms | metric | digest | declaration |
+| `freshness-checker-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `freshness-interior-gap` | monitoring_stack | metric | digest | factory:_alarm |
+| `freshness-interior-gap-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `grading-stalled` | monitoring_prediction_alarms | metric | digest | declaration |
+| `hae-webhook-errors` | ingestion_stack | metric | digest | constructor:create_platform_lambda |
+| `hae-webhook-no-invocations-24h` | monitoring_stack | metric | digest | declaration |
+| `hevy-restamp-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `hevy-routine-cron-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `ingest-auth-unhealthy-24h` | monitoring_stack | metric | urgent | declaration |
+| `ingest-auth-unhealthy-dropbox` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-auth-unhealthy-garmin` | monitoring_stack | metric | digest | factory:_alarm |
+| `ingest-auth-unhealthy-habitify` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-auth-unhealthy-notion` | monitoring_stack | metric | digest | factory:_alarm |
+| `ingest-auth-unhealthy-todoist` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-auth-unhealthy-whoop` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-consecutive-failures-eightsleep` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-consecutive-failures-hevy` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-consecutive-failures-strava` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-consecutive-failures-whoop` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-consecutive-failures-withings` | monitoring_stack | metric | urgent | factory:_alarm |
+| `ingest-liveness-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `ingest-liveness-unhealthy` | monitoring_stack | metric | digest | factory:_alarm |
+| `ingest-reconciliation-strava` | monitoring_stack | metric | digest | factory:_alarm |
+| `ingest-reconciliation-strava-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `ingest-reconciliation-whoop` | monitoring_stack | metric | digest | factory:_alarm |
+| `ingest-reconciliation-whoop-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `ingestion-error-insight-email-parser` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `ingestion-error-og-image-generator` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `ingestion-error-pipeline-health-check` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `ingestion-error-reading-cover-pipeline` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `ingestion-error-reading-recall-sweep` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `key-rotator-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `life-platform-alert-digest-errors` | monitoring_stack | metric | urgent | factory:_alarm |
+| `life-platform-alert-digest-queue-age` | monitoring_stack | metric | urgent | factory:_alarm |
+| `life-platform-between-chronicle-kill-switch-skip` | monitoring_stack | metric | digest | declaration |
+| `life-platform-budget-tier-escalation` | monitoring_stack | metric | digest | factory:_alarm |
+| `life-platform-canary-anthropic-failure` | operational_stack | metric | digest | factory:_canary_alarm |
+| `life-platform-canary-ddb-failure` | operational_stack | metric | digest+paging | factory:_canary_alarm |
+| `life-platform-canary-mcp-failure` | operational_stack | metric | digest | factory:_canary_alarm |
+| `life-platform-canary-s3-failure` | operational_stack | metric | digest+paging | factory:_canary_alarm |
+| `life-platform-canary-subscribe-cleanup-failure` | operational_stack | metric | digest | factory:_canary_alarm |
+| `life-platform-canary-subscribe-residue` | operational_stack | metric | digest | factory:_canary_alarm |
+| `life-platform-chronicle-email-sender-kill-switch-skip` | monitoring_stack | metric | digest | declaration |
+| `life-platform-daily-brief-errors` | monitoring_stack | metric | urgent | factory:_alarm |
+| `life-platform-daily-brief-memory-high` | monitoring_stack | metric | digest | declaration |
+| `life-platform-data-export-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `life-platform-ddb-item-size-warning` | monitoring_stack | metric | digest | factory:_alarm |
+| `life-platform-ddb-throttled-requests` | monitoring_stack | metric | urgent | factory:_alarm |
+| `life-platform-delete-user-data-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `life-platform-dlq-consumer-errors` | monitoring_stack | metric | urgent | factory:_alarm |
+| `life-platform-dlq-depth-warning` | operational_stack | metric | digest | declaration |
+| `life-platform-freshness-checker-not-emitting` | operational_stack | metric | digest | declaration |
+| `life-platform-ingestion-dlq-messages` | monitoring_stack | metric | urgent | factory:_alarm |
+| `life-platform-insight-email-parser-parse-failure` | operational_stack | metric | digest | declaration |
+| `life-platform-og-image-errors` | web_stack | metric | urgent | helper:add_web_alarms |
+| `life-platform-recursive-loop` | mcp_stack | metric | digest | declaration |
+| `life-platform-remediation-dispatcher-errors` | monitoring_stack | metric | digest | factory:_alarm |
+| `life-platform-s3-bucket-size-high` | monitoring_stack | metric | digest | factory:_alarm |
+| `life-platform-weekly-signal-kill-switch-skip` | monitoring_stack | metric | digest | declaration |
+| `mcp-server-duration-high` | mcp_stack | metric | digest | declaration |
+| `mcp-warmer-error` | mcp_stack | metric | digest | constructor:create_platform_lambda |
+| `mcp-warmer-no-invocations-24h` | mcp_stack | metric | digest | declaration |
+| `paging-budget-tier-3` | monitoring_stack | metric | paging | declaration |
+| `paging-pipeline-dead` | monitoring_stack | metric | paging | declaration |
+| `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |
+| `permanence-heartbeat` | operational_stack | metric | digest | declaration |
+| `prediction-gradable-share-low` | monitoring_prediction_alarms | metric | digest | declaration |
+| `qa-paused-by-budget` | monitoring_stack | metric | digest | factory:_alarm |
+| `qa-smoke-failures` | monitoring_stack | metric | digest | factory:_alarm |
+| `qa-smoke-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |
+| `qa-smoke-warnings` | monitoring_stack | metric | digest | factory:_alarm |
+| `recall-index-failed-chronicle-approve` | monitoring_silence_alarms | metric | digest | declaration |
+| `recall-index-failed-wednesday-chronicle` | monitoring_silence_alarms | metric | digest | declaration |
+| `site-api-ai-errors` | serve_stack | metric | digest | declaration |
+| `site-api-ai-throttles` | serve_stack | metric | digest | declaration |
+| `site-api-content-filter-fallback` | serve_stack | metric | digest | declaration |
+| `site-api-errors` | serve_stack | metric | digest | declaration |
+| `site-api-handled-5xx` | serve_stack | metric | digest | declaration |
+| `site-api-invocation-spike` | serve_stack | metric | digest | declaration |
+| `site-api-p95-latency-high` | serve_stack | metric | digest | declaration |
+| `site-api-throttles` | serve_stack | metric | digest | declaration |
+| `slo-ai-coaching-success` | monitoring_stack | metric | digest | factory:_alarm |
+| `slo-daily-brief-delivery` | monitoring_stack | metric | urgent | factory:_alarm |
+| `slo-mcp-availability` | mcp_stack | metric | digest | declaration |
+| `slo-source-freshness` | monitoring_stack | metric | digest | factory:_alarm |
+| `slo-warmer-completeness` | mcp_stack | metric | digest | declaration |
+| `telegram-coach-hold` | monitoring_silence_alarms | metric | digest | declaration |
+| `telegram-event-sweep-heartbeat` | serve_stack | metric | digest | declaration |
+| `telegram-webhook-errors` | serve_stack | metric | digest | declaration |
+| `telegram-webhook-throttles` | serve_stack | metric | digest | declaration |
+| `telegram-worker-errors` | serve_stack | metric | digest | declaration |
+| `telegram-worker-throttles` | serve_stack | metric | digest | declaration |
+| `token-alarm-genesis-window-active` | monitoring_stack | metric | via-composite | declaration |
+| `weekly-signal-delivery-heartbeat` | email_stack | metric | urgent | declaration |
+
+## 5b. Privacy Tiers (field_tiers registry, ADR-155)
+
+Source of truth: `lambdas/privacy/field_tiers.py` (#2803/#3045). Consent record for every
+`owner_published` stamp: ADR-155 (2026-08-23).
+Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_tiers.py's stated rule).
+
+| Source (partition) | Tier |
+|--------------------|------|
+| `cgm_readings` | owner_only |
+| `dexa` | owner_published |
+| `felt_probe` | owner_only |
+| `flourishing` | owner_only |
+| `genome` | owner_only |
+| `hevy` | owner_only |
+| `labs` | owner_published |
+| `macrofactor` | owner_only |
+| `notion` | owner_only |
+| `private_intake` | owner_only |
+| `reading` | owner_only |
+| `sick_days` | owner_only |
+| `state_of_mind` | owner_only |
+| `strava` | owner_only |
+| `supplements` | owner_only |
+
+Field-level rulings (only non-default fields are declared):
+
+| Source | Field | Tier |
+|--------|-------|------|
+| `reading` | `moodSnapshot` | owner_only |
+| `reading` | `retentionScore` | owner_only |
+| `whoop` | `hrv` | owner_published |
+| `whoop` | `light_sleep_hours` | owner_published |
+| `whoop` | `recovery_score` | owner_published |
+| `whoop` | `rem_sleep_hours` | owner_published |
+| `whoop` | `resting_heart_rate` | owner_published |
+| `whoop` | `skin_temp_celsius` | owner_only |
+| `whoop` | `sleep_consistency_percentage` | owner_only |
+| `whoop` | `sleep_duration_hours` | owner_published |
+| `whoop` | `slow_wave_sleep_hours` | owner_published |
+| `whoop` | `spo2_percentage` | owner_only |
+| `whoop` | `time_awake_hours` | owner_only |
+| `withings` | `afib_result` | owner_only |
+| `withings` | `bmr_kcal` | owner_only |
+| `withings` | `body_temperature_c` | owner_only |
+| `withings` | `bone_mass_kg` | owner_only |
+| `withings` | `bone_mass_lbs` | owner_only |
+| `withings` | `eda_feet` | owner_only |
+| `withings` | `eda_left_foot` | owner_only |
+| `withings` | `eda_right_foot` | owner_only |
+| `withings` | `extracellular_water_kg` | owner_only |
+| `withings` | `fat_free_mass_kg` | owner_published |
+| `withings` | `fat_free_mass_lbs` | owner_published |
+| `withings` | `fat_mass_kg` | owner_only |
+| `withings` | `fat_mass_lbs` | owner_only |
+| `withings` | `fat_ratio_pct` | owner_only |
+| `withings` | `heart_pulse` | owner_only |
+| `withings` | `height_m` | owner_only |
+| `withings` | `hydration_kg` | owner_only |
+| `withings` | `intracellular_water_kg` | owner_only |
+| `withings` | `metabolic_age` | owner_only |
+| `withings` | `muscle_mass_kg` | owner_only |
+| `withings` | `muscle_mass_lbs` | owner_only |
+| `withings` | `pr_interval_ms` | owner_only |
+| `withings` | `pulse_wave_velocity_mps` | owner_only |
+| `withings` | `qrs_interval_ms` | owner_only |
+| `withings` | `qt_interval_ms` | owner_only |
+| `withings` | `skin_temperature_c` | owner_only |
+| `withings` | `temperature_c` | owner_only |
+| `withings` | `vascular_age` | owner_only |
+| `withings` | `visceral_fat_index` | owner_only |
+| `withings` | `weight_kg` | owner_published |
+| `withings` | `weight_lbs` | owner_published |
 
 ## 6. Coverage (honest numbers, ADR-104)
 
 - Edge sites: 1145 total · 825 resolved · 320 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 81 resolved · 0 dynamic of 81 scheduled lambdas (104 lambdas total)
-- Alarms: 51 explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)
+- Alarms: 119 literal-named declarations across three idioms, 2 composite; routing digest 88 · digest+paging 2 · paging 2 · urgent 25 · via-composite 2 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Privacy: 13 owner-only + 2 owner-published sources; 33 owner-only + 11 owner-published fields — non-default entries only
+- Schedules: 88 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
-- Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled
+- Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)

@@ -15,8 +15,14 @@ Planes, each derived from the authority the charter names (docs/CHARTER.md):
               verbatim (scripts/check_doc_facts.py #1205 diffs doc crons against the
               same CDK strings); f-string crons are resolved through module-level
               constants and tagged ``resolved``; anything else is tagged ``dynamic``.
-  alarms      CDK ``alarm_name=`` declarations + SNS routing class where statically
-              resolvable (variable-traced ``add_alarm_action(SnsAction(topic))``).
+  alarms      every alarm whose name is a literal at its declaring call — explicit
+              ``alarm_name=`` kwargs, positional local-factory calls (monitoring_stack's
+              ``_alarm``/``_heartbeat_alarm``, operational_stack's ``_canary_alarm``) and
+              ``composite_alarm_name=`` declarations — with the SNS routing class traced
+              through the stack, the factory body under that call's arguments, or the
+              helper the alarm variable is handed to (#3314; the first slice held 50 of 99).
+  privacy     ``lambdas/privacy/field_tiers.py`` SOURCE_TIERS + FIELD_TIERS (#2803/#3045,
+              ADR-155 consent) — the operator's tier facet, loaded from the registry.
   partitions  the ADR-077 census — ``experiment.phase_taxonomy.SOURCE_CLASS`` (the
               computed-partition registry #2805 called for) joined with the
               ingestion facets of ``ingestion.source_registry``.
@@ -28,9 +34,10 @@ Planes, each derived from the authority the charter names (docs/CHARTER.md):
 
 Scope cuts (stated, not faked — see meta.scope_cuts in the model):
   * field-level edges wait on the #2797 wiring registry;
-  * privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose);
-  * helper-default error alarms (``ingestion-error-<fn>``) are not enumerated — the
-    alarms plane matches the #2844 vocabulary definition (explicit declarations).
+  * privacy rows exist only where the registry declares a NON-default tier (unlisted
+    = public by the registry's own omission rule);
+  * per-Lambda error alarms named dynamically inside the paved-road constructor
+    (``ingestion-error-<fn>``) are not enumerated.
 
 Run:  python3 scripts/generate_platform_model.py          # regenerate both artifacts
       python3 scripts/generate_platform_model.py --check  # exit 1 on drift (CI form)
@@ -223,69 +230,12 @@ def extract_lambdas() -> dict[str, dict]:
 # ── plane 3: alarms + routing (cdk/stacks/*.py) ──────────────────────────────
 
 
-def _topic_class(name: str) -> str:
-    lowered = name.lower()
-    if "paging" in lowered:
-        return "paging"
-    if "digest" in lowered:
-        return "digest"
-    return "urgent"
-
-
-def extract_alarms() -> dict[str, dict]:
-    alarms: dict[str, dict] = {}
-    for path in sorted((ROOT / "cdk" / "stacks").glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        consts = _module_str_consts(tree)
-        var_to_alarm: dict[str, str] = {}
-        declared_here: dict[str, dict] = {}
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            kwargs = {kw.arg: kw.value for kw in node.keywords if kw.arg}
-            an = kwargs.get("alarm_name")
-            if an is None:
-                continue
-            resolved = _resolve_str(an, consts)
-            if resolved is None or "{" in resolved:
-                continue  # per-call dynamic names (helper parameters) — scope cut
-            # ADR-050 helper contract: an explicit digest= flag on the declaring
-            # call routes to the digest (True) or urgent (False) topic. Absent
-            # flag stays "unresolved" — the helper's default depends on runtime
-            # wiring (alerts_topic) this AST pass cannot see.
-            routing = "unresolved"
-            dg = kwargs.get("digest")
-            if isinstance(dg, ast.Constant) and isinstance(dg.value, bool):
-                routing = "digest" if dg.value else "urgent"
-            declared_here[resolved] = {"stack": path.stem, "routing": routing}
-        # Variable trace: `<var> = ...create_alarm(..., alarm_name=X)` then
-        # `<var>.add_alarm_action(cw_actions.SnsAction(<topic>))`.
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-                call = node.value
-                if isinstance(call, ast.Call):
-                    for kw in call.keywords:
-                        if kw.arg == "alarm_name":
-                            resolved = _resolve_str(kw.value, consts)
-                            if resolved is not None and "{" not in resolved:
-                                var_to_alarm[node.targets[0].id] = resolved
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_alarm_action"):
-                continue
-            if not (isinstance(node.func.value, ast.Name) and node.func.value.id in var_to_alarm):
-                continue
-            alarm_name = var_to_alarm[node.func.value.id]
-            if alarm_name not in declared_here:
-                continue
-            if node.args and isinstance(node.args[0], ast.Call) and node.args[0].args:
-                topic = node.args[0].args[0]
-                if isinstance(topic, ast.Name):
-                    declared_here[alarm_name]["routing"] = _topic_class(topic.id)
-                elif isinstance(topic, ast.Attribute):
-                    declared_here[alarm_name]["routing"] = _topic_class(topic.attr)
-        alarms.update(declared_here)
-    return alarms
-
+# The alarm plane lives in scripts/platform_model_alarms.py (split at the #1665 module
+# ceiling); `extract_alarms` is re-exported here so callers and the drift test see one
+# entrypoint. The sibling import needs scripts/ on sys.path because check_doc_facts
+# spec-loads this file by path.
+sys.path.insert(0, str(ROOT / "scripts"))
+from platform_model_alarms import extract_alarms  # noqa: E402
 
 # ── plane 4: partitions (phase_taxonomy census × source_registry facets) ─────
 
@@ -304,6 +254,72 @@ def extract_partitions() -> dict[str, dict]:
             record["stale_hours"] = facets.get("stale_hours")
         partitions[name] = record
     return partitions
+
+
+# ── plane 4b: privacy tiers (lambdas/privacy/field_tiers.py — the executable registry) ──
+
+_TIER_NAMES = {0: "public", 1: "internal", 2: "owner_only", 3: "owner_published"}
+
+
+def _load_field_tiers():
+    """field_tiers.py by path (it is dependency-free; the `privacy` package's __init__ is
+    not, and importing it would drag Lambda-runtime modules into a repo script)."""
+    import importlib.util
+
+    path = ROOT / "lambdas" / "privacy" / "field_tiers.py"
+    spec = importlib.util.spec_from_file_location("_field_tiers_for_model", path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def extract_privacy() -> dict:
+    """The privacy plane (#3314): the source- and field-level tiers as `field_tiers.py`
+    declares them (#2803/#3045, ADR-155). The first slice cut this plane because the
+    tiers were prose; they are structure now, so the operator boots on them. Only
+    NON-default entries exist in the registry — an unlisted source/field is
+    `public` by the registry's own stated omission rule, and the model says so rather
+    than inventing rows."""
+    ft = _load_field_tiers()
+    return {
+        "tiers": {str(k): v for k, v in _TIER_NAMES.items()},
+        "default": "public — an unlisted source/field is TIER_PUBLIC by omission (field_tiers.py's stated rule)",
+        "consent": {"adr": ft.OWNER_CONSENT_ADR, "date": ft.OWNER_CONSENT_DATE},
+        "sources": {s: _TIER_NAMES[t] for s, t in sorted(ft.SOURCE_TIERS.items())},
+        "fields": {s: {f: _TIER_NAMES[t] for f, t in sorted(fields.items())} for s, fields in sorted(ft.FIELD_TIERS.items())},
+    }
+
+
+# ── plane 1b: schedules (the operator's "what runs when", flattened from the lambdas plane) ──
+
+
+def _utc_of(expr: str | None) -> str | None:
+    """`HH:MM` for a fixed-time cron (`cron(M H …)` with numeric minute + hour), else None —
+    a rate() or a multi-value field is not a clock time and is not pretended to be."""
+    if not expr or not expr.startswith("cron("):
+        return None
+    fields = expr[5:-1].split()
+    if len(fields) < 2 or not (fields[0].isdigit() and fields[1].isdigit()):
+        return None
+    return f"{int(fields[1]):02d}:{int(fields[0]):02d}"
+
+
+def extract_schedules(lambdas: dict[str, dict]) -> list[dict]:
+    rows: list[dict] = []
+    for name, rec in sorted(lambdas.items()):
+        for sched in rec["schedules"]:
+            rows.append(
+                {
+                    "lambda": name,
+                    "stack": rec["stack"],
+                    "expr": sched["expr"],
+                    "resolution": sched["resolution"],
+                    "utc": _utc_of(sched["expr"]),
+                }
+            )
+    rows.sort(key=lambda r: (r["utc"] is None, r["utc"] or "", r["lambda"]))
+    return rows
 
 
 # ── plane 5: edges (two-pass AST over lambdas/ + mcp/) ───────────────────────
@@ -717,6 +733,16 @@ def build_model() -> dict:
     edges, edge_stats = extract_edges(lambdas)
     contracts, contract_ratchet = extract_contracts()
     tool_count, tool_modules = _mcp_tool_counts()
+    privacy = extract_privacy()
+    schedules = extract_schedules(lambdas)
+    for name, rec in partitions.items():
+        rec["privacy_tier"] = privacy["sources"].get(name, "public")
+        restricted = sorted(f for f, t in privacy["fields"].get(name, {}).items() if t == "owner_only")
+        if restricted:
+            rec["owner_only_fields"] = restricted
+    routing_counts: dict[str, int] = {}
+    for rec in alarms.values():
+        routing_counts[rec["routing"]] = routing_counts.get(rec["routing"], 0) + 1
 
     scheduled = {n: r for n, r in lambdas.items() if r["schedules"]}
     resolved_sched = sum(1 for r in scheduled.values() if all(s["resolution"] != "dynamic" for s in r["schedules"]))
@@ -734,11 +760,22 @@ def build_model() -> dict:
                     "tests/pair_contract_registry.py (AST) — PairContract(...) declarations for the #2847 enrolled pairs, "
                     "unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR"
                 ),
+                "privacy": "lambdas/privacy/field_tiers.py SOURCE_TIERS + FIELD_TIERS (#2803/#3045, ADR-155 consent) — loaded, not re-typed",
+                "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron",
             },
             "counts": {
                 "lambdas": len(lambdas),
                 "scheduled_lambdas": len(scheduled),
                 "alarms": len(alarms),
+                "alarms_by_routing": dict(sorted(routing_counts.items())),
+                "alarms_composite": sum(1 for a in alarms.values() if a["kind"] == "composite"),
+                "schedules": len(schedules),
+                "privacy_sources_owner_only": sum(1 for t in privacy["sources"].values() if t == "owner_only"),
+                "privacy_sources_owner_published": sum(1 for t in privacy["sources"].values() if t == "owner_published"),
+                "privacy_fields_owner_only": sum(1 for fs in privacy["fields"].values() for t in fs.values() if t == "owner_only"),
+                "privacy_fields_owner_published": sum(
+                    1 for fs in privacy["fields"].values() for t in fs.values() if t == "owner_published"
+                ),
                 "partitions": len(partitions),
                 "edges": len(edges),
                 "contracts": len(contracts),
@@ -755,8 +792,8 @@ def build_model() -> dict:
             "non_census_families": non_census,
             "scope_cuts": [
                 "field-level edges wait on the #2797 per-field wiring registry",
-                "privacy tiers have no executable registry (docs/DATA_GOVERNANCE.md is prose) — not modeled",
-                "helper-default error alarms (ingestion-error-<fn>) are not enumerated — the alarms plane matches the #2844 vocabulary (explicit alarm_name declarations)",
+                "privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)",
+                "per-Lambda error alarms named dynamically inside the paved-road constructor (ingestion-error-<fn>, f-string names) are not enumerated — the alarms plane holds every alarm whose NAME is a literal at its declaring call: explicit alarm_name= kwargs, positional local-factory calls (_alarm/_heartbeat_alarm/_canary_alarm), and composite_alarm_name= declarations",
                 "edge direction 'unknown' = a partition reference outside a recognized read/write call (constants modules, comparisons, log strings)",
                 "the contracts plane lists the KNOWN pairs (#2847 — the enrolled contracts unioned with the KNOWN_MUST_AGREE_PAIRS floor), not every must-agree pair on the platform — without the per-field edges above, 'these two modules must agree about a SHAPE' is not decidable from this model; coverage is the counts.contracts_ratchet floor plus the ratchets in tests/test_pair_contract_sweep_2847.py",
             ],
@@ -766,6 +803,8 @@ def build_model() -> dict:
         "partitions": partitions,
         "edges": edges,
         "contracts": contracts,
+        "privacy": privacy,
+        "schedules": schedules,
     }
 
 
@@ -871,10 +910,46 @@ def render_doc(model: dict) -> str:
     add("")
     add("## 5. Alarms + Routing")
     add("")
-    add("| Alarm | Stack | Routing |")
-    add("|-------|-------|---------|")
+    add("Every alarm whose name is a literal at its declaring call (explicit `alarm_name=`, a")
+    add("positional local-factory call, or a `composite_alarm_name=`), with the SNS routing class")
+    add("traced through the stack, the factory body under that call's own arguments, or the")
+    add("helper the alarm variable is handed to. `via-composite` = the member routes nowhere")
+    add("itself; its composite does. `unresolved` is stated, never guessed.")
+    add("")
+    rc = counts.get("alarms_by_routing", {})
+    add(
+        "Routing: "
+        + " · ".join(f"{k} {v}" for k, v in rc.items())
+        + f" — of {counts['alarms']} alarms ({counts.get('alarms_composite', 0)} composite)"
+    )
+    add("")
+    add("| Alarm | Stack | Kind | Routing | Via |")
+    add("|-------|-------|------|---------|-----|")
     for name, rec in sorted(model["alarms"].items()):
-        add(f"| `{name}` | {rec['stack']} | {rec['routing']} |")
+        extra = ""
+        if rec.get("members"):
+            extra = " ← " + ", ".join(f"`{m}`" for m in rec["members"])
+        add(f"| `{name}` | {rec['stack']} | {rec.get('kind', 'metric')}{extra} | {rec['routing']} | {rec.get('via', 'declaration')} |")
+    add("")
+    add("## 5b. Privacy Tiers (field_tiers registry, ADR-155)")
+    add("")
+    privacy = model.get("privacy", {})
+    add("Source of truth: `lambdas/privacy/field_tiers.py` (#2803/#3045). Consent record for every")
+    add(f"`owner_published` stamp: {privacy.get('consent', {}).get('adr', '?')} ({privacy.get('consent', {}).get('date', '?')}).")
+    add(f"Default: {privacy.get('default', 'public')}.")
+    add("")
+    add("| Source (partition) | Tier |")
+    add("|--------------------|------|")
+    for source, tier in sorted(privacy.get("sources", {}).items()):
+        add(f"| `{source}` | {tier} |")
+    add("")
+    add("Field-level rulings (only non-default fields are declared):")
+    add("")
+    add("| Source | Field | Tier |")
+    add("|--------|-------|------|")
+    for source, fields in sorted(privacy.get("fields", {}).items()):
+        for field, tier in sorted(fields.items()):
+            add(f"| `{source}` | `{field}` | {tier} |")
     add("")
     add("## 6. Coverage (honest numbers, ADR-104)")
     add("")
@@ -886,7 +961,16 @@ def render_doc(model: dict) -> str:
     add(
         f"- Schedules: {sr['resolved']} resolved · {sr['dynamic']} dynamic of {counts['scheduled_lambdas']} scheduled lambdas ({counts['lambdas']} lambdas total)"
     )
-    add(f"- Alarms: {counts['alarms']} explicit declarations (helper-default `ingestion-error-*` alarms are a stated scope cut)")
+    add(
+        f"- Alarms: {counts['alarms']} literal-named declarations across three idioms, {counts.get('alarms_composite', 0)} composite; "
+        f"routing {' · '.join(f'{k} {v}' for k, v in counts.get('alarms_by_routing', {}).items())} "
+        "(dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)"
+    )
+    add(
+        f"- Privacy: {counts.get('privacy_sources_owner_only', 0)} owner-only + {counts.get('privacy_sources_owner_published', 0)} owner-published sources; "
+        f"{counts.get('privacy_fields_owner_only', 0)} owner-only + {counts.get('privacy_fields_owner_published', 0)} owner-published fields — non-default entries only"
+    )
+    add(f"- Schedules: {counts.get('schedules', 0)} (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not")
     non_census = model["meta"].get("non_census_families", [])
     if non_census:
         add(
