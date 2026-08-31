@@ -42,9 +42,29 @@ NAMESPACE = "LifePlatform/AI"
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 _MODEL_MATCH_TOL = 0.05
 
-# Interactive / latency-sensitive producers that must NOT batch even if volume
-# allowed it (the interactive ask endpoints stay real-time — AC of #409).
-_INTERACTIVE = {"life-platform-site-api-ai", "life-platform-canary", "ai-quality-canary", "unknown"}
+# Producers that must NOT count toward the batch floor even if volume allowed it,
+# because their volume can never move to Batch (#3372 — un-batchable volume must
+# not trip the wire, ADR-132's own premise):
+#   • Interactive / latency-sensitive endpoints stay real-time (AC of #409).
+#   • Deadline-critical CI/QA gates: Batch's SLA is 24h, and a gating pipeline
+#     (post-deploy visual/reader-truth QA, the nightly qa-smoke Lambda, the
+#     brief-blocking coach quality gate) cannot wait 24h for a verdict. Dimension
+#     strings verified against the emitters: `visual-ai-qa` / `reader-truth-qa`
+#     are the allowlisted CI labels in `bedrock_client.ATTRIBUTABLE_FEATURES`;
+#     `life-platform-qa-smoke` / `coach-quality-gate` are the deployed Lambda
+#     function names (the runtime's AWS_LAMBDA_FUNCTION_NAME always wins).
+_INTERACTIVE = {
+    # interactive / latency-sensitive (real-time by contract)
+    "life-platform-site-api-ai",
+    "life-platform-canary",
+    "ai-quality-canary",
+    "unknown",
+    # deadline-critical CI/QA gates (24h Batch SLA vs. gating deadlines)
+    "visual-ai-qa",
+    "reader-truth-qa",
+    "life-platform-qa-smoke",
+    "coach-quality-gate",
+}
 
 
 def _cw():
