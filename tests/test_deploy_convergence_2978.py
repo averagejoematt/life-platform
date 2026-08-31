@@ -454,3 +454,33 @@ def test_MUTATION_html_before_assets_reds_the_order_rule():
     swapped = text[:h] + _HTML_MARK + text[h + len(_HASHED_MARK) : t] + _HASHED_MARK + text[t + len(_HTML_MARK) :]
     assert not upload_order_is_assets_first(swapped)
     assert not upload_order_is_assets_first(text.replace(_HASHED_MARK, "echo removed"))
+
+
+# ── The JSON sync must never stamp the door's HTML (2026-08-31 outage) ──────────────────
+_DATA_JSON_MARK = 'echo "→ Data JSON'
+
+
+def data_json_sync_excludes_html(script_text: str) -> bool:
+    """Pure decision: the `aws s3 sync … data/` block that stamps application/json carries
+    `--exclude "*.html"` BEFORE its --content-type flag (site/data/ holds the /data/* door)."""
+    i = script_text.find(_DATA_JSON_MARK)
+    if i == -1:
+        return False
+    block = script_text[i : script_text.find("--region", i)]
+    return '--exclude "*.html"' in block and "application/json" in block
+
+
+def test_data_json_sync_excludes_the_door_html():
+    text = _SYNC_SCRIPT.read_text(encoding="utf-8")
+    assert data_json_sync_excludes_html(text), (
+        'the Data JSON sync in deploy/sync_site_to_s3.sh must --exclude "*.html": on 2026-08-31 it uploaded the '
+        "/data/* door's pages as application/json ahead of the HTML sync and the door served JSON for ~22 min"
+    )
+
+
+def test_MUTATION_dropping_the_html_exclude_reds_the_json_sync_rule():
+    text = _SYNC_SCRIPT.read_text(encoding="utf-8")
+    i = text.index(_DATA_JSON_MARK)
+    j = text.index('--exclude "*.html"', i)
+    mutated = text[:j] + text[j + len('--exclude "*.html"') :]
+    assert not data_json_sync_excludes_html(mutated)

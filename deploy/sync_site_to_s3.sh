@@ -259,8 +259,16 @@ aws s3 sync "$BUILD_DIR/assets/" "s3://$BUCKET/$S3_PREFIX/assets/" \
   --region "$REGION"
 
 # Data JSON — Lambda overwrites daily, 24h TTL is fine
+# JSON ONLY. site/data/ also holds the /data/* door's index.html pages; this sync stamps
+# everything it touches `application/json`. While HTML synced FIRST that was masked (the
+# html files were already uploaded as text/html and unchanged, so this step skipped them).
+# The 2026-08-31 assets-first reorder (#3349) put this step AHEAD of the HTML sync and it
+# uploaded the door's 20 changed pages as JSON; the HTML sync then skipped them as unchanged
+# and the whole /data/* door served application/json for ~22 minutes — including through the
+# auto-rollback, which ran the same script. Exclude *.html here, always.
 echo "→ Data JSON (max-age=86400)..."
 aws s3 sync "$BUILD_DIR/data/" "s3://$BUCKET/$S3_PREFIX/data/" \
+  --exclude "*.html" \
   --cache-control "max-age=86400, public" \
   --content-type "application/json" \
   --region "$REGION" 2>/dev/null || true
