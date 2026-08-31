@@ -129,3 +129,89 @@ def test_no_stale_staged_copy_is_left_behind():
     shell alias, or a half-remembered runbook line would reach for."""
     staged = Path.home() / ".local" / "bin" / "claude-memory-backup.sh"
     assert not staged.exists(), f"{staged} still exists — the staged copy must be removed, not merely bypassed"
+
+
+# ── The liveness assertion: a backup that finds nothing must not report success ──
+# MEMORY_DIR is derived from an UNDOCUMENTED Claude Code implementation detail (how it
+# encodes a checkout path into a project key). If that encoding changes, the script
+# resolves somewhere empty — and `aws s3 sync` over an empty source uploads nothing and
+# exits 0. That is a green backup carrying no data: a NEW instance of the exact class
+# the 2026-08-30/31 work removed. These tests run the real script against a synthetic
+# HOME, so no AWS call is ever made (both failure paths return before the sync).
+def _run_backup(tmp_home: Path, repo: Path) -> tuple[int, str]:
+    """Run the script with a synthetic HOME; return (exit code, its log contents).
+
+    The script redirects its own stdout into the dated log, so the log IS the output.
+    """
+    import subprocess
+
+    env = {**os.environ, "HOME": str(tmp_home)}
+    proc = subprocess.run(
+        ["/bin/bash", str(repo / "setup" / "claude_memory_backup.sh")],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
+    logs = sorted((tmp_home / "Library" / "Logs" / "claude-backup").glob("backup-*.log"))
+    text = logs[-1].read_text(encoding="utf-8") if logs else proc.stdout + proc.stderr
+    # The script APPENDS to a dated log, so a second run in the same test would otherwise
+    # be read together with the first — and an assertion like "FAIL not in log" would see
+    # the previous run's failure and be wrong about this one. Return the LAST run only.
+    segments = text.split("=== backup run ")
+    return proc.returncode, ("=== backup run " + segments[-1] if len(segments) > 1 else text)
+
+
+@pytest.fixture()
+def sandbox(tmp_path):
+    """A synthetic HOME + a checkout holding a copy of the real script."""
+    import shutil
+
+    home = tmp_path / "home"
+    repo = tmp_path / "repo"
+    (repo / "setup").mkdir(parents=True)
+    home.mkdir()
+    shutil.copy2(SCRIPT, repo / "setup" / SCRIPT.name)
+    return home, repo
+
+
+def test_missing_memory_dir_fails_loudly_and_names_the_resolved_path(sandbox):
+    home, repo = sandbox
+    code, log = _run_backup(home, repo)
+    assert code != 0, "a run that backed up no memory must NOT exit 0"
+    assert "FAIL: memory dir does NOT EXIST" in log
+    assert "memory:" in log, "the log must state what the path resolved TO, not what it should be"
+    resolved = [ln for ln in log.splitlines() if ln.strip().startswith("memory:")][0]
+    assert str(home) in resolved, f"the resolved path must be reported: {resolved!r}"
+
+
+def test_empty_memory_dir_refuses_to_sync_and_fails(sandbox):
+    """The genuinely silent vector: the directory EXISTS, so a bare `-d` check passes,
+    and `aws s3 sync` over it succeeds with zero files and exits 0."""
+    home, repo = sandbox
+    code, log = _run_backup(home, repo)  # first run tells us what it resolved to
+    resolved = Path([ln.split("memory:", 1)[1].strip() for ln in log.splitlines() if "memory:" in ln][0])
+
+    resolved.mkdir(parents=True)
+    assert resolved.is_dir() and not list(resolved.glob("*.md"))
+
+    code, log = _run_backup(home, repo)
+    assert code != 0, "an EMPTY memory dir must fail — sync would upload nothing and exit 0"
+    assert "FAIL: memory dir EXISTS but holds no .md files" in log
+    assert str(resolved) in log, "the failure must name the resolved path"
+
+
+def test_a_populated_memory_dir_passes_the_liveness_gate(sandbox):
+    """Negative control on the guard itself: with one .md present it must get PAST the
+    assertion and reach the sync. Proven by the file count it prints — the run still
+    fails overall (no AWS, no datadrops in the sandbox), which is the point: the gate
+    must not be what blocks it."""
+    home, repo = sandbox
+    _, log = _run_backup(home, repo)
+    resolved = Path([ln.split("memory:", 1)[1].strip() for ln in log.splitlines() if "memory:" in ln][0])
+    resolved.mkdir(parents=True)
+    (resolved / "MEMORY.md").write_text("# index\n", encoding="utf-8")
+
+    _, log = _run_backup(home, repo)
+    assert "memory files: 1" in log, "a populated dir must pass the gate and report its count"
+    assert "FAIL: memory dir" not in log, "the liveness gate must not fire on a populated dir"

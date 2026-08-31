@@ -71,14 +71,42 @@ echo "    memory: $MEMORY_DIR"
 rc=0
 
 # 1. Claude Code file memory (CONTINUITY §4) — ~/.claude, never TCC-blocked
+#
+# LIVENESS ASSERTION. MEMORY_DIR is derived from an UNDOCUMENTED Claude Code
+# implementation detail: how it encodes a checkout path into a project key. If that
+# encoding ever changes, this resolves to a directory that does not exist — or worse,
+# one that exists and is empty, because `aws s3 sync` over an empty source succeeds,
+# uploads nothing, and exits 0. That is a backup reporting success while carrying
+# nothing, which is the exact silent-failure class this script spent seven weeks in.
+#
+# So the source is asserted before it is trusted: it must exist AND hold at least one
+# .md. Anything else fails the run loudly, naming the resolved path so the next reader
+# can see what it resolved TO rather than guessing what it should have been.
+mem_count=0
 if [ -d "$MEMORY_DIR" ]; then
-    "$AWS" s3 sync "$MEMORY_DIR/" "s3://$BUCKET/claude-memory-backup/" --region "$REGION" || rc=1
-else
-    echo "WARN: memory dir missing: $MEMORY_DIR"
-    echo "      Derived from REPO ($REPO) using Claude Code's path-to-key encoding."
-    echo "      If the checkout moved, this is expected on the FIRST run only — Claude Code"
-    echo "      creates the new key on its next session. If it persists, the encoding changed."
+    # Count without globbing surprises: nullglob is not set, so a literal unmatched
+    # pattern would otherwise count as one file.
+    mem_count=$(find "$MEMORY_DIR" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
+fi
+
+if [ ! -d "$MEMORY_DIR" ]; then
+    echo "FAIL: memory dir does NOT EXIST: $MEMORY_DIR"
+    echo "      Derived from REPO ($REPO) by replacing '/' with '-' — Claude Code's"
+    echo "      project-key encoding, which is an undocumented implementation detail."
+    echo "      If the checkout just moved, expect this on the FIRST run only; Claude Code"
+    echo "      creates the new key on its next session. If it persists, the encoding changed"
+    echo "      and MEMORY_DIR must be re-derived. NOT backing up an empty set silently."
     rc=1
+elif [ "$mem_count" -eq 0 ]; then
+    echo "FAIL: memory dir EXISTS but holds no .md files: $MEMORY_DIR"
+    echo "      Refusing to sync: an empty source would upload nothing and exit 0, which"
+    echo "      is indistinguishable from a healthy backup. Either the project key moved"
+    echo "      (encoding change) or the memory dir was emptied. Investigate before trusting"
+    echo "      s3://$BUCKET/claude-memory-backup/ — the REMOTE copy is now the only copy."
+    rc=1
+else
+    echo "    memory files: $mem_count"
+    "$AWS" s3 sync "$MEMORY_DIR/" "s3://$BUCKET/claude-memory-backup/" --region "$REGION" || rc=1
 fi
 
 # 2. datadrops originals (genome, physicals, HAE exports, backfills)

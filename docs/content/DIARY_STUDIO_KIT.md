@@ -149,8 +149,19 @@ The page body is the transcript; only a **pointer** to the recording (filename +
 duration) is recorded as page properties — the video/audio file itself is never
 uploaded (#1573 AC2; Matthew separately decides if/when full video ever goes to
 S3, cost-gated against the $215 ceiling). For an unattended watched-folder setup,
-stage the launchd wrapper + this script to `~/.local/bin`, NOT under `~/Documents`
-(the TCC ~/Documents trap — a LaunchAgent reading ~/Documents exits 126).
+point the LaunchAgent at the repo copy of the wrapper and keep the watched folder
+under `~/dev` — **do not stage a copy to `~/.local/bin`.** TCC protects only
+Documents/Desktop/Downloads/iCloud, so a LaunchAgent under `~/dev` runs without a
+Full Disk Access grant; the old `~/Documents` trap (a LaunchAgent reading it exits
+126) is avoided by location, not by staging.
+
+> Staging is what broke the memory backup. Its script lived only in `~/.local/bin`,
+> untracked, with a hard-coded `~/Documents` path — so when the repo moved on
+> 2026-08-30 the path went stale and the job failed every run for seven weeks while
+> reporting a TCC cause that no longer applied. Nothing outside git could see it.
+> Follow `setup/claude_memory_backup.sh` + `setup/com.matthewwalker.claude-memory-backup.plist`
+> instead: script and agent both versioned, launchd running the repo file directly,
+> and `tests/test_backup_agent_path_contract.py` asserting the two cannot drift.
 
 ### Owner follow-up (REQUIRED — Notion, Matthew-side)
 
