@@ -81,7 +81,34 @@ def test_incident_log_last_updated_bumped():
     m = re.search(r"Last updated: (\d{4}-\d{2}-\d{2})", log)
     assert m, "#1332: no dated Last-updated line in docs/INCIDENT_LOG.md"
     assert m.group(1) >= "2026-07-19", "#1332: the Last-updated line was not bumped for the backfill"
-    assert "#1332" in log.split("Last updated:")[1][:400]
+
+    # Scope to the CURRENT session's clause, not to a character count.
+    #
+    # This read `log.split("Last updated:")[1][:400]` and fired twice on honest wrap edits
+    # — 2026-08-22 and again 2026-08-31 — both times because the entry was VERBOSE, not
+    # because the convention was skipped. The second cost ~50 minutes of a red suite behind
+    # a green badge, and would have misattributed the failure to the next commit touching
+    # lambdas/, because the wrap that broke it was path-filtered away from CI/CD.
+    #
+    # A character count is not a property of the thing being asserted. Measured at the time
+    # of this fix, the current clause was 407 characters long: the slice cut seven short of
+    # it, so whether the gate passed depended on where in their own sentence an author had
+    # happened to put the marker. The line directly above already refuses an exact-date pin
+    # for the same reason ("the golden-date trap") — this assertion just had the same flaw
+    # in a different dimension.
+    #
+    # The entry is delimited, so use the delimiter: everything from "Last updated:" to the
+    # first "Prior:" IS this session's clause, whatever its length. That keeps the gate
+    # meaningful (each session must cite the gate in its OWN clause, not inherit a citation
+    # from the accumulated history behind it) while removing the length dependency.
+    tail = log.split("Last updated:", 1)[1]
+    current_entry = tail.split("Prior:", 1)[0]
+    assert "#1332" in current_entry, (
+        "#1332: the CURRENT Last-updated clause does not cite the gate.\n"
+        "  Convention: `Last updated: YYYY-MM-DD Session X (#1332 gate; +N rows — ...)`\n"
+        f"  Got: {current_entry.strip()[:160]}...\n"
+        "  (Citations in the trailing `Prior:` history do NOT satisfy this — each session cites it itself.)"
+    )
 
 
 def test_backfilled_rows_are_well_formed():
