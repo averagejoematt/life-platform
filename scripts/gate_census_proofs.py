@@ -1,5 +1,7 @@
-"""scripts/gate_census_proofs.py — the recorded can-it-fail verdicts for census
-family 6, the drift-sentinel per-check gates (#3129/#3160, epic #2578 slice 2).
+"""scripts/gate_census_proofs.py — recorded can-it-fail verdicts that do not fit in
+`scripts/gate_census.py`: census family 6, the drift-sentinel per-check gates
+(#3129/#3160, epic #2578 slice 2), and `GUARD_PROOFS` at the foot of this file — family
+2 (guard-script) records, added for the same size reason (#2834, 2026-08-30).
 
 WHY ITS OWN MODULE
 ──────────────────
@@ -494,6 +496,58 @@ SENTINEL_PROOFS: dict[str, dict[str, Any]] = {
             "NEVER_EXPIRE and is caught by the NEXT weekly sweep (<=7 days), fixed by the attended apply script — CDK "
             "owns one region per stack and CloudWatch Logs has no account-level retention default. Live steady state "
             "until the driver runs the apply + LifePlatformOperational deploy is DRIFT (17 groups), by design. " + _ERROR_IS_NOT_A_SIGNAL
+        ),
+        "proved_on": "2026-08-30",
+    },
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GUARD_PROOFS — census family 2 (guard-script). Same `Proof` bar as
+# `gate_census.PROVEN_CAN_FAIL`; here only because `gate_census.py` sits at ~1,175 of its
+# 1,200-line ceiling (#1665) and the standing rule is extraction, never a baseline raise.
+# ─────────────────────────────────────────────────────────────────────────────
+
+GUARD_PROOFS: dict[str, dict[str, Any]] = {
+    "guard::deploy/iam_additive_gate.py": {
+        "gate_name": "deploy/iam_additive_gate.py",
+        "command": (
+            "python3 -m pytest tests/test_iam_additive_gate_2834.py -q   # 164 probes, each one a mutation of a "
+            "REAL `cdk synth` slice run through the module or its CLI; plus the out-of-band CLI transcript in "
+            "`observed`, re-runnable as: python3 deploy/iam_additive_gate.py --synth-dir <slice> --deployed-dir <slice>"
+        ),
+        "mutation": (
+            "Six defects, one at a time, planted into a copy of the committed synth slice "
+            "(tests/fixtures/iam_additive_gate/LifePlatformEmail.slice.template.json) with the deployed side held at "
+            "the clean original: (A) a new Allow carrying `iam:PassRole` on the CDK cfn-exec role; (B) the review-R1 "
+            "shape — a legitimate additive `s3:GetObject config/content_filter.json` grant riding with the function's "
+            "`Code.S3Bucket` repointed at `attacker-public-bucket`; (C) the review-R2 shape — `s3:DeleteObject` on "
+            "`raw/*`; (D) the review-R3 shape — `ssm:PutParameter` on `/life-platform/remediation-mode`, the "
+            "remediation kill-switch; (E) the dead-man — the deployed-side template removed entirely; (F) the "
+            "positive control — the 2026-08-14 P1 grant alone, which must still be admitted."
+        ),
+        "observed": (
+            "2026-08-30, watched in both directions. BASELINE (synth == deployed) exit 0, NO-IAM-CHANGE. "
+            "(A) exit 1, OWNER-REQUIRED, `forbidden-action:iam:PassRole (matches iam:*)` + "
+            "`out-of-namespace-resource:arn:aws:iam::<acct>:role/cdk-hnb659fds-cfn-exec-role-...`. "
+            "(B) exit 1, OWNER-REQUIRED, `rides-with-non-iam-change` naming "
+            "\"Code.S3Bucket 'attacker-public-bucket' is not this environment's CDK asset bucket "
+            "'cdk-hnb659fds-assets-<acct>-us-west-2'\" — this shape was ALLOW-ADDITIVE before review R1. "
+            "(C) exit 1, `s3-protected-prefix: … bucket_policy.json Deny 'ProtectDataFromDeployScripts' protects raw/ "
+            "against s3:deleteobject*` — ALLOW-ADDITIVE before review R2. "
+            "(D) exit 1, `forbidden-action:ssm:PutParameter` — ALLOW-ADDITIVE before review R3. "
+            "(E) exit 2, OWNER-REQUIRED, `UNEVALUABLE (fails closed)`. "
+            "REVERTED exit 0, NO-IAM-CHANGE. (F) exit 0, ALLOW-ADDITIVE. "
+            "The committed suite re-runs every one of these classes: 164 passed."
+        ),
+        "scope": (
+            "This is a verdict on the DECISION, not on the deploy. The gate decides from two JSON templates; whether "
+            "CI then applies what it admitted is the ci-cd.yml Deploy job's two #2834 steps, which are census gates of "
+            "their own and are UNPROVEN — proving them means watching an approval-gated production deploy fail, which "
+            "is not a local mutation. Also out of scope: the `--live` fetch path (an `aws cloudformation get-template` "
+            "call; the proof above uses --deployed-dir, the same evaluate_all code path with the fetch stubbed by a "
+            "file), and anything the SYNTH itself gets wrong — the gate reads cdk.out, so a defect CDK does not emit "
+            "into the template is invisible to it by construction."
         ),
         "proved_on": "2026-08-30",
     },

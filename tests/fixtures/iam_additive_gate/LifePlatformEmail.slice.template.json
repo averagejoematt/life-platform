@@ -1,0 +1,556 @@
+{
+ "Parameters": {
+  "BootstrapVersion": {
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+   "Type": "AWS::SSM::Parameter::Value<String>"
+  }
+ },
+ "Resources": {
+  "CDKMetadata": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/CDKMetadata/Default"
+   },
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02QzU7DMBCEn6V3Z4E24t4icUIihHKuNs6SmvinZG2qKPK7YzuAOM03M/LuylvY1jXcbvDKlezHSqsOllePchQpOi38yfASKNABmUQ/WzSu7+CInV4j3sEhyJH86izD0V2ULE6hgaV1msTDuy3aOK3knO1KUWg0XY+wPAYrvXI2d/+5ocko5ux+47dJ5yZJTOtPyEyeYZ9FaDcwPLmhJU+2zKCvBJzuCD93JI1Cahf6K3p5hmWvcTK5KhCjKKPSJwzKDuUJsQuTJPEHKXwO/hJ8FM3sz87e7OCuhvvNBytVTSGtNgTtqt+bam9qZAEAAA=="
+   },
+   "Type": "AWS::CDK::Metadata"
+  },
+  "DailyBrief22B24B58": {
+   "DependsOn": [
+    "DailyBriefRoleDefaultPolicyC441914D",
+    "DailyBriefRoleCE6CDC95"
+   ],
+   "Metadata": {
+    "aws:asset:is-bundled": false,
+    "aws:asset:path": "asset.deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    "aws:asset:property": "Code",
+    "aws:cdk:path": "LifePlatformEmail/DailyBrief/Resource"
+   },
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef.zip"
+    },
+    "DeadLetterConfig": {
+     "TargetArn": "arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq"
+    },
+    "Environment": {
+     "Variables": {
+      "ANTHROPIC_SECRET": "life-platform/ai-keys",
+      "AWS_REGION_OVERRIDE": "us-west-2",
+      "EDITORIAL_IMAGES": "on",
+      "EMAIL_RECIPIENT": "lifeplatform@mattsusername.com",
+      "EMAIL_SENDER": "lifeplatform@mattsusername.com",
+      "S3_BUCKET": "matthew-life-platform",
+      "TABLE_NAME": "life-platform",
+      "USER_ID": "matthew"
+     }
+    },
+    "FunctionName": "daily-brief",
+    "Handler": "emails.daily_brief_lambda.lambda_handler",
+    "MemorySize": 768,
+    "Role": {
+     "Fn::GetAtt": [
+      "DailyBriefRoleCE6CDC95",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.12",
+    "Tags": [
+     {
+      "Key": "Env",
+      "Value": "prod"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "cdk"
+     },
+     {
+      "Key": "Owner",
+      "Value": "matthew"
+     },
+     {
+      "Key": "Project",
+      "Value": "life-platform"
+     }
+    ],
+    "Timeout": 900,
+    "TracingConfig": {
+     "Mode": "Active"
+    }
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "DailyBriefLogRetentionFD85B111": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/DailyBrief/LogRetention/Resource"
+   },
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "DailyBrief22B24B58"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30,
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    }
+   },
+   "Type": "Custom::LogRetention"
+  },
+  "DailyBriefRoleCE6CDC95": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/DailyBriefRole/Resource"
+   },
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Env",
+      "Value": "prod"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "cdk"
+     },
+     {
+      "Key": "Owner",
+      "Value": "matthew"
+     },
+     {
+      "Key": "Project",
+      "Value": "life-platform"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "DailyBriefRoleDefaultPolicyC441914D": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/DailyBriefRole/DefaultPolicy/Resource"
+   },
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform",
+        "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform/index/*"
+       ],
+       "Sid": "DynamoDB"
+      },
+      {
+       "Action": [
+        "kms:Decrypt",
+        "kms:GenerateDataKey"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d",
+       "Sid": "KMS"
+      },
+      {
+       "Action": "s3:GetObject",
+       "Effect": "Allow",
+       "Resource": "arn:aws:s3:::matthew-life-platform/config/*",
+       "Sid": "S3ConfigRead"
+      },
+      {
+       "Action": "secretsmanager:GetSecretValue",
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/ai-keys*",
+       "Sid": "Secrets"
+      },
+      {
+       "Action": "bedrock:InvokeModel",
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:bedrock:*:205930651321:inference-profile/us.anthropic.claude-*",
+        "arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2:0",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+       ],
+       "Sid": "BedrockInvoke"
+      },
+      {
+       "Action": [
+        "ses:SendEmail",
+        "sesv2:SendEmail"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:ses:us-west-2:205930651321:configuration-set/life-platform-emails",
+        "arn:aws:ses:us-west-2:205930651321:identity/mattsusername.com"
+       ],
+       "Sid": "SES"
+      },
+      {
+       "Action": "sqs:SendMessage",
+       "Effect": "Allow",
+       "Resource": "arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq",
+       "Sid": "DLQ"
+      },
+      {
+       "Action": "s3:PutObject",
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:s3:::matthew-life-platform/buddy/*",
+        "arn:aws:s3:::matthew-life-platform/dashboard/*",
+        "arn:aws:s3:::matthew-life-platform/generated/*",
+        "arn:aws:s3:::matthew-life-platform/site/*"
+       ],
+       "Sid": "S3Write"
+      },
+      {
+       "Action": "cloudwatch:PutMetricData",
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "CloudWatchMetrics"
+      },
+      {
+       "Action": "ssm:GetParameter",
+       "Effect": "Allow",
+       "Resource": "arn:aws:ssm:us-west-2:205930651321:parameter/life-platform/experiment-cycle",
+       "Sid": "ExperimentCycleRead"
+      },
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:lambda:us-west-2:205930651321:function:coach-computation-engine",
+        "arn:aws:lambda:us-west-2:205930651321:function:coach-ensemble-digest",
+        "arn:aws:lambda:us-west-2:205930651321:function:coach-narrative-orchestrator",
+        "arn:aws:lambda:us-west-2:205930651321:function:coach-quality-gate",
+        "arn:aws:lambda:us-west-2:205930651321:function:coach-state-updater"
+       ],
+       "Sid": "CoachIntelligenceInvoke"
+      },
+      {
+       "Action": "ssm:GetParameter",
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:ssm:*:*:parameter/life-platform/budget-breakdown",
+        "arn:aws:ssm:*:*:parameter/life-platform/budget-tier"
+       ]
+      },
+      {
+       "Action": "sqs:SendMessage",
+       "Effect": "Allow",
+       "Resource": "arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq"
+      },
+      {
+       "Action": [
+        "xray:PutTelemetryRecords",
+        "xray:PutTraceSegments"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "DailyBriefRoleDefaultPolicyC441914D",
+    "Roles": [
+     {
+      "Ref": "DailyBriefRoleCE6CDC95"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Policy"
+  },
+  "DailyBriefSchedule99515B48": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/DailyBriefSchedule/Resource"
+   },
+   "Properties": {
+    "ScheduleExpression": "cron(0 17 * * ? *)",
+    "State": "ENABLED",
+    "Tags": [
+     {
+      "Key": "Env",
+      "Value": "prod"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "cdk"
+     },
+     {
+      "Key": "Owner",
+      "Value": "matthew"
+     },
+     {
+      "Key": "Project",
+      "Value": "life-platform"
+     }
+    ],
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "DailyBrief22B24B58",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Type": "AWS::Events::Rule"
+  },
+  "DailyBriefScheduleAllowEventRuleLifePlatformEmailDailyBriefDC5205DAA1BA5E7D": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/DailyBriefSchedule/AllowEventRuleLifePlatformEmailDailyBriefDC5205DA"
+   },
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "DailyBrief22B24B58",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "DailyBriefSchedule99515B48",
+      "Arn"
+     ]
+    }
+   },
+   "Type": "AWS::Lambda::Permission"
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
+   "DependsOn": [
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+   ],
+   "Metadata": {
+    "aws:asset:is-bundled": false,
+    "aws:asset:path": "asset.cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe",
+    "aws:asset:property": "Code",
+    "aws:cdk:path": "LifePlatformEmail/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource"
+   },
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-205930651321-us-west-2",
+     "S3Key": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe.zip"
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Tags": [
+     {
+      "Key": "Env",
+      "Value": "prod"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "cdk"
+     },
+     {
+      "Key": "Owner",
+      "Value": "matthew"
+     },
+     {
+      "Key": "Project",
+      "Value": "life-platform"
+     }
+    ],
+    "Timeout": 900
+   },
+   "Type": "AWS::Lambda::Function"
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource"
+   },
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Env",
+      "Value": "prod"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "cdk"
+     },
+     {
+      "Key": "Owner",
+      "Value": "matthew"
+     },
+     {
+      "Key": "Project",
+      "Value": "life-platform"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Role"
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource"
+   },
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:DeleteRetentionPolicy",
+        "logs:PutRetentionPolicy"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+    "Roles": [
+     {
+      "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+     }
+    ]
+   },
+   "Type": "AWS::IAM::Policy"
+  },
+  "WeeklySignalDeliveryHeartbeatFB9ECC22": {
+   "Metadata": {
+    "aws:cdk:path": "LifePlatformEmail/WeeklySignalDeliveryHeartbeat/Resource"
+   },
+   "Properties": {
+    "AlarmActions": [
+     "arn:aws:sns:us-west-2:205930651321:life-platform-alerts"
+    ],
+    "AlarmDescription": "#2820: no Sunday Weekly Signal delivery (WeeklySignalSent Sum < 1) for 7 consecutive days \u2014 the subscriber promise was silently missed. Check the weekly-signal Lambda's schedule and logs.",
+    "AlarmName": "weekly-signal-delivery-heartbeat",
+    "ComparisonOperator": "LessThanThreshold",
+    "DatapointsToAlarm": 7,
+    "EvaluationPeriods": 7,
+    "MetricName": "WeeklySignalSent",
+    "Namespace": "LifePlatform/Email",
+    "Period": 86400,
+    "Statistic": "Sum",
+    "Tags": [
+     {
+      "Key": "Env",
+      "Value": "prod"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "cdk"
+     },
+     {
+      "Key": "Owner",
+      "Value": "matthew"
+     },
+     {
+      "Key": "Project",
+      "Value": "life-platform"
+     }
+    ],
+    "Threshold": 1,
+    "TreatMissingData": "breaching"
+   },
+   "Type": "AWS::CloudWatch::Alarm"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
