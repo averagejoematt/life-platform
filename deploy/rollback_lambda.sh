@@ -13,8 +13,11 @@
 #   bash deploy/rollback_lambda.sh weekly-digest
 #
 # Note: Consecutive rollbacks of the same function will re-deploy the same artifact
-# (previous.zip is not rotated further). For older versions, use S3 versioning or
-# re-deploy from source.
+# (previous.zip is not rotated further). For older versions, S3 versioning is a
+# NARROW manual escape: lifecycle rule expire-lambda-deploy-artifacts
+# (deploy/s3_lifecycle.json, #3368) expires noncurrent versions after 1 day,
+# keeping only the newest noncurrent generation — beyond that window,
+# re-deploy from a git ref (deploy_lambda.sh on a checkout of the wanted sha).
 
 set -euo pipefail
 
