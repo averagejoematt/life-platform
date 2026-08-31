@@ -478,9 +478,15 @@ def test_the_verdict_counts_add_up_and_are_reported(real_census):
         # re-runnable harness (ARMED 1/1) — the bound exists to catch proofs that
         # stop being mutation-backed, and this one is. (#3279 adds the 42nd — the
         # sentinel events-client proof — still under the same bound.)
+        # Upper bound raised 45 → 46 (2026-08-31, #3315): the 46th proof is
+        # `structural::test_ci_dark_flag_sweep_3315.py` — mutation-backed via the same
+        # re-runnable harness (`gate_census_mutations.py --run --gate
+        # test_ci_dark_flag_sweep_3315.py`: ARMED 1/1, planted probe workflow carrying the
+        # pre-#3315 fresh-eyes install line). The 45th was #3336's twin guard, landed via
+        # PR #3338 the same night, also ARMED 1/1.
         3
         <= len(proven)
-        <= 45
+        <= 46
     ), f"proven verdicts n={len(proven)} — 0 means the layer is dark, a large number means it stopped being mutation-backed"
     assert attempted, "ATTEMPTED_UNPROVEN attached to no gate — the honest-failure record has gone dark"
     text = gc.render_report(real_census)
