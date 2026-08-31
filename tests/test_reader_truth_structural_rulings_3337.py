@@ -1,6 +1,7 @@
 """#3337 — every adjudication rule in the reader-truth ledger decides on STRUCTURE.
 
 THE CHARGE. `lambdas/operational/reader_truth_rulings.py` carried 13 `def is_*`
+(14 since #3379 added `is_uncited_temporal_objection`, classified below)
 adjudication rules and three of them decided on the judge's PHRASING:
 `is_vagueness_objection` (an adjective regex), `is_self_refuted` (a six-phrase
 withdrawal list) and `is_active_vs_passive_objection` (a silence-verb list). Every
@@ -11,7 +12,7 @@ exempting a real defect that happens to use the trigger words.
 
 WHAT THIS FILE HOLDS.
 
-  1. THE REGISTRY (`test_every_is_rule_is_classified`) — the 13 rules, each with the
+  1. THE REGISTRY (`test_every_is_rule_is_classified`) — the rules (14 since #3379), each with the
      structural predicate it decides on, derived from the module by AST. A new
      `is_*` that is not classified here reds the suite, so the sweep cannot go stale
      the way an epic checklist does.
@@ -66,7 +67,7 @@ def _f(note, page="/", category="temporal_contradiction", severity="high", **ext
     return f
 
 
-# ── 1. the registry: 13 rules, each with the structure it decides on ───────────
+# ── 1. the registry: 14 rules, each with the structure it decides on ───────────
 # Dated sweep 2026-08-30 (#3337). "structural" = decides on category / surface /
 # claim class / parsed evidence values / a structured judge field. "tiebreak" = a
 # phrase regex survives, but only to break a tie a structural predicate already
@@ -99,6 +100,11 @@ RULE_CLASSIFICATION = {
     "is_active_vs_passive_objection": (
         "structural",
         "category + a quoted claim scoped to the cycle start + an evidence set that is only the phase's own anchors",
+    ),
+    "is_uncited_temporal_objection": (
+        "structural",
+        "category + the judge's own sentences (quoted copy excluded) cite NO date, day number, or elapsed span, "
+        "and name no payload date field — a parsed-evidence absence, no wording consulted",
     ),
     "is_advisory": ("structural", "reads the `rulings` FIELD the assessment loop wrote — never the note"),
 }
@@ -133,7 +139,7 @@ def test_every_is_rule_is_classified():
         f"  stale entries: {sorted(set(RULE_CLASSIFICATION) - found)}\n"
         "Classify the new rule structural-vs-tiebreak (see the module header's bar) before merging."
     )
-    assert len(found) == 13, f"the ledger holds {len(found)} rules; #3337 swept 13 — update the sweep with the count"
+    assert len(found) == 14, f"the ledger holds {len(found)} rules; the sweep counts 14 (#3337 + #3379) — update the sweep with the count"
 
 
 def test_no_rule_is_classified_purely_lexical():
