@@ -889,11 +889,13 @@ def test_push_trigger_globs_match_workflows():
         push = on.get("push") if isinstance(on, dict) else None
         if not isinstance(push, dict) or "main" not in (push.get("branches") or []):
             continue
-        paths = push.get("paths")
-        assert (
-            paths
-        ), f"{fn}: push-to-main with NO path filter breaks the detector's 'every main push queues a run' model — update the detector"
-        expected.update(paths)
+        # #3378: a push-to-main workflow with NO `paths:` filter (ci-cd.yml since
+        # 2026-09-01) puts every path in scope. It contributes the universal glob, which
+        # `_matches_push_trigger` short-circuits on — the detector's model becomes
+        # "every main push should have queued a run", which is stronger than the old
+        # one, not broken by it. This used to `assert paths` and tell the reader to
+        # update the detector; the detector is updated.
+        expected.update(push.get("paths") or ["**"])
     assert expected == set(ds.PUSH_TRIGGER_GLOBS), (
         "PUSH_TRIGGER_GLOBS drifted from the live workflow path filters — update the constant in deploy/drift_sentinel.py:\n"
         f"missing from constant: {sorted(expected - set(ds.PUSH_TRIGGER_GLOBS))}\n"
@@ -907,8 +909,14 @@ def test_matches_push_trigger_semantics():
     assert ds._matches_push_trigger("requirements-dev.txt")
     assert ds._matches_push_trigger("scripts/v4_build_rss.py")
     assert ds._matches_push_trigger("site/index.html")
-    assert not ds._matches_push_trigger("handovers/HANDOVER_LATEST.md")
-    assert not ds._matches_push_trigger("MEMORY.md")
+    # #3378 — these two FLIPPED, and the flip is the point. ci-cd.yml's push-to-main
+    # filter is gone, so every path is in scope and every main push should have queued a
+    # run. Under the old model a `handovers/`-only wrap commit was an EXPECTED zero-run
+    # push, which is exactly the state that let three docs-only wraps inherit a green
+    # badge from a commit they never shared code with. There is no longer a path whose
+    # absence of a run is ordinary, so a zero-run main push is unambiguously a swallow.
+    assert ds._matches_push_trigger("handovers/HANDOVER_LATEST.md")
+    assert ds._matches_push_trigger("MEMORY.md")
     # #2881: deploy/ IS push-triggered as of 2026-08-19. It holds smoke_test_site.sh — the
     # gate that can auto-roll-back the public site — so a deploy/-only push earning zero runs
     # was a legitimate path-filter skip indistinguishable from a swallowed push. The prior
@@ -1212,14 +1220,23 @@ def test_push_runs_single_gap_is_reported_not_alarmed(monkeypatch):
     assert "multi-commit push" in res["note"]
 
 
-def test_push_runs_ignores_non_trigger_commits(monkeypatch):
-    # A wrap commit touching only handovers/ legitimately queues nothing.
+def test_a_handovers_only_commit_with_no_run_is_now_a_swallow(monkeypatch):
+    """#3378 — this test INVERTED, and the inversion is the fix.
+
+    It used to read "a wrap commit touching only handovers/ legitimately queues nothing"
+    and assert `clean`. That premise was ci-cd.yml's push `paths:` filter, and it is
+    exactly the state that let three docs-only wrap commits inherit a green badge from a
+    commit they never shared code with — the detector agreed the silence was ordinary.
+
+    With the filter gone every path is in scope, so there is no longer any commit whose
+    absence of a run is expected. A 90-minute-old head with no run is a swallow, and the
+    sentinel says so."""
     commits = [_commit("wrap", _iso_minutes_ago(90)), _commit("bbb", _iso_minutes_ago(200))]
     runs = [_run("bbb", _iso_minutes_ago(199))]
     _push_routes(monkeypatch, commits, runs, files_by_sha={"wrap": ["handovers/HANDOVER_LATEST.md", "MEMORY.md"]})
     res = ds.check_github_push_runs()
-    assert res["status"] == "clean"
-    assert res["stalled"] == [] and res["gap_commits"] == []
+    assert res["status"] == "drift"
+    assert [c["sha"] for c in res["stalled"]] == ["wrap"]
 
 
 def test_push_runs_grace_window_holds_fire(monkeypatch):

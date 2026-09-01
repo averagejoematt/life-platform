@@ -25,7 +25,12 @@ on has_deploys would deploy on every docs push, and a `visual-qa` job detached f
 
 from pathlib import Path
 
-import yaml
+import pytest
+
+# The deploy-critical lane installs only pytest/boto3/botocore/hypothesis, and a
+# module-scope third-party import there crashes COLLECTION for the whole lane, not just
+# this file (#2699/#2732). The full suite has PyYAML and runs every assertion below.
+yaml = pytest.importorskip("yaml")
 
 ROOT = Path(__file__).resolve().parents[1]
 CI_CD = ROOT / ".github" / "workflows" / "ci-cd.yml"

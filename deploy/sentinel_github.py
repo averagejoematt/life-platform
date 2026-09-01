@@ -58,7 +58,14 @@ PAT_FIX = (
 # test_push_trigger_globs_match_workflows parses the live workflow YAMLs and
 # reds CI when this set drifts (the PLATFORM_FACTS maintained-literal pattern).
 PUSH_TRIGGER_GLOBS = (
-    # ci-cd.yml
+    # ci-cd.yml — NO path filter since #3378 (2026-09-01): every push to main mints a
+    # real verdict, so ci-cd contributes the universal glob rather than a list. The
+    # detector's model is strictly stronger for it — a main push with zero runs is now
+    # unambiguously a swallow, never "an ordinary path-filter skip". The globs below are
+    # the OTHER push-to-main workflows' filters, several of which ci-cd used to declare
+    # too; they stay because the parity test compares against the union of ALL of them,
+    # and because a docs-ci or site-deploy run is still attributable per-path.
+    "**",
     "lambdas/**",
     "mcp/**",
     "mcp_server.py",
@@ -69,7 +76,6 @@ PUSH_TRIGGER_GLOBS = (
     ".github/workflows/**",
     "requirements*.txt",
     "pyproject.toml",
-    ".flake8",
     "deploy/**",  # #2881: gate scripts (smoke_test_site.sh et al.) are validated surface
     # docs-ci.yml
     "docs/**",
@@ -120,6 +126,10 @@ def _matches_push_trigger(path):
     import fnmatch
 
     for pat in PUSH_TRIGGER_GLOBS:
+        if pat == "**":
+            # A push-to-main workflow with no `paths:` filter (#3378: ci-cd.yml). Every
+            # path is in scope, so every main push should have queued a run.
+            return True
         if pat.endswith("/**"):
             if path.startswith(pat[:-2]):
                 return True
