@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 387** — feedback 22 · reference 215 · security 1 · project 146 · user 1 · index 2
+**Files in the memory index snapshot: 389** — feedback 22 · reference 216 · security 1 · project 147 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 238** — homed-here 58 · already-homed 160 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 239** — homed-here 58 · already-homed 161 · superseded 7 · narrative 11 · off-repo 2
 
-**Program/session files (project): 146** — already-homed 14 · superseded 1 · narrative 128 · off-repo 2 · index 1
+**Program/session files (project): 147** — already-homed 14 · superseded 1 · narrative 129 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -213,6 +213,7 @@ project_session_f_2026_08_27.md
 project_session_g_2026_08_27.md
 project_session_o_launch_2026_08_31.md
 project_session_p_2026_09_01.md
+project_session_q_2026_09_01.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -247,6 +248,7 @@ reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
 reference_a_pre_declared_red_is_not_a_read_lane.md
+reference_a_client_cap_below_the_callee_p50.md
 reference_a_proof_ledger_needs_its_own_freshness_guard.md
 reference_a_rollback_whose_scope_cannot_reach_its_trigger.md
 reference_a_sweep_one_import_away.md
@@ -497,6 +499,7 @@ user_who_is_matthew.md
 | `reference_a_sweep_one_import_away.md` | reference | `docs/CONVENTIONS.md` §4a1 (#2924) + `tests/premerge_derivation.py` | already-homed |
 | `reference_a_transform_can_be_correct_and_unreachable.md` | reference | `.claude/skills/new-machinery/SKILL.md` § traps (set equality both directions) + `.claude/skills/land/SKILL.md` §4 | homed-here |
 | `reference_a_vacuous_negative_control.md` | reference | `.claude/skills/prove-it/SKILL.md` Q1 + `.claude/agents/finding-verifier.md` 7 | already-homed |
+| `reference_a_client_cap_below_the_callee_p50.md` | reference | `lambdas/web/board_quality_gate.py` docstring (the measurement + derivation command) + `docs/DECISIONS.md` ADR-108 amendment 2026-09-01 | already-homed |
 | `reference_a_verified_stamp_is_a_human_claim.md` | reference | `docs/OPERATING_DISCIPLINE.md` §4.2 + `.claude/agents/finding-verifier.md` (standing cautions) | already-homed |
 | `reference_absence_read_as_success.md` | reference | `docs/CHARTER.md` (the derivation-guard primitive — derive, never trust a local copy) + the instance guards `tests/test_backup_agent_path_contract.py`, `scripts/check_main_green.py` HEAD-COVERAGE, #3378 | already-homed |
 | `reference_absent_check_invisible_to_fail_filter.md` | reference | `docs/OPERATING_DISCIPLINE.md` §3.7 | already-homed |
@@ -854,6 +857,7 @@ carries an operating rule.
 | `project_whoop_reauth.md` | project | `docs/RUNBOOK.md` § Common Issues (`ingest-auth-unhealthy-24h`, the auth breaker) + `docs/ACCOUNTS.md` | already-homed |
 | `project_wiki_program_2026_07_10.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_wrong_day_and_wrong_gauge_2026_08_18.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
+| `project_session_q_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 
 ## Out of scope
 

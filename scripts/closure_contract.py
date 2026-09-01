@@ -262,6 +262,14 @@ class Disposition:
 # with the DATED disposition a human gave it. Undated or terse entries fail the test; an entry
 # whose issue is later reopened and properly closed can be dropped (the count moves down).
 DISPOSITIONED_ESCAPES: dict = {
+    3413: Disposition(
+        "2026-09-01",
+        "Auto-closed by `Fixes #3413` at merge (18:51Z) while its own acceptance still required "
+        "post-DEPLOY live proof, which cannot exist until after the merge. The two post-close comments "
+        "ARE that evidence (probe 33.9s->12.8s; ai-canary-overall ALARM->OK 12:20:36 PT), not continued "
+        "work. Outcome verified realized, no reopen. Structural to `Fixes #N` + deploy-after-merge on any "
+        "issue whose acceptance demands a live probe -- not sloppiness, and not fixable by commenting sooner.",
+    ),
     2848: Disposition(
         "2026-08-30", "Session K audit: REOPENED — falsely closed by a stray Fixes in PR #3253; author had written 'stays OPEN' post-close"
     ),

@@ -445,7 +445,7 @@ A close is valid when ALL of these hold (registry: `scripts/closure_contract.py`
 5. **`closing-set-declared`** — A PR's closing set — every `Fixes/Closes/Resolves #N` in the body AND in every commit message — equals the lane's declared target (the `issue-N-*` branch, or `--target`), the body and the commits agree, GitHub's own linked set agrees with the parse, and no member is a `type:epic`. The stray-`Fixes` class: #3222 (PR #3226), #2848 (PR #3253). *Detector:* `scripts/check_pr_closing_set.py` → `declared-target-mismatch`, `body-commits-disagree`, `github-parse-disagree`, `epic-in-closing-set`.
 6. **`partial-is-not-a-close`** — A PR body that still carries an unchecked acceptance box (`- [ ]`) does not carry a closing keyword; and a closing keyword closes regardless of negation or tense (`docs/OPERATING_DISCIPLINE.md` §2.1, §2.5 — #2921 closed itself twice by writing "does NOT close #2921"). *Detector:* `scripts/check_pr_closing_set.py` → `partial-acceptance-close`, `negated-closing-keyword`.
 
-Structural window: a non-verdict comment more than **10 min** after `closedAt` is a finding; the verdict comment is recognised by its `**Outcome:**` marker, never by timing. Dispositioned escapes are the dated ledger `DISPOSITIONED_ESCAPES` (6 entries) — an entry needs a date and a reason, and comes OUT when the issue is properly re-closed.
+Structural window: a non-verdict comment more than **10 min** after `closedAt` is a finding; the verdict comment is recognised by its `**Outcome:**` marker, never by timing. Dispositioned escapes are the dated ledger `DISPOSITIONED_ESCAPES` (7 entries) — an entry needs a date and a reason, and comes OUT when the issue is properly re-closed.
 
 <!-- END GENERATED: closure-contract -->
 
