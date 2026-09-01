@@ -114,6 +114,79 @@ n=4, → #3403)
 **Ledger:** `MoM close delta clause` row added to `docs/PROPORTIONALITY.md` (#3374 R2 —
 ~0s CI, $0, one token per tripped month; demote trigger stated both ways)
 
+## Plan for the next session (written 2026-09-01 07:55 PT, after the post-wrap fix)
+
+**Shape:** short, and clock-shaped rather than effort-shaped. The backlog is drained to the
+point where nearly every remaining acceptance box needs elapsed time — "≥7 days", "n≥5
+subsequent runs", "the next scheduled fire" — not more hours. Expect a 60–90 minute session,
+not a drain. The September posture holds: **bug-fix-only, Opus or lower, Fable out (no
+credits)**; feature re-entry only at the 30/60/90 checkpoints.
+
+### Phase 0 — boot (10 min)
+
+1. `python3 scripts/check_main_green.py` — want **green AND `HEAD-COVERAGE: covered`**. Since
+   #3378 there is no path-filter-skip state on main, so a zero-run HEAD is a swallow.
+2. **Enumerate leases with `gh api "repos/…/actions/runs?per_page=100&status=waiting"`.**
+   `per_page=10` truncates and hid a 1.1h-old lease on 2026-09-01; a second lease then sat
+   ~9h and auto-filed #3404 (closed). Do this sweep again at the END of the session, after
+   the last run can still mint one — that is the half Session P got wrong.
+3. Alarm board. Two should have self-cleared overnight; **if they did, do not read that as
+   proof of anything** (see Phase 2).
+
+### Phase 1 — #3390, the Day-1 close-out (the priority; now unblocked)
+
+Post-genesis, so the whole runlist is finally runnable. Pre-flighted 2026-08-31 21:00 PT:
+
+- `python3 deploy/restart_verify.py` — was 20/24 pre-genesis; the four failures were all
+  expected pre-genesis states and should now resolve except the escapees.
+- **Escapees were 3** — `habit_scores` 1 · `computed_metrics` 1 · `circadian` 1 — in window
+  `[2026-08-31T20:16:14Z → 2026-09-01T07:00:00Z)`. Re-derive rather than trusting that count;
+  more EventBridge writers have fired since. Then `reconcile_countdown_gap.py --apply` **then**
+  `reconcile_prereg_voids.py --apply`, that order (the first creates the orphans the second voids).
+  Dry-run each first.
+- **Supersede reflex** once the real Day-1 weigh-in exists: DDB `PROFILE#v1` + `config/user_goals.json`
+  → `sync_constants_from_config.py` → rebake game/home → bump the CHARACTER.md Verified stamp.
+  The frozen prereg is deliberately NOT rewritten.
+- `PYTHONPATH=lambdas python3 deploy/restart_integration_check.py --deep --synthetic --expect-cycle 15`
+- **The one item needing the owner, not a session:** the 03:00 PT routine posted no verdict and
+  filed nothing. Silence is indistinguishable from "never fired" from inside a session
+  (`CronList` only sees the current session's routines). Either amend #3390's acceptance box to
+  match the silent-when-green design, or make the routine post a one-line GREEN — a verification
+  whose success looks identical to its absence is not yet a verification.
+
+### Phase 2 — the alarm reads that need care, not a glance
+
+- **`qa-smoke-failures` has TWO independent paths to green** and only one is the #3401 fix: the
+  other is tonight's sleep record landing `night_of = 2026-08-31`, which clears even the OLD
+  floor. **A green alarm is therefore not evidence the fix worked.** The evidence is the
+  recorded-payload test table on PR #3402. Both paths are stated in `docs/alarm_citations.json`
+  so this cannot be misread later.
+- **`qa-smoke-warnings`** should clear after the 14:00 UTC (07:00 PT) Todoist ingest backfills
+  the missing 08-31 record. If it is still lit after that, it is a new finding.
+- **`token-alarm-genesis-window-active`** is correct and designed — the dated window
+  `('2026-08-31','2026-09-08')`. **Prune its citation entry when the window closes**; it rotted
+  once already (it still described the cycle-14 window) and will rot again at the next reset.
+
+### Phase 3 — ONE build item, if time remains. Ranked, with what actually blocks each:
+
+1. **#3374 R1** — the only fully completable item. All five cost-bearing counts derive **right
+   now**: schedules 88 · alarms 119 (both from `model/platform_model.json`) · `_FEATURE_CUTOFF`
+   keys 18 · CDK-granted secrets 19 · EMF namespaces 31. Work is a committed baseline + a wire
+   into the existing #2845 model-drift gate. Mechanical, no production surface.
+2. **#3399** — highest value (a gating instrument producing false FAILs), but needs a *design*
+   decision measured against the 35 recorded findings in run `33451827346`. Its box 3 also needs
+   `basis:"withdrawn"` emission measured over a subsequent run, so it cannot fully close in one sitting.
+3. **#3369** — needs the two judges' claim sets diffed over **≥7 days**. The data is retrievable
+   (CloudWatch logs for the qa-smoke leg, CI artifacts at 14-day retention for the standalone leg),
+   so it is doable but it is archaeology, not coding.
+4. **#3403** — shed work, not a raise. The class has refused raises since #3106 and both prior
+   sheds found duplicated whole-repo scans, not test count. Box 2 needs n≥5 green-main runs *after*
+   the change, and #3378 changed the run volume, so re-measure the queueing term first.
+
+**Explicitly not next session:** #1407 and #3373 (fable-tagged / L-effort design touching the AI
+chokepoint), #3376 (a feature — the posture excludes it), #2978 (`blocked:date`, ~2026-09-24),
+#3042 (a 52-item program, not a session).
+
 ## Residuals / next picks
 
 - **#3390** — Day 1: read the 03:00 PT routine's verdict, then the AWS-side runlist. This
