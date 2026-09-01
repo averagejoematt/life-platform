@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 383** — feedback 22 · reference 213 · security 1 · project 144 · user 1 · index 2
+**Files in the memory index snapshot: 387** — feedback 22 · reference 215 · security 1 · project 146 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 236** — homed-here 56 · already-homed 160 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 238** — homed-here 58 · already-homed 160 · superseded 7 · narrative 11 · off-repo 2
 
-**Program/session files (project): 144** — already-homed 14 · superseded 1 · narrative 126 · off-repo 2 · index 1
+**Program/session files (project): 146** — already-homed 14 · superseded 1 · narrative 128 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
+## Snapshot of the memory index — 2026-09-01 (Session P: +4 files — 2 reference, 2 project incl. Session O's own, which was added as a row but never to this block). Prior: 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -211,6 +211,8 @@ project_session_d_2026_08_26.md
 project_session_e_2026_08_27.md
 project_session_f_2026_08_27.md
 project_session_g_2026_08_27.md
+project_session_o_launch_2026_08_31.md
+project_session_p_2026_09_01.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -241,6 +243,7 @@ reference_a_citation_string_is_not_an_owner.md
 reference_a_correct_rule_with_a_narrow_denominator.md
 reference_a_dependency_missing_makes_a_gate_dark.md
 reference_a_derived_artifact_needs_its_lane.md
+reference_a_filed_issues_mechanism_is_a_hypothesis.md
 reference_a_measurement_that_aborts_reports_zero.md
 reference_a_mutation_must_actually_mutate.md
 reference_a_pre_declared_red_is_not_a_read_lane.md
@@ -329,6 +332,7 @@ reference_ffmpeg_slim_brew_and_ass_units.md
 reference_fixture_must_be_the_wire.md
 reference_freshness_window_writer_cadence.md
 reference_frozen_artifact_supersede_annotation.md
+reference_future_genesis_breaks_rules_not_just_tests.md
 reference_gate_prose_is_a_parsed_interface.md
 reference_gate_registration_before_deploy.md
 reference_gated_run_is_a_deploy_group_lease.md
