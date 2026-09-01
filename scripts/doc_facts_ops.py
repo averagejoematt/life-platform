@@ -56,6 +56,7 @@ SYNC_META_PATH = ROOT / "deploy" / "sync_doc_metadata.py"
 ARCHITECTURE_PATH = ROOT / "docs" / "ARCHITECTURE.md"
 INGESTION_STACK_PATH = CDK_STACKS_DIR / "ingestion_stack.py"
 SOURCE_REGISTRY_PATH = ROOT / "lambdas" / "ingestion" / "source_registry.py"
+COST_TRACKER_PATH = ROOT / "docs" / "COST_TRACKER.md"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -509,6 +510,93 @@ def ingestion_scheduled_count_hits(files, truth, exempt) -> list:
                         f"cdk/stacks/ingestion_stack.py's live schedule= count is {truth} (#2003)\n"
                         f"      | {line.strip()[:120]}"
                     )
+    return hits
+
+
+# ── #3374 R2: the month-over-month close delta clause ─────────────────────────
+#
+# Nothing governed cost GROWTH structurally. The platform floor grew +16% Jul→Aug
+# (~$43 → $49.77 non-AI) with no gate noticing, and the Bedrock `unknown` attribution
+# bucket reached $33.19 across 8,524 calls in August before #2888/#2892 closed it. Both
+# were found by a once-a-quarter diligence panel, which is not a control.
+#
+# The rule: a Monthly Actuals row whose bill exceeds the previous close by more than
+# MOM_GROWTH_RATIO must name what grew, with a `driver:` token. It does NOT check that
+# the named driver is CORRECT — that needs live Cost Explorer, which a docs gate has no
+# business calling. It checks that the operator was made to answer the question at close
+# time instead of discovering the answer a quarter later. The #1354 monthly-close ritual
+# already pulls both facts (top-growth CE service, dominant CallerClass); this is what
+# makes writing them down non-optional.
+#
+# 1.15 is not a round number chosen for looking reasonable. It is tuned so the measured
+# Jul→Aug floor creep — the miss this ratchet exists because of — JUST trips it
+# (49.77/43.00 = 1.158). A threshold that would not have caught its own founding
+# incident is decoration.
+MOM_GROWTH_RATIO = 1.15
+
+# The rule binds from this close forward. Earlier rows are grandfathered for a reason
+# that is a fact about the data, not a convenience: the CallerClass dimension a `driver:`
+# token must name only went live 2026-08-23 (#2892), mid-August. Demanding it of Mar–Aug
+# rows would demand a fact that did not exist when they closed — and every one of those
+# rows trips 1.15 (Mar/Feb 10.4x, Apr 1.75x, May 1.38x, Jun 1.66x, Jul 1.23x, Aug 1.79x),
+# so the rule would have to be either retro-fitted with invented drivers or ignored. Both
+# are worse than a dated start.
+MOM_RULE_EFFECTIVE_FROM = "2026-09"
+
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+_ACTUALS_ROW = re.compile(r"^\|\s*(" + "|".join(_MONTHS) + r")\s+(\d{4})\s*\|")
+_FIRST_DOLLAR = re.compile(r"\$\s*([0-9]+(?:\.[0-9]+)?)")
+_DRIVER_TOKEN = re.compile(r"\bdriver:\s*\S", re.IGNORECASE)
+
+
+def _month_key(name: str, year: str) -> str:
+    return f"{year}-{_MONTHS.index(name) + 1:02d}"
+
+
+def monthly_actuals_rows(path: Path = COST_TRACKER_PATH) -> list:
+    """The Monthly Actuals table as (lineno, month_key, bill, raw_line), oldest first.
+
+    Pure and tolerant: a row whose bill cell carries no `$` figure is skipped rather than
+    guessed at, so a future "pending"/"—" row cannot manufacture a ratio out of nothing.
+    """
+    rows = []
+    if not path.exists():
+        return rows
+    for lineno, line in enumerate(_lines(path), 1):
+        mo = _ACTUALS_ROW.match(line)
+        if not mo:
+            continue
+        cells = line.split("|")
+        if len(cells) < 3:
+            continue
+        amount = _FIRST_DOLLAR.search(cells[2])
+        if not amount:
+            continue
+        rows.append((lineno, _month_key(mo.group(1), mo.group(2)), float(amount.group(1)), line))
+    return rows
+
+
+def monthly_close_driver_hits(path: Path = COST_TRACKER_PATH, exempt=None, ratio: float = MOM_GROWTH_RATIO) -> list:
+    """Monthly Actuals rows that grew past `ratio` without naming a `driver:` (#3374 R2)."""
+    hits = []
+    rows = monthly_actuals_rows(path)
+    rel = _rel(path)
+    for (_, prev_month, prev_bill, _prev_line), (lineno, month, bill, line) in zip(rows, rows[1:]):
+        if month < MOM_RULE_EFFECTIVE_FROM:
+            continue
+        if exempt and exempt(line):
+            continue
+        if prev_bill <= 0 or bill <= prev_bill * ratio:
+            continue
+        if _DRIVER_TOKEN.search(line):
+            continue
+        hits.append(
+            f"{rel}:{lineno}: {month} closed at ${bill:,.2f}, {bill / prev_bill:.2f}x the {prev_month} close "
+            f"of ${prev_bill:,.2f} (over the {ratio}x clause), and the row names no `driver:` — #3374 R2. "
+            f"Add `driver: <top-growth CE service> / <dominant CallerClass>` to the row's notes; the "
+            f"#1354 monthly-close ritual already pulls both.\n"
+            f"      | {line.strip()[:120]}"
+        )
     return hits
 
 
