@@ -39,42 +39,45 @@ name: CI/CD
 on:
   push:
     branches: [main]
-    paths:
-      - 'lambdas/**'
-      - 'mcp/**'
-      - 'mcp_server.py'
-      - 'tests/**'          # test-only changes must re-validate the suite (else CI red lingers)
-      # DEVOPS-01 (AUDIT 2026-06-30): infra/config/tooling were EXCLUDED, so IAM, alarm,
-      # and layer-version changes reached main with NO pipeline — and the auto-merge
-      # ALLOWLIST (role_policies.py, monitoring_stack.py, ci/lambda_map.json) relies on
-      # an on-main re-run that therefore never happened. These paths close that hole.
-      - 'cdk/**'                 # IAM / alarms / layer version → must hit Lint + Plan
-      - 'ci/**'                  # lambda_map.json / deploy-manifest drift
-      - 'config/**'              # config that feeds Lambdas (content_filter, personas, goals)
-      - '.github/workflows/**'   # workflow edits must re-validate
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - '.flake8'
-      # #2881 (AUDIT 2026-08-18): deploy/** is the same DEVOPS-01 class, missed in
-      # that sweep. It holds deploy/smoke_test_site.sh (gates every site deploy and
-      # can auto-rollback the public site), agent_commit.sh, rollback_lambda.sh/
-      # rollback_site.sh (the rollback path itself), sync_doc_metadata.py, and the
-      # restart pipeline — site-deploy.yml's own filter already treats two deploy/
-      # modules (config_twin_sync.py, config_twin_registry.py) as shippable surface.
-      # Observed live: 0bffc1ec (#2879/#2878's smoke-test fix) merged to main having
-      # earned exactly one workflow run (Docs CI) — no lint, no syntax check, no
-      # tests — a legitimate path-filter skip indistinguishable from a swallowed push.
-      #
-      # Deploy-vs-Lint-only decision: left IN the full Lint+Test+Plan lane rather than
-      # carved out to a narrower Lint+Test-only path. `plan`'s own deploy-matrix diff
-      # (`git diff … -- lambdas/ mcp/ mcp_server.py`, below) never looks at deploy/, so
-      # `has_deploys` computes false for a deploy/-only push and the `deploy` job still
-      # does not fire — the added cost is one `plan` run (CDK diff + read-only AWS
-      # resource checks, ~1-2 min) for a change that ships nothing, not an actual
-      # deploy. Building a second early change-detection pass just to skip `plan` for
-      # this one path was judged not worth the added graph surface for a cost that
-      # already resolves to "no deploy" downstream.
-      - 'deploy/**'
+    # NO `paths:` FILTER — DELIBERATE (#3378, 2026-09-01). Every push to main mints a
+    # real verdict.
+    #
+    # WHY. The filter that used to live here enumerated the "code-ish" paths, and the
+    # branch badge shows the last *verdict* — so a push touching only an unlisted path
+    # minted no run and INHERITED the previous commit's green. Absence of a run rendered
+    # as absence of a problem. Three measured instances:
+    #   • 4bc09cdde (Session N wrap, docs+site only) broke test_incident_gate_1332 and
+    #     minted no CI/CD run; the next commit to touch lambdas/ (194fd3196) was
+    #     attributed the failure — wrong author, wrong change, wrong diagnosis.
+    #   • CLAUDE.md's Session M wrap line redded every PR's full suite while main's badge
+    #     stayed green behind a path-filter skip (docs/INCIDENT_LOG.md, Session N row).
+    #   • 59773c2d4 (Session O wrap, docs-only) left docs/INCIDENT_LOG.md's derived
+    #     Patterns section stale: `incident_log_patterns.py --apply` lives in the
+    #     `reconcile` job BELOW, which the filter skipped, while the --check that asserts
+    #     it lives in docs-ci.yml, which the filter did not. The fixer was unreachable
+    #     from exactly the pushes that need it. Main sat red until a human noticed.
+    #
+    # The class is wider than docs/**: `scripts/**` was never listed either, yet ci-cd's
+    # own lint job runs `black --check` over it. Enumerating the missing paths would be a
+    # fourth guess at a list whose every previous version was wrong (DEVOPS-01 2026-06-30
+    # added cdk/ci/config/workflows; #2881 2026-08-18 added deploy/). The list IS the
+    # defect. Do not re-add one — tests/test_ci_main_push_coverage.py fails if you do.
+    #
+    # MEASURED COST of removing it (2026-09-01, run 33459108973): reconcile 0min, lint
+    # 3min, deploy-critical 2min, unit tests 39min, plan 5min — ~39min wall on the
+    # critical path. $0: the repo is PUBLIC on `ubuntu-latest`, where GitHub-hosted
+    # standard runners bill no minutes. NO deploy and NO AI spend are added, because
+    # `plan`'s deploy matrix diffs only `lambdas/ mcp/ mcp_server.py` (so has_deploys is
+    # false for a docs-only push, and the `deploy` job's `if:` is false), and `visual-qa`
+    # carries `needs: [reconcile, deploy]` with no `always()` — a skipped dependency skips
+    # it, so the Bedrock AI-vision pass never fires on a docs-only push. This is #3378's
+    # option (b), chosen over (a)/(c) once the cost turned out to be wall-clock only.
+    #
+    # KNOWN CONSEQUENCE: the `reconcile` job's own commit touches docs/** and, if it
+    # authenticates via RECONCILE_PUSH_TOKEN (a PAT, unlike GITHUB_TOKEN), now mints one
+    # additional run. That run is WANTED — it is the first time the reconciled tree is
+    # linted and tested — and it terminates: the `[skip-reconcile]` guard no-ops the
+    # reconcile job and the run pushes nothing.
   workflow_dispatch:
     inputs:
       deploy_all:
