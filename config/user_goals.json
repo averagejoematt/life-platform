@@ -1,7 +1,7 @@
 {
   "version": "1.2",
-  "last_updated": "2026-08-31",
-  "updated_by": "matthew_genesis_reweigh_jun08",
+  "last_updated": "2026-09-01",
+  "updated_by": "adr156_lean_mass_floor_instrument_status",
   "mission": "12-month aggressive body recomposition for longevity, mental health, and athletic performance. This is not Matthew's first transformation \u2014 he went from 305 to 190 lbs in 8 months approximately a year ago. He knows how to do this. The challenge is sustaining it.",
   "timeline": {
     "start_date": "2026-09-01",
@@ -50,7 +50,7 @@
       "current_lean_mass_lbs": 169,
       "current_ffmi": 25.2,
       "lean_mass_floor_lbs": 155,
-      "note": "At 185 lbs and 25% BF = ~139 lbs lean mass, which is a 30 lb lean mass loss from current 169. The coaches should monitor DEXA lean mass closely and flag if loss rate exceeds 25% of total weight lost. The lean_mass_floor of 155 lbs is a hard stop \u2014 if DEXA shows lean mass below this, the deficit must be reduced regardless of weight target."
+      "note": "At 185 lbs and 25% BF = ~139 lbs lean mass, which is a 30 lb lean mass loss from current 169. The coaches should monitor DEXA lean mass closely and flag if loss rate exceeds 25% of total weight lost. The lean_mass_floor of 155 lbs is a hard stop \u2014 if DEXA shows lean mass below this, the deficit must be reduced regardless of weight target. Instrument status (2026-09-01, ADR-156): this floor is OWNER-MONITORED \u2014 no automated instrument evaluates it. The pipeline has no scheduled lean-mass measurement: DEXA is periodic/manual, and the Withings scale reports composition only on full-scan days (hold the handles; a plain weigh gives weight only). Scale impedance \u0027muscle mass\u0027 is not DEXA lean mass and does not trip this floor \u2014 it is advisory context only."
     },
     "training": {
       "current_phase": "ramp",

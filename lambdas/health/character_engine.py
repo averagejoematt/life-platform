@@ -597,11 +597,15 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     components = pillar_cfg.get("components", {})
     scores = {}
 
-    # Body fat trajectory: REMOVED (#486/B-3). The Withings scale is weight-only —
-    # 0/1198 records ever carried body_fat_pct/fat_mass_pct, so the component
-    # could never score and structurally capped metabolic coverage at 0.75.
-    # Body composition lives in the sparse periodic `dexa` source, too infrequent
-    # for a 30-day trend. The component is gone from character_sheet.json too.
+    # Body fat trajectory: REMOVED (#486/B-3). At removal (2026-07-04) 0/1198
+    # withings records carried body_fat_pct/fat_mass_pct, so the component could
+    # never score and structurally capped metabolic coverage at 0.75. The
+    # "weight-only scale" premise behind that expired 2026-08-16 (#3417): full
+    # scans (handles held) now write composition, but only on full-scan days —
+    # a behavioral/sparse signal (n=2 as of 2026-09-01), still far too sparse
+    # for a 30-day trend, like the periodic `dexa` source. The removal stands on
+    # those grounds by recorded decision (ADR-156); the component is gone from
+    # character_sheet.json too.
 
     # CGM glucose control
     apple = data.get("apple") or {}

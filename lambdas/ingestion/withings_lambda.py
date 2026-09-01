@@ -10,8 +10,12 @@ Source-specific concerns preserved:
   - 401-in-body (not HTTP) → retry-with-refresh on first invocation
   - Multi-measurement-group parsing (scale + BPM produce separate groups)
   - kg→lbs derived fields for weight/composition metrics
-  (the 14-day body-comp delta query was deleted 2026-07-04, #486/B-3 — the
-  scale is weight-only, so it early-returned on every record)
+  (the 14-day body-comp delta query was deleted 2026-07-04, #486/B-3, on the
+  premise that the scale was weight-only. That premise expired 2026-08-16
+  (#3417): the device has two modes — a plain weigh writes weight only, a full
+  scan with the handles held writes ~30 composition fields. Composition is a
+  behavioral/sparse signal (full-scan days only); the delta stays deleted by
+  decision, not for want of inputs — see ADR-156.)
 
 DDB shape unchanged from pre-migration.
 """
@@ -323,8 +327,12 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
 
 def transform(raw: dict, date_str: str) -> list[dict]:
     """Parse measurements. (#486/B-3: the 14-day body-comp delta computation was
-    deleted — the scale is weight-only, so its fat/lean inputs never existed and
-    the function early-returned on every record since 2021.)"""
+    deleted 2026-07-04 — at deletion time no record had ever carried its fat/lean
+    inputs and it early-returned on every record. The stated premise, "the scale
+    is weight-only", stopped being true on 2026-08-16 (#3417): a full scan with
+    the handles held DOES write composition fields; a plain weigh still writes
+    weight only, so composition is behavioral/sparse — present only on full-scan
+    days. The delta stays deleted by recorded decision — see ADR-156.)"""
     if not raw:
         return []
     measurements = _parse_measurements(raw)
