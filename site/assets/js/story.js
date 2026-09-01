@@ -18,7 +18,6 @@ import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline 
 import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — returnability, reader-keyed
 import { instrumentMark, fnv1a, mulberry32 } from "/assets/js/sigils.js"; // visual P2 + #590 seeded drift
 import { domainIcon } from "/assets/js/icons.js"; // #590 — pillar icon for the hover door affordance
-import { seasonBand } from "/assets/js/texture.js"; // #1471 — the season banner on the premiere beat
 import { featuredQuoteHTML } from "/assets/js/journal_quotes.js"; // #1568 — the weekly featured line (ADR-142)
 import { heroProofLine, BRIEF_LINE_KICKER } from "/assets/js/daily_line.js"; // #1994/#1995 — Day-1-safe hero sentence + the one honest brief-line label
 import { sortChronicleNewestFirst } from "/assets/js/chronicle_order.js"; // #1988 — same-date part-sequence tie-break, shared with the server manifest
@@ -976,55 +975,15 @@ load();
   } catch (e) { /* honest silence — dormant on any failure */ }
 })();
 
-// >>> CYCLE_BEAT_START (#1244) — the season-premiere beat's self-hiding decision +
-// derived copy, PURE and marker-bracketed so the guard runs the shipped logic under
-// node. Visible ONLY inside a fresh cycle: window_days in [1,21] with >=1 prior start
-// to compare against. Returns null (→ the wrap stays hidden) past day 21, pre-start,
-// or with no prior cycle. Cycle/day/prior-count all derive from the API payload —
-// never hardcoded (cycles re-anchor on every reset).
-function cycleBeat(d) {
-  if (!d || d.pre_start) return null;
-  const wd = Number(d.window_days);
-  const cur = Number(d.current_cycle);
-  const cycles = Array.isArray(d.cycles) ? d.cycles : [];
-  const priors = cycles.filter((c) => c && Number(c.cycle) < cur).length;
-  if (!Number.isFinite(wd) || wd < 1 || wd > 21) return null; // outside the fresh-cycle window
-  if (!Number.isFinite(cur) || priors < 1) return null; // nothing to compare against yet
-  return {
-    kicker: "the reset log · a new start",
-    h: `Start ${cur}, day ${wd} — how it compares to the ${priors} start${priors === 1 ? "" : "s"} before it.`,
-    note: (typeof d.note === "string" && d.note) ? d.note : "Each start measured over its own matched window — correlative, N=1.",
-  };
-}
-// <<< CYCLE_BEAT_END
-
-// #1244 — mount the season-premiere beat. Same self-hiding contract as homePulse:
-// fetch the already-live endpoint, unhide only when cycleBeat() has something to say.
-(async function homeCycleBeat() {
-  const wrap = document.querySelector("[data-home-cycle-wrap]");
-  if (!wrap) return;
-  if (preStart()) return; // pre-start the countdown owns the page; no cross-cycle read yet
-  let d = null;
-  try {
-    const r = await fetch("/api/cycle_compare", { headers: { accept: "application/json" } });
-    d = r.ok ? await r.json() : null;
-  } catch (e) { return; } // honest silence
-  const beat = cycleBeat(d);
-  if (!beat) return;
-  const set = (sel, text) => { const el = wrap.querySelector(sel); if (el) el.textContent = text; };
-  set("[data-home-cycle-kicker]", beat.kicker);
-  set("[data-home-cycle-h]", beat.h);
-  set("[data-home-cycle-note]", beat.note);
-  // #1471 — the season banner: the premiere beat opens with the cycle's own
-  // texture band, and the counted ember beads ARE the attempt number (real
-  // data from the same payload — never hardcoded). Idempotent re-mount guard.
-  const cur = Number(d.current_cycle);
-  if (Number.isFinite(cur) && cur > 0 && !wrap.querySelector("[data-art-season]")) {
-    wrap.insertAdjacentHTML("afterbegin",
-      `<div class="art-band art-season" data-art-season aria-hidden="true">${seasonBand(cur)}</div>`);
-  }
-  wrap.hidden = false;
-})();
+// #1244 RETIRED at the 2026-09-01 launch re-anchor (owner decision, 2026-08-31 — the
+// September 1st launch, Session O Phase D1). `cycleBeat()` derived the home season-premiere
+// copy ("Start N, day D — how it compares to the D starts before it") and `homeCycleBeat()`
+// mounted it for the first 21 days of a fresh start; both are gone along with the
+// [data-home-cycle-wrap] section in site/index.html, because a launch-day home page should
+// not open on a comparison to earlier starts. Nothing server-side changed: /api/cycle_compare
+// still serves the matched-window comparison and /method/cycles/ still renders it in full.
+// The removed logic's guard (tests/test_cockpit_carry_scope_guards.py) now pins the ABSENCE
+// of the home beat rather than its self-hiding window.
 
 mountAsk(document.querySelector("[data-home-ask]"), {
   chips: ["Is my sleep actually improving?", "What moves the glucose most?", "Is the weight loss on track?"],

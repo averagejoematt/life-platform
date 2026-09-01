@@ -1865,7 +1865,6 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
 .art-band .art-count { fill: var(--ember); opacity: 0.85; }
 .page-hero .art-band { margin-block-start: var(--sp-4); }
 .art-chapter { margin-block-end: var(--sp-3); }
-.beat-cycle .art-band { margin-block-end: var(--sp-3); }
 .att-card .art-band { margin-block-end: var(--sp-2); }
 
 /* ════════════════════════════════════════════════════════════════════════════

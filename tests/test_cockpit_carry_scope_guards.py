@@ -127,48 +127,53 @@ def test_supplements_asof_carry_marker():
     ), "#1252: the supplements 'as of' fig must co-render the carried marker when pre-genesis"
 
 
-# ── #1244 — self-hiding Home season-premiere beat ───────────────────────────────
-def test_cycle_beat_self_hides_by_window():
-    block = _extract(_read(_STORY_JS), "CYCLE_BEAT_START", "CYCLE_BEAT_END")
-    harness = block + "\n" + _ASSERT + """
-const cyc = [1,2,3,4,5,6,7].map((n) => ({ cycle: n, genesis: "x" }));
-
-// Fresh cycle, day 4 -> VISIBLE, numbers derived from the API (never hardcoded).
-const fresh = cycleBeat({ window_days: 4, current_cycle: 7, cycles: cyc, note: "N" });
-assert(fresh && /day 4/.test(fresh.h), "window_days<=21 fresh cycle must render; got: " + JSON.stringify(fresh));
-assert(/Start 7/.test(fresh.h), "cycle number must derive from current_cycle; got: " + fresh.h);
-assert(/6 starts before/.test(fresh.h), "prior-start count must derive from the API; got: " + fresh.h);
-assert(fresh.note === "N", "the API's matched-window note carries through; got: " + fresh.note);
-
-// Past day 21 -> HIDDEN (self-hiding once the window has passed).
-assert(cycleBeat({ window_days: 22, current_cycle: 7, cycles: cyc }) === null, "window_days>21 must self-hide");
-assert(cycleBeat({ window_days: 28, current_cycle: 7, cycles: cyc }) === null, "a deep window must self-hide");
-// Day-21 boundary is inclusive.
-assert(cycleBeat({ window_days: 21, current_cycle: 7, cycles: cyc }) !== null, "day 21 is still a fresh window");
-// Pre-start -> HIDDEN.
-assert(cycleBeat({ window_days: 4, current_cycle: 7, cycles: cyc, pre_start: true }) === null, "pre-start must self-hide");
-// No prior cycle -> HIDDEN (nothing to compare against).
-assert(cycleBeat({ window_days: 4, current_cycle: 1, cycles: [{ cycle: 1 }] }) === null, "no prior start -> nothing to compare");
-// Missing/garbage payload -> HIDDEN.
-assert(cycleBeat(null) === null, "no payload -> hidden");
-assert(cycleBeat({ window_days: 0, current_cycle: 7, cycles: cyc }) === null, "window 0 (pre-genesis) -> hidden");
-
-// Singular prior wording.
-const one = cycleBeat({ window_days: 2, current_cycle: 2, cycles: [{ cycle: 1 }, { cycle: 2 }] });
-assert(one && /1 start before/.test(one.h) && !/starts before/.test(one.h), "singular prior wording; got: " + (one && one.h));
-
-console.log("CYCLE_BEAT_OK");
-"""
-    r = _run_node(harness)
-    assert r.returncode == 0, f"cycle-beat guard failed:\nSTDOUT {r.stdout}\nSTDERR {r.stderr}"
-    assert "CYCLE_BEAT_OK" in r.stdout, r.stdout
+# ── #1244 RETIRED — the Home season-premiere beat is GONE (launch re-anchor) ────
+# Owner decision, 2026-08-31 (the September 1st launch, Session O Phase D1): 2026-09-01
+# is the official launch of averagejoematt.com and reads as THE starting point, so the
+# home page no longer opens on "Start N, day D — how it compares to the D starts before
+# it". The section, its renderer (story.js cycleBeat/homeCycleBeat) and the season banner
+# it mounted were removed together.
+#
+# What this guard pins now is the ABSENCE, and it is deliberately the same shape as the
+# old presence guard: a re-added mount, wrap or derivation turns it red, so the retirement
+# cannot silently regress on the next site sweep. The comparison itself was NOT retired —
+# /api/cycle_compare is unchanged and /method/cycles/ still renders the matched-window
+# story — so the two assertions below check the archive route still exists on the site,
+# which is what makes removing the home beat a re-placement rather than a deletion.
+_RETIRED_HOME_CYCLE_MARKERS = (
+    "data-home-cycle-wrap",
+    "data-home-cycle-kicker",
+    "data-home-cycle-h",
+    "data-home-cycle-note",
+    'class="beat beat-cycle"',
+)
 
 
-def test_cycle_beat_html_ships_hidden_and_links_reset_log():
+def test_home_season_premiere_beat_stays_retired():
+    """The home page must carry no cycle-comparison beat (launch re-anchor, 2026-08-31)."""
     html = _read(_INDEX_HTML)
-    assert "data-home-cycle-wrap hidden" in html, "#1244: the Home cycle beat must ship hidden (self-hiding)"
-    assert 'href="/method/cycles/"' in html, "#1244: the beat must link the reset log (/method/cycles/)"
-    # The self-hiding mount must exist in story.js and be gated on pre-start.
+    # Comments record the retirement; the markers must be absent from the MARKUP.
+    markup = re.sub(r"<!--.*?-->", "", html, flags=re.DOTALL)
+    for marker in _RETIRED_HOME_CYCLE_MARKERS:
+        assert marker not in markup, f"the retired home cycle beat is back in site/index.html: {marker}"
+
+
+def test_home_cycle_renderer_stays_retired():
+    """story.js must carry neither the derivation nor the mount — a dead wrap plus a live
+    renderer is exactly how this would come back (the renderer would mount into whatever
+    [data-home-cycle-wrap] a later edit reintroduces)."""
     story = _read(_STORY_JS)
-    assert "homeCycleBeat" in story, "#1244: the self-hiding mount IIFE must exist"
-    assert 'querySelector("[data-home-cycle-wrap]")' in story, "#1244: the mount must target the beat wrap"
+    code = re.sub(r"//[^\n]*", "", re.sub(r"/\*.*?\*/", "", story, flags=re.DOTALL))
+    for symbol in ("cycleBeat", "homeCycleBeat", "data-home-cycle-wrap", "CYCLE_BEAT_START"):
+        assert symbol not in code, f"the retired home cycle-beat renderer is back in story.js: {symbol}"
+
+
+def test_the_comparison_story_still_has_a_home_on_the_site():
+    """Non-vacuous counterpart: the retirement RE-PLACED the comparison, it did not delete
+    it. /method/cycles/ must still exist and still be carried by the method registry (the
+    index links its pages from the embedded page-data registry, not from static hrefs)."""
+    page = os.path.join(_ROOT, "site", "method", "cycles", "index.html")
+    assert os.path.isfile(page), "the matched-window comparison must still live at /method/cycles/"
+    method_index = _read(os.path.join(_ROOT, "site", "method", "index.html"))
+    assert '"slug": "cycles"' in method_index, "/method/cycles/ must stay in the method registry"
+    assert '"endpoint": "/api/cycle_compare"' in method_index, "the comparison must still be served by /api/cycle_compare"

@@ -30,6 +30,12 @@ def _f(note, category="temporal_contradiction", page="/", severity="high"):
 
 # WIRE — qa-smoke 2026-08-31, finding 539c6d (high, "confirmed on a second pass"),
 # the note that held qa-smoke-failures in ALARM. Zero temporal citations.
+# NOTE (2026-08-31, the September 1st launch re-anchor, Session O Phase D1): the home copy
+# this note quotes ("every climb before this one ended the same way…") was retired from
+# site/index.html for launch framing — an editorial decision, NOT a concession to the
+# finding. The fixture stays VERBATIM: it is recorded judge output, the evidence that this
+# class exists, and the ruling it proves is structural (an absence of temporal citations in
+# the judge's own sentences), so it neither reads nor depends on the live page.
 WIRE_539C6D = (
     "Home page states 'Every climb before this one ended the same way' and references "
     "'a drawer of devices measured everything and changed nothing.' The phrasing 'before "

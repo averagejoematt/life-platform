@@ -167,11 +167,21 @@
                countdown day made "it's running now" a false claim about the experiment. -->
           <h2>That's the whole site — and every number lands in public.</h2>
           <!-- #732/#1087 compressed: the protagonist and the stakes still answer a cold
-               curl of / — who, the prior attempts, the falsifiable checkpoint. -->
-          <p>The ordinary life is <strong>Matthew's</strong> — every climb before this one ended
-            the same way, and a drawer of devices measured everything and changed nothing. What's
-            different this time is the loop above: every number read, argued over, and published
-            either way.</p>
+               curl of / — who he is, what the loop does, and the falsifiable checkpoint,
+               all in static HTML with no JS.
+               LAUNCH RE-ANCHOR (owner decision, 2026-08-31 — the September 1st launch,
+               Session O Phase D1): 2026-09-01 is the official launch of averagejoematt.com
+               and reads as THE starting point, so this paragraph is forward-facing. The
+               prior-attempt narration it used to carry ("every climb before this one ended
+               the same way…") is retired from reader-facing home + cockpit prose — NOT from
+               the site: the full history stays verbatim on /story/attempts/, /method/cycles/
+               and /data/wall/, which this change does not touch. The paragraph below keeps
+               "starts at the Day-1 weigh-in" verbatim; it is a registered durable-design
+               span (reader_truth_rulings.DURABLE_DESIGN_COPY, #2741). -->
+          <p>The ordinary life is <strong>Matthew's</strong> — one person, measured every day,
+            running the loop above in the open: the data is read, the coaches argue over it, the
+            protocols change, and the writing follows either way. The checkpoint below is the bet,
+            and it can be lost in public.</p>
           <!-- #949: the start weight binds to the live baseline (/api/journey) — never a
                hand-coded literal that strands on the next reset. -->
           <p>This attempt starts at <strong data-bind="hero-start">the Day&#8209;1 weigh&#8209;in</strong>,
@@ -236,19 +246,16 @@
       <p class="beat-deeper"><a href="/cockpit/" class="cta cta-quiet">See the full daily instrument →</a></p>
     </section>
 
-    <!-- #1244 — the season-premiere beat: a new cycle just started, and the matched-window
-         comparison to every prior start is at its most compelling in the first weeks (it was
-         only reachable footer-deep via /method/). Rendered client-side from the already-live
-         /api/cycle_compare (no new lambda, ADR-103 reuse of an existing endpoint + the
-         established self-hiding "beat" pattern) and SELF-HIDING: it appears only inside a fresh
-         cycle (window_days ≤ 21, ≥1 prior start to compare) and disappears on its own once the
-         window has passed. Numbers derive from the API — never a hardcoded cycle/day. -->
-    <section class="beat beat-cycle" data-home-cycle-wrap hidden aria-label="A new cycle just started">
-      <p class="beat-kicker label" data-home-cycle-kicker>the reset log · a new start</p>
-      <h2 class="beat-h" data-home-cycle-h></h2>
-      <p class="beat-note" data-home-cycle-note></p>
-      <p class="beat-deeper"><a href="/method/cycles/" class="cta">See how this start compares →</a></p>
-    </section>
+    <!-- #1244 RETIRED at the 2026-09-01 launch re-anchor (owner decision, 2026-08-31 —
+         the September 1st launch, Session O Phase D1). The season-premiere beat rendered
+         "Start N, day D — how it compares to the D starts before it" on the home page for
+         the first 21 days, which is precisely the window the launch is meant to own: the
+         first thing a launch-day reader met was a comparison to earlier starts. The beat,
+         its self-hiding renderer (story.js cycleBeat/homeCycleBeat) and its season banner
+         are removed from home only. The comparison itself is NOT retired — /api/cycle_compare
+         is unchanged and the matched-window story lives on at /method/cycles/, linked from
+         the method index and the archive pages (/story/attempts/, /data/wall/), none of
+         which this change touches. -->
 
     <!-- Returnability strip (uplevel P5): what moved since YOUR last visit (keyed to the
          reader's own localStorage stamp — the cockpit owns the stamp; this only reads) +
