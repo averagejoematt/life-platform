@@ -35,6 +35,15 @@ source "$(dirname "$0")/lib/cache_aware_fetch.sh"
 # transport-failure class only. See the lib header.
 source "$(dirname "$0")/lib/resilient_curl.sh"
 
+# ── Rollback reachability scope (#3395 — the smoke edition of #3352) ──────────
+# Every ❌ goes through smoke_record_fail under the surface the section DECLARES
+# via SMOKE_SURFACE (site / api / infra). At the end, smoke_emit_verdict tells
+# site-deploy.yml's rollback whether a site/** revert can even reach what failed
+# (an /api data-plane red reverted PR #3392's innocent content on 2026-09-01 and
+# cured nothing). Unknown surfaces count as site — rollback runs, today's
+# behaviour. See the lib header for the full contract.
+source "$(dirname "$0")/lib/smoke_verdict.sh"
+
 # ── Name the check in flight (#1911) ──────────────────────────────────────────
 # The belt to smoke_curl's braces: if ANY future call site regresses to a bare
 # curl (or the script dies for an unrelated reason), the exit trap still names
@@ -74,7 +83,7 @@ check_status() {
     PASS=$((PASS + 1))
   else
     echo "  ❌ $label — expected $expected, got $PROBE_GOT ($url)"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "$label — expected $expected, got $PROBE_GOT ($url)"
   fi
 }
 
@@ -102,7 +111,7 @@ check_redirect() {
     PASS=$((PASS + 1))
   else
     echo "  ❌ $label — expected 301 → $BASE$target, got $PROBE_GOT"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "$label — expected 301 → $BASE$target, got $PROBE_GOT"
   fi
 }
 
@@ -124,7 +133,7 @@ check_header() {
     PASS=$((PASS + 1))
   else
     echo "  ❌ $label — header not found: $header_pattern"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "$label — header not found: $header_pattern"
   fi
 }
 
@@ -171,6 +180,7 @@ fi
 # tests/qa_manifest.py is the ONE page list; this block sweeps every registered
 # page at its expected status. Adding a page = one manifest entry, never a new
 # check_status line here (the old hand list sampled 22 pages; this is all ~80).
+SMOKE_SURFACE="site"   # page shells are site/** bytes — a revert restores them
 echo "── v4 pages (HTTP status, from qa_manifest) ──────────────"
 QA_MANIFEST="$(dirname "$0")/../tests/qa_manifest.py"
 if MANIFEST_ROWS=$(python3 "$QA_MANIFEST" --emit smoke); then
@@ -180,7 +190,7 @@ if MANIFEST_ROWS=$(python3 "$QA_MANIFEST" --emit smoke); then
   done <<< "$MANIFEST_ROWS"
 else
   echo "  ❌ qa_manifest emit failed — page sweep did not run"
-  FAIL=$((FAIL + 1))
+  smoke_record_fail "qa_manifest emit failed — page sweep did not run"
 fi
 # Trailing slash so the #1209 bare-path normalizer (301 /x -> /x/) doesn't intercept —
 # a genuinely missing page must 404 at the origin directly, not via a redirect hop.
@@ -189,6 +199,10 @@ check_status "www redirect"         "https://www.averagejoematt.com/" "200"
 echo ""
 
 # ── Legacy v3 URLs → 301 (the v4-redirects CloudFront fn) ──────────────────────
+# #3395: these 301s are served by the v4-redirects CloudFront FUNCTION, published
+# out-of-band — a site/** revert cannot republish an edge function, so a red here
+# is not rollback-reachable (infra).
+SMOKE_SURFACE="infra"
 echo "── Legacy v3 URLs (expect 301 → v4) ─────────────────────"
 check_status "/live/ → 301"         "$BASE/live/"        "301"
 check_status "/chronicle/ → 301"    "$BASE/chronicle/"   "301"
@@ -209,6 +223,7 @@ echo ""
 # real-person-attribution scan in tests/test_legacy_real_person_attributions_1905.py).
 # If a later decision denies /legacy at the edge instead, flip this pin to
 # assert the denial (403) — never delete it: either state must be asserted.
+SMOKE_SURFACE="site"   # the /legacy tree is S3 site content
 echo "── /legacy archive pin (#1905: reachable by design) ─────"
 check_status "/legacy/ pin"          "$BASE/legacy/archive/v1/board/" "200"
 echo ""
@@ -219,6 +234,7 @@ echo ""
 # /now/ 404s (object gone, 301 not yet live). Probe for it: while the function is
 # still pending, WARN loudly and skip the strict block instead of failing the
 # site-deploy gate into an auto-rollback; once /now/ answers 301, assert strictly.
+SMOKE_SURFACE="infra"  # same CloudFront function as the legacy 301s (#3395)
 echo "── Cockpit rename (expect 301 → /cockpit/, one hop) ──────"
 CURRENT_CHECK="/now/ redirect probe"
 NOW_STATUS=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BASE/now/")
@@ -257,9 +273,10 @@ check_bare_door() {
     PASS=$((PASS + 1))
   else
     echo "  ❌ $label — expected 200 at $BASE$door/ (no /site/* hop), got $status at $effective"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "$label — expected 200 at $BASE$door/, got $status at $effective"
   fi
 }
+SMOKE_SURFACE="infra"  # bare-path normalisation lives in the same edge function (#3395)
 echo "── Bare door URLs (expect 200 on the door, no /site/* hop) ─"
 CURRENT_CHECK="bare door /data probe"
 DATA_BARE_STATUS=$(smoke_curl -sL -o /dev/null -w "%{http_code}" --max-time 15 "$BASE/data")
@@ -280,6 +297,7 @@ fi
 echo ""
 
 # ── Static assets (non-hashed fallbacks + feeds) ───────────────────────────────
+SMOKE_SURFACE="site"
 echo "── Static assets ─────────────────────────────────────────"
 check_status "tokens.css"           "$BASE/assets/css/tokens.css"
 check_status "cockpit.js"           "$BASE/assets/js/cockpit.js"
@@ -299,11 +317,17 @@ echo ""
 # The two JSON documents are covered by the api_deps sweep below (they are
 # declared on the /privacy/ row in tests/qa_manifest.py); the tarball is not
 # JSON, so it gets its own status check.
+# #3395: /archive/* is Lambda-written generated/ content (ADR-046) — data-plane,
+# not in site/, so a site/** revert cannot restore it.
+SMOKE_SURFACE="api"
 echo "── Permanence archive ────────────────────────────────────"
 check_status "archive tarball"      "$BASE/archive/latest.tar.gz"
 echo ""
 
 # ── API endpoints (HTTP 200) ───────────────────────────────────────────────────
+# #3395: DynamoDB via the site-api Lambda — the 2026-09-01 P3 class. A site/**
+# revert deletes innocent content and leaves an /api defect exactly as live.
+SMOKE_SURFACE="api"
 echo "── API endpoints ─────────────────────────────────────────"
 check_status "/api/vitals"          "$BASE/api/vitals"
 check_status "/api/journey"         "$BASE/api/journey"
@@ -329,11 +353,13 @@ check_status_and_type() {
     PASS=$((PASS + 1))
   else
     echo "  ❌ $label — expected $want_status $want_type, got $out ($url)"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "$label — expected $want_status $want_type, got $out"
   fi
 }
 check_status_and_type "API 404 is JSON (#2683)"    "$BASE/api/smoke-nonexistent-route" 404 "application/json"
+SMOKE_SURFACE="site"   # the HTML 404 body ships from site/404.html
 check_status_and_type "site 404 stays HTML (#2683)" "$BASE/smoke-nonexistent-page/"    404 "text/html"
+SMOKE_SURFACE="api"
 # #1112 — the head coach's detail route (lead tier) must resolve, not 404
 check_status "/api/coach/eli_marsh" "$BASE/api/coach/eli_marsh"
 # #1409 — the felt-reality calibration ledger (aggregates only)
@@ -355,6 +381,7 @@ echo ""
 # STRONGER check here (JSON-validity, not just status) — not a double count of
 # the coverage ratchet, which scripts/qa_audit.py computes from this section's
 # presence (see qa_audit.smoke_checked_endpoints).
+SMOKE_SURFACE="api"
 echo "── Manifest api_deps (distinct union, JSON health, #1586) ────"
 # #2831: routes explicitly deferred in deploy/api_deploy_sequencing.json's
 # pending_deploy_routes (the #2050 pattern, generalized — the SAME registry
@@ -390,7 +417,7 @@ check_json_endpoint() {
   # ❌ row that increments FAIL — it no longer aborts the run with a bare exit code.
   if [[ "$rc" -ne 0 ]]; then
     echo "  ❌ api_dep $dep_path — curl failed (exit $rc$([[ "$rc" -eq 28 ]] && echo ', timed out')) after $SMOKE_CURL_ATTEMPTS attempt(s) ($cb_url)"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "api_dep $dep_path — curl failed (exit $rc)"
     return
   fi
   status="${out##*$'\n'}"
@@ -401,17 +428,17 @@ check_json_endpoint() {
       return
     fi
     echo "  ❌ api_dep $dep_path — expected 200, got $status ($cb_url)"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "api_dep $dep_path — expected 200, got $status"
     return
   fi
   if [[ -z "$body" ]]; then
     echo "  ❌ api_dep $dep_path — 200 but empty body ($cb_url)"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "api_dep $dep_path — 200 but empty body"
     return
   fi
   if ! printf '%s' "$body" | python3 -c "import json,sys; json.load(sys.stdin)" >/dev/null 2>&1; then
     echo "  ❌ api_dep $dep_path — 200 but body is not valid JSON ($cb_url)"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "api_dep $dep_path — 200 but body is not valid JSON"
     return
   fi
   echo "  ✅ api_dep $dep_path"
@@ -424,7 +451,7 @@ if API_DEP_ROWS=$(python3 "$QA_MANIFEST" --emit api_deps); then
   done <<< "$API_DEP_ROWS"
 else
   echo "  ❌ qa_manifest api_deps emit failed — endpoint health sweep did not run"
-  FAIL=$((FAIL + 1))
+  smoke_record_fail "qa_manifest api_deps emit failed — endpoint health sweep did not run"
 fi
 echo ""
 
@@ -439,17 +466,19 @@ echo ""
 # the checker (the #2841 posture); wrong statuses and malformed JSON FAIL.
 # The numeric impossible-value scan over these same rows runs in
 # tests/accuracy_audit.py --live, whose denominator includes them.
+SMOKE_SURFACE="api"
 echo "── Live-route sweep (#2652 — router-derived long tail) ───────"
 if python3 "$(dirname "$0")/../scripts/api_sweep_check.py" --base "$BASE"; then
   echo "  ✅ live-route sweep — every router /api GET route swept or excepted with a reason"
   PASS=$((PASS + 1))
 else
   echo "  ❌ live-route sweep failed — see rows above (scripts/api_sweep_check.py)"
-  FAIL=$((FAIL + 1))
+  smoke_record_fail "live-route sweep failed (scripts/api_sweep_check.py)"
 fi
 echo ""
 
 if [[ "$QUICK" != "--quick" ]]; then
+  SMOKE_SURFACE="site"   # everything down to the cache-header section judges site/** bytes
   echo "── Content markers (v4 structure) ───────────────────────"
   # #1526: both checks take the page URL as a 4th arg — a failed needle re-fetches
   # within the shared retry budget (cache_aware_fetch.sh) before it is allowed to
@@ -458,13 +487,13 @@ if [[ "$QUICK" != "--quick" ]]; then
     local label="$1" file="$2" needle="$3" url="${4:-}"
     _needle_present() { grep -q "$needle" "$1"; }
     if [[ -n "$url" ]]; then assert_body_until "$url" "$file" _needle_present || true; fi
-    if _needle_present "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — expected to find: $needle"; FAIL=$((FAIL+1)); fi
+    if _needle_present "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — expected to find: $needle"; smoke_record_fail "$label — expected to find: $needle"; fi
   }
   check_body_not_contains() {
     local label="$1" file="$2" needle="$3" url="${4:-}"
     _needle_absent() { ! grep -qi "$needle" "$1"; }
     if [[ -n "$url" ]]; then assert_body_until "$url" "$file" _needle_absent || true; fi
-    if _needle_absent "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — unexpectedly found: $needle"; FAIL=$((FAIL+1)); fi
+    if _needle_absent "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — unexpectedly found: $needle"; smoke_record_fail "$label — unexpectedly found: $needle"; fi
   }
 
   HOME_FILE=$(mktemp);   CURRENT_CHECK="body fetch $BASE/"; smoke_curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
@@ -523,17 +552,17 @@ if [[ "$QUICK" != "--quick" ]]; then
       if assert_body_until "$BASE$st_path" "$ST_FILE" struct_marker_ok; then
         echo "  ✅ structural marker present · $st_name ($st_path)"; PASS=$((PASS + 1))
       else
-        echo "  ❌ structural marker MISSING · $st_name ($st_path) — expected body to contain: $st_marker"; FAIL=$((FAIL + 1))
+        echo "  ❌ structural marker MISSING · $st_name ($st_path) — expected body to contain: $st_marker"; smoke_record_fail "structural marker MISSING · $st_name ($st_path)"
       fi
       if assert_body_until "$BASE$st_path" "$ST_FILE" leak_tokens_absent; then
         echo "  ✅ no template-leak tokens · $st_name"; PASS=$((PASS + 1))
       else
-        echo "  ❌ template-leak token in body · $st_name ($st_path) — matched: $LEAK_TOKEN_PATTERN"; FAIL=$((FAIL + 1))
+        echo "  ❌ template-leak token in body · $st_name ($st_path) — matched: $LEAK_TOKEN_PATTERN"; smoke_record_fail "template-leak token in body · $st_name ($st_path)"
       fi
     done <<< "$STRUCT_ROWS"
     rm -f "$ST_FILE"
   else
-    echo "  ❌ qa_manifest structural emit failed — static-page structural checks did not run"; FAIL=$((FAIL + 1))
+    echo "  ❌ qa_manifest structural emit failed — static-page structural checks did not run"; smoke_record_fail "qa_manifest structural emit failed"
   fi
   echo ""
 
@@ -559,12 +588,12 @@ if [[ "$QUICK" != "--quick" ]]; then
       if assert_body_until "$BASE$sc_path" "$SC_FILE" _static_core_ok; then
         echo "  ✅ static core + provenance present · $sc_path"; PASS=$((PASS + 1))
       else
-        echo "  ❌ static core MISSING (blank crawler view) · $sc_path — expected a <noscript> proof-static block with an 'as of' stamp"; FAIL=$((FAIL + 1))
+        echo "  ❌ static core MISSING (blank crawler view) · $sc_path — expected a <noscript> proof-static block with an 'as of' stamp"; smoke_record_fail "static core MISSING (blank crawler view) · $sc_path"
       fi
     done <<< "$SC_PATHS"
     rm -f "$SC_FILE"
   else
-    echo "  ❌ qa_manifest static_core emit failed — static-core guard did not run"; FAIL=$((FAIL + 1))
+    echo "  ❌ qa_manifest static_core emit failed — static-core guard did not run"; smoke_record_fail "qa_manifest static_core emit failed"
   fi
   echo ""
 
@@ -584,7 +613,7 @@ if [[ "$QUICK" != "--quick" ]]; then
     if [[ "$verdict" -eq 0 ]]; then
       echo "  ✅ $label — $title"; PASS=$((PASS + 1))
     else
-      echo "  ❌ $label — og:title carries no number (generic boilerplate?): $title"; FAIL=$((FAIL + 1))
+      echo "  ❌ $label — og:title carries no number (generic boilerplate?): $title"; smoke_record_fail "$label — og:title carries no number"
     fi
     rm -f "$og_file"
   }
@@ -594,6 +623,10 @@ if [[ "$QUICK" != "--quick" ]]; then
   echo ""
 
   # ── Cache headers ────────────────────────────────────────────────────────────
+  # #3395: cache-control values are stamped by sync_site_to_s3.sh itself and x-cache
+  # is CloudFront — the #3352 `deploy-script` class. rollback_site.sh re-RUNS that
+  # same sync script, so a revert re-runs the defect (the 2026-08-31 P1 shape).
+  SMOKE_SURFACE="infra"
   echo "── Cache headers ─────────────────────────────────────────"
   check_header "HTML page: short TTL (max-age=300)"  "$BASE/story/"               "cache-control:.*max-age=300"
   check_header "CSS: long TTL"                        "$BASE/assets/css/tokens.css" "cache-control:.*max-age="
@@ -615,14 +648,15 @@ if [[ "$QUICK" != "--quick" ]]; then
   #     correct site deploy during that gap. A csp.py revert cannot hide in this
   #     branch: tests/test_csp_hardening_3048.py pins the source string.
   #   * anything else                           → FAIL (policy drift)
+  SMOKE_SURFACE="infra"  # the CSP header is CDK-owned (LifePlatformWeb) — not in site/
   echo "── Security headers (CSP #3048) ──────────────────────────"
   _EXPECTED_CSP="$(python3 "$(dirname "$0")/../scripts/expected_csp.py" 2>/dev/null || true)"
   _PRE_3048_CSP="$(python3 "$(dirname "$0")/../scripts/expected_csp.py" --legacy 2>/dev/null || true)"
   _LIVE_CSP="$(smoke_curl -s -I --max-time 10 "$BASE/" | tr -d '\r' | grep -i '^content-security-policy:' | sed 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy:[[:space:]]*//' || true)"
   if [ -z "$_EXPECTED_CSP" ]; then
-    echo "  ❌ CSP: scripts/expected_csp.py produced nothing — cannot derive the expected policy"; FAIL=$((FAIL + 1))
+    echo "  ❌ CSP: scripts/expected_csp.py produced nothing — cannot derive the expected policy"; smoke_record_fail "CSP: expected_csp.py produced nothing"
   elif [ -z "$_LIVE_CSP" ]; then
-    echo "  ❌ CSP: no content-security-policy header on $BASE/ (fetch failed or header missing)"; FAIL=$((FAIL + 1))
+    echo "  ❌ CSP: no content-security-policy header on $BASE/ (fetch failed or header missing)"; smoke_record_fail "CSP: no content-security-policy header on $BASE/"
   elif [ "$_LIVE_CSP" = "$_EXPECTED_CSP" ]; then
     echo "  ✅ CSP: live header matches the source-derived hardened policy (no 'unsafe-inline' scripts, no jsdelivr)"; PASS=$((PASS + 1))
   elif [ "$_LIVE_CSP" = "$_PRE_3048_CSP" ]; then
@@ -632,12 +666,12 @@ if [[ "$QUICK" != "--quick" ]]; then
     echo "  ❌ CSP: live header drifted from source"
     echo "     live:     $_LIVE_CSP"
     echo "     expected: $_EXPECTED_CSP"
-    FAIL=$((FAIL + 1))
+    smoke_record_fail "CSP: live header drifted from source"
   fi
   # /legacy/* keeps the compat policy (its frozen pages need inline scripts).
   _LEGACY_LIVE_CSP="$(smoke_curl -s -I --max-time 10 "$BASE/legacy/" | tr -d '\r' | grep -i '^content-security-policy:' | sed 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy:[[:space:]]*//' || true)"
   if [ -z "$_LEGACY_LIVE_CSP" ]; then
-    echo "  ❌ CSP: no content-security-policy header on $BASE/legacy/"; FAIL=$((FAIL + 1))
+    echo "  ❌ CSP: no content-security-policy header on $BASE/legacy/"; smoke_record_fail "CSP: no content-security-policy header on $BASE/legacy/"
   elif [ "$_LEGACY_LIVE_CSP" = "$_PRE_3048_CSP" ]; then
     echo "  ✅ CSP: /legacy/ serves the compat policy (frozen old site keeps working)"; PASS=$((PASS + 1))
   else
@@ -647,6 +681,9 @@ if [[ "$QUICK" != "--quick" ]]; then
   echo ""
 
   # ── API data quality ─────────────────────────────────────────────────────────
+  # #3395: THE check that fired the 2026-09-01 rollback of PR #3392's innocent
+  # content — a DynamoDB-served disagreement no site/** revert can touch.
+  SMOKE_SURFACE="api"
   echo "── API data quality ──────────────────────────────────────"
   # #2878: `weight_lbs` is required exactly when a weigh-in has ACTUALLY happened in
   # this cycle — never on a day-number proxy. The original carve-out was
@@ -681,19 +718,39 @@ except Exception:
   elif [ "$IN_CYCLE_WEIGHIN" = "no" ]; then
     echo "  ✅ /api/vitals: no in-cycle weigh-in yet — null weight_lbs is the honest state"; PASS=$((PASS + 1))
   elif [ "$IN_CYCLE_WEIGHIN" = "unknown" ]; then
-    echo "  ❌ /api/vitals: missing weight_lbs and /api/source_freshness could not confirm whether a weigh-in exists"; FAIL=$((FAIL + 1))
+    echo "  ❌ /api/vitals: missing weight_lbs and /api/source_freshness could not confirm whether a weigh-in exists"; smoke_record_fail "/api/vitals: missing weight_lbs, freshness unknown"
   else
-    echo "  ❌ /api/vitals: missing weight_lbs — an in-cycle weigh-in EXISTS in source_freshness but the payload dropped it"; FAIL=$((FAIL + 1))
+    echo "  ❌ /api/vitals: missing weight_lbs — an in-cycle weigh-in EXISTS in source_freshness but the payload dropped it"; smoke_record_fail "/api/vitals: missing weight_lbs despite in-cycle weigh-in"
   fi
   if smoke_curl -s --max-time 10 "$BASE/api/source_freshness" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('sources'),list) and len(d['sources'])>0" 2>/dev/null; then
     echo "  ✅ /api/source_freshness: sources present"; PASS=$((PASS + 1))
   else
-    echo "  ❌ /api/source_freshness: no sources array"; FAIL=$((FAIL + 1))
+    echo "  ❌ /api/source_freshness: no sources array"; smoke_record_fail "/api/source_freshness: no sources array"
   fi
   if smoke_curl -s --max-time 10 "$BASE/api/character" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d.get('pillars'),list) and len(d['pillars'])==7" 2>/dev/null; then
     echo "  ✅ /api/character: 7 pillars present"; PASS=$((PASS + 1))
   else
-    echo "  ❌ /api/character: pillars missing/incomplete"; FAIL=$((FAIL + 1))
+    echo "  ❌ /api/character: pillars missing/incomplete"; smoke_record_fail "/api/character: pillars missing/incomplete"
+  fi
+  echo ""
+fi
+
+# ── #3395 live-proof injection (mirrors #3352's VISUAL_QA_INJECT_SURFACE) ─────
+# One synthetic /api-class failure, reachable ONLY from site-deploy.yml's
+# workflow_dispatch input (`github.event.inputs.*` is empty on a push, and
+# tests/test_smoke_rollback_scope_3395.py pins that as the only source) — the
+# live proof that the rollback DECLINES on a data-plane red instead of reverting
+# innocent site content (the #3200 lesson: a fail-closed path with green unit
+# tests can be entirely non-functional). It rides the SAME smoke_record_fail
+# path as a real failure — never a classifier bypass.
+if [[ "${SMOKE_INJECT_SURFACE:-none}" != "none" ]]; then
+  echo "── #3395 live-proof injection ────────────────────────────"
+  if [[ "${SMOKE_INJECT_SURFACE}" == "api" ]]; then
+    SMOKE_SURFACE="api"
+    echo "  ❌ [INJECTED #3395 live proof — not a real defect] synthetic /api/* data-plane failure"
+    smoke_record_fail "[INJECTED #3395 live proof — not a real defect] synthetic /api/* data-plane red (SMOKE_INJECT_SURFACE=api)"
+  else
+    echo "  ⚠ SMOKE_INJECT_SURFACE='${SMOKE_INJECT_SURFACE}' is not a recognised injection class — ignored (only 'api' exists)"
   fi
   echo ""
 fi
@@ -713,6 +770,10 @@ SMOKE_TRANSIENTS=$(smoke_confirm_transient_count)
 if [[ "$SMOKE_TRANSIENTS" -gt 0 ]]; then
   echo "⟳ $SMOKE_TRANSIENTS check(s) failed the first probe and passed the confirm (#2978 deploy-race) — nothing gated, the race is counted."
 fi
+# #3395: the reachability verdict site-deploy.yml's rollback scope-checks —
+# printed always, appended to $GITHUB_OUTPUT in CI. Must run BEFORE the exit:
+# an aborted run emits nothing, and an absent verdict rolls back as today.
+smoke_emit_verdict
 if [[ $FAIL -eq 0 ]]; then
   echo "✅ All checks passed."
 else
