@@ -15,7 +15,7 @@ Source-specific concerns preserved:
   (#3417): the device has two modes — a plain weigh writes weight only, a full
   scan with the handles held writes ~30 composition fields. Composition is a
   behavioral/sparse signal (full-scan days only); the delta stays deleted by
-  decision, not for want of inputs — see ADR-156.)
+  decision, not for want of inputs — see the ADR-154 amendment (2026-09-01, #3417).)
 
 DDB shape unchanged from pre-migration.
 """
@@ -332,7 +332,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     is weight-only", stopped being true on 2026-08-16 (#3417): a full scan with
     the handles held DOES write composition fields; a plain weigh still writes
     weight only, so composition is behavioral/sparse — present only on full-scan
-    days. The delta stays deleted by recorded decision — see ADR-156.)"""
+    days. The delta stays deleted by recorded decision — see the ADR-154 amendment (2026-09-01, #3417).)"""
     if not raw:
         return []
     measurements = _parse_measurements(raw)

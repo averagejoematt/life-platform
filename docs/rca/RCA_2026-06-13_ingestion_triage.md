@@ -49,7 +49,7 @@
 
 **Root cause — source mismatch:** the handler queries `withings` for `body_fat_percentage`/`muscle_mass_lbs`, but the Withings scale here is **weight-only** — it has *never* carried body-composition fields (verified across cycles 1–3). Body composition lives in a separate **`dexa`** source (rich nested schema, last scan 2026-03-30). The freshness checker sees Withings weight (fresh); the body-comp query finds no comp fields → misleading "No Withings data." Compounded by the same window-bug class as F3 and, post-reset, the phase filter hiding all pre-genesis records.
 
-> **Correction (2026-09-01, #3417/ADR-156):** “weight-only” was true at this RCA's date and stopped being true on 2026-08-16 — the scale's *full scan* mode (handles held) writes composition fields; a plain weigh still does not. This paragraph is kept as the then-true record; ADR-156 holds the current semantics.
+> **Correction (2026-09-01, #3417/ADR-154 amendment):** “weight-only” was true at this RCA's date and stopped being true on 2026-08-16 — the scale's *full scan* mode (handles held) writes composition fields; a plain weigh still does not. This paragraph is kept as the then-true record; the ADR-154 amendment of 2026-09-01 holds the current semantics.
 
 **Fix (shipped, `mcp/tools_health.py`):**
 - Same window guard + explicit-`start_date` honoring as F3 (regression-tested alongside).
