@@ -1035,7 +1035,7 @@ def test_lean_mass_uses_the_most_recent_scan_that_actually_carries_it():
         macrofactor=[mf("2026-05-06", total_calories_kcal=2000)],
         withings=[
             row("withings", "2026-05-05", weight_lbs=205, fat_free_mass_lbs=150),
-            row("withings", "2026-05-06", weight_lbs=200),  # weight-only scale reading
+            row("withings", "2026-05-06", weight_lbs=200),  # basic-weigh row (weight only, no full scan — ADR-154 amendment/#3417)
         ],
     )
     assert overview(src)["lean_mass"]["lean_mass_lb"] == 150.0
