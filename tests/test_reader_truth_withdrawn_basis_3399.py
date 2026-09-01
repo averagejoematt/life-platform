@@ -81,7 +81,10 @@ _FIXTURE = Path(__file__).parent / "fixtures" / "reader_truth_run_33451827346_fi
 # a wire corpus breaks at every reset when it rides wall-clock constants
 # (test_reader_truth_structural_rulings_3337.py learned this first).
 _RECORDED_GENESIS = "2026-09-01"
-_RECORDED_TODAY = "2026-08-31"
+# The run's own capture_today_pt — a SEALED historical pin (the day the artifact
+# was recorded), never a claim about the wall clock; the handler clock is frozen
+# to it in _RecordedFrame.setUp below (#2376).
+_CAPTURE_DAY = "2026-08-31"
 
 _WIRE = json.loads(_FIXTURE.read_text(encoding="utf-8"))
 _VOICEFIDELITY = next(f for f in _WIRE["findings"] if f["page"] == "/method/voicefidelity/")
@@ -118,7 +121,7 @@ class _RecordedFrame(unittest.TestCase):
             mock.patch.dict(rtq._cycle_probe, {"done": True, "value": None}),
             # The nightly confirm pass (#2741) computes its phase at wall-clock
             # pacific_today(); pin it so the whole class replays in the recorded frame.
-            mock.patch("common.pacific_time.pacific_today", lambda: _RECORDED_TODAY),
+            mock.patch("common.pacific_time.pacific_today", lambda: _CAPTURE_DAY),
         ]
         for p in patches:
             p.start()
@@ -127,7 +130,7 @@ class _RecordedFrame(unittest.TestCase):
     def _assess(self, raw_findings, pages=None):
         pages = pages or sorted({f["page"] for f in raw_findings})
         surfaces = [{"name": p, "path": p, "prose": "wire replay"} for p in pages]
-        out, errs = rtq.assess_prose(surfaces, _reply(raw_findings), today_iso=_RECORDED_TODAY, batch_size=max(1, len(surfaces)))
+        out, errs = rtq.assess_prose(surfaces, _reply(raw_findings), today_iso=_CAPTURE_DAY, batch_size=max(1, len(surfaces)))
         assert errs == [], errs
         return out
 
@@ -166,7 +169,7 @@ class TestResponseContract(unittest.TestCase):
         """build_prompt must actually ship the footer (the contract is not a comment)."""
         prompt = rtq.build_prompt(
             [{"name": "Home", "path": "/", "prose": "hello"}],
-            rtq.phase_context(_RECORDED_TODAY),
+            rtq.phase_context(_CAPTURE_DAY),
         )
         schema = prompt.split("Set top-level")[0]
         self.assertLess(schema.rindex('"note"'), schema.rindex('"basis"'))
@@ -252,7 +255,7 @@ class TestConfirmPassHonoursTheMarker(_RecordedFrame):
             [wire_high],
             surfaces,
             _reply([_model_finding(_VOICEFIDELITY, basis="withdrawn")]),
-            today_iso=_RECORDED_TODAY,
+            today_iso=_CAPTURE_DAY,
         )
         self.assertEqual(confirmed, [])
         self.assertEqual(unconfirmed, [wire_high])
@@ -270,7 +273,7 @@ class TestConfirmPassHonoursTheMarker(_RecordedFrame):
             [wire_high],
             surfaces,
             _reply([_model_finding(_POSITIVE_CONTROL)]),
-            today_iso=_RECORDED_TODAY,
+            today_iso=_CAPTURE_DAY,
         )
         self.assertEqual(confirmed, [wire_high])
         self.assertEqual(unconfirmed, [])
