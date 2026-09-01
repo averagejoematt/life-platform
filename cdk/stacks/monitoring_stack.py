@@ -1042,7 +1042,7 @@ class MonitoringStack(Stack):
             "BucketSizeBytes",
             86400,
             "Maximum",
-            65 * 1024**3,
+            80 * 1024**3,  # Raised from 65 GiB; current usage 71.7 GiB (2026-08-31), 20% headroom for normal growth
             GTE,
             {"BucketName": S3_BUCKET, "StorageType": "StandardStorage"},
             to_digest=True,
