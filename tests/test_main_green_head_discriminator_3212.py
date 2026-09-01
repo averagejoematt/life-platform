@@ -61,6 +61,23 @@ SIBLING_RUNS = [
     {"id": 32415036516, "name": "Visual QA (standalone)", "status": "in_progress", "conclusion": None},
 ]
 DOCS_ONLY_FILES = ["CLAUDE.md", "handovers/HANDOVER_LATEST.md", "docs/CONVENTIONS.md"]
+
+# The RECORDED pre-#3378 `paths:` filter. Every shape in this file is a replay of a live
+# incident that happened while ci-cd.yml carried one; #3378 removed it on 2026-09-01, and
+# `main()` reads the filter from disk. Replaying against the live (now empty) filter would
+# reclassify the path-filter-skip shape as a swallow — a verdict change caused by the
+# frame, not by the behaviour under test. A replay runs under its own frame.
+RECORDED_CI_PATHS = [
+    "lambdas/**",
+    "mcp/**",
+    "mcp_server.py",
+    "tests/**",
+    "cdk/**",
+    "ci/**",
+    "config/**",
+    ".github/workflows/**",
+    "deploy/**",
+]
 IN_SCOPE_FILES = ["lambdas/ingestion/whoop_ingestion.py"]
 
 
@@ -109,6 +126,7 @@ def _gh_for(all_runs, files, committer="averagejoematt"):
 
 def _run_main(monkeypatch, gh, argv=("check_main_green.py",)):
     monkeypatch.setattr(cmg, "_gh_json", gh)
+    monkeypatch.setattr(cmg, "ci_cd_push_paths", lambda _text: list(RECORDED_CI_PATHS))
     monkeypatch.setattr(sys, "argv", list(argv))
     return cmg.main()
 
