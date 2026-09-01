@@ -297,6 +297,41 @@ def _load_fixture(name):
         return json.load(fh)
 
 
+# ── the gate's clock is PINNED, never the runner's (#3206 class; found by the
+# 2026-09-01 future-genesis reset) ─────────────────────────────────────────────
+# Several page scripts branch on the wall clock vs the site's genesis literal
+# (coach_popover.preStart() falls back to genesisCount() when a payload carries
+# no pre_start). Left unpinned, this gate's verdict flips with the calendar: the
+# first afternoon a reset staged a FUTURE genesis, /coaching/ rendered its
+# pre-start shell and the populated-board check went red on every PR while main
+# stayed green — a time-dependent gate outside its window. The pin derives from
+# the site's own literal (genesis + 5 days, noon PT = a mid-cycle morning), so a
+# reset re-anchors the gate automatically and the gate always exercises the
+# regime it has actually guarded since #1039: a live mid-cycle site.
+def _pinned_clock_ms():
+    import re as _re
+    from datetime import datetime, timedelta, timezone
+
+    src = open(os.path.join(REPO, "site", "assets", "js", "coach_popover.js"), encoding="utf-8").read()
+    m = _re.search(r'GENESIS_ISO = "(\d{4}-\d{2}-\d{2})"', src)
+    if not m:
+        raise SystemExit("pr_render_gate: cannot derive the clock pin — GENESIS_ISO not found in coach_popover.js")
+    genesis = datetime.fromisoformat(m.group(1)).replace(tzinfo=timezone.utc)
+    return int((genesis + timedelta(days=5, hours=19)).timestamp() * 1000)  # Day 6, ~noon PT
+
+
+def _clock_pin_script():
+    return (
+        "(() => {{ const FIXED = {ms}; const RealDate = Date;\n"
+        "  class PinnedDate extends RealDate {{\n"
+        "    constructor(...a) {{ if (a.length === 0) {{ super(FIXED); }} else {{ super(...a); }} }}\n"
+        "    static now() {{ return FIXED; }}\n"
+        "  }}\n"
+        "  PinnedDate.parse = RealDate.parse; PinnedDate.UTC = RealDate.UTC;\n"
+        "  window.Date = PinnedDate; }})();"
+    ).format(ms=_pinned_clock_ms())
+
+
 def _install_routes(context, extra_stats=None, fixtures=None):
     """Wire the API mocks onto the browser context.
 
@@ -431,6 +466,7 @@ def run_gate(site_dir, screenshot_dir, keep=False, a11y=False):
                 color_scheme="dark",
                 service_workers="block",
             )
+            context.add_init_script(_clock_pin_script())
             _install_routes(context)
             print("— pass 1: empty-state mocks —")
             _drive(context, GATE_PAGES, screenshot_dir)
@@ -444,6 +480,7 @@ def run_gate(site_dir, screenshot_dir, keep=False, a11y=False):
                 color_scheme="dark",
                 service_workers="block",
             )
+            context.add_init_script(_clock_pin_script())
             _install_routes(context, fixtures=POPULATED_API_MOCKS)
             print("— pass 2: realistic-data fixtures —")
             _drive(context, POPULATED_GATE_PAGES, populated_dir)

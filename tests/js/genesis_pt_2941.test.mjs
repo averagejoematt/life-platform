@@ -27,42 +27,42 @@ const POPOVER_SRC = readFileSync(
   "utf8",
 );
 
-// Cycle-14 genesis. If a reset re-anchors this literal, the boundary instants
+// Cycle-15 genesis. If a reset re-anchors this literal, the boundary instants
 // below are wrong on purpose — regenerate them with the sweep, don't loosen.
 test("this test's instants are anchored to the current genesis", () => {
-  assert.equal(GENESIS_ISO, "2026-08-17");
+  assert.equal(GENESIS_ISO, "2026-09-01");
 });
 
-test("the incident instant: 18:32 PT on Aug 21 is Day 5 everywhere (UTC already read Aug 22)", () => {
-  const { dayN, weekN, base } = genesisCount(new Date("2026-08-22T01:32:00Z"));
+test("the incident instant shape: 18:32 PT on Sep 5 is Day 5 everywhere (UTC already reads Sep 6)", () => {
+  const { dayN, weekN, base } = genesisCount(new Date("2026-09-06T01:32:00Z"));
   assert.equal(dayN, 5); // the old code returned 6 on any UTC-clock host
   assert.equal(weekN, 1);
-  assert.equal(base, "Day 5 · Week 1, since August 17 2026");
+  assert.equal(base, "Day 5 · Week 1, since September 1 2026");
 });
 
 test("the day flips at PT midnight, not at the viewer's midnight", () => {
-  assert.equal(genesisCount(new Date("2026-08-22T06:59:00Z")).dayN, 5); // 23:59 PT Aug 21
-  assert.equal(genesisCount(new Date("2026-08-22T07:01:00Z")).dayN, 6); // 00:01 PT Aug 22
+  assert.equal(genesisCount(new Date("2026-09-06T06:59:00Z")).dayN, 5); // 23:59 PT Sep 5
+  assert.equal(genesisCount(new Date("2026-09-06T07:01:00Z")).dayN, 6); // 00:01 PT Sep 6
 });
 
 test("genesis day is Day 1 from PT midnight; before it is pre-start (dayN < 1)", () => {
-  assert.equal(genesisCount(new Date("2026-08-17T07:01:00Z")).dayN, 1); // 00:01 PT genesis day
-  assert.equal(genesisCount(new Date("2026-08-17T06:59:00Z")).dayN, 0); // 23:59 PT the night before
+  assert.equal(genesisCount(new Date("2026-09-01T07:01:00Z")).dayN, 1); // 00:01 PT genesis day
+  assert.equal(genesisCount(new Date("2026-09-01T06:59:00Z")).dayN, 0); // 23:59 PT the night before
 });
 
 test("week arithmetic: Day 7 is Week 1, Day 8 is Week 2", () => {
-  const d7 = genesisCount(new Date("2026-08-23T12:00:00Z")); // PT Aug 23
+  const d7 = genesisCount(new Date("2026-09-07T12:00:00Z")); // PT Sep 7
   assert.deepEqual([d7.dayN, d7.weekN], [7, 1]);
-  const d8 = genesisCount(new Date("2026-08-24T12:00:00Z")); // PT Aug 24
+  const d8 = genesisCount(new Date("2026-09-08T12:00:00Z")); // PT Sep 8
   assert.deepEqual([d8.dayN, d8.weekN], [8, 2]);
 });
 
 test("crossing the DST fall-back boundary does not gain or lose a day", () => {
-  // PDT→PST is Nov 1 2026. Nov 5 is 80 calendar days after Aug 17 → Day 81.
+  // PDT→PST is Nov 1 2026. Nov 5 is 65 calendar days after Sep 1 → Day 66.
   // Instant-subtraction math would see an extra hour and drift here; the
   // UTC-noon date-only diff cannot.
   const { dayN } = genesisCount(new Date("2026-11-05T12:00:00Z"));
-  assert.equal(dayN, 81);
+  assert.equal(dayN, 66);
 });
 
 test("set-guard: the two-clock expression may not return", () => {
