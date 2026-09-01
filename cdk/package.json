@@ -3,6 +3,6 @@
   "private": true,
   "description": "Version of record for the AWS CDK CLI (#2760). ci-cd.yml resolves `npm install -g aws-cdk@X` from this devDependency at install time, and Dependabot's npm ecosystem (.github/dependabot.yml, /cdk) bumps it — the structural second leg the CLI pin lacked (#2468/#2751). Exact version, no range: guarded by tests/test_ci_pin_consistency.py. The pip leg (aws-cdk-lib/constructs) stays in cdk/requirements.txt.",
   "devDependencies": {
-    "aws-cdk": "2.1138.0"
+    "aws-cdk": "2.1139.0"
   }
 }
