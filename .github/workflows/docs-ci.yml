@@ -64,6 +64,7 @@ on:
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'deploy/doc_platform_counts.py'     # #3384 — the #3101 counts sync (+ its PR-event exemption) sync_doc_metadata.py delegates to
+      - 'deploy/emf_namespace_ledger.py'    # #3374 R1 — the EMF-namespace registry generate_platform_model.py's cost_surface plane counts
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
@@ -110,6 +111,7 @@ on:
       - 'deploy/sync_census_fact.py'        # #3156 — the gate_census_count discoverer sync_doc_metadata.py's --check calls into
       - 'deploy/doc_restamp_guard.py'       # #2986 — the re-stamp rule sync_doc_metadata.py's stamp path delegates to
       - 'deploy/doc_platform_counts.py'     # #3384 — the #3101 counts sync (+ its PR-event exemption) sync_doc_metadata.py delegates to
+      - 'deploy/emf_namespace_ledger.py'    # #3374 R1 — the EMF-namespace registry generate_platform_model.py's cost_surface plane counts
       - 'scripts/check_doc_*.py'
       - 'scripts/doc_facts_ops.py'   # the #1957 operational-claim rules the gate loads
       - 'scripts/generate_adr_index.py'
@@ -136,6 +138,12 @@ on:
       # drifts, and it runs in CI/CD's Unit Tests. Listed anyway so a change to the guard
       # still runs the gate family it belongs to.
       - 'tests/test_platform_stats_truth.py'
+      # #3374 R1 — generate_platform_model.py AST-reads KNOWN_SECRETS as the secrets
+      # cost-surface count (push already covers it via tests/**):
+      - 'tests/test_secret_references.py'
+      # Pre-existing gap surfaced by the same #3374 sweep: the model's contracts plane
+      # AST-reads the #2847 pair registry (push already covers it via tests/**):
+      - 'tests/pair_contract_registry.py'
   workflow_dispatch: {}
 
 permissions:

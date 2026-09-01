@@ -1,0 +1,11 @@
+{
+  "_purpose": "#3374 R1 — the committed cost-bearing-surface baseline. HAND-OWNED, deliberately NOT written by scripts/generate_platform_model.py: the generator derives the live counts into model/platform_model.json's cost_surface plane, and tests/test_platform_model_drift.py exact-pins this file against them. A PR that grows a cost-bearing population (a new schedule, alarm, EMF namespace, secret, or budget-guard AI feature) must bump the matching count HERE, in the same diff — that hand edit is the ratchet's deliberate act. A shrink must ratchet the count down the same way, so the baseline can never rot above the estate.",
+  "counts": {
+    "ai_features": 18,
+    "alarms": 119,
+    "emf_namespaces": 31,
+    "schedules": 88,
+    "secrets": 28
+  },
+  "measured_on": "2026-09-01"
+}

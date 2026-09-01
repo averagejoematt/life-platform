@@ -469,3 +469,19 @@ Field-level rulings (only non-default fields are declared):
 - Schedules: 88 (lambda, cron) rows; fixed-time rows carry a UTC clock, rate/multi-value rows do not
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
+
+## 7. Cost-bearing surface (#3374 R1)
+
+The five population counts whose growth means recurring spend, derived from the
+registries that govern each estate (see `meta.authorities.cost_surface`). They are
+exact-pinned against the hand-owned `model/cost_surface_baseline.json` by
+`tests/test_platform_model_drift.py` — a PR that grows a count must bump the
+baseline in the same diff, so a new cost-bearing surface cannot appear silently.
+
+| Surface | Count | Registry |
+|---------|-------|----------|
+| ai_features | 18 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
+| alarms | 119 | this model's alarms plane (CDK AST) |
+| emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
+| schedules | 88 | this model's schedules plane (CDK AST) |
+| secrets | 28 | `tests/test_secret_references.py::KNOWN_SECRETS` |
