@@ -110,6 +110,24 @@ FAIL = "\033[31m✗\033[0m"
 checks = []  # list of (name, passed, detail)
 
 
+def served_genesis(payload) -> str | None:
+    """The genesis the PUBLIC API is answering with, or None if it does not say (#3396).
+
+    Pure, so the served-plane check below can be tested in both directions without a
+    network. A missing/!dict/incomplete payload returns None — which never compares equal
+    to a real genesis string, so an unreadable answer fails the check rather than passing
+    it. That direction matters: this check exists because a reset can leave the serving
+    path on the previous cycle, and "could not tell" is not "fine".
+    """
+    if not isinstance(payload, dict):
+        return None
+    experiment = payload.get("experiment")
+    if not isinstance(experiment, dict):
+        return None
+    value = experiment.get("genesis")
+    return value if isinstance(value, str) and value else None
+
+
 def check(name: str, ok: bool, detail: str = ""):
     checks.append((name, ok, detail))
     icon = PASS if ok else FAIL
@@ -554,6 +572,42 @@ def main():
             )
     except Exception as e:  # never let the verifier itself crash the post-reset check
         check("compute-pipeline-stale is not a reset-predictable false red (#1962)", False, f"check could not run: {e}")
+
+    # 20. #3396 — the SERVED genesis must equal the staged genesis.
+    #
+    # Launch eve 2026-08-31: the reset staged genesis 2026-09-01 and `cdk deploy --all`
+    # updated every function (CFN: SiteApiLambdaA5C2FE08 UPDATE_COMPLETE 20:13:43Z), yet
+    # the public API still answered with the OLD anchor hours later — the nightly QA
+    # sweep read cycle-14 residue off 14 pages, the #2878 weight-arbitration smoke check
+    # tripped on the disagreement, and the scope-blind rollback reverted wanted prose.
+    #
+    # Every check above this one reads the CONTROL plane — constants.py, DynamoDB, the
+    # config files, CloudWatch. Not one of them reads what a reader actually receives, so
+    # a fleet that is correct everywhere except at the edge passed the whole battery. This
+    # check is deliberately CAUSE-AGNOSTIC: it does not care whether a bundle missed a
+    # function, an asset hash failed to move, a cache held, or a later deploy reasserted
+    # an older tree — it asserts the one fact the reset exists to establish, on the plane
+    # the public reads it from. `?cb=verify` matches the cache-buster the other served
+    # checks use, so a CloudFront hit cannot answer for the origin.
+    try:
+        with urllib.request.urlopen(f"{API}/api/source_freshness?cb=verify", timeout=15) as r:
+            served = json.loads(r.read().decode())
+        live = served_genesis(served)
+        check(
+            "served /api/source_freshness genesis == staged genesis (#3396)",
+            live == EXPERIMENT_START_DATE,
+            (
+                f"served={live} staged={EXPERIMENT_START_DATE}"
+                if live == EXPERIMENT_START_DATE
+                else (
+                    f"served={live} but staged={EXPERIMENT_START_DATE} — the public API is on a "
+                    "different cycle than the fleet. Redeploy the serving path "
+                    "(bash deploy/deploy_site_api.sh) and re-run; do NOT let a site deploy gate on it first."
+                )
+            ),
+        )
+    except Exception as e:  # never let the verifier itself crash the post-reset check
+        check("served /api/source_freshness genesis == staged genesis (#3396)", False, f"check could not run: {e}")
 
     # Summary
     total = len(checks)
