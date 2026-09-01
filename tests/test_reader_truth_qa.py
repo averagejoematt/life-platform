@@ -15,7 +15,7 @@ Covers the ONE shared module (lambdas/reader_truth_qa.py) and both of its hooks:
     tiers 1 and 2 must RUN the gate, which is what #1927 fixed).
 
 No wall-clock time bombs: every fixture date is DERIVED from
-constants.EXPERIMENT_START_DATE, which moves on each experiment reset.
+constants._RECORDED_GENESIS, which moves on each experiment reset.
 """
 
 import json
@@ -36,16 +36,36 @@ if _TESTS_DIR not in sys.path:
 import boto3  # noqa: E402
 import visual_ai_qa  # noqa: E402
 from ai import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
-from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from operational import reader_truth_qa as rtq  # noqa: E402
 
-_START = date.fromisoformat(EXPERIMENT_START_DATE)
+# The wire notes replayed below were RECORDED under the cycle-14 frame (genesis
+# 2026-08-17): their prose cites that genesis's absolute dates ("SINCE AUGUST 17
+# 2026", August day numbers). Replaying them under the LIVE genesis breaks at
+# every experiment reset — the 2026-09-01 re-anchor turned the whole corpus
+# pre-cycle and the archive exemption swallowed findings the vagueness/banner
+# rulings were being tested on. A wire replay runs under the frame it was
+# recorded in; only a test that CONSTRUCTS its note relative to the frame may
+# use the live constant.
+_RECORDED_GENESIS = "2026-08-17"
+
+_START = date.fromisoformat(_RECORDED_GENESIS)
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _recorded_frame(monkeypatch):
+    """assess_prose computes phase ground truth from constants at CALL time; the
+    wire corpus replays under its recorded frame (see _RECORDED_GENESIS above)."""
+    monkeypatch.setattr("common.constants.EXPERIMENT_START_DATE", _RECORDED_GENESIS)
+
+
 _DAY_1 = _START.isoformat()
 _DAY_2 = (_START + timedelta(days=1)).isoformat()
 _PRE_3 = (_START - timedelta(days=3)).isoformat()
 # #3337: the ruling predicates now take the phase anchors, and every wire note below
 # is replayed at the day it was RECORDED on — a fixture judged against the wrong day
-# is not the wire. Derived from EXPERIMENT_START_DATE, never a wall-clock literal.
+# is not the wire. Derived from _RECORDED_GENESIS, never a wall-clock literal.
 _DAY_5 = (_START + timedelta(days=4)).isoformat()
 _DAY_6 = (_START + timedelta(days=5)).isoformat()
 _DAY_9 = (_START + timedelta(days=8)).isoformat()
@@ -122,13 +142,13 @@ def test_emit_budget_pause_metric_is_fail_soft(monkeypatch):
     rtq.emit_budget_pause_metric("qa_smoke", 1)  # must not raise
 
 
-# ── phase context (derived from EXPERIMENT_START_DATE — no wall-clock literals) ──
+# ── phase context (derived from _RECORDED_GENESIS — no wall-clock literals) ──
 
 
 def test_phase_context_day_one():
     p = rtq.phase_context(_DAY_1)
     assert p["day_n"] == 1 and p["pre_start"] is False and p["days_until_start"] == 0
-    assert p["start_date"] == EXPERIMENT_START_DATE
+    assert p["start_date"] == _RECORDED_GENESIS
 
 
 def test_phase_context_day_two():
@@ -147,7 +167,7 @@ def test_phase_context_pre_start():
 def test_prompt_carries_day_number_and_start_date():
     prompt = rtq.build_prompt(_PAGES, rtq.phase_context(_DAY_2))
     assert "Day 2" in prompt
-    assert EXPERIMENT_START_DATE in prompt
+    assert _RECORDED_GENESIS in prompt
     for p in _PAGES:  # every surface's name, path, and prose are in the batch
         assert p["path"] in prompt and p["name"] in prompt and p["prose"][:40] in prompt
 
