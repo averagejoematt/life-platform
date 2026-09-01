@@ -41,12 +41,12 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-08-31 (Session O reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 382** — feedback 22 · reference 212 · security 1 · project 144 · user 1 · index 2
+**Files in the memory index snapshot: 383** — feedback 22 · reference 213 · security 1 · project 144 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 235** — homed-here 56 · already-homed 159 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 236** — homed-here 56 · already-homed 160 · superseded 7 · narrative 11 · off-repo 2
 
 **Program/session files (project): 144** — already-homed 14 · superseded 1 · narrative 126 · off-repo 2 · index 1
 
@@ -58,7 +58,7 @@ Of Appendix A's 35 `residual` entries: 26 were placed by this pass, 8 were alrea
 of #3245 — merged the day after the audit — ADR-146's own text, and that page's own §4.2), and 1
 is superseded (the severity-free write shipped in #2981).
 
-## Snapshot of the memory index — 2026-08-31 (Session O reconcile: +2)
+## Snapshot of the memory index — 2026-08-31 (Session O: +1 reference; earlier reconcile +2)
 
 The file list this ledger is checked against. Regenerate it by listing the memory
 directory (`ls <memory-dir>/*.md`) and re-run the guard; a file added to memory and not to
@@ -406,6 +406,7 @@ reference_regen_invoke_email_lambda_trap.md
 reference_reject_a_gated_run_pinned_to_a_stale_sha.md
 reference_removing_a_confound_reveals_the_second_defect.md
 reference_reordering_sync_steps_changes_what_each_step_owns.md
+reference_rerun_reuses_the_original_merge_commit.md
 reference_reset_pipeline_owned_manifest_clobber.md
 reference_rollback_partial_fires_mixed_fleet.md
 reference_ruff_full_dir_set.md
@@ -687,6 +688,7 @@ user_who_is_matthew.md
 | `reference_worktree_agent_path_reuse.md` | reference | `.claude/agents/worktree-implementer.md` 0b + `scripts/lane_worktree.py` | already-homed |
 | `reference_worktree_case_insensitive_pollution.md` | reference | `docs/CONVENTIONS.md` §7 | already-homed |
 | `reference_local_axe_blind_to_color_mix_contrast.md` | reference | `docs/CONVENTIONS.md` §7 (local axe blind to color-mix contrast — prove by arithmetic, read CI's report.json) | homed-here |
+| `reference_rerun_reuses_the_original_merge_commit.md` | reference | `docs/CONVENTIONS.md` §6 CI-recovery table (rerun reuses the stale merge ref — update-branch, never rerun --failed) | already-homed |
 | `reference_reordering_sync_steps_changes_what_each_step_owns.md` | reference | `docs/CONVENTIONS.md` §7 (reordering a sync changes ownership — assert include sets disjoint); INCIDENT_LOG 2026-08-31 P1 | homed-here |
 | `reference_stack_census_prs_on_a_nonstrict_ruleset.md` | reference | `docs/CONVENTIONS.md` §7 (stack census-bumping PRs; re-rebase after each squash) | homed-here |
 | `security_r22_mcp_token_exposure.md` | security | — off-repo by design: security-incident detail stays out of the public repo (`docs/CONTINUITY.md` §4); the fixes are recorded on #779/#780/#893 and in `docs/DECISIONS.md` | off-repo |

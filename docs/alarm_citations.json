@@ -50,9 +50,8 @@
     "added": "2026-08-28"
   },
   "life-platform-s3-bucket-size-high": {
-    "citation": "#2799 — DIL-026 S3 lifecycle lane, fix landed 2026-08-24 (pending post-merge apply)",
-    "note": "BucketSizeBytes crossed 50GiB (54.6GB) on 2026-08-22. Live sizing (2026-08-24) found deploys/ dominates (41.5GB noncurrent, but its #2642 rule is live and correctly configured — a 7-day rolling-window artifact of routine deploy velocity, not a gap) and imports/ was a real gap (2.07GB, zero coverage). Fix: imports/ lifecycle coverage added (deploy/s3_lifecycle.json) + declared-vs-live drift assertion (deploy/drift_sentinel.py::check_s3_lifecycle) + threshold re-derived 50GB→65GiB from the measured ~52-55GB steady state (ADR-105). Two post-merge steps required before this clears: `bash deploy/apply_s3_lifecycle.sh` (imports/ rule; out-of-IaC, cdk deploy does not touch it) and `bash deploy/cdk_deploy.sh LifePlatformMonitoring` (new threshold). Expect clear within ~24-48h of both landing (next BucketSizeBytes daily period + imports/ lifecycle sweep). Re-check before pruning this citation.",
-    "cited": "2026-08-24"
+    "citation": "self-clearing on a dated window — the deploys/ noncurrent-version lifecycle was tightened 7d to 1d and applied to the LIVE bucket 2026-08-31 (fin-diligence remediation, verified via get-bucket-lifecycle-configuration); S3 lifecycle expiry runs daily, so the ~72GB noncurrent tail drains over the next runs. Expiry of this citation: 2026-09-03 — if still ALARM then, file a follow-up issue instead of extending this line",
+    "note": "prior citation pointed at a closed issue; the shipped cure is the fin-diligence 2026-08-31 lifecycle change (PR 3381)"
   },
   "life-platform-budget-tier-escalation": {
     "citation": "#2801",
