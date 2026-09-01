@@ -49,10 +49,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lambdas"))
 
-from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from operational import reader_truth_rulings as R  # noqa: E402
 
-_START = EXPERIMENT_START_DATE
+# WIRE notes replay under the frame they were RECORDED in (cycle-14, genesis
+# 2026-08-17) — see test_reader_truth_qa.py's note; the 2026-09-01 re-anchor
+# proved the live constant breaks the corpus at every reset.
+_RECORDED_GENESIS = "2026-08-17"
+
+_START = _RECORDED_GENESIS
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _recorded_frame(monkeypatch):
+    """assess_prose computes phase ground truth from constants at CALL time; the
+    wire corpus replays under its recorded frame (see _RECORDED_GENESIS above)."""
+    monkeypatch.setattr("common.constants.EXPERIMENT_START_DATE", _RECORDED_GENESIS)
+
+
 _S = date.fromisoformat(_START)
 
 
