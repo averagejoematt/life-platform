@@ -20,7 +20,7 @@ import importlib.util
 import json
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
@@ -159,13 +159,22 @@ def test_stamp_token_alarm_window_writes_the_computed_window(tmp_path, monkeypat
     scratch.write_text(original_source)
     monkeypatch.setattr(pipeline, "TOKEN_ALARM_WINDOW_FILE", scratch)
 
-    status1 = pipeline.stamp_token_alarm_window("2026-09-01", apply=True)
+    # DERIVE a genesis that is NOT the one already stamped in the committed
+    # module — a pinned date here fails on exactly the cycle whose window is
+    # committed (found live on the 2026-09-01 reset eve: the reset had already
+    # stamped that genesis, so the "first" stamp was a no-op). Two weeks past
+    # the committed window's start is never the committed genesis.
+    committed_start = date.fromisoformat(taw.TOKEN_ALARM_GENESIS_WINDOW[0])
+    target = (committed_start + timedelta(days=14 + taw.WINDOW_DAYS_BEFORE)).isoformat()
+    want_start, want_end = taw.window_for_genesis(target)
+
+    status1 = pipeline.stamp_token_alarm_window(target, apply=True)
     assert status1.startswith("stamped")
     new_text = scratch.read_text()
-    assert 'TOKEN_ALARM_GENESIS_WINDOW = ("2026-08-31", "2026-09-08")' in new_text
+    assert f'TOKEN_ALARM_GENESIS_WINDOW = ("{want_start}", "{want_end}")' in new_text
 
     # Idempotent: re-stamping the SAME genesis is a no-op status.
-    status2 = pipeline.stamp_token_alarm_window("2026-09-01", apply=True)
+    status2 = pipeline.stamp_token_alarm_window(target, apply=True)
     assert status2.startswith("already-stamped")
 
     # Dry-run never writes.
