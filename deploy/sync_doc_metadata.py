@@ -50,6 +50,7 @@ DOCS = ROOT / "docs"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import doc_alarm_inventory as _alarm_inv  # noqa: E402 — #2649: extracted sibling (MONITORING.md inventory)
+import doc_platform_counts as _counts  # noqa: E402 — #3384: extracted sibling (the #3101 literal sync + the PR-event exemption)
 import doc_restamp_guard as _restamp  # noqa: E402 — #2986/#2838: the generic re-stamp rule
 import endpoint_registry  # noqa: E402 — the shared /api/* enumerator (#1436)
 
@@ -506,13 +507,11 @@ def _count_test_functions() -> int | None:
         return None
 
 
-# The credibility numbers served at /api/platform_stats (rendered on the /method/
-# pages — the surface a skeptic cross-checks against the public repo). Hand-editing
-# rotted: 2026-07-01 the dict claimed 303 tests vs ~1,290 actual, 138 tools vs 144,
-# 65 ADRs vs 85. These fields are rewritten from the discoverers above; judgment /
-# live-AWS fields (monthly_cost, review_grade, active_secrets, site_pages…) are
-# never touched. #3101: stamped into the GENERATED module below — see ITS docstring.
-_PLATFORM_COUNTS_PATH = ROOT / "lambdas" / "web" / "platform_counts.py"
+# The credibility numbers served at /api/platform_stats — the rewrite logic, its
+# history and the #3384 pull_request exemption live in the extracted sibling
+# doc_platform_counts (this file is at zero module-size headroom). This module keeps
+# only the facts→values glue; the path alias stays a global so tests can repoint it.
+_PLATFORM_COUNTS_PATH = _counts.PATH
 
 
 def _platform_counts_values(facts: dict) -> dict:
@@ -528,26 +527,9 @@ def _platform_counts_values(facts: dict) -> dict:
 
 
 def _sync_platform_counts(facts: dict, dry_run: bool) -> list[str]:
-    """Rewrite the discovered literals in lambdas/web/platform_counts.py (#3101)."""
-    if not _PLATFORM_COUNTS_PATH.exists():
-        return [f"  SKIP (not found): {_PLATFORM_COUNTS_PATH}"]
-    src = _PLATFORM_COUNTS_PATH.read_text(encoding="utf-8")
-    changes = []
-    for field, value in _platform_counts_values(facts).items():
-        if value is None:
-            continue
-        pattern = rf'("{field}": )\d+'
-        m = re.search(pattern, src)
-        if not m:
-            changes.append(f"  ! DISCOVERED_COUNTS field {field!r} not found (literal int expected)")
-            continue
-        old = int(m.group(0).split(":")[1])
-        if old != int(value):
-            src = re.sub(pattern, rf"\g<1>{int(value)}", src, count=1)
-            changes.append(f"  ~ DISCOVERED_COUNTS {field}: {old} → {value}")
-    if changes and not dry_run:
-        _PLATFORM_COUNTS_PATH.write_text(src, encoding="utf-8")
-    return changes
+    """Rewrite the discovered literals in lambdas/web/platform_counts.py (#3101) —
+    delegates to doc_platform_counts.sync (#3384), reading the path global at call time."""
+    return _counts.sync(_platform_counts_values(facts), dry_run, path=_PLATFORM_COUNTS_PATH)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
