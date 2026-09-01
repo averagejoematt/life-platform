@@ -44,7 +44,6 @@ from privacy import privacy_guard  # deterministic real-name + vice scrub (layer
 
 import web.site_api_ai_request as _req  # #2688: body parsing lives in the extracted sibling
 import web.site_api_ai_session as _sess  # #546/#3118: the follow-up session store lives in the extracted sibling
-from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.ask_retrieval import retrieve_block as _ask_retrieve  # #2348: the question selects published-archive passages (fail-soft)
 
 # #2667: the context/facts fetch layer lives in the extracted sibling — the size
@@ -730,15 +729,21 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
         logger.warning(f"[board_ask] interaction write-back failed for {pid} (non-fatal): {e}")
 
 
-# ── #968: ADR-108 quality gate on the public board ─────────────────────────
-# The coach-voiced board answers (initial ask + follow-up) run the SAME
-# coach-quality-gate lambda the daily brief enforces — but evaluate-then-
-# regenerate-once under a hard time budget off the real Lambda deadline, and
-# FAIL-OPEN (a reader is synchronously waiting; the fabrication class is
-# already fail-closed via the ADR-104 grounding gate above, so this gate
-# protects voice fidelity only). The full contract, budget mechanics and the
-# ADR-103 scope posture live in `web/board_quality_gate.py` (split out per
-# the 2000-line handler size gate); the `_bqg` alias is imported at the top.
+# ── #3413: the ADR-108 quality gate is NOT on this reader path ─────────────
+# It was (#968), synchronously, and it never once worked. Measured 2026-09-01:
+# `coach-quality-gate` Duration over 48h is n=68, p50=16371ms, p90=30000ms (its
+# own ceiling) — so the MEDIAN call alone exceeded the whole 14s evaluate budget,
+# and the 10s client cap sat below the gate's daily MEAN every day for a week.
+# Live proof over 7 days of board traffic: 8 gate attempts → 6 "skipped", 2 read
+# timeouts, ZERO verdicts, and `BoardQualityGateFired` has no datapoint in all of
+# August. The gate was ~10s of guaranteed reader latency per grounded coach with
+# the result discarded, on a 30s budget shared with up to 8 SEQUENTIAL coach
+# generations — which is how /api/board_ask came to serve 504s on launch day.
+# Fabrication protection is unaffected: that is the ADR-104 grounding gate above
+# (pure, deterministic, no network, fail-closed) and it is independent of this
+# gate, whose scope was voice fidelity only. Per its own docstring, "an
+# off-voice-but-grounded answer beats no answer".
+# Recovering the voice verdict off the reader path is #3414, not this change.
 
 
 # ── #546: board follow-up sessions ─────────────────────────
@@ -770,9 +775,6 @@ def _append_board_turn(token: str, ip_hash: str, persona: str, question: str, an
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     """Routes /api/ask (POST) and /api/board_ask (POST) only."""
-    # #968: capture the invocation context so the ADR-108 board quality gate
-    # can enforce its hard time budget off the REAL Lambda deadline.
-    _bqg.set_lambda_context(context)
     # Phase 2.2: centralized request envelope validation (Body size cap +
     # injection pattern detection + param format checks). Returns 4xx on abuse.
     try:
@@ -1399,23 +1401,9 @@ def _handle_board_ask(event: dict) -> dict:
             except Exception as _gg_e:
                 logger.warning(f"[board_ask] {pid} grounding gate error (fail-open): {_gg_e}")
 
-            # #968: ADR-108 quality gate (voice/anti-pattern/decision-class) —
-            # only a GROUNDED real answer is worth gating (a refusal is canned
-            # text). Fail-open under a hard time budget; a corrected rewrite
-            # must re-pass the ADR-104 grounding check before it can be served.
-            if _grounded:
-
-                def _qg_regen(_note, _req=req_body, _um=user_msg):
-                    _b = json.loads(_req)
-                    _b["messages"] = [{"role": "user", "content": _um + "\n\n" + _note}]
-                    _r = _bedrock_invoke(_b)
-                    _emit_token_metrics(_r.get("usage", {}), endpoint="api_board_ask")
-                    return _scrub_blocked_terms("".join(b["text"] for b in _r.get("content", []) if b.get("type") == "text"))
-
-                def _qg_grounded(_t, _s=_sys_txt, _u=user_msg):
-                    return not board_grounding_findings(_s, _u, _t)
-
-                _txt = _bqg.enforce(pid, _txt, _qg_regen, _qg_grounded, _retain_board_flag)
+            # #3413: the ADR-108 quality gate used to run here, synchronously.
+            # It is off the reader path now — see the section comment above for
+            # the measurement. Grounding (fail-closed) already ran above.
 
             # #531: the answer enters the coach's own memory (fail-soft).
             _write_board_interaction(pid, question, _txt, grounded=_grounded)
@@ -1647,30 +1635,8 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     except Exception as _gg_e:
         logger.warning(f"[board_ask] follow-up {persona} grounding gate error (fail-open): {_gg_e}")
 
-    # #968: ADR-108 quality gate, per turn — same contract as the initial path
-    # (fail-open, hard time budget, corrected rewrite must re-ground against
-    # the full transcript + prior answers before it can be served).
-    if _grounded:
-
-        def _qg_regen(_note):
-            _corr = list(messages)
-            _corr[-1] = {"role": "user", "content": messages[-1]["content"] + "\n\n" + _note}
-            _r = _bedrock_invoke(
-                {
-                    "model": AI_MODEL_HAIKU,
-                    "max_tokens": 450,
-                    "system": [{"type": "text", "text": _sys_txt, "cache_control": {"type": "ephemeral"}}],
-                    "messages": _corr,
-                }
-            )
-            _emit_token_metrics(_r.get("usage", {}), endpoint="api_board_ask")
-            return _scrub_blocked_terms("".join(b["text"] for b in _r.get("content", []) if b.get("type") == "text"))
-
-        def _qg_grounded(_t):
-            _mt = " ".join(m["content"] for m in messages if isinstance(m.get("content"), str))
-            return not board_grounding_findings(_sys_txt, _mt, _t, prior_answers=prior_answers)
-
-        _txt = _bqg.enforce(persona, _txt, _qg_regen, _qg_grounded, _retain_board_flag, endpoint="board_followup")
+    # #3413: the ADR-108 quality gate used to run here per turn, synchronously.
+    # Removed with the initial-ask call site — same measurement, same reasoning.
 
     # Persist the turn (atomic append + counter bump, re-checks the cap and IP).
     persisted = _append_board_turn(token, ip_hash, persona, question, _txt)
