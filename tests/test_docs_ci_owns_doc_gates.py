@@ -151,7 +151,17 @@ def _trigger_paths():
 # #2982's decision, recorded as an assertion. The two tests-side fact SOURCES a doc gate
 # genuinely reads — derived below rather than trusted from this list, which exists only to
 # make the intent legible next to the asymmetry it licenses.
-_TESTS_PR_PATHS = {"tests/qa_manifest.py", "tests/leak_token_sweep.py", "tests/test_platform_stats_truth.py"}
+_TESTS_PR_PATHS = {
+    "tests/qa_manifest.py",
+    "tests/leak_token_sweep.py",
+    "tests/test_platform_stats_truth.py",
+    # #3374 R1 — generate_platform_model.py AST-reads KNOWN_SECRETS as the secrets
+    # cost-surface count; push covers it via tests/**.
+    "tests/test_secret_references.py",
+    # Pre-existing gap surfaced by the same sweep: the model's #2847 contracts plane
+    # AST-reads the pair registry.
+    "tests/pair_contract_registry.py",
+}
 
 
 def test_the_only_push_vs_pr_asymmetry_is_the_tests_glob():
@@ -191,6 +201,9 @@ def test_every_tests_side_fact_source_is_on_the_pr_trigger():
         os.path.join(_REPO, "scripts", "check_doc_tombstones.py"),
         os.path.join(_REPO, "scripts", "generate_adr_index.py"),
         os.path.join(_REPO, "scripts", "incident_log_patterns.py"),
+        # #3374 R1 — the model generator runs in docs-ci (derived_artifact_registry) and
+        # AST-reads a tests/ registry for the secrets cost-surface count.
+        os.path.join(_REPO, "scripts", "generate_platform_model.py"),
     ]
     # `ROOT / "tests" / "name.py"` — a real path construction, not a mention in prose.
     pat = re.compile(r'"tests"\s*/\s*"([A-Za-z0-9_]+\.py)"')
