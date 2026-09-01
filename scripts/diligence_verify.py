@@ -63,6 +63,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import ssl
 import subprocess
 import sys
@@ -580,13 +581,47 @@ def edge_public_data_is_fresh() -> Verdict:
 # The playbook registry
 # ═════════════════════════════════════════════════════════════════════════════════
 
+
 # (id, family, DIL ids answered, callable). Adding a row here is how a new §15 playbook
 # joins the evidence pack; the register's live-evidence column is generated from the run.
+def control_register_maps_all_52() -> Verdict:
+    """Every DIL id 001–052 carries a disposition row in the response register.
+
+    The epic's box-1 checkbox is a human claim and went stale once already (it said
+    "20 of 52" two days after commit e619dd3d6 made the register 52/52). This derives
+    the coverage by parsing the register's own table rows — combined rows
+    ("| 039/040 …", "| 037/033/034/043/044/045/046 …") count each id — so the box
+    cannot rot silently again. A checkbox is not a gate; this is the gate.
+    """
+    path = os.path.join(_ROOT, "docs", "reviews", "DILIGENCE_2026-08-23_RESPONSE.md")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            txt = fh.read()
+    except OSError as e:
+        return _unknown(f"register unreadable: {e}")
+    ids: set[int] = set()
+    for m in re.finditer(r"^\|\s*(\d{3}(?:/\d{3})*)\s", txt, re.M):
+        for part in m.group(1).split("/"):
+            ids.add(int(part))
+    found = sorted(i for i in ids if 1 <= i <= TOTAL_DIL_FINDINGS)
+    missing = [f"DIL-{i:03d}" for i in range(1, TOTAL_DIL_FINDINGS + 1) if i not in ids]
+    if missing:
+        return _bad(
+            f"{len(missing)} of {TOTAL_DIL_FINDINGS} DIL ids have NO register row",
+            [f"missing: {', '.join(missing)}"],
+        )
+    return _ok(
+        f"all {TOTAL_DIL_FINDINGS} DIL ids carry a register disposition row (derived by parse)",
+        [f"row ids found = {len(found)} of {TOTAL_DIL_FINDINGS}"],
+    )
+
+
 PLAYBOOKS: list[tuple[str, str, str, Callable[[], Verdict]]] = [
     ("production_approval_gate", "control", "DIL-004", control_production_approval_gate),
     ("main_ruleset_active", "control", "DIL-005", control_main_ruleset_active),
     ("vulnerability_alerts_enabled", "control", "DIL-006", control_vulnerability_alerts_enabled),
     ("codeql_alerts_triaged", "control", "DIL-018", control_codeql_alerts_triaged),
+    ("register_maps_all_52", "control", "DIL-register", control_register_maps_all_52),
     ("no_private_markers_in_tree", "privacy", "DIL-001", privacy_no_private_markers_in_tree),
     ("relocated_docs_are_404", "privacy", "DIL-001", privacy_relocated_docs_are_404),
     ("public_api_serves_no_owner_only_field", "privacy", "DIL-008/011", privacy_public_api_serves_no_owner_only_field),
@@ -610,7 +645,9 @@ def covered_dils(results: list[dict]) -> set[str]:
     for r in results:
         stem, _, rest = r["dil"].partition("-")  # "DIL-008/011" → several ids
         for part in rest.split("/"):
-            if part.strip():
+            # Numeric only: meta-playbooks (e.g. "DIL-register") assert the register
+            # itself, not a finding, and must not inflate the live-asserted count.
+            if part.strip().isdigit():
                 out.add(f"{stem}-{part.strip()}")
     return out
 
