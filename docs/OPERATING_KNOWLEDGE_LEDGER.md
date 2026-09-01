@@ -691,6 +691,8 @@ user_who_is_matthew.md
 | `reference_rerun_reuses_the_original_merge_commit.md` | reference | `docs/CONVENTIONS.md` §6 CI-recovery table (rerun reuses the stale merge ref — update-branch, never rerun --failed) | already-homed |
 | `reference_reordering_sync_steps_changes_what_each_step_owns.md` | reference | `docs/CONVENTIONS.md` §7 (reordering a sync changes ownership — assert include sets disjoint); INCIDENT_LOG 2026-08-31 P1 | homed-here |
 | `reference_stack_census_prs_on_a_nonstrict_ruleset.md` | reference | `docs/CONVENTIONS.md` §7 (stack census-bumping PRs; re-rebase after each squash) | homed-here |
+| `reference_a_filed_issues_mechanism_is_a_hypothesis.md` | reference | `docs/CONVENTIONS.md` §7 (a filed issue's stated mechanism is a hypothesis — reproduce before implementing; `describe-stack-events` is the decisive "did that deploy ship X") | homed-here |
+| `reference_future_genesis_breaks_rules_not_just_tests.md` | reference | `docs/CONVENTIONS.md` §7 (a staged future genesis breaks genesis-anchored RUNTIME rules, not just tests — bound the floor by `today`, never skip pre-start) | homed-here |
 | `security_r22_mcp_token_exposure.md` | security | — off-repo by design: security-incident detail stays out of the public repo (`docs/CONTINUITY.md` §4); the fixes are recorded on #779/#780/#893 and in `docs/DECISIONS.md` | off-repo |
 
 ## Program and session records — `project_*`
@@ -704,6 +706,8 @@ carries an operating rule.
 |---|---|---|---|
 | `project_adr046_generated_prefix.md` | project | `CLAUDE.md` (S3 prefix separation) + `docs/DECISIONS.md` ADR-046 | already-homed |
 | `project_agrade_d2_drain_2026_08_24.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
+| `project_session_o_launch_2026_08_31.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
+| `project_session_p_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_agrade_program_2026_08_23.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_alarm_board_2026_08_15.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_arch781_layer_retirement.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |

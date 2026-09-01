@@ -146,7 +146,7 @@ output may already be live — leaving `main` both behind production and red.
 
 Source: #216, then the 2026-06-29 recurrence (`feedback_squash_merge_drops_unpushed_commits`).
 
-**A docs-only push can red every PR while main's badge stays green (#2899 class, 2026-08-31).** ci-cd.yml's `paths:` filter declines a docs/CLAUDE.md-only commit, so a tree-evaluated gate that the commit trips (the as-of-future-date budget scan, any doc-facts assertion) never runs on main — it runs on every PR's merge ref instead, as one identical red across unrelated PRs. The wrap runs `pytest tests/test_doc_facts_budget_2899.py -q` on the FINAL tree before committing; at boot, several PRs sharing ONE failing test means suspect main's docs-only tail first. `check_main_green`'s GREEN plus a path-filter-skip HEAD vouches for an untested tree, not a clean one.
+**A docs-only push could red every PR while main's badge stayed green (#2899 class) — CURED 2026-09-01 by #3378.** ci-cd.yml's push-to-main `paths:` filter used to decline a docs/CLAUDE.md-only commit, so a tree-evaluated gate that the commit tripped (the as-of-future-date budget scan, any doc-facts assertion) never ran on main — it ran on every PR's merge ref instead, as one identical red across unrelated PRs. **There is no longer a `paths:` filter on that trigger: every push to main mints a real verdict** (see §4a0). Three consequences worth keeping: (a) the wrap's `pytest tests/test_doc_facts_budget_2899.py -q` on the FINAL tree is now belt-and-braces rather than the only defence — keep running it, because catching a red before pushing still beats catching it after; (b) at boot, several PRs sharing ONE failing test still means suspect main's tail first, though it is now a genuinely red main rather than an untested one; (c) `check_main_green`'s `path-filter-skip` state is **unreachable for ci-cd on main**, so a zero-run HEAD there is unambiguously a swallow — the classifier still implements the state for other workflows and for the recorded incidents its tests replay.
 
 ## 4. CI gate ordering — one job, independently-reporting gates
 
@@ -252,6 +252,28 @@ is not distinguishable from "failed". Adding a `paths:` filter to either workflo
 status to be reported". `tests/test_branch_protection_spec.py` reds on exactly that.
 Desired state: `deploy/github_posture.json`. Writer: `scripts/apply_branch_protection.py`
 (`--check` to verify, `--apply` to fix). Never edit the ruleset in the GitHub UI.
+
+**On `main` itself, ci-cd.yml has NO push `paths:` filter (#3378, 2026-09-01).** Every
+push to `main` runs the pipeline, so every tip earns its own verdict instead of inheriting
+the last one. Do not re-add a filter: `tests/test_ci_main_push_coverage.py` reds on it, and
+the reason is that every previous version of that list was wrong in the same direction —
+DEVOPS-01 (2026-06-30) added `cdk/ci/config/workflows` after IAM and alarm changes reached
+main with no pipeline; #2881 (2026-08-18) added `deploy/` after the file that gates every
+site deploy earned exactly one run; `scripts/**` was never on it at all, though the lint job
+black-checks that directory. **The list was the defect.**
+
+What it costs, measured rather than assumed (run `33459108973`): ~39 min wall on the
+critical path and **$0** — the repo is public on `ubuntu-latest`, where standard runners
+bill no minutes. It adds **no deploy and no AI spend**: `plan`'s deploy matrix diffs only
+`lambdas/ mcp/ mcp_server.py`, so `has_deploys` is false for a docs-only push and the
+`deploy` job's `if:` is false; `visual-qa` carries `needs: [reconcile, deploy]` with no
+`always()`, so a skipped dependency skips it and the Bedrock vision gate never fires.
+
+Two consequences to expect. A `site/**`-only push now runs the `reconcile` job (§4c), which
+dispatches `site-deploy.yml` if the generators dirty `site/**` — wanted, terminates via the
+`[skip-reconcile]` guard, and only fires when the pushed tree was already stale. And the
+`Unit Tests` job now runs on every push, which raises total runner time and the queueing
+term the duration budget is mostly made of (#3403).
 
 ### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
 
@@ -959,6 +981,40 @@ a grant that moved.
   non-strict, but GitHub still reports the stacked branch CONFLICTING after the squash).
   `deploy/merge_train.sh` cannot resolve the baseline file; the stack resolves each hunk once.
 
+- **A filed issue's stated MECHANISM is a hypothesis — reproduce it before implementing its
+  fix.** `feedback_verify_agent_findings` covers subagent output; the same holds for an
+  issue a previous session filed while something was on fire, because its Fix-shape section
+  inherits whatever was wrong with its Problem section. Measured 2026-09-01: #3396 asserted
+  that `restart_pipeline`'s `cdk deploy --all` "does not ship site-api CODE". It does —
+  `serve_stack.py` passes no `code=` override and `lambda_helpers.py:309` resolves that to
+  `staged_tree_asset()`. **The decisive instrument is `aws cloudformation
+  describe-stack-events`** scoped to the deploy window (`SiteApiLambdaA5C2FE08
+  UPDATE_COMPLETE` at 20:13:43Z, inside the reset's own deploy); a Lambda's `LastModified`
+  shows only the most recent touch and answers nothing about an earlier one. Three more
+  hypotheses died the same way (the staged bundle on disk carried the NEW genesis;
+  `stage_tree()` `rmtree`s so the asset hash always moves; `/api/source_freshness` is
+  `no-cache, no-store` so the CDN was never holding it). **When the mechanism disproves but
+  the symptom is real:** ship the check that catches the symptom cause-agnostically, say
+  plainly that the root cause is not established, close on a corrected Outcome with each
+  disproven box recorded — and file no speculative carrier, because an unexplained event
+  that now has a detector on it does not need a second owner.
+
+- **A staged FUTURE genesis breaks genesis-anchored RUNTIME rules, not just tests.** Session
+  O fixed five time-anchored *test* families on the cycle-15 eve; #3401 is the same class on
+  the operational plane. `phase_plausibility`'s R7 night floor was `genesis - 1`
+  unconditionally, so on the day before Day 1 it named *tonight* — a night nobody had slept
+  — and raised a `high` against a payload satisfying the platform's own
+  `night_of + 1 == as_of_date` convention, holding `qa-smoke-failures` in ALARM through
+  launch eve. **After any future-genesis reset, grep for bounds derived from
+  `EXPERIMENT_START` / `start_date` / `genesis` and ask of each: can this bound name a
+  moment that has not happened yet?** The fix shape is **bound, don't skip** —
+  `min(genesis - 1, today - 1)`. A pre-start skip is the tempting cure and the wrong one:
+  R6/R7 run outside the pre-start guard precisely because a staged genesis is when a stale
+  prior-cycle row is most likely to leak. Post-start the term is inert, so assert both
+  halves — the fix is only worth having if the leak it was built for still reds. Degrade to
+  the OLD bound without a clock, and pin the production call site in a test (#3337: a
+  today-aware rule silently running without a clock is its own defect).
+
 ---
 
 ## 8. The wiki stays true — the four-layer contract
@@ -1150,7 +1206,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | Defect class | Owning gate | Where |
 |---|---|---|
 | Unformatted/unsorted Python, a stale-typed module, a syntax error | Lint job (`black`/`ruff`/`mypy`/`py_compile`) | §4 above |
-| A `deploy/**`-only push (e.g. `smoke_test_site.sh`, the script that can auto-rollback the public site) reaches main with ZERO CI runs — a legitimate `paths:` skip indistinguishable from a swallowed push (#2881, DEVOPS-01 class) | `deploy/**` added to `ci-cd.yml`'s push `paths:`; a new `bash -n` syntax-check step in `ci-lint.yml` closes the gap black/ruff/py_compile never covered (shell scripts) | `.github/workflows/ci-cd.yml` push `paths:`; `ci-lint.yml` step "Shell syntax check (bash -n)" (#2881) |
+| A `deploy/**`-only push (e.g. `smoke_test_site.sh`, the script that can auto-rollback the public site) reaches main with ZERO CI runs — a legitimate `paths:` skip indistinguishable from a swallowed push (#2881, DEVOPS-01 class) | `deploy/**` added to `ci-cd.yml`'s push `paths:`; a new `bash -n` syntax-check step in `ci-lint.yml` closes the gap black/ruff/py_compile never covered (shell scripts) | `ci-lint.yml` step "Shell syntax check (bash -n)" (#2881). **The `paths:` half is history: #3378 removed the filter entirely on 2026-09-01** — this row records the third of three attempts to enumerate the right list, and §4a0 records why enumerating it was the defect. |
 | A Lambda/CDK deploy artifact or its wiring is broken (IAM, handler names, DDB patterns, MCP registry) | `test-critical` deploy-critical lane (ADR-117) | §4a above |
 | A merged IAM grant sits undeployed because its only path is an owner-run `cdk deploy` — OR an IAM change ships through CI without a human reading it (the two failure modes the R8-ST6 grep traded between; INCIDENT_LOG 2026-08-14 P1 / 2026-08-15 P3) | Additive-IAM gate (#2834, ADR-065 amendment 2026-08-30): statement-level TEMPLATE diff — `ALLOW-ADDITIVE` deploys through CI (re-evaluated at apply time, `--exclusively`, convergence-proved, ledgered to `remediation-log/iam-additive-gate/`), `OWNER-REQUIRED` strands Plan by name, unparseable fails closed (exit 2); the allowed shape is a dated, ratcheted registry; the Deploy job reds if the verdict output is ABSENT | `deploy/iam_additive_gate.py` (+ `_registry`); `tests/test_iam_additive_gate{,_guards}_2834.py`; §4d(2) |
 | CloudFormation-via-CI grants or destroys outside the platform's namespace because the additive-IAM gate's parser was wrong, was skipped, or never saw the template — the residual the #2834 amendment named in writing (the cfn-exec role is `AdministratorAccess` with no boundary) | CDK cfn-exec permissions boundary (#3340, ADR-065 amendment 2026-08-31): one derived managed policy attached to all three regional exec roles — Allow broad, then 16 explicit Denies IAM enforces regardless of what the gate parses (protected S3 prefixes + the DIL-027 replica, IAM writes outside the enrolled name families, the fence removing itself, the account/audit/key/secret/data control planes, a region pin). The gate is the belt; this is the braces. Derived by `deploy/derive_cfn_exec_boundary.py`, asserted by `deploy/verify_oidc_iam.py --strict` (`BOUNDARY-MISSING`/`-DRIFT`/`-UNREADABLE` are all red), mutation-probed by `infra/iam/boundary_probe/` | `infra/iam/cdk-cfn-exec-boundary.boundary.json`; `tests/test_cfn_exec_boundary_3340.py`; `infra/iam/README.md` |
@@ -1196,7 +1252,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | The hook's `black`/`ruff` is a *different version* than CI pins — it blocks correct commits, and obeying it reds CI | Pinned-formatter resolution (#2570) | `deploy/lib/pinned_formatters.sh`, shared by the hook + `deploy/agent_commit.sh` + `make preflight` |
 | A doc-sync literal is stale at commit time | `sync_doc_metadata.py --apply`, auto-staged | `scripts/install_hooks.sh` |
 | A PR's check rollup is EMPTY, or non-empty but missing a required check, and ad-hoc `gh pr checks \| grep -c` tooling reads it as green (#2830) | PR-green rollup assertion — `total>0` AND `0` not-green AND every expected check present; parses both the `statusCheckRollup` and `gh pr checks --json bucket` dialects | `scripts/assert_pr_green.py`; expected set derived from `deploy/github_posture.json` |
-| A push to `main` mints ZERO workflow runs (the swallowed push) and no session is watching (#2826) | `head_coverage()` on `deploy-wedge-watch.yml`'s 15-min cron; three-way exit (0 ok / 1 confirmed swallow / 2 indeterminate) so it cannot fail dark. Distinguishes a genuine swallow from a path-filter skip and from a `GITHUB_TOKEN` bot push, which never dispatches | `scripts/check_main_green.py --head-coverage-check` |
+| A push to `main` mints ZERO workflow runs (the swallowed push) and no session is watching (#2826) | `head_coverage()` on `deploy-wedge-watch.yml`'s 15-min cron; three-way exit (0 ok / 1 confirmed swallow / 2 indeterminate) so it cannot fail dark. Distinguishes a genuine swallow from a path-filter skip and from a `GITHUB_TOKEN` bot push, which never dispatches. Since #3378 removed ci-cd.yml's push filter, the path-filter-skip state is unreachable for ci-cd on main — a zero-run HEAD there is a swallow or a bot push, nothing else | `scripts/check_main_green.py --head-coverage-check` |
 | A `gh run rerun --failed` after a main-side fix re-tests the STALE merge commit — the merge ref is snapshotted into the run at creation, so a rerun can never pick up the fix (verified live 2026-08-31: the rerun checked out `Merge <pr> into <pre-fix main>` and failed identically). Recovery: fix main, then mint FRESH runs per PR with `gh pr update-branch <n>` (or any branch push), and swallow-check each new head | procedure, not a gate — the reflex lives here; the wrapping session's memory carries the incident | (no script — a rerun-shaped fix is the defect) |
 | A PR's push is swallowed and the watcher polls `0/N green` for the full 30-minute timeout without ever saying so — twice in one session, ~10 min of dead polling each (#3219) | After `--zero-check-grace` (default 120s) with ZERO checks attached, `wait_pr_green.sh` classifies the FULL 40-char head sha and names the state. `swallowed` → **exit 5** (distinct from 1 = red/timeout) plus the recovery ladder; path-filter-skip / bot-push / indeterminate are named and polling continues. The classification is NOT reimplemented in bash — it shells out to `classify_zero_run_head` via the adapter below, because a second copy is how #3212 happened. Progress output distinguishes "no checks attached yet" from "N of M green" | `deploy/wait_pr_green.sh`; `scripts/check_main_green.py --classify-sha <FULL-40-CHAR-SHA>` |
 | A file that ships in every Lambda bundle changes, but the deploy plan does not notice — the run goes green with `Deploy: skipped` and production keeps the old value (#2920) | Bundled-config deploy triggers **derived** from what `build_bundle.py` stages, not hand-typed. The old `food_vocabulary.json`-only special case is exactly how `config/personas.json` (and 14 `config/coaches/*.json`) went untriggered | `deploy/build_bundle.py --print-bundled-config-paths`; guard `tests/test_bundle_deploy_trigger_registry.py` |
