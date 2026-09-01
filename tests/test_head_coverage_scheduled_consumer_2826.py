@@ -31,17 +31,31 @@ spec.loader.exec_module(cmg)
 # ─────────────────────────────────────────────────────────────────────────
 
 
-def test_ci_cd_push_paths_parses_the_real_file():
-    """Against the actual checked-in workflow, not a fixture — this is the
-    file `main_head_coverage()` reads live, so a stale hand-copied fixture
-    could pass while the real parse silently returned []."""
+def test_ci_cd_push_paths_finds_no_filter_on_the_real_file():
+    """Against the actual checked-in workflow, not a fixture — this is the file
+    `main_head_coverage()` reads live.
+
+    #3378 (2026-09-01) REMOVED ci-cd.yml's `paths:` filter, so the live parse now
+    legitimately returns []. The old assertion here named three patterns it expected to
+    find; it is inverted rather than deleted, because the reason it existed still holds —
+    this is the live read, and a silently-empty result used to be indistinguishable from a
+    parse failure. It no longer is: the absence is pinned by
+    tests/test_ci_main_push_coverage.py, which reds if anyone re-adds a filter.
+
+    The consequence for THIS module is the load-bearing half. With no filter, the empty
+    pattern list means every changed path is in scope (`path_matches_ci_filter` fails
+    toward in-scope by design), so a zero-run HEAD on main is unambiguously a SWALLOW —
+    `path-filter-skip` is now unreachable for ci-cd.yml on main. The classifier still
+    implements that state and the tests below still cover it, driven by the frozen
+    CI_PATHS frame rather than the live file: another workflow, or a future filter, can
+    still produce one, and the recorded 8cbf075f incident must keep replaying under the
+    filter it actually happened beneath.
+    """
     with open(os.path.join(_REPO, ".github", "workflows", "ci-cd.yml")) as f:
         paths = cmg.ci_cd_push_paths(f.read())
-    assert "tests/**" in paths
-    assert ".github/workflows/**" in paths
-    assert "lambdas/**" in paths
-    # Neither of 8cbf075f's files should ever be governed by this filter.
-    assert not cmg.path_matches_ci_filter(["CLAUDE.md", "handovers/HANDOVER_LATEST.md"], paths)
+    assert paths == [], f"ci-cd.yml re-acquired a push `paths:` filter: {paths} — see #3378"
+    # An empty filter means "everything is in scope", never "nothing is".
+    assert cmg.path_matches_ci_filter(["CLAUDE.md", "handovers/HANDOVER_LATEST.md"], paths) is True
 
 
 def test_bare_on_key_is_handled_despite_pyyaml_yaml11_gotcha():
@@ -225,6 +239,9 @@ def test_path_filter_skip_replay_8cbf075f_shape_exits_0_silently(monkeypatch, ca
         }
     )
     monkeypatch.setattr(cmg, "_gh_json", gh)
+    # Replay under the filter this incident actually ran beneath (#3378 removed the live
+    # one; main_head_coverage() reads it from disk, so it is pinned here, not stubbed away).
+    monkeypatch.setattr(cmg, "ci_cd_push_paths", lambda _text: list(CI_PATHS))
     assert cmg.main_head_coverage() == 0
     out = capsys.readouterr().out
     assert "SWALLOWED" not in out
@@ -280,11 +297,15 @@ def test_exit_codes_are_pairwise_distinct():
 
 
 def _ci_paths():
-    import os
+    """The RECORDED pre-#3378 filter, not the live file.
 
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open(os.path.join(root, ".github", "workflows", "ci-cd.yml")) as f:
-        return cmg.ci_cd_push_paths(f.read())
+    These are replays of incidents that happened while ci-cd.yml carried a `paths:`
+    filter (8cbf075f, PR #2916's head). #3378 removed that filter on 2026-09-01, so
+    reading the live file would replay them under a frame they never ran in — and every
+    path-filter-skip assertion below would flip to swallowed for a reason that has
+    nothing to do with the behaviour under test. A replay runs under its own frame.
+    """
+    return list(CI_PATHS)
 
 
 def test_reconcile_commit_by_bot_is_expected_not_swallowed():
