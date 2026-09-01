@@ -5,13 +5,20 @@
     <link>https://averagejoematt.com/story/chronicle/</link>
     <description>The weekly chronicle of an ordinary life, measured in full — every number, every week, including the weeks it dips. Written by Elena Voss.</description>
     <language>en-us</language>
-    <lastBuildDate>Mon, 31 Aug 2026 20:20:03 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 01 Sep 2026 02:21:58 +0000</lastBuildDate>
     <atom:link href="https://averagejoematt.com/rss.xml" rel="self" type="application/rss+xml"/>
     <image>
       <url>https://averagejoematt.com/assets/images/og-image.png</url>
       <title>The Measured Life — averagejoematt</title>
       <link>https://averagejoematt.com/story/chronicle/</link>
     </image>
+    <item>
+      <title>The Plan, On the Record</title>
+      <link>https://averagejoematt.com/journal/posts/week-03/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=chronicle</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-03/</guid>
+      <description>Tomorrow morning — September 1, 2026 — a scale in a quiet bathroom records the first number of a twelve-month experiment. Today, while that number is still a blank, we are doing the thing that separates a documented experiment from a highlight reel: writing the whole plan down, in public, before…</description>
+      <pubDate>Mon, 31 Aug 2026 12:00:00 +0000</pubDate>
+    </item>
     <item>
       <title>The Night Before Everything</title>
       <link>https://averagejoematt.com/journal/posts/week-02/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=chronicle</link>

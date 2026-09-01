@@ -5,49 +5,7 @@
     <link>https://averagejoematt.com/method/wrong/</link>
     <description>Every graded failure, in public — what the model believed, the number that killed it, and what changed. Deterministic verdicts only.</description>
     <language>en-us</language>
-    <lastBuildDate>Mon, 31 Aug 2026 20:20:04 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 01 Sep 2026 02:22:00 +0000</lastBuildDate>
     <atom:link href="https://averagejoematt.com/method/wrong/rss.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>The AI was wrong: hrv_7day_avg trend=down (slope=-0.0268), predicted=up</title>
-      <link>https://averagejoematt.com/moments/wrong/a436a5df6237/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=wrong</link>
-      <guid isPermaLink="true">https://averagejoematt.com/moments/wrong/a436a5df6237/</guid>
-      <description>hrv 7day avg measured -0.03 — hrv_7day_avg trend=down (slope=-0.0268), predicted=up</description>
-      <pubDate>Mon, 31 Aug 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The AI was wrong: blood_glucose_avg trend=up (slope=0.1479), predicted=down</title>
-      <link>https://averagejoematt.com/moments/wrong/3bcf4f94460a/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=wrong</link>
-      <guid isPermaLink="true">https://averagejoematt.com/moments/wrong/3bcf4f94460a/</guid>
-      <description>blood glucose avg measured 0.15 — blood_glucose_avg trend=up (slope=0.1479), predicted=down</description>
-      <pubDate>Mon, 31 Aug 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The AI was wrong: blood_glucose_std_dev trend=up (slope=0.8927), predicted=down</title>
-      <link>https://averagejoematt.com/moments/wrong/3bed4057f444/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=wrong</link>
-      <guid isPermaLink="true">https://averagejoematt.com/moments/wrong/3bed4057f444/</guid>
-      <description>blood glucose std dev measured 0.89 — blood_glucose_std_dev trend=up (slope=0.8927), predicted=down</description>
-      <pubDate>Mon, 31 Aug 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The AI was wrong: blood_glucose_avg trend=up (slope=0.1479), predicted=down</title>
-      <link>https://averagejoematt.com/moments/wrong/2783a79ac934/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=wrong</link>
-      <guid isPermaLink="true">https://averagejoematt.com/moments/wrong/2783a79ac934/</guid>
-      <description>blood glucose avg measured 0.15 — blood_glucose_avg trend=up (slope=0.1479), predicted=down</description>
-      <pubDate>Mon, 31 Aug 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The AI was wrong: hrv_7day_avg trend=down (slope=-0.0268), predicted=up</title>
-      <link>https://averagejoematt.com/moments/wrong/06d946009470/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=wrong</link>
-      <guid isPermaLink="true">https://averagejoematt.com/moments/wrong/06d946009470/</guid>
-      <description>hrv 7day avg measured -0.03 — hrv_7day_avg trend=down (slope=-0.0268), predicted=up</description>
-      <pubDate>Mon, 31 Aug 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The AI was wrong: hrv_7day_avg trend=down (slope=-0.0268), predicted=up</title>
-      <link>https://averagejoematt.com/moments/wrong/4493f1d453e5/?utm_source=rss&amp;utm_medium=feed&amp;utm_campaign=wrong</link>
-      <guid isPermaLink="true">https://averagejoematt.com/moments/wrong/4493f1d453e5/</guid>
-      <description>hrv 7day avg measured -0.03 — hrv_7day_avg trend=down (slope=-0.0268), predicted=up</description>
-      <pubDate>Mon, 31 Aug 2026 12:00:00 +0000</pubDate>
-    </item>
   </channel>
 </rss>
