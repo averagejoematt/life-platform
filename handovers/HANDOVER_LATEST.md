@@ -108,3 +108,150 @@ than what they measured — a quality gate that returned nothing while looking h
 gate that invented an owner out of a date and thereby masked a real dead citation, and a
 swallow-detector that answers "0 runs" to a question it was never asked. In each case the green
 came from the instrument not being able to fail.
+
+---
+
+## Plan for Session R (written 2026-09-01, post-wrap — owner-approved in-session)
+
+Owner context for the reader of this plan: Fable is back and set as the default model; the owner asked for "a good plan for the next session — either getting workable open items to zero, or skills/other ideas: improving SDLC, autonomous agents toward zero-touch, bug bashing, architecture/design review". The three shaping questions below were asked and answered by the owner before this plan was approved. An architecture review was deliberately NOT chosen: the 09-08 Architect-ritual run covers it days later and is itself a dead-man (#2849's reopen trigger).
+
+## Context
+
+Fable is back (owner set it as default this session), which lifts the September
+"bug-fix-only on Opus" constraint for session work — the owner's posture (he USES the
+platform; the platform doesn't demand his time) is unchanged and this plan records that
+distinction. Session Q closed the launch-day P1 and wrapped clean; the backlog now holds
+**~9 startable items**, one Now epic whose children are ALL closed (#3042), and a
+top-of-queue P1 that was waiting for Fable (#1407 — deliberately NOT this session's
+flagship; owner chose the A-Grade closeout instead, and #1407 remains the obvious next
+flagship after it).
+
+Owner's three shaping calls (asked and answered):
+1. **Flagship: #3042 A-Grade closeout** — dispose the remaining DIL-IDs, run the re-assessment.
+2. **Zero-touch: design-first, filed issues** — no building this session.
+3. **Fan-out: full drain (~8-9 lanes).**
+
+One discovery reframes the zero-touch phase: **the autonomy survey already happened.**
+#2849 ("the resident operator") closed 2026-08-30 having delivered the substrate spike
+(`docs/OPERATOR_SUBSTRATE_SPIKE.md`), a five-role operating staff (Engineering /
+Production support / QA / Architect / Reader) with an ADR-129-style authority ladder,
+and one leg live: the `architect-operator-2849` weekly routine, **first real run
+2026-09-08** with a written reopen trigger if it produces no report PR. So Phase 3 files
+the *next legs of that staff*, grounded in Session Q's measured pain — it does not
+invent a parallel autonomy program.
+
+## Phase 0 — Boot, leases, and loose ends from Session Q (~20 min)
+
+- **Dispose the parked CI/CD leases.** The wrap push (`6a935ae8e`) and this plan's own
+  docs-only commit each mint a gated CI/CD run that parks at the production approval gate.
+  Reject ancestors, approve the tip; hold ONE persistent lease steward for the whole session (memory:
+  `reference_lease_steward_must_outlive_the_tip`) — the full drain will mint one lease
+  per merge and Session Q disposed 4 by hand.
+- **Confirm the wrap sha settled green** (swallow-check with the FULL sha —
+  `gh api "repos/$REPO/actions/runs?head_sha=$FULL"`; a short sha returns 0 silently).
+- **#3394**: the visual-qa cron fires in practice ~22:30–23:45Z; it should have
+  auto-closed overnight. If still open with a fresh failure, it becomes a drain lane.
+- **The 7-persona probe** (#3413's stated-unmeasured worst case): the rate window is
+  open. One `POST /api/board_ask` with all 7 coach ids, report the real wall time on
+  closed #3413. If it breaches ~30s, file the fan-out issue (parallelize or
+  deadline-aware persona cap) — that's the pre-agreed disposition, not a re-litigation.
+- **Usage headroom check before the fan-out** (memory: `feedback_usage_headroom_before_fanout`).
+
+## Phase 1 — The full drain (~8 lanes, worktree-implementer fan-out)
+
+Standing sanctioned fan-out: one issue per lane, isolated worktrees, PRs behind full CI,
+merged through the reconcile-branch / stacked-census discipline. Lanes by stored rank:
+
+| Lane | Issue | Shape |
+|---|---|---|
+| 1 | **#3369** (Now·P3) | diff the two daily prose-truth judges' claim sets → merge or record complementarity (≤−$2-3/mo) |
+| 2 | **#3374 R1+R3** (Now·P3) | cost-surface baseline ratchet into the #2845 model-drift gate + per-feature AI budget ledger, `unknown` down-only at $33.19 (R2 shipped) |
+| 3 | **#3395** (Next·P2) | site rollback's SMOKE leg gets a reachability scope (the #3352 gap, smoke edition) |
+| 4 | **#3399** (Next·P2) | reader-truth judge: `basis:"withdrawn"` emitted 0 times in 35 findings; a self-withdrawn finding gated as `impossibility` |
+| 5 | **#3414** (Next·P3) | board voice verdict on an async channel — the gate already runs to completion and is billed; wire-contract change, brief path byte-unchanged |
+| 6 | **#3417** (Next·P3·sonnet) | correct the "scale is weight-only" comments; record the body-comp-delta decision + lean-mass-floor instrument (absence semantics per NEW_SIGNAL_PLAYBOOK — sparse/behavioral, n=2 real scans) |
+| 7 | **#3418** (Next·P3) | discriminate the three hypotheses on the recurring `Pending owner cdk deploy` warnings — compare DEPLOYED template vs CI synth vs local pinned synth for one Web `Comment` field; if CI synth diverges, they're unclearable by deploying |
+| 8 | **#3376** (Later·P3) | per-door page-view instrumentation for the three most expensive features |
+
+Parked, with reasons the lanes must not override: **#3403** (its own acceptance requires
+a week of post-#3378 duration data — earliest ~09-08), **#2978** (`blocked:date`),
+**#2883 + #3390** (`gate:owner` — surface both as numbered owner asks at wrap),
+**#3373** (fable design work — folds into Phase 3's filing pass instead of a lane).
+
+Merge-train discipline (all from memory, all bitten before): assert the expected check
+set BY NAME before any merge; swallow-check every push by FULL sha; rebase census PRs
+onto the previous PR's tip and re-rebase after EACH squash; lane-unique scratchpad
+filenames; the steward rejects ancestors and approves only the tip.
+
+## Phase 2 — Flagship: the #3042 A-Grade closeout (Fable)
+
+All 16+ child stories are CLOSED; the epic's live gap is the register and the
+re-assessment. (Memory: epic checklists are stale by construction — reconcile the boxes
+from live child state first.)
+
+1. **Dispose the remaining DIL-IDs** in `docs/reviews/DILIGENCE_2026-08-23_RESPONSE.md`
+   (20 of 52 done as of 08-31). Dispositions come from evidence — the closed children
+   (#3043-#3050, #3113-#3128, #3278, #3340) and `scripts/diligence_verify.py`'s live
+   asserts — never from re-narration. Each row: CONFIRMED-fixed / STALE-corrected /
+   WRONG-evidenced / PRICED-accepted-with-date.
+2. **Run the re-assessment** against the original report's §12 acceptance matrix on the
+   non-commercial domains, via the `/review` spine (the platform's graded-review ritual)
+   with the diligence rubric as the anchor set; adversarial verification pass on every
+   finding (finding-verifier — ~50% of first-pass findings are historically false).
+3. **The honesty gate on closing:** the epic's outcome asks for an *external*
+   re-assessment ≥9/10. A self-run review with fresh-context agents is the sanctioned
+   equivalent of how the ORIGINAL diligence was produced, but that equivalence is the
+   owner's call, not the session's. If any domain scores <9, or the owner hasn't blessed
+   the equivalence, the epic stays OPEN with the register complete and a one-line ask —
+   an epic can pass every box and fail its Outcome, and the Outcome sentence decides.
+4. `diligence_verify.py` must exit clean after the register edits; the epic body's
+   "Done when" boxes get reconciled to live state in the same pass.
+
+## Phase 3 — Zero-touch: file the next legs of the #2849 operating staff (design-first)
+
+No building. Each item lands as an ADR-099 issue citing `docs/OPERATOR_SUBSTRATE_SPIKE.md`,
+with its staff role, authority tier (observe → propose-PR → act; never auto-promote),
+substrate leg, and an ADR-103 rent line. Candidates, each grounded in measured evidence:
+
+1. **Production-support leg: the reject-only lease steward.** Session Q disposed 4 leases
+   by hand; the reject half is fully mechanical (a superseded ancestor is derivable from
+   the run DAG) and `check_main_green.py` already reads rejection comments back as
+   "not a red main". Authority: act, but REJECT-ONLY — approval stays human, consistent
+   with the owner decision that retired the remediation agent's auto mode.
+2. **Production-support leg: reader-facing canary escalation.** `ai-canary-overall` was
+   red 31h across launch day with immediate detection and zero escalation — it sat under
+   the 72h citation bar. Candidate: alarms whose Outcome audience is `reader` page or
+   escalate on first red, not at 72h. (This is the incident row's own lesson.)
+3. **Engineering leg pilot.** The spike's own acceptance names it: "the Engineering
+   role's first week of PRs opened with zero owner terminal sessions" —
+   `backlog_next.py` → worktree-implementer → PRs, propose-only, weekday-scheduled,
+   budget-tier-gated. Phase 1 of this session is the manual dress rehearsal; file the
+   pilot with Phase 1's measured cost/outcomes as the sizing evidence.
+4. **Fold #3373** (feature/cost-toggle kill-switch registry) into the staff frame — it
+   is the "act" tier's precondition for any Production-support automation (a kill switch
+   per feature), so its issue gets that dependency stated and possibly a promotion.
+5. **The unfiled 4%** — `coach-quality-gate` exceeding its own 30s ceiling on 8/211
+   invocations (~4% of brief coach sections silently ungated): put the owner decision in
+   the issue text rather than leaving it in a handover bullet.
+
+Explicitly NOT in scope: reopening #2849 (that's the 09-08 architect run's dead-man),
+any auto-merge or auto-approve authority, AgentCore (declined per ADR-103 with a dated
+revisit trigger — respect it).
+
+## Phase 4 — Wrap
+
+Standard `/wrap`. Likely build beat: the A-Grade closeout (if it honestly closes) or the
+drain count. Owner asks to surface, numbered: (1) #2883's gate:owner act, (2) #3390's
+weigh-in — and per #3417, the full-scan handles, (3) the coach-quality-gate 4% decision,
+(4) the external-equivalence call on #3042's re-assessment.
+
+## Verification
+
+- Every lane: full CI green by named check set; merged through the train; deploy leases
+  disposed by the persistent steward; post-merge verify by shipped CONTENT where a lambda
+  changed.
+- #3042: `python3 scripts/diligence_verify.py` exits 0; register grep shows 52/52
+  dispositions; the re-assessment scorecard is committed under `docs/reviews/` with per-
+  domain scores and n/uncertainty per ADR-105.
+- Phase 3: `python3 scripts/check_backlog_hygiene.py` green over the newly filed issues.
+- Session end: `python3 scripts/wrap_gates.py` + `--verify` both green.
