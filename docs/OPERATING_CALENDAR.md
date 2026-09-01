@@ -17,11 +17,14 @@ dated artifact, and the dead-man reds when a window closes empty.
 | Ritual | Procedure | Cadence | Grace | Attendance | Run artifact (the clock) |
 |---|---|---|---|---|---|
 | fullreview-delta | `/review full` | 7d | +3d | autonomous | `docs/reviews/` · `^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partial)?\.json$` |
+| rhythm-checkpoint-30d | ledger re-read | 30d | +7d | owner-attended | dated line in `docs/OPERATING_RHYTHM.md` · `^- 30-day checkpoint: (\d{4}-\d{2}-\d{2})` |
 | accuracy-full | `/review accuracy` | 31d | +7d | session | `docs/reviews/` · `^EDITORIAL_ACCURACY_REVIEW_(\d{4}-\d{2}-\d{2})\.md$` |
 | craft-review | `/review craft` | 31d | +7d | session | `docs/reviews/` · `^craft_grades_(\d{4}-\d{2}-\d{2})\.json$` |
 | emf-series-census | ledger re-read | 31d | +7d | session | dated line in `docs/PROPORTIONALITY.md` · `^- EMF census: (\d{4}-\d{2}-\d{2})` |
 | fullreview-full | `/review full` | 31d | +7d | session | `docs/reviews/` · `^fullreview_grades_(\d{4}-\d{2}-\d{2})\.json$` |
 | managed-where-reverify | ledger re-read | 31d | +7d | session | dated line in `docs/MANAGED_WHERE_LEDGER.md` · `^- Re-verified: (\d{4}-\d{2}-\d{2})` |
+| rhythm-checkpoint-60d | ledger re-read | 60d | +7d | owner-attended | dated line in `docs/OPERATING_RHYTHM.md` · `^- 60-day checkpoint: (\d{4}-\d{2}-\d{2})` |
+| rhythm-checkpoint-90d | ledger re-read | 90d | +7d | owner-attended | dated line in `docs/OPERATING_RHYTHM.md` · `^- 90-day checkpoint: (\d{4}-\d{2}-\d{2})` |
 | frontier-plan | `/frontier-plan` | 92d | +14d | owner-attended | `docs/reviews/` · `^FRONTIER_REVIEW_(\d{4}-\d{2}-\d{2})\.md$` |
 | proportionality-reread | ledger re-read | 92d | +14d | owner-attended | dated line in `docs/PROPORTIONALITY.md` · `^- Re-read: (\d{4}-\d{2}-\d{2})` |
 | sdlc-review | `/review sdlc` | 92d | +14d | owner-attended | `docs/reviews/` · `^sdlc_review_grades_(\d{4}-\d{2}-\d{2})\.json$` |
@@ -31,6 +34,12 @@ dated artifact, and the dead-man reds when a window closes empty.
 - **emf-series-census**: Run `python3 deploy/emf_series_census.py --strict`; resolve any over-budget or unregistered namespace in deploy/emf_namespace_ledger.py BEFORE appending the dated line the probe reads — a line appended over a red records a number nobody acted on
 - **managed-where-reverify**: Walk every ledger row against LIVE state (gh api for the GitHub rows, read-only aws for the AWS rows); update each probed row's Verified cell and append the dated log line the probe reads
 - **proportionality-reread**: Walk the whole ledger: every posture either re-earns its keep or gets its demote trigger pulled (the ADR-129 worked precedent)
+- **rhythm-checkpoint-30d**: Answer the 30-day section of docs/OPERATING_RHYTHM.md from OBSERVED behaviour (which surfaces were opened, which were not, which coaches were texted) rather than from memory, and append the dated log line this probe reads
+- **rhythm-checkpoint-30d**: This is the first window in which a feature may be reconsidered at all — anything wanted before it waits, and anything wanted at it is filed as an issue with the lived usage that motivated it written into the body
+- **rhythm-checkpoint-60d**: Read September's close in docs/COST_TRACKER.md against what the platform actually DID for the owner that month — named, specific things, not a feeling; an honest 'nothing I can name' is a valid and important answer
+- **rhythm-checkpoint-60d**: Append the dated log line this probe reads, with the two numbers (spend, and the count of named returns) written down so the 90-day read has a prior
+- **rhythm-checkpoint-90d**: Decide the next feature horizon from three months of lived usage — what was used, what was ignored, what was missed — and file it; speculation from before the launch does not qualify as evidence at this checkpoint
+- **rhythm-checkpoint-90d**: Re-decide these three checkpoint rows themselves: each one is DELETED from the registry once it has served (an EXEMPT row cannot hold it — exemptions are for discovered review procedures, and the set guard reads a non-procedure key there as a phantom), or converted to a standing cadence with its own written reason
 - **sdlc-review**: Re-grade the QA-strategy scorecard against the #1425 targets (the #1451 obligation — it stopped when this ritual did)
 - **sdlc-review**: Revisit ADR-138's release-topology posture: are the compensating controls (3-layer QA, gating visual-QA, auto-rollback) still the honest staging substitute, and has the revisit trigger (real multi-user traffic) fired? (the #1338 obligation)
 
@@ -44,6 +53,9 @@ dated artifact, and the dead-man reds when a window closes empty.
 - **fullreview-full** — Deltas drift: each one grades against the last, so a slow slide can stay invisible to every individual delta. A monthly FULL run re-grades every area from scratch. The probe deliberately excludes _delta/_partial filenames — only a full-suffix-free grades file resets this clock.
 - **managed-where-reverify** — The out-of-IaC ledger sat self-stamped 'Verified 2026-07-09' for ~7 weeks while three GitHub rows inverted underneath it, and the 2026-08-23 external diligence review read the stale rows as current truth — manufacturing two P0 findings (DIL-004/DIL-006). A self-description doc is an external-assessment attack surface when stale; the probe reads the dated '- Re-verified:' log lines, not the header stamp, for the same reason proportionality-reread does (a bumped literal is not a re-read, #2986).
 - **proportionality-reread** — ADR-103/144's quarterly re-read was chained to two rituals that did not run. The probe reads the dated `- Re-read:` lines in the ledger's own Re-read log — NOT the `Verified:` stamp, which automation refreshes and which therefore cannot distinguish a real re-read from a literal bump (the stale-behind-a-fresh-timestamp class, #2986).
+- **rhythm-checkpoint-30d** — First occurrence 2026-10-01. From the 2026-09-01 launch the owner operates the platform instead of building it daily, and Claude sessions go bug-fix-only. Both failure modes of that switch are invisible from inside any single day: the rhythm quietly lapses, or feature work quietly resumes one 'small' change at a time. A dated checkpoint is the only thing that reads a month of behaviour as a month.
+- **rhythm-checkpoint-60d** — First occurrence 2026-10-31, deliberately after the September cost close lands rather than during it — the first full month of user-mode spend is the first month whose cost can be read against use rather than against building. Cost without a return read is half an instrument, which is how a platform stays expensive and unquestioned (ADR-103/144's ledger asks the same question per subsystem; this asks it once, for the whole thing, from the owner's chair).
+- **rhythm-checkpoint-90d** — First occurrence 2026-11-30. The roadmap decision is deferred to here on purpose: three months of use is the smallest sample that can distinguish 'I need this' from 'I imagined I would need this', and every roadmap this platform has written from speculation has been re-written from usage within a cycle. Ninety days is also long enough that the checkpoint must be on a clock — nobody remembers a November date they set in August.
 - **sdlc-review** — Grades the machinery and rituals themselves — ran once (2026-07-18), 'quarterly-ish', then silently stopped, taking its two standing obligations with it. Those obligations are now recorded HERE, on the calendar entry, so they cannot die with a session's memory again.
 
 ## The guarded SET — every judgment procedure, classified (#3250)
@@ -72,6 +84,24 @@ implements) unwritable rather than merely noticed.
 - **journey** (2026-08-22) — Re-audits the chat↔platform integration after integration work, event-driven by construction. The #2832 calendar cadences standing judgment; a ritual whose trigger is 'the seam changed' has an event for a clock already.
 - **platform** (2026-08-22) — Not in the #2832 adopted calendar: its ground (a broad defect sweep) is covered by the monthly fullreview-full entry's panel, which grades the same surface with anchors and a trend line; it never ran as a command in its own right. Revive deliberately with its own entry if that panel proves too narrow for a defect hunt — do not let it half-exist off-calendar.
 - **site** (2026-08-22) — Owner-attended editorial walkthrough of the public site — run when the site's story changes (a redesign, a new door), not on a clock. Cadencing an editorial judgment would manufacture runs with nothing to judge; the accuracy-full entry owns the site's monthly truth pass.
+
+## Scheduled first occurrences (a ritual whose clock starts later, #3378)
+
+An entry may declare `starts` — the dated day its clock BEGINS — when its first
+occurrence is genuinely in the future (the 2026-09-01 launch checkpoints). Until that
+first occurrence passes, a row with no artifact reads `SCHEDULED` rather than
+`NEVER-RUN`, because a checkpoint due in October is not a ritual anybody has stopped
+doing. `starts` moves the CLOCK only: the day the first occurrence passes, an
+artifact-less row goes `DUE` and then `OVERDUE` like any other, so absence is still
+louder than failure — at the right time instead of a month early. A first occurrence
+more than 120 days past adoption fails the guard: a row that can
+never be late is decoration.
+
+| Ritual | Clock starts | First occurrence | Hard by |
+|---|---|---|---|
+| rhythm-checkpoint-30d | 2026-09-01 | 2026-10-01 | 2026-10-08 |
+| rhythm-checkpoint-60d | 2026-09-01 | 2026-10-31 | 2026-11-07 |
+| rhythm-checkpoint-90d | 2026-09-01 | 2026-11-30 | 2026-12-07 |
 
 ## Dated holds (a deferral is a decision, #3250)
 

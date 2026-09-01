@@ -96,6 +96,26 @@ doc. Rules the guards enforce (tests/test_operating_calendar_2832.py): the reaso
 its cause issue, the window is bounded, and a hold NEVER suppresses the NEVER-RUN verdict —
 deferring a ritual cannot manufacture evidence that it ever happened.
 
+A RITUAL WHOSE FIRST OCCURRENCE IS IN THE FUTURE (the ``starts`` field, #3378)
+------------------------------------------------------------------------------
+The 2026-09-01 launch put three one-time judgment points on the calendar — the 30/60/90-day
+operating checkpoints in ``docs/OPERATING_RHYTHM.md`` — whose first occurrence is a date that
+has not arrived yet. Every existing state assumed a ritual should already be running: an entry
+with no artifact reports NEVER-RUN and reds the daily sweep, which for a checkpoint due
+2026-10-01 would mean a month of daily red over a ritual that is not late by anybody's
+definition. A gate that reds for a month while nothing is wrong is how a gate gets ignored,
+and this file's own thesis dies with it.
+
+So an entry may declare ``starts=YYYY-MM-DD`` — the dated day its clock BEGINS (here, launch
+day). Its first occurrence is then ``starts + cadence``, and until that day passes a never-run
+entry reports ``SCHEDULED`` rather than NEVER-RUN. What ``starts`` may NOT do is the thing the
+anchor and the hold may not do either: it does not touch DUE or OVERDUE. The day the first
+occurrence passes, an artifact-less entry goes DUE and then OVERDUE exactly like every other
+row, so absence is still louder than failure — just at the right time rather than a month
+early. Parking a ritual permanently in the future is bounded out: a declared first occurrence
+more than ``MAX_SCHEDULE_AHEAD_DAYS`` past adoption fails the guard, and the entry's reason
+must state the first-occurrence date in full so registry and prose cannot drift apart.
+
 USAGE
 -----
     python3 scripts/operating_calendar.py            # human table, exit 0 always
@@ -107,7 +127,8 @@ USAGE
 Exit codes: 0 clean · 1 at least one OVERDUE · 2 bad --today · 3 no OVERDUE but at least
 one ritual has never produced its artifact.
 
-v1.2.0 — 2026-08-30 (#3250, lens set) · v1.1.0 — 2026-08-27 (#3250) · v1.0.0 — 2026-08-22 (#2832)
+v1.3.0 — 2026-08-31 (launch checkpoints, `starts`) · v1.2.0 — 2026-08-30 (#3250, lens set) ·
+v1.1.0 — 2026-08-27 (#3250) · v1.0.0 — 2026-08-22 (#2832)
 """
 
 from __future__ import annotations
@@ -148,7 +169,7 @@ _DATE_RE_GROUPS = 1  # every probe regex carries exactly one capture group: the 
 REVIEW_SPINE = "review"
 
 
-def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None, lens=None):
+def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None, lens=None, starts=None):
     return {
         "skill": skill,  # resolved via skill_registry.skill_path(), or None for a doc-only ritual
         # The `/review <lens>` rubric this entry schedules — a name under
@@ -165,6 +186,11 @@ def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reas
         # (declared YYYY-MM-DD, until YYYY-MM-DD, reason naming the cause issue) — a
         # one-time dated re-anchor of THIS entry's clock. See the module docstring.
         "hold": hold,
+        # YYYY-MM-DD the clock BEGINS for a ritual whose first occurrence is still in the
+        # future (first occurrence = starts + cadence_days). Before that day a never-run
+        # entry reads SCHEDULED instead of NEVER-RUN; after it, ordinary DUE/OVERDUE apply.
+        # See the module docstring — it moves the clock, never the lateness verdict.
+        "starts": starts,
     }
 
 
@@ -172,6 +198,13 @@ def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reas
 # deferral, it is a retirement wearing a deferral's clothes — and a retirement goes
 # through EXEMPT, which the set guard reads.
 MAX_HOLD_DAYS = 45
+
+# A declared first occurrence (`starts` + cadence) may sit at most this far past ADOPTED.
+# Without a bound, `starts` would be a way to hold an entry SCHEDULED forever — a row on
+# the calendar that can never be late is decoration, which is the shape #3250 killed one
+# level down. The launch checkpoints' furthest first occurrence (2026-11-30) sits 100 days
+# out; the bound leaves that room and nothing like a year of it.
+MAX_SCHEDULE_AHEAD_DAYS = 120
 
 
 CALENDAR: dict[str, dict] = {
@@ -357,6 +390,78 @@ CALENDAR: dict[str, dict] = {
             "canonical so a run cannot land its artifact somewhere this probe cannot see."
         ),
     ),
+    # ── The launch checkpoints (one-time, dated; #3378) ───────────────────────
+    "rhythm-checkpoint-30d": _entry(
+        skill=None,  # not a command — the owner's read of his own operating rhythm
+        cadence_days=30,
+        grace_days=7,
+        attendance=OWNER,
+        starts="2026-09-01",
+        probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 30-day checkpoint: (\d{4}-\d{2}-\d{2})"),
+        obligations=(
+            "Answer the 30-day section of docs/OPERATING_RHYTHM.md from OBSERVED behaviour "
+            "(which surfaces were opened, which were not, which coaches were texted) rather "
+            "than from memory, and append the dated log line this probe reads",
+            "This is the first window in which a feature may be reconsidered at all — "
+            "anything wanted before it waits, and anything wanted at it is filed as an issue "
+            "with the lived usage that motivated it written into the body",
+        ),
+        reason=(
+            "First occurrence 2026-10-01. From the 2026-09-01 launch the owner operates the "
+            "platform instead of building it daily, and Claude sessions go bug-fix-only. Both "
+            "failure modes of that switch are invisible from inside any single day: the rhythm "
+            "quietly lapses, or feature work quietly resumes one 'small' change at a time. A "
+            "dated checkpoint is the only thing that reads a month of behaviour as a month."
+        ),
+    ),
+    "rhythm-checkpoint-60d": _entry(
+        skill=None,  # not a command — the owner's cost + return read, on the closed month
+        cadence_days=60,
+        grace_days=7,
+        attendance=OWNER,
+        starts="2026-09-01",
+        probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 60-day checkpoint: (\d{4}-\d{2}-\d{2})"),
+        obligations=(
+            "Read September's close in docs/COST_TRACKER.md against what the platform "
+            "actually DID for the owner that month — named, specific things, not a feeling; "
+            "an honest 'nothing I can name' is a valid and important answer",
+            "Append the dated log line this probe reads, with the two numbers (spend, and the "
+            "count of named returns) written down so the 90-day read has a prior",
+        ),
+        reason=(
+            "First occurrence 2026-10-31, deliberately after the September cost close lands "
+            "rather than during it — the first full month of user-mode spend is the first "
+            "month whose cost can be read against use rather than against building. Cost "
+            "without a return read is half an instrument, which is how a platform stays "
+            "expensive and unquestioned (ADR-103/144's ledger asks the same question per "
+            "subsystem; this asks it once, for the whole thing, from the owner's chair)."
+        ),
+    ),
+    "rhythm-checkpoint-90d": _entry(
+        skill=None,  # not a command — the owner's roadmap decision, from lived usage
+        cadence_days=90,
+        grace_days=7,
+        attendance=OWNER,
+        starts="2026-09-01",
+        probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 90-day checkpoint: (\d{4}-\d{2}-\d{2})"),
+        obligations=(
+            "Decide the next feature horizon from three months of lived usage — what was "
+            "used, what was ignored, what was missed — and file it; speculation from before "
+            "the launch does not qualify as evidence at this checkpoint",
+            "Re-decide these three checkpoint rows themselves: each one is DELETED from the "
+            "registry once it has served (an EXEMPT row cannot hold it — exemptions are for "
+            "discovered review procedures, and the set guard reads a non-procedure key there "
+            "as a phantom), or converted to a standing cadence with its own written reason",
+        ),
+        reason=(
+            "First occurrence 2026-11-30. The roadmap decision is deferred to here on purpose: "
+            "three months of use is the smallest sample that can distinguish 'I need this' from "
+            "'I imagined I would need this', and every roadmap this platform has written from "
+            "speculation has been re-written from usage within a cycle. Ninety days is also long "
+            "enough that the checkpoint must be on a clock — nobody remembers a November date "
+            "they set in August."
+        ),
+    ),
 }
 
 # ── The set guard's exemptions ────────────────────────────────────────────────
@@ -437,6 +542,7 @@ def newest_run(entry: dict, repo: str = REPO) -> date | None:
 OK = "OK"
 NEVER = "NEVER-RUN"  # #3250 — the artifact has never existed; an anchor is not a run
 HELD = "HELD"  # a dated, reasoned, one-time deferral is in force (see `hold`)
+SCHEDULED = "SCHEDULED"  # #3378 — declared `starts`; the first occurrence has not arrived yet
 DUE = "DUE"  # inside the grace window — run it now, nothing screams yet
 OVERDUE = "OVERDUE"  # past cadence + grace — the scheduled workflow reds on this
 
@@ -464,13 +570,19 @@ def _hold_dates(entry: dict) -> tuple[date, date] | None:
 def status(entry: dict, today: date, repo: str = REPO) -> dict:
     """One ritual's dead-man verdict.
 
-    Clock = max(newest artifact, ADOPTED, hold.until). The clock floor is what the anchor
-    and a hold move; the STATE is what neither of them may fake. `never_ran` travels
-    beside `state` so a caller can act on the distinction the display used to own alone.
+    Clock = max(newest artifact, ADOPTED, hold.until, starts). The clock floor is what the
+    anchor, a hold and a declared start move; the STATE is what none of them may fake.
+    `never_ran` travels beside `state` so a caller can act on the distinction the display
+    used to own alone.
     """
     last = newest_run(entry, repo)
     hold = _hold_dates(entry)
-    floor = max(ADOPTED, hold[1]) if hold else ADOPTED
+    starts = _parse_date(entry["starts"]) if entry.get("starts") else None
+    floor = ADOPTED
+    if hold:
+        floor = max(floor, hold[1])
+    if starts:
+        floor = max(floor, starts)
     clock = max(last, floor) if last else floor
     due_by = clock + timedelta(days=entry["cadence_days"])
     hard_by = due_by + timedelta(days=entry["grace_days"])
@@ -482,7 +594,12 @@ def status(entry: dict, today: date, repo: str = REPO) -> dict:
         # #3250: this is the branch that used to say OK. A ritual with no artifact has
         # produced no evidence, and a hold does NOT override it — deferring a ritual
         # cannot manufacture a run that never happened.
-        state = NEVER
+        #
+        # #3378: unless the entry declared a dated FIRST occurrence that has not arrived
+        # (`starts`), in which case "never run" is a schedule fact, not an absence — and
+        # note the two branches above already ran, so a declared start can no more hide a
+        # DUE or an OVERDUE than the anchor can.
+        state = SCHEDULED if starts else NEVER
     elif hold and today <= hold[1]:
         state = HELD
     else:
@@ -495,6 +612,7 @@ def status(entry: dict, today: date, repo: str = REPO) -> dict:
         "state": state,
         "never_ran": last is None,
         "held_until": hold[1] if hold else None,
+        "starts": starts,
     }
 
 
@@ -504,25 +622,43 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str], list[str]
     overdue: list[str] = []
     never: list[str] = []
     held: list[str] = []
+    scheduled: list[str] = []
     width = max(len(n) for n in CALENDAR)
     for name in sorted(CALENDAR, key=lambda n: CALENDAR[n]["cadence_days"]):
         st = status(CALENDAR[name], today, repo)
-        last_s = st["last"].isoformat() if st["last"] else f"never (anchored {ADOPTED})"
+        if st["last"]:
+            last_s = st["last"].isoformat()
+        elif st["state"] == SCHEDULED:
+            # "never (anchored ...)" would be true and misleading here: this row's clock
+            # has not started, so there is nothing yet to be absent (#3378).
+            last_s = f"not started (starts {st['starts']})"
+        else:
+            last_s = f"never (anchored {ADOPTED})"
         lines.append(
             f"  {name:<{width}}  every {CALENDAR[name]['cadence_days']:>3}d"
             f"  last {last_s:<26}  due {st['due_by']}  hard {st['hard_by']}  {st['state']}"
         )
         if st["state"] == OVERDUE:
             overdue.append(name)
-        if st["never_ran"]:
+        # The NEVER *state*, not the raw `never_ran` fact: an entry whose declared first
+        # occurrence has not arrived reads SCHEDULED, and calling that "never ran" would
+        # red the daily sweep for a month over a ritual nobody is late for (#3378).
+        if st["state"] == NEVER:
             never.append(name)
         if st["state"] == HELD:
             held.append(name)
+        if st["state"] == SCHEDULED:
+            scheduled.append(name)
     if held:
         lines += ["", "⏸  held by a dated decision (clock re-anchored once, reason in the registry):"]
         for name in held:
             declared, until, reason = CALENDAR[name]["hold"]
             lines.append(f"   {name}: declared {declared}, resumes {until} — {reason.split('.')[0]}.")
+    if scheduled:
+        lines += ["", "🗓  scheduled — declared first occurrence has not arrived (never-run is not late here):"]
+        for name in scheduled:
+            st = status(CALENDAR[name], today, repo)
+            lines.append(f"   {name}: starts {CALENDAR[name]['starts']}, first due {st['due_by']}, hard {st['hard_by']}.")
     if overdue:
         lines += [
             "",
@@ -542,7 +678,8 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str], list[str]
             f"   clearing. (--due exits {EXIT_NEVER_RUN} on this state.)",
         ]
     if not overdue and not never:
-        lines += ["", "✅ no ritual outside its window, and every ritual has run at least once."]
+        tail = " (the scheduled rows above have not reached their first occurrence)." if scheduled else "."
+        lines += ["", f"✅ no ritual outside its window, and every started ritual has run at least once{tail}"]
     return "\n".join(lines), overdue, never
 
 
@@ -681,6 +818,31 @@ def render_doc() -> str:
     for name in sorted(EXEMPT):
         d, reason = EXEMPT[name]
         out.append(f"- **{name}** ({d}) — {reason}")
+    out += [
+        "",
+        "## Scheduled first occurrences (a ritual whose clock starts later, #3378)",
+        "",
+        "An entry may declare `starts` — the dated day its clock BEGINS — when its first",
+        "occurrence is genuinely in the future (the 2026-09-01 launch checkpoints). Until that",
+        "first occurrence passes, a row with no artifact reads `SCHEDULED` rather than",
+        "`NEVER-RUN`, because a checkpoint due in October is not a ritual anybody has stopped",
+        "doing. `starts` moves the CLOCK only: the day the first occurrence passes, an",
+        "artifact-less row goes `DUE` and then `OVERDUE` like any other, so absence is still",
+        "louder than failure — at the right time instead of a month early. A first occurrence",
+        f"more than {MAX_SCHEDULE_AHEAD_DAYS} days past adoption fails the guard: a row that can",
+        "never be late is decoration.",
+        "",
+    ]
+    scheduled = [n for n in sorted(CALENDAR) if CALENDAR[n]["starts"]]
+    if scheduled:
+        out += ["| Ritual | Clock starts | First occurrence | Hard by |", "|---|---|---|---|"]
+        for name in scheduled:
+            e = CALENDAR[name]
+            first = _parse_date(e["starts"]) + timedelta(days=e["cadence_days"])
+            hard = first + timedelta(days=e["grace_days"])
+            out.append(f"| {name} | {e['starts']} | {first} | {hard} |")
+    else:
+        out.append("_None declared._")
     out += ["", "## Dated holds (a deferral is a decision, #3250)", ""]
     holds = [n for n in sorted(CALENDAR) if CALENDAR[n]["hold"]]
     if holds:
