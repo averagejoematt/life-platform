@@ -14,6 +14,17 @@ ONE prompt, TWO hooks (both import this module so the rubric can never fork):
     small HTTPS-fetched surface set, so truth regressions surface between
     deploys too. Fail-soft there — a Bedrock outage must never red the nightly.
 
+THE TWO HOOKS ARE NOT DUPLICATES — measured, not asserted (#3369, 2026-09-01).
+Their surfaced claim sets over 10 paired days (2026-08-22 → 08-31) overlapped at
+3 of 30 day-level (page, category) claims on the 4 pages both judge, and all 3
+nominal matches were different sentences on inspection — substantive overlap 0.
+Structural reasons: disjoint surface sets (the nightly judges 5 /api/* payloads
+the CI leg never sees; the CI leg judges ~64 rendered pages the nightly never
+fetches), different text sources (static-HTML strip vs Playwright innerText),
+different channels (alarm/digest vs CI advisory). The dated decision + the
+"do not re-flag as duplication without a new diff" bar live in
+docs/COST_TRACKER.md § Cost Decisions Log.
+
 Phase ground truth is computed at runtime from constants.EXPERIMENT_START_DATE
 (never hardcoded — it moves on every experiment reset, ADR-058/077).
 

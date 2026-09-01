@@ -813,6 +813,13 @@
       "producer": "common.send_ledger::record_sent"
     }
   ],
+  "cost_surface": {
+    "ai_features": 18,
+    "alarms": 119,
+    "emf_namespaces": 31,
+    "schedules": 88,
+    "secrets": 28
+  },
   "edges": [
     {
       "direction": "read",
@@ -6852,6 +6859,7 @@
     "authorities": {
       "alarms": "cdk/stacks/*.py alarm_name= declarations (AST) + variable-traced SNS routing",
       "contracts": "tests/pair_contract_registry.py (AST) \u2014 PairContract(...) declarations for the #2847 enrolled pairs, unioned with the KNOWN_MUST_AGREE_PAIRS floor and ratcheted by ENROLLED_FLOOR",
+      "cost_surface": "#3374 R1 \u2014 the five cost-bearing population counts: alarms + schedules from this model's own planes; emf_namespaces from deploy/emf_namespace_ledger.LEDGER (AST), secrets from tests/test_secret_references.KNOWN_SECRETS (AST), ai_features from lambdas/ai/budget_guard._FEATURE_CUTOFF (AST). Exact-pinned against the hand-owned model/cost_surface_baseline.json by tests/test_platform_model_drift.py",
       "edges": "two-pass AST over lambdas/ + mcp/ (#2805): partition-string constants, pk expressions, literal-source seam calls",
       "lambdas": "cdk/stacks/*.py function_name= declarations (AST)",
       "partitions": "lambdas/experiment/phase_taxonomy.SOURCE_CLASS (ADR-077 census) \u00d7 lambdas/ingestion/source_registry facets",
