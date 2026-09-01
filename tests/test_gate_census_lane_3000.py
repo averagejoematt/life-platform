@@ -447,7 +447,26 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # pull_request; and a write through the exemption fails test_the_pr_exemption_never_writes_
 # the_counter. Live unproven moves 531 -> 532, well under the committed
 # BASELINE_UNPROVEN_GATES = 541, which is NOT moved (down-only, #3329 option B).
-BASELINE_TOTAL_GATES = 589
+# 589 -> 590 (2026-09-01, #3395): ONE real gate — `guard::deploy/lib/smoke_verdict.sh`, the
+# smoke leg's rollback reachability scope (the smoke edition of the #3352 scope check, after
+# the 2026-09-01 P3: an `/api/vitals` data-plane smoke red reverted PR #3392's innocent site
+# content). Verified by id-set diff, not count delta (each tree ran its OWN
+# scripts/gate_census.py --json, branch fully staged; main at this branch's merge-base
+# a64a18ee8 = 589, branch = 590): ADDED exactly {guard::deploy/lib/smoke_verdict.sh},
+# REMOVED {}.
+#
+# It arrives UNPROVEN by the census's own detector ("shell entrypoint — slice 1 ships no
+# shell detector") and, like the #3352 classifier step above, it is an INSTRUMENT, not a
+# gate: `smoke_record_fail`/`smoke_emit_verdict` never fail the smoke run themselves — the
+# smoke checks already decided pass/fail, and a second failure mode in the recorder would
+# only give the rollback a new way not to happen. The DECISION the verdict feeds is covered
+# functionally (real bash, positive AND negative controls: api/infra reds emit
+# `site_reachable=false`, a site-only or unknown-surface red keeps `true`, a recorder
+# bypass stays fail-safe and loud) in tests/test_smoke_rollback_scope_3395.py, and the
+# workflow-shape half by the same file's structural assertions. Live unproven moves
+# 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
+# (down-only, #3329 option B).
+BASELINE_TOTAL_GATES = 590
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was

@@ -30,9 +30,12 @@
 #
 # Rollback: smoke OR visual-QA red after a successful deploy → deploy/
 # rollback_site.sh HEAD~1 (re-hash + re-stamp version.json to the prior build,
-# re-invalidate) + SNS alert. Assumes squash-merge (one commit per PR) so the
-# previous good site == HEAD~1; for a multi-commit push roll back manually:
-# bash deploy/rollback_site.sh <ref>.
+# re-invalidate) + SNS alert — SCOPE-CHECKED on both legs (#3352 visual /
+# #3395 smoke): the rollback fires only when a failed check's surface is
+# site/**-reachable; a data-plane or edge-config red files a #1447 issue
+# instead of reverting innocent content. Assumes squash-merge (one commit per
+# PR) so the previous good site == HEAD~1; for a multi-commit push roll back
+# manually: bash deploy/rollback_site.sh <ref>.
 #
 # First watched run: merge of this PR (it touches .github/workflows/site-deploy.yml,
 # which is in its own paths filter, so the workflow exercises itself end-to-end).
@@ -65,6 +68,17 @@ on:
         default: none
         type: choice
         options: [none, api, deploy-script]
+      # #3395 box 3 — the smoke leg's twin of the input above: one synthetic /api-class
+      # smoke failure, so `rollback-site-on-failure` can be watched DECLINING on a
+      # data-plane red the smoke gate raised (the 2026-09-01 P3 shape). Same guard:
+      # reachable ONLY from workflow_dispatch, pinned in
+      # tests/test_smoke_rollback_scope_3395.py.
+      smoke_inject_failure:
+        description: 'Inject one synthetic /api-class SMOKE failure (live proof of the #3395 rollback scope check)'
+        required: false
+        default: none
+        type: choice
+        options: [none, api]
 
 # Never two site syncs racing (each pushes the whole tree + invalidates).
 # cancel-in-progress=false: a sync mid-flight should complete, not be killed halfway.
@@ -228,6 +242,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-site
     if: needs.deploy-site.outputs.superseded != 'true'
+    # #3395: the rollback's scope check reads these (the smoke twin of visual-qa's
+    # #3352 outputs). The smoke script appends them to $GITHUB_OUTPUT itself, right
+    # before its own exit — step outputs written before a step fails survive the
+    # failure, and an ABORTED run (set -e death mid-script) writes nothing, which
+    # reads as "no verdict" and rolls back exactly as before (fail-safe direction:
+    # only an explicit `false` ever declines).
+    outputs:
+      site_reachable: ${{ steps.smoke.outputs.site_reachable }}
+      surfaces: ${{ steps.smoke.outputs.surfaces }}
+      summary: ${{ steps.smoke.outputs.summary }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -247,8 +271,12 @@ jobs:
       # convergence signals before the first check runs. Credential-free by
       # construction, so this job stays exactly as credential-free as before.
       - name: Run site smoke test (pure HTTP — no AWS access)
+        id: smoke
         env:
           SMOKE_EXPECT_BUILD: ${{ github.sha }}
+          # #3395: the live-proof hook — `github.event.inputs.*` is EMPTY on a push,
+          # so a merge can never inject; only a deliberate operator dispatch can.
+          SMOKE_INJECT_SURFACE: ${{ github.event.inputs.smoke_inject_failure }}
         run: |
           bash deploy/smoke_test_site.sh
 
@@ -403,43 +431,64 @@ jobs:
           aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
-      # ── #3352: the SCOPE CHECK ──────────────────────────────────────────────
+      # ── #3352 + #3395: the SCOPE CHECK, on BOTH gate legs ──────────────────
       #
-      # Two live incidents where this job reported success and reached nothing:
+      # Three live incidents where this job reported success and reached nothing:
       #   • 2026-08-31 P1 — the whole /data/* door was served `application/json`
       #     because of a step-ordering defect in sync_site_to_s3.sh. The rollback
       #     re-ran THAT SAME SCRIPT and re-broke the door identically.
       #   • 2026-08-27 (Session G) — it reverted a wanted, published build beat over a
       #     DynamoDB-sourced narrative defect it was structurally incapable of fixing.
+      #   • 2026-09-01 P3 (#3395) — #3352 had scoped only the VISUAL leg; ONE failed
+      #     SMOKE check (/api/vitals weight arbitration, DynamoDB data-plane) reverted
+      #     PR #3392's innocent site content while visual QA had PASSED.
       #
       # The decision is a bash `if` INSIDE the rollback step, deliberately not a job-level
       # `if:` — a skipped job is indistinguishable from "nothing failed", and the whole
       # point is that a declined rollback must SAY SO by name.
       #
       # Fail-safe direction: only an explicit `false` declines. An empty/absent output
-      # (visual-qa died before the classifier ran, or only the smoke gate failed) rolls
-      # back exactly as it did before this existed.
+      # (a gate died before its verdict was written) rolls back exactly as it did before
+      # this existed. Mixed verdicts follow #3352's AND rule: ONE unreachable surface
+      # declines the whole rollback — a partial revert of a mixed failure is the worst
+      # of both, and the #1447 issue names every surface for the human.
       - name: Roll back site to previous build + re-invalidate CDN
         id: rollback
         env:
           SITE_REACHABLE: ${{ needs.visual-qa.outputs.site_reachable }}
           QA_SURFACES: ${{ needs.visual-qa.outputs.surfaces }}
           QA_SUMMARY: ${{ needs.visual-qa.outputs.summary }}
+          SMOKE_REACHABLE: ${{ needs.smoke.outputs.site_reachable }}
+          SMOKE_SURFACES: ${{ needs.smoke.outputs.surfaces }}
+          SMOKE_SUMMARY: ${{ needs.smoke.outputs.summary }}
         run: |
           set -uo pipefail
-          echo "Rollback scope check (#3352): site_reachable='${SITE_REACHABLE:-<unset>}' surfaces='${QA_SURFACES:-<none>}'"
-          echo "  verdict: ${QA_SUMMARY:-<no verdict recorded — the classifier step did not run>}"
-          if [ "${SITE_REACHABLE:-}" = "false" ]; then
+          echo "Rollback scope check (#3352 visual / #3395 smoke):"
+          echo "  visual-qa: site_reachable='${SITE_REACHABLE:-<unset>}' surfaces='${QA_SURFACES:-<none>}'"
+          echo "             ${QA_SUMMARY:-<no verdict recorded — the classifier step did not run>}"
+          echo "  smoke:     site_reachable='${SMOKE_REACHABLE:-<unset>}' surfaces='${SMOKE_SURFACES:-<none>}'"
+          echo "             ${SMOKE_SUMMARY:-<no verdict recorded — the smoke script did not reach its verdict>}"
+          if [ "${SITE_REACHABLE:-}" = "false" ] || [ "${SMOKE_REACHABLE:-}" = "false" ]; then
+            DECLINE_SURFACES=""
+            DECLINE_VERDICT=""
+            if [ "${SITE_REACHABLE:-}" = "false" ]; then
+              DECLINE_SURFACES="visual-qa[${QA_SURFACES:-?}]"
+              DECLINE_VERDICT="visual-qa: ${QA_SUMMARY:-<no summary>}"
+            fi
+            if [ "${SMOKE_REACHABLE:-}" = "false" ]; then
+              DECLINE_SURFACES="${DECLINE_SURFACES}${DECLINE_SURFACES:+ }smoke[${SMOKE_SURFACES:-?}]"
+              DECLINE_VERDICT="${DECLINE_VERDICT}${DECLINE_VERDICT:+ · }smoke: ${SMOKE_SUMMARY:-<no summary>}"
+            fi
             echo "⛔ ROLLBACK DECLINED — the failing surface is NOT site/**-reachable."
-            echo "   surfaces: ${QA_SURFACES}"
-            echo "   ${QA_SUMMARY}"
-            echo "   Reverting site/** would either re-run the defect (deploy-script) or revert an"
-            echo "   innocent build while the real defect stays live (api). Alerting instead."
-            echo "::warning title=Site rollback DECLINED (#3352)::${QA_SUMMARY}"
+            echo "   surfaces: ${DECLINE_SURFACES}"
+            echo "   ${DECLINE_VERDICT}"
+            echo "   Reverting site/** would either re-run the defect (deploy-script/infra) or revert"
+            echo "   an innocent build while the real defect stays live (api). Alerting instead."
+            echo "::warning title=Site rollback DECLINED (#3352/#3395)::${DECLINE_VERDICT}"
             {
               echo "declined=true"
-              echo "surfaces=${QA_SURFACES}"
-              echo "verdict=${QA_SUMMARY}"
+              echo "surfaces=${DECLINE_SURFACES}"
+              echo "verdict=${DECLINE_VERDICT}"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -468,12 +517,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           failure-summary: >-
             The site-deploy post-deploy gate failed on a surface a `site/**` revert cannot reach, so
-            the auto-rollback DECLINED (#3352). ${{ steps.rollback.outputs.verdict }}
+            the auto-rollback DECLINED (#3352 visual / #3395 smoke). ${{ steps.rollback.outputs.verdict }}
             Surfaces: ${{ steps.rollback.outputs.surfaces }}.
-            `deploy-script` = the sync script's own behaviour (2026-08-31 P1 — re-running it re-runs
-            the defect); `api` = DynamoDB/site-api content (2026-08-27 Session G — reverting site/**
-            deletes innocent work and leaves the defect live). Diagnose the named surface; the live
-            site is still on the newly deployed build.
+            `deploy-script`/`infra` = the sync script's own behaviour or edge/CDK config (2026-08-31
+            P1 — re-running the sync re-runs the defect; a revert cannot republish a CloudFront
+            function or a CDK-owned header); `api` = DynamoDB/site-api/generated data-plane content
+            (2026-08-27 Session G and 2026-09-01 P3 — reverting site/** deletes innocent work and
+            leaves the defect live). Diagnose the named surface; the live site is still on the newly
+            deployed build.
 
       - name: Notify site rollback
         if: always()
@@ -484,7 +535,7 @@ jobs:
           # #3352: the alert must state which of the two things happened. A declined
           # rollback that alerted as "AUTO-ROLLBACK" would be the same lie in a new place.
           if [ "${{ steps.rollback.outputs.declined }}" = "true" ]; then
-            HEADLINE="ROLLBACK DECLINED (site) — the post-deploy gate failed on a surface a site/** revert cannot reach (#3352). NOTHING WAS REVERTED."
+            HEADLINE="ROLLBACK DECLINED (site) — the post-deploy gate failed on a surface a site/** revert cannot reach (#3352/#3395). NOTHING WAS REVERTED."
             ACTION="Rollback: DECLINED (surface=${{ steps.rollback.outputs.surfaces }} not site/**-reachable)
           Verdict:         ${{ steps.rollback.outputs.verdict }}
           A tracked issue was filed via the #1447 helper (slug site-deploy-gate-unreachable).
