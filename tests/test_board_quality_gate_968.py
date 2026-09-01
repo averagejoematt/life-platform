@@ -21,7 +21,14 @@ What this file pins now:
       that sized the old cap is gone)
   G3  the module retains no I/O machinery at all — it is a pure rule module now
   G4  the removal is recorded where a reader will find it, with its measurement
-  W1  board_ask serves the grounded answer and makes zero gate invokes
+  W1  board_ask serves the grounded answer and makes zero SYNCHRONOUS gate
+      invokes — the only cross-Lambda call left is #3414's fire-and-forget
+      Event observe, which fires AFTER the served text is final and whose
+      result cannot reach the reader
+  O   the #3414 carve-out is structural, not a loosening: the async observer
+      module may use InvocationType="Event" ONLY, never consumes a response
+      payload, and its failure never reaches the reader — with mutation
+      proofs on the needles
   S1  scope posture: dialogue + memoir stay deliberately ungated (ADR-103 row)
   #1973 the Day<=3 cycle-boundary rule, direct and through the ONE enforcement
       path that remains (`ai_calls._invoke_quality_gate_sync`, which merges it
@@ -53,6 +60,7 @@ AI_SRC = open(os.path.join(ROOT, "lambdas/web/site_api_ai_lambda.py")).read()
 BQG_SRC = open(os.path.join(ROOT, "lambdas/web/board_quality_gate.py")).read()
 DIALOGUE_SRC = open(os.path.join(ROOT, "lambdas/coach/inter_coach_dialogue_lambda.py")).read()
 MEMOIR_SRC = open(os.path.join(ROOT, "lambdas/compute/coach_memoir_lambda.py")).read()
+OBSERVER_SRC = open(os.path.join(ROOT, "lambdas/web/board_verdict_observer.py")).read()
 
 
 AI_CALLS_SRC = open(os.path.join(ROOT, "lambdas/ai/ai_calls.py")).read()
@@ -128,6 +136,7 @@ def _code_without_comments(src: str) -> str:
 
 
 AI_CODE = _code_without_comments(AI_SRC)
+OBSERVER_CODE = _code_without_comments(OBSERVER_SRC)
 
 
 def test_board_reader_path_makes_no_synchronous_cross_lambda_invoke():
@@ -260,34 +269,86 @@ def _post(body, ip="203.0.113.9"):
     }
 
 
-def test_board_ask_serves_the_grounded_answer_and_invokes_no_gate(monkeypatch):
-    """W1. The reader gets the answer with no cross-Lambda call in the path.
+def _observer_client(monkeypatch):
+    """The #3414 observer's own lambda client, mocked at the module boundary —
+    the ONE cross-Lambda call left on the board surface, and it is async."""
+    from web import board_verdict_observer as bvo
 
-    `_gate_client_returning()` yields nothing, so ANY invoke raises
-    StopIteration — the assertion is that the count is zero, not that a fake
-    absorbed the call."""
+    client = MagicMock()
+    monkeypatch.setattr(bvo, "_client", client)
+    return client
+
+
+def test_board_ask_serves_the_grounded_answer_with_only_an_async_observe(monkeypatch):
+    """W1. The reader gets the answer with no synchronous cross-Lambda call in
+    the path. The only invoke made is #3414's fire-and-forget Event observe —
+    and even a FAILING verdict handed back by the mock cannot touch the served
+    text, because nothing ever reads it (observe-only, proved behaviourally)."""
     ai = _ai()
     table = _FakeTable()
     _wire(ai, monkeypatch, table)
-    client = _gate_client_returning()
     monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
+    # A hostile payload: if ANY code path consumed this, the served text would
+    # change (or a KeyError would 500 the handler). Neither may happen.
+    obs.invoke.return_value = {"Payload": MagicMock(), "StatusCode": 202, "passed": False, "score": 1}
 
     resp = ai._handle_board_ask(_post({"question": "How is recovery trending?", "personas": ["sleep_coach"]}))
     assert resp["statusCode"] == 200
     assert json.loads(resp["body"])["responses"]["sleep_coach"] == FLAGGED_TEXT
-    assert client.invoke.call_count == 0
+
+    # Exactly one observe for the one grounded coach — Event, never synchronous.
+    assert obs.invoke.call_count == 1
+    kwargs = obs.invoke.call_args.kwargs
+    assert kwargs["InvocationType"] == "Event"
+    assert kwargs["FunctionName"] == "coach-quality-gate"
+    wire = json.loads(kwargs["Payload"].decode())
+    assert wire["coach_id"] == "sleep_coach"
+    assert wire["output_text"] == FLAGGED_TEXT  # the text the reader GOT, not a draft
+    assert wire["emit_verdict"] == "board_ask"  # the #3414 opt-in rides the event
 
     # The served text is what entered episodic memory and the thread seed.
     interactions = [v for (pk, sk), v in table.store.items() if pk == "COACH#sleep_coach" and sk.startswith("INTERACTION#")]
     assert len(interactions) == 1 and interactions[0]["answer"] == FLAGGED_TEXT
 
 
-def test_board_followup_also_serves_without_a_gate_invoke(monkeypatch):
+def test_a_dead_observer_never_reaches_the_reader(monkeypatch):
+    """The observe is telemetry: the Lambda API being down costs a log line,
+    never a reader-facing error or a changed answer (fail-soft, #3414)."""
+    ai = _ai()
+    _wire(ai, monkeypatch, _FakeTable())
+    monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
+    obs.invoke.side_effect = RuntimeError("lambda API down")
+
+    resp = ai._handle_board_ask(_post({"question": "How is recovery trending?", "personas": ["sleep_coach"]}))
+    assert resp["statusCode"] == 200
+    assert json.loads(resp["body"])["responses"]["sleep_coach"] == FLAGGED_TEXT
+    assert obs.invoke.call_count == 1  # it was attempted, and its death was absorbed
+
+
+def test_an_ungrounded_refusal_is_not_observed(monkeypatch):
+    """A refusal is canned text — judging its voice would pollute the measured
+    rate. Only grounded answers (the texts a coach actually voiced) are sent."""
+    ai = _ai()
+    _wire(ai, monkeypatch, _FakeTable())
+    monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
+    # Force the grounding gate to flag both the draft and the corrective retry.
+    monkeypatch.setattr(ai, "board_grounding_findings", lambda *a, **k: [{"type": "fabricated_number", "detail": "48.0"}])
+
+    resp = ai._handle_board_ask(_post({"question": "How is recovery trending?", "personas": ["sleep_coach"]}))
+    assert resp["statusCode"] == 200
+    assert "stand behind" in json.loads(resp["body"])["responses"]["sleep_coach"]  # the refusal shipped
+    assert obs.invoke.call_count == 0  # and no verdict was requested for it
+
+
+def test_board_followup_also_observes_async_and_serves_unchanged(monkeypatch):
     ai = _ai()
     table = _FakeTable()
     _wire(ai, monkeypatch, table)
-    client = _gate_client_returning()
     monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
 
     token = ai._create_board_session("203.0.113.9", {"sleep_coach": [{"q": "Opening question?", "a": "Recovery looks steady."}]})
     resp = ai._handle_board_followup(
@@ -295,7 +356,72 @@ def test_board_followup_also_serves_without_a_gate_invoke(monkeypatch):
     )
     assert resp["statusCode"] == 200
     assert json.loads(resp["body"])["response"] == FLAGGED_TEXT
-    assert client.invoke.call_count == 0
+    assert obs.invoke.call_count == 1
+    kwargs = obs.invoke.call_args.kwargs
+    assert kwargs["InvocationType"] == "Event"
+    assert json.loads(kwargs["Payload"].decode())["output_text"] == FLAGGED_TEXT
+
+
+# ── O: the #3414 carve-out is structural — Event-only, never consumed ────────
+#
+# The #3413 guard (G1) bans a synchronous gate invoke from the reader lambda by
+# needle. #3414 does NOT loosen those needles — the reader lambda still may not
+# name the gate function or the synchronous invocation type. The sanctioned
+# channel lives in ONE module (web/board_verdict_observer.py) under its own
+# needle set: the only invocation type is "Event", and no response payload is
+# ever consumed. Anyone converting the observe back into a wait has to red
+# these tests first.
+
+
+def test_the_async_observer_is_event_only_and_never_consumes_a_response():
+    assert 'InvocationType="Event"' in OBSERVER_CODE
+    assert "RequestResponse" not in OBSERVER_CODE, "#3414 carve-out violated — the observer went synchronous"
+    assert OBSERVER_CODE.count("invoke(") == 1  # one channel, one call site
+    # Nothing reads the invoke result: consuming a payload is how an "async"
+    # call quietly becomes a wait-and-act — the exact #3413 class in disguise.
+    assert ".read(" not in OBSERVER_CODE
+    assert "json.loads" not in OBSERVER_CODE.split("def observe")[1].replace("json.dumps", "")
+    # The reader lambda reaches it only through the fail-soft wrapper…
+    assert "_observe_board_verdict" in AI_CODE
+    # …and the wrapper itself never names the gate function or invocation type
+    # (G1's needles already assert this over ALL of AI_CODE; restated here so
+    # this test documents the carve-out's whole shape in one place).
+    assert "coach-quality-gate" not in AI_CODE and "RequestResponse" not in AI_CODE
+
+
+def test_the_carveout_guard_sees_a_synchronous_mutation():
+    """Mutation proof for O — the carve-out's needles must actually fire.
+
+    Flip the observer's invocation type to the synchronous kind (the exact
+    reversion #3413 forbids) and the guard needle above goes red; bolt on a
+    payload read and that needle goes red too. Same comment-stripping as G1,
+    so a violation can't hide from the needle by reflowing (and an explanation
+    in a comment still can't trigger it)."""
+    mutated = OBSERVER_SRC.replace('InvocationType="Event"', 'InvocationType="RequestResponse"')
+    assert mutated != OBSERVER_SRC  # the mutation took — the needle site exists
+    assert "RequestResponse" in _code_without_comments(mutated)
+
+    consuming = OBSERVER_SRC + '\n_verdict = _lambda_client().invoke()["Payload"].read()\n'
+    assert ".read(" in _code_without_comments(consuming)
+
+    # …and a comment merely DESCRIBING the banned shape stays invisible, so the
+    # guard cannot be appeased by deleting documentation.
+    assert "RequestResponse" not in _code_without_comments("# never use RequestResponse here\n")
+
+
+def test_the_observer_itself_never_raises(monkeypatch):
+    """observe() is fail-soft at its own boundary: a client that cannot even be
+    constructed costs False + a log line, never an exception into the caller."""
+    from web import board_verdict_observer as bvo
+
+    dead = MagicMock()
+    dead.invoke.side_effect = RuntimeError("no network")
+    monkeypatch.setattr(bvo, "_client", dead)
+    assert bvo.observe("sleep_coach", "some served text") is False
+
+    ok = MagicMock()
+    monkeypatch.setattr(bvo, "_client", ok)
+    assert bvo.observe("sleep_coach", "some served text") is True
 
 
 # ── S1: the recorded scope posture (ADR-103 row / ADR-108 note, #968) ────────
@@ -331,6 +457,19 @@ def test_decisions_md_records_the_scope_withdrawal_and_its_measurement():
     # still reads "two surfaces" is how the next reviewer re-extends it.
     assert "ADR-108 coach quality gate — scope (#968, narrowed #3413)" in decisions
     assert "unknown" in decisions.split("narrowed #3413")[1][:1200]  # the open question is stated
+
+
+def test_decisions_md_records_the_3414_channel_as_observe_only():
+    """#3414's amendment must say what the channel IS (measurement) and what it
+    is NOT (enforcement) — the scope stays narrowed, in writing."""
+    decisions = open(os.path.join(ROOT, "docs/DECISIONS.md")).read()
+    assert "Amendment (2026-09-01, #3414)" in decisions
+    tail = decisions.split("Amendment (2026-09-01, #3414)")[1][:2200]
+    assert "observe-only" in tail
+    assert '"observed"' in tail  # the honest disposition is named
+    assert "BoardQualityGateVerdict" in tail  # where the verdict now lands
+    assert "byte-unchanged" in tail  # the daily-brief enforcement wire is untouched
+    assert "DELETING this machinery" in tail  # the ≥30d decision rule is written down
 
 
 # ── #1973: Day<=3 cycle-boundary framing rule ────────────────────────────────

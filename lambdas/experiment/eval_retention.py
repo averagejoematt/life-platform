@@ -114,7 +114,11 @@ def retain(surface, verdict, draft=None, final=None, findings=None, allowed=None
     """Persist one flagged gate event. FAIL-SOFT: never raises, returns bool.
 
     verdict ∈ {"flagged_corrected", "flagged_refused", "flagged_kept_best",
-    "flagged_fallback", "flagged_dropped"} — how the surface disposed of the flag.
+    "flagged_fallback", "flagged_dropped", "observed"} — how the surface disposed
+    of the flag. "observed" (#3414) is the async-channel disposition and is
+    deliberately NOT a flagged_* name: on a fire-and-forget verdict there is no
+    regeneration, no refusal and no hold — the reader already had the text —
+    and pretending otherwise would poison the harvest's disposition labels.
     """
     try:
         item = build_record(surface, verdict, draft=draft, final=final, findings=findings, allowed=allowed, facts=facts, extra=extra)
