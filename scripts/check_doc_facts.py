@@ -1107,6 +1107,14 @@ def main():
     hits += ops.ingestion_paused_cadence_hits(docs, paused_sources, line_is_exempt)
     hits += ops.ingestion_scheduled_count_hits(docs, scheduled_ingestion_count, line_is_exempt)
 
+    # #3374 R2 — the month-over-month close delta clause. A Monthly Actuals row that grew
+    # past 1.15x the previous close must name what grew (`driver:`). The threshold is tuned
+    # so the founding incident (the +16% Jul→Aug floor creep nothing noticed) just trips it;
+    # rows before 2026-09 are grandfathered because the CallerClass such a token names only
+    # went live 2026-08-23 (#2892). Presence, not correctness — verifying the named driver
+    # needs live Cost Explorer, which a docs gate must not call.
+    hits += ops.monthly_close_driver_hits(exempt=line_is_exempt)
+
     # #1351: DATA_GOVERNANCE.md-specific fact checks (repo visibility, deletion-lambda
     # status, Verified-header freshness).
     hits += _data_governance_hits(DATA_GOVERNANCE_PATH)

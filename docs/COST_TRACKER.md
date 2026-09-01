@@ -183,6 +183,22 @@ At each month rollover, append a row to Monthly Actuals with three facts:
    are unchanged and still ride TOTAL spend — a dev-heavy month is still a real bill,
    it just stops reading as a permanent run-rate change.
 
+5. **`driver:` on any month that grew >1.15x** (#3374 R2, binding from the 2026-09
+   close) — if the CE actual exceeds the previous close by more than 15%, the Notes
+   cell must carry a `driver:` token naming the top-growth CE service and the dominant
+   `CallerClass`. Both come from steps 1 and 4 above; this clause only makes writing
+   them down non-optional.
+
+   `scripts/check_doc_facts.py` enforces it (`doc_facts_ops.monthly_close_driver_hits`),
+   so the omission reds Docs CI rather than waiting for a diligence panel. **The
+   threshold is calibrated on the miss that created it:** the platform floor grew +16%
+   Jul→Aug 2026 ($43.00 → $49.77 non-AI) with nothing noticing, and 49.77/43.00 = 1.158
+   — just over the clause. The gate checks *presence*, never correctness: verifying a
+   named driver needs live Cost Explorer, which a docs gate must not call. Rows before
+   2026-09 are grandfathered because the `CallerClass` dimension such a token names only
+   went live 2026-08-23 (#2892), so every earlier row would be asked for a fact that did
+   not exist when it closed.
+
 Then update the two **Verified:** stamps in this doc — CI flags the doc at 45 days stale.
 
 ## Monthly Actuals
