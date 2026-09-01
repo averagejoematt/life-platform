@@ -102,14 +102,38 @@ _NIGHT_DATE_KEY_RE = re.compile(r"(?:^|_)(?:night_of|sleep_start)$")
 _ISO_DATE_PREFIX_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
 
-def _night_floor(start_date):
-    """The earliest night a live surface may legitimately name: the cycle start minus one."""
-    return (date.fromisoformat(start_date) - timedelta(days=1)).isoformat()
+def _night_floor(start_date, today=None):
+    """The earliest night a live surface may legitimately name.
+
+    Post-genesis this is the cycle start minus one — the #1923 wake-date frame, unchanged.
+
+    PRE-START it is bounded by what can physically exist (#3401). A staged future genesis
+    (#931/#939) is the sanctioned reset shape, and on the day before Day 1 the `genesis-1`
+    floor names TONIGHT — a night nobody has slept yet. The rule was unsatisfiable for the
+    whole pre-start window: measured live 2026-08-31, `/api/vitals` served
+    `night_of 2026-08-30 / as_of_date 2026-08-31`, which satisfies the platform's own
+    `night_of + 1 == as_of_date` convention exactly (reader_truth_evidence.py), and R7
+    raised a high against it and held `qa-smoke-failures` in ALARM on launch eve.
+
+    `min` rather than a pre-start skip, deliberately: a skip would drop coverage for the
+    window in which a stale prior-cycle row is most likely to leak, which is the reason
+    R6/R7 run outside the pre-start guard in the first place. Bounding keeps the rule
+    live and merely stops it demanding a night from the future — pre-start it flags
+    anything older than last night, and post-start `today-1 >= genesis-1` makes the
+    bound inert, so nothing about the Day-1-and-after behaviour changes.
+
+    Without a clock the floor is the genesis one, unchanged: a caller that cannot say
+    what day it is does not get the today-aware branch (#3337 — a today-aware rule
+    silently running without a clock is its own defect)."""
+    floor = date.fromisoformat(start_date) - timedelta(days=1)
+    if today:
+        floor = min(floor, date.fromisoformat(today) - timedelta(days=1))
+    return floor.isoformat()
 
 
-def _pre_genesis_night_findings(page, payload, start_date):
+def _pre_genesis_night_findings(page, payload, start_date, today=None):
     """R7 — a night-scoped date field may name the night before genesis, never earlier."""
-    floor = _night_floor(start_date)
+    floor = _night_floor(start_date, today)
     findings = []
     for obj_path, obj in _objects(payload):
         if not isinstance(obj, dict):
@@ -353,8 +377,10 @@ def check_payload(page, payload, day_n, strict=False, start_date=None, today=Non
         start_date: the cycle start (phase_context's `start_date`), for R6/R7. Omitted
             => both are skipped: a rule with no genesis to compare against must not
             guess one (the same fail-soft posture as the rest of this module).
-        today: today's ISO date (phase_context's `today`), for R8 (#3111). Omitted
-            => R8 is skipped, same fail-soft posture as R6/R7 with no start_date.
+        today: today's ISO date (phase_context's `today`), for R8 (#3111) and R7's
+            pre-start night floor (#3401). Omitted => R8 is skipped and R7 falls back to
+            the plain `genesis-1` floor, the same fail-soft posture as R6/R7 with no
+            start_date.
 
     Returns a list of {"page", "category", "severity", "note"} findings.
     Pre-start (day_n == 0) returns only R5/R8 — the phase rules R1–R4 have nothing to
@@ -370,7 +396,7 @@ def check_payload(page, payload, day_n, strict=False, start_date=None, today=Non
     # genesis (#931/#939) is precisely when a stale prior-cycle row is most likely to leak.
     if strict and start_date:
         findings.extend(_pre_genesis_row_findings(page, payload, start_date))
-        findings.extend(_pre_genesis_night_findings(page, payload, start_date))
+        findings.extend(_pre_genesis_night_findings(page, payload, start_date, today))
     # R8 (#3111): a served as_of_date lagging today is a date comparison, not a day
     # count, so it too runs outside the pre-start guard and independent of `strict`
     # (it targets a fixed, opted-in surface list, not every strict payload).
@@ -463,7 +489,7 @@ def sweep_payloads(payloads, today_iso=None):
                 day_n,
                 strict=bool(p.get("strict")),
                 start_date=phase["start_date"],  # R6 (#2613)
-                today=phase["today"],  # R8 (#3111)
+                today=phase["today"],  # R8 (#3111) + R7's pre-start night floor (#3401)
             )
         )
     return findings, warnings
