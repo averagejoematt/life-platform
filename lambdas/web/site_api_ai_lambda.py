@@ -686,6 +686,22 @@ def _retain_board_flag(pid: str, verdict: str, draft: str, final: str, findings:
         pass
 
 
+def _observe_board_verdict(pid: str, text: str) -> None:
+    # #3414: recover the ADR-108 voice verdict OFF the reader path. One
+    # fire-and-forget Event invoke via web/board_verdict_observer, sent after
+    # the answer is final: the verdict is captured CALLEE-side (CloudWatch +
+    # eval retention, disposition "observed"), nothing is awaited, and nothing
+    # returned can change the text the reader already has. Observe-only by
+    # design — ADR-108's enforcement scope stays daily-brief-only (#3413); this
+    # channel measures the board's voice-fidelity rate, it never enforces.
+    try:
+        from web import board_verdict_observer
+
+        board_verdict_observer.observe(pid, text)
+    except Exception:  # noqa: BLE001 — telemetry is never load-bearing
+        pass
+
+
 def _write_board_interaction(pid: str, question: str, answer: str, grounded: bool) -> None:
     """#531: episodic write-back — a public board answer enters the coach's OWN
     memory (PK=COACH#{pid}, SK=INTERACTION#{date}#{qhash}) so the weekly
@@ -743,7 +759,10 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
 # (pure, deterministic, no network, fail-closed) and it is independent of this
 # gate, whose scope was voice fidelity only. Per its own docstring, "an
 # off-voice-but-grounded answer beats no answer".
-# Recovering the voice verdict off the reader path is #3414, not this change.
+# The voice verdict is recovered OFF the reader path by #3414: after an answer
+# is served, `_observe_board_verdict` queues one fire-and-forget Event invoke
+# and the verdict lands callee-side (metrics + retention) — observe-only,
+# never a wait, never a regenerate-or-hold.
 
 
 # ── #546: board follow-up sessions ─────────────────────────
@@ -1407,6 +1426,10 @@ def _handle_board_ask(event: dict) -> dict:
 
             # #531: the answer enters the coach's own memory (fail-soft).
             _write_board_interaction(pid, question, _txt, grounded=_grounded)
+            # #3414: async voice-verdict capture — grounded answers only (a
+            # refusal is canned text; judging its voice would pollute the rate).
+            if _grounded:
+                _observe_board_verdict(pid, _txt)
 
             responses[pid] = _txt
             # #546: seed a follow-up thread for every coach that gave a real
@@ -1642,6 +1665,9 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     persisted = _append_board_turn(token, ip_hash, persona, question, _txt)
     # The answer also enters the coach's own episodic memory (fail-soft, #531).
     _write_board_interaction(persona, question, _txt, grounded=_grounded)
+    # #3414: same async voice-verdict capture as the initial path, per turn.
+    if _grounded:
+        _observe_board_verdict(persona, _txt)
 
     remaining = max(0, MAX_FOLLOWUPS - (used + 1)) if persisted else max(0, MAX_FOLLOWUPS - used)
     return {
