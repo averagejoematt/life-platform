@@ -797,3 +797,70 @@ def test_every_negative_in_one_entry_is_checked_not_just_the_first():
         }
     }
     assert cac.unfalsifiable_negatives(citations) == [("a", "has not recurred")]
+
+
+# ── #3412: an issue reference is not a DynamoDB sort key ─────────────────────
+#
+# `re.findall(r"#(\d+)", citation)` read `DATE#2026-08-24` as a reference to
+# issue #2026 — a real, CLOSED issue — so the #2996 dead-citation check reddened
+# naming an owner that does not exist. It punished the most evidence-bound
+# citation an operator can write; the workaround, twice, was to stop quoting the
+# key. These pin the grammar-based extractor that replaced it.
+
+
+_KEY_SHAPED = [
+    "withings' newest DDB record is DATE#2026-08-24",
+    "the partition USER#matthew#SOURCE#withings is empty",
+    "rolled into LIFETIME#2026 at the reset",
+    "TOTALS#current was zeroed",
+    "COACH#2026 is not an issue either",
+]
+
+
+@pytest.mark.parametrize("citation", _KEY_SHAPED)
+def test_a_quoted_sort_key_yields_no_issue_reference(citation):
+    assert cac.issue_refs(citation) == []
+
+
+def test_a_genuine_reference_still_parses_positive_control():
+    """The fix must not be a blanket 'ignore #2026' — 2026 is a live issue
+    number as well as a year, and both readings have to keep working."""
+    assert cac.issue_refs("owned by #2026") == ["2026"]
+    assert cac.issue_refs("see #3412 for the parser bug") == ["3412"]
+    assert cac.issue_refs("#1959 filed this gate") == ["1959"]
+
+
+def test_a_short_uppercase_prefix_is_a_reference_not_a_key():
+    """`PR#3075` is a form this repo's own comments use. The 3-character floor
+    on the key-prefix rule is what keeps it parsing."""
+    assert cac.issue_refs("fixed by #3066/PR#3075, verified live") == ["3066", "3075"]
+
+
+def test_a_citation_may_quote_its_key_AND_name_its_owner():
+    """The case the bug made impossible, and the reason it mattered: evidence
+    and ownership in one sentence."""
+    assert cac.issue_refs("withings' newest DDB record is DATE#2026-08-24 — owned by #3390") == ["3390"]
+
+
+def test_the_live_registry_parses_no_issue_out_of_a_date():
+    """The real committed registry, not a fixture — every reference the gate
+    would chase must be a plausible issue number, never a year lifted out of a
+    quoted key. (`fixture must be the wire`: the bug only ever appeared on the
+    real file's real prose.)"""
+    registry = json.load(open(os.path.join(os.path.dirname(__file__), "..", "docs", "alarm_citations.json")))
+    for name, entry in registry.items():
+        if not isinstance(entry, dict):
+            continue
+        text = str(entry.get("citation", ""))
+        for num in cac.issue_refs(text):
+            assert not re.search(rf"[A-Z][A-Z0-9_]{{2,}}#{num}\b", text), f"{name}: {num} was lifted out of a sort key"
+            assert not re.search(rf"#{num}-\d\d-\d\d", text), f"{name}: {num} is the year of a date"
+
+
+def test_mutation_the_old_extractor_reds_these():
+    """The negative control the #3412 acceptance box asks for: the pre-fix
+    regex, run against the same input, produces the wrong owner. If this ever
+    stops holding, the assertions above have stopped discriminating."""
+    old = lambda text: re.findall(r"#(\d+)", text)  # noqa: E731 — the exact pre-#3412 line
+    assert old("withings' newest DDB record is DATE#2026-08-24") == ["2026"]  # the bug, reproduced
+    assert cac.issue_refs("withings' newest DDB record is DATE#2026-08-24") == []  # the fix

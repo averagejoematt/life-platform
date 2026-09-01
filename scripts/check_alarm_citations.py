@@ -249,18 +249,60 @@ def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS
     return out
 
 
+# ── #3412: an issue reference is not a DynamoDB sort key ─────────────────────
+#
+# `re.findall(r"#(\d+)", citation)` cannot tell the two apart, and this repo
+# writes keys as `PREFIX#value` constantly. A citation that quoted the evidence
+# it was citing —
+#
+#     withings' newest DDB record is DATE#2026-08-24
+#
+# — parsed as a reference to issue #2026, which resolves to a real, CLOSED
+# issue, so the #2996 check reddened naming an owner that does not exist. Hit
+# live twice (2026-09-01, sessions P and Q); both times the "fix" was to stop
+# quoting the key, which punishes the most evidence-bound citation an operator
+# can write and rewards a vaguer one.
+#
+# The rule keys off the sort-key GRAMMAR, never a blocklist of strings or a
+# phrase match on the surrounding sentence: every phrase-matched member of the
+# #2959/#3003/#3199 suppressor family has failed in the field.
+#
+#   * digits immediately followed by `-DD-DD` are a calendar date, not an issue;
+#   * a `#` immediately preceded by an ALL-CAPS token of 3+ characters is a key
+#     prefix (DATE, SOURCE, USER, COACH, PROFILE, TOTALS, LIFETIME, WORKOUT, …).
+#
+# The 3-character floor is what keeps `PR#3075` — a form this file's own header
+# comment uses — parsing as a genuine reference.
+_KEY_TOKEN_BEFORE_HASH = re.compile(r"[A-Z][A-Z0-9_]{2,}$")
+_DATE_TAIL = re.compile(r"^-\d{2}-\d{2}")
+
+
+def issue_refs(text):
+    """Issue numbers (as strings) genuinely referenced by a citation string.
+
+    ONE definition, used by every caller — the two `re.findall` sites this
+    replaced had to be fixed in lockstep and silently disagreed if they were not.
+    """
+    out = []
+    for m in re.finditer(r"#(\d+)", str(text or "")):
+        if _DATE_TAIL.match(text[m.end() :]):
+            continue  # DATE#2026-08-24 — a calendar date
+        if _KEY_TOKEN_BEFORE_HASH.search(text[: m.start()]):
+            continue  # SOURCE#hevy, TOTALS#current — a sort key
+        out.append(m.group(1))
+    return out
+
+
 def cited_issue_refs(alarms, citations):
     """The issue numbers cited by alarms that are CURRENTLY lit, as strings.
 
     Scoped to `alarms` (which is the ALARM-state read) rather than the whole
     registry: a stale entry on a recovered alarm is a pruning chore, not a red.
     """
-    import re
-
     refs = set()
     for a in alarms:
         entry = citations.get(a.get("name") or "?") or {}
-        refs.update(re.findall(r"#(\d+)", str(entry.get("citation", ""))))
+        refs.update(issue_refs(entry.get("citation", "")))
     return sorted(refs)
 
 
@@ -284,13 +326,11 @@ def dead_citations(alarms, citations, issue_states):
     Pure and deterministic — `issue_states` is injected, so the regression test
     drives it with synthetic input exactly like the sibling checks.
     """
-    import re
-
     out = []
     for a in alarms:
         name = a.get("name") or "?"
         entry = citations.get(name) or {}
-        for num in re.findall(r"#(\d+)", str(entry.get("citation", ""))):
+        for num in issue_refs(entry.get("citation", "")):
             state = issue_states.get(num)
             if state is not None and str(state).upper() != "OPEN":
                 out.append((name, f"#{num}"))
