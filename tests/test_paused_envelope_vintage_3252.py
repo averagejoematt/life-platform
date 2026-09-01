@@ -369,6 +369,16 @@ def test_a_single_day_board_is_not_disclosed_as_mixed(dashboard):
 def test_the_weekly_priority_endpoint_carries_the_same_anchor_and_vintage(monkeypatch):
     monkeypatch.setattr(C, "table", FakeDdbTable(store_items=[LIVE_INTEGRATOR]))
     monkeypatch.setattr(C, "EXPERIMENT_START", GENESIS)
+    # The handler's #948 pre-start gate reads pre_start_meta() off the LIVE clock
+    # and constant — unpatched, a staged future genesis (a reset eve) flips this
+    # test's frame and the handler honestly serves the countdown envelope instead
+    # of the recorded normal path (found live on the 2026-09-01 re-anchor). Pin
+    # the normal-path frame the fixtures were recorded in.
+    # (delegated: C.handle_weekly_priority forwards to site_api_coach_narrative,
+    # which resolves pre_start_meta in ITS OWN namespace — patch that home.)
+    from web import site_api_coach_narrative as _narr
+
+    monkeypatch.setattr(_narr, "pre_start_meta", lambda: None)
     resp = C.handle_weekly_priority({"queryStringParameters": {}})
     assert resp["statusCode"] == 200, resp
     body = json.loads(resp["body"])

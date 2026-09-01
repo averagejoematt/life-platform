@@ -46,7 +46,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lambdas"))
 
-from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from operational import (
     qa_check_reader_truth as q,  # noqa: E402
     reader_truth_qa as rtq,  # noqa: E402
@@ -70,8 +69,18 @@ RETRACTED_NOTE_CHARS = 576  # the log line's own stamp
 # The phase the retraction was recorded at (Day 11), derived from the live constant so
 # a reset moves it — the #3337 rulings take the phase anchors, and a wire note judged
 # against the wrong day is no longer the wire.
-_PHASE_START = EXPERIMENT_START_DATE
-_DAY_11 = (date.fromisoformat(EXPERIMENT_START_DATE) + timedelta(days=10)).isoformat()
+# Wire-recorded frame (cycle-14, genesis 2026-08-17) — see test_reader_truth_qa.py.
+_RECORDED_GENESIS = "2026-08-17"
+_PHASE_START = _RECORDED_GENESIS
+_DAY_11 = (date.fromisoformat(_RECORDED_GENESIS) + timedelta(days=10)).isoformat()
+
+
+@pytest.fixture(autouse=True)
+def _recorded_frame(monkeypatch):
+    """assess_prose computes phase ground truth from constants at CALL time; the
+    wire corpus replays under its recorded frame (see _RECORDED_GENESIS above)."""
+    monkeypatch.setattr("common.constants.EXPERIMENT_START_DATE", _RECORDED_GENESIS)
+
 
 # "… finding e5eafd · /api/glucose [temporal_contradiction/med] — full note (387 chars): …"
 REAL_NOTE = (
