@@ -255,3 +255,38 @@ weigh-in — and per #3417, the full-scan handles, (3) the coach-quality-gate 4%
   domain scores and n/uncertainty per ADR-105.
 - Phase 3: `python3 scripts/check_backlog_hygiene.py` green over the newly filed issues.
 - Session end: `python3 scripts/wrap_gates.py` + `--verify` both green.
+
+## Phase 2 correction (the register mapping completed after the plan was approved — this supersedes Phase 2's premise)
+
+**The epic's "20 of 52" note is STALE — the register has had 52/52 rows since 2026-08-29**
+(commit `e619dd3d6`, whose own message says "Coverage now derives 52/52"; verified by grep,
+several IDs via combined rows). The epic body's box 1 is the self-referential-stale-doc bug
+this program hunts: update the checkbox + note as the first, cheapest act of Phase 2.
+
+What actually remains, from evidence:
+
+- **~10 thin dispositions, not 32 missing**: DIL-016, 020, 023 (the one literally blank
+  `—` cell, `RESPONSE.md:78`), 029, 030, 032, 038, 041, 050, 051 — pointer-only rows
+  ("D4 eval matrix", bare "#3000 / #2578") with no live evidence — plus borderline **022**,
+  which claims PRICED but has no row in the finalized priced table (`:148-157`), unbacked
+  by the register's own bar. The DIL-ID↔issue mapping is machine-readable (closed child
+  titles carry their DIL-IDs in parentheses), so dispositions are written from evidence,
+  no re-investigation.
+- **`diligence_verify.py` does NOT enforce 52/52** — `covered_dils()` is print-only
+  (14 of 52 scripted; the docstring says the rest are register-only by design). If the
+  session wants the coverage box to be un-rottable, that is a one-assert change worth
+  making while in the file — a checkbox is not a gate.
+- **Box 4 is the hard part and was last measured NOT MET.** `REGRADE_2026-08-29_FABLE.md`
+  scored only **2 of 9** non-commercial domains ≥9 (Privacy 9.0, Data integrity 9.0;
+  Product sits at 6.5, Release governance 7.0) — and that doc's own lead sentence
+  miscounts it as "four of nine", an internal inconsistency to resolve before treating it
+  as the baseline. Two top-leverage gap items (#3278, #3340) have closed since, so some
+  grades are stale-low — but the named blockers include owner-gated work (D3
+  owner-handoff/restore drills, clinician review). **The honest expected outcome is
+  therefore: register complete + boxes reconciled + a FRESH re-grade with real per-domain
+  scores — and the epic likely stays OPEN on box 4 with a named, owner-visible gap list.**
+  Closing it this session is not the bar; making its state true is.
+- **No diligence lens exists in `/review`** and the original PDF is not in the repo — the
+  re-grade re-runs `REGRADE_2026-08-29_FABLE.md`'s own §12 reconstruction (9 domains,
+  Commercial excluded) with `REGRADE_BRIEF_2026-08-25.md` as the assessor brief, through
+  fresh-context agents + finding-verifier. The session does NOT invent a new rubric.
