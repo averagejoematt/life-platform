@@ -462,18 +462,47 @@ in-cycle ("this cycle's 7-day average") while the cycle is younger than the wind
 SURFACES ({k}):
 """
 
+# ── #3399 (2026-09-01): `basis` is a POST-NOTE field — order is the mechanism ──
+#
+# THE OBSERVED FAILURE (run 33451827346, the cycle-15 pre-start eve; the artifact
+# is replayed verbatim in tests/test_reader_truth_withdrawn_basis_3399.py).
+# /method/voicefidelity/ FAILed the sweep on a high whose own note narrates a
+# re-check and ends "…This is correctly framed as historical. Withdrawing this
+# finding." — labelled `basis: "impossibility"`, precisely what this footer's old
+# closing sentence forbade in prose. Measured over all 35 findings in that run,
+# `basis: "withdrawn"` was emitted ZERO times: the structured channel #3337 built
+# was populated and WRONG, which is worse than absent.
+#
+# WHY: the old schema ordered each finding `severity, basis, note`. Generation is
+# autoregressive — the judge had committed its basis tokens before writing one
+# word of the note, so a retraction it reasons its way to MID-NOTE had no
+# structured place left to land. Instructing it not to do that was a prose
+# clause, and prose clauses measure 3-of-3 / 25-of-60 ignored (#2613/#2741).
+#
+# THE FIX is the field order: `basis` now closes each finding, emitted AFTER the
+# note, so the classification happens after the re-check the note narrates.
+# `basis: "withdrawn"` is thereby the judge's own post-note structured withdrawal
+# marker — `_normalize_finding` keeps it and `is_self_refuted` channel 1 drops
+# the finding on the FIELD, no phrase list anywhere (`_WITHDRAWAL_RE` stays a
+# logged tiebreak that can never decide alone). A first-pass mislabel gets its
+# second structured chance at the #2741/#3102 confirm passes, which re-judge
+# every would-gate high under this same contract before anything gates.
+# Emission rate on live runs is the #3399 acceptance measurement — if it stays
+# at 0 the field is not carrying its design load, and that is its own finding.
 _PROMPT_FOOTER = """
 Respond with ONLY a JSON object, no prose, no markdown fences:
 {{"findings": [{{"page": "<path of the surface, exactly as given>", \
 "category": "temporal_contradiction"|"duplicated_narrative"|"audience_violation", \
-"severity": "low"|"med"|"high", "basis": "impossibility"|"ambiguity"|"withdrawn", \
-"note": "string"}}], \
+"severity": "low"|"med"|"high", "note": "string", \
+"basis": "impossibility"|"ambiguity"|"withdrawn"}}], \
 "severity": "ok"|"low"|"med"|"high", "summary": "one sentence"}}
 Set top-level "severity" to the maximum finding severity, or "ok" if there are no findings.
-"basis" records what your own note concludes: "impossibility" = the phase makes the copy \
-impossible; "ambiguity" = the copy is unclear/imprecise but not impossible; "withdrawn" = \
-your note re-checked and found no contradiction. Say which — do not drop a retraction or an \
-ambiguity into the prose of a finding you still label an impossibility."""
+"basis" is each finding's LAST field, filled after its note is written: re-read what the note \
+actually concluded and record that — "impossibility" = the phase makes the copy impossible; \
+"ambiguity" = the copy is unclear/imprecise but not impossible; "withdrawn" = the note's own \
+re-check retracted the finding. If the note ends by withdrawing or retracting, "basis" MUST \
+be "withdrawn" — a retraction reached while writing the note belongs in this field, never \
+only in the prose."""
 
 
 def build_prompt(pages, phase, max_chars=MAX_PROSE_CHARS):
