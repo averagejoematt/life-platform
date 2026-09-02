@@ -153,3 +153,41 @@ a checkbox no reader could ever use (7 > 5 by arithmetic), six warnings no deplo
 ever clear (`?` ≠ `—` by API design), and a verdict no caller ever waited long enough to
 receive (p50 > cap) — each cured not by retuning but by teaching the instrument what its
 own wire actually carries.
+
+---
+
+## Plan for Session S (written 2026-09-02, post-wrap — owner-approved in-session)
+
+Owner context: three shaping calls asked and answered — flagship = **all three, staged**;
+#3419 decided **on evidence** in-session; **Monarch MCP is disabled**, so #1407's
+finance-drop leg is ON HOLD (owner call) while the CFPB-5 half proceeds. A fourth call
+(the advisor question) swapped the staff-legs phase for a **calculation-proof pass**:
+#3422/#3423 stay in Now for a later session, and restore-drill prep was declined for now.
+The full approved plan with file-level grounding lives at
+`~/.claude/plans/quiet-exploring-music.md`; the phases:
+
+1. **Phase 0 — boot + overnight reads:** steward armed with the run-bearing-sha fix;
+   #3399 box-3 emission count from the 09-02 23:42Z artifact; #3414's verdict counter;
+   swallow-check; headroom.
+2. **Phase 1 — #3419 repair, decided on evidence:** measure the 5-persona wall time;
+   raise-to-7 + parallelize if ~30s clears, else cap the UI at 5; the window-burn
+   sub-fix (a doomed request must not consume the window) ships regardless, with a
+   red-then-green regression on the exact 1+6>5 shape; live-verify + render-qa.
+3. **Phase 2 — #1407's Monarch-free half:** the `financial_wellbeing` Tier-2 partition
+   (EXTRA_QUERYABLE_PARTITIONS + SOURCE_CLASS + SOURCE_TIERS + DATA_GOVERNANCE bullet),
+   the `log_financial_wellbeing` MCP tool with its OWN closed-set validator
+   (`mcp/handler.py:204` allows extra args — the registry schema alone cannot meet
+   acceptance box 2), the inverse-vocabulary privacy contract (amount/merchant/balance/
+   account_id/transaction_id rejected, tested to fail once), CFPB-5 scoring with
+   provenance, catalog regenerated. The Monarch aggregates whitelist ships NOW as the
+   boundary contract; the drop + the buffer-months→sleep/HRV edge park with a written
+   re-enable trigger — #1407 stays OPEN partial, box 3 blocked-on-Monarch dated.
+4. **Phase 3 — the calculation-proof pass** (`/review accuracy`): fresh-context Fable
+   agents re-derive each formula family behind a public claim (sleep math, readiness/
+   ACWR, character engine vs the frozen 07-11 audit, calibration/Brier + the prediction
+   evaluator incl. the #2219 `beats_null` class-check, flourishing EMA, time-affluence
+   n_eff/FDR vs the methods-registry fingerprints, the new budget-ledger arithmetic) —
+   adversarially verified, graded scorecard under `docs/reviews/`, findings filed;
+   feeds the 09-08 Architect first run.
+5. **Phase 4 — wrap**, owner asks re-surfaced (the standing 10 + the Monarch re-enable
+   question when ready).
