@@ -3496,6 +3496,21 @@
      "url": "https://github.com/averagejoematt/life-platform/pull/3425"
     }
    ]
+  },
+  {
+   "id": "2026-09-02-the-checkbox-that-could-never-succeed",
+   "date": "2026-09-02",
+   "title": "The checkbox that could never succeed",
+   "shipped": "The coaching page has offered 'convene the full board (7)' since July — tick it, and all seven AI coaches answer your question at once. Except none ever did: since a rate-limit fix in August correctly started charging one token per coach, a 7-coach panel cost 7 tokens against a budget of 5. Arithmetic forbade it, for every reader, always — and the doomed attempt still burned the reader's whole hour, so even the working 3-coach panel then failed. Before choosing a fix, this session measured the alternative: cap the panel at 5? The live probe answered no — even a 5-coach panel timed out at the serving function's own 30-second ceiling, with the fifth coach never reached. So the fix was both: the budget raised to 7 so one full board per hour is genuinely purchasable, the seven coaches now generating their answers in PARALLEL instead of single-file, and the rate limiter rebuilt so a rejected request consumes nothing. The proof is live: one full-board question, HTTP 200 in 17 seconds, all seven coaches answering — the first time that checkbox has ever done what it says.",
+   "why_it_mattered": "An affordance that structurally cannot work is worse than a missing one: it invites the click, punishes it, and then breaks the fallback that WAS working. This one sat broken for 12 days including launch day, invisible because nothing measures attempts-versus-successes per button. The repair also hardened the general case — any request too big for its rate window is now refused before it spends, instead of charged for a thing it can never receive.",
+   "gotcha": "Extracting the parallel loop into its own module tripped five different guards in sequence — the module-size ratchet, four source-anchored tests, the AI-invoke census, the type checker, and the grounding-wiring registry, which correctly refused a surface whose safety gate it could no longer see. The cure was teaching the registry a new structural concept (a gate call baked inside a wrapper) rather than exempting the file — so the next extraction gets discovered and forced to register, not waved through.",
+   "honest_miss": "The same session's math audit found the board's sibling instruments in worse shape: the training-load ratio (ACWR) has been computed and then destroyed every night since August 24 by a scheduling collision — nine days dark with zero alarms — and weekly correlations silently drop exactly the workout days. Both are filed with reproductions; the formulas themselves proved out exact.",
+   "prs": [
+    {
+     "label": "PR #3439",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3439"
+    }
+   ]
   }
  ]
 }

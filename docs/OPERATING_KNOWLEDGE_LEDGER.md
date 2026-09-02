@@ -41,14 +41,14 @@ section heading is the anchor; where it cites a code file, the file's header doc
 | `user` | Who the owner is — out of scope for this ledger, stays in memory |
 | `index` | The memory index itself, or its annex |
 
-## Coverage — 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
+## Coverage — 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 390** — feedback 22 · reference 216 · security 1 · project 148 · user 1 · index 2
+**Files in the memory index snapshot: 392** — feedback 22 · reference 217 · security 1 · project 149 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 239** — homed-here 58 · already-homed 161 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 240** — homed-here 58 · already-homed 162 · superseded 7 · narrative 11 · off-repo 2
 
-**Program/session files (project): 148** — already-homed 14 · superseded 1 · narrative 130 · off-repo 2 · index 1
+**Program/session files (project): 149** — already-homed 14 · superseded 1 · narrative 131 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -215,6 +215,7 @@ project_session_o_launch_2026_08_31.md
 project_session_p_2026_09_01.md
 project_session_q_2026_09_01.md
 project_session_r_2026_09_01.md
+project_session_s_2026_09_02.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -257,6 +258,7 @@ reference_a_transform_can_be_correct_and_unreachable.md
 reference_a_vacuous_negative_control.md
 reference_a_verified_stamp_is_a_human_claim.md
 reference_absence_read_as_success.md
+reference_co_owned_record_reput_erases_merged_fields.md
 reference_absent_check_invisible_to_fail_filter.md
 reference_accuracy_gate_signed_metrics.md
 reference_adr099_score_inverts_priority.md
@@ -503,6 +505,7 @@ user_who_is_matthew.md
 | `reference_a_client_cap_below_the_callee_p50.md` | reference | `lambdas/web/board_quality_gate.py` docstring (the measurement + derivation command) + `docs/DECISIONS.md` ADR-108 amendment 2026-09-01 | already-homed |
 | `reference_a_verified_stamp_is_a_human_claim.md` | reference | `docs/OPERATING_DISCIPLINE.md` §4.2 + `.claude/agents/finding-verifier.md` (standing cautions) | already-homed |
 | `reference_absence_read_as_success.md` | reference | `docs/CHARTER.md` (the derivation-guard primitive — derive, never trust a local copy) + the instance guards `tests/test_backup_agent_path_contract.py`, `scripts/check_main_green.py` HEAD-COVERAGE, #3378 | already-homed |
+| `reference_co_owned_record_reput_erases_merged_fields.md` | reference | `docs/INCIDENT_LOG.md` (the 2026-09-02 ACWR row records the class); the mechanical guard (co-owned-fields-survive-re-put contract test + merged-timestamp dead-man) is #3443's acceptance and lands with it | already-homed |
 | `reference_absent_check_invisible_to_fail_filter.md` | reference | `docs/OPERATING_DISCIPLINE.md` §3.7 | already-homed |
 | `reference_accuracy_gate_signed_metrics.md` | reference | `tests/accuracy_audit.py` (signed `progress_pct`) | already-homed |
 | `reference_adr099_score_inverts_priority.md` | reference | `docs/OPERATING_DISCIPLINE.md` §2.7 | already-homed |
@@ -859,6 +862,7 @@ carries an operating rule.
 | `project_wiki_program_2026_07_10.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_wrong_day_and_wrong_gauge_2026_08_18.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_q_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
+| `project_session_s_2026_09_02.md` | project | session narrative — the durable rule went to its own reference file, the rest is handover-class history | narrative |
 | `project_session_r_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 
 ## Out of scope
