@@ -989,14 +989,29 @@ def render_doc(model: dict) -> str:
         + f" — of {counts['alarms']} alarms ({counts.get('alarms_composite', 0)} composite)"
     )
     add("")
-    add("| Alarm | Stack | Kind | Routing | Via |")
-    add("|-------|-------|------|---------|-----|")
+    add("| Alarm | Stack | Kind | Routing | Via | Audience |")
+    add("|-------|-------|------|---------|-----|----------|")
     for name, rec in sorted(model["alarms"].items()):
         extra = ""
         if rec.get("members"):
             extra = " ← " + ", ".join(f"`{m}`" for m in rec["members"])
-        add(f"| `{name}` | {rec['stack']} | {rec.get('kind', 'metric')}{extra} | {rec['routing']} | {rec.get('via', 'declaration')} |")
+        audience = rec.get("audience", "")
+        add(
+            f"| `{name}` | {rec['stack']} | {rec.get('kind', 'metric')}{extra} | {rec['routing']} | {rec.get('via', 'declaration')} | {audience} |"
+        )
     add("")
+    reader_alarms = sorted(n for n, r in model["alarms"].items() if r.get("audience") == "reader")
+    if reader_alarms:
+        add(
+            f"**Reader-audience alarms ({len(reader_alarms)}, #3423):** escalate on FIRST red — 0h bar, not the "
+            "72h citation/aging window — in `scripts/check_alarm_citations.py` and `remediation/agent.py`. "
+            "Curated in `scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS`, each with its blast-radius "
+            "ruling."
+        )
+        add("")
+        for name in reader_alarms:
+            add(f"- `{name}` — {model['alarms'][name].get('audience_ruling', '')}")
+        add("")
     add("## 5b. Privacy Tiers (field_tiers registry, ADR-155)")
     add("")
     privacy = model.get("privacy", {})

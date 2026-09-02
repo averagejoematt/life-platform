@@ -18,6 +18,73 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
+# ── #3423: the reader-audience facet ──────────────────────────────────────────
+#
+# `ai-canary-overall` went ALARM 2026-08-31 09:22 PT (the #3413 board-504 P1) and
+# sat lit ~31h across launch day because it was under the citation gate's 72h bar
+# and nothing routed it to a human sooner — "immediate detection, ~31h escalation.
+# The canary worked; nothing read it." (docs/INCIDENT_LOG.md row). The fix is an
+# audience-conditional bar in the check_alarm_citations.py / remediation/agent.py
+# family (both readers of `model/platform_model.json`'s alarms plane): a
+# reader-audience alarm escalates on FIRST red, everything else keeps the 72h bar.
+#
+# The facet is a CURATED registry, not a derivation from stack/routing/name —
+# same shape as `docs/alarm_citations.json` ("hand-maintained the same way
+# remediation/agent.py's MANUAL_ROTATION_SECRETS is — citations are asserted by
+# an operator, not pattern-matched out of prose"). "Reader-audience" is a
+# judgment about blast radius (does this alarm's failure reach a real reader of
+# averagejoematt.com?), which a stack name or an SNS topic cannot answer on its
+# own — `ai-canary-overall` itself is proof: it is declared in monitoring_stack,
+# not serve_stack, and a stack-keyed derivation would have missed the very alarm
+# that motivated this facet. Every entry below is asserted with its blast-radius
+# reasoning, and the alarm NAME must round-trip through the real CDK-derived
+# inventory (tests/test_reader_audience_alarms.py fails loudly on a typo/rename —
+# the same discipline the citation registry enforces for `#N` references).
+#
+# Considered and DECLINED (documented so the omission is a ruling, not a gap):
+#   * `email-subscriber-errors`, `life-platform-og-image-errors` (web_stack) — a
+#     broken share-card or a failed subscribe email is reader-adjacent, but the
+#     blast radius is one interaction at a time, not the live site; conservative
+#     call, stays on the 72h bar.
+#   * `life-platform-canary-ddb-failure` / `-mcp-failure` / `-s3-failure` /
+#     `-anthropic-failure` / `-subscribe-residue` / `-subscribe-cleanup-failure`
+#     (operational_stack, REL-4) — internal STORE/SERVE round-trip health (DDB,
+#     S3, the MCP Function URL used by Claude Desktop/claude.ai, never a public
+#     reader path); stays on the 72h bar.
+#
+# Unlisted alarms default to no `audience` facet at all (absent, not
+# `"internal"`) — the same "unlisted = default by omission" convention the
+# privacy plane already uses (see generate_platform_model.py's module docstring,
+# "privacy rows exist only where the registry declares a NON-default tier").
+READER_AUDIENCE_ALARMS: dict[str, str] = {
+    "ai-canary-overall": (
+        "the public-AI quality canary (ai_quality_canary_lambda.py: 'standing eyes on "
+        "the public AI') invokes site-api-ai directly with probes against /api/ask and "
+        "/api/board_ask — the exact alarm that sat lit ~31h through the #3413 board-504 "
+        "incident this facet exists to fix."
+    ),
+    "ai-canary-blind": (
+        "same LifePlatform/AICanary probe family as ai-canary-overall — fires when the "
+        "probe itself cannot reach the reader-facing /api/ask, /api/board_ask endpoints "
+        "(distinguishes 'the watcher is broken' from 'the answers are bad', but both "
+        "states mean the reader-facing AI surface is unwatched)."
+    ),
+    "ai-canary-heartbeat": (
+        "dead-man's-switch on the same public-AI canary — a missed heartbeat means the "
+        "reader-facing AI watch has gone dark, silently, exactly the failure mode #3413 "
+        "hid inside."
+    ),
+    "site-api-errors": "serve_stack (CLAUDE.md: 'public serving path — site-api + site-api-ai, #793') — general error rate serving averagejoematt.com readers.",
+    "site-api-handled-5xx": "serve_stack — 5xx served directly to a reader's browser/API client.",
+    "site-api-ai-errors": "serve_stack — errors on the reader-facing AI endpoints (/api/ask, /api/board_ask).",
+    "site-api-ai-throttles": "serve_stack — throttling a reader hits directly on the AI endpoints.",
+    "site-api-content-filter-fallback": "serve_stack — the reader-facing AI content-filter fallback path.",
+    "site-api-invocation-spike": "serve_stack — an invocation spike on the reader-facing API (capacity/DoS blast radius reaches readers).",
+    "site-api-p95-latency-high": "serve_stack — p95 latency a reader directly experiences loading the site.",
+    "site-api-throttles": "serve_stack — throttling a reader hits directly on the public API.",
+}
+
+
 def _resolve_str(node: ast.AST, consts: dict[str, str]) -> str | None:
     from generate_platform_model import _resolve_str as _impl
 
@@ -396,4 +463,13 @@ def extract_alarms() -> dict[str, dict]:
         for name in inventory.get(stack, []):
             here.setdefault(name, {"stack": stack, "kind": "metric", "routing": "unresolved", "via": "alarm_discovery-only (untraced)"})
         alarms.update(here)
+    # #3423: attach the curated reader-audience facet — a name the registry holds
+    # that no CDK-derived alarm matches is a typo/rename and must not be dropped
+    # silently (tests/test_reader_audience_alarms.py pins the same invariant against
+    # the real inventory; this assertion catches it at generation time too, the same
+    # "stated, never guessed" posture as the rest of this module).
+    for name, ruling in READER_AUDIENCE_ALARMS.items():
+        assert name in alarms, f"READER_AUDIENCE_ALARMS names {name!r}, which is not a CDK-declared alarm — typo or rename?"
+        alarms[name]["audience"] = "reader"
+        alarms[name]["audience_ruling"] = ruling
     return alarms
