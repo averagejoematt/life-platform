@@ -18,6 +18,23 @@ contract:
     — a gate whose must-fail case cannot fail is decoration (the vacuous
     negative-control class).
 
+#3447 (the Session S calculation-proof pass) found the founding guards above
+were founding-MONTH snapshots, not invariants, and this file closes three of
+the four legs (the fourth, secrets registry-vs-estate, is a close-time-only
+check in ``scripts/monthly_close.py`` — it needs a live AWS read this file
+deliberately never makes):
+
+  * leg (b) — the down-only check above compared only against the FOUNDING
+    pin, so ratchet-to-$5-then-reraise-to-$20 (still <= founding) was a quiet
+    ONE-file edit. ``test_current_unknown_budget_matches_pin`` below pins the
+    CURRENT committed value too, by equality — any move off it, anywhere in
+    the range, now requires touching this file as well;
+  * leg (a) — a named spend dimension claimed by no row and not ``unknown``
+    was invisible to every close check (the founding $9.22/8-dimension
+    escape); covered by the unclaimed-dimension tests below;
+  * leg (c) — a founding->=$1 EXCLUSIVE row reading $0.00 graded as a clean
+    bill; covered by the absent-emitter tests below.
+
 The close-time half (spend vs. budget on live CloudWatch data) runs in
 ``scripts/monthly_close.py`` step [5/5]; nothing here calls AWS.
 """
@@ -37,6 +54,12 @@ import ai_budget_ledger as ledger  # noqa: E402
 # Deliberately restated here as a literal: the ledger's own constant asserting
 # against itself would be a vacuous control.
 UNKNOWN_FOUNDING_PIN = 33.19
+
+# #3447 leg (b): the CURRENT committed unknown budget, pinned independently of
+# the founding value above. Update this line AND the ledger's row together —
+# that pairing IS the two-file, reviewed act for a move in EITHER direction,
+# closing the sub-founding-range hole the founding-only pin left open.
+CURRENT_UNKNOWN_BUDGET_PIN = 33.19
 
 
 @pytest.fixture(autouse=True)
@@ -87,10 +110,34 @@ def test_mutation_raising_the_unknown_budget_fails():
 
 
 def test_lowering_the_unknown_budget_is_quiet():
-    """The ratchet's whole point: attribution landing lets the bucket shrink with
-    no ceremony beyond the edit itself."""
+    """``validate()`` in isolation still permits a quiet lower — the ratchet's
+    whole point: attribution landing lets the bucket shrink with no ceremony
+    beyond the edit itself. (The FULL contract still requires the current-pin
+    test below to match the committed file, which is what makes a real commit
+    a two-file act; this test is only about validate()'s own permissiveness.)"""
     ledger.LEDGER[ledger.UNKNOWN_KEY]["monthly_budget_usd"] = 5.00
     assert ledger.validate() == []
+
+
+def test_current_unknown_budget_matches_pin():
+    """#3447 leg (b): the CURRENT committed value, not just the founding one, is
+    pinned here by EQUALITY. This is the full-range companion to the founding
+    pin above — it closes the sub-founding hole where a value anywhere in
+    [$0, founding] passed the old down-only check with no test-file edit."""
+    assert ledger.LEDGER[ledger.UNKNOWN_KEY]["monthly_budget_usd"] == CURRENT_UNKNOWN_BUDGET_PIN
+
+
+def test_mutation_the_founding_exploit_shape_fails_the_current_pin():
+    """The exact #3447 leg (b) finding, reproduced and then closed: ratchet the
+    unknown budget down to $5, then re-raise it to $20 — still <= founding
+    $33.19, so the OLD down-only guard (checked here via validate()) stays
+    quiet on both moves. The new current-value pin is what catches it."""
+    ledger.LEDGER[ledger.UNKNOWN_KEY]["monthly_budget_usd"] = 5.00
+    assert ledger.validate() == []  # the founding-only guard: quiet
+    ledger.LEDGER[ledger.UNKNOWN_KEY]["monthly_budget_usd"] = 20.00
+    assert ledger.validate() == []  # still <= founding — this WAS the one-file hole
+    # the current-pin equality is what a real PR's test suite would catch:
+    assert ledger.LEDGER[ledger.UNKNOWN_KEY]["monthly_budget_usd"] != CURRENT_UNKNOWN_BUDGET_PIN
 
 
 def test_mutation_a_budget_off_the_stated_rule_fails():
@@ -161,3 +208,68 @@ def test_close_dead_men():
     rows = _baseline_rows()
     rows.pop("unknown", None)
     assert any("no `unknown` datapoint" in f for f in ledger.evaluate_close(_attribution(rows)))
+
+
+# ── #3447 leg (a): unclaimed named dimensions ─────────────────────────────────
+
+
+def test_close_unclaimed_dimension_fails_and_names_it():
+    """The founding finding, reproduced: named LambdaFunction dimensions with
+    real spend, claimed by no row and not `unknown`, must red — the $9.22/
+    8-dimension escape this leg exists to catch."""
+    rows = _baseline_rows()
+    rows["ai-expert-analyzer"] = 4.45
+    rows["coach-quality-gate"] = 2.66
+    failures = ledger.evaluate_close(_attribution(rows))
+    hit = next((f for f in failures if f.startswith("unclaimed named dimension")), None)
+    assert hit is not None
+    assert "ai-expert-analyzer" in hit and "coach-quality-gate" in hit
+    assert "$7.11" in hit
+
+
+def test_close_a_tiny_unclaimed_dimension_under_the_floor_is_quiet():
+    """A cent of noise under an unrecognized dimension name is not the defect
+    class — only real, floor-clearing unclaimed spend should red (positive
+    control for the floor itself, not just its presence)."""
+    rows = _baseline_rows()
+    rows["some-new-experimental-lambda"] = 0.03
+    assert ledger.evaluate_close(_attribution(rows)) == []
+
+
+def test_close_a_claimed_dimension_never_counts_as_unclaimed():
+    """Negative control: a dimension already named in a SHARED row's
+    attribution_keys (e.g. wednesday-chronicle) is claimed — carrying its
+    normal spend must never trip the unclaimed-dimension check."""
+    rows = _baseline_rows()
+    rows["wednesday-chronicle"] = 0.29  # chronicle + chronicle_editor's real Aug combined figure
+    assert ledger.evaluate_close(_attribution(rows)) == []
+
+
+# ── #3447 leg (c): absent/renamed-emitter flag ────────────────────────────────
+
+
+def test_close_a_dead_founding_emitter_is_flagged_not_passed():
+    """The rename-mode finding: a founding->=$1 EXCLUSIVE row reading exactly
+    $0.00 must be flagged as a probable absent/renamed emitter, never pass
+    quietly the way `spend.get(k, 0.0)` alone would let it."""
+    rows = _baseline_rows()
+    rows["daily-brief"] = 0.0
+    failures = ledger.evaluate_close(_attribution(rows))
+    assert any(f.startswith("daily_brief_ai:") and "absent or renamed emitter" in f for f in failures)
+
+
+def test_close_a_sub_dollar_founding_row_at_zero_is_not_flagged():
+    """Negative control: coach_nudge founded at $0.00 — genuinely idle is its
+    normal state, not a broken emitter; the floor must not fire on it."""
+    rows = _baseline_rows()
+    rows["coach-nudge"] = 0.0
+    assert ledger.evaluate_close(_attribution(rows)) == []
+
+
+def test_close_unknown_at_zero_is_never_flagged_as_absent():
+    """`unknown` reading $0.00 means attribution reached 100% — the ratchet's
+    own success state — never a broken-emitter flag; it has its own dedicated
+    (missing-datapoint) absence check above instead."""
+    rows = _baseline_rows()
+    rows["unknown"] = 0.0
+    assert ledger.evaluate_close(_attribution(rows)) == []
