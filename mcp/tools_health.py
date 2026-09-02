@@ -467,7 +467,12 @@ def tool_get_readiness_score(args):
             "readiness_score": float(_cm["readiness_score"]),
             "label": _cm.get("readiness_colour", ""),
             "source": "daily-metrics-compute (9:40 AM)",
-            "note": "Pre-computed with Whoop recovery 40% + sleep 30% + HRV trend 20% + TSB 10% (no Body Battery component). Minor weight difference from live tool.",
+            "note": (
+                "Pre-computed with Whoop recovery 40% + sleep 25% + HRV trend 20% + TSB 10% "
+                "(sums to 95%, not 100% — no Body Battery component, and the shortfall isn't "
+                "backfilled; present components are re-normalised the same way the live tool "
+                "does it). Minor weight difference from live tool."
+            ),
         }
         if _cc_date and _cc_date != end_date:
             result["_precomputed_cross_check"]["drift_note"] = (
