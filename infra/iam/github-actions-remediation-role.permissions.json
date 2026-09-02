@@ -144,7 +144,8 @@
         "StringLike": {
           "s3:prefix": [
             "remediation-log/*",
-            "drift-log/*"
+            "drift-log/*",
+            "raw/*"
           ]
         }
       }
