@@ -1122,7 +1122,7 @@ function renderAskBoard(read) {
     `<button class="askboard-btn" type="submit">Convene the board</button>` +
     `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>` +
     `<div class="cv-panel" data-cv-panel aria-live="polite"></div>` +
-    `<p class="dx-disclosure label">Rate-limited (5/hour) and budget-guarded. Prefer a considered, human-reviewed answer? ` +
+    `<p class="dx-disclosure label">Rate-limited (7/hour — one full board) and budget-guarded. Prefer a considered, human-reviewed answer? ` +
     `<button type="button" class="dx-readfull" data-cv-queue>Send it to the weekly Reader Q&amp;A →</button></p>` +
     `<p class="dx-prose" data-qa-feedstate></p>` +
     `<div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>`;
