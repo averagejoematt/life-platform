@@ -21,6 +21,7 @@ Contents:
   - Banister: compute_banister_from_list, compute_banister_from_dict
 """
 
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -78,6 +79,34 @@ def safe_float(rec, field, default=None):
 # DDB RANGE QUERIES  (paginated, phase-scoped — the one sanctioned implementation, #970)
 # ══════════════════════════════════════════════════════════════════════════════
 
+# #3442: the one day-row predicate. Several partitions carry sub-records under the
+# same DATE# prefix (whoop stores DATE#<d>#WORKOUT#<uuid> per workout, notion stores
+# DATE#<d>#journal#<template>#<uuid> per entry). A date-keyed consumer that indexes
+# such a partition by `date` lets the sub-record (sorted after the day row, carrying
+# per-workout strain and none of the day fields) last-write-win over the day row —
+# the 2026-W26 "20 nights of sleep in one week" incident, refound at 8 sites by the
+# 2026-09-02 calculation-proof pass. Day-keyed consumers filter with these; list
+# consumers whose sub-records ARE the data (hevy, journal) deliberately do not.
+DAY_SK_RE = re.compile(r"^DATE#\d{4}-\d{2}-\d{2}$")
+
+
+def is_day_row(item) -> bool:
+    """True iff the record is a plain day row (sk == DATE#YYYY-MM-DD) — #3442.
+
+    A record with NO sk at all is treated as a day row: the wire always carries
+    sk (it is the table's range key), so sk-absence means a synthetic or
+    field-stripped record, which cannot be identified as a sub-record and must
+    not be silently dropped."""
+    sk = item.get("sk")
+    if sk is None:
+        return True
+    return bool(DAY_SK_RE.match(str(sk)))
+
+
+def filter_day_rows(records: list) -> list:
+    """Day rows only — drops DATE#<d>#<sub>… sub-records from a wire list (#3442)."""
+    return [r for r in records if is_day_row(r)]
+
 
 def query_range(table, source, start_date, end_date, user_id="matthew", include_pilot: bool = False):
     """Query all DATE# records for a source in a date range, as a {date: record} dict.
@@ -86,6 +115,11 @@ def query_range(table, source, start_date, end_date, user_id="matthew", include_
     1MB page) and applies the ADR-058 phase filter. Values are d2f-converted.
     Records sharing a `date` collapse to the last one — use query_range_list for
     per-workout schemas (Hevy) where duplicates are legitimate.
+
+    Day rows ONLY since #3442: sub-records (DATE#<d>#WORKOUT#<uuid> and kin) are
+    skipped, because "one record per date" is this function's contract and letting
+    a sub-record last-write-win over the day row is the 8-site clobber class. A
+    consumer that wants sub-records wants query_range_list.
 
     `include_pilot` (#2150) is a plain pass-through, default False — the pre-#2150
     behaviour every existing caller relies on. This was the ROOT ENABLER of the
@@ -108,6 +142,8 @@ def query_range(table, source, start_date, end_date, user_id="matthew", include_
     while True:
         resp = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))
         for item in resp.get("Items", []):
+            if not is_day_row(item):  # #3442: sub-records never clobber the day row
+                continue
             date_str = item.get("date") or item["sk"].replace("DATE#", "")
             records[date_str] = d2f(item)
         if "LastEvaluatedKey" not in resp:

@@ -66,7 +66,10 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-from common.digest_utils import d2f as decimal_to_float  # shared bundled helpers (#970)
+from common.digest_utils import (
+    d2f as decimal_to_float,  # shared bundled helpers (#970)
+    filter_day_rows,  # #3442: day rows only for the by-date whoop index
+)
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:
@@ -359,7 +362,9 @@ def enrich_date_range(start_date: str, end_date: str):
 
     # Load Whoop for recovery context (same window)
     whoop_items = query_source("whoop", start_date, end_date)
-    whoop_by_date = {w["date"]: w for w in whoop_items if w.get("date")}
+    # #3442: day rows only — a DATE#<d>#WORKOUT#<uuid> fragment (no recovery/hrv)
+    # was last-write-winning over the day row in this by-date index.
+    whoop_by_date = {w["date"]: w for w in filter_day_rows(whoop_items) if w.get("date")}
 
     enriched_count = 0
     skipped_count = 0
