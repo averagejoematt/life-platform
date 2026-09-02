@@ -52,10 +52,10 @@ import urllib.request
 from operational.qa_check import CONTENT_TRUTH, Check
 from operational.qa_check_reader_truth import SITE_BASE_URL
 
-# BOARD_RATE_LIMIT (5/hr) + 1 — enough to observe one real 429. Pinned to
-# lambdas/web/site_api_ai_lambda.py's constant by the lockstep test; never
-# imported at runtime (see module docstring).
-MAX_PROBES = 6
+# BOARD_RATE_LIMIT (7/hr since #3419) + 1 — enough to observe one real 429.
+# Pinned to lambdas/web/site_api_ai_lambda.py's constant by the lockstep test;
+# never imported at runtime (see module docstring).
+MAX_PROBES = 8
 
 _ENDPOINT = "/api/board_ask"
 _TIMEOUT_S = 10

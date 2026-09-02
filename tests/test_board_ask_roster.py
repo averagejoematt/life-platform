@@ -16,6 +16,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 AI_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas/web/site_api_ai_lambda.py")).read()
+# #3419: the parallel persona pass (prompt construction + bedrock invokes) was
+# extracted to this sibling — the grounding/spend-ordering pins follow the code.
+PANEL_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas/web/site_api_board_panel.py")).read()
 SITE_SRC = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas/web/site_api_lambda.py")).read()
 COACHING_JS = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "site/assets/js/coaching.js")).read()
 
@@ -51,11 +54,16 @@ def test_legacy_ids_map_to_real_coaches_never_500():
 
 
 def test_unknown_persona_is_400_before_model_spend():
-    """The 400 branch must run BEFORE any bedrock invoke in the handler source."""
+    """The 400 branch must run BEFORE any bedrock invoke. Since #3419 the
+    invokes live in the extracted panel sibling, so the pin is two-part: the
+    handler rejects unknown ids before it hands off to the panel, and the
+    handler itself contains NO invoke (the panel is the only spend path)."""
     body = re.search(r"def _handle_board_ask.*?(?=\ndef |\Z)", AI_SRC, re.S).group(0)
     reject = body.find("Unknown persona id")
-    invoke = body.find("_bedrock_invoke")
-    assert 0 < reject < invoke, "unknown-id rejection must precede the model call"
+    handoff = body.find("_board_panel.convene(")
+    assert 0 < reject < handoff, "unknown-id rejection must precede the panel handoff"
+    assert "_bedrock_invoke" not in body, "the handler must not invoke the model directly — the panel sibling owns spend"
+    assert "_bedrock_invoke" in PANEL_SRC, "the panel sibling must be where the model call actually lives"
 
 
 def test_grounding_in_every_persona_turn():
@@ -63,8 +71,10 @@ def test_grounding_in_every_persona_turn():
     # #743: facts block now takes the shared, once-fetched brief so the reader
     # receipt (board_grounding_receipts) describes the SAME ctx the prompt used.
     assert "_board_facts_block(_brief_ctx)" in body
-    assert "CURRENT DATA" in body and "cite only these numbers" in body
-    assert "_coach_stance_bits(" in body
+    # #3419: the per-persona turn is built in the extracted panel sibling —
+    # the grounding vocabulary + stance load must be there, in the prep pass.
+    assert "CURRENT DATA" in PANEL_SRC and "cite only these numbers" in PANEL_SRC
+    assert "_coach_stance_bits(" in PANEL_SRC
 
 
 def test_system_prompt_has_the_guardrails():

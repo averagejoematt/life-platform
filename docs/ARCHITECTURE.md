@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Last updated: 2026-08-31 (v8.6.0 — 76 tools, 39-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 117 alarms, 10 CDK stacks deployed).
+Last updated: 2026-09-02 (v8.6.0 — 76 tools, 39-module MCP package, 20 data sources, 104 Lambdas, 26 secrets, 117 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **153 ADRs** (ADR-001 → ADR-155 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -289,7 +289,7 @@ All of these ship together via the standard `Code.from_asset("../lambdas")` zip.
 - `GET /api/experiments` — N=1 experiment list
 - `GET /api/current_challenge` — weekly challenge ticker
 - `POST /api/ask` — AI Q&A (Haiku 4.5), 3 anon / 20 subscriber q/hr
-- `POST /api/board_ask` — 6-persona board AI (Haiku 4.5), 5/hr IP limit
+- `POST /api/board_ask` — board AI, up to the full 7-coach roster in parallel (Haiku 4.5), 7/hr IP fan-out budget (#3419)
 - `GET /api/verify_subscriber?email=` — HMAC token for subscriber gate (24hr)
 - `POST /api/subscribe` — email subscriber capture
 
