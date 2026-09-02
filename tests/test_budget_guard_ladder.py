@@ -60,7 +60,25 @@ _OPERATOR_TRUTH = ("reader_truth_qa", "visual_ai_qa")
 
 
 def _at_tier(monkeypatch, tier):
+    """Stub current_tier() at a fixed value for the ladder tests.
+
+    #3438: current_tier() is stubbed here, but allow()'s FAIL_CLOSED_FEATURES
+    check reads `_cache['readable']` directly (#2824/DIL-036), NOT the stubbed
+    function — the two are separate reads of separate state. `_cache['readable']`
+    is module-global and normally only ever written by the real refresh path
+    (see budget_guard.py's `_cache` comment), so if an EARLIER test in the same
+    process let a real current_tier() run in this creds-less test env, that
+    refresh caches readable=False for the TTL — poisoning every later test in
+    this file regardless of the stub above. CI's alphabetical collection never
+    triggers a real refresh before this file, so the poisoning was invisible
+    there; any custom or randomized selection (e.g. `pytest
+    tests/test_site_api_ai_behavior.py tests/test_budget_guard_ladder.py`) hits
+    it and denies website_ai at every tier. Pin readable=True here via
+    monkeypatch.setitem (auto-restored at teardown) so the ladder tests are
+    immune to whatever ran before them in the same process.
+    """
     monkeypatch.setattr(budget_guard, "current_tier", lambda: tier)
+    monkeypatch.setitem(budget_guard._cache, "readable", True)
 
 
 def test_tier0_everything_runs(monkeypatch):
