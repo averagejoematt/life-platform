@@ -68,6 +68,8 @@ from health import (
 from intelligence import weight_recency  # #2221: ONE definition of the week-ago weigh-in
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
+from compute.computed_metrics_contract import ACWR_COOWNED_FIELDS  # #3443: the co-owned field registry
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from common.platform_logger import get_logger
@@ -731,6 +733,19 @@ def store_computed_metrics(
         item["tsb_load_basis"] = _deep_dec(tsb_load_basis)
 
     item = {k: v for k, v in item.items() if v is not None}
+
+    # #3443: computed_metrics is a CO-OWNED record — acwr-compute merges its
+    # fields onto it via update_item (~16:55Z). This function rebuilds the record
+    # from scratch, so a later re-put (the 00:00Z evening re-run) erased every
+    # merged field: ACWR was destroyed nightly 2026-08-24→09-01 with zero alarms.
+    # Carry the other writer's fields through. The field set is the ONE registry
+    # in compute.computed_metrics_contract; a read failure raises (a silent
+    # fail-open here IS the erasure this exists to prevent).
+    existing = table.get_item(Key={"pk": item["pk"], "sk": item["sk"]}).get("Item") or {}
+    for _f in ACWR_COOWNED_FIELDS:
+        if _f in existing and _f not in item:
+            item[_f] = existing[_f]
+
     # DATA-2: Use validate_item directly (no S3 client — compute partitions don't archive
     # to S3 on failure; they log and skip. validate_and_write requires s3_client != None.)
     try:
@@ -1222,6 +1237,13 @@ def lambda_handler(event, context):
         }
         if _vice_streaks:
             _sick_item["vice_streaks"] = {k: Decimal(str(v)) for k, v in _vice_streaks.items()}
+
+        # #3443: this is the OTHER from-scratch rebuild of the co-owned record —
+        # a sick-day re-put must not erase the merged acwr_* fields either.
+        _existing_cm = table.get_item(Key={"pk": _sick_item["pk"], "sk": _sick_item["sk"]}).get("Item") or {}
+        for _f in ACWR_COOWNED_FIELDS:
+            if _f in _existing_cm and _f not in _sick_item:
+                _sick_item[_f] = _existing_cm[_f]
 
         try:
             table.put_item(Item=_sick_item)
