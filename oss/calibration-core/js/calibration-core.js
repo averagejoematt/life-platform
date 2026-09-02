@@ -20,7 +20,7 @@
 //
 // Licence: MIT.
 
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Exact Python-compatible rounding
@@ -93,7 +93,10 @@ export const WORD_CONFIDENCE = {
   "very high": 0.95,
 };
 
-const TRUE_OUTCOMES = new Set(["confirmed", "confirming"]);
+// "confirming" is deliberately NOT here -- it names a still-open, in-progress
+// state (one step before "confirmed" in the reference platform's own writers),
+// never a settled one. See the Python grader's parity note (#3450).
+const TRUE_OUTCOMES = new Set(["confirmed"]);
 const FALSE_OUTCOMES = new Set(["refuted"]);
 
 // Python float() accepts underscores between digits, a leading sign, an
@@ -245,6 +248,29 @@ export function reliabilityBins(pairs, nBins = 10) {
   return out;
 }
 
+// 95% two-sided critical z, matching the reference platform's stats_core._Z_CRIT[0.95]
+// lookup and the Python package's _Z95 exactly (kept in lockstep by the shared
+// parity vectors, not by import).
+const Z95 = 1.96;
+
+/**
+ * 95% Wilson score interval for k successes of n trials. Wilson, not the
+ * normal (Wald) approximation: Wald can escape [0,1] and collapses to zero
+ * width exactly at k=0 or k=n. Returns [lo, hi] UNROUNDED in [0,1], or null
+ * when n <= 0.
+ */
+export function wilsonInterval(k, n) {
+  if (!n) return null;
+  const phat = k / n;
+  const z2 = Z95 * Z95;
+  const denom = 1.0 + z2 / n;
+  const center = (phat + z2 / (2.0 * n)) / denom;
+  const margin = (Z95 * Math.sqrt((phat * (1.0 - phat)) / n + z2 / (4.0 * n * n))) / denom;
+  const lo = Math.max(0.0, center - margin);
+  const hi = Math.min(1.0, center + margin);
+  return [lo, hi];
+}
+
 /**
  * Score (confidence, outcome) pairs into a calibration summary.
  * Field-for-field identical to calibration_core.score_pairs.
@@ -263,6 +289,14 @@ export function scorePairs(pairs, nBins = 10) {
   const skill = brierSkillScore(scored);
   const bins = reliabilityBins(scored, nBins);
   const accuracyPct = n ? pyRound((100.0 * confirmed) / n, 1) : null;
+
+  let accuracyCi95 = null;
+  if (n) {
+    const wilson = wilsonInterval(confirmed, n);
+    if (wilson !== null) {
+      accuracyCi95 = [pyRound(100.0 * wilson[0], 1), pyRound(100.0 * wilson[1], 1)];
+    }
+  }
 
   const skilled = skill === null ? null : skill > 0;
 
@@ -303,6 +337,7 @@ export function scorePairs(pairs, nBins = 10) {
     confirmed,
     refuted,
     accuracy_pct: accuracyPct,
+    accuracy_ci95: accuracyCi95,
     brier: brier === null ? null : pyRound(brier, 4),
     brier_skill: skill === null ? null : pyRound(skill, 4),
     skilled,

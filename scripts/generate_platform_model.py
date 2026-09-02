@@ -322,6 +322,75 @@ def extract_schedules(lambdas: dict[str, dict]) -> list[dict]:
     return rows
 
 
+# ── plane: cost-bearing surface (#3374 R1) ───────────────────────────────────
+# The five population counts whose growth means recurring spend: EventBridge
+# schedules (cron invocations), CloudWatch alarms (~$0.10/alarm/mo), EMF custom-
+# metric namespaces (the #2837 ledger — MetricMonitorUsage grew 9x in 3 months
+# with nothing watching), Secrets Manager secrets ($0.40/secret/mo), and
+# budget-guard AI features (each one a standing Bedrock caller). Two counts are
+# planes of this model already; the other three lift by AST from the registry
+# that governs each estate. The committed baseline lives in
+# model/cost_surface_baseline.json (hand-owned, NOT generated) and is
+# exact-pinned against this plane by tests/test_platform_model_drift.py — a PR
+# that grows a count must bump the baseline in the same diff.
+#
+# SCOPE CUT (#3447 leg d, the alarms scope-cut pattern applied to secrets): the
+# `secrets` count below is KNOWN_SECRETS — a CODE-REFERENCE registry scanned from
+# lambdas/+mcp/ source only — NOT the live billable Secrets Manager estate. The
+# two have already drifted (28 registry vs 26 live, 2026-09-02): 3 registry rows
+# describe deliberately-disarmed/deferred features with no secret provisioned
+# yet, and `life-platform/github-billing` is live+billed but referenced only
+# from deploy/, outside this scan's scope, so it never counts here at all. This
+# plane prices REFERENCED secrets, not the bill; scripts/monthly_close.py emits
+# the registry-vs-live-estate reconciliation the bill actually needs, read-only,
+# at close time.
+
+COST_SURFACE_SOURCES = {
+    "emf_namespaces": (ROOT / "deploy" / "emf_namespace_ledger.py", "LEDGER"),
+    "secrets": (ROOT / "tests" / "test_secret_references.py", "KNOWN_SECRETS"),
+    "ai_features": (ROOT / "lambdas" / "ai" / "budget_guard.py", "_FEATURE_CUTOFF"),
+}
+
+
+def _count_registry_members(path: pathlib.Path, name: str) -> int:
+    """Member count of a module-level dict/set literal registry, by AST.
+
+    Raises (never returns 0) when the assignment is missing or empty — a registry
+    this plane can no longer find must red the drift gate as a build error, not
+    serialize as a plausible zero (the absence-read-as-success class)."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        targets: list[str] = []
+        if isinstance(node, ast.Assign):
+            targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            targets = [node.target.id]
+        if name not in targets:
+            continue
+        value = getattr(node, "value", None)
+        count = 0
+        if isinstance(value, ast.Dict):
+            count = len(value.keys)
+        elif isinstance(value, ast.Set):
+            count = len(value.elts)
+        if count > 0:
+            return count
+    raise ValueError(f"cost-surface registry {name} not found (or empty) in {path.relative_to(ROOT)} — the #3374 R1 derivation rotted")
+
+
+def extract_cost_surface(alarms: dict[str, dict], schedules: list[dict]) -> dict[str, int]:
+    surface = {
+        "alarms": len(alarms),
+        "schedules": len(schedules),
+    }
+    for key, (path, registry) in COST_SURFACE_SOURCES.items():
+        surface[key] = _count_registry_members(path, registry)
+    for key, count in surface.items():
+        if count <= 0:
+            raise ValueError(f"cost-surface count {key!r} is {count} — a cost-bearing plane collapsed (#3374 R1 dead-man)")
+    return surface
+
+
 # ── plane 5: edges (two-pass AST over lambdas/ + mcp/) ───────────────────────
 
 # Seam functions whose literal first argument IS the partition name (bare source
@@ -735,6 +804,7 @@ def build_model() -> dict:
     tool_count, tool_modules = _mcp_tool_counts()
     privacy = extract_privacy()
     schedules = extract_schedules(lambdas)
+    cost_surface = extract_cost_surface(alarms, schedules)
     for name, rec in partitions.items():
         rec["privacy_tier"] = privacy["sources"].get(name, "public")
         restricted = sorted(f for f, t in privacy["fields"].get(name, {}).items() if t == "owner_only")
@@ -762,6 +832,12 @@ def build_model() -> dict:
                 ),
                 "privacy": "lambdas/privacy/field_tiers.py SOURCE_TIERS + FIELD_TIERS (#2803/#3045, ADR-155 consent) — loaded, not re-typed",
                 "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time cron",
+                "cost_surface": (
+                    "#3374 R1 — the five cost-bearing population counts: alarms + schedules from this model's own planes; "
+                    "emf_namespaces from deploy/emf_namespace_ledger.LEDGER (AST), secrets from "
+                    "tests/test_secret_references.KNOWN_SECRETS (AST), ai_features from lambdas/ai/budget_guard._FEATURE_CUTOFF (AST). "
+                    "Exact-pinned against the hand-owned model/cost_surface_baseline.json by tests/test_platform_model_drift.py"
+                ),
             },
             "counts": {
                 "lambdas": len(lambdas),
@@ -805,6 +881,7 @@ def build_model() -> dict:
         "contracts": contracts,
         "privacy": privacy,
         "schedules": schedules,
+        "cost_surface": cost_surface,
     }
 
 
@@ -923,14 +1000,29 @@ def render_doc(model: dict) -> str:
         + f" — of {counts['alarms']} alarms ({counts.get('alarms_composite', 0)} composite)"
     )
     add("")
-    add("| Alarm | Stack | Kind | Routing | Via |")
-    add("|-------|-------|------|---------|-----|")
+    add("| Alarm | Stack | Kind | Routing | Via | Audience |")
+    add("|-------|-------|------|---------|-----|----------|")
     for name, rec in sorted(model["alarms"].items()):
         extra = ""
         if rec.get("members"):
             extra = " ← " + ", ".join(f"`{m}`" for m in rec["members"])
-        add(f"| `{name}` | {rec['stack']} | {rec.get('kind', 'metric')}{extra} | {rec['routing']} | {rec.get('via', 'declaration')} |")
+        audience = rec.get("audience", "")
+        add(
+            f"| `{name}` | {rec['stack']} | {rec.get('kind', 'metric')}{extra} | {rec['routing']} | {rec.get('via', 'declaration')} | {audience} |"
+        )
     add("")
+    reader_alarms = sorted(n for n, r in model["alarms"].items() if r.get("audience") == "reader")
+    if reader_alarms:
+        add(
+            f"**Reader-audience alarms ({len(reader_alarms)}, #3423):** escalate on FIRST red — 0h bar, not the "
+            "72h citation/aging window — in `scripts/check_alarm_citations.py` and `remediation/agent.py`. "
+            "Curated in `scripts/platform_model_alarms.py::READER_AUDIENCE_ALARMS`, each with its blast-radius "
+            "ruling."
+        )
+        add("")
+        for name in reader_alarms:
+            add(f"- `{name}` — {model['alarms'][name].get('audience_ruling', '')}")
+        add("")
     add("## 5b. Privacy Tiers (field_tiers registry, ADR-155)")
     add("")
     privacy = model.get("privacy", {})
@@ -979,6 +1071,37 @@ def render_doc(model: dict) -> str:
             + " — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design"
         )
     add("- Scope cuts: " + " · ".join(model["meta"]["scope_cuts"][:2]))
+    add("")
+    add("## 7. Cost-bearing surface (#3374 R1)")
+    add("")
+    add("The five population counts whose growth means recurring spend, derived from the")
+    add("registries that govern each estate (see `meta.authorities.cost_surface`). They are")
+    add("exact-pinned against the hand-owned `model/cost_surface_baseline.json` by")
+    add("`tests/test_platform_model_drift.py` — a PR that grows a count must bump the")
+    add("baseline in the same diff, so a new cost-bearing surface cannot appear silently.")
+    add("")
+    add("| Surface | Count | Registry |")
+    add("|---------|-------|----------|")
+    cs = model.get("cost_surface", {})
+    registries = {
+        "alarms": "this model's alarms plane (CDK AST)",
+        "schedules": "this model's schedules plane (CDK AST)",
+        "emf_namespaces": "`deploy/emf_namespace_ledger.py::LEDGER`",
+        "secrets": "`tests/test_secret_references.py::KNOWN_SECRETS`",
+        "ai_features": "`lambdas/ai/budget_guard.py::_FEATURE_CUTOFF`",
+    }
+    for key in sorted(cs):
+        add(f"| {key} | {cs[key]} | {registries.get(key, '?')} |")
+    add("")
+    add(
+        "Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): "
+        "`secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source "
+        "only), never the live billable Secrets Manager estate — the two have already "
+        "drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from "
+        "`deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to "
+        "this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate "
+        "reconciliation at close."
+    )
     add("")
     return "\n".join(lines)
 

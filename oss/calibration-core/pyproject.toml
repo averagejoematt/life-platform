@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "calibration-core"
-version = "1.0.0"
+version = "1.1.0"
 description = "Grade a forecaster — human or LLM — against what actually happened. Brier score, reliability curve, skill vs. the base rate."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -34,6 +34,18 @@ Also emits the 7-day unique/page-view counts as CloudWatch metrics
 (LifePlatform/Traffic::UniqueVisitors7d / PageViews7d) — the cost_governor
 Lambda reads the latest UniqueVisitors7d datapoint to decide whether reader
 traffic has crossed the surge-mode threshold (ADR-133, #739).
+
+PER-DOOR AUDIENCE SERIES (#3376): the same weekly emission also carries
+PageViews7d with a bounded `Door` dimension — exactly the six v5-IA doors
+(home + cockpit/data/coaching/protocols/story, docs/SITE_MAP_AND_INTENT.md),
+a code literal, never request-derived, so cardinality cannot be driven from
+outside — plus SyndicatedReferrals7d, the count of page views whose URL
+carried a `utm_source` query param. These are the evidence series the
+docs/PROPORTIONALITY.md retire-triggers read (syndication poster, and the
+door-level audience grades); before #3376 the triggers were unfalsifiable
+because no such series existed. SyndicatedReferrals7d is dimensionless BY
+DESIGN: utm values are attacker-controlled URL input and must never mint
+metric series. A 0 is a valid reading — every door emits every week.
 """
 
 import gzip
@@ -166,6 +178,56 @@ def _norm_page(uri: str) -> str:
     return u
 
 
+# ── Per-door page views (#3376) ──────────────────────────────────────────────
+# The six doors of the v5 IA (docs/SITE_MAP_AND_INTENT.md: Home + 5 doors).
+# DOORS is the CLOSED set the metric dimension may take — a code literal, so the
+# series population is bounded by construction, never by request traffic.
+DOORS = ("home", "cockpit", "data", "coaching", "protocols", "story")
+
+# Prefix → door. Two deliberate section-mappings, both from the site map:
+#   /mind/    → data   ("Mind & accountability" is a Data-door section, #1109)
+#   /journal/ → story  (the "In my own words" essay permalinks, #1566)
+# Deliberately UNMAPPED (they belong to no door, matching the doors nav):
+# /method/ and /gear/ (footer-tier "under the hood", explicitly "no door"),
+# /subscribe/, /privacy/ and other utility pages. Their views still count in
+# the site-wide PageViews7d — a door series measures a door, not the site.
+_DOOR_BY_PREFIX = {
+    "/cockpit/": "cockpit",
+    "/data/": "data",
+    "/mind/": "data",
+    "/coaching/": "coaching",
+    "/protocols/": "protocols",
+    "/story/": "story",
+    "/journal/": "story",
+}
+
+
+def _door(uri: str):
+    """The v5-IA door a page URI belongs to, or None for no-door pages."""
+    u = _norm_page(uri)
+    if u == "/":
+        return "home"
+    for prefix, door in _DOOR_BY_PREFIX.items():
+        if u.startswith(prefix):
+            return door
+    return None
+
+
+def _has_utm_source(query: str) -> bool:
+    """True when a CF-logged query string carries a utm_source param (#3376).
+
+    Only the BOOLEAN is ever retained — the query string itself is dropped at
+    parse time (it is arbitrary visitor-controlled input, same posture as raw
+    IPs). parse_qs is used rather than a substring test so `xutm_source=` and
+    fragment junk do not count."""
+    if not query or query == "-":
+        return False
+    try:
+        return "utm_source" in urllib.parse.parse_qs(query)
+    except Exception:
+        return False
+
+
 def parse_cf_log(text: str):
     """Parse one CloudFront standard log file's text → list of page-request dicts.
     Pure function (no I/O) so it's unit-testable. Header lines (#Version/#Fields)
@@ -195,7 +257,17 @@ def parse_cf_log(text: str):
             continue
         if not _is_page(uri) or _is_bot(ua):
             continue
-        out.append({"date": date, "uri": uri, "ref": ref, "vkey": _ipkey(ip, ua)})
+        # #3376: only the utm_source BOOLEAN survives parsing — the query string
+        # itself (visitor-controlled input) is discarded here, like raw IPs.
+        out.append(
+            {
+                "date": date,
+                "uri": uri,
+                "ref": ref,
+                "vkey": _ipkey(ip, ua),
+                "utm": _has_utm_source(row.get("cs-uri-query", "")),
+            }
+        )
     return out
 
 
@@ -205,12 +277,21 @@ def aggregate(records):
     referrers = Counter()
     visit_days = {}  # vkey -> set(date)
     watched = {_norm_page(p): {"views": 0, "referrers": Counter()} for p in WATCHED_PAGES}
+    # #3376: every door is present from the start — a 0-view door is a valid
+    # reading and must emit, never vanish (the honest-absence rule, ADR-104).
+    door_views = {d: 0 for d in DOORS}
+    syndicated = 0
     for r in records:
         pages[r["uri"]] += 1
         d = _ref_domain(r["ref"])
         if d and d != SITE_HOST:
             referrers[d] += 1
         visit_days.setdefault(r["vkey"], set()).add(r["date"])
+        door = _door(r["uri"])
+        if door is not None:
+            door_views[door] += 1
+        if r.get("utm"):
+            syndicated += 1
         w = watched.get(_norm_page(r["uri"]))
         if w is not None:
             w["views"] += 1
@@ -225,6 +306,8 @@ def aggregate(records):
         "returning_pct": round(100 * returning / unique) if unique else 0,
         "top_pages": pages.most_common(15),
         "top_referrers": referrers.most_common(10),
+        "door_views": door_views,  # all six doors, zeros included (#3376)
+        "syndicated_referrals": syndicated,  # utm_source-attributed views (#3376)
         # Travel watch (#741): a 0-view week is a valid reading — always report
         # every watched page so "no travel yet" is visible, never silent.
         "watched_pages": [
@@ -370,6 +453,21 @@ def build_html(agg, start_date, end_date, green_html="", funnel=None, ops_html="
             for k, v in pairs
         )
 
+    def doors_block(door_views):
+        # #3376: the per-door audience row — same numbers the PageViews7d{Door}
+        # series carry, so the Monday email and CloudWatch can never disagree.
+        if not door_views:
+            return ""
+        cells = "".join(
+            f'<td style="padding:4px 12px 4px 0"><span style="font-family:monospace;font-size:12px;color:#6e665a">{d}</span><br>'
+            f'<span style="font-variant-numeric:tabular-nums;font-weight:600">{door_views.get(d, 0)}</span></td>'
+            for d in DOORS
+        )
+        return (
+            '<h2 style="font-size:16px;margin-top:24px">The six doors</h2>'
+            f'<table style="border-collapse:collapse"><tr>{cells}</tr></table>'
+        )
+
     def watched_block(entries):
         if not entries:
             return ""
@@ -393,6 +491,7 @@ def build_html(agg, start_date, end_date, green_html="", funnel=None, ops_html="
       <td style="font-size:32px;font-weight:600">{agg['returning_pct']}%</td></tr>
   <tr style="color:#6e665a;font-size:13px"><td>page views</td><td>unique visitors</td><td>returning</td></tr>
 </table>
+{doors_block(agg.get('door_views'))}
 <h2 style="font-size:16px;margin-top:24px">Top pages</h2>
 <table style="width:100%;border-collapse:collapse">{rows(agg['top_pages'], 'pages')}</table>
 <h2 style="font-size:16px;margin-top:24px">Where they came from</h2>
@@ -883,11 +982,25 @@ def lambda_handler(event, context):
         # run to tell "quiet week" apart from "no data yet" (a missing/stale
         # metric fails closed to non-surge, see cost_governor._recent_unique_visitors).
         try:
+            # #3376: the per-door series ride the same weekly put. The Door
+            # dimension takes only the six code-literal values in DOORS and
+            # every door emits every run (zeros included) — a bounded, dense-by
+            # -construction population the emf_namespace_ledger budget covers.
             cw.put_metric_data(
                 Namespace="LifePlatform/Traffic",
                 MetricData=[
                     {"MetricName": "UniqueVisitors7d", "Value": agg["unique_visitors"], "Unit": "Count"},
                     {"MetricName": "PageViews7d", "Value": agg["page_views"], "Unit": "Count"},
+                    {"MetricName": "SyndicatedReferrals7d", "Value": agg["syndicated_referrals"], "Unit": "Count"},
+                ]
+                + [
+                    {
+                        "MetricName": "PageViews7d",
+                        "Dimensions": [{"Name": "Door", "Value": door}],
+                        "Value": agg["door_views"].get(door, 0),
+                        "Unit": "Count",
+                    }
+                    for door in DOORS
                 ],
             )
         except Exception as e:

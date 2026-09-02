@@ -42,15 +42,73 @@ DDB_GROUND_TRUTH = [
 ]
 
 # Sentinels in a JSON string value usually mean a Python-repr / serialization leak.
-# JS-runtime leaks ("undefined"/"NaN"/"[object Object]") never occur as innocent
-# English substrings, so a mid-string match is still a real finding. "None"/"null"
-# ARE common English/statistics vocabulary ("null hypothesis", "None when |r| >= 1",
-# ADR-104 absence prose) — #3324: those two are anchored to the WHOLE string value
-# (the value IS the literal leaked token, not a sentence that happens to use the
-# word), so a genuine leak like `"value": "None"` still fires and a sentence
-# merely containing "none"/"null hypothesis" does not.
-_PROSE_LEAK_RE = re.compile(r"(undefined|NaN|\[object Object\])")
+# #3324 anchored "None"/"null" to the WHOLE string value because they ARE common
+# English/statistics vocabulary ("null hypothesis", "None when |r| >= 1") — but it
+# kept "undefined"/"NaN" as a bare substring match on the premise that THOSE "never
+# occur as innocent English". #3453: that premise is FALSE — the platform's own
+# published prose (/method/registry/, ADR-104/105 #1370's calibration-verdict
+# language) reads "...skill is undefined against a degenerate base rate..." and
+# "An undefined skill (degenerate base rate) is treated as unknown...", both
+# deliberate honest statistics prose, not a leak. A phrase-matched substring can't
+# tell those apart from a real `Value: undefined` render — the #2959/#3003/#3199/
+# #3379 family's lesson applies to a DETECTOR too: it must be structural.
+#
+# So "undefined"/"NaN" are now matched STRUCTURALLY: a hit only counts when it sits
+# in a rendered-VALUE position — adjacent to a label/colon/punctuation/quote/bracket,
+# at a line boundary, or standalone — never mid-sentence flanked by two ordinary
+# words (see `_is_isolated_value` below, which is what the "leak" vs "prose" call
+# actually turns on; #3453 acceptance: never fire between lowercase words).
+# "[object Object]" keeps the old pure-substring match: it is JS's literal
+# `Object.prototype.toString()` output, bracket-delimited, and still never occurs
+# as innocent English — nothing in the #3453 finding challenges that one.
+_STRUCTURAL_LEAK_RE = re.compile(r"(undefined|NaN)")
+_ALWAYS_LEAK_RE = re.compile(r"\[object Object\]")
 _WHOLE_VALUE_NULLISH_RE = re.compile(r"^(None|null)$")
+
+
+def _is_isolated_value(text, start, end):
+    """True if text[start:end] sits in a rendered-VALUE position, not embedded
+    mid-sentence between two ordinary words (#3453).
+
+    Looks past HORIZONTAL whitespace only (spaces/tabs — same-line padding, as in
+    a label's `Weight:  undefined`) to the nearest non-whitespace character on
+    each side. If BOTH sides are alphabetic — the token is flanked by ordinary
+    words on the same line, as in "...skill is undefined against a degenerate..."
+    — it's prose, not a leak. A newline is NOT skipped: it's a real line/block
+    boundary in rendered prose (document.body.innerText), so `undefined` sitting
+    alone on its own line (a real leak's most common shape) must not be treated
+    as continuous with the word before/after it on a different line.
+
+    Anything else on either side (a colon, quote, bracket, comma, digit, other
+    punctuation, a newline, or the start/end of the string) reads as a value
+    position, the way a real leak actually renders: `Value: undefined`,
+    `undefined%`, a bare `undefined` alone on its own line, or `"field":
+    "undefined"`.
+    """
+    j = start - 1
+    while j >= 0 and text[j] in " \t":
+        j -= 1
+    prev_alpha = j >= 0 and text[j].isalpha()
+
+    k = end
+    while k < len(text) and text[k] in " \t":
+        k += 1
+    next_alpha = k < len(text) and text[k].isalpha()
+
+    return not (prev_alpha and next_alpha)
+
+
+def _find_leak_matches(text):
+    """Yield (start, end) for every raw JS-runtime sentinel leak in `text`:
+    "undefined"/"NaN" only when `_is_isolated_value` says it's in a rendered-value
+    position, "[object Object]" unconditionally (see the module comment above)."""
+    for m in _STRUCTURAL_LEAK_RE.finditer(text):
+        if _is_isolated_value(text, m.start(), m.end()):
+            yield m.start(), m.end()
+    for m in _ALWAYS_LEAK_RE.finditer(text):
+        yield m.start(), m.end()
+
+
 # Strings that look like a raw ISO datetime leaking where a friendly date belongs.
 _RAW_DT_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 
@@ -141,12 +199,17 @@ def scan_json_value_leaks(data, source_label):
     """Walk a parsed JSON value for leaked NaN/undefined/[object Object]/None/null
     inside STRING values (keys named 'null'/'none' are fine — only values matter).
 
-    #3324: "undefined"/"NaN"/"[object Object]" (`_PROSE_LEAK_RE`) are matched as a
-    substring anywhere in the value — they never occur as innocent English. "None"/
-    "null" are common English/statistics words (a `limitations` sentence reading
-    "None when |r| >= 1..." or "null hypothesis"), so they are anchored to the WHOLE
-    string value (`_WHOLE_VALUE_NULLISH_RE`) — a leak looks like `"value": "None"`,
-    not a sentence that happens to use the word.
+    #3324: "None"/"null" are common English/statistics words (a `limitations`
+    sentence reading "None when |r| >= 1..." or "null hypothesis"), so they are
+    anchored to the WHOLE string value (`_WHOLE_VALUE_NULLISH_RE`) — a leak looks
+    like `"value": "None"`, not a sentence that happens to use the word.
+
+    #3453: "undefined"/"NaN" turned out to have the SAME false-positive risk — the
+    platform's own honest calibration prose reads "...skill is undefined against a
+    degenerate base rate..." — so they're no longer a bare substring match either.
+    `_find_leak_matches` only counts a hit when it's in a rendered-VALUE position
+    (see `_is_isolated_value`); a sentence merely containing the word does not fire.
+    "[object Object]" stays a pure substring match (never innocent English).
 
     Extracted (#1436) so this is the ONE leak-scan walk shared by:
       - sanity_scan() below, which reads already-captured api/*.json files off disk
@@ -170,7 +233,7 @@ def scan_json_value_leaks(data, source_label):
             for i, v in enumerate(node[:50]):
                 _walk(v, f"{path}[{i}]")
         elif isinstance(node, str):
-            if len(node) < 200 and (_PROSE_LEAK_RE.search(node) or _WHOLE_VALUE_NULLISH_RE.match(node.strip())):
+            if len(node) < 200 and (next(_find_leak_matches(node), None) is not None or _WHOLE_VALUE_NULLISH_RE.match(node.strip())):
                 findings.append({"source": source_label, "where": path, "severity": "high", "snippet": node[:120]})
 
     _walk(data)
@@ -195,8 +258,8 @@ def sanity_scan(run_dir):
                 text = f.read()
         except Exception:  # noqa: BLE001
             continue
-        for m in _PROSE_LEAK_RE.finditer(text):
-            seg = text[max(0, m.start() - 40) : m.start() + 40].replace("\n", " ")
+        for start, _end in _find_leak_matches(text):
+            seg = text[max(0, start - 40) : start + 40].replace("\n", " ")
             findings.append({"source": os.path.basename(fpath), "where": "rendered prose", "severity": "high", "snippet": seg})
         for m in _RAW_DT_RE.finditer(text):
             seg = text[max(0, m.start() - 30) : m.start() + 30].replace("\n", " ")

@@ -1,32 +1,42 @@
-"""tests/test_board_quality_gate_968.py — #968: the ADR-108 coach quality gate
-extends to the public board (the coach-voiced ask surface).
+"""tests/test_board_quality_gate_968.py — the ADR-108 coach quality gate and
+the public board: why it is NOT on the reader path (#3413), and the #1973
+cycle-boundary rule that still is.
 
-The daily brief enforces the gate regenerate-or-HOLD (`ai_calls._enforce_quality_gate`,
-#390/ADR-108). The board is a synchronous reader-facing path, so its enforcement
-(`web/board_quality_gate.enforce`, wired into both site_api_ai_lambda board
-handlers) is evaluate-then-regenerate-once under a HARD TIME BUDGET and FAILS
-OPEN — the reader always gets an answer; a fired verdict that can't be corrected
-in budget is served with log + metric + eval retention.
+HISTORY. #968 wired `web/board_quality_gate.enforce` into both board handlers:
+the coach-quality-gate lambda invoked SYNCHRONOUSLY while a reader waited,
+evaluate-then-regenerate-once under a hard time budget, fail-open. #3413
+removed it, because it never once produced a verdict and was the direct cause
+of /api/board_ask serving 504s on 2026-09-01 (launch day). The measurement and
+the reasoning live in `lambdas/web/board_quality_gate.py`'s docstring; the
+headline is that the callee's measured p50 (16371ms) was above the caller's
+whole 14s evaluate budget, and 7 days of live traffic produced 8 attempts and
+0 verdicts.
 
-Pinned here, mirroring tests/test_coach_quality_gate_390.py's fakes (no AWS):
+What this file pins now:
 
-  U1  no Lambda context (tests/local direct calls) → gate skipped entirely
-  U2  insufficient remaining time → gate skipped (never evaluated)
-  U3  passing verdict → answer unchanged, nothing retained
-  U4  gate infra failure → fail-open (via ai_calls._invoke_quality_gate_sync)
-  U5  fired verdict + budget → ONE corrective regen; grounded candidate served
-  U6  fired verdict, regen candidate UNGROUNDED → original served (a voice fix
-      must never smuggle in a fabricated number)
-  U7  fired verdict, regen raises / returns empty → original served
-  U8  fired verdict, no budget left for regen → original served, no regen call
-  U9  fired verdicts emit the BoardQualityGateFired metric + retention pair
-  W1  handler wiring: board_ask serves the corrected text and stores IT (not
-      the flagged draft) in the coach's episodic memory + follow-up thread
-  W2  handler wiring: follow-up path gates too
-  W3  without a Lambda context the handlers behave exactly as before (the
-      pre-#968 suite must stay green untouched)
-  S1  scope posture (ADR-103 row): inter_coach_dialogue + coach_memoir are
-      deliberately NOT wired to the quality gate; both board call sites are
+  G1  the board reader path performs NO synchronous cross-Lambda invoke — the
+      #3413 class cannot be reintroduced silently
+  G2  no client-side invoke cap survives on that path, and any future one must
+      be justified against MEASURED callee latency (the assumed "≈2-5s" comment
+      that sized the old cap is gone)
+  G3  the module retains no I/O machinery at all — it is a pure rule module now
+  G4  the removal is recorded where a reader will find it, with its measurement
+  W1  board_ask serves the grounded answer and makes zero SYNCHRONOUS gate
+      invokes — the only cross-Lambda call left is #3414's fire-and-forget
+      Event observe, which fires AFTER the served text is final and whose
+      result cannot reach the reader
+  O   the #3414 carve-out is structural, not a loosening: the async observer
+      module may use InvocationType="Event" ONLY, never consumes a response
+      payload, and its failure never reaches the reader — with mutation
+      proofs on the needles
+  S1  scope posture: dialogue + memoir stay deliberately ungated (ADR-103 row)
+  #1973 the Day<=3 cycle-boundary rule, direct and through the ONE enforcement
+      path that remains (`ai_calls._invoke_quality_gate_sync`, which merges it
+      into the same report the daily brief acts on — so the rule still covers
+      both coach-voiced surfaces from a single definition)
+
+Fabrication protection is not tested here and never was this gate's job: that
+is the ADR-104 grounding gate (tests/test_board_ask_grounding.py).
 """
 
 import json
@@ -50,6 +60,10 @@ AI_SRC = open(os.path.join(ROOT, "lambdas/web/site_api_ai_lambda.py")).read()
 BQG_SRC = open(os.path.join(ROOT, "lambdas/web/board_quality_gate.py")).read()
 DIALOGUE_SRC = open(os.path.join(ROOT, "lambdas/coach/inter_coach_dialogue_lambda.py")).read()
 MEMOIR_SRC = open(os.path.join(ROOT, "lambdas/compute/coach_memoir_lambda.py")).read()
+OBSERVER_SRC = open(os.path.join(ROOT, "lambdas/web/board_verdict_observer.py")).read()
+
+
+AI_CALLS_SRC = open(os.path.join(ROOT, "lambdas/ai/ai_calls.py")).read()
 
 
 def _bqg():
@@ -62,17 +76,6 @@ def _ai():
     from web import site_api_ai_lambda as ai
 
     return ai
-
-
-class _FakeContext:
-    """get_remaining_time_in_millis returns the values in order, then repeats
-    the last one — lets a test drain the budget between gate steps."""
-
-    def __init__(self, *remaining):
-        self._vals = list(remaining)
-
-    def get_remaining_time_in_millis(self):
-        return self._vals.pop(0) if len(self._vals) > 1 else self._vals[0]
 
 
 def _gate_client_returning(*reports):
@@ -92,131 +95,109 @@ def _gate_client_returning(*reports):
     return client
 
 
-_FIRED = {
-    "statusCode": 200,
-    "passed": False,
-    "score": 62,
-    "anti_pattern_violations": [{"phrase": "As an AI coach", "context": "opening"}],
-    "suggestions": ["Vary your opening"],
-}
+# ── G: the #3413 guard — this class must not come back silently ──────────────
+#
+# The defect was not "a timeout was tuned wrong". It was a client-side cap
+# (10s) written from an ASSUMED callee cost ("gate ≈2-5s", a comment) that sat
+# below the callee's real p50 (16.4s) — so the gate could not return at its
+# TYPICAL speed, burned the budget, and the result was discarded every time.
+# The guard is therefore structural rather than numeric: no synchronous
+# cross-Lambda invoke belongs on this reader path at all. A numeric
+# cap-vs-p99 assertion was considered and rejected — it would need live
+# CloudWatch in CI, and it would still pass while the cap quietly did nothing.
 
 
-def _arm(bqg, monkeypatch, context, client):
-    """Point the gate module at a fake deadline + fake gate lambda + fake CW,
-    and return the retention capture list."""
-    retained = []
-    monkeypatch.setattr(bqg, "_LAMBDA_CONTEXT", context)
-    monkeypatch.setattr(bqg, "_qg_lambda_client", lambda: client)
-    monkeypatch.setattr(bqg, "_cw_client", lambda: MagicMock())
-    return retained, (lambda *a, **k: retained.append((a, k)))
+def _code_without_comments(src: str) -> str:
+    """Source with COMMENT tokens removed, string literals KEPT.
+
+    The guards below must judge what the module DOES, not what it says about
+    itself — the #3413 record in site_api_ai_lambda.py necessarily names the
+    gate it removed, and a bare substring match over raw source would read that
+    explanation as the offence. String literals stay in scope on purpose: a
+    function name reaching the wire is a literal, not a comment.
+
+    Comments are BLANKED IN PLACE rather than dropped, so every other byte keeps
+    its original position — a multi-token needle like `_bqg.enforce(` still
+    matches. (Rebuilding the source by joining token strings looks equivalent
+    and is not: it separates `_bqg` `.` `enforce` `(`, and every multi-token
+    assertion below silently stops matching anything. That mistake was made
+    here first and caught by the mutation proof in the next test.)
+    """
+    import io
+    import tokenize
+
+    lines = src.splitlines(keepends=True)
+    for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+        if tok.type == tokenize.COMMENT:
+            (r, c0), (_, c1) = tok.start, tok.end
+            line = lines[r - 1]
+            lines[r - 1] = line[:c0] + " " * (c1 - c0) + line[c1:]
+    return "".join(lines)
 
 
-# ── U: the fail-open regenerate-once state machine ───────────────────────────
+AI_CODE = _code_without_comments(AI_SRC)
+OBSERVER_CODE = _code_without_comments(OBSERVER_SRC)
 
 
-def test_no_lambda_context_skips_the_gate_entirely(monkeypatch):
+def test_board_reader_path_makes_no_synchronous_cross_lambda_invoke():
+    """G1. The reader lambda must not invoke another Lambda and wait for it.
+
+    Mutation proof: restoring any of these to site_api_ai_lambda.py reds this
+    test, which is exactly what should happen — the person doing it has to come
+    back here and justify the latency against a measurement.
+    """
+    for banned in ("_bqg.enforce(", "board_quality_gate", "coach-quality-gate", "_invoke_quality_gate_sync", "RequestResponse"):
+        assert banned not in AI_CODE, f"#3413: {banned!r} is back on the board reader path — measure the callee's p50 before you do this"
+
+
+def test_the_guard_itself_sees_a_reintroduced_invoke():
+    """G1's positive control. A guard that only ever passes is not a guard:
+    prove the comment-stripping did not blind it to the real thing."""
+    reintroduced = '_txt = _bqg.enforce(pid, _txt)  # noqa\nc.invoke(FunctionName="coach-quality-gate", InvocationType="RequestResponse")\n'
+    code = _code_without_comments(reintroduced)
+    # Every banned needle must be findable, INCLUDING the multi-token one —
+    # this is the assertion that fails if the stripper reflows the source.
+    for banned in ("_bqg.enforce(", "coach-quality-gate", "RequestResponse"):
+        assert banned in code, f"the guard is blind to {banned!r} — it would pass while the invoke is live"
+    # …while an explanation of the removal is correctly ignored.
+    assert "coach-quality-gate" not in _code_without_comments("# we removed the coach-quality-gate invoke\n")
+
+
+def test_no_client_side_invoke_cap_survives_on_the_board_path():
+    """G2. The cap and the budget constants it was sized against are gone, and
+    so is the assumed-latency comment that justified them."""
+    for gone in ("QG_INVOKE_TIMEOUT_S", "QG_EVAL_MIN_REMAINING_MS", "QG_REGEN_MIN_REMAINING_MS"):
+        assert gone not in BQG_SRC and gone not in AI_SRC
+    # The assumed cost that sized the old cap survives only as history, next to
+    # the measurement that refuted it — never again as a live justification.
+    assert "2-5s" in BQG_SRC and "10434ms" in BQG_SRC
+    assert "get_remaining_time_in_millis" not in AI_CODE
+
+
+def test_the_gate_module_is_now_pure_with_no_io():
+    """G3. No boto3, no clients, no invocation context — a rule module only.
+
+    This is what makes G1 hard to undo by accident: there is no longer any
+    machinery here for a call site to reach for.
+    """
+    assert "import boto3" not in BQG_SRC
+    assert "def enforce(" not in BQG_SRC
+    assert "put_metric_data" not in BQG_SRC
     bqg = _bqg()
-    client = _gate_client_returning()  # any invoke would StopIteration
-    _, retain = _arm(bqg, monkeypatch, None, client)
-    out = bqg.enforce("sleep_coach", "answer", lambda n: "regen", lambda t: True, retain)
-    assert out == "answer"
-    assert client.invoke.call_count == 0
+    assert not hasattr(bqg, "enforce")
+    assert not hasattr(bqg, "set_lambda_context")
+    # …and the rule it still owns is intact and reachable.
+    assert callable(bqg.cycle_boundary_violations)
 
 
-def test_insufficient_budget_skips_the_gate(monkeypatch):
-    bqg = _bqg()
-    client = _gate_client_returning()
-    _, retain = _arm(bqg, monkeypatch, _FakeContext(bqg.QG_EVAL_MIN_REMAINING_MS - 1), client)
-    out = bqg.enforce("sleep_coach", "answer", lambda n: "regen", lambda t: True, retain)
-    assert out == "answer"
-    assert client.invoke.call_count == 0
-
-
-def test_passing_verdict_serves_the_answer_untouched(monkeypatch):
-    bqg = _bqg()
-    retained, retain = _arm(
-        bqg, monkeypatch, _FakeContext(29_000), _gate_client_returning({"statusCode": 200, "passed": True, "score": 92})
-    )
-    out = bqg.enforce("sleep_coach", "answer", lambda n: "regen", lambda t: True, retain)
-    assert out == "answer"
-    assert retained == []
-
-
-def test_gate_infra_failure_fails_open(monkeypatch):
-    bqg = _bqg()
-    client = MagicMock()
-    client.invoke.side_effect = RuntimeError("Lambda unreachable")
-    retained, retain = _arm(bqg, monkeypatch, _FakeContext(29_000), client)
-    out = bqg.enforce("sleep_coach", "answer", lambda n: "regen", lambda t: True, retain)
-    assert out == "answer"  # ai_calls._invoke_quality_gate_sync fails open
-    assert retained == []
-
-
-def test_fired_verdict_regenerates_once_and_serves_the_grounded_candidate(monkeypatch):
-    bqg = _bqg()
-    retained, retain = _arm(bqg, monkeypatch, _FakeContext(29_000), _gate_client_returning(_FIRED))
-    notes = []
-
-    def _regen(note):
-        notes.append(note)
-        return "a corrected, on-voice answer"
-
-    out = bqg.enforce("sleep_coach", "the flagged draft", _regen, lambda t: True, retain)
-    assert out == "a corrected, on-voice answer"
-    assert len(notes) == 1
-    assert "As an AI coach" in notes[0]  # the correction note carries the finding
-    ((args, kwargs),) = [retained[0]]
-    assert args[1] == "flagged_corrected"
-    assert args[2] == "the flagged draft" and args[3] == "a corrected, on-voice answer"
-    assert kwargs["extra"]["gate"] == "adr108_quality"
-
-
-def test_ungrounded_regen_candidate_is_rejected_and_original_served(monkeypatch):
-    """A voice correction must never smuggle in a fabricated number — the
-    candidate re-runs the ADR-104 grounding check and loses if it fails."""
-    bqg = _bqg()
-    retained, retain = _arm(bqg, monkeypatch, _FakeContext(29_000), _gate_client_returning(_FIRED))
-    out = bqg.enforce("sleep_coach", "the flagged draft", lambda n: "HRV jumped 41 to 78", lambda t: False, retain)
-    assert out == "the flagged draft"
-    assert retained[0][0][1] == "flagged_kept"
-
-
-def test_regen_exception_and_empty_regen_serve_the_original(monkeypatch):
-    bqg = _bqg()
-    retained, retain = _arm(bqg, monkeypatch, _FakeContext(29_000), _gate_client_returning(_FIRED, _FIRED))
-
-    def _boom(note):
-        raise RuntimeError("bedrock hiccup")
-
-    assert bqg.enforce("sleep_coach", "draft", _boom, lambda t: True, retain) == "draft"
-    assert bqg.enforce("sleep_coach", "draft", lambda n: "   ", lambda t: True, retain) == "draft"
-    assert [r[0][1] for r in retained] == ["flagged_kept", "flagged_kept"]
-
-
-def test_budget_drained_after_evaluation_skips_the_regen(monkeypatch):
-    """Evaluate consumed the slack: the second budget check (< regen floor)
-    must serve the original WITHOUT a regeneration call."""
-    bqg = _bqg()
-    ctx = _FakeContext(bqg.QG_EVAL_MIN_REMAINING_MS, bqg.QG_REGEN_MIN_REMAINING_MS - 1)
-    retained, retain = _arm(bqg, monkeypatch, ctx, _gate_client_returning(_FIRED))
-    regen_calls = []
-    out = bqg.enforce("sleep_coach", "draft", lambda n: regen_calls.append(n) or "regen", lambda t: True, retain)
-    assert out == "draft"
-    assert regen_calls == []
-    assert retained[0][0][1] == "flagged_kept"
-
-
-def test_fired_verdict_emits_the_cloudwatch_metric(monkeypatch):
-    bqg = _bqg()
-    cw = MagicMock()
-    monkeypatch.setattr(bqg, "_LAMBDA_CONTEXT", _FakeContext(29_000))
-    monkeypatch.setattr(bqg, "_qg_lambda_client", lambda: _gate_client_returning(_FIRED))
-    monkeypatch.setattr(bqg, "_cw_client", lambda: cw)
-    bqg.enforce("labs_coach", "draft", lambda n: "fixed", lambda t: True, lambda *a, **k: None)
-    (call,) = cw.put_metric_data.call_args_list
-    metric = call.kwargs["MetricData"][0]
-    assert metric["MetricName"] == "BoardQualityGateFired"
-    assert {"Name": "CoachID", "Value": "labs_coach"} in metric["Dimensions"]
+def test_the_removal_carries_its_measurement():
+    """G4. A future reader must be able to see this was MEASURED, not assumed —
+    the failure mode that caused #3413 in the first place. Numbers and the
+    command that produced them, in the module a maintainer opens first."""
+    assert "p50=10434ms" in BQG_SRC and "p50=16371ms" in BQG_SRC  # both windows, incl. the weaker one
+    assert "filter-log-events" in BQG_SRC  # the derivation, not just the result
+    assert "0 verdicts" in BQG_SRC
+    assert "#3414" in BQG_SRC  # the open question is named, not buried
 
 
 # ── W: handler wiring (same fake harness as tests/test_board_ask_grounding.py) ──
@@ -288,71 +269,171 @@ def _post(body, ip="203.0.113.9"):
     }
 
 
-def test_board_ask_serves_and_remembers_the_corrected_text(monkeypatch):
-    ai, bqg = _ai(), _bqg()
+def _observer_client(monkeypatch):
+    """The #3414 observer's own lambda client, mocked at the module boundary —
+    the ONE cross-Lambda call left on the board surface, and it is async."""
+    from web import board_verdict_observer as bvo
+
+    client = MagicMock()
+    monkeypatch.setattr(bvo, "_client", client)
+    return client
+
+
+def test_board_ask_serves_the_grounded_answer_with_only_an_async_observe(monkeypatch):
+    """W1. The reader gets the answer with no synchronous cross-Lambda call in
+    the path. The only invoke made is #3414's fire-and-forget Event observe —
+    and even a FAILING verdict handed back by the mock cannot touch the served
+    text, because nothing ever reads it (observe-only, proved behaviourally)."""
+    ai = _ai()
     table = _FakeTable()
     _wire(ai, monkeypatch, table)
-    monkeypatch.setattr(bqg, "_LAMBDA_CONTEXT", _FakeContext(29_000))
-    monkeypatch.setattr(bqg, "_qg_lambda_client", lambda: _gate_client_returning(_FIRED))
-    monkeypatch.setattr(bqg, "_cw_client", lambda: MagicMock())
     monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
+    # A hostile payload: if ANY code path consumed this, the served text would
+    # change (or a KeyError would 500 the handler). Neither may happen.
+    obs.invoke.return_value = {"Payload": MagicMock(), "StatusCode": 202, "passed": False, "score": 1}
 
     resp = ai._handle_board_ask(_post({"question": "How is recovery trending?", "personas": ["sleep_coach"]}))
     assert resp["statusCode"] == 200
-    body = json.loads(resp["body"])
-    assert body["responses"]["sleep_coach"] == CORRECTED_TEXT
+    assert json.loads(resp["body"])["responses"]["sleep_coach"] == FLAGGED_TEXT
 
-    # The gated text — not the flagged draft — is what entered the coach's own
-    # episodic memory and the follow-up thread seed.
+    # Exactly one observe for the one grounded coach — Event, never synchronous.
+    assert obs.invoke.call_count == 1
+    kwargs = obs.invoke.call_args.kwargs
+    assert kwargs["InvocationType"] == "Event"
+    assert kwargs["FunctionName"] == "coach-quality-gate"
+    wire = json.loads(kwargs["Payload"].decode())
+    assert wire["coach_id"] == "sleep_coach"
+    assert wire["output_text"] == FLAGGED_TEXT  # the text the reader GOT, not a draft
+    assert wire["emit_verdict"] == "board_ask"  # the #3414 opt-in rides the event
+
+    # The served text is what entered episodic memory and the thread seed.
     interactions = [v for (pk, sk), v in table.store.items() if pk == "COACH#sleep_coach" and sk.startswith("INTERACTION#")]
-    assert len(interactions) == 1 and interactions[0]["answer"] == CORRECTED_TEXT
-    sessions = [v for (pk, sk), v in table.store.items() if pk.startswith("BOARDSESS#")]
-    assert sessions and sessions[0]["threads"]["sleep_coach"][0]["a"] == CORRECTED_TEXT
+    assert len(interactions) == 1 and interactions[0]["answer"] == FLAGGED_TEXT
 
 
-def test_board_followup_gates_the_turn_too(monkeypatch):
-    ai, bqg = _ai(), _bqg()
+def test_a_dead_observer_never_reaches_the_reader(monkeypatch):
+    """The observe is telemetry: the Lambda API being down costs a log line,
+    never a reader-facing error or a changed answer (fail-soft, #3414)."""
+    ai = _ai()
+    _wire(ai, monkeypatch, _FakeTable())
+    monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
+    obs.invoke.side_effect = RuntimeError("lambda API down")
+
+    resp = ai._handle_board_ask(_post({"question": "How is recovery trending?", "personas": ["sleep_coach"]}))
+    assert resp["statusCode"] == 200
+    assert json.loads(resp["body"])["responses"]["sleep_coach"] == FLAGGED_TEXT
+    assert obs.invoke.call_count == 1  # it was attempted, and its death was absorbed
+
+
+def test_an_ungrounded_refusal_is_not_observed(monkeypatch):
+    """A refusal is canned text — judging its voice would pollute the measured
+    rate. Only grounded answers (the texts a coach actually voiced) are sent."""
+    ai = _ai()
+    _wire(ai, monkeypatch, _FakeTable())
+    monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
+    # Force the grounding gate to flag both the draft and the corrective retry.
+    monkeypatch.setattr(ai, "board_grounding_findings", lambda *a, **k: [{"type": "fabricated_number", "detail": "48.0"}])
+
+    resp = ai._handle_board_ask(_post({"question": "How is recovery trending?", "personas": ["sleep_coach"]}))
+    assert resp["statusCode"] == 200
+    assert "stand behind" in json.loads(resp["body"])["responses"]["sleep_coach"]  # the refusal shipped
+    assert obs.invoke.call_count == 0  # and no verdict was requested for it
+
+
+def test_board_followup_also_observes_async_and_serves_unchanged(monkeypatch):
+    ai = _ai()
     table = _FakeTable()
     _wire(ai, monkeypatch, table)
-    monkeypatch.setattr(bqg, "_LAMBDA_CONTEXT", _FakeContext(29_000))
-    monkeypatch.setattr(bqg, "_qg_lambda_client", lambda: _gate_client_returning(_FIRED))
-    monkeypatch.setattr(bqg, "_cw_client", lambda: MagicMock())
     monkeypatch.setattr(ai, "_retain_board_flag", lambda *a, **k: None)
+    obs = _observer_client(monkeypatch)
 
     token = ai._create_board_session("203.0.113.9", {"sleep_coach": [{"q": "Opening question?", "a": "Recovery looks steady."}]})
     resp = ai._handle_board_followup(
         {"session_token": token, "persona": "sleep_coach", "question": "And what about consistency?"}, "203.0.113.9"
     )
     assert resp["statusCode"] == 200
-    assert json.loads(resp["body"])["response"] == CORRECTED_TEXT
+    assert json.loads(resp["body"])["response"] == FLAGGED_TEXT
+    assert obs.invoke.call_count == 1
+    kwargs = obs.invoke.call_args.kwargs
+    assert kwargs["InvocationType"] == "Event"
+    assert json.loads(kwargs["Payload"].decode())["output_text"] == FLAGGED_TEXT
 
 
-def test_handlers_unchanged_without_a_lambda_context(monkeypatch):
-    """Direct handler calls (the whole pre-#968 suite) carry no context — the
-    gate must not evaluate, and the answer must flow exactly as before."""
-    ai, bqg = _ai(), _bqg()
-    table = _FakeTable()
-    _wire(ai, monkeypatch, table)
-    monkeypatch.setattr(bqg, "_LAMBDA_CONTEXT", None)
-    client = _gate_client_returning()  # any invoke would StopIteration
-    monkeypatch.setattr(bqg, "_qg_lambda_client", lambda: client)
+# ── O: the #3414 carve-out is structural — Event-only, never consumed ────────
+#
+# The #3413 guard (G1) bans a synchronous gate invoke from the reader lambda by
+# needle. #3414 does NOT loosen those needles — the reader lambda still may not
+# name the gate function or the synchronous invocation type. The sanctioned
+# channel lives in ONE module (web/board_verdict_observer.py) under its own
+# needle set: the only invocation type is "Event", and no response payload is
+# ever consumed. Anyone converting the observe back into a wait has to red
+# these tests first.
 
-    resp = ai._handle_board_ask(_post({"question": "How is recovery trending?", "personas": ["sleep_coach"]}))
-    assert resp["statusCode"] == 200
-    assert json.loads(resp["body"])["responses"]["sleep_coach"] == FLAGGED_TEXT
-    assert client.invoke.call_count == 0
+
+def test_the_async_observer_is_event_only_and_never_consumes_a_response():
+    assert 'InvocationType="Event"' in OBSERVER_CODE
+    assert "RequestResponse" not in OBSERVER_CODE, "#3414 carve-out violated — the observer went synchronous"
+    assert OBSERVER_CODE.count("invoke(") == 1  # one channel, one call site
+    # Nothing reads the invoke result: consuming a payload is how an "async"
+    # call quietly becomes a wait-and-act — the exact #3413 class in disguise.
+    assert ".read(" not in OBSERVER_CODE
+    assert "json.loads" not in OBSERVER_CODE.split("def observe")[1].replace("json.dumps", "")
+    # The reader lambda reaches it only through the fail-soft wrapper…
+    assert "_observe_board_verdict" in AI_CODE
+    # …and the wrapper itself never names the gate function or invocation type
+    # (G1's needles already assert this over ALL of AI_CODE; restated here so
+    # this test documents the carve-out's whole shape in one place).
+    assert "coach-quality-gate" not in AI_CODE and "RequestResponse" not in AI_CODE
+
+
+def test_the_carveout_guard_sees_a_synchronous_mutation():
+    """Mutation proof for O — the carve-out's needles must actually fire.
+
+    Flip the observer's invocation type to the synchronous kind (the exact
+    reversion #3413 forbids) and the guard needle above goes red; bolt on a
+    payload read and that needle goes red too. Same comment-stripping as G1,
+    so a violation can't hide from the needle by reflowing (and an explanation
+    in a comment still can't trigger it)."""
+    mutated = OBSERVER_SRC.replace('InvocationType="Event"', 'InvocationType="RequestResponse"')
+    assert mutated != OBSERVER_SRC  # the mutation took — the needle site exists
+    assert "RequestResponse" in _code_without_comments(mutated)
+
+    consuming = OBSERVER_SRC + '\n_verdict = _lambda_client().invoke()["Payload"].read()\n'
+    assert ".read(" in _code_without_comments(consuming)
+
+    # …and a comment merely DESCRIBING the banned shape stays invisible, so the
+    # guard cannot be appeased by deleting documentation.
+    assert "RequestResponse" not in _code_without_comments("# never use RequestResponse here\n")
+
+
+def test_the_observer_itself_never_raises(monkeypatch):
+    """observe() is fail-soft at its own boundary: a client that cannot even be
+    constructed costs False + a log line, never an exception into the caller."""
+    from web import board_verdict_observer as bvo
+
+    dead = MagicMock()
+    dead.invoke.side_effect = RuntimeError("no network")
+    monkeypatch.setattr(bvo, "_client", dead)
+    assert bvo.observe("sleep_coach", "some served text") is False
+
+    ok = MagicMock()
+    monkeypatch.setattr(bvo, "_client", ok)
+    assert bvo.observe("sleep_coach", "some served text") is True
 
 
 # ── S1: the recorded scope posture (ADR-103 row / ADR-108 note, #968) ────────
 
 
-def test_scope_posture_board_gated_dialogue_and_memoir_deliberately_not():
-    # Both coach-voiced board call sites run the gate…
-    assert AI_SRC.count("_bqg.enforce(") == 2  # initial ask + follow-up
-    assert 'endpoint="board_followup"' in AI_SRC
-    assert "set_lambda_context(context)" in AI_SRC  # the deadline is captured per-invocation
-    # …the budget/deadline machinery exists…
-    assert "get_remaining_time_in_millis" in BQG_SRC
+def test_scope_posture_board_ungated_dialogue_and_memoir_still_ungated():
+    # #3413: the board reader path no longer runs the gate at all…
+    assert AI_SRC.count("_bqg.enforce(") == 0
+    assert "set_lambda_context" not in AI_SRC
+    # …the deterministic #1973 rule is still merged from the one place that
+    # covers BOTH coach-voiced surfaces…
+    assert "from web.board_quality_gate import cycle_boundary_violations" in AI_CALLS_SRC
     # …and the deliberately-out-of-scope surfaces stay grounding-only (ADR-103
     # ledger row dated 2026-07-11; re-open only with a measured failure rate).
     for src in (DIALOGUE_SRC, MEMOIR_SRC):
@@ -361,10 +442,34 @@ def test_scope_posture_board_gated_dialogue_and_memoir_deliberately_not():
         assert "_enforce_quality_gate" not in src
 
 
-def test_decisions_md_records_the_scope_extension():
+def test_decisions_md_records_the_scope_withdrawal_and_its_measurement():
+    """The scope change is only real if the record says so. #968's extension
+    stays in the file as history — deleting it would hide that this was once
+    decided the other way — but it must be marked retired, and the withdrawal
+    must carry the measurement that justified it, not just the verdict."""
     decisions = open(os.path.join(ROOT, "docs/DECISIONS.md")).read()
-    assert "Scope extension (2026-07-11, #968)" in decisions
-    assert "ADR-108 coach quality gate — scope (#968)" in decisions
+    assert "Scope extension (2026-07-11, #968)" in decisions  # kept as history…
+    assert "RETIRED 2026-09-01 by the #3413 amendment" in decisions  # …and marked
+    assert "Amendment (2026-09-01, #3413)" in decisions
+    assert "p50=10434ms" in decisions or "p50 10434ms" in decisions  # the number, not just the claim
+    assert "0 verdicts" in decisions
+    # The ADR-103 ledger row must name the narrowing too — a scope row that
+    # still reads "two surfaces" is how the next reviewer re-extends it.
+    assert "ADR-108 coach quality gate — scope (#968, narrowed #3413)" in decisions
+    assert "unknown" in decisions.split("narrowed #3413")[1][:1200]  # the open question is stated
+
+
+def test_decisions_md_records_the_3414_channel_as_observe_only():
+    """#3414's amendment must say what the channel IS (measurement) and what it
+    is NOT (enforcement) — the scope stays narrowed, in writing."""
+    decisions = open(os.path.join(ROOT, "docs/DECISIONS.md")).read()
+    assert "Amendment (2026-09-01, #3414)" in decisions
+    tail = decisions.split("Amendment (2026-09-01, #3414)")[1][:2200]
+    assert "observe-only" in tail
+    assert '"observed"' in tail  # the honest disposition is named
+    assert "BoardQualityGateVerdict" in tail  # where the verdict now lands
+    assert "byte-unchanged" in tail  # the daily-brief enforcement wire is untouched
+    assert "DELETING this machinery" in tail  # the ≥30d decision rule is written down
 
 
 # ── #1973: Day<=3 cycle-boundary framing rule ────────────────────────────────
@@ -450,61 +555,56 @@ def test_day_n_today_uses_the_pacific_calendar_day_not_utc(monkeypatch):
     assert bqg._day_n_today() == 1  # Pacific "today" == genesis day, not UTC's Day 2
 
 
-def test_enforce_fires_the_gate_on_an_unframed_graded_call_day_one(monkeypatch):
-    """Integration proof: the LLM-scored verdict alone says passed=True with
-    zero findings (the exact live-failure shape — nothing in the anti-pattern/
-    decision-class/similarity checks would have caught this). The
-    deterministic day<=3 rule is what fires the regenerate-once path."""
-    bqg = _bqg()
-    monkeypatch.setattr(bqg, "_day_n_today", lambda: 1)
-    retained, retain = _arm(
-        bqg,
-        monkeypatch,
-        _FakeContext(29_000),
-        _gate_client_returning({"statusCode": 200, "passed": True, "score": 95}),
-    )
-    notes = []
-
-    def _regen(note):
-        notes.append(note)
-        return _FRAMED_GRADED_CALL
-
-    out = bqg.enforce("physical_coach", _UNFRAMED_GRADED_CALL, _regen, lambda t: True, retain)
-    assert out == _FRAMED_GRADED_CALL
-    assert len(notes) == 1
-    assert "cycle" in notes[0].lower()  # the correction note names the missing framing
-    assert retained and retained[0][0][1] == "flagged_corrected"
+# ── #1973 through the ONE enforcement path that remains ──────────────────────
+#
+# These were `enforce()` integration proofs until #3413. They now run against
+# `ai_calls._invoke_quality_gate_sync`, which is where the rule is merged into
+# the gate report for BOTH surfaces — so the proof follows the rule to the
+# path that still executes it (the daily brief), instead of dying with the
+# board wrapper it happened to be written against.
 
 
-def test_enforce_leaves_a_correctly_framed_call_untouched(monkeypatch):
-    bqg = _bqg()
-    monkeypatch.setattr(bqg, "_day_n_today", lambda: 1)
-    retained, retain = _arm(
-        bqg,
-        monkeypatch,
-        _FakeContext(29_000),
-        _gate_client_returning({"statusCode": 200, "passed": True, "score": 95}),
-    )
-    out = bqg.enforce("physical_coach", _FRAMED_GRADED_CALL, lambda n: "unused", lambda t: True, retain)
-    assert out == _FRAMED_GRADED_CALL
-    assert retained == []
+def _sync_report(monkeypatch, coach_id, text, llm_report, day_n=1):
+    from ai import ai_calls
+    from web import board_quality_gate as bqg
+
+    monkeypatch.setattr(bqg, "_day_n_today", lambda: day_n)
+    return ai_calls._invoke_quality_gate_sync(_gate_client_returning(llm_report), coach_id, text, None)
 
 
-def test_regression_guard_without_the_new_rule_the_llm_pass_alone_lets_it_through(monkeypatch):
-    """AC3's regression proof, made explicit: stub `cycle_boundary_violations`
-    back to a no-op — i.e. simulate the gate as it stood BEFORE #1973 — and
-    the identical Day-1 unframed draft, under the identical passing LLM
-    verdict, now sails through completely untouched. This is exactly the bug
-    #1973 fixes; the assertion below FAILS if the new rule is removed."""
-    bqg = _bqg()
+_LLM_PASSES = {"statusCode": 200, "passed": True, "score": 95}
+
+
+def test_the_rule_fails_a_report_the_llm_verdict_alone_passed(monkeypatch):
+    """Integration proof: the LLM-scored verdict says passed=True with zero
+    findings (the exact live-failure shape — nothing in the anti-pattern /
+    decision-class / similarity checks catches this). The deterministic day<=3
+    rule is what flips the report to failing, which is what drives the
+    daily brief's regenerate-or-hold loop."""
+    report = _sync_report(monkeypatch, "physical_coach", _UNFRAMED_GRADED_CALL, _LLM_PASSES)
+    assert report["passed"] is False
+    assert len(report["cycle_boundary_violations"]) == 1
+
+    from ai.ai_calls import _quality_gate_correction_note
+
+    note = _quality_gate_correction_note(report)
+    assert "cycle" in note.lower()  # the correction note names the missing framing
+
+
+def test_a_correctly_framed_call_leaves_the_passing_verdict_alone(monkeypatch):
+    report = _sync_report(monkeypatch, "physical_coach", _FRAMED_GRADED_CALL, _LLM_PASSES)
+    assert report["passed"] is True
+    assert "cycle_boundary_violations" not in report
+
+
+def test_regression_guard_without_the_rule_the_llm_pass_alone_lets_it_through(monkeypatch):
+    """The negative control, kept from #1973: stub `cycle_boundary_violations`
+    back to a no-op — i.e. simulate the gate as it stood BEFORE #1973 — and the
+    identical Day-1 unframed draft, under the identical passing LLM verdict,
+    sails through untouched. This assertion FAILS if the rule is removed."""
+    from web import board_quality_gate as bqg
+
     monkeypatch.setattr(bqg, "cycle_boundary_violations", lambda *a, **k: [])
-    monkeypatch.setattr(bqg, "_day_n_today", lambda: 1)
-    retained, retain = _arm(
-        bqg,
-        monkeypatch,
-        _FakeContext(29_000),
-        _gate_client_returning({"statusCode": 200, "passed": True, "score": 95}),
-    )
-    out = bqg.enforce("physical_coach", _UNFRAMED_GRADED_CALL, lambda n: "unused", lambda t: True, retain)
-    assert out == _UNFRAMED_GRADED_CALL  # unchanged — the pre-#1973 gate never saw a problem
-    assert retained == []
+    report = _sync_report(monkeypatch, "physical_coach", _UNFRAMED_GRADED_CALL, _LLM_PASSES)
+    assert report["passed"] is True  # unchanged — the pre-#1973 gate never saw a problem
+    assert "cycle_boundary_violations" not in report

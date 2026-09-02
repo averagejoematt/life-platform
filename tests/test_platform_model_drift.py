@@ -92,6 +92,80 @@ def test_known_true_edges_pin_the_extractor():
     assert len(model["alarms"]) >= 30, "the CDK alarm plane collapsed"
 
 
+# ── #3374 R1: the cost-bearing-surface baseline ratchet ──────────────────────
+# model/cost_surface_baseline.json is HAND-OWNED (the generator never writes it);
+# the model's cost_surface plane is derived. Exact-pinning the two means a PR that
+# grows any of the five cost-bearing populations (schedules, alarms, EMF
+# namespaces, secrets, budget-guard AI features) must bump the baseline in the
+# SAME diff — a deliberate, reviewable act — and a shrink must ratchet it down,
+# so the baseline can never quietly sit above the estate.
+
+_BASELINE_PATH = ROOT / "model" / "cost_surface_baseline.json"
+
+
+def _cost_surface_failures(derived: dict, baseline: dict) -> list:
+    """Every way the committed baseline disagrees with the derived plane."""
+    failures = []
+    for key in sorted(set(derived) | set(baseline)):
+        if key not in baseline:
+            failures.append(f"cost surface {key!r} is derived but has no baseline entry — add it to model/cost_surface_baseline.json")
+        elif key not in derived:
+            failures.append(f"baseline entry {key!r} no longer derived — remove it from model/cost_surface_baseline.json")
+        elif derived[key] > baseline[key]:
+            failures.append(
+                f"cost surface {key!r} GREW: {baseline[key]} -> {derived[key]}. A new cost-bearing surface may not appear "
+                f"silently (#3374 R1) — bump model/cost_surface_baseline.json in this same diff, naming the surface in the PR"
+            )
+        elif derived[key] < baseline[key]:
+            failures.append(
+                f"cost surface {key!r} shrank: {baseline[key]} -> {derived[key]} — ratchet model/cost_surface_baseline.json "
+                f"down to match (a baseline above the estate would let the next growth pass unseen)"
+            )
+    return failures
+
+
+def test_cost_surface_baseline_is_exact():
+    """#3374 R1: derived cost-surface counts == the committed baseline, key-for-key."""
+    model, _, _ = _built()
+    baseline = json.loads(_BASELINE_PATH.read_text(encoding="utf-8"))["counts"]
+    failures = _cost_surface_failures(model["cost_surface"], baseline)
+    assert not failures, "\n".join(failures)
+
+
+def test_cost_surface_mutations_fail_both_directions():
+    """Positive controls: the comparison can actually fail — on growth, shrink, a
+    surface the baseline never heard of, and a baseline row for a dead surface."""
+    model, _, _ = _built()
+    derived = dict(model["cost_surface"])
+    baseline = json.loads(_BASELINE_PATH.read_text(encoding="utf-8"))["counts"]
+    victim = sorted(derived)[0]
+
+    grown = dict(derived, **{victim: derived[victim] + 1})
+    assert any("GREW" in f for f in _cost_surface_failures(grown, baseline))
+
+    shrunk = dict(derived, **{victim: derived[victim] - 1})
+    assert any("shrank" in f for f in _cost_surface_failures(shrunk, baseline))
+
+    unlisted = dict(derived, phantom_surface=1)
+    assert any("no baseline entry" in f for f in _cost_surface_failures(unlisted, baseline))
+
+    dead = dict(baseline, phantom_surface=1)
+    assert any("no longer derived" in f for f in _cost_surface_failures(derived, dead))
+
+    # negative control: agreement is quiet
+    assert _cost_surface_failures(derived, dict(derived)) == []
+
+
+def test_cost_surface_derivation_dead_man():
+    """A registry the extractor can no longer find must RAISE, never count 0 —
+    a plausible zero would serialize and the ratchet would read it as a shrink to
+    fix rather than a broken derivation (the absence-read-as-success class)."""
+    import pytest
+
+    with pytest.raises(ValueError, match="not found"):
+        gen._count_registry_members(ROOT / "scripts" / "generate_platform_model.py", "NO_SUCH_REGISTRY_EXISTS_HERE")
+
+
 def test_mutation_a_hand_edit_is_detected():
     """Mutation self-test: any single-field change to the model changes the
     serialization (what the byte diff gate keys on), and a mutated model renders

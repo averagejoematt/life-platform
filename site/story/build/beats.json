@@ -3462,6 +3462,55 @@
      "url": "https://github.com/averagejoematt/life-platform/pull/3358"
     }
    ]
+  },
+  {
+   "id": "2026-09-01-the-gate-that-never-once-answered",
+   "date": "2026-09-01",
+   "title": "The gate that never once answered",
+   "shipped": "On day one of the experiment, the public coaching board was returning 504s. Ask the coaches a question and you waited thirty seconds for an error. The cause was a quality gate — a second AI pass that checks whether each coach still sounds like themselves — running while the reader waited, behind a 10-second cap. That cap had been written from a code comment claiming the gate cost 'about 2 to 5 seconds'. Nobody had ever checked. Measured against seven days of real logs, its median call was 10.4 seconds, and over the previous 48 hours, 16.4 seconds. The cap sat below the callee's median in both windows, which means the gate could not return at its typical speed, never mind its slow one. Then the logs settled it: in seven days of live board traffic there were 8 attempts, 6 skipped, 2 timed out, and zero verdicts. Not degraded — it had never once worked on this surface. So it came off the reader path entirely rather than being retuned. The board went from 33.9 seconds to 12.8.",
+   "why_it_mattered": "A gate that cannot finish is not a safety feature, it is latency with a good reputation. This one had been sitting on the public path since July, costing every reader about ten seconds per coach for a result that was thrown away at the socket, while the dashboard showed a healthy component. The honest fix was subtraction. What makes it worth writing down is the second half: removing it does not prove the board's voice quality is fine — it proves nobody knows, because the instrument never returned an answer. That distinction got written into the decision record rather than quietly rounded up to 'fixed'.",
+   "gotcha": "The guard written to stop this coming back was itself broken, and the mutation test caught it. It rebuilt the source file by joining code tokens together, which split the thing it was searching for — `_bqg.enforce(` — into four separate pieces, so the check could never match and would have passed forever while the bug sat live. It only surfaced because the fix was deliberately re-broken to watch the guard go red, and it didn't. A check you have never seen fail is not yet a check.",
+   "honest_miss": "The worst case went unmeasured. The board can convene seven coaches at once, and that is the run most likely to still be slow — but the endpoint rate-limits by coach, and the earlier probes had spent the budget. The arithmetic says about 22 seconds, comfortably under the ceiling, and arithmetic is not a measurement. Working around the limiter with synthetic requests would have written junk into the coaches' memory on day one, which was not a trade worth making. It is recorded as unmeasured on the issue rather than rounded into the win. Separately: the same gate exceeds its own 30-second ceiling on 4% of runs elsewhere in the system, which means roughly one daily-brief section in twenty ships unchecked. That is measured, intentional, and until now invisible.",
+   "prs": [
+    {
+     "label": "PR #3415",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3415"
+    },
+    {
+     "label": "PR #3416",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3416"
+    }
+   ]
+  },
+  {
+   "id": "2026-09-02-the-rollback-that-learned-its-reach",
+   "date": "2026-09-02",
+   "title": "The rollback that learned its reach",
+   "shipped": "On launch eve, the site's automatic safety net had reverted perfectly good pages. The post-deploy smoke test judges two different worlds — the static site files a deploy just shipped, and the live data APIs behind them — but the rollback it triggers can only restore the files. So when a data API went stale, the rollback fired anyway, reverted content it could not have broken, and cured nothing. This session taught every smoke check to declare which world it lives in (site, API, or infrastructure), and taught the rollback to decline by name when the failure is out of its reach: it now prints exactly which checks failed on a surface a file-revert cannot touch, files a tracking issue instead, and leaves the healthy deploy serving. Then we proved it the honest way — deliberately injecting an API-class failure into a real production deploy run. The smoke test went red on the planted row, the rollback printed its refusal, the live site never flinched, and the tracking issue filed itself and closed itself on the next green run.",
+   "why_it_mattered": "A safety mechanism that acts outside its reach is worse than none: it destroys good work while the actual problem stays live, and its 'success' message teaches you to trust it more. This was the second half of a matched pair — the visual-QA leg learned the same lesson two days earlier — so the class is now closed on both gates that can trigger a revert. The deeper pattern kept recurring all session: a checkbox readers could never successfully click, warnings no deploy could ever clear, a verdict no caller waited long enough to receive. Each one looked like a working control and was arithmetically incapable of its job.",
+   "gotcha": "Proving the decline path meant deliberately failing a production deploy. The injection is a dispatch-only flag that plants exactly one fake API-class smoke failure, so the run goes red for a reason we chose, on a surface the rollback must refuse. Watching a production pipeline print a refusal you engineered is the only way to know the refusal exists — sixty green unit tests had said so too, but this platform has shipped 'verdict-closed and non-functional' before.",
+   "honest_miss": "The classification of edge cases — which world a cache-header check or a redirect check belongs to — is judgment encoded in one session, documented inline. If any call is wrong, the failure mode is deliberately the old behavior: a rollback that still runs. Wrong in the safe direction, but wrong is wrong, and only a future misfire will audit it.",
+   "prs": [
+    {
+     "label": "PR #3425",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3425"
+    }
+   ]
+  },
+  {
+   "id": "2026-09-02-the-checkbox-that-could-never-succeed",
+   "date": "2026-09-02",
+   "title": "The checkbox that could never succeed",
+   "shipped": "The coaching page has offered 'convene the full board (7)' since July — tick it, and all seven AI coaches answer your question at once. Except none ever did: since a rate-limit fix in August correctly started charging one token per coach, a 7-coach panel cost 7 tokens against a budget of 5. Arithmetic forbade it, for every reader, always — and the doomed attempt still burned the reader's whole hour, so even the working 3-coach panel then failed. Before choosing a fix, this session measured the alternative: cap the panel at 5? The live probe answered no — even a 5-coach panel timed out at the serving function's own 30-second ceiling, with the fifth coach never reached. So the fix was both: the budget raised to 7 so one full board per hour is genuinely purchasable, the seven coaches now generating their answers in PARALLEL instead of single-file, and the rate limiter rebuilt so a rejected request consumes nothing. The proof is live: one full-board question, HTTP 200 in 17 seconds, all seven coaches answering — the first time that checkbox has ever done what it says.",
+   "why_it_mattered": "An affordance that structurally cannot work is worse than a missing one: it invites the click, punishes it, and then breaks the fallback that WAS working. This one sat broken for 12 days including launch day, invisible because nothing measures attempts-versus-successes per button. The repair also hardened the general case — any request too big for its rate window is now refused before it spends, instead of charged for a thing it can never receive.",
+   "gotcha": "Extracting the parallel loop into its own module tripped five different guards in sequence — the module-size ratchet, four source-anchored tests, the AI-invoke census, the type checker, and the grounding-wiring registry, which correctly refused a surface whose safety gate it could no longer see. The cure was teaching the registry a new structural concept (a gate call baked inside a wrapper) rather than exempting the file — so the next extraction gets discovered and forced to register, not waved through.",
+   "honest_miss": "The same session's math audit found the board's sibling instruments in worse shape: the training-load ratio (ACWR) has been computed and then destroyed every night since August 24 by a scheduling collision — nine days dark with zero alarms — and weekly correlations silently drop exactly the workout days. Both are filed with reproductions; the formulas themselves proved out exact.",
+   "prs": [
+    {
+     "label": "PR #3439",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3439"
+    }
+   ]
   }
  ]
 }

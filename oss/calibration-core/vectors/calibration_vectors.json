@@ -13,6 +13,7 @@
         "confirmed": 0,
         "refuted": 0,
         "accuracy_pct": null,
+        "accuracy_ci95": null,
         "brier": null,
         "brier_skill": null,
         "skilled": null,
@@ -37,6 +38,10 @@
         "confirmed": 1,
         "refuted": 0,
         "accuracy_pct": 100.0,
+        "accuracy_ci95": [
+          20.7,
+          100.0
+        ],
         "brier": 0.04,
         "brier_skill": null,
         "skilled": null,
@@ -73,6 +78,10 @@
         "confirmed": 2,
         "refuted": 0,
         "accuracy_pct": 100.0,
+        "accuracy_ci95": [
+          34.2,
+          100.0
+        ],
         "brier": 0.025,
         "brier_skill": null,
         "skilled": null,
@@ -132,6 +141,10 @@
         "confirmed": 3,
         "refuted": 3,
         "accuracy_pct": 50.0,
+        "accuracy_ci95": [
+          18.8,
+          81.2
+        ],
         "brier": 0.0,
         "brier_skill": 1.0,
         "skilled": true,
@@ -191,6 +204,10 @@
         "confirmed": 3,
         "refuted": 3,
         "accuracy_pct": 50.0,
+        "accuracy_ci95": [
+          18.8,
+          81.2
+        ],
         "brier": 1.0,
         "brier_skill": -3.0,
         "skilled": false,
@@ -250,6 +267,10 @@
         "confirmed": 3,
         "refuted": 3,
         "accuracy_pct": 50.0,
+        "accuracy_ci95": [
+          18.8,
+          81.2
+        ],
         "brier": 0.25,
         "brier_skill": 0.0,
         "skilled": false,
@@ -310,6 +331,10 @@
         "confirmed": 3,
         "refuted": 5,
         "accuracy_pct": 37.5,
+        "accuracy_ci95": [
+          13.7,
+          69.4
+        ],
         "brier": 0.4909,
         "brier_skill": -1.0947,
         "skilled": false,
@@ -377,6 +402,10 @@
         "confirmed": 7,
         "refuted": 1,
         "accuracy_pct": 87.5,
+        "accuracy_ci95": [
+          52.9,
+          97.8
+        ],
         "brier": 0.5281,
         "brier_skill": -3.8286,
         "skilled": false,
@@ -451,6 +480,10 @@
         "confirmed": 5,
         "refuted": 3,
         "accuracy_pct": 62.5,
+        "accuracy_ci95": [
+          30.6,
+          86.3
+        ],
         "brier": 0.25,
         "brier_skill": -0.0667,
         "skilled": false,
@@ -535,6 +568,10 @@
         "confirmed": 7,
         "refuted": 7,
         "accuracy_pct": 50.0,
+        "accuracy_ci95": [
+          26.8,
+          73.2
+        ],
         "brier": 0.0076,
         "brier_skill": 0.9697,
         "skilled": true,
@@ -612,6 +649,10 @@
         "confirmed": 4,
         "refuted": 3,
         "accuracy_pct": 57.1,
+        "accuracy_ci95": [
+          25.0,
+          84.2
+        ],
         "brier": 0.3243,
         "brier_skill": -0.3242,
         "skilled": false,
@@ -697,6 +738,10 @@
         "confirmed": 5,
         "refuted": 3,
         "accuracy_pct": 62.5,
+        "accuracy_ci95": [
+          30.6,
+          86.3
+        ],
         "brier": 0.1565,
         "brier_skill": 0.3479,
         "skilled": true,
@@ -785,6 +830,10 @@
         "confirmed": 5,
         "refuted": 3,
         "accuracy_pct": 62.5,
+        "accuracy_ci95": [
+          30.6,
+          86.3
+        ],
         "brier": 0.0875,
         "brier_skill": 0.6267,
         "skilled": true,
@@ -873,6 +922,10 @@
         "confirmed": 4,
         "refuted": 4,
         "accuracy_pct": 50.0,
+        "accuracy_ci95": [
+          21.5,
+          78.5
+        ],
         "brier": 0.3223,
         "brier_skill": -0.2891,
         "skilled": false,
@@ -1025,7 +1078,7 @@
     },
     {
       "input": " confirming ",
-      "expected": 1
+      "expected": null
     },
     {
       "input": "refuted",
@@ -1156,10 +1209,6 @@
         [
           0.2,
           0
-        ],
-        [
-          0.42,
-          1
         ]
       ]
     },

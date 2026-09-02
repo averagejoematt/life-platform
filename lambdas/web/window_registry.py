@@ -114,6 +114,12 @@ REGISTRY: dict[str, tuple[str, str | None]] = {
     # gap reasoning as avg_30d_g above: this is a real, permanently-full value
     # that must NOT trip the phase_plausibility day_n gate on a young cycle.
     "sleep_hours_30d_avg": (INTENSIVE, "#1919 — EXEMPT (not debt): cross-phase RAW_TIMESERIES read (#2089/#2109), never genesis-clamped"),
+    # #3451: the n travels beside the average above — an EXTENSIVE count (like
+    # hrv_30d_n) even though its sibling average is EXEMPT rather than gated: on
+    # a Whoop outage the average keeps publishing (cross-phase, never clamped)
+    # but n honestly shrinks, so a reader can judge the average's weight for
+    # themselves instead of trusting a bare "30d" label that could cover 3 nights.
+    "sleep_hours_30d_n": (EXTENSIVE, None),
     # STILL OPEN — real debt, left open deliberately (not mechanically converted).
     # group_90d_avgs (site_api_habits.py) IS a genesis-clamped mean (same shape as
     # weight_delta_30d) and IS under-filled through Day 90 of every cycle — but
