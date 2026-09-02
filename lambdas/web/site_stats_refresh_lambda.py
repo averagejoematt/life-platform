@@ -214,6 +214,9 @@ def lambda_handler(event, context):
         "recovery_status": rec_status,
         "sleep_hours": round(sleep, 1) if sleep else ev.get("sleep_hours"),
         "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
+        # #3451: the n travels with the average — this refresh only ever preserves
+        # the morning daily-brief's pair, it never recomputes either half alone.
+        "sleep_hours_30d_n": ev.get("sleep_hours_30d_n"),
     }
 
     # ── 5. Update tier0_streak from computed_metrics if available (#3172) ────

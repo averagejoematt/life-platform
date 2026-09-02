@@ -2290,6 +2290,7 @@ def lambda_handler(event, context):
             _trends = {}
             _weight_as_of = None  # G-3: date of last known weight reading
             _sleep_hours_30d_avg = None  # HOME-3: 30-day average sleep hours
+            _sleep_hours_30d_n = None  # #3451: nights the average above is over
             try:
                 # Weight trend (last 12 weeks of weekly averages)
                 _wt_90d = fetch_range("withings", (today - timedelta(days=84)).isoformat(), yesterday)
@@ -2318,6 +2319,11 @@ def lambda_handler(event, context):
                 if _sleep_vals:
                     _trends["sleep_daily"] = [{"date": d, "hrs": round(v, 1)} for d, v in _sleep_vals[-14:]]
                 _sleep_hours_30d_avg = round(sum(v for _, v in _sleep_vals) / len(_sleep_vals), 2) if _sleep_vals else None
+                # #3451: the average carried no n anywhere — a Whoop outage would silently
+                # shrink "30d" to a handful of nights with no way for a reader (or the
+                # weekly-signal email, or public_stats.json) to tell. Travels WITH the
+                # average, same discipline as weight_delta_window_days (#1917).
+                _sleep_hours_30d_n = len(_sleep_vals) if _sleep_vals else None
 
                 # Recovery trend (last 14 days)
                 _rec_vals = [
@@ -2444,6 +2450,7 @@ def lambda_handler(event, context):
                     "recovery_status": _rec_status,
                     "sleep_hours": _vr["sleep_hours"],
                     "sleep_hours_30d_avg": _sleep_hours_30d_avg,  # HOME-3
+                    "sleep_hours_30d_n": _sleep_hours_30d_n,  # #3451: nights the average is over
                 },
                 journey={
                     "start_weight_lbs": _start_wt,

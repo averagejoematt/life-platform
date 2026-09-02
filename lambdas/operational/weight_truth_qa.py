@@ -375,6 +375,61 @@ def assess_cross_surface_vitals(vitals, coaches, tol: dict | None = None):
     return True, "coach narratives agree with the cockpit vitals (" + ", ".join(f"{k} {v:g}" for k, v in sorted(truth.items())) + ")"
 
 
+# ── #3451: the OTHER cross-surface question — same night, different DEVICE ─────
+#
+# The live specimen: home vitals served 6.8h (Whoop, the #1369 Truth Spine SoT)
+# while the /sleep hero served 1.1h (Eight Sleep's `total_sleep_hours`, a
+# mattress-partial night) for the same night — no label on either figure. #2921
+# already sanctioned dual numbers from two devices (a "correction" would be
+# false precision neither sensor actually has); what it did NOT sanction was
+# publishing the disagreement silently. Its closing rule — "saying so, every
+# time" — is what this checks, not the arithmetic.
+#
+# Deliberately NOT judging the two devices against each other for accuracy: a
+# real divergence is expected and fine. The only failure mode this catches is
+# the API forgetting to disclose it — `figure_scope.total_sleep_hours_source`
+# already ships unconditionally as of the #3451 fix, so this is a regression
+# guard, not a live gap.
+CROSS_SURFACE_SLEEP_DISCLOSURE_TOL_HRS = 0.5
+
+
+def assess_cross_surface_sleep_disclosure(vitals, sleep_detail, tol: float = CROSS_SURFACE_SLEEP_DISCLOSURE_TOL_HRS):
+    """Home vitals' Whoop-SoT sleep figure vs the /sleep hero's Eight Sleep figure.
+
+    Returns (ok, message). A close agreement needs no disclosure (nothing to
+    reconcile). A real divergence is fine TOO, as long as `sleep_detail` names
+    the device its figure came from (`figure_scope.total_sleep_hours_source`) —
+    only an undisclosed divergence fails. Absence on either side is a clean pass
+    (ADR-104): no reading, nothing to compare.
+    """
+    if not isinstance(vitals, dict) or not isinstance(sleep_detail, dict):
+        return True, "no payload — nothing to compare"
+    home = vitals.get("sleep_hours")
+    hero = sleep_detail.get("total_sleep_hours")
+    if home is None or hero is None:
+        return True, "home vitals or /sleep hero sleep figure is null — nothing to compare"
+    try:
+        home, hero = float(home), float(hero)
+    except (TypeError, ValueError):
+        return True, f"sleep figures not numeric (home={home!r}, hero={hero!r}) — skipped"
+
+    diff = abs(home - hero)
+    if diff <= tol:
+        return True, f"home vitals ({home:g}h) and the /sleep hero ({hero:g}h) agree within {tol}h"
+
+    source = (sleep_detail.get("figure_scope") or {}).get("total_sleep_hours_source")
+    if source:
+        return True, (
+            f"home vitals ({home:g}h, Whoop) and the /sleep hero ({hero:g}h, {source}) diverge by "
+            f"{diff:g}h but the hero discloses its device (#2921) — two sensors, not a contradiction"
+        )
+    return False, (
+        f"home vitals ({home:g}h) and the /sleep hero ({hero:g}h) diverge by {diff:g}h with NO device "
+        f"disclosure on the hero payload — a reader can't tell these are two different sensors, not one "
+        f"surface correcting the other (#3451)"
+    )
+
+
 def checks(check_cls, site_base_url, partition, timeout=15):
     """The qa_smoke-facing entrypoint: fetch both surfaces and return [Check].
 
@@ -396,25 +451,47 @@ def checks(check_cls, site_base_url, partition, timeout=15):
     # Reported separately so a recovery/HRV contradiction is named as one, rather
     # than folded into a check whose title says "weight".
     vitals_check = check_cls("cross_surface:vitals", "Reader Truth", partition)
-    try:
-        payloads = {}
-        for path in ("/api/vitals", "/api/coaching-dashboard"):
+    # #3451: a third leg, a third surface (/api/sleep_detail) — fetched
+    # independently below so a /sleep-only outage never blanks the weight/vitals
+    # legs, and vice versa.
+    sleep_check = check_cls("cross_surface:sleep_disclosure", "Reader Truth", partition)
+
+    payloads, fetch_errors = {}, {}
+    for path in ("/api/vitals", "/api/coaching-dashboard", "/api/sleep_detail"):
+        try:
             req = urllib.request.Request(site_base_url + path, headers={"User-Agent": "life-platform-qa-smoke"})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 payloads[path] = json.loads(r.read().decode("utf-8", "replace"))
-    except Exception as e:
-        msg = f"cross-surface fetch failed (fail-soft): {str(e)[:120]}"
-        return [check.warn(msg), vitals_check.warn(msg)]
+        except Exception as e:
+            fetch_errors[path] = str(e)[:120]
 
-    served_vitals = payloads.get("/api/vitals", {}).get("vitals", {})
-    served_coaches = payloads.get("/api/coaching-dashboard", {}).get("coaches", [])
+    if "/api/vitals" in fetch_errors or "/api/coaching-dashboard" in fetch_errors:
+        msg = "cross-surface fetch failed (fail-soft): " + "; ".join(
+            f"{p} — {e}" for p, e in fetch_errors.items() if p in ("/api/vitals", "/api/coaching-dashboard")
+        )
+        weight_vitals_checks = [check.warn(msg), vitals_check.warn(msg)]
+    else:
+        served_vitals = payloads.get("/api/vitals", {}).get("vitals", {})
+        served_coaches = payloads.get("/api/coaching-dashboard", {}).get("coaches", [])
+        ok, msg = assess_cross_surface_weight(served_vitals, served_coaches)
+        v_ok, v_msg = assess_cross_surface_vitals(served_vitals, served_coaches)
+        weight_vitals_checks = [
+            check.ok(msg) if ok else check.fail(msg),
+            vitals_check.ok(v_msg) if v_ok else vitals_check.fail(v_msg),
+        ]
 
-    ok, msg = assess_cross_surface_weight(served_vitals, served_coaches)
-    v_ok, v_msg = assess_cross_surface_vitals(served_vitals, served_coaches)
-    return [
-        check.ok(msg) if ok else check.fail(msg),
-        vitals_check.ok(v_msg) if v_ok else vitals_check.fail(v_msg),
-    ]
+    if "/api/vitals" in fetch_errors or "/api/sleep_detail" in fetch_errors:
+        sleep_result = sleep_check.warn(
+            "cross-surface fetch failed (fail-soft): "
+            + "; ".join(f"{p} — {e}" for p, e in fetch_errors.items() if p in ("/api/vitals", "/api/sleep_detail"))
+        )
+    else:
+        served_vitals = payloads.get("/api/vitals", {}).get("vitals", {})
+        served_sleep_detail = payloads.get("/api/sleep_detail", {}).get("sleep_detail", {})
+        s_ok, s_msg = assess_cross_surface_sleep_disclosure(served_vitals, served_sleep_detail)
+        sleep_result = sleep_check.ok(s_msg) if s_ok else sleep_check.fail(s_msg)
+
+    return weight_vitals_checks + [sleep_result]
 
 
 # ── #1225: single-surface hero-weight arithmetic. Moved here from
