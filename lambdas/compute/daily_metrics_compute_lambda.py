@@ -68,6 +68,8 @@ from health import (
 from intelligence import weight_recency  # #2221: ONE definition of the week-ago weigh-in
 from training import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
+from compute.computed_metrics_contract import carry_coowned_fields  # #3443: the co-owned write contract
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from common.platform_logger import get_logger
@@ -643,12 +645,10 @@ def store_computed_metrics(
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "algo_version": ALGO_VERSION,
     }
-    # #1843 AC1: diary-day intervention flag — video-diary/solo-recording session
-    # count. Written whenever the caller passes a count, INCLUDING 0 (an honest
-    # absence, never a gap), so "diary_sessions" in item is a reliable presence
-    # test for the correlation/hypothesis engines. Only skipped when the caller
-    # passes None (the sick-day path writes a separate minimal record and never
-    # calls this function at all).
+    # #1843 AC1: diary-day intervention flag — written whenever the caller passes a
+    # count, INCLUDING 0 (honest absence, never a gap), so "diary_sessions" in item is
+    # a reliable presence test for the correlation/hypothesis engines. Skipped only on
+    # None (the sick-day path writes its own minimal record, never through here).
     if diary_sessions is not None:
         item["diary_sessions"] = Decimal(str(int(diary_sessions)))
     if day_grade_score is not None:
@@ -691,10 +691,9 @@ def store_computed_metrics(
         if weight_traj.get("days_to_goal") is not None:
             item["days_to_goal"] = _to_dec(weight_traj["days_to_goal"])
 
-    # Phase-3 canonical vitals + protein — the single chosen-day recovery/HRV/RHR and
-    # the window protein avg+target+floor, with units in the field names. Every surface
-    # (brief vitals block, AI narrative, website, coaches) reads these instead of
-    # re-deriving, so the same number can't appear two ways on one page.
+    # Phase-3 canonical vitals + protein — the single chosen-day recovery/HRV/RHR and the
+    # window protein avg+target+floor, units in the field names. Every surface (brief,
+    # AI narrative, website, coaches) reads these — one number, never two ways on a page.
     if vitals:
         for field, val in [
             ("recovery_pct", vitals.get("recovery_pct")),
@@ -731,6 +730,11 @@ def store_computed_metrics(
         item["tsb_load_basis"] = _deep_dec(tsb_load_basis)
 
     item = {k: v for k, v in item.items() if v is not None}
+
+    # #3443: co-owned record — acwr-compute merges fields on at 16:55Z and this
+    # from-scratch rebuild erased them nightly 08-24→09-01. Carry them through.
+    carry_coowned_fields(table, item)
+
     # DATA-2: Use validate_item directly (no S3 client — compute partitions don't archive
     # to S3 on failure; they log and skip. validate_and_write requires s3_client != None.)
     try:
@@ -1222,6 +1226,9 @@ def lambda_handler(event, context):
         }
         if _vice_streaks:
             _sick_item["vice_streaks"] = {k: Decimal(str(v)) for k, v in _vice_streaks.items()}
+
+        # #3443: the other from-scratch rebuild — same co-owned carry (see above).
+        carry_coowned_fields(table, _sick_item)
 
         try:
             table.put_item(Item=_sick_item)
