@@ -141,3 +141,34 @@ and served a field named n_eff that never carried one. And the session's own ref
 its keep twice: the live probe that decided #3419 found the panel was undeliverable at ANY
 size, and the deliberate wait for the janitor's first live rejection found the janitor
 doesn't run when it says it does.
+
+---
+
+## Plan for Session T (written 2026-09-02, post-wrap — owner-approved in-session)
+
+Owner context: shaping calls asked and answered — **maximal drain** (close 14–16 of the 26
+working issues in one session; the honest floor is ~7–10, every survivor's reason named)
+and an **owner window** (each gate:owner item — #2883, #3424, #3429 — teed up as one
+paste-able action and pinged in-session; closed only on response). The full plan lives at
+`~/.claude/plans/piped-dazzling-volcano.md`; the phases:
+
+1. **Phase 0 — boot + overnight reads:** steward armed (one-shot pass on watcher events —
+   the classifier blocks a persistent loop); #3399 box 3 from the 09-02 ~22:30Z artifact
+   (predicts exactly one `basis:"withdrawn"`); #3414's counter; swallow-check; headroom.
+2. **Phase 1 — the P1 pipe repairs, driver-run, IN ORDER:** #3442 (the 8-site whoop
+   `#WORKOUT#` clobber class — shared day-row predicate + the SET guard; the verifier's
+   byte-exact reproductions become the regression fixtures) then #3443 (ACWR survives the
+   evening re-put — contract test + dead-man + the 9-day backfill), because the second
+   unmasks the first's strain corruption.
+3. **Phase 2 — three lane waves (≤4 concurrent, serial merge queue):** A: #3444/#3445/
+   #3446/#3447 (the P2s) · B: #3449/#3450/#3451/#3453 · C: #3452/#3437/#3438/#3455 +
+   #3430 (opus root-cause).
+4. **Phase 3 — driver while lanes run:** #3448 (variance-derive the 2% null or stamp the
+   documented ADR-105 exception); #3390's session-runnable legs (Day-1 force-recompute
+   once #3446 merges); #3373 design (stretch); **the owner window** (#2883/#3424/#3429
+   prepared and pinged).
+5. **Phase 4 — wrap:** headline = the honest floor (N closed / M filed / X remaining with
+   reasons); beat candidate: the ACWR repair or the drain itself.
+
+Out of scope, stated: the 22 Roadmap issues; #3403/#3422/#3436 (time-anchored); #2978
+(blocked:date); #3042 (closes on grades, not sessions); all Monarch/financial build work.
