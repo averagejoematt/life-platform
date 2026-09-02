@@ -309,9 +309,13 @@ def write_public_stats(
         s3_client:    boto3 S3 client (already initialised in the Lambda)
         vitals:       dict with keys: weight_lbs, weight_delta_7d,
                       weight_delta_window_days, hrv_ms, hrv_trend, rhr_bpm,
-                      rhr_trend, recovery_pct, recovery_status, sleep_hours
+                      rhr_trend, recovery_pct, recovery_status, sleep_hours,
+                      sleep_hours_30d_avg, sleep_hours_30d_n
                       (#1917: the delta key names its REAL window — it was
-                      `weight_delta_30d` over a 7-day computation until then)
+                      `weight_delta_30d` over a 7-day computation until then.
+                      #3451: the 30d sleep average carries its n alongside it,
+                      same discipline — an average with no n can't tell a
+                      reader a Whoop outage silently shrank the window.)
         journey:      dict with keys: start_weight_lbs, goal_weight_lbs,
                       current_weight_lbs, lost_lbs, remaining_lbs, progress_pct,
                       weekly_rate_lbs, projected_goal_date, days_to_goal,

@@ -90,8 +90,15 @@ export async function renderSleep(d) {
   const recNote = s.recovery_night_of
     ? `<p class="rd-meta label">Recovery, HRV and resting HR are from the night of ${fmtShort(s.recovery_night_of)} — the latest night with a Whoop reading; last night's isn't in yet.</p>`
     : "";
+  // #3451: `total_sleep_hours` is unconditionally Eight Sleep's duration (see
+  // site_api_sleep.py's `figure_scope.total_sleep_hours_source`) — a different
+  // device than the home vitals card's Whoop SoT figure for the same night, and
+  // the hero rendered it with no label at all. #2921's rule is "saying so, every
+  // time" without changing the dual-surface posture, so this captions the figure
+  // from the API's own disclosure rather than switching which device leads.
+  const _hoursSrc = s.figure_scope && s.figure_scope.total_sleep_hours_source === "eightsleep" ? "Eight Sleep" : null;
   if (Object.values(s).some(has)) {
-    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
+    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), _hoursSrc ? `hours · ${_hoursSrc}` : "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
     // #2921: ONE device's own stage hours, not Eight Sleep's total against Whoop's
     // stages (the bug — a total that could read smaller than the stages beside it).
     // `s.whoop` is additive (may be absent pre-deploy of the API change), so this
