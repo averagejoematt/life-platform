@@ -104,24 +104,10 @@ EVALUABLE_STATUSES = {"pending", "confirming"}
 # EWMA decay factor for directional trend evaluation
 EWMA_DECAY = 0.87
 
-# Directional evaluation: minimum slope magnitude to count as a real signal
-# (avoids calling noise a confirmed direction)
-#
-# DOCUMENTED EXCEPTION to ADR-105 "thresholds from personal variance"
-# (dated 2026-09-02, #3448 — the ±0.15 calibration_verdict form): ±2% on the
-# relative EWMA slope is a fixed editorial choice, NOT derived from each
-# metric's own trailing variance. It is the de-facto null for the DOMINANT
-# live scoring path — every machine spec re-routed to directional evaluation
-# by the #813 rescue (1,207/1,207 at stamping) is judged against this one
-# band, so a high-variance metric can clear it on noise and a low-variance
-# metric's real signal can be absorbed as "flat"
-# (tests/test_directional_noise_band_3448.py makes both regimes executable).
-# Deriving per-metric bands means deriving the EWMA-slope statistic's null
-# distribution per metric — a grading-semantics change to the dominant path,
-# not a constant swap. Re-derive trigger: when a per-metric trailing-variance
-# baseline exists over a clean cycle window (the September 2026 n≥30 read is
-# the first candidate), derive the band from it as its own measured change;
-# registry entry `directional_trend_verdict` carries the public stamp.
+# Directional evaluation: minimum slope to count as real signal — a DOCUMENTED ADR-105
+# EXCEPTION (2026-09-02, #3448): fixed editorial band, the de-facto null for the #813
+# rescue path. Stamp, reach + re-derive trigger: registry entry `directional_trend_verdict`
+# + the PROPORTIONALITY row; failure regimes executable in test_directional_noise_band_3448.
 DIRECTIONAL_NOISE_THRESHOLD = 0.02
 
 # #2221 — the EWMA observation floor + the provisional-grade rules, reasoned out there.
