@@ -46,7 +46,7 @@ import json
 import math
 import os
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "WORD_CONFIDENCE",
@@ -82,9 +82,12 @@ WORD_CONFIDENCE = {
 }
 
 # Outcome strings that resolve to a scorable binary. Everything else
-# (inconclusive, expired, pending, archived) has no ground-truth outcome yet and
-# is excluded from the Brier score rather than guessed at.
-_TRUE_OUTCOMES = {"confirmed", "confirming"}
+# (inconclusive, expired, pending, confirming, archived) has no ground-truth
+# outcome yet and is excluded from the Brier score rather than guessed at.
+# "confirming" is deliberately NOT here: it names a still-open, in-progress
+# state (one step before "confirmed" in the reference platform's own writers),
+# never a settled one -- see the platform grader's parity note.
+_TRUE_OUTCOMES = {"confirmed"}
 _FALSE_OUTCOMES = {"refuted"}
 
 
@@ -194,6 +197,35 @@ def brier_skill_score(pairs):
     return 1.0 - bs / bs_ref
 
 
+# 95% two-sided critical z, matching the reference platform's stats_core._Z_CRIT[0.95]
+# lookup exactly (kept in lockstep by the shared parity vectors, not by import --
+# this package has no dependency on the platform).
+_Z95 = 1.9600
+
+
+def _wilson_interval(k, n):
+    """95% Wilson score interval for k successes of n trials.
+
+    Wilson, not the normal (Wald) approximation: Wald can escape [0,1] and
+    collapses to zero width exactly at k=0 or k=n, which is the small-n regime
+    every calibration surface here lives in. Returns (lo, hi) UNROUNDED in
+    [0,1], or None when n <= 0. Duplicated (not shared) with the reference
+    platform's ``stats_core.wilson_interval`` because this package is a
+    single-file, zero-dependency vendor copy by design -- see the module
+    docstring's PARITY note.
+    """
+    if not n:
+        return None
+    phat = k / n
+    z2 = _Z95 * _Z95
+    denom = 1.0 + z2 / n
+    center = (phat + z2 / (2.0 * n)) / denom
+    margin = _Z95 * math.sqrt(phat * (1.0 - phat) / n + z2 / (4.0 * n * n)) / denom
+    lo = max(0.0, center - margin)
+    hi = min(1.0, center + margin)
+    return (lo, hi)
+
+
 def reliability_bins(pairs, n_bins=10):
     """Calibration-curve bins: for each confidence band, stated vs. observed rate.
 
@@ -231,10 +263,14 @@ def score_pairs(pairs, n_bins=10):
 
     Returns a dict -- all rounding applied here so every surface renders identically::
 
-        n, confirmed, refuted, accuracy_pct, brier, brier_skill, skilled,
-        reliability_bins, calibration, label, score
+        n, confirmed, refuted, accuracy_pct, accuracy_ci95, brier, brier_skill,
+        skilled, reliability_bins, calibration, label, score
 
-    ``brier``/``brier_skill``/``accuracy_pct`` are ``None`` when nothing resolved.
+    ``brier``/``brier_skill``/``accuracy_pct``/``accuracy_ci95`` are ``None`` when
+    nothing resolved. ``accuracy_ci95`` is the 95% Wilson interval on
+    ``confirmed``/``n``, in the SAME percentage-point units as ``accuracy_pct``
+    (``[lo, hi]``) so the two render side by side with no unit conversion --
+    a served accuracy percentage should never ship without it (ADR-105).
 
     **Calibrated and skilled are different claims.** *Calibrated* means stated
     confidence tracks observed rates. *Skilled* means the Brier skill score beats
@@ -253,6 +289,12 @@ def score_pairs(pairs, n_bins=10):
     skill = brier_skill_score(scored)
     bins = reliability_bins(scored, n_bins=n_bins)
     accuracy_pct = round(100.0 * confirmed / n, 1) if n else None
+
+    accuracy_ci95 = None
+    if n:
+        wilson = _wilson_interval(confirmed, n)
+        if wilson is not None:
+            accuracy_ci95 = [round(100.0 * wilson[0], 1), round(100.0 * wilson[1], 1)]
 
     skilled = None if skill is None else bool(skill > 0)
 
@@ -292,6 +334,7 @@ def score_pairs(pairs, n_bins=10):
         "confirmed": confirmed,
         "refuted": refuted,
         "accuracy_pct": accuracy_pct,
+        "accuracy_ci95": accuracy_ci95,
         "brier": round(brier, 4) if brier is not None else None,
         "brier_skill": round(skill, 4) if skill is not None else None,
         "skilled": skilled,

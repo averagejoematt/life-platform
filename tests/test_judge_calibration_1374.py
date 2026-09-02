@@ -181,6 +181,34 @@ def test_the_harness_replays_through_that_same_builder(monkeypatch):
     assert '"generation_date":' not in src
 
 
+def test_the_enforcement_wire_carries_no_3414_optin_key():
+    """#3414 added `emit_verdict` for ASYNC callers (verdict captured callee-side,
+    observe-only). The daily brief's enforcement wire payload must stay
+    byte-identical: the builder attaches the key ONLY on explicit opt-in, and
+    the live sync call site never opts in."""
+    from ai import ai_calls
+    from ai.quality_gate_contract import EMIT_VERDICT_KEY, quality_gate_event
+
+    assert EMIT_VERDICT_KEY not in quality_gate_event("c", "t", {}, generation_date="2026-01-01")
+    assert quality_gate_event("c", "t", {}, generation_date="2026-01-01", emit_verdict="board_ask")[EMIT_VERDICT_KEY] == "board_ask"
+
+    sent = {}
+
+    class _FakeClient:
+        def invoke(self, **kwargs):
+            sent.update(kwargs)
+
+            class _P:
+                @staticmethod
+                def read():
+                    return json.dumps({"passed": True, "score": 90}).encode()
+
+            return {"Payload": _P()}
+
+    ai_calls._invoke_quality_gate_sync(_FakeClient(), "sleep_coach", "text under test", {"decision_class_ceiling": "observational"})
+    assert EMIT_VERDICT_KEY not in json.loads(sent["Payload"].decode())
+
+
 def test_a_non_dict_brief_is_nulled_exactly_as_production_does():
     from ai import ai_calls
     from ai.quality_gate_contract import quality_gate_event

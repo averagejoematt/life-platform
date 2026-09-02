@@ -178,6 +178,7 @@ committed alongside it. If they disagree, the library is wrong — open an issue
   "confirmed": 16,
   "refuted": 15,
   "accuracy_pct": 51.6,          // hit rate — the number that flatters; read it last
+  "accuracy_ci95": [34.8, 68.0], // 95% Wilson interval on the SAME confirmed/n, same units
   "brier": 0.2801,               // null when nothing has resolved
   "brier_skill": -0.1215,        // null when undefined, never 0
   "skilled": false,              // true / false / null(unknown)
@@ -311,3 +312,7 @@ calibration-core/
   ledger reports `None` everywhere, not a flattering zero.
 - **`accuracy_pct` is deliberately not the headline.** Hit rate rewards
   forecasting only the things you were already sure of. Brier and skill do not.
+- **`accuracy_pct` never ships alone.** A hit rate off a small `n` reads as more
+  precise than it is — 21.6% (8/37) and "somewhere between 11% and 37%" are
+  different decisions. `accuracy_ci95` is the 95% Wilson interval on the same
+  `confirmed`/`n`, present whenever `n > 0`.

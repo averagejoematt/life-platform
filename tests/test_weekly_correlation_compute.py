@@ -387,13 +387,15 @@ class TestHelpers:
     def test_fetch_range_delegates_to_the_shared_query(self, monkeypatch):
         seen = {}
 
-        def _fake(table, source, start, end, user_id=None):
-            seen.update(source=source, start=start, end=end, user_id=user_id)
+        def _fake(table, source, start, end, user_id=None, include_pilot=False):
+            seen.update(source=source, start=start, end=end, user_id=user_id, include_pilot=include_pilot)
             return [{"date": "2026-05-01"}]
 
         monkeypatch.setattr(wc.digest_utils, "query_range_list", _fake)
         assert wc.fetch_range("whoop", "2026-05-01", "2026-05-10") == [{"date": "2026-05-01"}]
         assert seen["source"] == "whoop" and seen["user_id"] == wc.USER_ID
+        # #3444: whoop is RAW_TIMESERIES, so fetch_range must derive a cross-phase read.
+        assert seen["include_pilot"] is True
 
     def test_fetch_range_degrades_to_empty_on_a_read_failure(self, monkeypatch):
         def _boom(*a, **k):

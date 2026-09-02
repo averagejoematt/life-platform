@@ -274,11 +274,14 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
-        # #968: the coach-voiced board answers run the ADR-108 quality gate
-        # (the same coach-quality-gate lambda the daily brief enforces). Sync
-        # invoke, fail-open in code — but without this grant every gate call
-        # would log AccessDeniedException and the gate would silently never
-        # evaluate (the daily-brief role hit that exact failure mode 2026-05-24).
+        # #968 -> #3414: the coach-voiced board answers run the ADR-108 quality
+        # gate (the same coach-quality-gate lambda the daily brief enforces).
+        # #3413 removed the #968 SYNCHRONOUS reader-path invoke; the grant now
+        # backs the #3414 fire-and-forget Event invoke (web/board_verdict_observer
+        # — observe-only, verdict captured callee-side). Fail-soft in code — but
+        # without this grant every observe would log AccessDeniedException and
+        # the board's voice-fidelity rate would silently stay unmeasured (the
+        # daily-brief role hit that exact failure mode 2026-05-24).
         iam.PolicyStatement(
             sid="CoachQualityGateInvoke",
             actions=["lambda:InvokeFunction"],

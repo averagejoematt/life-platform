@@ -245,6 +245,10 @@
     "confirmed": 16,
     "refuted": 15,
     "accuracy_pct": 51.6,
+    "accuracy_ci95": [
+      34.8,
+      68.0
+    ],
     "brier": 0.2801,
     "brier_skill": -0.1215,
     "skilled": false,

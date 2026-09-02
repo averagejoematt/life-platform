@@ -72,6 +72,7 @@ This module is bundled into every function's deploy package (#781 retired the sh
 import json
 import logging
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -304,6 +305,10 @@ FAIL_CLOSED_FEATURES = ("website_ai",)
 # current_tier() leaves it True and the ladder tests keep their fixtures.
 _cache: dict[str, Any] = {"tier": 0, "ts": 0.0, "readable": True}
 _ssm = None
+# #3419: current_tier() runs inside board_ask's parallel persona workers (via
+# bedrock_client.invoke). boto3 client CREATION is not thread-safe — lock it.
+# A racing duplicate _cache refresh is benign (idempotent SSM read).
+_SSM_INIT_LOCK = threading.Lock()
 
 
 class BudgetExceeded(RuntimeError):
@@ -313,7 +318,9 @@ class BudgetExceeded(RuntimeError):
 def _client():
     global _ssm
     if _ssm is None:
-        _ssm = boto3.client("ssm", region_name=_REGION)
+        with _SSM_INIT_LOCK:
+            if _ssm is None:
+                _ssm = boto3.client("ssm", region_name=_REGION)
     return _ssm
 
 

@@ -26,6 +26,9 @@ from coach import persona_core  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AI_SRC = open(os.path.join(ROOT, "lambdas/web/site_api_ai_lambda.py")).read()
+# #3419: the board's persona pass (context load → generation → gate → write-back)
+# was extracted to this sibling — the P4/P5 source pins follow the code.
+PANEL_SRC = open(os.path.join(ROOT, "lambdas/web/site_api_board_panel.py")).read()
 EXPERT_SRC = open(os.path.join(ROOT, "lambdas/intelligence/ai_expert_analyzer_lambda.py")).read()
 SUMMARIZER_SRC = open(os.path.join(ROOT, "lambdas/coach/coach_history_summarizer.py")).read()
 
@@ -117,24 +120,28 @@ def test_board_system_prompt_carries_the_voice_core():
 
 
 def test_board_ask_loads_memory_and_episodic_recall():
-    import re
-
-    body = re.search(r"def _handle_board_ask.*?(?=\ndef |\Z)", AI_SRC, re.S).group(0)
-    assert "_coach_memory_bits(" in body
-    assert "_coach_recent_interactions(" in body
-    assert "YOUR MEMORY" in body and "YOUR RECENT BOARD ANSWERS" in body
+    # #3419: the per-persona context load lives in the panel sibling's prep pass.
+    assert "_coach_memory_bits(" in PANEL_SRC
+    assert "_coach_recent_interactions(" in PANEL_SRC
+    assert "YOUR MEMORY" in PANEL_SRC and "YOUR RECENT BOARD ANSWERS" in PANEL_SRC
 
 
 def test_board_answer_written_back_after_grounding_gate():
     """The episodic record must store what the reader actually saw — so the
     write-back call must come AFTER the grounding gate replaces an ungrounded
-    answer with the refusal."""
+    answer with the refusal. #3419: the gate runs in the worker (_generate);
+    the write-back runs in convene()'s main-thread assembly, on the worker's
+    FINAL text — so the pin is: gate in the worker, write-back in the assembly
+    consuming the returned txt, in that source order."""
     import re
 
-    body = re.search(r"def _handle_board_ask.*?(?=\ndef |\Z)", AI_SRC, re.S).group(0)
-    gate = body.find("grounding_findings")
-    writeback = body.find("_write_board_interaction(")
-    assert 0 < gate < writeback, "write-back must follow the grounding gate"
+    worker = re.search(r"def _generate.*?(?=\ndef |\Z)", PANEL_SRC, re.S).group(0)
+    assembly = re.search(r"def convene.*?(?=\ndef |\Z)", PANEL_SRC, re.S).group(0)
+    assert "grounding_findings" in worker, "the grounding gate must run inside the generation worker"
+    assert "_write_board_interaction(" not in worker, "the worker must not write back — boto3 stays on the main thread"
+    writeback = assembly.find("_write_board_interaction(")
+    final_txt = assembly.find('_txt = _r["txt"]')
+    assert 0 < final_txt < writeback, "write-back must consume the worker's final (post-gate) text"
 
 
 def test_interaction_record_shape():

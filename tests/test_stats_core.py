@@ -159,6 +159,52 @@ class TestFisherCI:
         assert stats_core.fisher_ci(0.5, 40, confidence=0.80) is not None
 
 
+class TestWilsonInterval:
+    """#3450: the honest interval for a served proportion (a hit rate, a rate of
+    any kind) — Wilson, not the normal (Wald) approximation, because Wald can
+    escape [0,1] and collapses to zero width exactly at k=0 or k=n."""
+
+    def test_the_dil_039_040_specimen_matches_the_published_reading(self):
+        # 8/37 confirmed -> the issue's own worked example: Wilson 95% [11.4%, 37.2%].
+        lo, hi = stats_core.wilson_interval(8, 37)
+        assert round(100.0 * lo, 1) == 11.4
+        assert round(100.0 * hi, 1) == 37.2
+
+    def test_contains_the_point_estimate_and_stays_inside_the_unit_interval(self):
+        for k, n in [(0, 10), (1, 10), (5, 10), (9, 10), (10, 10)]:
+            lo, hi = stats_core.wilson_interval(k, n)
+            phat = k / n
+            assert 0.0 <= lo <= phat <= hi <= 1.0, (k, n, lo, hi)
+
+    def test_perfect_record_stays_a_nonzero_width_interval(self):
+        """The reason Wilson, not Wald: Wald collapses to a zero-width interval
+        at a perfect record. Wilson must not."""
+        lo, hi = stats_core.wilson_interval(8, 8)
+        assert lo > 0.0
+        assert hi <= 1.0
+        assert hi - lo > 0.0
+
+    def test_narrows_with_n_at_the_same_rate(self):
+        lo1, hi1 = stats_core.wilson_interval(5, 10)
+        lo2, hi2 = stats_core.wilson_interval(50, 100)
+        assert (hi2 - lo2) < (hi1 - lo1)
+
+    def test_guards(self):
+        assert stats_core.wilson_interval(0, 0) is None
+        assert stats_core.wilson_interval(3, 0) is None
+        assert stats_core.wilson_interval(5, None) is None
+        assert stats_core.wilson_interval(-1, 10) is None
+        assert stats_core.wilson_interval(11, 10) is None
+
+    def test_unsupported_confidence_raises(self):
+        try:
+            stats_core.wilson_interval(5, 10, confidence=0.85)
+            assert False, "expected ValueError"
+        except ValueError:
+            pass
+        assert stats_core.wilson_interval(5, 10, confidence=0.80) is not None
+
+
 class TestBlockBootstrap:
     def test_deterministic_same_seed(self):
         xs = _ar1_series(60, rho=0.5, seed=5)

@@ -42,12 +42,27 @@ QUALITY_GATE_FUNCTION_NAME = "coach-quality-gate"
 GROUNDING_ALLOWLIST_KEY = "grounding_allowlist"
 AUTHORITATIVE_FACTS_KEY = "authoritative_facts"
 
+# ── #3414: the opt-in field for ASYNC callers — verdict captured CALLEE-side ──
+# A fire-and-forget (Event) invoke returns nothing to its caller, so a caller
+# that wants the verdict MEASURED must say so on the event itself; the gate
+# Lambda then emits the CloudWatch datapoints + eval retention as it completes
+# (`coach_quality_gate._emit_async_verdict`). The value is the `eval_retention`
+# surface name (e.g. "board_ask"). This is a DELIBERATE contract change, not an
+# incidental one: the key is attached ONLY when a caller passes
+# `emit_verdict=...` — the daily brief's enforcement wire payload
+# (`ai_calls._invoke_quality_gate_sync`, key-by-key-diffed by
+# `tests/test_judge_calibration_1374.py`) stays byte-identical, and a report
+# emitted this way is OBSERVED, never enforced (no regenerate-or-hold exists on
+# an async channel — the reader already has the text).
+EMIT_VERDICT_KEY = "emit_verdict"
+
 
 def quality_gate_event(
     coach_id: str,
     output_text: str,
     generation_brief: Any,
     generation_date: Optional[str] = None,
+    emit_verdict: Optional[str] = None,
 ) -> dict[str, Any]:
     """The EXACT event payload production sends to `coach-quality-gate`.
 
@@ -59,8 +74,13 @@ def quality_gate_event(
     queries DynamoDB), no `skip_cross_coach`. A hermetic replay has to substitute
     for those two AWS reads and must say so rather than quietly measuring a
     different prompt — see `judge_calibration.FIDELITY_GAPS`.
+
+    `emit_verdict` (#3414, async callers only): a surface name opts in to
+    callee-side verdict capture — see `EMIT_VERDICT_KEY` above. `None` (the
+    default, and what every synchronous enforcement caller passes) attaches no
+    key at all, keeping the enforcement wire payload byte-identical to pre-#3414.
     """
-    return {
+    event: dict[str, Any] = {
         "coach_id": coach_id,
         "output_text": output_text,
         "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
@@ -72,6 +92,41 @@ def quality_gate_event(
         # generation was judged against tomorrow's cycle position.
         "generation_date": generation_date or pacific_today(),
     }
+    if emit_verdict is not None:
+        event[EMIT_VERDICT_KEY] = str(emit_verdict)
+    return event
+
+
+def report_findings(report: dict) -> list:
+    """Translate a gate report's violation sections into eval-retention findings.
+
+    ONE mapping platform-wide (#744/#3202/#3414): the daily-brief translator
+    (`ai.coach_brief_retention.retain_coach_brief_flag`) and the gate's own
+    async-channel capture (`coach_quality_gate._emit_async_verdict`) both read
+    it from here, so the two surfaces' retained records cannot drift apart.
+    Order is load-bearing only for stability of the retained payloads:
+    anti-pattern, decision-class, cross-coach, cycle-boundary (#1973), then the
+    deterministic number-grounding findings (#3202 — the one class whose absence
+    made the 2026-08-26 holds undiagnosable without an offline re-run).
+    """
+    findings = []
+    for v in report.get("anti_pattern_violations") or []:
+        phrase = v.get("phrase") if isinstance(v, dict) else v
+        if phrase:
+            findings.append({"type": "anti_pattern", "detail": phrase})
+    for v in report.get("decision_class_violations") or []:
+        if isinstance(v, dict):
+            findings.append({"type": "decision_class", "detail": v.get("excerpt", "")})
+    for flag in report.get("cross_coach_similarity_flags") or []:
+        if isinstance(flag, dict):
+            findings.append({"type": "cross_coach_similarity", "detail": flag.get("reason", "")})
+    for v in report.get("cycle_boundary_violations") or []:  # #1973
+        if isinstance(v, dict):
+            findings.append({"type": "cycle_boundary", "detail": v.get("reason", "")})
+    _raw_gr = report.get("number_grounding")
+    _gr: dict = _raw_gr if isinstance(_raw_gr, dict) else {}
+    findings += [{"type": f.get("type"), "detail": f.get("detail", "")} for f in (_gr.get("findings") or []) if isinstance(f, dict)]
+    return findings
 
 
 try:  # #2813 — register with the standing PT-day producer/gate contract sweep

@@ -27,9 +27,30 @@ WORD_CONFIDENCE = {
 }
 
 # Outcome strings that resolve to a scorable binary. Everything else (inconclusive,
-# expired, pending, archived) has no ground-truth outcome and is excluded from Brier.
-_TRUE_OUTCOMES = {"confirmed", "confirming"}
+# expired, pending, confirming, archived) has no ground-truth outcome and is excluded
+# from Brier.
+#
+# #3450: "confirming" does NOT belong here. Every other reader of this vocabulary —
+# coach_prediction_evaluator.EVALUABLE_STATUSES, phase_taxonomy.OPEN_BET_STATUSES,
+# ACTIVE_PREDICTION_STATUSES, _OPEN_PREDICTION_STATUSES, hypothesis_engine_lambda's
+# own writer — treats "confirming" as still OPEN (the hypothesis engine writes it as
+# an in-progress state on HYPOTHESIS rows, one step before "confirmed"). This module
+# alone counted it as settled-TRUE, which contradicts this very docstring's "no
+# ground-truth outcome yet" intent and would double-count an unresolved bet as a win
+# the moment any writer's status vocabulary drifted a "confirming" row into CALIB#/
+# PREDICTION# (verified strictly latent: 0 rows carry the status today, since CALIB#
+# is written at resolution and PREDICTION# statuses never include it — but the
+# summarizer's own prompt vocabulary offers the word, so the divergence was one
+# prompt drift from live). See test_settled_and_open_sets_are_disjoint for the
+# structural guard that keeps this class from re-forming.
+_TRUE_OUTCOMES = {"confirmed"}
 _FALSE_OUTCOMES = {"refuted"}
+
+# The still-open vocabulary this module must never treat as settled (either TRUE or
+# FALSE) — sourced from the platform's own open-status registries so the disjointness
+# check is against what the rest of the codebase actually writes, not a hand-typed
+# guess. Not scored; imported by tests, not by any scoring path here.
+OPEN_OUTCOMES = frozenset({"pending", "confirming", "inconclusive", "expired"})
 
 
 def normalize_confidence(value, default=0.5):
@@ -184,9 +205,18 @@ def score_pairs(pairs, n_bins=10):
     """Score a set of (confidence, outcome) pairs into a calibration summary.
 
     Returns a dict — all rounding applied here so every surface renders identically:
-      n, confirmed, refuted, accuracy_pct, brier, brier_skill, skilled,
-      reliability_bins, calibration (a plain-language verdict), label, score.
-    `brier`/`brier_skill`/`accuracy_pct` are None when there's nothing resolved.
+      n, confirmed, refuted, accuracy_pct, accuracy_ci95, brier, brier_skill,
+      skilled, reliability_bins, calibration (a plain-language verdict), label, score.
+    `brier`/`brier_skill`/`accuracy_pct`/`accuracy_ci95` are None when there's nothing
+    resolved.
+
+    Uncertainty on the headline number (#3450, ADR-105): `accuracy_pct` alone reads
+    as more precise than a small n supports — 21.6% and "somewhere between 11% and
+    37%" are different decisions for a reader. `accuracy_ci95` is the 95% Wilson
+    interval on `confirmed`/`n`, in the SAME percentage-point units as `accuracy_pct`
+    (`[lo, hi]`, e.g. `[11.4, 37.2]` for the platform's live 8/37) so the two render
+    side by side with no unit conversion. Present whenever n > 0; None only when
+    there is nothing resolved at all (mirrors `accuracy_pct`'s own None case).
 
     Honest-badge gate (#1370, ADR-104/105): *calibrated* (reliability — stated
     confidence tracks observed rates) and *skilled* (Brier skill > 0 — beats the
@@ -205,6 +235,14 @@ def score_pairs(pairs, n_bins=10):
     skill = stats_core.brier_skill_score(scored)
     bins = stats_core.reliability_bins(scored, n_bins=n_bins)
     accuracy_pct = round(100.0 * confirmed / n, 1) if n else None
+
+    # #3450: the Wilson 95% interval on the same (confirmed, n), in percentage-point
+    # units so it renders directly beside accuracy_pct. None only when n == 0.
+    accuracy_ci95 = None
+    if n:
+        wilson = stats_core.wilson_interval(confirmed, n)
+        if wilson is not None:
+            accuracy_ci95 = [round(100.0 * wilson[0], 1), round(100.0 * wilson[1], 1)]
 
     # The calibrated-vs-skilled distinction (#1370): True = beats the base rate,
     # False = worse than it, None = undefined (can't be scored against a degenerate
@@ -248,6 +286,7 @@ def score_pairs(pairs, n_bins=10):
         "confirmed": confirmed,
         "refuted": refuted,
         "accuracy_pct": accuracy_pct,
+        "accuracy_ci95": accuracy_ci95,
         "brier": round(brier, 4) if brier is not None else None,
         "brier_skill": round(skill, 4) if skill is not None else None,
         "skilled": skilled,

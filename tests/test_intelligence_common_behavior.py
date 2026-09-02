@@ -354,11 +354,23 @@ class TestInventoryShape:
                 return None
             if kwargs.get("Select") == "COUNT":
                 return {"Count": 42}
-            return {"Items": [{"sk": "DATE#2026-08-07"}]}
+            if kwargs.get("ScanIndexForward") is False:
+                return {"Items": [{"sk": "DATE#2026-08-07"}]}
+            # #3442: whoop's count read is an sk projection counted client-side —
+            # day rows only; the two #WORKOUT# fragments below must not count.
+            return {
+                "Items": [
+                    {"sk": "DATE#2026-08-05"},
+                    {"sk": "DATE#2026-08-06"},
+                    {"sk": "DATE#2026-08-06#WORKOUT#aaaa"},
+                    {"sk": "DATE#2026-08-07"},
+                    {"sk": "DATE#2026-08-07#WORKOUT#bbbb"},
+                ]
+            }
 
         monkeypatch.setattr(ic, "table", FakeTable(router=router))
         inv = ic.build_data_inventory()
-        assert inv["whoop"] == {"exists": True, "latest": "2026-08-07", "records": 42, "days_of_data": 42}
+        assert inv["whoop"] == {"exists": True, "latest": "2026-08-07", "records": 3, "days_of_data": 3}
 
     def test_a_partition_with_no_rows_reports_absence_not_a_fabricated_zero_date(self, monkeypatch):
         _freeze(monkeypatch)

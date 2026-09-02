@@ -417,7 +417,29 @@ _SANCTIONED_CURRENT_CYCLE_VIEWS: dict[str, str] = {
 #     character_sheet are EXPERIMENT_SCOPED and stay current-cycle, unchanged.
 # Their behaviour is pinned by tests/test_genesis_blind_digest_and_readers_2150.py.
 # This empties the debt ledger — the ratchet's acceptance criterion.
-_KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {}
+#
+# #3444 (the third wave) then extended the SCAN ITSELF to trace through the
+# digest_utils.query_range_list pass-through — previously invisible because it
+# never calls with_phase_filter directly. That widened scan fixed
+# weekly_correlation_compute_lambda.fetch_range and hypothesis_engine_lambda.
+# query_range (below in _PER_SOURCE_READS; the Time-Affluence Meter's "never
+# scored a week" consequence rides the latter) and surfaced two more genuinely
+# blind pass-through callers the wider trace could now see — recorded as debt
+# rather than fixed here, per this ledger's own contract (each is a different
+# Lambda with a different deploy surface, #3444 was scoped to the two sites
+# with a live downstream consequence):
+_KNOWN_CROSS_CYCLE_DEBT: dict[str, str] = {
+    "lambdas/emails/weekly_digest_lambda.py::query_range_list": (
+        "Its only direct caller passes 'hevy' (RAW_TIMESERIES) for the 4-week Hevy pull — a "
+        "fresh cycle truncates that window to the cycle's age, same #2109 class as the two "
+        "#3444 fixed sites, but a different Lambda/deploy surface; not fixed in #3444."
+    ),
+    "lambdas/emails/wednesday_chronicle_lambda.py::query_range_list": (
+        "Source is a function parameter (interpolated) reached indirectly via chronicle_data.py's "
+        "globals-dict injection with 'notion' (RAW_TIMESERIES) — same #2109 class, different Lambda; "
+        "not fixed in #3444."
+    ),
+}
 
 # Sites whose include_pilot is a NON-LITERAL expression: the phase decision is made
 # per call or per source rather than fixed at the site. Recording them here is a
@@ -492,6 +514,27 @@ _PER_SOURCE_READS: dict[str, str] = {
         "include_pilot=source_reads_cross_phase(<source>). Only life_events (RAW_TIMESERIES) "
         "actually goes cross-phase — experiments and character_sheet are EXPERIMENT_SCOPED, so "
         "the flag resolves False and behaviour there is unchanged (#2150)."
+    ),
+    # #3444 (the third wave) — surfaced by extending this SCAN to trace through
+    # digest_utils.query_range_list, not by a code change to these three sites'
+    # own call shape (challenge_generator was already fixed at #2221; it was
+    # simply invisible to the pre-#3444 scan).
+    "lambdas/intelligence/challenge_generator_lambda.py::query_range": (
+        "include_pilot=source_reads_cross_phase(source, user_id=USER_ID) — fixed at #2221, before "
+        "this scan could see behind digest_utils.query_range_list at all. notion/whoop/withings read "
+        "cross-phase; habit_scores (EXPERIMENT_SCOPED) stays filtered."
+    ),
+    "lambdas/compute/weekly_correlation_compute_lambda.py::fetch_range": (
+        "include_pilot=source_reads_cross_phase(source) — the #2109 idiom, closing #3444: the "
+        "registry-published 90-day window's whoop/strava/macrofactor/apple_health/habitify/"
+        "flourishing/withings/hevy callers all read cross-phase; the computed_metrics caller "
+        "(EXPERIMENT_SCOPED) stays filtered. Pinned by tests/test_phase_filter_third_wave_3444.py."
+    ),
+    "lambdas/compute/hypothesis_engine_lambda.py::query_range": (
+        "include_pilot=source_reads_cross_phase(source) — the #2109 idiom, closing #3444: every "
+        "COMPUTE_INPUTS['hypothesis-engine'] source plus todoist/evening_ritual/time_affluence/"
+        "habitify (the Time-Affluence Meter's own reads) now go cross-phase; computed_metrics "
+        "(EXPERIMENT_SCOPED) stays filtered. Pinned by tests/test_phase_filter_third_wave_3444.py."
     ),
 }
 
@@ -616,6 +659,54 @@ def _filter_call_verdicts(func) -> list[str]:
     return verdicts
 
 
+# ── #3444: trace THROUGH the digest_utils.query_range_list pass-through ────────
+#
+# The blind spot the #3444 grader found: `weekly_correlation_compute_lambda.
+# fetch_range` and `hypothesis_engine_lambda.query_range` never call
+# `with_phase_filter` themselves — they call `digest_utils.query_range_list`,
+# which applies the filter internally (#2150) and defaults `include_pilot` to
+# False. `_filter_call_verdicts` only recognises a DIRECT `with_phase_filter`
+# call, so a caller that forwards no `include_pilot` at all was invisible to
+# this scan entirely, not merely mis-graded — the #2109 class recurring behind
+# exactly the kind of pass-through boundary #2090's constant-key fix closed for
+# partition-key construction but never extended to this second indirection.
+#
+# Traced the same three-way way as a direct with_phase_filter call: the
+# `include_pilot` keyword on the `digest_utils.query_range_list(...)` call
+# itself decides blind/per-source/cross-phase, and the `source` argument
+# (positional index 1, or an explicit `source=` keyword) is resolved through
+# the SAME `_flatten_literal`/constants machinery as `#SOURCE#` key extraction,
+# so a literal source name feeds straight into the taxonomy prune and a
+# non-literal one (a loop variable, a parameter) is conservatively interpolated
+# — "could be anything", never assumed safe.
+def _query_range_list_call_verdicts_and_sources(func, consts: dict[str, str]) -> tuple[list[str], set[str], bool]:
+    verdicts: list[str] = []
+    names: set[str] = set()
+    interpolated = False
+    for node in ast.walk(func):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "query_range_list"):
+            continue
+        if not (isinstance(node.func.value, ast.Name) and node.func.value.id == "digest_utils"):
+            continue  # a same-named local wrapper, not the shared reader itself
+        kw = next((k for k in node.keywords if k.arg == "include_pilot"), None)
+        if kw is None or (isinstance(kw.value, ast.Constant) and kw.value.value is False):
+            verdicts.append(PHASE_BLIND_READ)
+        elif isinstance(kw.value, ast.Constant) and kw.value.value is True:
+            verdicts.append(CROSS_PHASE_READ)
+        else:
+            verdicts.append(PER_SOURCE_READ)
+        source_node = node.args[1] if len(node.args) >= 2 else None
+        if source_node is None:
+            kw_source = next((k for k in node.keywords if k.arg == "source"), None)
+            source_node = kw_source.value if kw_source is not None else None
+        text = _flatten_literal(source_node, consts) if source_node is not None else None
+        if text is not None and _INTERPOLATION not in text:
+            names.add(text)
+        else:
+            interpolated = True
+    return verdicts, names, interpolated
+
+
 def _phase_filtered_raw_reads(source_text: str, label: str) -> dict[str, str]:
     """{"<label>::<function>": verdict} for one module's source text, where verdict
     is CROSS_PHASE_READ / PER_SOURCE_READ / PHASE_BLIND_READ (worst-call-wins).
@@ -625,7 +716,13 @@ def _phase_filtered_raw_reads(source_text: str, label: str) -> dict[str, str]:
     shape — a scan that has never been shown to catch anything guards nothing.
     """
     found: dict[str, str] = {}
-    if "with_phase_filter" not in source_text or "#SOURCE#" not in source_text:
+    # #3444: a module that never calls with_phase_filter directly can still be
+    # a phase-blind reader through the digest_utils.query_range_list pass-
+    # through — checked as its own (looser) gate, since that path carries the
+    # filter behaviour internally and needs no local `#SOURCE#` construction.
+    has_direct_filter = "with_phase_filter" in source_text and "#SOURCE#" in source_text
+    has_passthrough_reader = "query_range_list(" in source_text
+    if not has_direct_filter and not has_passthrough_reader:
         return found
     try:
         tree = ast.parse(source_text)
@@ -636,9 +733,13 @@ def _phase_filtered_raw_reads(source_text: str, label: str) -> dict[str, str]:
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         verdicts = _filter_call_verdicts(node)
+        qrl_verdicts, qrl_names, qrl_interpolated = _query_range_list_call_verdicts_and_sources(node, consts)
+        verdicts = verdicts + qrl_verdicts
         if not verdicts:
             continue
         names, interpolated = _source_names_in(node, consts)
+        names = names | qrl_names
+        interpolated = interpolated or qrl_interpolated
         # In scope when the read can land on a never-hidden measured series: an
         # interpolated source (anything), an unclassified one, or an explicit
         # RAW_TIMESERIES name. EXPERIMENT_SCOPED / CROSS_PHASE names prune out.
@@ -718,6 +819,21 @@ def sweep():
     return helper_module.collect(table, USER_PREFIX, with_phase_filter)
 """
 
+# #3444: the digest_utils.query_range_list pass-through blind spot, verbatim in
+# shape — weekly_correlation_compute_lambda.fetch_range and hypothesis_engine_
+# lambda.query_range before their #3444 fix. No with_phase_filter call anywhere
+# in this module; the phase decision is entirely inside the callee.
+_PRE_FIX_PASSTHROUGH_SHAPE = '''
+def fetch_range(source, start_date, end_date):
+    """No with_phase_filter call in sight — digest_utils applies it internally."""
+    return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
+'''
+
+_PRE_FIX_PASSTHROUGH_LITERAL_SOURCE_SHAPE = """
+def fetch_hevy(start_date, end_date):
+    return digest_utils.query_range_list(table, "hevy", start_date, end_date, user_id=USER_ID)
+"""
+
 
 def test_the_derivation_fires_on_the_defect_shape():
     """Prove it fires. Both known members of this class — the #2023 rolling-window
@@ -759,6 +875,44 @@ def test_the_derivation_grades_a_computed_flag_per_source():
     verdict — neither blessed as cross-phase nor flagged blind."""
     per_source = _PRE_FIX_SHAPE.replace("with_phase_filter(kwargs)", "with_phase_filter(kwargs, include_pilot=_reads_cross(source))")
     assert _phase_filtered_raw_reads(per_source, "synthetic.py") == {"synthetic.py::_metric_has_recent_data": PER_SOURCE_READ}
+
+
+def test_the_derivation_traces_through_the_query_range_list_passthrough():
+    """#3444: the blind spot the AST ratchet couldn't see through — a function
+    with NO with_phase_filter call anywhere calls digest_utils.query_range_list
+    with no include_pilot, and must still be flagged. The literal-source variant
+    (hevy, RAW_TIMESERIES) must resolve through the same taxonomy prune as a
+    #SOURCE# key literal would."""
+    assert _phase_filtered_raw_reads(_PRE_FIX_PASSTHROUGH_SHAPE, "synthetic.py") == {"synthetic.py::fetch_range": PHASE_BLIND_READ}
+    assert _phase_filtered_raw_reads(_PRE_FIX_PASSTHROUGH_LITERAL_SOURCE_SHAPE, "synthetic.py") == {
+        "synthetic.py::fetch_hevy": PHASE_BLIND_READ
+    }
+
+
+def test_the_derivation_clears_a_fixed_query_range_list_passthrough():
+    """…and clears once the pass-through call derives include_pilot per source,
+    exactly the #3444 fix shape (source_reads_cross_phase is opaque to the AST,
+    so it grades PER_SOURCE, not CROSS_PHASE — the same three-way contract as a
+    direct with_phase_filter call)."""
+    fixed = _PRE_FIX_PASSTHROUGH_SHAPE.replace(
+        "digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)",
+        "digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID, "
+        "include_pilot=source_reads_cross_phase(source))",
+    )
+    assert _phase_filtered_raw_reads(fixed, "synthetic.py") == {"synthetic.py::fetch_range": PER_SOURCE_READ}
+
+
+def test_the_derivation_ignores_a_local_wrapper_of_the_same_name():
+    """A local function also named query_range_list (weekly_digest_lambda's and
+    wednesday_chronicle_lambda's own wrappers) must not be mistaken for the
+    digest_utils call — only the qualified `digest_utils.query_range_list(...)`
+    form is traced, so a caller of the LOCAL wrapper isn't double-counted here
+    (the wrapper's own body, which does call digest_utils, is what gets flagged)."""
+    local_wrapper_caller = """
+def gather():
+    return query_range_list("hevy", start, end)
+"""
+    assert _phase_filtered_raw_reads(local_wrapper_caller, "synthetic.py") == {}
 
 
 def test_docstring_mentions_do_not_grade_a_site():

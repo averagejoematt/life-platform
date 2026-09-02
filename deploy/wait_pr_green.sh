@@ -297,6 +297,25 @@ _extract_wiki_drift_files() {
 _WAIT_PR_GREEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 CLASSIFY_CMD="${WAIT_PR_GREEN_CLASSIFY_CMD:-python3 ${_WAIT_PR_GREEN_DIR}/../scripts/check_main_green.py --classify-sha}"
 
+# ── #3455: the elapsed-time source is overridable for tests ─────────────────
+#
+# THE INCIDENT (main run 33605871465, 2026-09-02): the docs-only #3454 merge was
+# red-mained by `test_indeterminate_is_named_and_is_not_a_swallow` (and its
+# zero-check-diagnosis siblings below), which simulate a 1s watcher budget. The
+# poll loop reads elapsed time via two `date +%s` calls a loop-iteration apart;
+# `date +%s` has 1-SECOND granularity, so under a loaded runner (the same job
+# logged 2012s against its own 1950s duration budget that night) the fork+exec
+# overhead of the second call can by itself straddle a whole-second boundary —
+# making `elapsed >= timeout` true on the very FIRST iteration, before the
+# zero-check diagnosis these tests assert on ever runs. That is a race against
+# wall-clock SCHEDULING, not against the logic under test: a bigger timeout
+# constant only makes the race rarer, never closes it (the #3206
+# time-dependent-gate-outside-its-window family). The fix is an injectable time
+# source — tests script the EXACT sequence of values the loop's `elapsed` math
+# sees via `WAIT_PR_GREEN_TIME_CMD`, decoupling the assertion from real
+# process-scheduling jitter entirely, rather than hoping the real clock behaves.
+TIME_CMD="${WAIT_PR_GREEN_TIME_CMD:-date +%s}"
+
 # The states, named once. Keyed off check_main_green.py's own vocabulary — never
 # off a phrase in the reason text (the #3199 lesson: every phrase-matched
 # suppressor in this repo has failed in the field).
@@ -740,9 +759,9 @@ main() {
   # then went quiet is a different animal that this must not misdiagnose.
   # `diagnosed` keeps a non-swallow verdict from reprinting every interval.
   local attached=0 saw_attach=0 diagnosed=0 diag_out diag_rc
-  start=$(date +%s)
+  start=$(${TIME_CMD})
   while true; do
-    now=$(date +%s)
+    now=$(${TIME_CMD})
     elapsed=$((now - start))
     if [[ "${elapsed}" -ge "${timeout}" ]]; then
       echo "TIMEOUT after ${elapsed}s (budget ${timeout}s) — last known state:"
@@ -757,7 +776,7 @@ main() {
     if [[ -n "${cur_sha}" && ${#cur_sha} -eq 40 && "${cur_sha}" != "${head_sha}" ]]; then
       echo "PR head moved ${head_sha} -> ${cur_sha} (a new push landed) — restarting the watch against the new sha"
       head_sha="${cur_sha}"
-      start=$(date +%s)
+      start=$(${TIME_CMD})
       changed_files=$(gh pr view "${pr}" --repo "${REPO}" --json files --jq '.files[].path' 2>/dev/null || echo "")
       continue
     fi

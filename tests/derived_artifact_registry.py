@@ -205,7 +205,15 @@ ARTIFACTS: dict[str, dict] = {
         writer="python3 scripts/generate_platform_model.py",
         guard="scripts/generate_platform_model.py --check",
         guard_lane=LANE_DOCS_CI,
-        inputs=("lambdas/**", "cdk/**", "mcp/**"),
+        inputs=(
+            "lambdas/**",
+            "cdk/**",
+            "mcp/**",
+            # #3374 R1 — the cost_surface plane AST-reads two registries outside the
+            # code trees: the EMF-namespace ledger and the KNOWN_SECRETS set.
+            "deploy/emf_namespace_ledger.py",
+            "tests/test_secret_references.py",
+        ),
         reconciled=True,
         reason=(
             "The #2845 system model. Its only guard was tests/test_platform_model_drift.py, "

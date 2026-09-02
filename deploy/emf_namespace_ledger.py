@@ -351,8 +351,21 @@ LEDGER: dict[str, dict] = {
         cardinality=FIXED,
         driver=None,
         live_series=2,
-        series_budget=5,
-        note="No alarm, but cost_governor_lambda reads it — the reader-traffic surge input to the ADR-133 ceiling float.",
+        series_budget=12,
+        ritual_consumer="docs/PROPORTIONALITY.md",
+        note=(
+            "No alarm, but cost_governor_lambda reads UniqueVisitors7d — the reader-traffic surge "
+            "input to the ADR-133 ceiling float — and scripts/monthly_close.py [3/5] grades "
+            "cost-per-reader-week from it. 2026-09-01 (#3376): the audience-evidence series the "
+            "PROPORTIONALITY retire-triggers read land here — PageViews7d gains a bounded Door "
+            "dimension (exactly the six v5-IA doors, a code literal in traffic_digest_lambda.DOORS, "
+            "never request-derived, so cardinality cannot be driven from outside) and "
+            "SyndicatedReferrals7d counts utm_source-attributed views (dimensionless BY DESIGN — "
+            "utm values are attacker-controlled URL input and must never mint series). Worst-case "
+            "population: UniqueVisitors7d + PageViews7d + 6 door series + SyndicatedReferrals7d + "
+            "the rare LogSourceEmpty = 10; budget 12. All weekly-emitted (Monday digest), so the "
+            "prorated bill is cents/mo, not 10 x the $0.30 flat rate."
+        ),
     ),
     # ── rare-event counters: zero live series is the HEALTHY state ───────────
     "LifePlatform/QA": _row(
