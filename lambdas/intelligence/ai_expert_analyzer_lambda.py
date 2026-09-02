@@ -211,9 +211,8 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
         from grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions  # noqa: F401
 
-# ADR-104: the shared grounded-generation harness — the regen-once keep-if-improved
-# flow moved there (one implementation for every surface), plus the allow-list
-# number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
+# ADR-104: the shared grounded-generation harness — regen-once keep-if-improved (one impl
+# for every surface) + the allow-list number gate catching fabricated trends ("from 58 to 64").
 from ai import grounded_generation as _gg
 from ai.behavior_logs import available_logs_from_recency as _avail_logs  # #2056 — the #1699 map
 from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
