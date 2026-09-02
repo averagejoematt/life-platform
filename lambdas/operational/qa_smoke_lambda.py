@@ -36,9 +36,8 @@ except ImportError:
     logger = logging.getLogger("qa-smoke")
     logger.setLevel(logging.INFO)
 
-# Genesis-aware checks (2026-06-08): on the day after an experiment reset, the
-# dashboard validates *yesterday*, which is pre-genesis and legitimately has no
-# day-grade. A missing grade for a pre-experiment date is expected, not a fault.
+# Genesis-aware checks (2026-06-08): the day after a reset, the dashboard validates
+# *yesterday* — pre-genesis, so a missing day-grade there is expected, not a fault.
 try:
     from common.constants import EXPERIMENT_START_DATE
 except ImportError:
@@ -57,6 +56,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 # lives in its own module, same size-split pattern — this file owns the AWS
 # clients and the nightly wiring, raw_archive_qa owns the logic.
 from operational import (
+    acwr_liveness_qa,  # noqa: E402
     qa_check_edge_429,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
@@ -988,6 +988,7 @@ def check_steps():
     """
     return [
         ("ddb_freshness", check_ddb_freshness),
+        ("acwr_liveness", lambda: acwr_liveness_qa.check_acwr_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now)),  # #3443 dead-man
         ("hae_liveness_truth", check_hae_liveness_truth),  # #2001: dark HAE datatypes carry a numeric days_dark when findable
         ("s3_freshness", check_s3_freshness),
         # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)
