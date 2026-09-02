@@ -88,6 +88,7 @@ from common.digest_utils import (
     ex_whoop_from_list as ex_whoop,
     ex_whoop_sleep_from_list as ex_whoop_sleep,
     ex_withings_from_list as ex_withings,
+    filter_day_rows,
 )
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
@@ -694,6 +695,11 @@ def gather_all():
 
     raw_cur = {s: fetch_range(s, wins["cur_start"], wins["cur_end"]) for s in SOURCES}
     raw_prior = {s: fetch_range(s, wins["prior_start"], wins["prior_end"]) for s in SOURCES}
+    # #3442: whoop day rows only — ex_whoop's `days`/averages counted DATE#<d>#WORKOUT#
+    # fragments as extra days and mixed per-workout strain into the day-strain average.
+    # Hevy stays unfiltered: its sub-keyed workout records ARE the data (#485).
+    raw_cur["whoop"] = filter_day_rows(raw_cur["whoop"])
+    raw_prior["whoop"] = filter_day_rows(raw_prior["whoop"])
 
     # One pass per extractor per arm (#1658). This used to build cur/prior with the
     # profile-blind extractors and then immediately overwrite strava + macrofactor

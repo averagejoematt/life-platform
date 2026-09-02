@@ -351,20 +351,40 @@ def discoveries(*, _g) -> dict:
         }
         for item in _decimal_to_float(corr_resp.get("Items", [])):
             week = item.get("week", item.get("sk", "").replace("WEEK#", ""))
-            corrs = item.get("correlations", [])
+            corrs = item.get("correlations", {})
             if isinstance(corrs, str):
                 try:
                     corrs = json.loads(corrs)
                 except (json.JSONDecodeError, TypeError):
-                    corrs = []
-            if not isinstance(corrs, list):
+                    corrs = {}
+            # #3445: weekly_correlation_compute_lambda.store_correlations writes
+            # `correlations` as a MAP keyed by pair label (e.g. "hrv_vs_recovery")
+            # -> {pearson_r, n_days, n_eff, fdr_significant, ...} — never a list of
+            # {r, n} dicts. The old `isinstance(corrs, list)` check made this loop
+            # `continue` on every real record (structurally always []); a
+            # hypothetical legacy flat-list record is still accepted, the same way
+            # site_api_discovery.correlations() handles both shapes.
+            if isinstance(corrs, dict):
+                pairs = list(corrs.values())
+            elif isinstance(corrs, list):
+                pairs = corrs
+            else:
                 continue
-            for c in corrs:
+            for c in pairs:
+                if not isinstance(c, dict):
+                    continue
                 if not (c.get("fdr_significant") or c.get("significant")):
                     continue
                 a = _LABELS.get(c.get("metric_a", ""), c.get("metric_a", ""))
                 b = _LABELS.get(c.get("metric_b", ""), c.get("metric_b", ""))
-                r = c.get("r", 0)
+                # Stored key is `pearson_r`/`n_days`; `r`/`n` tolerated for a
+                # hypothetical legacy flat-list record.
+                r = c.get("pearson_r", c.get("r", 0)) or 0
+                n = c.get("n_days", c.get("n", 0)) or 0
+                # #3445: the autocorrelation-corrected effective n, NOT raw n — feeds
+                # correlation_evidence's level/score so a claim isn't graded on a
+                # sample size larger than the data's real independent information.
+                n_eff = c.get("n_eff")
                 direction = "positively" if r > 0 else "negatively"
                 # #1372 Evidence Bar: pass the stored FDR verdict through honestly —
                 # a legacy record with only the pre-FDR `significant` flag serves
@@ -376,13 +396,15 @@ def discoveries(*, _g) -> dict:
                         "metric_a": a,
                         "metric_b": b,
                         "r": round(r, 2) if r else 0,
-                        "n": c.get("n", 0),
+                        "n": n,
+                        "n_eff": n_eff,
                         "title": f"{a} × {b}: {direction} correlated",
-                        "body": f"r={r:+.2f}, n={c.get('n', '?')} days. " f"FDR-corrected significant finding from {week}.",
-                        # #1372: per-claim rigor readout from the ONE sanctioned pure
-                        # function (stats_core.correlation_evidence, ADR-105).
+                        "body": f"r={r:+.2f}, n={n} days. " f"FDR-corrected significant finding from {week}.",
+                        # #1372/#3445: per-claim rigor readout from the ONE sanctioned
+                        # pure function (stats_core.correlation_evidence, ADR-105) —
+                        # n_eff drives the served level, never raw n.
                         "evidence": stats_core.correlation_evidence(
-                            r, c.get("n", 0), fdr_significant=(bool(fdr_flag) if fdr_flag is not None else None)
+                            r, n, n_eff=n_eff, fdr_significant=(bool(fdr_flag) if fdr_flag is not None else None)
                         ),
                     }
                 )
