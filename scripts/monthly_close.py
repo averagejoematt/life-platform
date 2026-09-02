@@ -32,9 +32,14 @@ What it runs (the ritual's queries, in order)
      budgeted feature's spend vs. its ledger budget, and the `unknown` bucket vs. its
      down-only ratchet, graded on the stability check's own attribution run. An
      overage is a close FAILURE (exit 1), not a note.
-  Plus the dial states (SSM budget-tier / qa-level / remediation-mode) and the
-  run-twice stability check on scripts/ai_spend_attribution.py (its first invocation
-  returned partial data on 2026-08-31 — nondeterminism observed n=1, #3375).
+  Plus the dial states (SSM budget-tier / qa-level / remediation-mode), a secrets
+  registry-vs-live-estate reconciliation (#3447 leg d — tests/test_secret_references
+  .KNOWN_SECRETS is a CODE-REFERENCE registry, not the billable Secrets Manager
+  estate; the two have already drifted, 28 registry vs 26 live as of 2026-09-02, and
+  a live-but-unreferenced secret like life-platform/github-billing is billed and
+  structurally invisible to the registry), and the run-twice stability check on
+  scripts/ai_spend_attribution.py (its first invocation returned partial data on
+  2026-08-31 — nondeterminism observed n=1, #3375).
 
 Exit code (read it UNPIPED — `... | tail` reads the pipe's exit, the
 reference_a_ci_gate_that_cannot_fail class): 0 = every query answered and the
@@ -49,6 +54,7 @@ Usage
 """
 
 import argparse
+import ast
 import json
 import os
 import statistics
@@ -217,6 +223,39 @@ def _dials(ssm) -> dict[str, str]:
     return out
 
 
+# ── Secrets reconciliation (#3447 leg d) ──────────────────────────────────────
+_SECRET_REFS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "test_secret_references.py")
+
+
+def _known_secrets_registry() -> set[str]:
+    """``KNOWN_SECRETS`` lifted by AST — never a hand-restated copy (the same
+    #3374 R1 discipline the cost-surface plane's count already uses). This is
+    the CODE-REFERENCE registry (grep scope: lambdas/ + mcp/ source), not the
+    live billable Secrets Manager estate — that is exactly the gap this
+    reconciliation exists to surface, not to paper over."""
+    tree = ast.parse(open(_SECRET_REFS_PATH, encoding="utf-8").read(), filename=_SECRET_REFS_PATH)
+    for node in ast.walk(tree):
+        targets = [t.id for t in node.targets if isinstance(t, ast.Name)] if isinstance(node, ast.Assign) else []
+        if "KNOWN_SECRETS" in targets and isinstance(getattr(node, "value", None), ast.Set):
+            names = {e.value for e in node.value.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+            if names:
+                return names
+    raise ValueError(f"KNOWN_SECRETS not found (or empty) in {_SECRET_REFS_PATH} — the #3447 secrets reconciliation rotted")
+
+
+def _secrets_reconciliation() -> tuple[set[str], set[str]]:
+    """(registry, live estate) — read-only ``secretsmanager:ListSecrets``. Raises
+    up to the caller on an AWS failure; the caller records it as a problem, same
+    as every other query here (absence must never read as a clean reconciliation)."""
+    registry = _known_secrets_registry()
+    sm = boto3.client("secretsmanager", region_name=REGION)
+    estate: set[str] = set()
+    paginator = sm.get_paginator("list_secrets")
+    for page in paginator.paginate():
+        estate.update(s["Name"] for s in page.get("SecretList", []))
+    return registry, estate
+
+
 # ── Run-twice stability check on ai_spend_attribution.py ─────────────────────
 def _attribution_run(month: str) -> dict | None:
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_spend_attribution.py")
@@ -335,6 +374,27 @@ def main(argv=None) -> int:
     print("\nDial states (SSM, read-only)")
     for name, value in _dials(ssm).items():
         print(f"  {name:<38} {value}")
+
+    # Secrets reconciliation (#3447 leg d)
+    print("\nSecrets reconciliation (tests/test_secret_references.KNOWN_SECRETS vs live Secrets Manager estate, #3447)")
+    try:
+        registry, estate = _secrets_reconciliation()
+    except Exception as e:
+        _problem(f"secrets reconciliation failed: {e}")
+    else:
+        registry_only = sorted(registry - estate)
+        estate_only = sorted(estate - registry)
+        print(f"  registry {len(registry)} vs live estate {len(estate)}")
+        if registry_only:
+            print(
+                f"  registry-only (declared, not currently live — verify each is a deliberately-disarmed/deferred feature): {', '.join(registry_only)}"
+            )
+        if estate_only:
+            _problem(
+                f"live secret(s) billed with NO registry row — invisible to the R1 cost-surface secrets count: {', '.join(estate_only)}"
+            )
+        if not registry_only and not estate_only:
+            print("  registry and live estate agree exactly")
 
     # Run-twice stability
     attribution, diffs = (None, [])
