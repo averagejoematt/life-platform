@@ -267,7 +267,7 @@ than one, and 24 match none):
 
 | n | class |
 |---|---|
-| 125 | deployment error |
+| 126 | deployment error |
 | 54 | stale config / literal drift |
 | 42 | QA-oracle false positive |
 | 39 | QA false positive — deploy-race (#2978) |
@@ -275,8 +275,8 @@ than one, and 24 match none):
 | 28 | deploy-plane wedge / strand / race |
 | 28 | secret / credential |
 | 18 | QA false positive — semantic oracle (#2959) |
+| 17 | timezone / wallclock |
 | 16 | IAM / permission |
-| 16 | timezone / wallclock |
 | 6 | data quality / scoring |
 | 24 | *(unclassified)* |
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:END -->
