@@ -216,6 +216,7 @@ _PREMERGE_EXTRA_FILES = frozenset(
         "test_phase_context_coverage.py",  # the phase-context census
         "test_grounding_wiring_1967.py",  # the grounding-surface registry
         "test_privacy_tier_wiring_2803.py",  # #2803: the Tier-2 consumer registry — a new module touching an owner-only field must red BEFORE merge, not after
+        "test_whoop_workout_subrecord_class_3442.py",  # #3442: AST census — a new date-keyed whoop consumer must pick a guard lane BEFORE merge
         # #2986: the derived-artifact registry. Verdict is pure repo shape — a new
         # generator writing a committed artifact must be classified BEFORE the merge,
         # and a guard placed in the wrong lane must red on the PR that placed it there.
