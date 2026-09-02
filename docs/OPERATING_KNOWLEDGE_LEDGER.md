@@ -214,6 +214,7 @@ project_session_g_2026_08_27.md
 project_session_o_launch_2026_08_31.md
 project_session_p_2026_09_01.md
 project_session_q_2026_09_01.md
+project_session_r_2026_09_01.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -858,6 +859,7 @@ carries an operating rule.
 | `project_wiki_program_2026_07_10.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_wrong_day_and_wrong_gauge_2026_08_18.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_q_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
+| `project_session_r_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 
 ## Out of scope
 
