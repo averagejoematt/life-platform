@@ -1376,6 +1376,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "daily-metrics-compute",
+      "module": "lambdas/compute/daily_metrics_compute_lambda.py",
+      "partition": "computed_metrics",
+      "via": "pk"
+    },
+    {
       "direction": "unknown",
       "lambda": "daily-metrics-compute",
       "module": "lambdas/compute/daily_metrics_compute_lambda.py",
@@ -3438,6 +3445,13 @@
       "lambda": "life-platform-qa-smoke",
       "module": "lambdas/operational/qa_smoke_lambda.py",
       "partition": "chronicle",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "computed_metrics",
       "via": "pk"
     },
     {
@@ -6902,7 +6916,7 @@
       "contracts_enrolled": 8,
       "contracts_known": 8,
       "contracts_ratchet": 8,
-      "edges": 666,
+      "edges": 668,
       "lambdas": 104,
       "mcp_tool_modules": 26,
       "mcp_tools": 76,
@@ -6916,9 +6930,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 320,
-        "sites_resolved": 825,
-        "sites_total": 1145
+        "sites_dynamic": 321,
+        "sites_resolved": 828,
+        "sites_total": 1149
       },
       "schedule_resolution": {
         "dynamic": 0,
