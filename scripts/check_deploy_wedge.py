@@ -786,6 +786,19 @@ def recover(state: dict) -> int:
 # run's approvals record, which IS the audit trail.
 #
 # Writes are behind --apply; the default is a dry-run that prints what it would reject.
+#
+# #3422 (2026-09-02): this janitor IS the mechanized reject-only lease steward — the
+# production-support operator leg (docs/OPERATOR_SUBSTRATE_SPIKE.md, Actions lane).
+# Two rules it keeps STRUCTURALLY, held by tests/test_reject_only_steward_3422.py:
+#   * REJECT-ONLY (#2833; ADR-129 amendment 2026-08-30 — approval is a human act,
+#     with no re-promotion path short of a new ADR). No approval code path exists in
+#     this module or its workflow: the one pending_deployments writer is
+#     reject_lease(), and the only state it can post is "rejected". Not a flag.
+#   * THE RUN-BEARING-SHA RULE (Session R, recorded on #3422): a `[skip-reconcile]`
+#     tip commit mints NO CI/CD run, so "reject proper ancestors of origin/main"
+#     over-rejects. This predicate never consults origin/main: candidates are RUNS
+#     (waiting leases + completed successful deploys), so a run-less tip can never
+#     supersede anything, and the newest RUN-BEARING lease is the protected one.
 
 JANITOR_BRANCH = "main"
 # Completed-superseder candidates whose Deploy jobs we are willing to fetch per sweep.
