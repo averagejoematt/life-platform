@@ -245,9 +245,8 @@ def assemble_daily_series(start_date, end_date):
 
     def index_by_date(records, source_key):
         for r in records:
-            # #3442: sub-records (DATE#<d>#WORKOUT#<uuid>) sort after the day row and
-            # were last-write-winning here — every whoop workout day lost hrv/recovery
-            # (W35: hrv_vs_recovery n=11 r=.9799 clobbered vs n=14 r=.9666 true).
+            # #3442: sub-records (DATE#<d>#WORKOUT#<uuid>) sort after the day row and were
+            # last-write-winning here — whoop workout days lost hrv/recovery (W35: n=11→14).
             if not digest_utils.is_day_row(r):
                 continue
             d = r.get("date") or r.get("sk", "").replace("DATE#", "")[:10]
