@@ -168,8 +168,19 @@ def fetch_hevy_workout_days(start_date, end_date):
     plain BETWEEN … "DATE#{end}" bound would EXCLUDE the end date's workouts
     (the `#WORKOUT#` suffix sorts after the bare date) — the end bound gets a
     high sentinel. DELETE#WORKOUT# tombstone markers sort outside the DATE#
-    range and never match. Returns a sorted list of date strings ([] on error —
-    the component is behavioral, so an empty week honestly scores 0).
+    range and never match.
+
+    Returns a sorted list of date strings, or **None** on a query failure
+    (including a mid-pagination failure, #3446). The docstring this replaces
+    argued []-on-error was a deliberate, honest choice ("the component is
+    behavioral, so an empty week honestly scores 0") — that reasoning
+    conflates an infra fetch failure with a *behavioral* absence, which the
+    ADR-104 #3268 amendment rejects: a DDB error is not evidence the user
+    didn't lift, it's evidence we couldn't look. `character_engine`'s
+    `strength_sessions` component already branches on `is not None` to tell
+    "uninstrumented" from "measured zero" (ADR-104) — this function now
+    actually reaches that branch instead of silently reporting a fetch
+    failure as a real zero-session week.
     """
     days = set()
     try:
@@ -197,6 +208,7 @@ def fetch_hevy_workout_days(start_date, end_date):
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     except Exception as e:
         logger.warning(f"[character] fetch_hevy_workout_days({start_date}→{end_date}) failed: {e}")
+        return None  # #3446: an infra failure is not a behavioral absence — never []
     return sorted(days)
 
 
@@ -206,7 +218,13 @@ def fetch_reading_session_days(start_date, end_date):
     timestamp). The end bound uses the next calendar day as an exclusive-ish
     ceiling (any real same-day timestamp sorts below it). Reading rows are
     CROSS_PHASE — no phase filter applies (reading survives resets by design).
-    Returns a sorted list of date strings ([] on error)."""
+
+    Returns a sorted list of date strings, or **None** on a query failure
+    (including a mid-pagination failure, #3446) — an infra fetch failure is
+    not evidence of a behavioral absence (ADR-104 #3268 amendment); see
+    `fetch_hevy_workout_days` for the full rationale this mirrors.
+    `character_engine`'s `reading_practice` component already branches on
+    `is not None` to tell "uninstrumented" from "measured zero"."""
     days = set()
     try:
         from boto3.dynamodb.conditions import Key as _Key
@@ -227,6 +245,7 @@ def fetch_reading_session_days(start_date, end_date):
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     except Exception as e:
         logger.warning(f"[character] fetch_reading_session_days({start_date}→{end_date}) failed: {e}")
+        return None  # #3446: an infra failure is not a behavioral absence — never []
     return sorted(days)
 
 
@@ -714,6 +733,140 @@ def write_progression_receipt(record, config, data, history_records, challenge_i
         return None
 
 
+def publish_site_stats(record, yesterday_str, history_depth):
+    """Write character_stats.json to S3 for averagejoematt.com.
+
+    #3446: extracted out of the tail of ``lambda_handler`` so it can be called
+    from BOTH the normal compute path and the idempotency-skip path — a decode
+    of #3446's second box: the guard's existence-only skip used to also skip
+    this write, so a locked-partial (or any) stored record kept serving
+    whatever ``character_stats.json`` last happened to be written, potentially
+    stale by days. Now every path that returns a 200 for a given date also
+    republishes the served JSON from whatever record is authoritative at that
+    moment. Non-fatal — a failure here never breaks the caller.
+    """
+    char_level = record.get("character_level", 1)
+    char_tier = record.get("character_tier", "Foundation")
+    char_emoji = record.get("character_tier_emoji", "🔨")
+    events = record.get("level_events", [])
+
+    try:
+        from content.site_writer import write_character_stats
+
+        PILLAR_EMOJI_MAP = {
+            "sleep": "😴",
+            "movement": "🏋️",
+            "nutrition": "🥗",
+            "metabolic": "📊",
+            "mind": "🧠",
+            "relationships": "💬",
+            "consistency": "🎯",
+        }
+        pillars_for_site = [
+            {
+                "name": p,
+                "emoji": PILLAR_EMOJI_MAP.get(p, ""),
+                "level": float(record.get(f"pillar_{p}", {}).get("level", 1)),
+                "raw_score": float(record.get(f"pillar_{p}", {}).get("raw_score", 0)),
+                "tier": record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
+                "xp_delta": float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
+                "challenge_bonus_xp": float(record.get(f"pillar_{p}", {}).get("challenge_bonus_xp", 0)),
+                "trend": "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",
+            }
+            for p in PILLAR_ORDER
+        ]
+
+        def _build_event_description(ev):
+            pillar = (ev.get("pillar") or "overall").title()
+            etype = ev.get("type", "")
+            ev.get("old_level", "?")
+            new_lv = ev.get("new_level", "?")
+            base = f"{pillar} → Level {new_lv}"
+            if "tier" in etype:
+                base = f"{pillar} tier {'up' if 'up' in etype else 'down'}: {ev.get('new_tier', '?')}"
+            # Add "why" context if available
+            parts = []
+            if ev.get("top_driver"):
+                parts.append(f"{ev['top_driver']}")
+                if ev.get("top_driver_value"):
+                    parts[-1] += f" at {ev['top_driver_value']}"
+            if ev.get("streak_days") and ev["streak_days"] > 1:
+                parts.append(f"{ev['streak_days']}-day streak")
+            if ev.get("xp_earned") and ev["xp_earned"] > 0:
+                parts.append(f"+{ev['xp_earned']} XP")
+            if parts:
+                base += f" — {', '.join(parts)}"
+            return base
+
+        timeline_events = [
+            {
+                "date": ev.get("date", yesterday_str),
+                "character_level": float(ev.get("new_level", char_level)),
+                "event": _build_event_description(ev),
+                # #913: carry the raw event type so the front end can render a
+                # level-DOWN distinctly and never celebrate during a lull.
+                "type": ev.get("type", ""),
+            }
+            for ev in (events or [])
+        ]
+
+        # CHAR-4: Build weekly pillar history for heatmap
+        _pillar_history = []
+        try:
+            from collections import defaultdict as _dd
+
+            _hist_start = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=49)).strftime("%Y-%m-%d")
+            _hist_recs = fetch_range("character_sheet", _hist_start, yesterday_str)
+            _weeks = _dd(list)
+            for _rec in _hist_recs:
+                _d = _rec.get("date") or _rec.get("sk", "").replace("DATE#", "")
+                if not _d:
+                    continue
+                _dt = datetime.strptime(_d, "%Y-%m-%d")
+                _wk = _dt.strftime("%G-W%V")  # ISO year-week
+                _weeks[_wk].append((_d, _rec))
+            for _wk in sorted(_weeks.keys()):
+                _last_date, _last_rec = _weeks[_wk][-1]
+                _scores = {}
+                for _p in PILLAR_ORDER:
+                    _pdata = _last_rec.get(f"pillar_{_p}") or {}
+                    _scores[_p] = round(float(_pdata.get("level_score") or _pdata.get("raw_score") or 0), 1)
+                _wk_dt = datetime.strptime(_last_date, "%Y-%m-%d")
+                _mon_dt = _wk_dt - timedelta(days=_wk_dt.weekday())
+                _pillar_history.append(
+                    {
+                        "week_label": f"Wk {_wk.split('-W')[1]}",
+                        "week_end": _last_date,
+                        "week_start": _mon_dt.strftime("%Y-%m-%d"),
+                        "pillars": _scores,
+                    }
+                )
+        except Exception as _phe:
+            logger.warning(f"[character] pillar_history build failed (non-fatal): {_phe}")
+
+        write_character_stats(
+            s3_client=boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2")),
+            character={
+                "level": float(char_level),
+                "tier": char_tier,
+                "tier_emoji": char_emoji,
+                "xp_total": float(record.get("character_xp", 0)),
+                "days_active": int(history_depth),
+                "level_events_count": len(events),
+                "next_tier": "Momentum",
+                "next_tier_level": 21,
+                "started_date": EXPERIMENT_START_DATE,
+                "challenge_bonus_xp": {k: v for k, v in (record.get("challenge_bonus_xp") or {}).items()},
+            },
+            pillars=pillars_for_site,
+            timeline=timeline_events,
+            pillar_history=_pillar_history,
+        )
+        logger.info("[character] site_writer: character_stats.json written")
+    except Exception as _sw_e:
+        logger.warning(f"[character] site_writer failed (non-fatal): {_sw_e}")
+
+
 # ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
@@ -735,16 +888,47 @@ def lambda_handler(event, context):
         yesterday_str = (today - timedelta(days=1)).isoformat()
 
     # ── Check if already computed (idempotency) ──
+    # #3446: existence alone used to be the whole guard, so a record written
+    # mid-day with input_status="partial" (an incomplete-inputs snapshot,
+    # #3049/ADR-104) was permanently locked in — every later invocation for
+    # that date, even the next morning once the day's inputs were complete,
+    # read the record as "done" and skipped. The guard now reads
+    # ``input_status`` too: a partial record is only honored as a skip while
+    # its date could still legitimately be in progress. Once the date is
+    # fully past (it can never gain more same-day inputs), a stored partial
+    # is stale by construction and the guard recomputes instead of trusting
+    # its own prior incomplete run.
     if not event.get("force"):
         existing = fetch_date("character_sheet", yesterday_str)
         if existing:
-            logger.info(f"[character] Already computed for {yesterday_str} — skipping")
-            return {
-                "statusCode": 200,
-                "body": f"Already computed for {yesterday_str}",
-                "character_level": existing.get("character_level"),
-                "character_tier": existing.get("character_tier"),
-            }
+            try:
+                _target_date = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+                _date_fully_past = _target_date < pacific_now().date()
+            except ValueError:
+                _date_fully_past = False  # unparseable override date — fail closed to the old behavior
+            _locked_partial = _date_fully_past and existing.get("input_status") == "partial"
+            if not _locked_partial:
+                logger.info(f"[character] Already computed for {yesterday_str} — skipping compute")
+                # #3446: the skip must never suppress the site publish — a
+                # decoupled re-publish keeps the served JSON matched to
+                # whatever record is authoritative, even on a pure skip.
+                _skip_history_depth = 0
+                try:
+                    _skip_histories, _ = load_raw_score_histories(yesterday_str)
+                    _skip_history_depth = max(len(v) for v in _skip_histories.values()) if _skip_histories else 0
+                except Exception as _hde:
+                    logger.warning(f"[character] history-depth lookup failed on skip path (non-fatal): {_hde}")
+                publish_site_stats(existing, yesterday_str, _skip_history_depth)
+                return {
+                    "statusCode": 200,
+                    "body": f"Already computed for {yesterday_str}",
+                    "character_level": existing.get("character_level"),
+                    "character_tier": existing.get("character_tier"),
+                }
+            logger.info(
+                f"[character] {yesterday_str} carries a locked input_status=partial for a fully-past date "
+                "— recomputing instead of honoring the existence-only skip (#3446)"
+            )
 
     # ── Sick day check ─────────────────────────────────────────────────────
     # If the target date is flagged as a sick/rest day, freeze the EMA:
@@ -940,122 +1124,10 @@ def lambda_handler(event, context):
     logger.info("[character] Done in %.1fs", elapsed)
 
     # site_writer: write character_stats.json to S3 for averagejoematt.com
-    # Non-fatal — failure here never breaks character sheet compute
-    try:
-        from content.site_writer import write_character_stats
-
-        PILLAR_EMOJI_MAP = {
-            "sleep": "😴",
-            "movement": "🏋️",
-            "nutrition": "🥗",
-            "metabolic": "📊",
-            "mind": "🧠",
-            "relationships": "💬",
-            "consistency": "🎯",
-        }
-        pillars_for_site = [
-            {
-                "name": p,
-                "emoji": PILLAR_EMOJI_MAP.get(p, ""),
-                "level": float(record.get(f"pillar_{p}", {}).get("level", 1)),
-                "raw_score": float(record.get(f"pillar_{p}", {}).get("raw_score", 0)),
-                "tier": record.get(f"pillar_{p}", {}).get("tier", "Foundation"),
-                "xp_delta": float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)),
-                "challenge_bonus_xp": float(record.get(f"pillar_{p}", {}).get("challenge_bonus_xp", 0)),
-                "trend": "up" if float(record.get(f"pillar_{p}", {}).get("xp_delta", 0)) > 0 else "neutral",
-            }
-            for p in PILLAR_ORDER
-        ]
-
-        def _build_event_description(ev):
-            pillar = (ev.get("pillar") or "overall").title()
-            etype = ev.get("type", "")
-            ev.get("old_level", "?")
-            new_lv = ev.get("new_level", "?")
-            base = f"{pillar} \u2192 Level {new_lv}"
-            if "tier" in etype:
-                base = f"{pillar} tier {'up' if 'up' in etype else 'down'}: {ev.get('new_tier', '?')}"
-            # Add "why" context if available
-            parts = []
-            if ev.get("top_driver"):
-                parts.append(f"{ev['top_driver']}")
-                if ev.get("top_driver_value"):
-                    parts[-1] += f" at {ev['top_driver_value']}"
-            if ev.get("streak_days") and ev["streak_days"] > 1:
-                parts.append(f"{ev['streak_days']}-day streak")
-            if ev.get("xp_earned") and ev["xp_earned"] > 0:
-                parts.append(f"+{ev['xp_earned']} XP")
-            if parts:
-                base += f" \u2014 {', '.join(parts)}"
-            return base
-
-        timeline_events = [
-            {
-                "date": ev.get("date", yesterday_str),
-                "character_level": float(ev.get("new_level", char_level)),
-                "event": _build_event_description(ev),
-                # #913: carry the raw event type so the front end can render a
-                # level-DOWN distinctly and never celebrate during a lull.
-                "type": ev.get("type", ""),
-            }
-            for ev in (events or [])
-        ]
-
-        # CHAR-4: Build weekly pillar history for heatmap
-        _pillar_history = []
-        try:
-            from collections import defaultdict as _dd
-
-            _hist_start = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=49)).strftime("%Y-%m-%d")
-            _hist_recs = fetch_range("character_sheet", _hist_start, yesterday_str)
-            _weeks = _dd(list)
-            for _rec in _hist_recs:
-                _d = _rec.get("date") or _rec.get("sk", "").replace("DATE#", "")
-                if not _d:
-                    continue
-                _dt = datetime.strptime(_d, "%Y-%m-%d")
-                _wk = _dt.strftime("%G-W%V")  # ISO year-week
-                _weeks[_wk].append((_d, _rec))
-            for _wk in sorted(_weeks.keys()):
-                _last_date, _last_rec = _weeks[_wk][-1]
-                _scores = {}
-                for _p in PILLAR_ORDER:
-                    _pdata = _last_rec.get(f"pillar_{_p}") or {}
-                    _scores[_p] = round(float(_pdata.get("level_score") or _pdata.get("raw_score") or 0), 1)
-                _wk_dt = datetime.strptime(_last_date, "%Y-%m-%d")
-                _mon_dt = _wk_dt - timedelta(days=_wk_dt.weekday())
-                _pillar_history.append(
-                    {
-                        "week_label": f"Wk {_wk.split('-W')[1]}",
-                        "week_end": _last_date,
-                        "week_start": _mon_dt.strftime("%Y-%m-%d"),
-                        "pillars": _scores,
-                    }
-                )
-        except Exception as _phe:
-            logger.warning(f"[character] pillar_history build failed (non-fatal): {_phe}")
-
-        write_character_stats(
-            s3_client=boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2")),
-            character={
-                "level": float(char_level),
-                "tier": char_tier,
-                "tier_emoji": char_emoji,
-                "xp_total": float(record.get("character_xp", 0)),
-                "days_active": int(history_depth),
-                "level_events_count": len(events),
-                "next_tier": "Momentum",
-                "next_tier_level": 21,
-                "started_date": EXPERIMENT_START_DATE,
-                "challenge_bonus_xp": {k: v for k, v in (record.get("challenge_bonus_xp") or {}).items()},
-            },
-            pillars=pillars_for_site,
-            timeline=timeline_events,
-            pillar_history=_pillar_history,
-        )
-        logger.info("[character] site_writer: character_stats.json written")
-    except Exception as _sw_e:
-        logger.warning(f"[character] site_writer failed (non-fatal): {_sw_e}")
+    # (#3446: extracted to publish_site_stats — also called from the
+    # idempotency-skip path so a skip can never pin the served JSON to a stale
+    # snapshot).
+    publish_site_stats(record, yesterday_str, history_depth)
 
     return {
         "statusCode": 200,

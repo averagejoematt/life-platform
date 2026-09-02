@@ -122,7 +122,15 @@ class _PkTable:
         if self.fail:
             raise RuntimeError("ddb down")
         if self.pages is not None:
-            return self.pages.pop(0) if self.pages else {"Items": []}
+            if not self.pages:
+                return {"Items": []}
+            page = self.pages.pop(0)
+            # #3446: a page can be the sentinel "FAIL" to simulate a query
+            # exception raised mid-pagination (after >=1 good page already
+            # returned), distinct from failing on the very first call.
+            if page == "FAIL":
+                raise RuntimeError("ddb down mid-pagination")
+            return page
         if kwargs.get("IndexName") == "GSI2":
             return {"Items": list(self.gsi2_rows)}
         kce = kwargs.get("KeyConditionExpression")
@@ -294,9 +302,26 @@ class TestFetchHevyWorkoutDays:
         )
         assert csl.fetch_hevy_workout_days("2026-07-30", DATE) == ["2026-08-01", "2026-08-02"]
 
-    def test_failure_scores_an_honest_empty_week(self, monkeypatch):
+    def test_failure_returns_none_not_an_honest_empty_week(self, monkeypatch):
+        # #3446: an infra query failure must be distinguishable from a real
+        # zero-session week — None (ADR-104 absence), never [] (measured 0).
         _install(monkeypatch, _PkTable(fail=True))
-        assert csl.fetch_hevy_workout_days("2026-07-30", DATE) == []
+        assert csl.fetch_hevy_workout_days("2026-07-30", DATE) is None
+
+    def test_mid_pagination_failure_also_returns_none(self, monkeypatch):
+        # #3446 bonus defect: a failure on page 2 (after page 1 already
+        # yielded real days) must not silently degrade to a partial []; the
+        # whole fetch is unreliable, so it reports None.
+        _install(
+            monkeypatch,
+            _PkTable(
+                pages=[
+                    {"Items": [{"sk": "DATE#2026-08-01#WORKOUT#a"}], "LastEvaluatedKey": {"k": 1}},
+                    "FAIL",
+                ]
+            ),
+        )
+        assert csl.fetch_hevy_workout_days("2026-07-30", DATE) is None
 
 
 class TestFetchReadingSessionDays:
@@ -319,9 +344,25 @@ class TestFetchReadingSessionDays:
         # reading rows are CROSS_PHASE — the ADR-058 phase filter must not apply
         assert "FilterExpression" not in table.query_calls[0]
 
-    def test_failure_is_fail_soft(self, monkeypatch):
+    def test_failure_returns_none_not_an_honest_empty_week(self, monkeypatch):
+        # #3446: an infra query failure must be distinguishable from a real
+        # zero-session week — None (ADR-104 absence), never [] (measured 0).
         _install(monkeypatch, _PkTable(fail=True))
-        assert csl.fetch_reading_session_days("2026-07-30", DATE) == []
+        assert csl.fetch_reading_session_days("2026-07-30", DATE) is None
+
+    def test_mid_pagination_failure_also_returns_none(self, monkeypatch):
+        # #3446 bonus defect: a failure on page 2 must not silently degrade
+        # to a partial [] — the whole fetch is unreliable, so it reports None.
+        _install(
+            monkeypatch,
+            _PkTable(
+                pages=[
+                    {"Items": [{"GSI2SK": f"{DATE}T08:00:00Z"}], "LastEvaluatedKey": {"k": 1}},
+                    "FAIL",
+                ]
+            ),
+        )
+        assert csl.fetch_reading_session_days("2026-07-30", DATE) is None
 
 
 class TestSafeFloat:
@@ -783,6 +824,7 @@ class TestHandlerShortCircuits:
 
     def test_already_computed_day_is_skipped_idempotently(self, monkeypatch):
         table = _install(monkeypatch, _PkTable([_sheet_row(DATE, 9)]))
+        monkeypatch.setattr(site_writer, "write_character_stats", lambda **kwargs: True)
 
         out = csl.lambda_handler({"date": DATE}, None)
 
@@ -790,6 +832,20 @@ class TestHandlerShortCircuits:
         assert out["body"] == f"Already computed for {DATE}"
         assert out["character_level"] == 9
         assert table.puts == []
+
+    def test_skip_path_still_republishes_the_site_json(self, monkeypatch):
+        # #3446 box 2: the existence-only skip must not also suppress
+        # write_character_stats — a decoupled republish keeps the served JSON
+        # matched to whatever record is authoritative, even on a pure skip.
+        _install(monkeypatch, _PkTable([_sheet_row(DATE, 9)]))
+        captured = {}
+        monkeypatch.setattr(site_writer, "write_character_stats", lambda **kwargs: captured.update(kwargs) or True)
+
+        out = csl.lambda_handler({"date": DATE}, None)
+
+        assert out["body"] == f"Already computed for {DATE}"
+        assert captured  # write_character_stats was actually invoked on the skip path
+        assert captured["character"]["level"] == 9.0
 
     def test_force_bypasses_the_idempotency_check(self, monkeypatch):
         _install(monkeypatch, _PkTable([_sheet_row(DATE, 9)]))
@@ -803,8 +859,56 @@ class TestHandlerShortCircuits:
 
     def test_target_date_defaults_to_yesterday(self, monkeypatch, frozen_clock):
         table = _install(monkeypatch, _PkTable([_sheet_row(DATE, 4)]))
+        monkeypatch.setattr(site_writer, "write_character_stats", lambda **kwargs: True)
         out = csl.lambda_handler({}, None)
         # frozen now = 2026-08-06 → yesterday = DATE
+        assert out["body"] == f"Already computed for {DATE}"
+        assert table.puts == []
+
+    def test_locked_partial_for_a_fully_past_date_is_recomputed_not_skipped(self, monkeypatch, frozen_clock):
+        # #3446 box 1: existence alone used to be the whole guard, so a
+        # partial-inputs record for a date that can never gain more same-day
+        # data (fully past) was locked in forever. The guard must now bypass
+        # the skip and fall through to a real recompute.
+        partial = _sheet_row(DATE, 9)
+        partial["input_status"] = "partial"
+        _install(monkeypatch, _PkTable([partial]))
+        monkeypatch.setattr(sick_day_checker, "check_sick_day", lambda t, u, d: None)
+        monkeypatch.setattr(character_engine, "load_character_config", lambda s3, bucket: None)
+
+        # frozen_clock pins "now" to 2026-08-06 — DATE (2026-08-05) is fully past.
+        # Reaching the config-load RAISE (rather than a 200 skip) proves the
+        # locked partial did not short-circuit the handler.
+        with pytest.raises(RuntimeError, match="failed to load config"):
+            csl.lambda_handler({"date": DATE}, None)
+
+    def test_locked_partial_for_a_date_still_in_progress_is_still_skipped(self, monkeypatch, frozen_clock):
+        # The correction the issue calls out explicitly: only a FULLY PAST
+        # date's partial is untrustworthy. A partial for "today" (still
+        # accumulating inputs) is legitimately the best-available snapshot
+        # and must still be honored as a skip.
+        today_str = "2026-08-06"  # frozen_clock's pacific "now" date
+        partial = _sheet_row(today_str, 9)
+        partial["input_status"] = "partial"
+        table = _install(monkeypatch, _PkTable([partial]))
+        monkeypatch.setattr(site_writer, "write_character_stats", lambda **kwargs: True)
+
+        out = csl.lambda_handler({"date": today_str}, None)
+
+        assert out["statusCode"] == 200
+        assert out["body"] == f"Already computed for {today_str}"
+        assert table.puts == []
+
+    def test_non_partial_existing_record_for_a_fully_past_date_is_still_skipped(self, monkeypatch, frozen_clock):
+        # A "complete" (or pre-#3049, unstamped) record must still be honored
+        # as a skip regardless of date — only input_status=partial forces a
+        # recompute.
+        table = _install(monkeypatch, _PkTable([_sheet_row(DATE, 9)]))
+        monkeypatch.setattr(site_writer, "write_character_stats", lambda **kwargs: True)
+
+        out = csl.lambda_handler({"date": DATE}, None)
+
+        assert out["statusCode"] == 200
         assert out["body"] == f"Already computed for {DATE}"
         assert table.puts == []
 
