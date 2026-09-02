@@ -333,6 +333,17 @@ def extract_schedules(lambdas: dict[str, dict]) -> list[dict]:
 # model/cost_surface_baseline.json (hand-owned, NOT generated) and is
 # exact-pinned against this plane by tests/test_platform_model_drift.py — a PR
 # that grows a count must bump the baseline in the same diff.
+#
+# SCOPE CUT (#3447 leg d, the alarms scope-cut pattern applied to secrets): the
+# `secrets` count below is KNOWN_SECRETS — a CODE-REFERENCE registry scanned from
+# lambdas/+mcp/ source only — NOT the live billable Secrets Manager estate. The
+# two have already drifted (28 registry vs 26 live, 2026-09-02): 3 registry rows
+# describe deliberately-disarmed/deferred features with no secret provisioned
+# yet, and `life-platform/github-billing` is live+billed but referenced only
+# from deploy/, outside this scan's scope, so it never counts here at all. This
+# plane prices REFERENCED secrets, not the bill; scripts/monthly_close.py emits
+# the registry-vs-live-estate reconciliation the bill actually needs, read-only,
+# at close time.
 
 COST_SURFACE_SOURCES = {
     "emf_namespaces": (ROOT / "deploy" / "emf_namespace_ledger.py", "LEDGER"),
@@ -1081,6 +1092,16 @@ def render_doc(model: dict) -> str:
     }
     for key in sorted(cs):
         add(f"| {key} | {cs[key]} | {registries.get(key, '?')} |")
+    add("")
+    add(
+        "Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): "
+        "`secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source "
+        "only), never the live billable Secrets Manager estate — the two have already "
+        "drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from "
+        "`deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to "
+        "this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate "
+        "reconciliation at close."
+    )
     add("")
     return "\n".join(lines)
 
