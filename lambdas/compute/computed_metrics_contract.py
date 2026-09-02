@@ -46,3 +46,14 @@ ACWR_COOWNED_FIELDS = (
 # never lets acwr_computed_at age past ~24h. 48h tolerates one missed run
 # before paging (the 2026-08 incident would have paged on day 2).
 ACWR_MAX_AGE_HOURS = 48
+
+
+def carry_coowned_fields(table, item):
+    """Merge the other writer's co-owned fields into a from-scratch rebuild of the
+    computed_metrics record, in place. Reads the existing record by the item's own
+    key; a read failure RAISES — a silent fail-open here IS the #3443 erasure."""
+    existing = table.get_item(Key={"pk": item["pk"], "sk": item["sk"]}).get("Item") or {}
+    for field in ACWR_COOWNED_FIELDS:
+        if field in existing and field not in item:
+            item[field] = existing[field]
+    return item

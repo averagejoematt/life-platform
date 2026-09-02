@@ -36,9 +36,8 @@ except ImportError:
     logger = logging.getLogger("qa-smoke")
     logger.setLevel(logging.INFO)
 
-# Genesis-aware checks (2026-06-08): on the day after an experiment reset, the
-# dashboard validates *yesterday*, which is pre-genesis and legitimately has no
-# day-grade. A missing grade for a pre-experiment date is expected, not a fault.
+# Genesis-aware checks (2026-06-08): the day after a reset, the dashboard validates
+# *yesterday* — pre-genesis, so a missing day-grade there is expected, not a fault.
 try:
     from common.constants import EXPERIMENT_START_DATE
 except ImportError:
@@ -57,6 +56,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 # lives in its own module, same size-split pattern — this file owns the AWS
 # clients and the nightly wiring, raw_archive_qa owns the logic.
 from operational import (
+    acwr_liveness_qa,  # noqa: E402
     qa_check_edge_429,  # noqa: E402
     raw_archive_qa,  # noqa: E402
     recall_freshness_qa,  # noqa: E402
@@ -183,53 +183,6 @@ def check_ddb_freshness():
         checks.append(Check(f"DDB:{source}", "Data Freshness", CONTENT_TRUTH).pause(note))
 
     return checks
-
-
-# ---------------------------------------------------------------------------
-# CHECK 1a — ACWR co-owned-field liveness (#3443 dead-man)
-# ---------------------------------------------------------------------------
-# acwr-compute merges acwr_* onto the computed_metrics record daily at 16:55Z;
-# daily-metrics-compute rebuilds that record from scratch, and 2026-08-24→09-01
-# the evening re-put erased the merged fields nightly — 9 days dark, zero alarms
-# (only the 17:00 brief, reading inside the ~5-minute survival window, still saw
-# a value). This check is the dead-man the incident lacked: red when the newest
-# acwr_computed_at across the trailing three day-records is older than
-# ACWR_MAX_AGE_HOURS or absent entirely. It would have paged on day 2.
-
-
-def check_acwr_liveness():
-    from datetime import datetime, timezone
-
-    from compute.computed_metrics_contract import ACWR_MAX_AGE_HOURS
-
-    c = Check("acwr_liveness", "Data Freshness", CONTENT_TRUTH)
-    newest = None
-    now_pt = pt_now()
-    try:
-        for i in range(1, 4):
-            d = (now_pt - timedelta(days=i)).strftime("%Y-%m-%d")
-            item = table.get_item(Key={"pk": USER_PREFIX + "computed_metrics", "sk": "DATE#" + d}).get("Item") or {}
-            ts = item.get("acwr_computed_at")
-            if ts and (newest is None or str(ts) > newest):
-                newest = str(ts)
-    except Exception as e:
-        c.fail(f"ACWR liveness — DDB error: {e}")
-        return [c]
-    if not newest:
-        c.fail(
-            "no acwr_computed_at on any of the last 3 computed_metrics records — the merge is being erased or acwr-compute is not running (#3443)"
-        )
-        return [c]
-    try:
-        age_h = (datetime.now(timezone.utc) - datetime.fromisoformat(newest)).total_seconds() / 3600.0
-    except ValueError:
-        c.fail(f"unparseable acwr_computed_at: {newest!r}")
-        return [c]
-    if age_h > ACWR_MAX_AGE_HOURS:
-        c.fail(f"newest acwr_computed_at is {age_h:.0f}h old (> {ACWR_MAX_AGE_HOURS}h) — ACWR is dark (#3443)")
-    else:
-        c.ok(f"acwr_computed_at {age_h:.0f}h old (<= {ACWR_MAX_AGE_HOURS}h)")
-    return [c]
 
 
 # ---------------------------------------------------------------------------
@@ -1035,7 +988,7 @@ def check_steps():
     """
     return [
         ("ddb_freshness", check_ddb_freshness),
-        ("acwr_liveness", check_acwr_liveness),  # #3443: co-owned acwr_* fields must stay merged and fresh
+        ("acwr_liveness", lambda: acwr_liveness_qa.check_acwr_liveness(table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now)),  # #3443 dead-man
         ("hae_liveness_truth", check_hae_liveness_truth),  # #2001: dark HAE datatypes carry a numeric days_dark when findable
         ("s3_freshness", check_s3_freshness),
         # #1949: raw_layout facets must be live-true (DDB-fresh/raw-dead reds a check)

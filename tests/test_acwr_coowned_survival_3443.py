@@ -147,7 +147,7 @@ def test_sick_day_rebuild_carries_the_fields_too():
     the sick-day put must be preceded by the same registry-driven carry."""
     src = open(os.path.join(_REPO, "lambdas", "compute", "daily_metrics_compute_lambda.py")).read()
     build = src.index("_sick_item = {")
-    carry = src.index("for _f in ACWR_COOWNED_FIELDS:\n            if _f in _existing_cm")
+    carry = src.index("carry_coowned_fields(table, _sick_item)")
     put = src.index("table.put_item(Item=_sick_item)")
     assert build < carry < put
 
@@ -194,8 +194,9 @@ class _QaTable:
 
 def _run_liveness(monkeypatch, records):
     qa = _qa()
-    monkeypatch.setattr(qa, "table", _QaTable(records))
-    (check,) = qa.check_acwr_liveness()
+    from operational import acwr_liveness_qa
+
+    (check,) = acwr_liveness_qa.check_acwr_liveness(_QaTable(records), qa.USER_PREFIX, qa.Check, qa.CONTENT_TRUTH, qa.pt_now)
     return check
 
 
