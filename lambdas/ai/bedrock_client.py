@@ -26,6 +26,7 @@ import contextlib
 import contextvars
 import json
 import os
+import threading
 
 import boto3
 from botocore.config import Config
@@ -56,6 +57,12 @@ _DEFAULT_PROFILE = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "us-west-2")
 
 _BEDROCK = None
+
+# #3419: board_ask invokes this module from worker THREADS (parallel persona
+# pass). boto3 client CREATION is not thread-safe (calls on a built client
+# are), so the two lazy inits below take this lock. Single-threaded callers
+# pay one uncontended acquire on first use — nothing else changes.
+_CLIENT_INIT_LOCK = threading.Lock()
 
 # ── Cost telemetry (G1) ─────────────────────────────────────────────────────
 # ADR-062 makes invoke() the single chokepoint for every Claude call, so it is
@@ -230,7 +237,9 @@ def _cw():
     bedrock-runtime client; only created if/when telemetry actually runs)."""
     global _CW
     if _CW is None:
-        _CW = boto3.client("cloudwatch", region_name=BEDROCK_REGION)
+        with _CLIENT_INIT_LOCK:  # #3419: creation-locked — see the lock's comment
+            if _CW is None:
+                _CW = boto3.client("cloudwatch", region_name=BEDROCK_REGION)
     return _CW
 
 
@@ -555,18 +564,21 @@ def _client():
     """Lazy-init bedrock-runtime client. Read timeout generous for long
     Sonnet narrative passes; botocore adaptive retries on throttling."""
     global _BEDROCK
-    if _BEDROCK is None:
-        _BEDROCK = boto3.client(
-            "bedrock-runtime",
-            region_name=BEDROCK_REGION,
-            config=Config(
-                # 60s was too short for long Sonnet narrative passes (4k-token
-                # podcast scripts) → intermittent ReadTimeout. 180s gives headroom.
-                read_timeout=180,
-                connect_timeout=10,
-                retries={"max_attempts": 2, "mode": "adaptive"},
-            ),
-        )
+    if _BEDROCK is not None:
+        return _BEDROCK
+    with _CLIENT_INIT_LOCK:  # #3419: creation-locked — see the lock's comment
+        if _BEDROCK is None:
+            _BEDROCK = boto3.client(
+                "bedrock-runtime",
+                region_name=BEDROCK_REGION,
+                config=Config(
+                    # 60s was too short for long Sonnet narrative passes (4k-token
+                    # podcast scripts) → intermittent ReadTimeout. 180s gives headroom.
+                    read_timeout=180,
+                    connect_timeout=10,
+                    retries={"max_attempts": 2, "mode": "adaptive"},
+                ),
+            )
     return _BEDROCK
 
 
