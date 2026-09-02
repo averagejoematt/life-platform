@@ -67,8 +67,16 @@ GATE_CLASSES = {
     "night": {"kwargs": ("nightly_vitals",), "direct": ("night_scoped_vitals_findings",)},
 }
 
-# The composite entrypoint whose kwargs are read, plus the standalone gate helpers.
-CHOKEPOINTS = {"grounding_findings"} | {fn for spec in GATE_CLASSES.values() for fn in spec["direct"]}
+# Wrappers that BAKE the gate kwargs inside their own body (the #2276/#1654 extraction
+# shape): the wrapper's registered surface proves the composition once; a CALL to the
+# wrapper then arms everything it bakes. Without this, a caller module that gates only
+# through the wrapper (#3419: site_api_board_panel's worker) scans as gateless — the
+# census sees the invoke seam but no decision, and a SURFACES entry for it reads stale.
+WRAPPER_CHOKEPOINTS = {"board_grounding_findings": frozenset({"numbers", "dates", "freshness"})}
+
+# The composite entrypoint whose kwargs are read, plus the standalone gate helpers,
+# plus the baked wrappers.
+CHOKEPOINTS = {"grounding_findings"} | {fn for spec in GATE_CLASSES.values() for fn in spec["direct"]} | set(WRAPPER_CHOKEPOINTS)
 
 # Helpers that SUPPLY gate kwargs as a ``**spread``. AST sees only ``**call()``, so the
 # provider has to declare what it arms. Renaming the provider without updating this map
@@ -532,13 +540,20 @@ SURFACES = {
         ("numbers", "dates", "freshness"),
         {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
     ),
+    # #3419: the follow-up leg was always gated through board_grounding_findings;
+    # the wrapper-chokepoint scan now names it as its own surface — registered with
+    # the same arms/exemptions as the opening board turn.
+    "lambdas/web/site_api_ai_lambda.py::_handle_board_followup": _entry(
+        ("numbers", "dates", "freshness"),
+        {"behavioral": _NOT_ABOUT_MATTHEW, "night": _NO_NIGHT_MAP},
+    ),
 }
 
 
 # ── The derivation ───────────────────────────────────────────────────────────
 def _classes_for_call(func_name, kwarg_names, spread_providers):
     """Gate classes a single call arms."""
-    armed = set()
+    armed = set(WRAPPER_CHOKEPOINTS.get(func_name, frozenset()))
     for cls, spec in GATE_CLASSES.items():
         if func_name in spec["direct"] and (not spec["kwargs"] or all(k in kwarg_names for k in spec["kwargs"])):
             armed.add(cls)
