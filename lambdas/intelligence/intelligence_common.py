@@ -23,6 +23,7 @@ import boto3
 from boto3.dynamodb.conditions import Attr, Key
 from coach.reading_date_fidelity import guard_derived_summary  # #2343: derived-summary day correspondence
 from coach.voice_register_guard import sanitize_summary  # #1987: deterministic voice-register check
+from common.digest_utils import is_day_row  # #3442: whoop inventory counts day rows, not #WORKOUT# fragments
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from common.text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 from experiment import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
@@ -123,17 +124,32 @@ def build_data_inventory() -> dict:
             pk = f"{USER_PREFIX}{partition}"
             # #2109: cross-phase unless the partition is EXPERIMENT_SCOPED — see the docstring.
             cross_phase = source_reads_cross_phase(partition)
-            # Count records in last 90 days
-            resp = table.query(
-                **with_phase_filter(
-                    {
-                        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
-                        "Select": "COUNT",
-                    },
-                    include_pilot=cross_phase,
+            # Count records in last 90 days. Whoop counts DAY ROWS only (#3442):
+            # its DATE#<d>#WORKOUT#<uuid> sub-records inflated this inventory ~45/90d,
+            # and Select=COUNT cannot express the day-row grammar — so that partition
+            # projects sk and counts client-side with the shared predicate.
+            if partition == "whoop":
+                resp = table.query(
+                    **with_phase_filter(
+                        {
+                            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
+                            "ProjectionExpression": "sk",
+                        },
+                        include_pilot=cross_phase,
+                    )
                 )
-            )
-            count = resp.get("Count", 0)
+                count = sum(1 for i in resp.get("Items", []) if is_day_row(i))
+            else:
+                resp = table.query(
+                    **with_phase_filter(
+                        {
+                            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{d90}", f"DATE#{today}~"),
+                            "Select": "COUNT",
+                        },
+                        include_pilot=cross_phase,
+                    )
+                )
+                count = resp.get("Count", 0)
 
             # Get latest record. NB the Limit:1 half is the #1203 mechanism verbatim —
             # DynamoDB applies Limit BEFORE FilterExpression, so a filtered read here
