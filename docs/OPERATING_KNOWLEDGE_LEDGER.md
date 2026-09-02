@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 389** — feedback 22 · reference 216 · security 1 · project 147 · user 1 · index 2
+**Files in the memory index snapshot: 390** — feedback 22 · reference 216 · security 1 · project 148 · user 1 · index 2
 
 **Rule-class files (feedback + reference + security): 239** — homed-here 58 · already-homed 161 · superseded 7 · narrative 11 · off-repo 2
 
-**Program/session files (project): 147** — already-homed 14 · superseded 1 · narrative 129 · off-repo 2 · index 1
+**Program/session files (project): 148** — already-homed 14 · superseded 1 · narrative 130 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
