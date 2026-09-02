@@ -556,8 +556,11 @@ REGISTRY = {
         "rather than a guess dressed as a number. Also reports `skilled` (Brier skill > 0?) — "
         "calibrated (reliability: stated confidence tracks observed rates) and skilled (beats "
         "the base rate) are different claims, and the summary carries both so no surface can "
-        "conflate them (#1370).",
-        "1403fa3eec2a",
+        "conflate them (#1370). Reports `accuracy_ci95` — the 95% Wilson interval on the same "
+        "confirmed/n, same percentage-point units as accuracy_pct — whenever n > 0 (#3450, "
+        "ADR-105): a bare accuracy_pct off a small n reads as more precise than it is (21.6% "
+        "vs. 'somewhere between 11% and 37%' are different decisions at n=37).",
+        "f1d7ff696095",
         used_by="/api/calibration, /api/coach_team's per-coach calibration line.",
     ),
     "directional_trend_verdict": _entry(
@@ -599,7 +602,7 @@ REGISTRY = {
         "always guessing the base rate) reads 'not_yet_skillful' — reliability alone never earns "
         "the flattering verdict (ADR-104/105, #1370). An undefined skill (degenerate base rate) "
         "is treated as unknown, not as unskilled.",
-        "1403fa3eec2a",
+        "f1d7ff696095",
         min_n=5,
     ),
     "credibility_label": _entry(
@@ -616,7 +619,7 @@ REGISTRY = {
         "derived. A negative Brier skill (worse than the base rate) can never render the "
         "reliable/authoritative rungs, however good the raw Brier looks against an extreme "
         "base rate — it reads not-yet-skillful (#1370).",
-        "1403fa3eec2a",
+        "f1d7ff696095",
         used_by="Coach cards that need a single at-a-glance credibility word.",
     ),
     "conversational_enrichment_scope": _entry(

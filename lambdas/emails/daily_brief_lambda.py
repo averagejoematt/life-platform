@@ -87,6 +87,15 @@ PROFILE_PK = f"USER#{USER_ID}"
 GENESIS_ALARM_WINDOW_PK = "SYSTEM#alarm-windows"
 GENESIS_ALARM_WINDOW_SK = "GENESIS#compute-pipeline-stale"
 
+# #3430: daily-metrics-compute's OWN EventBridge cron, in UTC — `cron(40 16 * * ? *)`
+# in cdk/stacks/compute_stack.py. It is restated here because the staleness ops metric
+# below is only ANSWERABLE after that cron has had its chance, and it is pinned against
+# the CDK source by tests/test_compute_staleness_offschedule_3430.py so the two cannot
+# drift (#2003's "read the registry, never hand-state a schedule" rule applied to the one
+# place a Lambda has to know a sibling's clock).
+COMPUTE_DEADLINE_UTC_HOUR = 16
+COMPUTE_DEADLINE_UTC_MINUTE = 40
+
 # -- AWS clients ---------------------------------------------------------------
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -234,6 +243,54 @@ def _compute_staleness_metric_value(compute_stale, today_str):
     suppressed = bool(compute_stale) and _compute_staleness_alarm_suppressed(today_str)
     value = 1.0 if (compute_stale and not suppressed) else 0.0
     return value, suppressed
+
+
+def _compute_staleness_observation_deadline(yesterday_str):
+    """#3430: the earliest instant at which `yesterday`'s computed_metrics row can exist.
+
+    `daily-metrics-compute` runs at COMPUTE_DEADLINE_UTC_HOUR:MINUTE UTC and writes the
+    row for ITS yesterday. So the row for date D is written by the cron that fires on
+    D+1 — before that instant the row is absent BY CONSTRUCTION, not by failure.
+
+    Derived from the date being read rather than from "today" on purpose: a late/backfill
+    run reading an old date is still entitled to report that date's row missing.
+    """
+    read_date = datetime.strptime(yesterday_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    return (read_date + timedelta(days=1)).replace(hour=COMPUTE_DEADLINE_UTC_HOUR, minute=COMPUTE_DEADLINE_UTC_MINUTE)
+
+
+def _compute_staleness_observation_authoritative(yesterday_str, event=None, now_utc=None):
+    """#3430: may THIS run's staleness reading speak for the compute PIPELINE?
+
+    `compute-pipeline-stale` asks exactly one question — did daily-metrics-compute put
+    yesterday's row in place by the time the 17:00 UTC brief needed it? Two kinds of run
+    cannot answer it, and both have fired the alarm:
+
+    1. **A run before the upstream cron's own deadline.** It reads the row as absent
+       because the compute has not run yet; its 1.0 describes the invoker's clock, not
+       the pipeline. Measured over the 60 days of retained 5-minute data (2026-09-02,
+       #3430): ComputePipelineStaleness emitted 1.0 exactly four times — 2026-07-26
+       16:05Z and 16:10Z, 2026-07-27 16:35Z, 2026-08-30 15:55Z. Every one is before
+       16:40Z; not one is the scheduled 17:00Z brief; and every scheduled run in the
+       window emitted 0.0, INCLUDING the two cycle-11 genesis mornings #1962 was filed
+       about. The 2026-08-30 15:55Z datapoint is the #3430 episode itself.
+    2. **A DRY_RUN invocation.** common/dry_run.py already draws its line at
+       "observability datapoints that describe the *pipeline* rather than this run".
+       This datapoint's value is a function of when the run happened, so it sits on the
+       far side of that line and #2255 sorted it onto the wrong one — the 2026-08-30
+       episode was an operator's `{"dry_run": true}` invoke (the run's own first log
+       line is the DRY_RUN banner) writing to a production alarm.
+
+    Fail-open on an unparseable date: an unknown deadline must not silence a real red.
+    """
+    if event is not None and dry_run.is_dry_run(event):
+        return False
+    try:
+        deadline = _compute_staleness_observation_deadline(yesterday_str)
+    except Exception as _e:  # pragma: no cover - defensive; a malformed date is not a silencer
+        logger.warning("#3430: could not derive the compute-staleness observation deadline: " + str(_e))
+        return True
+    return (now_utc or datetime.now(timezone.utc)) >= deadline
 
 
 def _compute_staleness_alarm_suppressed(today_str):
@@ -1656,26 +1713,39 @@ def lambda_handler(event, context):
     # or two post-genesis even though the compute chain is healthy — while a
     # declared genesis suppression window is active, report 0.0 to the ALARM
     # (the reader-facing "data may be estimated" banner above is untouched).
+    # #3430: and a run that CANNOT answer the pipeline question emits nothing at all —
+    # see `_compute_staleness_observation_authoritative`. Silence is the honest report
+    # here (the alarm is treat-missing-data=notBreaching and the scheduled 17:00 UTC
+    # brief still emits every day), where a 1.0 was a 24h digest red about the clock.
     _staleness_metric_value, _staleness_suppressed = _compute_staleness_metric_value(_compute_stale, today.isoformat())
     if _staleness_suppressed:
         logger.warning(
             "REL-1/#1962: compute staleness suppressed for the ops alarm — "
             "within a declared post-reset genesis window (" + _compute_age_msg + ")"
         )
-    try:
-        _cloudwatch.put_metric_data(
-            Namespace="LifePlatform",
-            MetricData=[
-                {
-                    "MetricName": "ComputePipelineStaleness",
-                    "Value": _staleness_metric_value,
-                    "Unit": "Count",
-                    "Dimensions": [{"Name": "Source", "Value": "computed_metrics"}],
-                }
-            ],
+    _staleness_authoritative = _compute_staleness_observation_authoritative(yesterday, event=event)
+    if not _staleness_authoritative:
+        logger.info(
+            "#3430: not emitting ComputePipelineStaleness — this run cannot speak for the "
+            "pipeline (dry run, or earlier than daily-metrics-compute's own "
+            f"{COMPUTE_DEADLINE_UTC_HOUR:02d}:{COMPUTE_DEADLINE_UTC_MINUTE:02d}Z cron for {yesterday}); "
+            "compute_stale=" + str(_compute_stale) + " (" + _compute_age_msg + ")"
         )
-    except Exception as _cw_e:
-        logger.warning("Risk-7: failed to emit compute staleness metric: " + str(_cw_e))
+    if _staleness_authoritative:
+        try:
+            _cloudwatch.put_metric_data(
+                Namespace="LifePlatform",
+                MetricData=[
+                    {
+                        "MetricName": "ComputePipelineStaleness",
+                        "Value": _staleness_metric_value,
+                        "Unit": "Count",
+                        "Dimensions": [{"Name": "Source", "Value": "computed_metrics"}],
+                    }
+                ],
+            )
+        except Exception as _cw_e:
+            logger.warning("Risk-7: failed to emit compute staleness metric: " + str(_cw_e))
 
     if _computed:
         # Read pre-computed values — daily-metrics-compute already stored day_grade + habit_scores
@@ -2290,6 +2360,7 @@ def lambda_handler(event, context):
             _trends = {}
             _weight_as_of = None  # G-3: date of last known weight reading
             _sleep_hours_30d_avg = None  # HOME-3: 30-day average sleep hours
+            _sleep_hours_30d_n = None  # #3451: nights the average above is over
             try:
                 # Weight trend (last 12 weeks of weekly averages)
                 _wt_90d = fetch_range("withings", (today - timedelta(days=84)).isoformat(), yesterday)
@@ -2318,6 +2389,11 @@ def lambda_handler(event, context):
                 if _sleep_vals:
                     _trends["sleep_daily"] = [{"date": d, "hrs": round(v, 1)} for d, v in _sleep_vals[-14:]]
                 _sleep_hours_30d_avg = round(sum(v for _, v in _sleep_vals) / len(_sleep_vals), 2) if _sleep_vals else None
+                # #3451: the average carried no n anywhere — a Whoop outage would silently
+                # shrink "30d" to a handful of nights with no way for a reader (or the
+                # weekly-signal email, or public_stats.json) to tell. Travels WITH the
+                # average, same discipline as weight_delta_window_days (#1917).
+                _sleep_hours_30d_n = len(_sleep_vals) if _sleep_vals else None
 
                 # Recovery trend (last 14 days)
                 _rec_vals = [
@@ -2444,6 +2520,7 @@ def lambda_handler(event, context):
                     "recovery_status": _rec_status,
                     "sleep_hours": _vr["sleep_hours"],
                     "sleep_hours_30d_avg": _sleep_hours_30d_avg,  # HOME-3
+                    "sleep_hours_30d_n": _sleep_hours_30d_n,  # #3451: nights the average is over
                 },
                 journey={
                     "start_weight_lbs": _start_wt,
