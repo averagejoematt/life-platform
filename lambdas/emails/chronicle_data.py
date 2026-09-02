@@ -68,6 +68,8 @@ def gather_chronicle_data(*, _g):
     logger.info(f"Gathering data: {start} -> {end}")
 
     # --- Core biometrics ---
+    # #3442: the injected query_range is digest_utils.query_range — day-rows-only,
+    # so whoop's DATE#<d>#WORKOUT#<uuid> sub-records cannot clobber the day row here.
     whoop = query_range("whoop", start, end)
     eightsleep = query_range("eightsleep", start, end)
     garmin = query_range("garmin", start, end)

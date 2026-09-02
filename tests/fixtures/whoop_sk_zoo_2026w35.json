@@ -1,0 +1,190 @@
+{
+ "note": "Wire snapshot of the whoop raw partition sk zoo (day rows + DATE#<d>#WORKOUT#<uuid> sub-records) read through digest_utils.query_range_list over 2026-08-17..30 \u2014 the W35 candidate set the weekly-correlation lambda saw (the trailing-~ upper bound includes end-date sub-records). Field-pruned to the metrics the #3442 reproductions read; sk grammar and per-record field presence/absence are verbatim wire shape. All metrics are owner-published (site cockpit).",
+ "records": [
+  {
+   "sk": "DATE#2026-08-17",
+   "date": "2026-08-17",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 7.23,
+   "hrv": 32.49,
+   "recovery_score": 33.0,
+   "sleep_duration_hours": 9.19
+  },
+  {
+   "sk": "DATE#2026-08-18",
+   "date": "2026-08-18",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 8.46,
+   "hrv": 33.94,
+   "recovery_score": 39.0,
+   "sleep_duration_hours": 7.08
+  },
+  {
+   "sk": "DATE#2026-08-18#WORKOUT#5c539cdb-08c2-40cb-bed2-46a9420a9c4e",
+   "date": "2026-08-18",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 6.16,
+   "workout_id": "5c539cdb-08c2-40cb-bed2-46a9420a9c4e",
+   "sport_name": "Hiking"
+  },
+  {
+   "sk": "DATE#2026-08-18#WORKOUT#73448a5f-bc43-4eb2-b5a4-b81fc2cee235",
+   "date": "2026-08-18",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 6.63,
+   "workout_id": "73448a5f-bc43-4eb2-b5a4-b81fc2cee235",
+   "sport_name": "Hiking"
+  },
+  {
+   "sk": "DATE#2026-08-19",
+   "date": "2026-08-19",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 6.11,
+   "hrv": 36.53,
+   "recovery_score": 47.0,
+   "sleep_duration_hours": 7.92
+  },
+  {
+   "sk": "DATE#2026-08-20",
+   "date": "2026-08-20",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.01,
+   "hrv": 37.6,
+   "recovery_score": 50.0,
+   "sleep_duration_hours": 5.23
+  },
+  {
+   "sk": "DATE#2026-08-21",
+   "date": "2026-08-21",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.3,
+   "hrv": 49.34,
+   "recovery_score": 77.0,
+   "sleep_duration_hours": 6.85
+  },
+  {
+   "sk": "DATE#2026-08-22",
+   "date": "2026-08-22",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.75,
+   "hrv": 23.61,
+   "recovery_score": 17.0,
+   "sleep_duration_hours": 6.23
+  },
+  {
+   "sk": "DATE#2026-08-23",
+   "date": "2026-08-23",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 9.58,
+   "hrv": 22.84,
+   "recovery_score": 18.0,
+   "sleep_duration_hours": 5.05
+  },
+  {
+   "sk": "DATE#2026-08-24",
+   "date": "2026-08-24",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.17,
+   "hrv": 32.34,
+   "recovery_score": 43.0,
+   "sleep_duration_hours": 9.53
+  },
+  {
+   "sk": "DATE#2026-08-25",
+   "date": "2026-08-25",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 4.6,
+   "hrv": 45.39,
+   "recovery_score": 72.0,
+   "sleep_duration_hours": 7.72
+  },
+  {
+   "sk": "DATE#2026-08-26",
+   "date": "2026-08-26",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.76,
+   "hrv": 36.14,
+   "recovery_score": 52.0,
+   "sleep_duration_hours": 8.32
+  },
+  {
+   "sk": "DATE#2026-08-27",
+   "date": "2026-08-27",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.16,
+   "hrv": 34.99,
+   "recovery_score": 49.0,
+   "sleep_duration_hours": 7.22
+  },
+  {
+   "sk": "DATE#2026-08-28",
+   "date": "2026-08-28",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.12,
+   "hrv": 27.17,
+   "recovery_score": 34.0,
+   "sleep_duration_hours": 8.09
+  },
+  {
+   "sk": "DATE#2026-08-29",
+   "date": "2026-08-29",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 11.85,
+   "hrv": 19.94,
+   "recovery_score": 19.0,
+   "sleep_duration_hours": 7.37
+  },
+  {
+   "sk": "DATE#2026-08-29#WORKOUT#a81b2927-4387-4e01-ab67-094620b68128",
+   "date": "2026-08-29",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.25,
+   "workout_id": "a81b2927-4387-4e01-ab67-094620b68128",
+   "sport_name": "Hiking"
+  },
+  {
+   "sk": "DATE#2026-08-29#WORKOUT#fc54160a-bdf6-4447-8cb3-74a9e87d6315",
+   "date": "2026-08-29",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.25,
+   "workout_id": "fc54160a-bdf6-4447-8cb3-74a9e87d6315",
+   "sport_name": "Hiking"
+  },
+  {
+   "sk": "DATE#2026-08-30",
+   "date": "2026-08-30",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 9.45,
+   "hrv": 34.34,
+   "recovery_score": 54.0,
+   "sleep_duration_hours": 8.52
+  },
+  {
+   "sk": "DATE#2026-08-30#WORKOUT#0fd63bb4-1c64-4b19-b4e5-02d01356bf0e",
+   "date": "2026-08-30",
+   "phase": "pilot",
+   "source": "whoop",
+   "strain": 5.11,
+   "workout_id": "0fd63bb4-1c64-4b19-b4e5-02d01356bf0e",
+   "sport_name": "Hiking"
+  }
+ ]
+}
