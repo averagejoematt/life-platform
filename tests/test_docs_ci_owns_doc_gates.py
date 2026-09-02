@@ -263,7 +263,7 @@ def test_shallow_clone_really_does_skip_the_drift_gate():
     ), f"expected the shallow path to flag nothing and note the skip; got:\n{out.stdout}\n{out.stderr}"
 
 
-# ── #3384: the pull_request exemption for the bot-owned test_count literal ───
+# ── #3384/#3437: the pull_request exemption for the bot-owned counter literals ──
 #
 # A mixed code+tests PR enters docs-ci through a code-path trigger (the #2982
 # asymmetry only spares test-ONLY PRs), and `sync_doc_metadata --check` sweeps the
@@ -271,9 +271,12 @@ def test_shallow_clone_really_does_skip_the_drift_gate():
 # the branch is policy-FORBIDDEN to commit (agent_commit.sh refuses the file; the
 # reconcile bot on main is the single writer, #3101). Hit live 2026-08-31 on
 # PR #3383: the branch could not go green either way. The fix: on a `pull_request`
-# event, doc_platform_counts.sync reports that ONE literal's staleness as a visible
-# "  i " INFO line instead of a "  ~" drift line. These tests pin the exemption to
-# exactly that shape — one field, pull_request only, loud, never a write.
+# event, doc_platform_counts.sync reports that literal's staleness as a visible
+# "  i " INFO line instead of a "  ~" drift line. #3437 extends the identical
+# treatment to `adrs` — a branch minting a new `## ADR-NNN` heading in
+# docs/DECISIONS.md hits the exact same trap (reproduced live 2026-09-01 on
+# PR #3432). These tests pin the exemption to exactly that shape — the two named
+# fields, pull_request only, loud, never a write.
 
 
 def _counts_mod():
@@ -295,13 +298,28 @@ def _stale_test_count():
     return int(m.group(1)) + 1
 
 
-def test_the_pr_exemption_covers_exactly_the_one_bot_owned_literal():
+def _stale_adrs():
+    """Same shape as `_stale_test_count`, for the #3437 `adrs` field."""
+    m = re.search(r'"adrs":\s*(\d+)', _read(_COUNTS_FILE))
+    assert m, "no adrs literal in platform_counts.py — the literal shape drifted"
+    return int(m.group(1)) + 1
+
+
+def test_the_pr_exemption_covers_exactly_the_two_bot_owned_literals():
     """Widening the exempt set is a policy change, not a tweak — every other literal
-    in the generated module IS committable on a branch and must stay enforced."""
+    in the generated module IS committable on a branch and must stay enforced.
+
+    Deliberate widening (owner-sanctioned, NOT drift): #3437 extends the #3384
+    mechanism from {"test_count"} to {"test_count", "adrs"} — same trap (no legal
+    same-PR fix for a bot-owned, agent_commit.sh-refused literal), second field
+    (`docs/DECISIONS.md` ADR headings, reproduced live on PR #3432). See the audit
+    in `deploy/doc_platform_counts.py`'s module docstring for why every OTHER
+    DECISIONS.md-derived literal (`adr_count`, `adr_max`) stays strict instead of
+    joining this set."""
     mod = _counts_mod()
-    assert mod.PR_EXEMPT_FIELDS == frozenset({"test_count"}), (
-        "#3384 licenses the pull_request exemption for the single literal a branch is "
-        f"forbidden to commit (#3101) and nothing else; got {sorted(mod.PR_EXEMPT_FIELDS)}"
+    assert mod.PR_EXEMPT_FIELDS == frozenset({"test_count", "adrs"}), (
+        "#3384/#3437 license the pull_request exemption for exactly the two literals a "
+        f"branch is forbidden to commit (#3101) and nothing else; got {sorted(mod.PR_EXEMPT_FIELDS)}"
     )
 
 
@@ -331,6 +349,48 @@ def test_the_exemption_is_dead_outside_pull_request_events(monkeypatch, event):
         c.startswith("  ~") and "test_count" in c for c in changes
     ), f"event={event!r} must enforce the test_count literal, got: {changes}"
     assert not any(c.startswith("  i") for c in changes), f"the exemption fired outside pull_request: {changes}"
+
+
+def test_pull_request_event_reports_adrs_as_info_not_drift(monkeypatch):
+    """#3437 parity: `adrs` gets the exact same pull_request treatment as test_count —
+    this is the inverted #3432 reproduction (a stale `adrs` literal, standing in for
+    what a freshly-minted `## ADR-NNN` heading would produce, must not fail --check)."""
+    mod = _counts_mod()
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    changes = mod.sync({"adrs": _stale_adrs()}, dry_run=True)
+    assert not any(c.startswith("  ~") for c in changes), f"a PR run still counts adrs as drift: {changes}"
+    info = [c for c in changes if c.startswith("  i ")]
+    assert (
+        len(info) == 1 and "adrs" in info[0] and "#3101" in info[0]
+    ), f"the exemption must print what it skipped and who owns it: {changes}"
+
+
+@pytest.mark.parametrize("event", ["push", "schedule", "workflow_dispatch", None])
+def test_the_adrs_exemption_is_dead_outside_pull_request_events(monkeypatch, event):
+    """Parity with test_count: adrs stays fully enforced on main/push/local — a wrong
+    ADR count on main still reds main's own run, and the reconcile bot restamps it."""
+    mod = _counts_mod()
+    if event is None:
+        monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_EVENT_NAME", event)
+    changes = mod.sync({"adrs": _stale_adrs()}, dry_run=True)
+    assert any(c.startswith("  ~") and "adrs" in c for c in changes), f"event={event!r} must enforce adrs, got: {changes}"
+    assert not any(c.startswith("  i") for c in changes), f"the exemption fired outside pull_request: {changes}"
+
+
+def test_the_adrs_exemption_does_not_swallow_a_concurrent_genuine_drift(monkeypatch):
+    """The must-fail positive control (#3437 acceptance): exempting `adrs` must not
+    blanket-exempt the PR — a genuine drift on any OTHER field in the SAME sync call
+    still fails --check's accounting."""
+    mod = _counts_mod()
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    changes = mod.sync({"adrs": _stale_adrs(), "mcp_tools": _stale_test_count() + 999999}, dry_run=True)
+    assert any(
+        c.startswith("  ~") and "mcp_tools" in c for c in changes
+    ), f"a genuine same-PR drift on a non-exempt field was swallowed by the adrs exemption: {changes}"
+    info = [c for c in changes if c.startswith("  i ")]
+    assert len(info) == 1 and "adrs" in info[0], f"adrs itself must still be reported as the exemption, not drift: {changes}"
 
 
 def test_every_other_literal_stays_enforced_on_pull_request(monkeypatch):
