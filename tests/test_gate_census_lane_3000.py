@@ -466,7 +466,7 @@ for _p in (_REPO, os.path.join(_REPO, "scripts")):
 # workflow-shape half by the same file's structural assertions. Live unproven moves
 # 532 -> 533, under the committed BASELINE_UNPROVEN_GATES = 541, which is NOT moved
 # (down-only, #3329 option B).
-BASELINE_TOTAL_GATES = 590
+BASELINE_TOTAL_GATES = 591  # +1 2026-09-02: the #3442 whoop-consumer SET census
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DOWN-ONLY (#3329, owner decision 2026-08-31 option B). Epic #2578's box 2 was
