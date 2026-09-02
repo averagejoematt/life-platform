@@ -109,7 +109,7 @@
       "Effect": "Allow",
       "Action": [
         "s3:GetBucketPolicy",
-        "s3:GetBucketLifecycleConfiguration",
+        "s3:GetLifecycleConfiguration",
         "s3:GetReplicationConfiguration"
       ],
       "Resource": "arn:aws:s3:::matthew-life-platform"
