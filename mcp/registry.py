@@ -645,7 +645,7 @@ TOOLS = {
                 "type": "object",
                 "properties": {
                     "days": {"type": "integer", "description": "Trailing window in days (7-365, default 90)."},
-                    "ema_span": {"type": "integer", "description": "EMA span in days (3-60, default 14)."},
+                    "ema_span": {"type": "integer", "description": "EMA span in OBSERVATIONS not days (3-60, default 14); gaps carried."},
                 },
                 "required": [],
             },

@@ -211,12 +211,12 @@ except ImportError:  # pragma: no cover — flat sys.path (tests)
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
         from grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions  # noqa: F401
 
-# ADR-104: the shared grounded-generation harness — the regen-once keep-if-improved
-# flow moved there (one implementation for every surface), plus the allow-list
-# number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
+# ADR-104: the shared grounded-generation harness — regen-once keep-if-improved (one impl
+# for every surface) + the allow-list number gate catching fabricated trends ("from 58 to 64").
 from ai import grounded_generation as _gg
 from ai.behavior_logs import available_logs_from_recency as _avail_logs  # #2056 — the #1699 map
 from ai.night_scope import nightly_vitals_from_facts as _night_map  # #1968
+from common.digest_utils import filter_day_rows  # #3442: day rows only — nights_tracked counted #WORKOUT# fragments
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import singleton_visible  # hoisted from two function-local sites (size ceiling)
 
@@ -349,7 +349,7 @@ def gather_data_for_expert(expert_key):
         hevy_items = _query_source("hevy", d30, today)
         activities = _query_source("strava", d30, today)
         garmin_items = _query_source("garmin", d30, today)
-        whoop_items = _query_source("whoop", d30, today)
+        whoop_items = filter_day_rows(_query_source("whoop", d30, today))  # #3442: day rows only
         steps_items = _query_source("apple_health", d30, today)
 
         _garmin_rl = has_rate_limit_marker(table, USER_ID, "garmin")
@@ -525,7 +525,7 @@ def gather_data_for_expert(expert_key):
         return build_labs_fact_block(lab_items)
 
     elif expert_key == "sleep":
-        whoop_items = _query_source("whoop", d30, today)
+        whoop_items = filter_day_rows(_query_source("whoop", d30, today))  # #3442: day rows only
         eight_items = _query_source("eightsleep", d30, today)
         sleep_hours = [float(w["sleep_duration_hours"]) for w in whoop_items if w.get("sleep_duration_hours")]
         recovery_vals = [float(w["recovery_score"]) for w in whoop_items if w.get("recovery_score")]

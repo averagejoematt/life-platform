@@ -249,6 +249,43 @@ def correlation_evidence(r, n, n_eff=None, fdr_significant=None):
     }
 
 
+def wilson_interval(k, n, confidence=0.95):
+    """Wilson score interval for a binomial proportion k/n (ADR-105, #3450).
+
+    The honest interval for a served rate — Wilson, not the normal (Wald)
+    approximation, because Wald can escape [0,1] and collapses to zero width
+    exactly at k=0 or k=n (the small-n regime every calibration/hit-rate
+    surface on this platform lives in). Mirrors `fisher_ci`'s role for a
+    correlation: the ONE sanctioned interval for a proportion, so a served
+    "21.6%" always ships as "21.6% (8/37, 95% CI [11.4%, 37.2%])" rather than
+    a bare point estimate an ADR-105 audit would reject.
+
+    Returns (lo, hi) UNROUNDED in [0,1], or None when n <= 0 or k is outside
+    [0, n]. Deterministic, no scipy. `confidence` uses the same `_Z_CRIT`
+    lookup as every other interval in this module.
+    """
+    if n is None or n <= 0:
+        return None
+    try:
+        k = float(k)
+        n = float(n)
+    except (TypeError, ValueError):
+        return None
+    if k < 0 or k > n:
+        return None
+    z_crit = _Z_CRIT.get(confidence)
+    if z_crit is None:
+        raise ValueError(f"unsupported confidence {confidence}; use one of {sorted(_Z_CRIT)}")
+    phat = k / n
+    z2 = z_crit * z_crit
+    denom = 1.0 + z2 / n
+    center = (phat + z2 / (2.0 * n)) / denom
+    margin = z_crit * math.sqrt(phat * (1.0 - phat) / n + z2 / (4.0 * n * n)) / denom
+    lo = max(0.0, center - margin)
+    hi = min(1.0, center + margin)
+    return (lo, hi)
+
+
 def _block_resample(n, block_len, rng):
     """Indices for one moving-block bootstrap replicate of length n."""
     idx = []

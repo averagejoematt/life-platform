@@ -466,6 +466,11 @@ def correlations(event: dict = None, *, _g) -> dict:
         meta_b = _METRIC_META.get(metric_b, {})
         r_val = float(p.get("pearson_r", p.get("r", 0)) or 0)
         n_val = int(p.get("n_days", p.get("n", 0)) or 0)
+        # #3445: the autocorrelation-corrected effective n stored alongside n_days —
+        # None (never coerced to n_val here) lets correlation_evidence fall back to
+        # raw n honestly for a record that predates n_eff, rather than us silently
+        # asserting a corrected value that was never computed.
+        n_eff_val = p.get("n_eff")
         fdr_flag = bool(p.get("fdr_significant", False))
         public_pairs.append(
             {
@@ -480,11 +485,11 @@ def correlations(event: dict = None, *, _g) -> dict:
                 "n": n_val,
                 "strength": _corr_strength(r_val, p.get("interpretation", p.get("strength", ""))),
                 "fdr_significant": p.get("fdr_significant", False),
-                # #1372 Evidence Bar: the per-claim rigor readout, computed by the
-                # ONE sanctioned pure function (stats_core.correlation_evidence,
-                # ADR-105) — never an authored grade. Additive field; the shape
-                # snapshot's key-added class is informational, not breaking.
-                "evidence": stats_core.correlation_evidence(r_val, n_val, fdr_significant=fdr_flag),
+                # #1372/#3445 Evidence Bar: the per-claim rigor readout, computed by
+                # the ONE sanctioned pure function (stats_core.correlation_evidence,
+                # ADR-105) — never an authored grade. n_eff (not raw n) drives the
+                # served level/score; a level flip vs raw n is real, not a bug.
+                "evidence": stats_core.correlation_evidence(r_val, n_val, n_eff=n_eff_val, fdr_significant=fdr_flag),
                 "correlation_type": p.get("correlation_type", "cross_sectional"),
                 "lag_days": int(p.get("lag_days", 0) or 0),
                 "description": p.get("description", ""),

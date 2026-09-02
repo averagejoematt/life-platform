@@ -538,6 +538,38 @@ def _resolved_code(value: Any, ctx: Ctx) -> Any:
     return out
 
 
+def _cfn_transcode(value: Any) -> Any:
+    """Reproduce what CloudFormation's GetTemplate does to a stored template's text (#3418):
+    every non-ASCII character comes back as a literal `?` (0x3F). Proven live 2026-09-01 by
+    triangulation on LifePlatformWeb's `AmjDistribution` Comment: the staged S3 template the
+    owner deploy submitted carries the UTF-8 em-dash (`\\xe2\\x80\\x94`), the live CloudFront
+    distribution carries U+2014, and `get-template --template-stage Original` for that same
+    deploy returns `?` — the loss is in the GetTemplate read, not in synth, submit, or the
+    provisioned resource."""
+    if isinstance(value, str):
+        return "".join(ch if ord(ch) < 128 else "?" for ch in value)
+    if isinstance(value, dict):
+        return {_cfn_transcode(k): _cfn_transcode(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_cfn_transcode(v) for v in value]
+    return value
+
+
+def transcode_equal(deployed: Any, synthesized: Any) -> bool:
+    """#3418: True when the deployed-side READ matches the synthesized value exactly, or
+    matches it after the GetTemplate non-ASCII→`?` transcode. Without this, any template
+    field containing an em-dash could NEVER equal its own deployed read, so its `Pending
+    owner cdk deploy` warning was unclearable by deploying — six such warnings stood on
+    every green run and re-minted within hours of a verified full-fleet deploy (#3365).
+    The rule is structural (the exact charset transcode, applied to the synth side only)
+    and one-directional: a repo edit that really changes `—` to `?` still equalizes (that
+    edit is invisible through the GetTemplate API — the same trade the CDK CLI makes when
+    its diff omits "likely mangled non-ASCII characters" unless --strict), but a deployed
+    `—` against a synth `?` does NOT equalize. Used only where the outcome would be the
+    advisory `pending_non_iam` path — every IAM-relevant comparison stays strict."""
+    return bool(deployed == synthesized or deployed == _cfn_transcode(synthesized))
+
+
 def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str, account: str) -> StackVerdict:
     """The pure core: two templates in, one StackVerdict out. Never raises on template content."""
     v = StackVerdict(stack=stack)
@@ -554,7 +586,7 @@ def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str,
     iam_touched = False
 
     for section in ("Parameters", "Rules", "Conditions", "Mappings", "Outputs", "Transform"):
-        if deployed.get(section) != synthesized.get(section):
+        if not transcode_equal(deployed.get(section), synthesized.get(section)):
             v.pending_non_iam.append(f"template.{section}")
 
     for lid in sorted(set(dres) | set(sres)):
@@ -616,6 +648,8 @@ def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str,
                 iam_touched = True
                 v.findings.append(Finding("iam-property-edit", lid, f"{typ}.{p} differs"))
                 continue
+            if transcode_equal(op.get(p), np_.get(p)):
+                continue  # #3418: differs only by the GetTemplate non-ASCII→`?` read — not a pending change
             problem = _tolerance_problem(typ, lid, p, np_.get(p), ctx)
             if problem is not None:
                 entry = f"{lid} ({typ}).{p}"
@@ -625,6 +659,8 @@ def evaluate_templates(stack: str, deployed: Any, synthesized: Any, region: str,
         for k in changed_attrs:
             if k == "Metadata" and _tolerance_problem(typ, lid, None, new.get(k), ctx) is None:
                 continue
+            if transcode_equal(old.get(k), new.get(k)):
+                continue  # #3418: same transcode-read equivalence, attribute level
             v.pending_non_iam.append(f"{lid} ({typ}) attribute {k}")
 
     if not iam_touched:

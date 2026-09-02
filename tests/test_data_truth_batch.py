@@ -6,7 +6,8 @@ actually have. Each test replays the review finding it closes:
   #488/A-5  hypothesis_engine read fields no writer emits → both columns dead
   #488/A-6  whoop onset window diluted by DATE#…#WORKOUT# sub-records
   #486/D-2  character engine + nutrition review read glucose_* names; writer emits blood_glucose_*
-  #486/B-3  body_fat_trajectory could never score (weight-only scale) → metabolic coverage capped
+  #486/B-3  body_fat_trajectory could never score (0 composition records at the time; the
+            "weight-only scale" premise expired 2026-08-16 — ADR-154 amendment/#3417) → coverage capped
   #491/M-6  Apple weight fallback engaged same-day only → latest_weight() is the ONE resolution
   #492/M-4  readiness score stored beside its ACTUAL inputs, and served from them
   #495/M-9  sleep_detail recovery substitution carries recovery_night_of + UI captions it

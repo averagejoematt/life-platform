@@ -184,6 +184,64 @@ def test_alarm_description_change_alone_is_no_iam_change_with_advisory(base):
     assert any("Pending owner cdk deploy" in line for line in g.render([v]))
 
 
+# ── #3418: the deployed side is a lossy READ (GetTemplate returns non-ASCII as `?`) ───────
+
+
+def _gettemplate_read(s: str) -> str:
+    """What `aws cloudformation get-template` returns for a stored string (#3418, proven live)."""
+    return "".join(ch if ord(ch) < 128 else "?" for ch in s)
+
+
+def test_gettemplate_transcoded_nonascii_alone_is_not_pending__3418(base):
+    """The six-warning treadmill (#3365 → #3418): the fixture's REAL AlarmDescription carries an
+    em-dash, and GetTemplate reads it back as `?`. That read artifact is not a pending change —
+    before this rule the warning was unclearable by deploying."""
+    dep, syn = _fresh(base)
+    desc = syn["Resources"][ALARM]["Properties"]["AlarmDescription"]
+    assert any(ord(ch) > 127 for ch in desc)  # the fixture is the wire: the em-dash is really in it
+    dep["Resources"][ALARM]["Properties"]["AlarmDescription"] = _gettemplate_read(desc)
+    v = _ev(dep, syn)
+    assert v.verdict == g.NO_CHANGE and not v.pending_non_iam and not v.findings
+
+
+def test_transcode_equivalence_is_one_directional__3418(base):
+    """Negative control: only the DEPLOYED side is the mangled one. A deployed real character
+    against a synth literal `?` is a genuine repo change and must still warn."""
+    dep, syn = _fresh(base)
+    desc = dep["Resources"][ALARM]["Properties"]["AlarmDescription"]
+    syn["Resources"][ALARM]["Properties"]["AlarmDescription"] = _gettemplate_read(desc)
+    v = _ev(dep, syn)
+    assert v.pending_non_iam == [f"{ALARM} (AWS::CloudWatch::Alarm).AlarmDescription"]
+
+
+def test_real_text_change_with_nonascii_still_warns__3418(base):
+    """Positive control for the must-fail case: a real wording change that happens to contain an
+    em-dash is still pending — the transcode equalizes reads, it never blinds the gate."""
+    dep, syn = _fresh(base)
+    syn["Resources"][ALARM]["Properties"]["AlarmDescription"] = "reworded — differently"
+    v = _ev(dep, syn)
+    assert v.pending_non_iam == [f"{ALARM} (AWS::CloudWatch::Alarm).AlarmDescription"]
+
+
+def test_mixed_resource_keeps_the_real_prop_and_drops_the_transcoded_one__3418(base):
+    dep, syn = _fresh(base)
+    desc = syn["Resources"][ALARM]["Properties"]["AlarmDescription"]
+    dep["Resources"][ALARM]["Properties"]["AlarmDescription"] = _gettemplate_read(desc)
+    syn["Resources"][ALARM]["Properties"]["Threshold"] = 99
+    v = _ev(dep, syn)
+    assert v.pending_non_iam == [f"{ALARM} (AWS::CloudWatch::Alarm).Threshold"]
+
+
+def test_transcoded_outputs_section_is_not_pending_but_a_real_outputs_change_is__3418(base):
+    """The `template.Outputs` member of the six — nested dict/list values transcode too."""
+    dep, syn = _fresh(base)
+    syn["Outputs"] = {"DlqUrl": {"Description": "DLQ — BUG-06", "Value": {"Fn::Join": ["", ["a — b"]]}}}
+    dep["Outputs"] = {"DlqUrl": {"Description": "DLQ ? BUG-06", "Value": {"Fn::Join": ["", ["a ? b"]]}}}
+    assert not _ev(dep, syn).pending_non_iam
+    dep["Outputs"]["DlqUrl"]["Description"] = "DLQ ? BUG-07"
+    assert _ev(dep, syn).pending_non_iam == ["template.Outputs"]
+
+
 def test_partition_ref_join_resource_resolves_into_namespace(base):
     dep, syn = _fresh(base)
     _stmts(syn).append(

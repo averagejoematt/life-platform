@@ -8,10 +8,21 @@ raw_layout facet kept claiming the layout was ACTUAL (#1256's "read it, don't
 construct keys" contract). This check makes every non-None raw_layout facet
 live-true: if the source's DDB partition shows a record within the last
 RAW_LIVENESS_DDB_LIVE_DAYS (the writer is demonstrably live — this is what
-separates "user didn't log / source paused" from "archive dead"), the newest
-object under the facet's prefix must be at most RAW_LIVENESS_MAX_AGE_DAYS old.
-The archive is written in the same run as the DDB store, so a live writer with
-a week-stale raw prefix is a dead archive, not a timing artifact.
+separates "user didn't log / source paused" from "archive dead"), the archive
+must not TRAIL that writer by more than RAW_LIVENESS_MAX_LAG_DAYS. The archive
+is written in the same run as the DDB store, so a live writer whose raw prefix
+lags it by a week is a dead archive, not a timing artifact.
+
+#3410 — the lag is measured against the writer, not against the wall clock,
+because the two clocks are not the same kind of thing. `days_quiet` counts whole
+PACIFIC CALENDAR DAYS back to the newest DDB `DATE#` (a *data day*); the raw
+object's age is FRACTIONAL UTC AGE of its `LastModified` (a *write time*), and a
+day-D object is always written at some hour during or after D. Comparing the two
+against one shared constant left a band in which a perfectly healthy archive was
+guaranteed to FAIL: withings, 2026-09-01T05:18Z, DDB `DATE#2026-08-24` and raw
+`2026/08/2026-08-24.json` — the SAME data day — scored days_quiet=7 (LIVE) and
+age=7.30d (dead), and held `qa-smoke-failures` in ALARM through launch day while
+masking the R7 fix (#3401) that had just landed underneath it.
 
 Own module per the qa_smoke size split (#1921/#1894 pattern): qa_smoke_lambda
 owns the AWS clients and the nightly wiring; this module owns the logic, so it
@@ -26,7 +37,7 @@ from common.pacific_time import PACIFIC  # #2798: raw/{YYYY}/{MM} partitions are
 USER_PREFIX = "USER#matthew#SOURCE#"
 
 RAW_LIVENESS_DDB_LIVE_DAYS = 7  # writer counts as live if a DATE# record landed within this window
-RAW_LIVENESS_MAX_AGE_DAYS = 7  # a live writer must have archived a raw object within this window
+RAW_LIVENESS_MAX_LAG_DAYS = 7  # how far the raw archive may trail the writer it archives (#3410)
 _RAW_LIVENESS_MAX_PAGES = 10  # per-prefix pagination bound (a busy HAE month can exceed one page)
 
 
@@ -125,17 +136,29 @@ def check_raw_archive_liveness(table, s3, s3_bucket, Check, content_truth, pt_no
             # Fail-soft until the operational_qa_smoke S3List raw/* grant deploys (#1949).
             checks.append(c.warn(f"{source} — S3 list under {prefix}/ failed (S3List raw/* grant deployed?): {e}"))
             continue
-        if age_days is not None and age_days <= RAW_LIVENESS_MAX_AGE_DAYS:
-            c.ok(f"{source} — raw archive live (newest object {age_days:.1f}d old under {prefix}/)")
+        # #3410: the archive is judged against the WRITER it archives, not the wall
+        # clock. `days_quiet` is already the writer's own distance from today, so
+        # subtracting it leaves how far the archive trails the writer — which is the
+        # only quantity that distinguishes a dead archive from a quiet user.
+        lag_days = None if age_days is None else age_days - days_quiet
+        if lag_days is not None and lag_days <= RAW_LIVENESS_MAX_LAG_DAYS:
+            c.ok(
+                f"{source} — raw archive live (newest object {age_days:.1f}d old under {prefix}/, "
+                f"trailing a writer last seen {days_quiet}d ago by {lag_days:.1f}d)"
+            )
         elif truncated and age_days is not None:
             # Pagination bound hit with pages unread — the newest object may be
             # in an unread page, so a FAIL here could be a false positive.
             c.warn(f"{source} — newest raw object under {prefix}/ looks {age_days:.0f}d old but the listing was truncated (inconclusive)")
         else:
-            seen = "no raw object found" if age_days is None else f"newest raw object is {age_days:.0f}d old"
+            seen = (
+                "no raw object found"
+                if age_days is None
+                else f"newest raw object is {age_days:.0f}d old — {lag_days:.0f}d behind the writer"
+            )
             c.fail(
                 f"{source} — writer is LIVE (DDB {newest_date}) but {seen} under {prefix}/ "
-                f"(max {RAW_LIVENESS_MAX_AGE_DAYS}d) — raw archive dead while its raw_layout facet claims ACTUAL (#1949 class)"
+                f"(max lag {RAW_LIVENESS_MAX_LAG_DAYS}d) — raw archive dead while its raw_layout facet claims ACTUAL (#1949 class)"
             )
         checks.append(c)
     return checks

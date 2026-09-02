@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -44,7 +45,7 @@ from privacy import privacy_guard  # deterministic real-name + vice scrub (layer
 
 import web.site_api_ai_request as _req  # #2688: body parsing lives in the extracted sibling
 import web.site_api_ai_session as _sess  # #546/#3118: the follow-up session store lives in the extracted sibling
-from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
+import web.site_api_board_panel as _board_panel  # #3419: the parallel persona pass lives in the extracted sibling
 from web.ask_retrieval import retrieve_block as _ask_retrieve  # #2348: the question selects published-archive passages (fail-soft)
 
 # #2667: the context/facts fetch layer lives in the extracted sibling — the size
@@ -169,8 +170,11 @@ CORS_HEADERS = {
 # Old stores kept as fallbacks if rate_limiter import fails.
 _ask_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
 _board_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
-BOARD_RATE_LIMIT = 5  # 5 Bedrock calls/IP/hr. #1221 box 5: this is now a FAN-OUT budget, not a
+BOARD_RATE_LIMIT = 7  # 7 Bedrock calls/IP/hr. #1221 box 5: this is a FAN-OUT budget, not a
 # request count — a panel charges one token per persona (cap 8), so it can no longer buy 8x its price.
+# #3419: 5 → 7 (2026-09-02) so the advertised "full board (7)" is actually purchasable — at 5, the
+# 1+6 fan-out charge made the checkbox 429 by arithmetic for every reader since #2930. One full
+# board per IP per hour; the wall-time side is covered by the parallel persona pass below.
 
 # ── #546: board follow-up sessions (short-lived, server-side, opaque token) ──
 # A board_ask response mints an opaque session token; a follow-up carrying that
@@ -687,6 +691,22 @@ def _retain_board_flag(pid: str, verdict: str, draft: str, final: str, findings:
         pass
 
 
+def _observe_board_verdict(pid: str, text: str) -> None:
+    # #3414: recover the ADR-108 voice verdict OFF the reader path. One
+    # fire-and-forget Event invoke via web/board_verdict_observer, sent after
+    # the answer is final: the verdict is captured CALLEE-side (CloudWatch +
+    # eval retention, disposition "observed"), nothing is awaited, and nothing
+    # returned can change the text the reader already has. Observe-only by
+    # design — ADR-108's enforcement scope stays daily-brief-only (#3413); this
+    # channel measures the board's voice-fidelity rate, it never enforces.
+    try:
+        from web import board_verdict_observer
+
+        board_verdict_observer.observe(pid, text)
+    except Exception:  # noqa: BLE001 — telemetry is never load-bearing
+        pass
+
+
 def _write_board_interaction(pid: str, question: str, answer: str, grounded: bool) -> None:
     """#531: episodic write-back — a public board answer enters the coach's OWN
     memory (PK=COACH#{pid}, SK=INTERACTION#{date}#{qhash}) so the weekly
@@ -730,15 +750,24 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
         logger.warning(f"[board_ask] interaction write-back failed for {pid} (non-fatal): {e}")
 
 
-# ── #968: ADR-108 quality gate on the public board ─────────────────────────
-# The coach-voiced board answers (initial ask + follow-up) run the SAME
-# coach-quality-gate lambda the daily brief enforces — but evaluate-then-
-# regenerate-once under a hard time budget off the real Lambda deadline, and
-# FAIL-OPEN (a reader is synchronously waiting; the fabrication class is
-# already fail-closed via the ADR-104 grounding gate above, so this gate
-# protects voice fidelity only). The full contract, budget mechanics and the
-# ADR-103 scope posture live in `web/board_quality_gate.py` (split out per
-# the 2000-line handler size gate); the `_bqg` alias is imported at the top.
+# ── #3413: the ADR-108 quality gate is NOT on this reader path ─────────────
+# It was (#968), synchronously, and it never once worked. Measured 2026-09-01:
+# `coach-quality-gate` Duration over 48h is n=68, p50=16371ms, p90=30000ms (its
+# own ceiling) — so the MEDIAN call alone exceeded the whole 14s evaluate budget,
+# and the 10s client cap sat below the gate's daily MEAN every day for a week.
+# Live proof over 7 days of board traffic: 8 gate attempts → 6 "skipped", 2 read
+# timeouts, ZERO verdicts, and `BoardQualityGateFired` has no datapoint in all of
+# August. The gate was ~10s of guaranteed reader latency per grounded coach with
+# the result discarded, on a 30s budget shared with up to 8 SEQUENTIAL coach
+# generations — which is how /api/board_ask came to serve 504s on launch day.
+# Fabrication protection is unaffected: that is the ADR-104 grounding gate above
+# (pure, deterministic, no network, fail-closed) and it is independent of this
+# gate, whose scope was voice fidelity only. Per its own docstring, "an
+# off-voice-but-grounded answer beats no answer".
+# The voice verdict is recovered OFF the reader path by #3414: after an answer
+# is served, `_observe_board_verdict` queues one fire-and-forget Event invoke
+# and the verdict lands callee-side (metrics + retention) — observe-only,
+# never a wait, never a regenerate-or-hold.
 
 
 # ── #546: board follow-up sessions ─────────────────────────
@@ -770,9 +799,6 @@ def _append_board_turn(token: str, ip_hash: str, persona: str, question: str, an
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     """Routes /api/ask (POST) and /api/board_ask (POST) only."""
-    # #968: capture the invocation context so the ADR-108 board quality gate
-    # can enforce its hard time budget off the REAL Lambda deadline.
-    _bqg.set_lambda_context(context)
     # Phase 2.2: centralized request envelope validation (Body size cap +
     # injection pattern detection + param format checks). Returns 4xx on abuse.
     try:
@@ -1159,7 +1185,7 @@ def _handle_explain(event: dict) -> dict:
 
 
 def _handle_board_ask(event: dict) -> dict:
-    """POST /api/board_ask — 6-persona board panel answers."""
+    """POST /api/board_ask — board panel answers (up to the full 7-coach roster)."""
     _paused = _ai_paused_response()
     if _paused:
         return _paused
@@ -1269,9 +1295,12 @@ def _handle_board_ask(event: dict) -> dict:
             _now = int(time.time())
             _hour_ago = _now - 3600
             _ts = [t for t in _board_rate_store.get(ip_hash, []) if t > _hour_ago]
-            _ts.extend([_now] * _extra)
+            # #3419: pre-check — a fan-out that cannot fit must not burn the
+            # window (mirrors the conditional charge in common.rate_limiter).
+            _fan_allowed = len(_ts) + _extra <= BOARD_RATE_LIMIT
+            if _fan_allowed:
+                _ts.extend([_now] * _extra)
             _board_rate_store[ip_hash] = _ts[-40:]
-            _fan_allowed = len(_ts) <= BOARD_RATE_LIMIT
             _fan_retry = 3600
         if not _fan_allowed:
             _emit_rate_limit_metric("board_ask")
@@ -1296,138 +1325,12 @@ def _handle_board_ask(event: dict) -> dict:
     # #743: the reader-facing grounding receipt — code-derived straight off the
     # SAME brief every persona turn was built from, never off the model's text.
     grounding = board_grounding_receipts(_brief_ctx)
-    responses = {}
-    threads: dict = {}  # #546: opening transcript per coach that actually answered
-    for pid in personas:
-        p = COACH_ROSTER[pid]
-        try:
-            # #531: one mind per coach — the board self loads the same memory the
-            # daily-brief self reasons from (stance + compressed state), plus its
-            # own recent board answers (episodic). All volatile → user turn, so
-            # the persona system block stays byte-stable for the prompt cache.
-            stance = _coach_stance_bits(pid)
-            memory = _coach_memory_bits(pid)
-            episodic = _coach_recent_interactions(pid)
-            user_msg = (
-                f"CURRENT DATA (authoritative — cite only these numbers): {facts}\n"
-                # #1086: the phase block rides the user turn (volatile), never
-                # the cached persona system block — COST-OPT-2.
-                + f"{_phase_context_block()}\n"
-                + (f"YOUR CURRENT READ (your own published stance): {stance}\n" if stance else "")
-                + (f"YOUR MEMORY (the compressed history your weekly summarizer maintains): {memory}\n" if memory else "")
-                + (
-                    f"YOUR RECENT BOARD ANSWERS (reference them when relevant — never silently contradict them):\n{episodic}\n"
-                    if episodic
-                    else ""
-                )
-                + f"READER QUESTION: {wrap_untrusted_reader_text(question)}"  # R22-SEC-04 (#811)
-            )
-            _sys_txt = _coach_system(pid)
-            req_body = json.dumps(
-                {
-                    "model": AI_MODEL_HAIKU,
-                    # #531 follow-up: 300 → 450. The voice-core selves write
-                    # longer analytical sentences; at 300 the closing sentence
-                    # was truncating mid-thought on the public page.
-                    "max_tokens": 450,
-                    "system": [
-                        {
-                            "type": "text",
-                            "text": _sys_txt,
-                            "cache_control": {"type": "ephemeral"},
-                        }
-                    ],
-                    "messages": [{"role": "user", "content": user_msg}],
-                }
-            )
-            # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
-            # No retry wrapper — board_ask makes 6 calls/request; a transient
-            # Bedrock error on call N degrades cleanly to "[name] temporarily
-            # unavailable" for that persona. bedrock_client is bundled in
-            # /var/task via Code.from_asset, so it imports even though site-api-ai
-            # runs without the shared layer.
-            from ai.bedrock_client import invoke as _bedrock_invoke
 
-            result = _bedrock_invoke(json.loads(req_body))
-            # V2 follow-up: emit per-persona token metrics (was dark)
-            _emit_token_metrics(result.get("usage", {}), endpoint="api_board_ask")
-            _txt = _scrub_blocked_terms("".join(b["text"] for b in (result.get("content") or []) if b.get("type") == "text"))
-
-            # ADR-104 grounding gate (reader-facing → fail-closed, no regen —
-            # board_ask already costs ~6 calls/request): any number the coach
-            # states must exist in its system context, the facts, its stance,
-            # or the question. Ungrounded → an honest in-voice refusal, never
-            # a fabricated figure served to a reader.
-            _grounded = True
-            try:
-                from ai import grounded_generation as _gg
-
-                _gf = board_grounding_findings(_sys_txt, user_msg, _txt)
-                if _gf:
-                    _draft = _txt  # #812/#744: keep the flagged draft for retention
-                    logger.warning(f"[board_ask] {pid} ungrounded: {[f['detail'] for f in _gf][:3]}")
-                    _grounded = False
-                    _refusal = (
-                        "I'd want to answer that with numbers I can actually stand behind, and I can't "
-                        "ground them in today's record — ask me about something the current data covers."
-                    )
-                    # #531 follow-up (live drill 2026-07-04): ONE corrective
-                    # rewrite before falling back to the refusal — the same
-                    # discipline the daily-brief self gets (regen-once). The
-                    # richer voice core raised fabrication pressure enough
-                    # that a fixable stray figure was turning good answers
-                    # into refusals. Bounded: at most one extra Haiku call per
-                    # flagged persona, inside the 5/hr/IP rate limit.
-                    try:
-                        _corr_body = json.loads(req_body)
-                        _corr_body["messages"] = [{"role": "user", "content": user_msg + "\n\n" + _gg.correction_prompt(_gf)}]
-                        _retry = _bedrock_invoke(_corr_body)
-                        _emit_token_metrics(_retry.get("usage", {}), endpoint="api_board_ask")
-                        _txt2 = _scrub_blocked_terms("".join(b["text"] for b in _retry.get("content", []) if b.get("type") == "text"))
-                        if _txt2.strip() and not board_grounding_findings(_sys_txt, user_msg, _txt2):
-                            _txt = _txt2
-                            _grounded = True
-                            logger.info(f"[board_ask] {pid} corrected once — grounded on retry")
-                        else:
-                            _txt = _refusal
-                    except Exception as _rt_e:
-                        logger.warning(f"[board_ask] {pid} correction retry failed: {_rt_e}")
-                        _txt = _refusal
-                    _retain_board_flag(pid, "flagged_corrected" if _grounded else "flagged_refused", _draft, _txt, _gf)
-            except ImportError:
-                pass  # helper not bundled — serve as before
-            except Exception as _gg_e:
-                logger.warning(f"[board_ask] {pid} grounding gate error (fail-open): {_gg_e}")
-
-            # #968: ADR-108 quality gate (voice/anti-pattern/decision-class) —
-            # only a GROUNDED real answer is worth gating (a refusal is canned
-            # text). Fail-open under a hard time budget; a corrected rewrite
-            # must re-pass the ADR-104 grounding check before it can be served.
-            if _grounded:
-
-                def _qg_regen(_note, _req=req_body, _um=user_msg):
-                    _b = json.loads(_req)
-                    _b["messages"] = [{"role": "user", "content": _um + "\n\n" + _note}]
-                    _r = _bedrock_invoke(_b)
-                    _emit_token_metrics(_r.get("usage", {}), endpoint="api_board_ask")
-                    return _scrub_blocked_terms("".join(b["text"] for b in _r.get("content", []) if b.get("type") == "text"))
-
-                def _qg_grounded(_t, _s=_sys_txt, _u=user_msg):
-                    return not board_grounding_findings(_s, _u, _t)
-
-                _txt = _bqg.enforce(pid, _txt, _qg_regen, _qg_grounded, _retain_board_flag)
-
-            # #531: the answer enters the coach's own memory (fail-soft).
-            _write_board_interaction(pid, question, _txt, grounded=_grounded)
-
-            responses[pid] = _txt
-            # #546: seed a follow-up thread for every coach that gave a real
-            # answer (an unavailable stub carries nothing to build on).
-            if _grounded:
-                threads[pid] = [{"q": question, "a": _txt}]
-        except Exception as e:
-            logger.error(f"[board_ask] {pid} failed: {e}")
-            responses[pid] = f"[{p['name']} is temporarily unavailable]"
+    # ── #3419: the persona pass is PARALLEL ── the machinery (prep → threaded
+    # generation → main-thread side effects) lives in web/site_api_board_panel.py
+    # (module-size guard). It calls back through THIS module for every
+    # collaborator, so the existing monkeypatch seams keep gating the real path.
+    responses, threads = _board_panel.convene(sys.modules[__name__], personas, question, facts)
 
     # #546: mint a short-lived session so the reader can follow up with any coach
     # that answered. Fail-soft — a session-write hiccup never blocks the answers.
@@ -1647,35 +1550,16 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     except Exception as _gg_e:
         logger.warning(f"[board_ask] follow-up {persona} grounding gate error (fail-open): {_gg_e}")
 
-    # #968: ADR-108 quality gate, per turn — same contract as the initial path
-    # (fail-open, hard time budget, corrected rewrite must re-ground against
-    # the full transcript + prior answers before it can be served).
-    if _grounded:
-
-        def _qg_regen(_note):
-            _corr = list(messages)
-            _corr[-1] = {"role": "user", "content": messages[-1]["content"] + "\n\n" + _note}
-            _r = _bedrock_invoke(
-                {
-                    "model": AI_MODEL_HAIKU,
-                    "max_tokens": 450,
-                    "system": [{"type": "text", "text": _sys_txt, "cache_control": {"type": "ephemeral"}}],
-                    "messages": _corr,
-                }
-            )
-            _emit_token_metrics(_r.get("usage", {}), endpoint="api_board_ask")
-            return _scrub_blocked_terms("".join(b["text"] for b in _r.get("content", []) if b.get("type") == "text"))
-
-        def _qg_grounded(_t):
-            _mt = " ".join(m["content"] for m in messages if isinstance(m.get("content"), str))
-            return not board_grounding_findings(_sys_txt, _mt, _t, prior_answers=prior_answers)
-
-        _txt = _bqg.enforce(persona, _txt, _qg_regen, _qg_grounded, _retain_board_flag, endpoint="board_followup")
+    # #3413: the ADR-108 quality gate used to run here per turn, synchronously.
+    # Removed with the initial-ask call site — same measurement, same reasoning.
 
     # Persist the turn (atomic append + counter bump, re-checks the cap and IP).
     persisted = _append_board_turn(token, ip_hash, persona, question, _txt)
     # The answer also enters the coach's own episodic memory (fail-soft, #531).
     _write_board_interaction(persona, question, _txt, grounded=_grounded)
+    # #3414: same async voice-verdict capture as the initial path, per turn.
+    if _grounded:
+        _observe_board_verdict(persona, _txt)
 
     remaining = max(0, MAX_FOLLOWUPS - (used + 1)) if persisted else max(0, MAX_FOLLOWUPS - used)
     return {

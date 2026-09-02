@@ -467,11 +467,27 @@ def test_capture_script_reuses_the_shared_sentinel_scan_not_a_copy():
 
 
 def test_sentinel_scan_flags_a_leaked_undefined_in_a_live_style_payload():
+    """#3453: a real leak renders as a VALUE (label-adjacent or the whole string),
+    not padded into a sentence — this fixture was rewritten from the pre-#3453
+    "value is undefined right now" wording, which turned out to be indistinguishable
+    from the platform's own honest prose (see test_sentinel_scan_does_not_fire_on_
+    undefined_mid_sentence_prose below) and is no longer a valid leak fixture."""
+    import accuracy_audit as aa
+
+    findings = aa.scan_json_value_leaks({"vitals": {"note": "Weight: undefined"}}, "test:/api/vitals")
+    assert findings
+    assert findings[0]["where"] == ".vitals.note"
+
+
+def test_sentinel_scan_does_not_fire_on_undefined_mid_sentence_prose():
+    """#3453: the false positive that reds the review instrument — "undefined"
+    flanked by two ordinary lowercase words is honest prose (the platform's own
+    method-registry page reads "...skill is undefined against a degenerate base
+    rate..."), not a rendered-value leak, and must not fire."""
     import accuracy_audit as aa
 
     findings = aa.scan_json_value_leaks({"vitals": {"note": "value is undefined right now"}}, "test:/api/vitals")
-    assert findings
-    assert findings[0]["where"] == ".vitals.note"
+    assert findings == []
 
 
 # ── #3324: the sentinel scan is anchored to whole string values for None/null ────
@@ -521,14 +537,32 @@ def test_sentinel_scan_does_not_fire_on_null_hypothesis_prose():
     assert findings == []
 
 
-def test_sentinel_scan_still_fires_on_js_runtime_leaks_mid_sentence():
-    """The JS-runtime-only tokens (undefined/NaN/[object Object]) are NOT common
-    English — a mid-string match still counts, unlike None/null. Re-asserted here
-    (alongside the existing undefined test) for NaN and [object Object]."""
+def test_sentinel_scan_still_fires_on_object_object_mid_sentence():
+    """The "[object Object]" token is JS's literal `Object.prototype.toString()`
+    output, bracket-delimited — it is NOT common English, so a mid-string match
+    still counts. #3453 does not touch this one (only "undefined"/"NaN" turned
+    out to have a false-positive risk — see the mid-sentence tests below)."""
     import accuracy_audit as aa
 
-    assert aa.scan_json_value_leaks({"a": "score is NaN this week"}, "src")
     assert aa.scan_json_value_leaks({"a": "rendered [object Object] on the card"}, "src")
+
+
+def test_sentinel_scan_still_fires_on_a_value_position_nan_leak():
+    """#3453: "NaN" fires when it's in a rendered-value position (label-adjacent),
+    the shape a real leak actually takes."""
+    import accuracy_audit as aa
+
+    assert aa.scan_json_value_leaks({"a": "ACWR score: NaN"}, "src")
+
+
+def test_sentinel_scan_does_not_fire_on_nan_mid_sentence_prose():
+    """#3453: "NaN" flanked by two ordinary lowercase words ("score is NaN this
+    week") is the same false-positive shape as the "undefined" case — pre-#3453
+    this fired as a bare substring match; it must not fire once the rule is
+    structural (position, not phrase)."""
+    import accuracy_audit as aa
+
+    assert aa.scan_json_value_leaks({"a": "score is NaN this week"}, "src") == []
 
 
 # ── #2578/#3324: can-it-fail proof for the nullable-aware shape rule ─────────────

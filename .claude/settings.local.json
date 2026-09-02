@@ -318,7 +318,8 @@
       "Bash(SP2=/private/tmp/claude-501/-Users-matthewwalker-Documents-Claude-life-platform/c3d9198f-1ccf-4fc5-8a04-3c6fdeb0f5ef/scratchpad/runs2; bash scripts/coach_sim_runall.sh $SP2 1.30)",
       "Bash(bash scripts/coach_sim_runall.sh /private/tmp/claude-501/-Users-matthewwalker-Documents-Claude-life-platform/c3d9198f-1ccf-4fc5-8a04-3c6fdeb0f5ef/scratchpad/runs3 1.30)",
       "Bash(.venv/bin/black --check tests/test_heartbeat_completeness.py)",
-      "Bash(/Users/matthewwalker/dev/life-platform/.venv-black/bin/black tests/test_heartbeat_completeness.py)"
+      "Bash(/Users/matthewwalker/dev/life-platform/.venv-black/bin/black tests/test_heartbeat_completeness.py)",
+      "Bash(aws s3 *)"
     ]
   },
   "enableAllProjectMcpServers": true,

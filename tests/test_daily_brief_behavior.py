@@ -2039,11 +2039,30 @@ class TestPublishedTrendArrays:
         brief.lambda_handler({}, None)
         assert _published(handler_env)["vitals"]["sleep_hours_30d_avg"] == 7.0
 
+    def test_the_thirty_day_sleep_average_carries_its_n(self, handler_env):
+        """#3451: the average must never ship without the reading count behind it —
+        a Whoop outage would otherwise silently shrink "30d" with no visible tell."""
+        brief.lambda_handler({}, None)
+        v = _published(handler_env)["vitals"]
+        assert v["sleep_hours_30d_n"] == 20, "20 whoop rows were seeded — n must count exactly them"
+        assert (
+            v["sleep_hours_30d_avg"] is not None and v["sleep_hours_30d_n"] is not None
+        ), "the average and its n must ship as a pair — never one without the other"
+
     def test_the_weight_as_of_date_travels_with_the_weight(self, handler_env):
         """#1924 — a reading has to carry its own date or the coach narrates a
         stale number as current."""
         brief.lambda_handler({}, None)
         assert _published(handler_env)["vitals"]["weight_as_of"] == YESTERDAY
+
+
+def test_sleep_average_and_its_n_are_null_together_with_no_readings(handler_env):
+    """#3451: with no whoop rows at all, the average AND its n must both be null —
+    never a bare n=0 next to a null average, and never an average with no n."""
+    brief.lambda_handler({}, None)
+    v = _published(handler_env)["vitals"]
+    assert v["sleep_hours_30d_avg"] is None
+    assert v["sleep_hours_30d_n"] is None
 
 
 class TestInlineFallbackPath:
