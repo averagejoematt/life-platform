@@ -177,17 +177,28 @@ def test_repo_config_carries_values_alignment_balanced():
 
 
 def test_get_flourishing_trend_ema_provenance_and_framing(monkeypatch):
+    from health.flourishing import ema_series
+
     from mcp import tools_journal as tj
 
+    # Gapped fixture (#3452 F1/F2): four widely-spaced rows (100+ day gaps
+    # between them), not ten consecutive days — closer to the real production
+    # density (20 rows over a 222-day window) than a tidy daily run. This is
+    # what proves the recurrence is OBSERVATION-indexed rather than
+    # calendar-indexed: a naive day-decayed EMA would erase a reading from
+    # months back, but health.flourishing.ema_series only ever advances on
+    # rows that carry a value, so this gapped series produces exactly the
+    # same EMA as four adjacent days would.
+    gapped_dates = ["2025-11-01", "2026-02-09", "2026-05-20", "2026-07-10"]
     rows = [
         {
             "pk": "USER#matthew#SOURCE#flourishing",
-            "sk": f"DATE#2026-07-{d:02d}",
-            "date": f"2026-07-{d:02d}",
-            "values_lived_count": Decimal(d % 3),
+            "sk": f"DATE#{dt}",
+            "date": dt,
+            "values_lived_count": Decimal(i % 3),
             "enrichment_model": "claude-haiku-4-5",
         }
-        for d in range(1, 11)
+        for i, dt in enumerate(gapped_dates)
     ]
 
     class _T:
@@ -195,10 +206,16 @@ def test_get_flourishing_trend_ema_provenance_and_framing(monkeypatch):
             return {"Items": rows}
 
     monkeypatch.setattr(tj, "table", _T())
-    out = tj.tool_get_flourishing_trend({"days": 30})
+    out = tj.tool_get_flourishing_trend({"days": 365})
     sig = out["signals"]["values_lived_count"]
-    assert sig["n"] == 10 and sig["ema"] is not None
+    assert sig["n"] == 4 and sig["ema"] is not None
     assert sig["latest"]["date"] == "2026-07-10"
+    # Position-indexed: matches the same recurrence run directly over the
+    # ordered values with the calendar gaps discarded entirely.
+    assert sig["ema"] == ema_series([i % 3 for i in range(4)], span=14)
     assert "LLM-coded from journal text (model claude-haiku-4-5)" == out["provenance"]
     assert "tracking break" in out["_framing"]  # anti-rumination framing (review warning #1)
     assert out["signals"]["ownership_score"]["n"] == 0  # absent signal reported honestly
+    # #3452: the payload names the semantics a bare "ema_span" integer can't —
+    # gaps between entries are carried, not decayed by elapsed time.
+    assert "observation-indexed" in out["ema_span_semantics"]
