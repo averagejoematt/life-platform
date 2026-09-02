@@ -499,3 +499,5 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | emf_namespaces | 31 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 88 | this model's schedules plane (CDK AST) |
 | secrets | 28 | `tests/test_secret_references.py::KNOWN_SECRETS` |
+
+Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.
