@@ -44,11 +44,11 @@ section heading is the anchor; where it cites a code file, the file's header doc
 ## Coverage — 2026-09-02 (Session S: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session Q: +1 reference +1 project, snapshot + counters updated in the same edit as the rows). Prior: 2026-09-01 (Session P: +2 reference +1 project; regenerated from the rows after CI caught the snapshot/coverage drift). Prior: 2026-08-31 (Session O: +1 reference; reconcile: +1 reference +1 project the N/fin-diligence wraps added as rows but not here; Session M: +3 reference)
 
 <!-- LEDGER-COVERAGE:START -->
-**Files in the memory index snapshot: 392** — feedback 22 · reference 217 · security 1 · project 149 · user 1 · index 2
+**Files in the memory index snapshot: 394** — feedback 22 · reference 218 · security 1 · project 150 · user 1 · index 2
 
-**Rule-class files (feedback + reference + security): 240** — homed-here 58 · already-homed 162 · superseded 7 · narrative 11 · off-repo 2
+**Rule-class files (feedback + reference + security): 241** — homed-here 58 · already-homed 162 · superseded 7 · narrative 12 · off-repo 2
 
-**Program/session files (project): 149** — already-homed 14 · superseded 1 · narrative 131 · off-repo 2 · index 1
+**Program/session files (project): 150** — already-homed 14 · superseded 1 · narrative 132 · off-repo 2 · index 1
 
 **Out of scope: user 1 · index 2**
 <!-- LEDGER-COVERAGE:END -->
@@ -216,6 +216,7 @@ project_session_p_2026_09_01.md
 project_session_q_2026_09_01.md
 project_session_r_2026_09_01.md
 project_session_s_2026_09_02.md
+project_session_t_2026_09_02.md
 project_shipped_archive.md
 project_silent_failure_drain_2026_08_15.md
 project_social_membrane_2026_07_21.md
@@ -349,6 +350,7 @@ reference_git_add_a_sweeps_concurrent_agent_edits.md
 reference_git_checkout_path_destroys_your_own_edit.md
 reference_git_stash_shared_across_worktrees.md
 reference_github_env_protection_private_flip.md
+reference_gh_hosts_yml_write_race.md
 reference_github_event_swallow_recovery.md
 reference_github_token_push_never_dispatches.md
 reference_gitleaks_push_only.md
@@ -863,6 +865,8 @@ carries an operating rule.
 | `project_wrong_day_and_wrong_gauge_2026_08_18.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_q_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 | `project_session_s_2026_09_02.md` | project | session narrative — the durable rule went to its own reference file, the rest is handover-class history | narrative |
+| `project_session_t_2026_09_02.md` | project | session narrative — durable rules went to the lease/swallow/gh-race reference files, the rest is handover-class history | narrative |
+| `reference_gh_hosts_yml_write_race.md` | reference | laptop-local gh credential state — no repo file can hold the recovery (only the owner's `gh auth login`); the concurrency-hygiene half (fewer parallel gh pollers) is session discipline, not code | narrative |
 | `project_session_r_2026_09_01.md` | project | — narrative: a program/session record; the repo's equivalent is the `session-archive` branch of `handovers/` | narrative |
 
 ## Out of scope

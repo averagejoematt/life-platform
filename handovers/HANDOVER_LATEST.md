@@ -1,174 +1,150 @@
-# Handover — 2026-09-02 (Fable 5): Session S — the repair, the night-shift crew, and the proof of the numbers
+# Handover — 2026-09-02 (Fable 5): Session T — the drain to the floor
 
-**Session:** Claude Fable 5, executing the owner-approved Session S plan ("read the plan and
-get going") — Phase 0 boot/overnight reads, Phase 1 the #3419 full-board repair decided on
-evidence, Phase 2 the operator staff legs (#3422/#3423), Phase 3 the calculation-proof pass
-(`/review accuracy`, formula-family variant), Phase 4 this wrap. All Monarch/financial work
-stayed pulled per the owner call (#1407 parked to Roadmap; the architecture question is a
-named 09-08 Architect-ritual input).
+**Session:** Claude Fable 5, executing the owner-approved Session T plan ("do the next
+session plan" — maximal drain + the owner window). Phase 0 boot reads; Phase 1 the two
+P1 pipe repairs driver-run in order (#3442 → #3443); Phase 2 three lane waves (9
+worktree-implementer lanes, all landed); Phase 3 driver work (#3448, #3373 design, the
+owner window — both gate:owner items cleared IN-SESSION); pre-wrap: the 5 stale
+dependabot PRs folded in. **Target was 14–16 closes; landed 18** (plus 2 filed), with
+every survivor's reason named. The owner was present throughout — approved the IAM
+apply, picked (a) on #3424, and approved the Session U plan.
 
----
+## What shipped — 24 PRs merged (19 session + 5 dependabot), 3 approved fleet deploys, 18 issues closed
 
-## What shipped (4 PRs merged, all deploys verified by shipped CONTENT)
+**The P1 pipe repairs (driver-run, deployed, live-proven):**
+- **#3442 / PR #3456** — the whoop `DATE#<d>#WORKOUT#<uuid>` clobber class: ONE shared
+  day-row predicate (`digest_utils.DAY_SK_RE`/`is_day_row`/`filter_day_rows`),
+  `query_range` day-rows-only as the paved road, all 8 member sites fixed, field_notes'
+  prior-art regex converged, and the SET guard — an AST census registry pinning every
+  literal-whoop query site (32 modules) by lane; a 9th member cannot silently re-join.
+  The verifier's byte-exact reproductions are wire-fixture regressions through the REAL
+  code paths (W35 hrv_vs_recovery 11/.9799→14/.9666; ACWR 08-31 0.945→1.040, 24/85 days).
+- **#3443 / PR #3457** — ACWR survives the night: co-owned field registry
+  (`compute/computed_metrics_contract.py`), read-before-put carry in BOTH from-scratch
+  rebuilds (fail-loud), a derivation guard pinning the acwr writer's UpdateExpression to
+  the registry, and the dead-man (`operational/acwr_liveness_qa`, >48h red — this
+  incident pages on day 2). **The filed #3135 hypothesis was REFUTED**: the real trigger
+  is the #2811 PT-clock correction re-aiming the evening re-put from UTC-yesterday (a
+  wrong-record latent bug that accidentally protected the merge) onto PT-yesterday.
+  **Backfill: all 8 dark days restored with clean values — 08-31 serves 1.040 live**, the
+  exact number the #3442 verifier predicted; 09-01 corrected to 1.017; 09-02 seeded for
+  tonight's 00:00Z survival observation.
 
-| PR | Issue | What |
-|---|---|---|
-| #3439 | **#3419** | **The full board (7) is deliverable for the first time ever.** The live probe settled the decision harder than the plan expected: even the 5-persona panel — the max the rate arithmetic allowed — timed out at the Lambda's OWN 30s ceiling (`Status: timeout`, persona 5 never ran). So option (b) "cap at 5" was never real; shipped (a): `BOARD_RATE_LIMIT` 5→7, the persona pass PARALLELIZED (extracted to `web/site_api_board_panel.py` for the module-size guard; DDB reads before / boto3 side effects after on the main thread, workers Bedrock+pure-grounding only; `bedrock_client`/`budget_guard` lazy clients creation-locked), and the window-burn sub-fix — `check_rate_limit` charges via conditional `ADD`, a rejected request consumes NOTHING, `cost>limit` rejects before any write (red-then-green on the exact 1+6>5 shape). **Live proof: HTTP 200 in 17.2s wall / 15.2s origin, all 7 coaches answered, 0 unavailable** — vs the baseline 504. Closed realized. |
-| #3441 | **#3423** | Reader-audience alarms escalate on FIRST red: `audience: reader` facet on the model's alarms plane (11 alarms tagged with per-alarm rulings, 3 declined with reasons), the conditional bar in BOTH citation-gate legs (`check_alarm_citations.py` + `remediation/agent.py`'s needs-human email — the chosen channel), the 08-31 launch-day episode replayed red-then-green both directions. Non-reader 72h bar + #2912 lookback regression-proven unchanged. Closed realized. |
-| #3440 | **#3422** | The reject-only steward mechanized by PINNING the existing #3021 janitor (the lane's central finding: it already exists and is armed — building a twin would have been a vocabulary copy): run-bearing-sha rule + rejection-comment grammar as contracts against `check_main_green.py`'s REAL classifier, reject-only proven structural by mutation both directions. **Closed `partial` and REOPENED**: the live measurement (below) shows the janitor's actual sweep cadence is 2–4.5 **hours**, not 15 minutes — the Outcome's "within minutes" is not yet true; the one open leg (measure the interval distribution; accept a bound or move to an event hook) is named on the issue. |
-| #3454 | — | `docs/reviews/CALCULATION_PROOF_2026-09-02.md` + `calc_proof_grades_2026-09-02.json` — the Phase 3 scorecard (below). Docs-only. |
+**The lane waves (9 lanes, 9 PRs):** #3444/PR #3463 (phase-filter third wave + the
+ratchet traced through digest_utils; 2 further sites recorded as debt) · #3445/PR #3460
+(Evidence Bar MAP-shape + n_eff — a real level-flip found in live W35 data) · #3446/PR
+#3459 (input_status-aware Day-1 guard; the live force-recompute proved it) · #3447/PR
+#3461 (budget-ledger invariants; live check surfaced an unregistered billed secret) ·
+#3449/PR #3465 (closure-aware registry fingerprints, 3 blind spots proven to trip) ·
+#3450/PR #3467 (Wilson accuracy_ci95 everywhere + settled/open disjointness — the
+DIL-039/040 8/37 [11.4%, 37.2%] number is now the served format) · #3451/PR #3466
+(sleep n + device disclosure, Playwright DOM proof) · #3453/PR #3464 (structural
+value-position sentinel — 5th phrase-matched family member retired) · **#3430/PR #3471
+(opus root-cause: the compute-pipeline flap was a FALSE POSITIVE — operator pre-cron
+dry-runs + Period-86400 evaluation arithmetic; 0-of-4 true positives in 60d; #1962's
+premise falsified by the metric record; the authoritative-run gate ships with positive
+controls).**
 
-## Phase 3 — the calculation-proof pass (the session's spine)
+**Driver work:** #3448/PR #3462 (the 2% null stamped as a documented ADR-105 exception —
+registry entry `directional_trend_verdict`, executable failure regimes, September n≥30
+re-derive trigger) · the #3373 design comment (substrate, row schema, five primitives,
+the #3447 interplay, the governor hold_until ruling — carry, implementation on the owner
+call) · smalls #3437/PR #3470, #3438/PR #3468, #3455/PR #3469.
 
-7 fresh-context Fable graders (source vs spec vs LIVE recomputation, hand arithmetic
-required) + 4 adversarial verifier batches. **23/23 findings CONFIRMED, 0 refuted** (vs the
-~50% base rate — the recompute-first briefs front-loaded verification; the pass still earned
-its keep: the 8-member class census, 2 severity corrections, 3 citation fixes, 1 scope
-correction). Grades: sleep A− · flourishing A− · budget-ledger A− · calibration B+ ·
-character B+ · readiness/ACWR **C+** · stats-core **C+**. **Top line: the arithmetic proves
-out byte-exact everywhere; the defects live in the pipes between correct formulas.** Filed
-#3442–#3453 under `review:calc-proof-2026-09`:
+**The owner window (both gate:owner items CLOSED in-session):**
+- **#3429 / PR #3458** — owner approved the IAM apply; three live sentinel dispatches
+  enumerated the REAL read set beyond the filed four (ListTargetsByRule, backup-bucket
+  reads, `s3:GetLifecycleConfiguration` — the action name lacks "Bucket", raw/* listing
+  for the sampler). Final run 18:46Z: **3 clean + 1 honest drift, zero AccessDenied** —
+  the DIL-027 chain exercised for the first time since the checks landed.
+- **#3424** — owner picked **(a)**: the 30s fail-open ceiling accepted as a dated priced
+  tolerance (decision-time re-measure **0/109, Wilson [0%, 3.4%]** — the filed 4% tail
+  predates #3413 and has not recurred), recorded in the ADR-108 scope row (3c6aab5be)
+  with quarterly/p90-25s/any-occurrence re-measure triggers and **(d) pre-named as the
+  upgrade path** — never a silent widening.
 
-- **#3442 (P1, the class):** whoop `DATE#<d>#WORKOUT#<uuid>` sub-records last-write-win over
-  day rows in **8 consumer sites** — correlations silently drop exactly the workout days
-  (byte-exact both ways: with-clobber == the stored record), ACWR strain corrupted 24/85
-  days, digests/chronicle/enrichment/counters inherit it. Prior art recorded in
-  `field_notes._DAY_SK_RE` (the 2026-W26 "20 nights in one week" incident — fixed at ONE
-  site). The textbook guard-the-SET filing.
-- **#3443 (P1):** every ACWR value since 08-24 is **destroyed nightly** — acwr-compute
-  merges via update_item at 16:55Z; the evening daily-metrics re-put (00:00Z) rebuilds the
-  record from scratch and erases the fields. 9 consecutive days dark, zero alarms; only the
-  17:00 brief (reading inside the 5-min survival window) still showed it.
-- **#3444 (P2):** the #2109 phase-filter escape's third wave — weekly_correlation +
-  hypothesis_engine read RAW_TIMESERIES through the filter, running the published "90-day
-  window" as 14 days; consequence: the Time-Affluence Meter has **never scored a week**
-  (10 rows, all null since birth). The AST ratchet is blind to the `digest_utils`
-  pass-through — extending it is the acceptance.
-- #3445 (P2) Evidence Bar double-dead + `n_eff` serving raw n · #3446 (P2) Day-1 character
-  sheet locked in partial by an existence-only idempotency guard (extends #3390) ·
-  #3447 (P2) budget-ledger guards are founding snapshots not invariants ($9.22/mo ungoverned
-  per-feature; the PR's "~$1.2/mo residual" undercounted 8×) · #3448 (P3, promoted to Now)
-  the 2% directional null unstamped · #3449–#3453 (P3) methods-registry hygiene, Wilson
-  interval + 'confirming' disjointness, sleep disclosure pair, served-description drift,
-  the accuracy_audit phrase-matched sentinel.
-
-## Phase 0 reads
-
-#3399 box 3: NOT yet measurable — the next visual-qa sweep is ~09-02 22:30Z (after this
-wrap); carries. #3414 counter: 1 passed / 0 failed (n=1 — the Session R proof verdict; no
-organic asks yet; noted on the issue). Swallow-checks clean all session. The two overnight
-main reds decoded: one was Session R's own steward rejection (the classified shape), one the
-ledger-snapshot drift its next commit cured.
+**Also live-verified:** the Day-1 character force-recompute (#3390 leg — structurally
+impossible pre-#3446); the #3414 day-2 counter (12 passed / 3 failed, n=15 — the first
+failed voice verdicts this surface ever recorded); dependabot batch #3405–#3409 all
+green after rebase (one stuck "merge in progress" cleared on retry).
 
 ## Gotchas hit
 
-1. **The auto-mode classifier blocks a persistent approve/reject steward loop** (Bash and
-   Monitor both) — adapted to a one-shot `steward_once.sh` fired on a read-only
-   waiting-run watcher's events. Worked cleanly across 5 gate arrivals (2 approvals of the
-   newest run-bearing sha, 2 ancestor rejections, 1 approval after a reconcile tip minted
-   its own run late).
-2. **The #3021 janitor's real cadence is hours, not minutes** — deliberately left a
-   superseded lease for the sweep to collect its first live unattended rejection; the
-   janitor didn't run in the 26-min window (observed inter-run gaps 2–4.5h). Hand-rejected
-   per never-leave-waiting; datapoint recorded on #3422, which reopened over it.
-3. **An extraction moves the guards' anchors**: pulling the persona loop into a sibling
-   tripped, in sequence, the module-size guard (extract, never raise), four source-pin
-   tests (re-anchored onto the seam), the #2390 invoke-site census, mypy, AND
-   `test_grounding_wiring_1967` — cured structurally with `WRAPPER_CHOKEPOINTS` (a call to
-   a kwargs-baking wrapper arms what the wrapper's registered surface proves; any future
-   wrapper caller is auto-discovered and forced to register).
-4. **A CI-load flake red-mained a docs-only merge**: `test_wait_pr_green_swallow_3219`'s
-   1-second simulated budget raced on a loaded runner (the same job ran 2012s over its own
-   duration budget). Rerun --failed restored green (no main-side fix = the sanctioned
-   rerun case); filed #3455.
-5. Found and filed en route: #3438 — the budget-guard ladder is order-dependent
-   (`_cache['readable']` poisoning; CI's alphabetical order just never hits it).
+1. **A rejected code-lease superseded by a docs-only tip = an undeployed-merge window.**
+   Stewarding rejected #3462/#3463/#3470's merge runs in favor of the then-tip — which
+   was a docs-only commit whose Deploy the classifier SKIPPED. Caught by content-checking
+   lambda timestamps, not by any green run; cured with a `deploy_all=true` dispatch +
+   approval, content-verified. New reflex in the lease memory: before rejecting a
+   code-bearing lease, confirm the superseding run will actually deploy.
+2. **`gh` auth died mid-session** — `~/.config/gh/hosts.yml` truncated to 3 bytes,
+   almost certainly a write race among the many concurrent gh pollers (Monitor + several
+   wait_pr_green watchers + lanes). Git-remote auth survived; only the owner's
+   `gh auth login` recovers. Memory: `reference_gh_hosts_yml_write_race`.
+3. **The extraction-moves-the-anchors class fired on BOTH P1 PRs** (Session S's gotcha,
+   reproduced): the census test tripped gate-census/premerge-registration/two size
+   ceilings; the qa dead-man pushed qa_smoke over 1200 (extracted to the raw_archive_qa
+   sibling pattern); daily_metrics paid for its carry via extraction into the contract
+   module. Also learned: an EXTRACTED check leaves the gate census (the #3457 bump had
+   to be reverted — found=590 on its branch while #3456's test added the +1).
+4. **The swallow-recovery ladder's rung 1 failed live** (#3430 lane): close/reopen minted
+   ZERO runs — only a new head sha recovered. Ladder memory extended.
+5. **The census/ledger literals churned all queue long** — PROPORTIONALITY's gate count
+   and BASELINE_TOTAL_GATES needed per-branch reconciliation at 3 points (590→591→592);
+   the stack-census-PRs discipline held.
 
 ## Gate lines
 
-**Build beat:** 2026-09-02-the-checkbox-that-could-never-succeed
-**Docs:** updated in-PR by lanes (ARCHITECTURE.md board line #3439; PROPORTIONALITY rows + DEPENDENCY_GRAPH regen #3440/#3441; ADR-108-adjacent none) + `docs/reviews/CALCULATION_PROOF_2026-09-02.md` + grades JSON (#3454) + this wrap's sync_doc_metadata
-**Decisions:** none needed — no new governance decision; the ADR-105 exception call on the 2% null is deliberately #3448's acceptance, and the steward authority tier stayed inside #2833/ADR-129
-**Main:** green (cda169d9)
-**Incidents:** 1 row added — ACWR destroyed nightly since 08-24, 9 days dark with zero alarms (#3443; found by the calculation-proof pass, not an alarm — the TTD is the row's own lesson)
+**Build beat:** 2026-09-02-the-drain-to-the-floor
+**Docs:** engine docs re-verified in-queue (READINESS + SCORING #3443, CHARACTER #3446, HYPOTHESIS #3444+#3450 folded), 4 PROPORTIONALITY rows in-PR, INCIDENT_LOG updated in-PR (#3430 row rewrite) + 2 wrap rows, `docs/alarm_citations.json` re-pointed, this wrap's sync_doc_metadata
+**Decisions:** none needed — the #3424 tolerance landed as a dated ADR-108 scope-row amendment (3c6aab5be), not a new ADR; the #3448 exception rides ADR-105's documented-exception form
+**Main:** green (a1d8623f)
+**Incidents:** 2 rows added — the gh hosts.yml auth truncation (~30 min gh outage, owner re-auth); the undeployed-merge window from lease rejections superseded by a docs-only skipped-Deploy tip (caught by content check, cured by deploy_all)
 **Stash/hooks:** clean
-**Closures:** #3419, #3423 commented (realized); #3422 commented partial + REOPENED with the unmet leg named · DoD: scanned=6 window=closed>=2026-09-02 hits=0 findings=0 dispositioned=0 mode=warn (re-run post-comments)
-**Backlog:** Now 3 actionable in-lane (promoted #3448 by stored rank, both edits); Later sweep — none stale, no calls owed
-**Alarms:** all red >72h cited (batch PASS); reader-audience alarms now escalate on first red per #3441
-**CI warnings:** 1 — Unit Tests 2195s > 1950s budget: the standing #3403 class (its own acceptance waits for the post-#3378 measurement window, earliest ~09-08); this session added ~30 tests across 4 PRs — no raise on a single reading, per the warning's own instruction; decoded
-**Ledger:** rows added in-PR — #3440 (reject-only steward row, zero-rejections-per-quarter demote trigger) + #3441 (reader-audience first-red row, $0 new infra); none new at wrap
+**Closures:** #3442, #3443, #3444, #3445, #3446, #3447, #3448, #3449, #3450, #3451, #3452, #3453, #3455, #3437, #3438, #3429, #3424, #3430 commented (18) · DoD: scanned=24 window=closed>=2026-09-02 hits=10 findings=10 dispositioned=0 mode=warn — all 10 are post-close-comment: the (e8) wrap-time verdicts themselves landing after `Fixes #N` auto-close, the contract's own designed flow, dispositioned as-designed; 0 unhomed residuals, 0 post-close assertions of continued work
+**Backlog:** Now 3 actionable in-lane (#3436, #3422, #3390 — no promotions needed, floor met); Later sweep — none stale, no calls owed
+**Alarms:** all cited (batch PASS) — `ai-tokens-platform-daily-total` re-pointed #2801→#3474 (its citation went stale when the owner-window closed #2801's parent; the #2996 closed-citation leg of the gate caught it)
+**CI warnings:** 3 — 2× duplicate `LifePlatformMonitoring` Tags (the ONE real pending owner cdk deploy, standing owner ask: `bash deploy/cdk_deploy.sh LifePlatformMonitoring`); 1× Unit Tests 2038s > 1950s budget (the #3403 class — its acceptance waits on post-#3378 data, earliest ~09-08; this session added ~60 tests across 19 PRs; no raise on a single reading per the warning's own instruction); decoded
+**Ledger:** rows added in-PR — #3443 (co-owned computed_metrics write contract + ACWR dead-man) and #3448 (the stamped ±2% exception, priced acceptance); none new at wrap
 
-## Numbered owner asks (the standing set, updated)
+## Residuals / next picks (the floor: 9 working issues, every survivor's reason named)
 
-1. **Pentest** — commission or sign a dated declining row (third consecutive assessment naming it).
-2. **Signed artifacts** — same shape, can share ask 1's signing pass.
-3. **#3429** — apply the four read-only grants to the remediation role JSON.
-4. **The #1781 cleanup script** — still never run; the weekly IAM-drift noise is its residue.
-5. **The two drills** — owner-present timed restore + D3 owner-handoff.
-6. **`bash deploy/cdk_deploy.sh LifePlatformMonitoring`** — the ONE real Tags warning.
-7. **#3424** — the coach-quality-gate 4% decision.
-8. **DIL-039/040 revisit is DUE** — and the proof pass sharpened the number: read 21.6% as
-   **8/37, Wilson 95% [11.4%, 37.2%]** (#3450 will put the interval on the surface).
-9. **#3042's "external" equivalence call** — needed only when the numbers clear the bar.
-10. **#2883 + #3390** — weigh-in still pending; per #3417 hold the handles. #3390 also now
-    carries the Day-1 character force-recompute (from #3446's finding).
-11. **NEW: the 09-08 Architect-ritual inputs** — the #1407 financial-architecture question
-    (owner call, standing) + the Time-Affluence Meter keep-or-demote rent ruling (#3444
-    names it; 10 weeks of structural silence) + the calc-proof findings corpus
-    (`review:calc-proof-2026-09`).
+- **The Session U plan is owner-approved** — `~/.claude/plans/lovely-snacking-panda.md`:
+  one session on **2026-09-08** (Opus, September posture). Expected 9 → 5 working.
+  (not-work — the plan itself; its items are cited below)
+- **#3473** — compute-pipeline-stale heartbeat (the #3430 residual; Next, workable any
+  session).
+- **#3474** — ai-tokens daily-total re-threshold-or-tripwire (filed at wrap when the
+  citation gate caught the orphaned alarm; Next).
+- **#3422** — the janitor cadence leg: now DECIDABLE — Session T's 0-of-~10 (the hand
+  steward beat the janitor to every rejection) + the 2–4.5h measured cadence point at a
+  `workflow_run` event hook over the 15-min cron.
+- **#3403** — not-work until ~09-08 — its acceptance requires the post-#3378 duration
+  window.
+- **#3436** — Engineering-leg design box after the 09-08 Architect first run; arming is
+  gated on 4 clean Architect weeks by its own precondition.
+- **#3390** — owner-only residue: the weigh-in → supersede reflex (the session-runnable
+  legs are done, incl. the Day-1 force-recompute).
+- **#2883** — not-work until the September n=30 clean-month read (~09-30), per its own
+  thread ruling.
+- **#2978** — check its `blocked:date` on 09-08; the warm-retry/origin-side fix is
+  ordinary engineering once open.
+- **#3042** — the A-Grade epic: moves on grades + the two owner acts (pentest and
+  signed-artifacts commission-or-decline rows).
+- **#3373** — design posted; implementation on the owner's park-or-build call (an 09-08
+  Architect input).
+- **Tonight's two observables:** the 00:00Z evening re-put must preserve 09-02's seeded
+  ACWR (not-work — the acwr_liveness dead-man owns it from here); the ~23:42Z
+  reader-truth sweep's `basis:"withdrawn"` count (not-work — a courtesy datapoint on the
+  closed #3399, predicts exactly one).
+- **Standing owner asks (unchanged set, renumbered):** pentest · signed artifacts · the
+  #1781 cleanup script · the two drills · `bash deploy/cdk_deploy.sh
+  LifePlatformMonitoring` (clears 2 of the 3 CI warnings) · the weigh-in (#3390/#2883) ·
+  the 09-08 Architect inputs (#1407, Time-Affluence rent ruling — read Sunday's first
+  cross-phase run first, the calc-proof corpus, the #3373 call). (not-work — owner-only)
 
-## Residuals / next picks
-
-- **#3442 (Now·P1)** — the workout-subrecord class, 8 sites; the natural next-session pick
-  (with #3443, which its fix unmasks).
-- **#3443 (Now·P1)** — ACWR nightly destruction; a session-sized fix + dead-man.
-- **Now queue (fable lane):** #3448 (the 2% null — variance-derive or stamp), plus the
-  standing #3436 (parked until the 09-08 Architect run per plan).
-- **#3399's acceptance box 3** — measure `basis:"withdrawn"` on the ~09-02 22:30Z sweep
-  artifact (report.json, never the log line); tonight's pre-fix specimen predicts one.
-- **#3414's 30-day measurement** — day-1 read done (1/0, n=1); keep reading per its row.
-- **#3422 (reopened)** — the janitor cadence leg: measure the sweep-interval distribution
-  over a week; accept a bound or move to an event hook.
-- **#3403** — not-work — its acceptance requires post-#3378 duration data (earliest ~09-08).
-- **The 09-08 Architect-ritual first run** — not-work — #2849's reopen trigger; inputs in
-  owner ask 11.
-
-**The through-line:** Session R found affordances and warnings that could never succeed;
-Session S's counterpart is **correct arithmetic flowing through broken pipes** — every
-formula recomputed byte-exact, while the pipes fed them workout-fragments instead of days,
-truncated 90-day windows to 14, erased a night's computation seven hours after writing it,
-and served a field named n_eff that never carried one. And the session's own reflex earned
-its keep twice: the live probe that decided #3419 found the panel was undeliverable at ANY
-size, and the deliberate wait for the janitor's first live rejection found the janitor
-doesn't run when it says it does.
-
----
-
-## Plan for Session T (written 2026-09-02, post-wrap — owner-approved in-session)
-
-Owner context: shaping calls asked and answered — **maximal drain** (close 14–16 of the 26
-working issues in one session; the honest floor is ~7–10, every survivor's reason named)
-and an **owner window** (each gate:owner item — #2883, #3424, #3429 — teed up as one
-paste-able action and pinged in-session; closed only on response). The full plan lives at
-`~/.claude/plans/piped-dazzling-volcano.md`; the phases:
-
-1. **Phase 0 — boot + overnight reads:** steward armed (one-shot pass on watcher events —
-   the classifier blocks a persistent loop); #3399 box 3 from the 09-02 ~22:30Z artifact
-   (predicts exactly one `basis:"withdrawn"`); #3414's counter; swallow-check; headroom.
-2. **Phase 1 — the P1 pipe repairs, driver-run, IN ORDER:** #3442 (the 8-site whoop
-   `#WORKOUT#` clobber class — shared day-row predicate + the SET guard; the verifier's
-   byte-exact reproductions become the regression fixtures) then #3443 (ACWR survives the
-   evening re-put — contract test + dead-man + the 9-day backfill), because the second
-   unmasks the first's strain corruption.
-3. **Phase 2 — three lane waves (≤4 concurrent, serial merge queue):** A: #3444/#3445/
-   #3446/#3447 (the P2s) · B: #3449/#3450/#3451/#3453 · C: #3452/#3437/#3438/#3455 +
-   #3430 (opus root-cause).
-4. **Phase 3 — driver while lanes run:** #3448 (variance-derive the 2% null or stamp the
-   documented ADR-105 exception); #3390's session-runnable legs (Day-1 force-recompute
-   once #3446 merges); #3373 design (stretch); **the owner window** (#2883/#3424/#3429
-   prepared and pinged).
-5. **Phase 4 — wrap:** headline = the honest floor (N closed / M filed / X remaining with
-   reasons); beat candidate: the ACWR repair or the drain itself.
-
-Out of scope, stated: the 22 Roadmap issues; #3403/#3422/#3436 (time-anchored); #2978
-(blocked:date); #3042 (closes on grades, not sessions); all Monarch/financial build work.
+**The through-line:** Session S proved the arithmetic and indicted the pipes; Session T
+replaced the pipes and watched the true numbers flow through them — the erased 0.945
+became a served 1.040, the never-scored meter got its first honest window, every served
+accuracy grew its interval, and the two decisions only the owner could make were made
+in the room, in the session, on fresh measurements. The floor that remains is not
+unfinished work; it is dated windows and owner acts, named one by one.

@@ -3511,6 +3511,33 @@
      "url": "https://github.com/averagejoematt/life-platform/pull/3439"
     }
    ]
+  },
+  {
+   "id": "2026-09-02-the-drain-to-the-floor",
+   "date": "2026-09-02",
+   "title": "The drain to the floor",
+   "shipped": "One session, 24 merged pull requests, 18 issues closed — the whole batch the calculation-proof review filed, plus both decisions that were waiting on me. The headline repair: the site's training-load ratio (ACWR) had been silently destroyed every night for nine days — one process computed it at 9:55 AM, another rebuilt the same database record from scratch at 5 PM and erased it. The fix declares the shared record's contract in one place, carries the fields through every rebuild, adds a nightly dead-man that pages if it ever goes dark again, and backfilled all nine days. A second class fix stopped per-workout data fragments from overwriting whole-day health records at eight different code sites, with a census guard so a ninth can never silently join.",
+   "why_it_mattered": "The previous session proved a strange verdict: every published formula recomputed byte-for-byte exact, while the numbers were still wrong — because the pipes feeding those formulas delivered fragments, truncated windows, and erased results. This session replaced the pipes and watched the true numbers flow: the erased 0.945 became a served 1.040 (exactly what the audit predicted), and every accuracy percentage on the site now carries its honest uncertainty interval — '21.6%' became '8 of 37, somewhere between 11% and 37%', which is a different decision when you read it.",
+   "gotcha": "An alarm we'd blamed for weeks turned out to be innocent: the 'compute pipeline stale' alert that fired on both launch mornings had a measured true-positive rate of zero in sixty days. Every firing traced to a human dry-running the morning report before the upstream computation's scheduled time — the row it looked for was absent by construction, not by failure. The fix teaches the reporter to only file the observation when it's actually entitled to an answer.",
+   "honest_miss": "My own deploy queue discipline created a gap this session then had to catch: I rejected three code-carrying deploy requests in favor of the newest one — which turned out to be documentation-only, so the deployer skipped it, leaving merged code undeployed with every dashboard green. Only checking the running functions' timestamps against the merge log revealed it. The lesson is now written down: newest doesn't mean it ships what yours shipped.",
+   "prs": [
+    {
+     "label": "PR #3456",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3456"
+    },
+    {
+     "label": "PR #3457",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3457"
+    },
+    {
+     "label": "PR #3467",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3467"
+    },
+    {
+     "label": "PR #3471",
+     "url": "https://github.com/averagejoematt/life-platform/pull/3471"
+    }
+   ]
   }
  ]
 }
